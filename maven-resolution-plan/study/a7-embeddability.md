@@ -1,0 +1,134 @@
+# A7 — Embeddability, footprint, locking, failure caching, performance of embedded Maven resolution
+
+Scope: facts for embedding real Maven resolution (maven-resolver + model builder) inside rewrite-maven.
+Sources: local clones at `/Users/jon/Projects/github/apache/maven-resolver` (2.0.21-SNAPSHOT master),
+`/Users/jon/Projects/github/apache/maven-4` (4.1.0-SNAPSHOT master), `/Users/jon/Projects/github/apache/maven-3.9.x`
+(3.9.17-SNAPSHOT), and the rewrite worktree. All claims cite file(:line).
+
+---
+
+## 0. Version / GAV / JDK facts (Q6)
+
+| Thing | Value | Citation |
+|---|---|---|
+| Resolver master version | **2.0.21-SNAPSHOT** | `maven-resolver/pom.xml` `<version>` |
+| Resolver core JDK target | **Java 8** | `maven-resolver/pom.xml:98` `<javaVersion>8</javaVersion>` |
+| Per-module JDK overrides | supplier-mvn4 = 17 (`maven-resolver-supplier-mvn4/pom.xml` `<javaVersion>17`), transport-jdk11 = 11, transport-jdk8 = 8 (`maven-resolver-transport-jdk-parent/*/pom.xml`), named-locks-ipc = 17 (`maven-resolver-named-locks-ipc/pom.xml:35`), transport-jetty = 17 (Jetty 12, `pom.xml:113` jettyVersion 12.1.10) | as noted |
+| Maven 4 master version | **4.1.0-SNAPSHOT**, **Java 17** required | `maven-4/pom.xml` version; `:131` `<javaVersion>17` |
+| Maven 4 ships resolver | **2.0.20** | `maven-4/pom.xml:166` `<resolverVersion>2.0.20` |
+| Maven 3.9.x version | **3.9.17-SNAPSHOT**, **Java 8** | `maven-3.9.x/pom.xml:31,127` |
+| Maven 3.9 ships resolver | **1.9.27** | `maven-3.9.x/pom.xml:146` |
+| Supplier alignment | supplier-mvn3 pins Maven **3.9.16**; supplier-mvn4 pins Maven **4.0.0-rc-5** | `maven-resolver/pom.xml:115-116` |
+| maven-model-builder 3.9.x version | 3.9.16/3.9.17-SNAPSHOT (same reactor as Maven) | `maven-3.9.x/pom.xml` |
+| **rewrite bytecode target** | **Java 8** (class files stamped major version 52) | build plugin `rewrite-build-gradle-plugin-2.19.7.jar` contains `MarkClassfileWithLanguageLevel8DoLast` whose bytecode does `bipush 52`; corroborated by `rewrite-maven/build.gradle.kts` comment "Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only" |
+| rewrite-maven today | **no resolver/aether/model-builder dependency at all** (fully custom); only a stale comment references maven-resolver (`rewrite-maven/build.gradle.kts:39`) | grep over `*.gradle.kts` |
+
+**Consequence:** only the **supplier-mvn3 stack runs on Java 8**. The entire Maven 4 stack (and supplier-mvn4) requires **Java 17**. If rewrite keeps its Java 8 runtime target, the Maven-3.9-flavored stack is the only option; the Maven 4 stack becomes viable only in a JDK-17+ loader or if rewrite raises its floor.
+
+---
+
+## 1. Dependency footprint (Q1)
+
+### (a) supplier-mvn3 stack (resolver 2.x + Maven 3.9 provider/model-builder)
+
+`maven-resolver-supplier-mvn3/pom.xml` declares exactly:
+- resolver: `maven-resolver-api`, `-util`, `-spi`, `-named-locks`, `-impl`, `-connector-basic`, `-transport-file`, `-transport-apache`
+- `org.apache.maven:maven-resolver-provider:3.9.16` with **exclusions: javax.inject, org.eclipse.sisu.inject, guice, asm**
+- `org.apache.maven:maven-model-builder:3.9.16` with **exclusions: javax.inject, jakarta.inject-api, sisu.inject, sisu.plexus**
+- `slf4j-api`
+- enforcer rule **bans javax.inject** outright (`ban-javax.inject` execution in the same pom)
+
+Transitives of the two Maven artifacts (from `maven-3.9.x/maven-resolver-provider/pom.xml` and `maven-3.9.x/maven-model-builder/pom.xml` dependency sections):
+- provider → `maven-model`, `maven-model-builder`, `maven-repository-metadata`, resolver api/spi/util/impl, `plexus-utils`; **guice/guava/failureaccess are `<optional>true</optional>`** (not pulled transitively)
+- model-builder → `plexus-interpolation`, `maven-model`, `maven-artifact`, `maven-builder-support` (sisu/asm are excluded by the supplier)
+- `plexus-utils` pinned to **3.6.1** (`maven-resolver/pom.xml:117` plexusUtils3Version)
+- transport-apache → `httpclient` 4.x (excluding commons-logging), `httpcore`, `commons-codec`, `jcl-over-slf4j` (runtime); javax.inject is `provided`+`optional` (`maven-resolver-transport-apache/pom.xml`)
+
+**Full runtime list (~20 jars): 8 resolver jars + 6 maven jars (resolver-provider, model-builder, model, artifact, builder-support, repository-metadata) + plexus-utils + plexus-interpolation + httpclient + httpcore + commons-codec + jcl-over-slf4j + slf4j-api. Zero DI container (no sisu, no guice, no guava, no javax.inject jar), zero commons-lang, no wagon, no ASM. All Java 8.**
+
+DI annotations: resolver impl classes still carry `javax.inject.@Named/@Inject` in bytecode (e.g. `DefaultUpdateCheckManager.java:21-23`) but the jar is absent at runtime — the JVM silently ignores annotation classes that are missing, and the supplier wires everything with `new` (below), so this is inert.
+
+OSGi/plexus/sisu metadata: resolver jars are OSGi bundles (bnd `Bundle-SymbolicName` instructions in supplier poms); Maven 3.9 jars carry `META-INF/sisu` component indexes generated by sisu-maven-plugin (`maven-3.9.x/pom.xml:594`, model-builder pom:120). Both are **inert for a plain-classpath embedder**; the sisu index only matters if the jar lands inside a Sisu-scanned container (i.e., a Maven plugin realm) — where it can auto-register duplicate components. Relocation (below) also neutralizes this.
+
+### (b) supplier-mvn4 / Maven 4 stack
+
+`maven-resolver-supplier-mvn4/pom.xml`: same 8 resolver modules + `maven-resolver-provider:4.0.0-rc-5` + `maven-model-builder:4.0.0-rc-5` (same exclusion set), `<javaVersion>17`.
+In Maven 4 those two are **compat modules** (`maven-4/compat/` contains maven-model-builder and maven-resolver-provider — i.e., the deprecated Maven-3 API surface). `maven-4/compat/maven-resolver-provider/pom.xml` runtime deps: `maven-api-annotations, maven-api-xml, maven-api-metadata, maven-api-spi, maven-api-core, maven-xml, maven-support, maven-model, maven-model-builder, maven-repository-metadata`, resolver api/spi/util/impl/connector-basic/transport-file/transport-apache, `slf4j-api`, `plexus-utils`, `plexus-xml` (sisu/guice/javax.inject all `provided`). `compat/maven-model-builder/pom.xml` adds `maven-api-model, maven-artifact, maven-builder-support, plexus-interpolation`.
+
+The **new-API alternative** (no compat layer): `org.apache.maven:maven-impl` + `org.apache.maven.impl.standalone.ApiRunner` ("running Maven API in a standalone mode", `@since 4.0.0` — `maven-4/impl/maven-impl/src/main/java/org/apache/maven/impl/standalone/ApiRunner.java`; a standalone `RepositorySystemSupplier` sits next to it). `impl/maven-impl/pom.xml` runtime deps: `maven-api-*` (core, spi, metadata, xml, toolchain, di, annotations, model, settings), `maven-di` (Maven's own tiny DI), `maven-support`, `maven-xml`, **woodstox-core + stax2-api** (StAX), `slf4j-api`, resolver api/spi/util/impl/named-locks/connector-basic, `plexus-sec-dispatcher`. **No plexus-utils, no plexus-interpolation, no sisu/guice/guava.**
+
+**Verdict:** jar-count is similar (~20 either way). The Maven 4 new-impl stack is architecturally cleanest (immutable model API, no plexus-utils), but requires **Java 17** and drags Woodstox. The supplier-mvn3 stack is the leanest thing that runs on **Java 8**, and it is the artifact Apache explicitly maintains for embedders ("A helper module to provide RepositorySystem instances", supplier pom description).
+
+---
+
+## 2. Package / classpath collision analysis (Q2)
+
+- **Packages did NOT move.** Resolver 2.x source lives under `org/eclipse/aether/...` (`maven-resolver-api/src/main/java/org/eclipse/aether/` — directory listing). Coordinates have been `org.apache.maven.resolver:maven-resolver-*` since 1.x. `upgrading-resolver.md` describes 1.x→2.x as binary-compatible "smooth sailing" unless you used deprecated classes.
+- **Artifact renames in 2.x:** `maven-resolver-transport-http` → `maven-resolver-transport-apache`; the old single `maven-resolver-supplier` split into `-supplier-mvn3` / `-supplier-mvn4`; new modules: `transport-jdk` (Java 11+), `transport-jetty` (17), `transport-minio`, `maven-resolver-named-locks-ipc` (@since 2.0.1).
+- **Inside a Maven process (rewrite-maven-plugin):** Maven's core realm **exports the resolver packages to every plugin, parent-first**: `maven-3.9.x/maven-core/src/main/resources/META-INF/maven/extension.xml:59-73` exports `org.eclipse.aether.*` including `org.eclipse.aether.internal.impl` and `.util`; lines 154-155 export the artifacts `org.apache.maven:maven-model` and `maven-model-builder`; line 35 exports the `org.apache.maven.model` package. Maven 4 does the same (`maven-4/impl/maven-core/src/main/resources/META-INF/maven/extension.xml:62-78`, plus `org.eclipse.aether.scope`/`.transform`). **A plugin therefore cannot load its own versions of these classes un-relocated** — it would compile against resolver 2.0.x but execute against Maven 3.9's exported 1.9.27 classes → `NoSuchMethodError`-class skew. Standard remedies, in practice: (1) **shade + relocate** `org.eclipse.aether`, `org.apache.maven.model(.building)`, `org.apache.maven.repository.internal`, `org.codehaus.plexus` into a private namespace (what plugins that embed a resolver do); (2) use the host Maven's own injected `RepositorySystem` when running inside Maven (zero conflict, but then behavior varies by host Maven version — exactly the divergence Jon wants to kill); (3) core extensions (not applicable to a library).
+- **Inside Gradle:** Gradle does not export aether, but build-script classpaths are flat per-project; other plugins may carry their own resolver. Same remedy — relocation — which the rewrite ecosystem already practices in rewrite-gradle-plugin.
+- **Maven version → resolver version:** 3.9.17 → 1.9.27 (`maven-3.9.x/pom.xml:146`); Maven 4 master → 2.0.20 (`maven-4/pom.xml:166`); resolver's supplier-mvn4 is aligned to Maven 4.0.0-rc-5 (`maven-resolver/pom.xml:116`).
+
+---
+
+## 3. Interprocess locking (Q3 / Jon concern #3)
+
+- **Named-locks providers** (`maven-resolver-named-locks/.../named/providers/`): `FileLockNamedLockFactory` (OS advisory file locks, interprocess), `LocalReadWriteLockNamedLockFactory`, `LocalSemaphoreNamedLockFactory`, `NoopNamedLockFactory`. Extra modules: named-locks-hazelcast, named-locks-redisson (multi-host), and **named-locks-ipc** (@since 2.0.1, Java 17): forks a small IPC lock **server process** that all Maven/resolver processes on the machine talk to over a socket (`IpcServer.java`, config `aether.named.ipc.nofork`, `aether.named.ipc.idleTimeout`).
+- **Resolver 2.x DEFAULT is interprocess-safe:** `DefaultNamedLockFactorySelector.java:64` → `DEFAULT_FACTORY_NAME = FileLockNamedLockFactory.NAME` ("file-lock"), name mapper default `file-gaecv` (`NamedLockFactoryAdapterFactoryImpl.java:56`), max lock wait 900 s (`DefaultNamedLockFactorySelector.java:76` DEFAULT_LOCK_WAIT_TIME). So **Maven 4 / resolver 2.x guards ~/.m2 across processes out of the box** — Jon's 2020 complaint about no interprocess locking is fixed there.
+- **Maven 3.9 / resolver 1.9.x default is still JVM-local** (rwlock-local + gav mapper; the 2.x docs still describe "multi-threaded, in JVM locking (the default)" — `local-repository.md` "Shared Access" section); file-lock is opt-in via `-Daether.syncContext.named.factory=file-lock`. The default flipped to file-lock in the 2.x line.
+- Sidecar metadata writes are additionally self-locking: `LegacyTrackingFileManager` takes `java.nio.channels.FileLock`s when writing `.lastUpdated`/`_remote.repositories` (`LegacyTrackingFileManager.java:28-29,69,101`; comment at :43 notes this locking predates SyncContext and must remain); `NamedLocksTrackingFileManager` (@since 2.0.17) is the named-locks variant.
+- **Is a LocalRepositoryManager optional? NO.** `DefaultRepositorySystem.validateSession` (`DefaultRepositorySystem.java:483-486`) hard-fails without one; the supplier's `SessionBuilderSupplier` javadoc repeats "At least LRM must be set on builder" (`SessionBuilderSupplier.java` get() javadoc). Shipped implementations: **enhanced** (production; origin-scoped via `_remote.repositories`, optional split-by-origin/installed/snapshot — `local-repository.md`) and **simple** (tests). There is **no in-memory LRM**; artifacts surface as `Path`/`File`, and connector-basic writes real files. Practical minimum for "no ~/.m2 pollution": point the LRM at a private/temp directory. The seam is pluggable (`LocalRepositoryManagerFactory` SPI, `RepositorySystemSupplier.createLocalRepositoryProvider`:535), so rewrite's artifact cache can be a custom LRM — but it must produce filesystem paths.
+- **In-process caches are separately pluggable:** the session `RepositoryCache` (set it to `DefaultRepositoryCache` or your own); `DataPool` interning + descriptor pools "live across session (if session carries non-null RepositoryCache)" (`DataPool.java:138-153`, reads `session.getCache()` at :173) — i.e., **sharing one RepositoryCache instance across many sessions gives cross-session POM/descriptor reuse in memory**, a direct hook for rewrite's pluggable POM cache. Maven itself does `session.setCache(request.getRepositoryCache())` (`maven-3.9.x/.../DefaultRepositorySystemSessionFactory.java:160`).
+
+---
+
+## 4. Failure caching (Q4 / Jon concern #2)
+
+Mechanics (`DefaultUpdateCheckManager.java`):
+- Per artifact, a sidecar properties file `<artifact>.lastUpdated` (`UPDATED_KEY_SUFFIX`, :66); per metadata, `resolver-status.properties` (:355-361). Keys: normalized repo URL (+ mirrored URLs for repo managers) → `.error` entry; **empty value = "not found" (404), non-empty = transfer error message** (:68-70, getDataKey :363-380); transfer-error entries are additionally keyed by proxy+auth digest+repo id+URL (`getRepoKey` :395-410), so credential changes invalidate them.
+- Decision path (`checkArtifact` :137-208): if a cached error exists and the update policy window hasn't elapsed, the error policy decides: not-found is replayed as a cached `ArtifactNotFoundException` if `CACHE_NOT_FOUND` is set; transfer errors replayed only if `CACHE_TRANSFER_ERROR` is set (`getCacheFlag` :210-216, exception text literally says "This failure was cached in the local repository..." :219-240).
+- **Per-session dedupe:** `aether.updateCheckManager.sessionState` default **"enabled"** (:90-93) → each artifact/metadata+repo is checked **at most once per session** (`isAlreadyUpdated`), with the recorded error replayed for later requests in the same session (:186-192).
+- **DataPool** additionally caches artifact descriptors (including BAD_DESCRIPTOR markers) per session/RepositoryCache, so a broken POM is not re-fetched within a run.
+
+Policy defaults:
+- Maven 3.9 CLI: `request.setCacheNotFound(true); request.setCacheTransferError(false);` (`maven-3.9.x/maven-embedder/.../MavenCli.java:1423-1424`) → session gets `new SimpleResolutionErrorPolicy(CACHE_NOT_FOUND, CACHE_NOT_FOUND)`; the metadata side is always OR-ed with CACHE_NOT_FOUND (`DefaultRepositorySystemSessionFactory.java:184-190`).
+- Maven 4: identical wiring (`maven-4/impl/maven-cli/.../MavenInvoker.java:267-268` — `-canf` CLI flag defaults true, transfer-error caching hardcoded false; `maven-4/impl/maven-core/.../DefaultRepositorySystemSessionFactory.java:180-186`).
+- The resolver's own doc states it flatly (`local-repository.md`, "Error Handling and Caching"): *"In Maven 3 resolver errors of type 1 [not found] are always cached and the ones of type 2 [any other error: auth, timeout] are never cached. With Maven 4 (MNG-7653) the caching of type 1 errors can be disabled with `-canf false`... the caching of type 2 errors is disabled without any way to override that policy even in Maven 4."*
+
+**Was Jon right in ~2020?** Split verdict. For **missing artifacts (404)**: wrong — Maven has cached those persistently per-repo since long before 2020 (the `.lastUpdated` machinery). For **unreachable/dead repositories (connect timeouts, DNS, auth)**: right, and **still right today** — Maven's CLI never caches transfer errors across invocations, and Maven 4 removed even the knob. Within one invocation the damage is bounded (sessionState dedupes per artifact+repo, but a dead repo still eats one connect-timeout per distinct artifact). **What changed since 2020 that helps:** (1) as an embedder rewrite sets the policy itself — `session.setResolutionErrorPolicy(new SimpleResolutionErrorPolicy(CACHE_ALL))` turns on transfer-error caching programmatically, no custom code; update-policy interval (`interval:X`) tunes the retry TTL; (2) **Remote Repository Filtering** (resolver 1.9.0, `remote-repository-filtering.md`): prefixes/groupId filters stop the "ordered loop leaks requests to N-1 wrong repos" behavior entirely — the doc names the exact slow-build/leak problem Jon observed.
+
+---
+
+## 5. Performance features (Q5)
+
+- **BF collector is the DEFAULT in resolver 2.x**: `DefaultDependencyCollector.java:60-61` `DEFAULT_COLLECTOR_IMPL = BfDependencyCollector.NAME`; the javadoc (:48-52) says df suits small/medium projects, **bf better for huge graphs**. (Resolver 1.9/Maven 3.9 default remained `df`; bf is `-Daether.dependencyCollector.impl=bf`.) No benchmark docs are in the repo; the guidance is the quoted javadoc ("Experiment and come back to us").
+- **Skipper**: BF's `DependencyResolutionSkipper` defaults ON — `DEFAULT_SKIPPER = VERSIONLESS_SKIPPER` (GACE key) (`BfDependencyCollector.java:104-117`, selection logic :160-174); modes: versionless/versioned/none.
+- **Parallel descriptor (POM) prefetch**: BF runs a `ParallelDescriptorResolver` over a smart executor, `aether.dependencyCollector.bf.threads` default **5** (`BfDependencyCollector.java:125-134`, pool built at :177-182, async submit `resolveArtifactDescriptorAsync` :219).
+- **Parallel metadata**: `aether.metadataResolver.threads` default **4** (`DefaultMetadataResolver.java:92-94,312`).
+- **Parallel file downloads**: connector-basic pool `aether.connector.basic.threads` default **5** (`BasicRepositoryConnector.java:154-163`).
+- **Connection pooling** (transport-apache/httpclient 4.x): `aether.transport.http.maxConnectionsPerRoute` default **50** (`ConfigurationProperties.java:420-427`); `connectTimeout` 30 s (:225), `requestTimeout` 1800 s (:242).
+- **HTTP/2**: `transport-jdk` (Java 11+, `java.net.http`) — `aether.transport.jdk.httpVersion`, default `HTTP_1_1`, `HTTP_2` opt-in (`JdkTransporterConfigurationKeys.java:43-45`); `transport-jetty` (Java 17) prefers H2 over HTTPS (`JettyTransporter.java:430-436`). transport-apache is HTTP/1.1 only.
+- **Checksums**: default algorithms `"SHA-1,MD5"` per repo layout (`Maven2RepositoryLayoutFactory.java:72`), configurable via `aether.checksums.algorithms` (supports SHA-256/512); checksum policy warn/fail/ignore per repo; checksum extractor strategies can read checksums from response headers (avoiding the extra `.sha1` GET) — all wired in the supplier (`RepositorySystemSupplier.createChecksumExtractorStrategies`:689).
+- **Maven 4 model builder parallelism**: `DefaultModelBuilder` builds reactor models on a `PhasingExecutor` with parallelism `cores/2+1` capped at `cores` (`maven-4/impl/maven-impl/.../DefaultModelBuilder.java:393-407,815-822`). (Maven 3.9's model builder is single-threaded per model; thread-safe for concurrent calls.)
+- **POM-only resolution: yes, first-class.** The resolver's own doc: *"in 'collect' step, while the graph is being built, Maven uses only POMs... it will download **the POMs only**"* (`common-misconceptions.md`, Misconception No1). Code: descriptor reading resolves only the `.pom` artifact (`maven-3.9.x/.../DefaultArtifactDescriptorReader.java:240-241` builds an `ArtifactRequest(pomArtifact, ...)`); jars are fetched only by the separate resolve step. So `RepositorySystem.collectDependencies()` is exactly rewrite's "resolution without artifacts" — I/O cost = POMs (+ `maven-metadata.xml` for ranges/SNAPSHOTs), each parsed with the real model builder and cached via DataPool/ModelCache.
+
+---
+
+## 6. Leanest viable embedding recipes
+
+**Stack A — Java 8 compatible (recommended given rewrite's Java 8 bytecode target):**
+single dependency `org.apache.maven.resolver:maven-resolver-supplier-mvn3:2.0.x`, which transitively pins:
+`maven-resolver-{api,util,spi,named-locks,impl,connector-basic,transport-file,transport-apache}:2.0.x`,
+`org.apache.maven:{maven-resolver-provider,maven-model-builder,maven-model,maven-artifact,maven-builder-support,maven-repository-metadata}:3.9.16`,
+`plexus-utils:3.6.1`, `plexus-interpolation`, `httpclient/httpcore/commons-codec/jcl-over-slf4j`, `slf4j-api`.
+Instantiate `new RepositorySystemSupplier().get()` + `SessionBuilderSupplier` — pure `new`-based wiring (RepositorySystemSupplier.java is 1193 lines with ~60 `protected create*()` extension points: transports, LRM provider, update-check manager, named-lock factories, trusted-checksums sources, remote-repository filters, etc.), **no plexus/sisu/guice/OSGI at runtime**. Swap `transport-apache` for `transport-jdk` if the runtime JVM is 11+ (HTTP/2-capable, zero Apache HTTP deps).
+
+**Stack B — Java 17 (Maven 4):** either `maven-resolver-supplier-mvn4` (compat model-builder, closest drop-in to Stack A) or `org.apache.maven:maven-impl` + `ApiRunner.createSession()` (new immutable API; adds woodstox/stax2/maven-di/plexus-sec-dispatcher; sheds plexus-utils/interpolation). Note `maven-model-builder`/`maven-resolver-provider` live in Maven 4's `compat/` tree — the Maven-3-shaped API is already deprecated upstream; long-term the new `maven-api-*`/`maven-impl` surface is where fixes land.
+
+**Either stack must be shaded/relocated** in rewrite-maven (or at least in the plugin distributions), because `rewrite-maven` runs inside Maven processes whose core realm force-exports `org.eclipse.aether.*` and `maven-model(-builder)` classes to plugins (extension.xml facts above), and inside Gradle where other plugins may carry conflicting resolver versions.
+
+## 7. Frank verdict on Jon's original three reasons
+
+1. **"Maven was hard to invoke programmatically (aether/wagon/OSGI/plexus baggage)" — solved upstream.** The supplier modules exist precisely for this: no wagon, no plexus container, no sisu/guice, DI annotations inert, one class of manual wiring with protected overrides. This reason no longer justifies a custom algorithm.
+2. **"Maven doesn't cache inaccessibility" — he was half right, and the half that's right is still true by default** (transfer errors never cached across CLI invocations; Maven 4 hard-codes that). But an embedder controls `ResolutionErrorPolicy` per session — one line enables full failure caching with TTL via update policy — and RRF + session-state dedupe + DataPool eliminate most redundant dead-repo traffic within a run. **No custom resolution algorithm needed; only session configuration.**
+3. **"No interprocess locking, wanted pluggable caches" — solved for locking in resolver 2.x** (file-lock named locks are the default; hazelcast/redisson/ipc available). **Pluggable caches are partially solved:** POM/descriptor caching has a clean in-memory seam (shared `RepositoryCache` + `ModelCacheFactory` + DataPool) and artifact storage has an SPI seam (`LocalRepositoryManagerFactory`), but a session **must** have a file-backed-shaped LRM and artifacts must exist as real paths — rewrite's RocksDB-style POM cache would map onto RepositoryCache/a custom LRM rather than replace the local repo concept. The remaining genuinely custom work is (a) that cache adapter, (b) the conversion layer into `org.openrewrite.maven.tree.MavenResolutionResult`, and (c) relocation packaging.

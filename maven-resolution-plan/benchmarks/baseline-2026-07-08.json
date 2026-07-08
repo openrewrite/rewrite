@@ -1,0 +1,253 @@
+{
+  "generated": "2026-07-08",
+  "harness": "maven-resolution-plan/spike/benchmark (parameterized: -Pcorpus/-PmaxModules/-PleafModule/-PskipCold/-PlocalRepo)",
+  "environment": {
+    "machine": "Mac16,7 (Apple Silicon), 14 cores, 24 GB RAM, macOS Darwin 25.2.0",
+    "benchJvm": "Eclipse Temurin 17.0.6 (separate JVM per engine via Gradle JavaExec)",
+    "heap": "-Xms2g -Xmx2g (identical both engines)",
+    "gradle": "9.5.1",
+    "versions": {
+      "old.rewrite-maven": "8.86.1",
+      "old.rewrite-core": "8.86.1",
+      "new.maven-resolver": "2.0.20 (maven-resolver-supplier-mvn3 + api/util/impl/connector/transports)",
+      "new.maven-model-builder": "3.9.16",
+      "new.rewrite-core (HttpSender)": "8.86.1"
+    },
+    "corpora": {
+      "apache/maven@maven-3.9.16": "15-module reactor (full)",
+      "apache/camel@camel-4.4.0": "548 non-src reactor poms; tiers 50/150/400 via Corpus.selectSubtree (all 47 pom-packaging scaffolding modules + path-sorted artifact leaves; caps are strict supersets)"
+    }
+  },
+  "methodology": {
+    "warm": "median of 7 measured iterations after 2 warm-up full-reactor builds; shared caches (OLD: InMemoryMavenPomCache; NEW: RepositoryCache+ModelCache), fresh session/ctx per iteration; requests(last iter)=0 for OLD, ~6 residual failed-lookup probes/iter for camel NEW (fresh session re-probes non-existent poms)",
+    "loop": "one leaf module re-resolved x50 against warm caches (3 warm-up); median per-iteration; same leaf pinned for both engines per tier (loopLeaf field)",
+    "cold": "apache/maven only (single live-network shot); skipped for camel tiers (bench.skipCold) - warm scaling is the question, live-network over thousands of poms is disproportionate",
+    "modelCacheClones": "CountingModelCache counts cache hits per tag during ONE additional warm full-reactor build; Maven 3.9 DefaultModelBuilder deep-clones on every RAW hit (Model.clone) and IMPORT hit (DependencyManagement.clone), so hits == clones",
+    "engines": {
+      "old": "released rewrite-maven resolution (MavenParser, all four scopes)",
+      "new_n1": "raw pipeline, one verbose collect (test scope) per pom + effective model build",
+      "new_n4": "raw pipeline, four per-scope collects per pom (apples-to-apples with OLD's four-scope work)"
+    },
+    "notes": [
+      "Machine suspended (laptop lid) twice during the session; spread audit over all recorded tiers showed no suspend artifacts in measured phases (all warm max/min <= 1.17). camel OLD-400 was suspended during its unmeasured network warm-up; killed and re-run fresh to completion.",
+      "RE-MEASURED: camel OLD tier 150. The first OLD-150 measurement (warm 4756 ms, loop 9.9 ms) was invalid for two compounding reasons: (a) methodology inconsistency - it alone pointed the local repository at the resolver-populated repo (a warm-up shortcut experiment); rewrite-maven treats the local repo as a file:// repository, so every warm iteration paid thousands of local file reads that OLD-50/OLD-400 (empty local repo) did not - the persistent 2x inflation of the 5 ms loop metric on the same leaf (9.9 vs 4.9 ms) is the mechanical fingerprint; (b) it was recorded near a machine-suspend window. Re-run under the standard empty-local-repo methodology: warm 2016.4 ms, loop 4.731 ms - restoring OLD tier monotonicity (1177 -> 2016 -> 4016 ms). Recorded numbers are from the re-run; all OLD camel tiers are methodologically identical (empty local repo, unmeasured network warm-up, in-memory pom cache serving measured iterations at requests=0).",
+      "Engine pairing per tier is guaranteed by construction: both engines run the same Corpus.selectSubtree from the shared common source set on the same corpus path; every RESULT line records modules= and both engines' LOOP lines record the same leaf (asserted at JSON-assembly time). NEW full-548 has no OLD counterpart by design (see next note).",
+      "camel OLD tiers 150 and 400 each had 2 parse failures (poms yielding no resolution result; NEW built all models at every tier); counts reported as measured.",
+      "camel tier 50 loop leaf is components/camel-debezium/camel-debezium-common (deterministic deepest-path fallback; tier 50 = 47 scaffolding poms + 3 archetypes, no jar component in tier). Tiers >=150 pin components/camel-activemq. Loop comparisons are valid within a tier, not across camel tiers 50->150.",
+      "OLD full-548 tier skipped: OLD pays a 20-40 min unmeasured serial network warm-up per tier (rewrite-maven does not persist poms to a local repo) and the OLD curve already has 4 points; NEW full-548 included (the ModelCache scaling deliverable).",
+      "graphNodes counts differ by design between engines: OLD = winner-only resolved deps summed over 4 scopes; NEW-N1 = verbose graph (retained conflict losers), one scope; NEW-N4 = verbose nodes summed across 4 overlapping scope subgraphs."
+    ]
+  },
+  "results": {
+    "apache/maven@maven-3.9.16": {
+      "full-15": {
+        "old": {
+          "warmMedianMs": 103.6,
+          "warmSpread": {
+            "minMs": 101.5,
+            "maxMs": 106.7
+          },
+          "loopMedianMs": 9.865,
+          "modules": 15,
+          "graphNodes": 904,
+          "modelCacheRawClones": null,
+          "modelCacheImportClones": null,
+          "loopLeaf": "maven-core/pom.xml",
+          "coldWallMs": 11399.1
+        },
+        "new_n1": {
+          "warmMedianMs": 13.7,
+          "warmSpread": {
+            "minMs": 12.3,
+            "maxMs": 17.1
+          },
+          "loopMedianMs": 1.423,
+          "modules": 15,
+          "graphNodes": 680,
+          "modelCacheRawClones": 44,
+          "modelCacheImportClones": 15,
+          "loopLeaf": "maven-core/pom.xml",
+          "coldWallMs": 5536.7
+        },
+        "new_n4": {
+          "warmMedianMs": 24.8,
+          "warmSpread": {
+            "minMs": 22.5,
+            "maxMs": 28.3
+          },
+          "loopMedianMs": 2.853,
+          "modules": 15,
+          "graphNodes": 2222,
+          "modelCacheRawClones": 44,
+          "modelCacheImportClones": 15,
+          "loopLeaf": "maven-core/pom.xml",
+          "coldWallMs": 5581.7
+        }
+      }
+    },
+    "apache/camel@camel-4.4.0": {
+      "50": {
+        "old": {
+          "warmMedianMs": 1176.7,
+          "warmSpread": {
+            "minMs": 1171.1,
+            "maxMs": 1207.1
+          },
+          "loopMedianMs": 6.242,
+          "modules": 50,
+          "graphNodes": 16109,
+          "modelCacheRawClones": null,
+          "modelCacheImportClones": null,
+          "loopLeaf": "components/camel-debezium/camel-debezium-common/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n1": {
+          "warmMedianMs": 1036.3,
+          "warmSpread": {
+            "minMs": 1000.6,
+            "maxMs": 1175.7
+          },
+          "loopMedianMs": 1.362,
+          "modules": 50,
+          "graphNodes": 19117,
+          "modelCacheRawClones": 181,
+          "modelCacheImportClones": 193,
+          "loopLeaf": "components/camel-debezium/camel-debezium-common/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n4": {
+          "warmMedianMs": 2157.3,
+          "warmSpread": {
+            "minMs": 2129.1,
+            "maxMs": 2309.8
+          },
+          "loopMedianMs": 2.808,
+          "modules": 50,
+          "graphNodes": 68224,
+          "modelCacheRawClones": 181,
+          "modelCacheImportClones": 193,
+          "loopLeaf": "components/camel-debezium/camel-debezium-common/pom.xml",
+          "coldWallMs": null
+        }
+      },
+      "150": {
+        "old": {
+          "warmMedianMs": 2016.4,
+          "warmSpread": {
+            "minMs": 1970.8,
+            "maxMs": 2303.0
+          },
+          "loopMedianMs": 4.731,
+          "modules": 150,
+          "graphNodes": 34243,
+          "modelCacheRawClones": null,
+          "modelCacheImportClones": null,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n1": {
+          "warmMedianMs": 1355.1,
+          "warmSpread": {
+            "minMs": 1259.9,
+            "maxMs": 1404.2
+          },
+          "loopMedianMs": 2.355,
+          "modules": 150,
+          "graphNodes": 48995,
+          "modelCacheRawClones": 632,
+          "modelCacheImportClones": 602,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n4": {
+          "warmMedianMs": 2689.8,
+          "warmSpread": {
+            "minMs": 2553.1,
+            "maxMs": 2753.3
+          },
+          "loopMedianMs": 3.213,
+          "modules": 150,
+          "graphNodes": 129467,
+          "modelCacheRawClones": 632,
+          "modelCacheImportClones": 602,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        }
+      },
+      "400": {
+        "old": {
+          "warmMedianMs": 4016.1,
+          "warmSpread": {
+            "minMs": 3958.1,
+            "maxMs": 4111.0
+          },
+          "loopMedianMs": 4.902,
+          "modules": 400,
+          "graphNodes": 73782,
+          "modelCacheRawClones": null,
+          "modelCacheImportClones": null,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n1": {
+          "warmMedianMs": 1620.6,
+          "warmSpread": {
+            "minMs": 1554.2,
+            "maxMs": 1711.8
+          },
+          "loopMedianMs": 2.084,
+          "modules": 400,
+          "graphNodes": 98030,
+          "modelCacheRawClones": 1684,
+          "modelCacheImportClones": 1613,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n4": {
+          "warmMedianMs": 3057.8,
+          "warmSpread": {
+            "minMs": 2976.8,
+            "maxMs": 3207.8
+          },
+          "loopMedianMs": 2.904,
+          "modules": 400,
+          "graphNodes": 219912,
+          "modelCacheRawClones": 1684,
+          "modelCacheImportClones": 1613,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        }
+      },
+      "full-548": {
+        "new_n1": {
+          "warmMedianMs": 2167.2,
+          "warmSpread": {
+            "minMs": 2090.7,
+            "maxMs": 2283.4
+          },
+          "loopMedianMs": 2.109,
+          "modules": 548,
+          "graphNodes": 128545,
+          "modelCacheRawClones": 2353,
+          "modelCacheImportClones": 2217,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        },
+        "new_n4": {
+          "warmMedianMs": 4450.7,
+          "warmSpread": {
+            "minMs": 4357.4,
+            "maxMs": 4625.8
+          },
+          "loopMedianMs": 2.929,
+          "modules": 548,
+          "graphNodes": 301474,
+          "modelCacheRawClones": 2353,
+          "modelCacheImportClones": 2217,
+          "loopLeaf": "components/camel-activemq/pom.xml",
+          "coldWallMs": null
+        }
+      }
+    }
+  }
+}
