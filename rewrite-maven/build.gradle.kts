@@ -27,6 +27,14 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
+    // The shaded Maven-resolver/model-builder engine. Consume its `shadowRuntimeElements` variant (the fat jar,
+    // `bundling=shadowed`) rather than the plain project() dependency: a plain project() resolves the engine's
+    // classes-directory secondary variant, which holds only the engine's own classes (referencing the UN-relocated
+    // org.eclipse.aether.* stack) and none of the relocated org.openrewrite.maven.engine.shaded.* types the adapters
+    // compile against. shadowRuntimeElements is jar-only (no classes-directory secondary variant), so the relocated
+    // stack lands on both the compile and runtime classpaths.
+    implementation(project(path = ":rewrite-maven-engine", configuration = "shadowRuntimeElements"))
+
     compileOnly("org.rocksdb:rocksdbjni:10.2.1")
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))

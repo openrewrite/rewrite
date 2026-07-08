@@ -1,9 +1,20 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.attributes.java.TargetJvmVersion
 
 plugins {
     id("org.openrewrite.build.language-library")
     // The convention wraps com.gradleup.shadow (see phase1-results-spine.md "Shading decisions").
     id("org.openrewrite.build.shadow")
+}
+
+// The shaded jar is Java-8 bytecode (enforced by Java8BytecodeFloorTest), but the consumable shadow variant otherwise
+// inherits the build toolchain's JVM version (21), which fails attribute matching when a Java-8 module (rewrite-maven)
+// consumes the relocated stack. Advertise the variant's true level so those modules resolve it, exactly as apiElements
+// already advertises 8.
+configurations.named("shadowRuntimeElements").configure {
+    attributes {
+        attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 8)
+    }
 }
 
 description = "Shaded Maven Resolver 2.x / Maven 3.9 model-building engine behind an OpenRewrite HttpSender transport."
