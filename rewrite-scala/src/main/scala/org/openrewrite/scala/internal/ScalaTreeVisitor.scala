@@ -762,7 +762,7 @@ class ScalaTreeVisitor(
           case _ => return visitUnknown(postfixOp)
         }
 
-        val opName = postfixOp.op.name.toString
+        val opName = backtickAwareName(postfixOp.op.span, postfixOp.op.name.toString)
         val odEnd = Math.max(0, postfixOp.od.span.end - offsetAdjustment)
         val opStart = Math.max(0, postfixOp.op.span.start - offsetAdjustment)
         val namePrefix = if (odEnd <= opStart && odEnd >= 0 && opStart <= source.length) {
@@ -972,10 +972,10 @@ class ScalaTreeVisitor(
 
         select = target
         selectAfterSpace = selectAfter
-        methodName = sel.name.toString
+        methodName = backtickAwareName(sel.nameSpan, sel.name.toString)
 
       case id: Trees.Ident[?] =>
-        methodName = id.name.toString
+        methodName = backtickAwareName(id.span, id.name.toString)
 
       case typeApp: Trees.TypeApply[?] =>
         // TypeApply as method invocation target (e.g., Option.apply[String]("hi"), __P__.p[int])
@@ -997,12 +997,12 @@ class ScalaTreeVisitor(
             // Parse [T] type args — advances cursor past `]`
             select = target
             selectAfterSpace = selectAfter
-            methodName = sel.name.toString
+            methodName = backtickAwareName(sel.nameSpan, sel.name.toString)
             typeParamsContainer = parseTypeApplyArgs(typeApp)
           case id: Trees.Ident[?] =>
             val nameEnd = if (id.span.exists) Math.max(0, id.span.end - offsetAdjustment) else cursor
             if (nameEnd > cursor) cursor = nameEnd
-            methodName = id.name.toString
+            methodName = backtickAwareName(id.span, id.name.toString)
             typeParamsContainer = parseTypeApplyArgs(typeApp)
           case _ =>
             cursor = savedCursor; return visitUnknown(app)
@@ -1662,7 +1662,7 @@ class ScalaTreeVisitor(
       case _ => return visitUnknown(infixOp)
     }
 
-    val methodName = infixOp.op.name.toString
+    val methodName = backtickAwareName(infixOp.op.span, infixOp.op.name.toString)
     // Scala: any operator ending in ':' is right-associative, so `a op: b` means `b.op:(a)`.
     val rightAssoc = methodName.endsWith(":")
 
@@ -8749,6 +8749,31 @@ class ScalaTreeVisitor(
    * Build a `J.Identifier` with sensible defaults (random id, empty markers,
    * no annotations). Mirrors the JS parser's `mapIdentifier` convenience.
    */
+  /**
+   * Reconstruct a name preserving backtick quoting. Dotty's `name.toString` strips the
+   * backticks that escape reserved words or special characters (e.g. `type`), so we
+   * re-attach them from source. For a Select the nameSpan excludes the backticks (they
+   * sit at start-1 and end); for an Ident the span includes them. Returns the plain name
+   * unchanged when the source is not backtick-quoted.
+   */
+  private def backtickAwareName(nameSpan: Spans.Span, plainName: String): String = {
+    if (nameSpan.exists) {
+      val adjStart = Math.max(0, nameSpan.start - offsetAdjustment)
+      val adjEnd = Math.max(0, nameSpan.end - offsetAdjustment)
+      if (adjEnd > adjStart && adjEnd <= source.length) {
+        val text = source.substring(adjStart, adjEnd)
+        if (text.length >= 2 && text.charAt(0) == '`' && text.charAt(text.length - 1) == '`') {
+          return text
+        }
+        if (adjStart > 0 && adjEnd < source.length &&
+            source.charAt(adjStart - 1) == '`' && source.charAt(adjEnd) == '`') {
+          return "`" + text + "`"
+        }
+      }
+    }
+    plainName
+  }
+
   private def ident(
     name: String,
     prefix: Space = Space.EMPTY,

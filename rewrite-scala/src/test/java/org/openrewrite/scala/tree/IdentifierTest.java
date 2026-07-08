@@ -114,6 +114,45 @@ class IdentifierTest implements RewriteTest {
     }
 
     @Test
+    void backtickIdentifierAsMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(x: Any): Any = x.`type`()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void backtickIdentifierAsInfixInvocation() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(a: Int, b: Int): Int = a `min` b
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void backtickIdentifierAsPostfixInvocation() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(a: List[Int]): Any = a `head`
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void operatorIdentifier() {
         rewriteRun(
           scala("+")
