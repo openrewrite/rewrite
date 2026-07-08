@@ -98,9 +98,20 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
     List<Retract> retracts;
 
     /**
-     * Transitive resolutions from go.sum. Each module version appears once with its content hash.
+     * The resolved build list. One node per selected {@code module@version}, carrying go.sum
+     * content hashes and — when parse-time resolution ran — {@code go list -m} build-list metadata
+     * and {@code go mod graph} edges (see {@link ResolvedDependency#deps}).
      */
     List<ResolvedDependency> resolvedDependencies;
+
+    /**
+     * Import-path -&gt; providing-module map from {@code go list -deps -json ./...}.
+     * <p>
+     * Go-specific: no sibling ecosystem has an import-to-coordinate map because their import name is
+     * (near enough) the coordinate; Go's import path and module path diverge, so this must be
+     * toolchain-derived. Empty unless parse-time resolution ran.
+     */
+    List<PackageModule> packageModules;
 
     public @Nullable Require findRequire(String module) {
         for (Require r : requires) {
@@ -115,6 +126,15 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         for (ResolvedDependency rd : resolvedDependencies) {
             if (rd.getModulePath().equals(module)) {
                 return rd;
+            }
+        }
+        return null;
+    }
+
+    public @Nullable PackageModule findPackageModule(String importPath) {
+        for (PackageModule pm : packageModules) {
+            if (pm.getImportPath().equals(importPath)) {
+                return pm;
             }
         }
         return null;
@@ -142,6 +162,9 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         q.getAndSendListAsRef(after, r -> r.getResolvedDependencies() != null ? r.getResolvedDependencies() : emptyList(),
                 rd -> rd.getModulePath() + "@" + rd.getVersion(),
                 rd -> rd.rpcSend(rd, q));
+        q.getAndSendListAsRef(after, r -> r.getPackageModules() != null ? r.getPackageModules() : emptyList(),
+                PackageModule::getImportPath,
+                pm -> pm.rpcSend(pm, q));
     }
 
     @Override
@@ -156,7 +179,8 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withReplaces(q.receiveList(before.replaces, r -> r.rpcReceive(r, q)))
                 .withExcludes(q.receiveList(before.excludes, r -> r.rpcReceive(r, q)))
                 .withRetracts(q.receiveList(before.retracts, r -> r.rpcReceive(r, q)))
-                .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)));
+                .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
+                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)));
     }
 
     /**
@@ -273,7 +297,9 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
     }
 
     /**
-     * A resolved dependency from go.sum. Each module version appears once with its content hash.
+     * A resolved module in the build list. Merges go.sum content hashes with {@code go list -m}
+     * build-list metadata and {@code go mod graph} edges. The toolchain-sourced fields are
+     * empty/false/null when parse-time resolution did not run (go.sum-only fallback).
      */
     @Value
     @With
@@ -295,12 +321,42 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
          */
         @Nullable String goModHash;
 
+        /** From {@code go list -m}: this module is present only transitively. */
+        boolean indirect;
+
+        /** From {@code go list -m}: this is the main module. */
+        boolean main;
+
+        /** Toolchain-applied {@code replace} target path, null if none. */
+        @Nullable String replacePath;
+
+        @Nullable String replaceVersion;
+
+        /** This module's own {@code go} directive version, from {@code go list -m}. */
+        @Nullable String moduleGoVersion;
+
+        /**
+         * Direct module dependencies of this node (from {@code go mod graph}), by {@code module@version}
+         * edge reference. Resolve against {@link #resolvedDependencies}. Null when the graph is
+         * unavailable. Edges (not nested nodes) keep this cycle-safe; Go's MVS gives one selected
+         * version per module path.
+         */
+        @Nullable List<ModuleRef> deps;
+
         @Override
         public void rpcSend(ResolvedDependency after, RpcSendQueue q) {
             q.getAndSend(after, ResolvedDependency::getModulePath);
             q.getAndSend(after, ResolvedDependency::getVersion);
             q.getAndSend(after, ResolvedDependency::getModuleHash);
             q.getAndSend(after, ResolvedDependency::getGoModHash);
+            q.getAndSend(after, ResolvedDependency::isIndirect);
+            q.getAndSend(after, ResolvedDependency::isMain);
+            q.getAndSend(after, ResolvedDependency::getReplacePath);
+            q.getAndSend(after, ResolvedDependency::getReplaceVersion);
+            q.getAndSend(after, ResolvedDependency::getModuleGoVersion);
+            q.getAndSendListAsRef(after, r -> r.getDeps() != null ? r.getDeps() : emptyList(),
+                    ref -> ref.getModulePath() + "@" + ref.getVersion(),
+                    ref -> ref.rpcSend(ref, q));
         }
 
         @Override
@@ -309,7 +365,71 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                     .withModulePath(q.receive(before.modulePath))
                     .withVersion(q.receive(before.version))
                     .withModuleHash(q.receive(before.moduleHash))
-                    .withGoModHash(q.receive(before.goModHash));
+                    .withGoModHash(q.receive(before.goModHash))
+                    .withIndirect(q.receive(before.indirect))
+                    .withMain(q.receive(before.main))
+                    .withReplacePath(q.receive(before.replacePath))
+                    .withReplaceVersion(q.receive(before.replaceVersion))
+                    .withModuleGoVersion(q.receive(before.moduleGoVersion))
+                    .withDeps(q.receiveList(before.deps, ref -> ref.rpcReceive(ref, q)));
+        }
+    }
+
+    /**
+     * A {@code module@version} reference — a {@code go mod graph} edge target.
+     */
+    @Value
+    @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    public static class ModuleRef implements RpcCodec<ModuleRef> {
+        String modulePath;
+        String version;
+
+        @Override
+        public void rpcSend(ModuleRef after, RpcSendQueue q) {
+            q.getAndSend(after, ModuleRef::getModulePath);
+            q.getAndSend(after, ModuleRef::getVersion);
+        }
+
+        @Override
+        public ModuleRef rpcReceive(ModuleRef before, RpcReceiveQueue q) {
+            return before
+                    .withModulePath(q.receive(before.modulePath))
+                    .withVersion(q.receive(before.version));
+        }
+    }
+
+    /**
+     * Which module provides an imported package, from {@code go list -deps -json ./...}.
+     * {@link #modulePath} is null for the standard library ({@link #standard} true).
+     */
+    @Value
+    @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    public static class PackageModule implements RpcCodec<PackageModule> {
+        String importPath;
+
+        @Nullable String modulePath;
+
+        @Nullable String version;
+
+        boolean standard;
+
+        @Override
+        public void rpcSend(PackageModule after, RpcSendQueue q) {
+            q.getAndSend(after, PackageModule::getImportPath);
+            q.getAndSend(after, PackageModule::getModulePath);
+            q.getAndSend(after, PackageModule::getVersion);
+            q.getAndSend(after, PackageModule::isStandard);
+        }
+
+        @Override
+        public PackageModule rpcReceive(PackageModule before, RpcReceiveQueue q) {
+            return before
+                    .withImportPath(q.receive(before.importPath))
+                    .withModulePath(q.receive(before.modulePath))
+                    .withVersion(q.receive(before.version))
+                    .withStandard(q.receive(before.standard));
         }
     }
 }
