@@ -845,7 +845,7 @@ def handle_install_recipes(params: dict) -> dict:
             before = recipe_name_set(marketplace)
             _import_and_activate_package(package_name, marketplace, local_path)
             added = recipe_name_set(marketplace) - before
-            _attribution.record(package_name, added)
+            _attribution.record(recipes, added)
             recipes_added = len(added)
 
     elif isinstance(recipes, dict):
