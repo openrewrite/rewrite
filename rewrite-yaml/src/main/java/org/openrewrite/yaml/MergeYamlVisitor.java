@@ -466,11 +466,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         if (targetIndent < 0) {
             return entry;
         }
-        int currentIndent = lastLineIndent(entry.getPrefix());
-        if (currentIndent < 0 || currentIndent == targetIndent) {
-            return entry;
-        }
-        return (Yaml.Mapping.Entry) new ShiftFormatVisitor<Integer>(entry, targetIndent - currentIndent).visitNonNull(entry, 0);
+        return (Yaml.Mapping.Entry) ShiftIndentVisitor.<Integer>toIndent(entry, targetIndent).visitNonNull(entry, 0);
     }
 
     /**

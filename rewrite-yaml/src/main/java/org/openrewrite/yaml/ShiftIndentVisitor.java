@@ -22,24 +22,37 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.Arrays;
 
 /**
- * Shifts the indentation of every element within {@code scope} by a fixed amount.
- * A positive {@code shift} adds whitespace (moves right); a negative {@code shift}
- * removes whitespace (moves left). The relative indentation between nested elements
- * is preserved, so the whole subtree simply moves as a block.
+ * Shifts the indentation of every element within {@code scope} by a fixed amount, preserving the
+ * relative indentation between nested elements so the whole subtree moves as a block. A positive
+ * {@code shift} adds whitespace (moves right); a negative {@code shift} removes whitespace (moves
+ * left).
+ * <p>
+ * Use {@link #toIndent(Yaml, int)} when the desired absolute indentation of {@code scope} is known
+ * rather than the relative offset.
  */
-public class ShiftFormatVisitor<P> extends YamlIsoVisitor<P> {
+public class ShiftIndentVisitor<P> extends YamlIsoVisitor<P> {
     private final Yaml scope;
     private final int shift;
 
-    public ShiftFormatVisitor(Yaml scope, int shift) {
+    public ShiftIndentVisitor(Yaml scope, int shift) {
         this.scope = scope;
         this.shift = shift;
+    }
+
+    /**
+     * Creates a visitor that moves {@code scope} (and its nested content) so that {@code scope}
+     * itself lands at {@code targetColumn}. Leaves the tree unchanged when {@code scope}'s current
+     * indentation cannot be determined (it does not begin its own line) or already matches.
+     */
+    public static <P> ShiftIndentVisitor<P> toIndent(Yaml scope, int targetColumn) {
+        int currentIndent = currentIndent(scope.getPrefix());
+        return new ShiftIndentVisitor<>(scope, currentIndent < 0 ? 0 : targetColumn - currentIndent);
     }
 
     @Override
     public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
         Yaml.Sequence.Entry e = super.visitSequenceEntry(entry, p);
-        if (getCursor().isScopeInPath(scope) && e.isDash() && e.getPrefix().contains("\n")) {
+        if (shift != 0 && getCursor().isScopeInPath(scope) && e.isDash() && e.getPrefix().contains("\n")) {
             e = e.withPrefix(shiftPrefix(e.getPrefix()));
         }
         return e;
@@ -48,7 +61,7 @@ public class ShiftFormatVisitor<P> extends YamlIsoVisitor<P> {
     @Override
     public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
-        if (getCursor().isScopeInPath(scope) && e.getPrefix().contains("\n")) {
+        if (shift != 0 && getCursor().isScopeInPath(scope) && e.getPrefix().contains("\n")) {
             e = e.withPrefix(shiftPrefix(e.getPrefix()));
         }
         return e;
@@ -56,7 +69,9 @@ public class ShiftFormatVisitor<P> extends YamlIsoVisitor<P> {
 
     @SuppressWarnings("DynamicRegexReplaceableByCompiledPattern")
     private String shiftPrefix(String prefix) {
-        return String.join("\n", ListUtils.map(Arrays.asList(prefix.split("\\n")), (index, s) -> {
+        // Split with a negative limit so a trailing line break (e.g. a bare "\n" prefix on a
+        // zero-indent entry) is preserved rather than dropped.
+        return String.join("\n", ListUtils.map(Arrays.asList(prefix.split("\\n", -1)), (index, s) -> {
             // The segment before the first line break stays on the previous element's line
             // (it may hold a trailing inline comment), so it is never re-indented.
             if (index == 0) {
@@ -65,13 +80,22 @@ public class ShiftFormatVisitor<P> extends YamlIsoVisitor<P> {
             if (shift >= 0) {
                 return StringUtils.repeat(" ", shift) + s;
             }
-            // Only remove whitespace when there is enough available on this line, mirroring the
-            // safeguards in ShiftFormatLeftVisitor so comments are not mangled.
+            // Only remove whitespace when there is enough available on this line, so comments and
+            // content are never mangled.
             int amount = -shift;
             if (StringUtils.indexOfNonWhitespace(s) >= amount || (StringUtils.indexOfNonWhitespace(s) == -1 && s.length() >= amount)) {
                 return s.substring(amount);
             }
             return s;
         }));
+    }
+
+    /**
+     * The number of whitespace characters after the last line break of a prefix, or {@code -1} when
+     * the prefix has no line break (i.e. the element is not on its own line).
+     */
+    private static int currentIndent(String prefix) {
+        int idx = Math.max(prefix.lastIndexOf('\n'), prefix.lastIndexOf('\r'));
+        return idx < 0 ? -1 : prefix.length() - idx - 1;
     }
 }
