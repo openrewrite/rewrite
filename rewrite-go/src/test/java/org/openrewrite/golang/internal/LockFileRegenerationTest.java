@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Timeout;
 import org.openrewrite.golang.RegenerateGoSum;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +58,28 @@ class LockFileRegenerationTest implements RewriteTest {
         // then
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).isNotNull();
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void seedsLocallyReplacedSiblingModule() {
+        // given a submodule that resolves its parent module through a local `replace`, alongside a public dependency
+        assumeThat(GoExecutor.GO.find()).isNotNull();
+        Map<String, String> workspace = new LinkedHashMap<>();
+        workspace.put("go.mod", "module example.com/root\n\ngo 1.21\n");
+        workspace.put("sub/go.mod",
+          "module example.com/root/sub\n\ngo 1.21\n\n" +
+          "require example.com/root v0.0.0-00010101000000-000000000000\n\n" +
+          "require rsc.io/quote v1.5.2\n\n" +
+          "replace example.com/root => ../\n");
+
+        // when the sibling go.mod is seeded into the workspace and go.sum is regenerated from the sub directory
+        LockFileRegeneration.Result result = LockFileRegeneration.GO_SUM.regenerate(
+          workspace, "sub", null, java.util.Collections.emptyMap());
+
+        // then the local replacement resolves and the public dependency is locked
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("rsc.io/quote v1.5.2 h1:");
     }
 
     @Test

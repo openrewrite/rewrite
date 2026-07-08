@@ -86,6 +86,10 @@ public final class LockFileRegeneration {
      * dependencies), or an error message
      */
     public Result regenerate(String manifestContent, @Nullable String existingLockContent, Map<String, String> environment) {
+        return regenerate(Collections.singletonMap(manifestFile, manifestContent), "", existingLockContent, environment);
+    }
+
+    public Result regenerate(Map<String, String> filesByPath, String workSubdir, @Nullable String existingLockContent, Map<String, String> environment) {
         String executablePath = executor.find();
         if (executablePath == null) {
             return Result.failure(executor.getName() + " is not installed or not on PATH");
@@ -95,15 +99,26 @@ public final class LockFileRegeneration {
         try {
             tempDir = Files.createTempDirectory("openrewrite-go-lock-");
 
-            Files.write(tempDir.resolve(manifestFile),
-                    manifestContent.getBytes(StandardCharsets.UTF_8));
+            for (Map.Entry<String, String> entry : filesByPath.entrySet()) {
+                Path target = resolveWithin(tempDir, entry.getKey());
+                if (target == null) {
+                    return Result.failure("refusing to seed file outside the workspace: " + entry.getKey());
+                }
+                Files.createDirectories(target.getParent());
+                Files.write(target, entry.getValue().getBytes(StandardCharsets.UTF_8));
+            }
+
+            Path workDir = resolveWithin(tempDir, workSubdir);
+            if (workDir == null) {
+                return Result.failure("refusing to run outside the workspace: " + workSubdir);
+            }
 
             if (existingLockContent != null) {
-                Files.write(tempDir.resolve(lockFile),
+                Files.write(workDir.resolve(lockFile),
                         existingLockContent.getBytes(StandardCharsets.UTF_8));
             }
 
-            GoExecutor.RunResult runResult = executor.run(tempDir, executablePath, environment, args);
+            GoExecutor.RunResult runResult = executor.run(workDir, executablePath, environment, args);
             if (!runResult.isSuccess()) {
                 String stderr = runResult.getStderr();
                 if (stderr != null && stderr.length() > 2000) {
@@ -113,7 +128,7 @@ public final class LockFileRegeneration {
                         " failed (exit " + runResult.getExitCode() + "): " + stderr);
             }
 
-            Path lockPath = tempDir.resolve(lockFile);
+            Path lockPath = workDir.resolve(lockFile);
             if (!Files.exists(lockPath)) {
                 return Result.success("");
             }
@@ -129,6 +144,11 @@ public final class LockFileRegeneration {
                 cleanupDirectory(tempDir);
             }
         }
+    }
+
+    private static @Nullable Path resolveWithin(Path root, String relative) {
+        Path resolved = root.resolve(relative).normalize();
+        return resolved.startsWith(root) ? resolved : null;
     }
 
     private static void cleanupDirectory(Path dir) {
