@@ -68,6 +68,14 @@ class MockMavenServer implements AutoCloseable {
         return this;
     }
 
+    /** Serve a snapshot pom whose file carries the dated build ({@code artifactId-datedVersion.pom}) under the base-version directory. */
+    MockMavenServer snapshotPom(String groupId, String artifactId, String baseVersion, String datedVersion, String xml) {
+        String path = "/" + groupId.replace('.', '/') + "/" + artifactId + "/" + baseVersion + "/" +
+                artifactId + "-" + datedVersion + ".pom";
+        pomsByPath.put(path, xml.getBytes(StandardCharsets.UTF_8));
+        return this;
+    }
+
     private static String path(String groupId, String artifactId, String version) {
         return "/" + groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/" + artifactId + "-" + version + ".pom";
     }
