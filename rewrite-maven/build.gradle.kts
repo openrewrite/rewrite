@@ -87,6 +87,8 @@ tasks.withType<Javadoc>().configureEach {
 
 configure<LicenseExtension> {
     excludePatterns.add("**/unresolvable.txt")
+    // Parity fixtures and serialized-LST payloads are verbatim test data; a header breaks them
+    excludePatterns.add("**/parity/**")
 }
 
 tasks.register<JavaExec>("generateRecipeMarketplace") {

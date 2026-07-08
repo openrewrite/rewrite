@@ -1,0 +1,32 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>classifiers-app</artifactId>
+    <version>1</version>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.parity</groupId>
+                <artifactId>multi</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.parity</groupId>
+                <artifactId>multi</artifactId>
+                <version>1.1</version>
+                <classifier>tests</classifier>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>multi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>multi</artifactId>
+            <classifier>tests</classifier>
+        </dependency>
+    </dependencies>
+</project>

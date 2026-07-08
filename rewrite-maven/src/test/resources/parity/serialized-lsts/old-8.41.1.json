@@ -1,0 +1,555 @@
+{
+  "@c" : "org.openrewrite.maven.tree.MavenResolutionResult",
+  "@ref" : 1,
+  "id" : "4dde59b4-1df1-4838-96c7-15c9982c79ce",
+  "managedReference" : null,
+  "pom" : {
+    "@ref" : 2,
+    "requested" : {
+      "sourcePath" : "file:///parity/project/pom.xml",
+      "repository" : null,
+      "parent" : null,
+      "gav" : {
+        "repository" : null,
+        "groupId" : "org.parity",
+        "artifactId" : "bom-import-app",
+        "version" : "1",
+        "datedSnapshotVersion" : null
+      },
+      "obsoletePomVersion" : null,
+      "name" : null,
+      "prerequisites" : null,
+      "packaging" : null,
+      "properties" : {
+        "project.basedir" : "/parity/project",
+        "basedir" : "/parity/project"
+      },
+      "dependencyManagement" : [ {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Imported",
+        "@ref" : 3,
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "bom",
+          "version" : "1.0"
+        }
+      }, {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Defined",
+        "@ref" : 4,
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : "1.5"
+        },
+        "scope" : null,
+        "type" : null,
+        "classifier" : null,
+        "exclusions" : null
+      } ],
+      "dependencies" : [ {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      }, {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      } ],
+      "repositories" : [ ],
+      "licenses" : [ ],
+      "profiles" : [ ],
+      "plugins" : [ ],
+      "pluginManagement" : [ ],
+      "subprojects" : [ ]
+    },
+    "activeProfiles" : [ ],
+    "properties" : {
+      "basedir" : "/parity/project",
+      "project.basedir" : "/parity/project"
+    },
+    "dependencyManagement" : [ {
+      "gav" : {
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0"
+      },
+      "scope" : null,
+      "type" : null,
+      "classifier" : null,
+      "exclusions" : null,
+      "requested" : {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Defined",
+        "@ref" : 5,
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : "2.0"
+        },
+        "scope" : null,
+        "type" : null,
+        "classifier" : null,
+        "exclusions" : null
+      },
+      "requestedBom" : 3,
+      "bomGav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "bom",
+        "version" : "1.0",
+        "datedSnapshotVersion" : "1.0"
+      }
+    }, {
+      "gav" : {
+        "groupId" : "org.parity",
+        "artifactId" : "managed-b",
+        "version" : "2.0"
+      },
+      "scope" : null,
+      "type" : null,
+      "classifier" : null,
+      "exclusions" : null,
+      "requested" : {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Defined",
+        "@ref" : 6,
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-b",
+          "version" : "2.0"
+        },
+        "scope" : null,
+        "type" : null,
+        "classifier" : null,
+        "exclusions" : null
+      },
+      "requestedBom" : 3,
+      "bomGav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "bom",
+        "version" : "1.0",
+        "datedSnapshotVersion" : "1.0"
+      }
+    }, {
+      "gav" : {
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : "1.5"
+      },
+      "scope" : null,
+      "type" : null,
+      "classifier" : null,
+      "exclusions" : null,
+      "requested" : 4,
+      "requestedBom" : null,
+      "bomGav" : null
+    } ],
+    "initialRepositories" : [ ],
+    "repositories" : [ ],
+    "requestedDependencies" : [ {
+      "gav" : {
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : null
+      },
+      "classifier" : null,
+      "type" : null,
+      "scope" : null,
+      "exclusions" : null,
+      "optional" : null
+    }, {
+      "gav" : {
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : null
+      },
+      "classifier" : null,
+      "type" : null,
+      "scope" : null,
+      "exclusions" : null,
+      "optional" : null
+    } ],
+    "plugins" : [ ],
+    "pluginManagement" : [ ],
+    "subprojects" : [ ]
+  },
+  "modules" : [ ],
+  "parent" : null,
+  "dependencies" : {
+    "Compile" : [ {
+      "@ref" : 7,
+      "repository" : {
+        "@ref" : 8,
+        "id" : "fixture",
+        "uri" : "file:///parity/fixture/repo/",
+        "releases" : null,
+        "snapshots" : null,
+        "knownToExist" : true,
+        "timeout" : null,
+        "deriveMetadataIfMissing" : null
+      },
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0",
+        "datedSnapshotVersion" : "2.0"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ {
+        "@ref" : 9,
+        "repository" : 8,
+        "gav" : {
+          "repository" : "file:///parity/fixture/repo/",
+          "groupId" : "org.parity",
+          "artifactId" : "managed-b",
+          "version" : "2.0",
+          "datedSnapshotVersion" : "2.0"
+        },
+        "requested" : {
+          "gav" : {
+            "groupId" : "org.parity",
+            "artifactId" : "managed-b",
+            "version" : "2.0"
+          },
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 10,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : "1.5",
+        "datedSnapshotVersion" : "1.5"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 9 ],
+    "Test" : [ {
+      "@ref" : 11,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0",
+        "datedSnapshotVersion" : "2.0"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ {
+        "@ref" : 12,
+        "repository" : 8,
+        "gav" : {
+          "repository" : "file:///parity/fixture/repo/",
+          "groupId" : "org.parity",
+          "artifactId" : "managed-b",
+          "version" : "2.0",
+          "datedSnapshotVersion" : "2.0"
+        },
+        "requested" : {
+          "gav" : {
+            "groupId" : "org.parity",
+            "artifactId" : "managed-b",
+            "version" : "2.0"
+          },
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 13,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : "1.5",
+        "datedSnapshotVersion" : "1.5"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 12 ],
+    "Runtime" : [ {
+      "@ref" : 14,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0",
+        "datedSnapshotVersion" : "2.0"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ {
+        "@ref" : 15,
+        "repository" : 8,
+        "gav" : {
+          "repository" : "file:///parity/fixture/repo/",
+          "groupId" : "org.parity",
+          "artifactId" : "managed-b",
+          "version" : "2.0",
+          "datedSnapshotVersion" : "2.0"
+        },
+        "requested" : {
+          "gav" : {
+            "groupId" : "org.parity",
+            "artifactId" : "managed-b",
+            "version" : "2.0"
+          },
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 16,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : "1.5",
+        "datedSnapshotVersion" : "1.5"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 15 ],
+    "Provided" : [ {
+      "@ref" : 17,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0",
+        "datedSnapshotVersion" : "2.0"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ {
+        "@ref" : 18,
+        "repository" : 8,
+        "gav" : {
+          "repository" : "file:///parity/fixture/repo/",
+          "groupId" : "org.parity",
+          "artifactId" : "managed-b",
+          "version" : "2.0",
+          "datedSnapshotVersion" : "2.0"
+        },
+        "requested" : {
+          "gav" : {
+            "groupId" : "org.parity",
+            "artifactId" : "managed-b",
+            "version" : "2.0"
+          },
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 19,
+      "repository" : 8,
+      "gav" : {
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : "1.5",
+        "datedSnapshotVersion" : "1.5"
+      },
+      "requested" : {
+        "gav" : {
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 18 ]
+  },
+  "mavenSettings" : null,
+  "activeProfiles" : [ ]
+}
