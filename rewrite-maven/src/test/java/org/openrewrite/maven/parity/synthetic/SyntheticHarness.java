@@ -26,9 +26,9 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.parity.ParityHarness;
-import org.openrewrite.maven.parity.RecordingResolutionListener;
-import org.openrewrite.maven.parity.ResolutionSnapshot;
-import org.openrewrite.maven.parity.SnapshotNormalizer;
+import org.openrewrite.maven.internal.parity.RecordingResolutionListener;
+import org.openrewrite.maven.internal.parity.ResolutionSnapshot;
+import org.openrewrite.maven.internal.parity.SnapshotNormalizer;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 
 import java.io.UncheckedIOException;

@@ -20,8 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.parity.ResolutionSnapshot;
-import org.openrewrite.maven.parity.SnapshotNormalizer;
+import org.openrewrite.maven.internal.parity.ResolutionSnapshot;
+import org.openrewrite.maven.internal.parity.SnapshotNormalizer;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 
 import java.nio.file.Paths;

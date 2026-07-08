@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
+import org.openrewrite.maven.internal.engine.PomXmlRegistry;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
@@ -30,6 +31,7 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
@@ -89,6 +91,8 @@ public class MavenParser implements Parser {
 
                     projectPoms.put(xml, pom);
                     projectPomsByPath.put(pomPath, pom);
+                    // XML-first: the engine reads this pom from its printed document bytes (DESIGN §0).
+                    PomXmlRegistry.put(ctx, pom.getSourcePath(), pom.getGav(), xml.printAll().getBytes(StandardCharsets.UTF_8));
                 } else {
                     parsed.add(sourceFile);
                 }
@@ -99,6 +103,7 @@ public class MavenParser implements Parser {
         }
 
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
+        PomXmlRegistry.setInjectedProperties(ctx, properties);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()

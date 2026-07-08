@@ -1,3 +1,0 @@
-# Known-nondeterminism mask registry for the parity oracle.
-# Format: one `<ledgerId> <jsonPathPrefix>` pair per line. Every mask MUST reference a row in
-# doc/maven-resolution-ledger.md; a mask without a ledger id fails the build.

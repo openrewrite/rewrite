@@ -24,6 +24,7 @@ import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.Model
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.ModelBuildingRequest;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.ModelBuildingResult;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.StringModelSource;
+import org.openrewrite.maven.engine.shaded.org.eclipse.aether.DefaultRepositoryCache;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystem;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystemSession;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -72,7 +73,11 @@ public class EngineEffectivePom {
         request.setModelSource(new StringModelSource(new String(requestedPomXml, StandardCharsets.UTF_8), sourceLabel(requested)));
         request.setModelResolver(new EngineModelResolver(bridge, requestRepositories));
         request.setWorkspaceModelResolver(reactor);
-        request.setModelCache(new EngineModelCache(session.getCache(), session, reactor));
+        // A fresh per-build model cache: the model-building walk (resolvePom for parents/BOMs) must run each build so
+        // the servedBy gav→repo attribution the mappers depend on is complete even on a warm run. Byte downloads are
+        // still avoided by the MavenPomCache bytes region; only the cheap re-parse repeats. Reusing the shared session
+        // cache would let a second resolve serve a BOM's model from cache, skipping resolvePom and emptying servedBy.
+        request.setModelCache(new EngineModelCache(new DefaultRepositoryCache(), session, reactor));
         request.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
         request.setProcessPlugins(false);
         request.setTwoPhaseBuilding(false);

@@ -77,6 +77,11 @@ tasks.register<JavaExec>("generateAntlrSources") {
 
 tasks.withType<Test>().configureEach {
     jvmArgs("-Djava.util.logging.config.file=${file("src/test/resources/logging.properties").absolutePath}")
+    // Forward the dev/CI resolution-engine selector to the forked test JVM (Gradle does not by default), so
+    // `-Dorg.openrewrite.maven.resolution.engine=shadow ./gradlew :rewrite-maven:test` reaches ResolutionEngineSelector.
+    System.getProperty("org.openrewrite.maven.resolution.engine")?.let {
+        systemProperty("org.openrewrite.maven.resolution.engine", it)
+    }
 }
 
 tasks.withType<Javadoc>().configureEach {

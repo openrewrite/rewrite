@@ -32,6 +32,7 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.engine.MavenEngineResolution;
 import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
@@ -198,20 +199,23 @@ public class ResolvedPom {
             return this;
         }
 
-        ResolvedPom resolved = new ResolvedPom(
-                requested,
-                activeProfiles,
-                emptyMap(),
-                emptyList(),
-                true,
-                initialRepositories,
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList()
-        ).resolver(ctx, downloader).resolve();
+        // The effective-pom chokepoint for both Pom.resolve (initial parse) and UpdateMavenModel (re-resolution):
+        // the engine selector routes it legacy/maven/shadow. Dependency resolution stays legacy in every mode.
+        ResolvedPom resolved = MavenEngineResolution.effectivePom(requested, activeProfiles, downloader, ctx, () ->
+                new ResolvedPom(
+                        requested,
+                        activeProfiles,
+                        emptyMap(),
+                        emptyList(),
+                        true,
+                        initialRepositories,
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList()
+                ).resolver(ctx, downloader).resolve());
 
         if (!getVersion().equals(resolved.getVersion())) {
             return resolved;

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven.parity;
 
+import org.openrewrite.maven.internal.parity.*;
+
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;

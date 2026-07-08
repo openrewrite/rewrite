@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.parity;
+package org.openrewrite.maven.internal.parity;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;

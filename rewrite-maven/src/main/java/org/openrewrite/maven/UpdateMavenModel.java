@@ -20,9 +20,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.engine.PomXmlRegistry;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -144,6 +146,11 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             if (sourcePath != null) {
                 projectPoms.put(sourcePath, requested);
             }
+            // XML-first re-resolution: feed the engine the mutated document's current bytes and bump the reactor epoch
+            // so any GAV-keyed engine cache re-reads them (DESIGN §5.5). Inert unless the maven/shadow engine is active.
+            PomXmlRegistry.put(ctx, sourcePath, requested.getGav(), document.printAll().getBytes(StandardCharsets.UTF_8));
+            PomXmlRegistry.setInjectedProperties(ctx, resolutionResult.getUserProperties());
+            PomXmlRegistry.bumpEpoch(ctx);
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     projectPoms);
             markDirtyForAmbiguityRecipes(ctx, document, updated);

@@ -73,8 +73,18 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
     private volatile int epoch;
 
     public ReactorWorkspace(Map<Path, Pom> projectPoms, Function<Path, byte @Nullable []> pomXmlSource) {
+        this(projectPoms, pomXmlSource, 0);
+    }
+
+    /**
+     * @param initialEpoch seeds {@link #epoch()} so a fresh workspace built after a re-resolution (a new
+     *                     {@link org.openrewrite.maven.internal.engine.PomXmlRegistry} generation) keeps a monotonic,
+     *                     ctx-wide epoch — engine caches keyed on it never serve a model from a prior generation.
+     */
+    public ReactorWorkspace(Map<Path, Pom> projectPoms, Function<Path, byte @Nullable []> pomXmlSource, int initialEpoch) {
         this.projectPoms = projectPoms;
         this.pomXmlSource = pomXmlSource;
+        this.epoch = initialEpoch;
         this.pathByPom = new IdentityHashMap<>();
         for (Map.Entry<Path, Pom> entry : projectPoms.entrySet()) {
             pathByPom.put(entry.getValue(), entry.getKey());

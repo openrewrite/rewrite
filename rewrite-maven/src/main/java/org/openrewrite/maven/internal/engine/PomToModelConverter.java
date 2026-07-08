@@ -28,11 +28,15 @@ import org.openrewrite.maven.engine.shaded.org.apache.maven.model.PluginManageme
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Prerequisites;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Repository;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.RepositoryPolicy;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.io.DefaultModelWriter;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ProfileActivation;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +49,20 @@ import java.util.Properties;
  * come from XML (printed document bytes or the pom-bytes cache region) and never touch this converter.
  */
 public class PomToModelConverter {
+
+    /**
+     * Convert a synthetic {@link Pom} and print it as raw XML bytes — the XML-first input the model builder needs for a
+     * root pom that has no backing document (rewrite-gradle's {@code Pom.builder()} graphs).
+     */
+    public byte[] toXml(Pom pom) {
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            new DefaultModelWriter().write(out, java.util.Collections.emptyMap(), convert(pom));
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     public Model convert(Pom pom) {
         Model model = new Model();

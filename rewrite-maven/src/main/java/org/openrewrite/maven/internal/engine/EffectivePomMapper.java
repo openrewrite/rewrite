@@ -68,9 +68,11 @@ public class EffectivePomMapper {
         String rootModelId = lineage.get(0);
         Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy = outcome.getServedBy();
 
-        // Real contributing models (root + anything actually fetched); the super-POM is neither, so its injected
-        // pluginManagement/repositories/pluginRepositories are excluded — rewrite only carries declared/inherited entries.
-        Set<String> knownModelIds = knownModelIds(rootModelId, servedBy);
+        // Real contributing models (the inheritance lineage + imported BOMs); the super-POM contributes an empty model
+        // id and is excluded, so its injected pluginManagement/repositories/pluginRepositories never surface — rewrite
+        // only carries declared/inherited entries. Derived from the lineage (not servedBy) so it holds on a warm cache,
+        // where a served-from-bytes parent is absent from servedBy (shadow mode warms the cache before the engine runs).
+        Set<String> knownModelIds = knownModelIds(lineage, servedBy);
 
         Map<String, String> properties = mergeProperties(result, lineage, injectedProperties);
         List<ResolvedManagedDependency> dependencyManagement =
@@ -121,7 +123,11 @@ public class EffectivePomMapper {
 
     private static void putAllIfAbsent(Map<String, String> target, Properties properties) {
         for (String name : properties.stringPropertyNames()) {
-            target.putIfAbsent(name, properties.getProperty(name));
+            if (!target.containsKey(name)) {
+                // An empty <tag/> is null in rewrite's RawPom but "" in Maven's model; keep RawPom's representation.
+                String value = properties.getProperty(name);
+                target.put(name, value.isEmpty() ? null : value);
+            }
         }
     }
 
@@ -267,9 +273,14 @@ public class EffectivePomMapper {
         return result;
     }
 
-    private static Set<String> knownModelIds(String rootModelId, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
+    private static Set<String> knownModelIds(List<String> lineage, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
         Set<String> known = new HashSet<>();
-        known.add(rootModelId);
+        for (String id : lineage) {
+            // The super-POM's inheritance entry carries an empty model id; every real model has a g:a:v id.
+            if (!id.isEmpty()) {
+                known.add(id);
+            }
+        }
         for (ResolvedGroupArtifactVersion key : servedBy.keySet()) {
             known.add(key.getGroupId() + ":" + key.getArtifactId() + ":" + key.getVersion());
         }

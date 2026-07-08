@@ -1,0 +1,21 @@
+# Known-nondeterminism / ledgered-expected-flip mask registry for the parity oracle.
+# Format: one `<ledgerId> <jsonPathPrefix>` pair per line. Every mask MUST reference a row in
+# doc/maven-resolution-ledger.md; a mask without a ledger id fails the build.
+#
+# The engine produces Maven-correct effective plugin ordering and goal-union ordering; the legacy
+# resolver does not. Both flips surface on the whole `$.pom.plugins` array, so shadow mode masks it.
+L-P0-002 $.pom.plugins
+L-P0-003 $.pom.plugins
+# The engine's pluginManagement is Maven's effective list (interpolated coordinates, declaration-order-preserving
+# merge); legacy keeps raw ${...} coordinates and its own merge/order — the same class as the plugins flip above.
+L-P2-C-001 $.pom.pluginManagement
+# Legacy ResolvedPom.resolve rebuilds with an emptyList() subprojects scaffold and returns it whenever any field
+# changed, dropping <modules>; the engine preserves requested.getSubprojects().
+L-P2-C-002 $.pom.subprojects
+# The engine's projected repositories are the declared/inherited ones only (Maven's effective model, super-POM
+# filtered); legacy prepends the embedder-injected local (~/.m2) and central repos, shifting the array. Extends
+# L-P2-B2-001: repo-universe membership is a pipeline decision, not the effective model's shape.
+L-P2-C-004 $.pom.repositories
+# Legacy resolution drops <pluginRepositories> entirely (they survive only when resolve() returns
+# `this` unchanged); the engine carries declared+inherited plugin repositories per Maven.
+L-P2-C-005 $.pom.pluginRepositories

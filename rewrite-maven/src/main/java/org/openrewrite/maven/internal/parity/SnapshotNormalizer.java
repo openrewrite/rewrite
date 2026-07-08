@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.parity;
+package org.openrewrite.maven.internal.parity;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -85,7 +86,7 @@ public class SnapshotNormalizer {
             if (is == null) {
                 return masks;
             }
-            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            String content = StringUtils.readFully(is, StandardCharsets.UTF_8);
             for (String line : content.split("\n")) {
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith("#")) {
