@@ -8475,7 +8475,15 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(po.span)
     val elementType = visitTypeTree(po.od)
     val innerEnd = if (po.od.span.exists) Math.max(0, po.od.span.end - offsetAdjustment) else cursor
-    val starStart = if (po.op.span.exists) Math.max(0, po.op.span.start - offsetAdjustment) else innerEnd
+    val repeatedEnd = if (po.span.exists) Math.min(source.length, Math.max(0, po.span.end - offsetAdjustment)) else source.length
+    val starStart =
+      if (po.op.span.exists && po.op.span.start != po.op.span.end) {
+        Math.max(0, po.op.span.start - offsetAdjustment)
+      } else {
+        val searchStart = Math.min(Math.max(cursor, innerEnd), repeatedEnd)
+        val found = positionOfNext("*", searchStart)
+        if (found >= 0 && found < repeatedEnd) found else innerEnd
+      }
     val beforeStar = if (cursor < starStart && starStart <= source.length) {
       ScalaSpace.format(source, cursor, starStart)
     } else Space.EMPTY
