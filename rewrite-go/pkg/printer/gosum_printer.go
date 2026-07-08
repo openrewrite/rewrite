@@ -19,16 +19,10 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
-// PrintGoSum renders a GoSum LST back to source. Because every byte of
-// whitespace is preserved on the tree, an unmodified GoSum re-prints to the
-// original bytes verbatim (for canonical, toolchain-written go.sum files).
 func PrintGoSum(gs *golang.GoSum) string {
 	return printGoSum(gs, NewPrintOutputCapture())
 }
 
-// PrintGoSumWithMarkers renders a GoSum LST to source, printing cross-cutting
-// markers (SearchResult, Markup) via the given MarkerPrinter — so search
-// recipes can be tested with the same /*~~>*/ convention used for .go sources.
 func PrintGoSumWithMarkers(gs *golang.GoSum, mp MarkerPrinter) string {
 	return printGoSum(gs, NewPrintOutputCaptureWithMarkers(mp))
 }

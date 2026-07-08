@@ -23,9 +23,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
-// TestGoSumRPCRoundTrip parses go.sum into a GoSum, ships it Go→wire→Go through
-// the sender/receiver, and asserts the received tree prints identically — i.e.
-// the RPC codec preserves the lossless tree.
 func TestGoSumRPCRoundTrip(t *testing.T) {
 	cases := map[string]string{
 		"single": "github.com/a/b v1.0.0 h1:aaaa=\n" +
@@ -62,8 +59,6 @@ func TestGoSumRPCRoundTrip(t *testing.T) {
 	}
 }
 
-// TestGoSumRPCPreservesResolutionMarker verifies a GoResolutionResult attached
-// to GoSum.Markers survives the RPC round-trip.
 func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	content := "github.com/x/y v1.2.3 h1:aaaa=\n" +
 		"github.com/x/y v1.2.3/go.mod h1:bbbb=\n"

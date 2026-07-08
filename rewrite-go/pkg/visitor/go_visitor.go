@@ -292,8 +292,6 @@ type VisitorI interface {
 	VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree
 	VisitGoModBlock(b *golang.GoModBlock, p any) java.Tree
 	VisitGoModValue(val *golang.GoModValue, p any) java.Tree
-	// go.sum nodes are Tree, not J (their tokens are not Java
-	// expressions), so these return java.Tree rather than java.J.
 	VisitGoSum(gs *golang.GoSum, p any) java.Tree
 	VisitGoSumLine(l *golang.GoSumLine, p any) java.Tree
 	VisitIdentifier(ident *java.Identifier, p any) java.J
@@ -1215,9 +1213,6 @@ func visitGoModStatementList(v *GoVisitor, list []java.RightPadded[golang.GoModS
 	return result
 }
 
-// visitGoSumLineList visits a right-padded list of go.sum lines. GoSumLine is
-// a java.Tree (not java.J), so the J-constrained visitRightPaddedList helper
-// can't be reused here.
 func visitGoSumLineList(v *GoVisitor, list []java.RightPadded[*golang.GoSumLine], p any) []java.RightPadded[*golang.GoSumLine] {
 	result := make([]java.RightPadded[*golang.GoSumLine], 0, len(list))
 	for _, rp := range list {

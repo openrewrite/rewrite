@@ -675,8 +675,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		goModByIdx[r.idx] = gm
 	}
 
-	// Index the GoResolutionResult of each parsed go.mod by directory so a
-	// sibling go.sum can carry the module's resolved build list as a marker.
+	// Index each go.mod's GoResolutionResult by directory for sibling go.sum.
 	mrrByDir := make(map[string]*golang.GoResolutionResult, len(goModByIdx))
 	for _, gm := range goModByIdx {
 		for i := range gm.Markers.Entries {
@@ -687,9 +686,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
-	// Parse every go.sum input into a lossless GoSum LST, mirroring the go.mod
-	// path. Attach the sibling go.mod's GoResolutionResult marker when the two
-	// arrive in the same batch so go.sum recipes can read the resolved graph.
 	goSumByIdx := make(map[int]*golang.GoSum, len(resolvedInputs))
 	for _, r := range resolvedInputs {
 		if filepath.Base(r.sourcePath) != "go.sum" {
@@ -2376,10 +2372,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		})
 	}
 
-	// Emit each sibling go.sum as a lossless GoSum LST so recipes can edit
-	// the checksum file directly. The module's GoResolutionResult — already
-	// parsed above — rides along as a marker so a go.sum recipe can read the
-	// resolved build list.
+	// Emit each sibling go.sum as a GoSum LST, carrying the module's marker.
 	for _, modPath := range disc.goMods {
 		sumPath := filepath.Join(filepath.Dir(modPath), "go.sum")
 		data, err := os.ReadFile(sumPath)

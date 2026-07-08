@@ -26,8 +26,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// pruneModule removes every go.sum line for a given module path, mirroring the
-// offline-safe "prune" half of a SyncGoSum recipe.
 type pruneModule struct {
 	recipe.Base
 	ModulePath string
@@ -55,7 +53,6 @@ func (v *pruneModuleVisitor) VisitGoSumLine(l *golang.GoSumLine, p any) java.Tre
 	return v.GoVisitor.VisitGoSumLine(l, p)
 }
 
-// findModuleHash marks the hash of every go.sum line for a module.
 type findModuleHash struct {
 	recipe.Base
 	ModulePath string

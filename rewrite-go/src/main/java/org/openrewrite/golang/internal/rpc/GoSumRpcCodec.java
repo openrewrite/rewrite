@@ -31,15 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
-/**
- * RPC codec for the {@link GoSum} SourceFile. The field order here is the single
- * source of truth shared with the Go-side {@code sendGoSum}/{@code receiveGoSum}
- * (pkg/rpc/gosum_codec.go) — both must agree exactly or the cross-language queue
- * desyncs.
- * <p>
- * Like {@link GoModRpcCodec}, this serializes go.sum's bespoke node set manually
- * rather than via the J-element padding helpers.
- */
+// Field order must match the Go-side gosum_codec.go exactly.
 @Getter
 public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
 

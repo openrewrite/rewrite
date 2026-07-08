@@ -22,19 +22,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// GoSum is the lossless LST for a Go `go.sum` file. It mirrors
-// org.openrewrite.golang.tree.GoSum on the Java side.
-//
-// Like GoMod, GoSum is NOT a J node: go.sum tokens are not Java
-// expressions, so the tree carries its own minimal node set and is
-// special-cased ahead of the J-dispatch in the RPC sender/receiver.
-//
-// go.sum has no nested structure — it is a flat list of hash lines, each
-// of the form `module version[/go.mod] h1:hash`. Every byte of the
-// original file is recoverable: leading whitespace and blank lines live
-// in java.Space prefixes and the After of each line (the line terminator).
-// Re-printing a parsed GoSum yields the original bytes verbatim for
-// canonical (toolchain-written) go.sum files.
 type GoSum struct {
 	Ident            uuid.UUID
 	Prefix           java.Space
@@ -76,22 +63,14 @@ func (n *GoSum) WithEof(eof java.Space) *GoSum {
 }
 
 // GoSumLine is one go.sum entry: `module version[/go.mod] h1:hash`.
-//
-// Each module version appears on two lines — one for the module zip and
-// one for its go.mod — distinguished by GoMod. The module/version/hash
-// tokens are stored verbatim; the canonical single-space separators are
-// reconstructed by the printer.
 type GoSumLine struct {
 	Ident      uuid.UUID
 	Prefix     java.Space
 	Markers    java.Markers
 	ModulePath string
 	Version    string
-	// GoMod is true when this line records the hash of the module's
-	// go.mod (the `/go.mod` version suffix); false for the module zip.
-	GoMod bool
-	// Hash is the full `h1:…` checksum token.
-	Hash string
+	GoMod      bool
+	Hash       string
 }
 
 func (*GoSumLine) IsTree() {}

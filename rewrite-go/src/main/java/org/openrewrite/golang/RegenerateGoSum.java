@@ -129,8 +129,7 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                // go.sum may arrive as a lossless GoSum LST (Go RPC pipeline) or
-                // as PlainText (pure-Java pipeline); handle both.
+                // go.sum may arrive as a GoSum LST or as PlainText.
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }

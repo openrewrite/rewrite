@@ -30,13 +30,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Guards the {@code go.sum} LST against the same {@code .lst} round-trip failure
- * {@link GoModSerializationTest} covers for go.mod: {@link GoSum.Line} must carry
- * {@code Tree}'s {@code @c} polymorphic type id, otherwise each
- * {@link JRightPadded#getElement() line element} deserializes to {@code null} and
- * later NPEs in {@code GoSumRpcCodec.rpcSend}.
- */
 class GoSumSerializationTest {
 
     private static final ObjectMapper MAPPER = ObjectMappers.propertyBasedMapper(null);

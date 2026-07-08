@@ -21,8 +21,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 )
 
-// roundTripSum parses go.sum content into a GoSum LST and prints it back,
-// asserting byte-for-byte equality — the lossless contract.
 func roundTripSum(t *testing.T, content string) {
 	t.Helper()
 	gs, err := ParseGoSumFile("go.sum", content)

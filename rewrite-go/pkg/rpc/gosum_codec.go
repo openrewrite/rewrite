@@ -22,13 +22,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// GoSum is a SourceFile but not a J node, so — like GoMod and java.ParseError —
-// it is special-cased ahead of the J-dispatch in GoSender.Visit / GoReceiver.Visit
-// and serialized by this self-contained codec rather than the generic padding
-// helpers (which assume J elements).
-//
-// The field order below is the single source of truth: the Go send/receive here
-// and the Java GoSumRpcCodec#rpcSend/#rpcReceive must all agree on it.
+// Field order here is the single source of truth shared with the Java
+// GoSumRpcCodec; both must agree exactly.
 
 func init() {
 	RegisterValueType(reflect.TypeOf((*golang.GoSum)(nil)), "org.openrewrite.golang.tree.GoSum")

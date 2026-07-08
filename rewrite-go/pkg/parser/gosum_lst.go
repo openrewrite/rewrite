@@ -25,20 +25,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// ParseGoSumFile parses go.sum content into a lossless GoSum LST. Mirrors
-// org.openrewrite.golang.tree.GoSum on the Java side (the LST path, not the
-// legacy data-marker path that stays in ParseGoSum).
-//
-// go.sum is a flat list of `module version[/go.mod] h1:hash` lines. Leading
-// whitespace and blank lines are captured into the next line's Prefix (or the
-// trailing Eof); the line terminator and any trailing whitespace ride along in
-// each line's RightPadded.After. Re-printing yields the input verbatim for
-// canonical (toolchain-written) files.
-//
-// A non-blank line that does not match the go.sum grammar is a hard parse
-// error: unlike go.mod (which tolerates unknown directives), go.sum has a
-// single fixed line shape, so a malformed line means the file is not a go.sum
-// and the caller should fall back to a verbatim (PlainText/ParseError) source.
+// ParseGoSumFile parses go.sum content into a lossless GoSum LST. A malformed
+// non-blank line is a hard error, so the caller falls back to a verbatim source.
 func ParseGoSumFile(path, content string) (*golang.GoSum, error) {
 	gs := &golang.GoSum{
 		Ident:      uuid.New(),
@@ -58,13 +46,11 @@ func ParseGoSumFile(path, content string) (*golang.GoSum, error) {
 		}
 		lineEnd := j
 		if lineEnd < len(content) {
-			lineEnd++ // include the newline
+			lineEnd++
 		}
 		lineText := content[lineStart:j]
 
 		if strings.TrimSpace(lineText) == "" {
-			// Blank line: fold into the next line's Prefix (or Eof) by
-			// leaving the cursor untouched and advancing past it.
 			i = lineEnd
 			continue
 		}
@@ -85,10 +71,9 @@ func ParseGoSumFile(path, content string) (*golang.GoSum, error) {
 			GoMod:      m[6] != -1,
 			Hash:       "h1:" + lineText[m[8]:m[9]],
 		}
-		after := java.ParseSpace(content[hashEnd:lineEnd])
 		lines = append(lines, java.RightPadded[*golang.GoSumLine]{
 			Element: line,
-			After:   after,
+			After:   java.ParseSpace(content[hashEnd:lineEnd]),
 			Markers: java.Markers{ID: uuid.New()},
 		})
 		cursor = lineEnd

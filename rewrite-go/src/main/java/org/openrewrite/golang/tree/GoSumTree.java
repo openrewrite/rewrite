@@ -20,15 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.golang.GoSumVisitor;
 
-/**
- * Node family for the {@code go.sum} LST: {@link GoSum} and its lines.
- * <p>
- * Mirrors {@link GoModTree}: extending {@link Tree} gives every node
- * {@code Tree}'s {@code @c} polymorphic type id so the elements survive
- * {@code .lst} (de)serialization, and the {@code accept} dispatch routes
- * traversal to a {@link GoSumVisitor}. Printing remains delegated to the Go
- * RPC server.
- */
 public interface GoSumTree extends Tree {
 
     @SuppressWarnings("unchecked")

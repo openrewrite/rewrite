@@ -25,15 +25,6 @@ import org.openrewrite.golang.tree.GoSum;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-/**
- * Parses Go {@code go.sum} files into a lossless {@link GoSum} LST.
- * <p>
- * Like {@link GoModParser}, the actual parsing happens on the Go side (which
- * ships the tree over RPC); this is the Java-side client. go.sum is a flat list
- * of {@code module version[/go.mod] h1:hash} lines with no structured metadata of
- * its own — the module's {@code GoResolutionResult} is attached as a marker by
- * the Go server when a sibling go.mod is available in the same parse batch.
- */
 public class GoSumParser implements Parser {
 
     @Override

@@ -38,21 +38,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Lossless LST for a Go {@code go.sum} file. Mirrors {@code golang.GoSum} on the
- * Go side, which does the actual parsing and ships the tree over RPC.
- * <p>
- * {@code GoSum} is a {@link SourceFile} but, like {@link GoMod} and
- * {@link org.openrewrite.tree.ParseError}, not a {@code J} node — go.sum tokens
- * are not Java expressions. It is serialized by {@code GoSumRpcCodec} and printed
- * by the Go RPC server.
- * <p>
- * go.sum is a flat list of {@code module version[/go.mod] h1:hash} lines. Every
- * byte of whitespace is recoverable: leading whitespace and blank lines live in
- * {@link Space} prefixes and in the {@link JRightPadded#getAfter() after} of each
- * line. The module's structured metadata is not duplicated here; it rides along
- * as a {@code GoResolutionResult} marker.
- */
 @lombok.Value
 @With
 public class GoSum implements SourceFile, GoSumTree {
@@ -77,9 +62,6 @@ public class GoSum implements SourceFile, GoSumTree {
     @Nullable
     FileAttributes fileAttributes;
 
-    /**
-     * The go.sum entries, each right-padded with its line terminator.
-     */
     List<JRightPadded<Line>> lines;
 
     Space eof;
@@ -113,31 +95,16 @@ public class GoSum implements SourceFile, GoSumTree {
         };
     }
 
-    /**
-     * One go.sum entry: {@code module version[/go.mod] h1:hash}. Each module
-     * version appears on two lines — one for the module zip and one for its
-     * go.mod — distinguished by {@link #isGoMod()}.
-     */
+    // One go.sum entry: `module version[/go.mod] h1:hash`.
     @lombok.Value
     @With
     public static class Line implements GoSumTree {
         UUID id;
         Space prefix;
         Markers markers;
-
         String modulePath;
-
         String version;
-
-        /**
-         * {@code true} when this line records the hash of the module's go.mod
-         * (the {@code /go.mod} version suffix); {@code false} for the module zip.
-         */
         boolean goMod;
-
-        /**
-         * The full {@code h1:…} checksum token.
-         */
         String hash;
 
         @Override

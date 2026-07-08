@@ -26,12 +26,6 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-/**
- * Java-side visitor for the {@code go.sum} LST, analogous to {@link GoModVisitor}
- * for {@code go.mod}. It traverses the bespoke {@link GoSum} node set (the flat
- * list of hash lines) so recipes can inspect and rewrite go.sum entirely in Java;
- * printing still goes through the Go RPC server.
- */
 @SuppressWarnings("unused")
 public class GoSumVisitor<P> extends TreeVisitor<GoSumTree, P> {
 
@@ -61,10 +55,6 @@ public class GoSumVisitor<P> extends TreeVisitor<GoSumTree, P> {
         return l;
     }
 
-    /**
-     * go.sum {@link Space} carries no location taxonomy (unlike {@code J}), so
-     * this is a plain identity hook for subclasses to override.
-     */
     public Space visitSpace(Space space, P p) {
         return space;
     }

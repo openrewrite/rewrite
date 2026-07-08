@@ -82,15 +82,6 @@ public final class Assertions {
         return goMod;
     }
 
-    /**
-     * Wrap go.sum content as a sibling SourceSpec, parsed into a lossless
-     * {@link GoSum} LST (via {@link GoSumParser}) so recipes can edit it, just
-     * like {@link #goMod(String)}. When placed inside a
-     * {@link #goProject(String, SourceSpecs...)} alongside a
-     * {@link #goMod(String)}, the go.mod parse also reads the sibling go.sum off
-     * disk (via {@link GoModParser#parseSumContent}) and populates
-     * {@code GoResolutionResult.resolvedDependencies}.
-     */
     public static SourceSpecs goSum(@Nullable String before) {
         return goSum(before, s -> {
         });
