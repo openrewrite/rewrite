@@ -1657,8 +1657,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (!indented) {
                 p.append('{');
             }
-            for (Statement caseStmt : cases.getStatements()) {
-                visit(caseStmt, p);
+            for (JRightPadded<Statement> rp : cases.getPadding().getStatements()) {
+                visit(rp.getElement(), p);
+                visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+                if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                    p.append(';');
+                }
             }
             visitSpace(cases.getEnd(), Space.Location.BLOCK_END, p);
             if (!indented) {
