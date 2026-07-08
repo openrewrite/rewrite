@@ -467,6 +467,7 @@ func (s *server) handleGetLanguages() []string {
 	return []string{
 		"org.openrewrite.golang.tree.Go$CompilationUnit",
 		"org.openrewrite.golang.tree.GoMod",
+		"org.openrewrite.golang.tree.GoSum",
 	}
 }
 
@@ -674,6 +675,37 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		goModByIdx[r.idx] = gm
 	}
 
+	// Index the GoResolutionResult of each parsed go.mod by directory so a
+	// sibling go.sum can carry the module's resolved build list as a marker.
+	mrrByDir := make(map[string]*golang.GoResolutionResult, len(goModByIdx))
+	for _, gm := range goModByIdx {
+		for i := range gm.Markers.Entries {
+			if mrr, ok := gm.Markers.Entries[i].(golang.GoResolutionResult); ok {
+				mrrByDir[filepath.Dir(gm.SourcePath)] = &mrr
+				break
+			}
+		}
+	}
+
+	// Parse every go.sum input into a lossless GoSum LST, mirroring the go.mod
+	// path. Attach the sibling go.mod's GoResolutionResult marker when the two
+	// arrive in the same batch so go.sum recipes can read the resolved graph.
+	goSumByIdx := make(map[int]*golang.GoSum, len(resolvedInputs))
+	for _, r := range resolvedInputs {
+		if filepath.Base(r.sourcePath) != "go.sum" {
+			continue
+		}
+		gs, err := goparser.ParseGoSumFile(r.sourcePath, r.source)
+		if err != nil {
+			parseErrByIdx[r.idx] = err
+			continue
+		}
+		if mrr, ok := mrrByDir[filepath.Dir(r.sourcePath)]; ok && mrr != nil {
+			gs.Markers.Entries = append(gs.Markers.Entries, *mrr)
+		}
+		goSumByIdx[r.idx] = gs
+	}
+
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
@@ -685,6 +717,12 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		if gm, ok := goModByIdx[r.idx]; ok && gm != nil {
 			id := gm.Ident.String()
 			s.localObjects[id] = gm
+			ids = append(ids, id)
+			continue
+		}
+		if gs, ok := goSumByIdx[r.idx]; ok && gs != nil {
+			id := gs.Ident.String()
+			s.localObjects[id] = gs
 			ids = append(ids, id)
 			continue
 		}
@@ -772,7 +810,16 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 		return printer.Print(cu), nil
 	}
 	if gm, ok := obj.(*golang.GoMod); ok {
+		if mp != nil {
+			return printer.PrintGoModWithMarkers(gm, mp), nil
+		}
 		return printer.PrintGoMod(gm), nil
+	}
+	if gs, ok := obj.(*golang.GoSum); ok {
+		if mp != nil {
+			return printer.PrintGoSumWithMarkers(gs, mp), nil
+		}
+		return printer.PrintGoSum(gs), nil
 	}
 	if t, ok := obj.(java.Tree); ok {
 		if mp != nil {
@@ -2325,6 +2372,39 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		items = append(items, parseProjectResponseItem{
 			ID:             id,
 			SourceFileType: "org.openrewrite.golang.tree.GoMod",
+			SourcePath:     sourcePath,
+		})
+	}
+
+	// Emit each sibling go.sum as a lossless GoSum LST so recipes can edit
+	// the checksum file directly. The module's GoResolutionResult — already
+	// parsed above — rides along as a marker so a go.sum recipe can read the
+	// resolved build list.
+	for _, modPath := range disc.goMods {
+		sumPath := filepath.Join(filepath.Dir(modPath), "go.sum")
+		data, err := os.ReadFile(sumPath)
+		if err != nil {
+			continue
+		}
+		sourcePath := sumPath
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, err := filepath.Rel(*req.RelativeTo, sumPath); err == nil {
+				sourcePath = rel
+			}
+		}
+		gs, err := goparser.ParseGoSumFile(sourcePath, string(data))
+		if err != nil {
+			s.logger.Printf("ParseProject: skip go.sum LST %s: %v", sumPath, err)
+			continue
+		}
+		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
+			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr)
+		}
+		id := gs.Ident.String()
+		s.localObjects[id] = gs
+		items = append(items, parseProjectResponseItem{
+			ID:             id,
+			SourceFileType: "org.openrewrite.golang.tree.GoSum",
 			SourcePath:     sourcePath,
 		})
 	}

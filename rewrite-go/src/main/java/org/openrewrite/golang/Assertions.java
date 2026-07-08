@@ -21,12 +21,12 @@ import org.openrewrite.Tree;
 import org.openrewrite.golang.marker.GoProject;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.golang.tree.GoMod;
+import org.openrewrite.golang.tree.GoSum;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
-import org.openrewrite.text.PlainText;
 
 import java.util.function.Consumer;
 
@@ -83,24 +83,21 @@ public final class Assertions {
     }
 
     /**
-     * Wrap go.sum content as a sibling SourceSpec. When placed inside a
+     * Wrap go.sum content as a sibling SourceSpec, parsed into a lossless
+     * {@link GoSum} LST (via {@link GoSumParser}) so recipes can edit it, just
+     * like {@link #goMod(String)}. When placed inside a
      * {@link #goProject(String, SourceSpecs...)} alongside a
-     * {@link #goMod(String)}, the parser reads the sibling go.sum off disk
-     * during parse (via {@link GoModParser#parseSumContent}) and populates
+     * {@link #goMod(String)}, the go.mod parse also reads the sibling go.sum off
+     * disk (via {@link GoModParser#parseSumContent}) and populates
      * {@code GoResolutionResult.resolvedDependencies}.
-     * <p>
-     * Today there is no dedicated parser for go.sum — content round-trips as
-     * a {@link PlainText}. The marker side-effect happens during go.mod
-     * parsing.
      */
     public static SourceSpecs goSum(@Nullable String before) {
         return goSum(before, s -> {
         });
     }
 
-    public static SourceSpecs goSum(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> goSum = new SourceSpec<>(PlainText.class, null,
-                org.openrewrite.text.PlainTextParser.builder(), before, null);
+    public static SourceSpecs goSum(@Nullable String before, Consumer<SourceSpec<GoSum>> spec) {
+        SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, null);
         goSum.path("go.sum");
         spec.accept(goSum);
         return goSum;
@@ -112,9 +109,8 @@ public final class Assertions {
     }
 
     public static SourceSpecs goSum(@Nullable String before, String after,
-                                    Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> goSum = new SourceSpec<>(PlainText.class, null,
-                org.openrewrite.text.PlainTextParser.builder(), before, s -> after);
+                                    Consumer<SourceSpec<GoSum>> spec) {
+        SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, s -> after);
         goSum.path("go.sum");
         spec.accept(goSum);
         return goSum;

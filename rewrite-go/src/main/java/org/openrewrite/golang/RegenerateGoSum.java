@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.golang.internal.LockFileRegeneration;
+import org.openrewrite.golang.tree.GoSum;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
@@ -128,10 +129,12 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof PlainText)) {
+                // go.sum may arrive as a lossless GoSum LST (Go RPC pipeline) or
+                // as PlainText (pure-Java pipeline); handle both.
+                if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                PlainText goSum = (PlainText) tree;
+                SourceFile goSum = (SourceFile) tree;
                 if (!"go.sum".equals(fileName(goSum.getSourcePath()))) {
                     return tree;
                 }
@@ -144,10 +147,21 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
                 }
 
                 String regenerated = result.getLockFileContent();
-                if (regenerated == null || regenerated.equals(goSum.getText())) {
+                if (regenerated == null || regenerated.equals(goSum.printAll())) {
                     return tree;
                 }
-                return goSum.withText(regenerated);
+                if (goSum instanceof PlainText) {
+                    return ((PlainText) goSum).withText(regenerated);
+                }
+                if (goSum instanceof GoSum) {
+                    return GoSumParser.builder().build().parse(regenerated)
+                            .findFirst()
+                            .map(reparsed -> (Tree) reparsed
+                                    .withSourcePath(goSum.getSourcePath())
+                                    .withMarkers(goSum.getMarkers()))
+                            .orElse(tree);
+                }
+                return tree;
             }
         };
     }
