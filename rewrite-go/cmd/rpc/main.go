@@ -995,6 +995,9 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install from path failed: %v", err)}
 		}
+		for _, r := range info.Recipes {
+			s.recipeOrigin[r.Name] = localPath
+		}
 		afterCount := len(s.registry.AllRecipes())
 		return &installRecipesResponse{
 			RecipesInstalled: afterCount - beforeCount,

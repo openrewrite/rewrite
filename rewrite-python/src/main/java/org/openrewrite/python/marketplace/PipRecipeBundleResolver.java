@@ -40,7 +40,10 @@ public class PipRecipeBundleResolver implements RecipeBundleResolver {
         Path pkgPath = Paths.get(bundle.getPackageName());
         InstallRecipesResponse response;
         if (Files.exists(pkgPath)) {
-            response = rpc.installRecipes(pkgPath.toFile());
+            // Key the bundle on the absolute, normalized path so it matches the origin the server records for it.
+            Path absolute = pkgPath.toAbsolutePath().normalize();
+            bundle.setPackageName(absolute.toString());
+            response = rpc.installRecipes(absolute.toFile());
         } else {
             response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
         }
