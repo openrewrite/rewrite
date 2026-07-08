@@ -108,7 +108,7 @@ class EngineReResolutionTest {
         // epoch bumps, and projectPoms carries the mutated parent. Then the child re-resolves through the facade.
         byte[] mutatedParentXml = parentPom("2.0").getBytes(StandardCharsets.UTF_8);
         Pom mutatedParent = RawPom.parse(new ByteArrayInputStream(mutatedParentXml), null).toPom(PARENT_PATH, null);
-        PomXmlRegistry.put(ctx, PARENT_PATH, mutatedParent.getGav(), mutatedParentXml);
+        PomXmlRegistry.put(ctx, mutatedParent, mutatedParentXml);
         PomXmlRegistry.bumpEpoch(ctx);
 
         Map<Path, Pom> projectPoms = new HashMap<>(childResult.getProjectPoms());

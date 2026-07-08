@@ -29,3 +29,8 @@ L-P2-D-002 outcome:expression-cycle
 L-P2-D-003 outcome:parent-packaging
 L-P2-D-004 outcome:aggregator-packaging
 L-P2-D-005 outcome:missing-dependency-version
+L-P2-E-001 outcome:system-scope-missing-path
+# Legacy resolves a metaversion (latest/release) declared in <dependencyManagement> to a concrete version
+# (nondeterministic); Maven — and the engine — keep the literal. Value-conditioned so only the engine-keeps-literal flip
+# is suppressed, never a real version divergence.
+L-P2-E-002 metaversion:$.pom.dependencyManagement

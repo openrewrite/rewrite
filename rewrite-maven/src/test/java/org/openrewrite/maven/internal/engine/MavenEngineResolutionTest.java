@@ -42,17 +42,21 @@ class MavenEngineResolutionTest {
     // ---- PomXmlRegistry ----
 
     @Test
-    void registryStoresAndReadsByPathAndGav() {
+    void registryStoresAndReadsByRequestedPom() {
         ExecutionContext ctx = new InMemoryExecutionContext();
         Path path = Paths.get("a/pom.xml");
         ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(null, "g", "a", "1", null);
+        Pom source = Pom.builder().sourcePath(path).gav(gav).build();
         byte[] xml = "<project/>".getBytes(StandardCharsets.UTF_8);
 
-        PomXmlRegistry.put(ctx, path, gav, xml);
+        PomXmlRegistry.put(ctx, source, xml);
 
-        assertThat(PomXmlRegistry.get(ctx, path, null)).isEqualTo(xml);
-        assertThat(PomXmlRegistry.get(ctx, null, gav)).isEqualTo(xml);
-        assertThat(PomXmlRegistry.get(ctx, Paths.get("other/pom.xml"), null)).isNull();
+        // An equal (or identical) requested pom reads the stored bytes...
+        assertThat(PomXmlRegistry.get(ctx, source)).isEqualTo(xml);
+        assertThat(PomXmlRegistry.get(ctx, Pom.builder().sourcePath(path).gav(gav).build())).isEqualTo(xml);
+        // ...but a mutated (non-equal) pom does not, so a re-resolution never reads stale bytes.
+        assertThat(PomXmlRegistry.get(ctx, source.withName("changed"))).isNull();
+        assertThat(PomXmlRegistry.get(ctx, Pom.builder().sourcePath(Paths.get("other/pom.xml")).gav(gav).build())).isNull();
         assertThat(PomXmlRegistry.pathSource(ctx).apply(path)).isEqualTo(xml);
     }
 

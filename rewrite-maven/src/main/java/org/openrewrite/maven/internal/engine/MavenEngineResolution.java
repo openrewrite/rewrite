@@ -71,6 +71,27 @@ public final class MavenEngineResolution {
         ResolvedPom resolve() throws MavenDownloadingException;
     }
 
+    /** An action run with the engine suppressed (legacy-only); see {@link #withoutEngine}. */
+    @FunctionalInterface
+    public interface SuppressedAction<T, E extends Throwable> {
+        T run() throws E;
+    }
+
+    /**
+     * Runs {@code action} with engine dispatch suppressed, so every nested {@link #effectivePom} call takes the legacy
+     * path. Dependency resolution — and the imported-BOM/parent effective-poms it builds internally — stays 100% legacy
+     * in every mode (Phase 2 routes only the project effective pom through the engine); callers wrap that pass with this.
+     */
+    public static <T, E extends Throwable> T withoutEngine(SuppressedAction<T, E> action) throws E {
+        boolean previous = DISPATCHING.get();
+        DISPATCHING.set(Boolean.TRUE);
+        try {
+            return action.run();
+        } finally {
+            DISPATCHING.set(previous);
+        }
+    }
+
     public static ResolvedPom effectivePom(Pom requested, Iterable<String> activeProfiles,
                                            MavenPomDownloader downloader, ExecutionContext ctx,
                                            LegacyResolution legacy) throws MavenDownloadingException {
@@ -102,9 +123,10 @@ public final class MavenEngineResolution {
         List<String> profiles = toList(activeProfiles);
         Map<String, String> injected = PomXmlRegistry.injectedProperties(ctx);
 
-        byte[] xml = PomXmlRegistry.get(ctx, requested.getSourcePath(), requested.getGav());
+        byte[] xml = PomXmlRegistry.get(ctx, requested);
         if (xml == null) {
-            // Synthetic Pom.builder() graph (rewrite-gradle): no backing document — print one from the converter.
+            // No registry bytes match this requested pom: a synthetic Pom.builder() graph (rewrite-gradle), or a recipe
+            // that mutated the requested pom and re-resolved without refreshing the registry. Print from the converter.
             xml = new PomToModelConverter().toXml(requested);
         }
         xml = ensureModelVersion(xml);
@@ -129,7 +151,7 @@ public final class MavenEngineResolution {
             throw rethrow(outcome.getFailure());
         }
         BomGavAttributor attributor = new BomGavAttributor(service, effectiveSettings, reactor, ctx, mctx.getPomCache());
-        EffectivePomMapper mapper = new EffectivePomMapper(mctx.getPomCache(), attributor);
+        EffectivePomMapper mapper = new EffectivePomMapper(mctx.getPomCache(), attributor, reactor);
         return mapper.map(outcome, requested, profiles, injected);
     }
 
@@ -273,6 +295,11 @@ public final class MavenEngineResolution {
         }
         if (message.contains("dependencies.dependency.version") && message.contains("is missing")) {
             return "missing-dependency-version";
+        }
+        // Any system-scope <systemPath> validation Maven enforces but rewrite tolerates: absent, or non-absolute
+        // (e.g. ${project.basedir}-relative). Legacy resolves; the engine throws exactly where Maven does.
+        if (message.contains("dependencies.dependency.systemPath")) {
+            return "system-scope-missing-path";
         }
         return null;
     }

@@ -72,6 +72,12 @@ public final class EngineFixtureHarness {
         try {
             byte[] xml = Files.readAllBytes(pomPath);
             Pom requested = RawPom.parse(new ByteArrayInputStream(xml), null).toPom(pomPath, null);
+            // Bake injected properties into the project pom's own properties exactly as MavenParser/ParityHarness do
+            // (MavenParser ~L83 putAll), so the engine sees the same requested-pom overlay the legacy side compares against.
+            if (requested.getProperties().isEmpty()) {
+                requested = requested.withProperties(new LinkedHashMap<>());
+            }
+            requested.getProperties().putAll(injected);
             List<MavenRepository> repositories = singletonList(MavenRepository.builder()
                     .id("fixture").uri(repoUri).knownToExist(true).build());
             EffectiveSettings settings = new EffectiveSettings(emptyList(), activeProfiles, injected);
@@ -89,7 +95,7 @@ public final class EngineFixtureHarness {
                 BomGavAttributor attributor = new BomGavAttributor(
                         service, settings, reactor, ctx, MavenExecutionContextView.view(ctx).getPomCache());
                 EffectivePomMapper mapper = new EffectivePomMapper(
-                        MavenExecutionContextView.view(ctx).getPomCache(), attributor);
+                        MavenExecutionContextView.view(ctx).getPomCache(), attributor, reactor);
                 ResolvedPom pom = mapper.map(outcome, requested, activeProfiles, injected);
                 return new EngineResolution(fixture, fixtureDir, pom, requested, activeProfiles, injected, ctx);
             }

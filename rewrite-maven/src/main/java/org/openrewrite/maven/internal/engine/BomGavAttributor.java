@@ -30,6 +30,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedPom;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -66,13 +67,14 @@ public class BomGavAttributor {
         this.pomCache = pomCache;
     }
 
-    public Attribution attribute(Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
+    public Attribution attribute(Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
+                                 Map<String, String> properties) {
         List<Membership> memberships = new ArrayList<>();
         // BOM imports declared in the requested pom AND inherited from its ancestry (a parent's import contributes its
         // managed entries to the child's effective DM — see indirectBomImportedFromParent). Import declaration order,
         // child-first, matches Maven's first-wins merge.
         for (ManagedDependency md : inheritedImports(requested, servedBy)) {
-            ResolvedGroupArtifactVersion bomKey = findServedKey(md, servedBy);
+            ResolvedGroupArtifactVersion bomKey = findServedKey(md, servedBy, properties);
             if (bomKey == null) {
                 continue;
             }
@@ -164,17 +166,27 @@ public class BomGavAttributor {
     }
 
     private static @Nullable ResolvedGroupArtifactVersion findServedKey(
-            ManagedDependency imported, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
+            ManagedDependency imported, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
+            Map<String, String> properties) {
+        // A BOM import can declare its coordinates as ${...} (e.g. Quarkus' maven.config platform g:a:v); servedBy keys
+        // are interpolated, so interpolate the import's coordinates through the merged properties before matching.
+        String groupId = interpolate(imported.getGroupId(), properties);
+        String artifactId = interpolate(imported.getArtifactId(), properties);
+        String version = interpolate(imported.getVersion(), properties);
         ResolvedGroupArtifactVersion fallback = null;
         for (ResolvedGroupArtifactVersion key : servedBy.keySet()) {
-            if (imported.getGroupId().equals(key.getGroupId()) && imported.getArtifactId().equals(key.getArtifactId())) {
-                if (imported.getVersion() != null && imported.getVersion().equals(key.getVersion())) {
+            if (Objects.equals(groupId, key.getGroupId()) && Objects.equals(artifactId, key.getArtifactId())) {
+                if (version != null && version.equals(key.getVersion())) {
                     return key;
                 }
                 fallback = key;
             }
         }
         return fallback;
+    }
+
+    private static @Nullable String interpolate(@Nullable String value, Map<String, String> properties) {
+        return value == null ? null : ResolvedPom.placeholderHelper.replacePlaceholders(value, properties::get);
     }
 
     /** Per-import membership: the directly-imported BOM's identity plus the GACT keys its effective management covers. */

@@ -92,7 +92,7 @@ public class MavenParser implements Parser {
                     projectPoms.put(xml, pom);
                     projectPomsByPath.put(pomPath, pom);
                     // XML-first: the engine reads this pom from its printed document bytes (DESIGN §0).
-                    PomXmlRegistry.put(ctx, pom.getSourcePath(), pom.getGav(), xml.printAll().getBytes(StandardCharsets.UTF_8));
+                    PomXmlRegistry.put(ctx, pom, xml.printAll().getBytes(StandardCharsets.UTF_8));
                 } else {
                     parsed.add(sourceFile);
                 }

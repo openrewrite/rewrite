@@ -1000,12 +1000,12 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx);
+        return MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx));
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return doResolveDependencies(scope, requirements, true, downloader, ctx);
+        return MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, requirements, true, downloader, ctx));
     }
 
     /**
@@ -1015,7 +1015,7 @@ public class ResolvedPom {
      * transitive POM downloads.
      */
     public List<ResolvedDependency> resolveDirectDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx);
+        return MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx));
     }
 
     private List<ResolvedDependency> doResolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,

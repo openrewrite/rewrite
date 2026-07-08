@@ -53,10 +53,12 @@ public class EffectivePomMapper {
 
     private final MavenPomCache pomCache;
     private final BomGavAttributor bomGavAttributor;
+    private final ReactorWorkspace reactor;
 
-    public EffectivePomMapper(MavenPomCache pomCache, BomGavAttributor bomGavAttributor) {
+    public EffectivePomMapper(MavenPomCache pomCache, BomGavAttributor bomGavAttributor, ReactorWorkspace reactor) {
         this.pomCache = pomCache;
         this.bomGavAttributor = bomGavAttributor;
+        this.reactor = reactor;
     }
 
     public ResolvedPom map(EngineModelBuildingOutcome outcome, Pom requested, List<String> activeProfiles,
@@ -78,9 +80,9 @@ public class EffectivePomMapper {
         // where a served-from-bytes parent is absent from servedBy (shadow mode warms the cache before the engine runs).
         Set<String> knownModelIds = knownModelIds(lineageIdBySourceId, servedBy);
 
-        Map<String, String> properties = mergeProperties(result, lineage, injectedProperties);
+        Map<String, String> properties = mergeProperties(result, lineage, rootModelId, requested, servedBy, injectedProperties);
         List<ResolvedManagedDependency> dependencyManagement =
-                dependencyManagement(result, requested, servedBy, lineageIdBySourceId, rootModelId);
+                dependencyManagement(result, requested, servedBy, lineageIdBySourceId, rootModelId, properties);
         List<org.openrewrite.maven.tree.Dependency> requestedDependencies =
                 requestedDependencies(result, requested, servedBy, lineage, rootModelId);
         List<MavenRepository> repositories = repositories(effective.getRepositories(), knownModelIds);
@@ -121,30 +123,45 @@ public class EffectivePomMapper {
 
     // ---- properties (raw lineage merge + injected overlay) ----
 
-    private Map<String, String> mergeProperties(ModelBuildingResult result, List<String> lineage,
+    private Map<String, String> mergeProperties(ModelBuildingResult result, List<String> lineage, String rootModelId,
+                                                Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
                                                 Map<String, String> injected) {
         Map<String, String> merged = new LinkedHashMap<>();
         for (String id : lineage) {
+            // The RawPom-parsed pom for this model carries rewrite's XML-syntax-sensitive empty representation, which
+            // Maven's model collapses (see putAllIfAbsent); consult it so a re-resolution matches legacy's merge.
+            Pom declaring = declaringPom(id, rootModelId, requested, servedBy);
             for (Profile profile : result.getActivePomProfiles(id)) {
-                putAllIfAbsent(merged, profile.getProperties());
+                putAllIfAbsent(merged, profile.getProperties(), declaring);
             }
             Model raw = result.getRawModel(id);
             if (raw != null) {
-                putAllIfAbsent(merged, raw.getProperties());
+                putAllIfAbsent(merged, raw.getProperties(), declaring);
             }
         }
         // Parser/config-injected properties (MavenParser.builder().property(...)) override POM-declared values: legacy
-        // bakes them into every project pom at parse time (MavenParser ~L83 putAll), so they win the raw-lineage merge.
-        merged.putAll(injected);
+        // bakes them into every PROJECT pom at parse time (MavenParser ~L83 putAll), so they win the raw-lineage merge.
+        // A downloaded pom resolved standalone (e.g. a parent probed by ChangeParentPom) never had them baked, so only
+        // overlay a key the requested pom actually carries with that value — never leak them into a foreign pom.
+        for (Map.Entry<String, String> entry : injected.entrySet()) {
+            if (Objects.equals(requested.getProperties().get(entry.getKey()), entry.getValue())) {
+                merged.put(entry.getKey(), entry.getValue());
+            }
+        }
         return merged;
     }
 
-    private static void putAllIfAbsent(Map<String, String> target, Properties properties) {
+    private static void putAllIfAbsent(Map<String, String> target, Properties properties, @Nullable Pom rawSource) {
         for (String name : properties.stringPropertyNames()) {
             if (!target.containsKey(name)) {
-                // An empty <tag/> is null in rewrite's RawPom but "" in Maven's model; keep RawPom's representation.
                 String value = properties.getProperty(name);
-                target.put(name, value.isEmpty() ? null : value);
+                // A self-closing <tag/> is null in rewrite's RawPom, an open/close <tag></tag> is ""; Maven's model
+                // collapses both to "". Preserve the declaring RawPom's representation where it knows the property.
+                if (value.isEmpty() && rawSource != null && rawSource.getProperties().containsKey(name)) {
+                    target.put(name, rawSource.getProperties().get(name));
+                } else {
+                    target.put(name, value.isEmpty() ? null : value);
+                }
             }
         }
     }
@@ -153,12 +170,12 @@ public class EffectivePomMapper {
 
     private List<ResolvedManagedDependency> dependencyManagement(
             ModelBuildingResult result, Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
-            Map<String, String> lineageIdBySourceId, String rootModelId) {
+            Map<String, String> lineageIdBySourceId, String rootModelId, Map<String, String> mergedProperties) {
         DependencyManagement dm = result.getEffectiveModel().getDependencyManagement();
         if (dm == null || dm.getDependencies().isEmpty()) {
             return new ArrayList<>();
         }
-        BomGavAttributor.Attribution attribution = bomGavAttributor.attribute(requested, servedBy);
+        BomGavAttributor.Attribution attribution = bomGavAttributor.attribute(requested, servedBy, mergedProperties);
         List<ResolvedManagedDependency> managed = new ArrayList<>(dm.getDependencies().size());
         // Maven keeps every raw dependencyManagement entry (its ModelNormalizer dedups only <dependencies>); legacy's
         // effective DM is keyed on g:a:classifier:type first-wins (a4 #5402). Match that output shape so duplicate
@@ -454,7 +471,9 @@ public class EffectivePomMapper {
                 }
             }
         }
-        return null;
+        // A reactor parent is served by the WorkspaceModelResolver, never recorded in servedBy; consult the reactor so
+        // its declared instances/properties still thread (its Pom carries RawPom's exact empty representation).
+        return reactor.findReactorPom(coordinates[0], coordinates[1], coordinates[2]);
     }
 
     private static ModelBuildingResult requireResult(EngineModelBuildingOutcome outcome) {

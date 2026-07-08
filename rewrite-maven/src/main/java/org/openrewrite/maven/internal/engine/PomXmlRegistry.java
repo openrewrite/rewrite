@@ -17,6 +17,7 @@ package org.openrewrite.maven.internal.engine;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.nio.file.Path;
@@ -33,6 +34,11 @@ import static java.util.Collections.emptyMap;
  * mutated document's bytes and bumps the reactor epoch on re-resolution. All state lives on the {@link ExecutionContext}
  * as internal messages — additive, no public API. Synthetic {@code Pom.builder()} graphs have no entry here and route
  * through {@link PomToModelConverter} at the facade.
+ * <p>
+ * Each entry remembers the {@link Pom} its bytes were printed from, so {@link #get(ExecutionContext, Pom)} serves them
+ * only while the {@code requested} pom still matches. A recipe that mutates the requested pom and re-resolves without
+ * refreshing this registry (e.g. {@code ChangeParentPom}'s scanner, which re-resolves a {@code withParent} pom directly)
+ * therefore does not get stale bytes; the facade falls back to {@link PomToModelConverter} on the mutated pom.
  */
 public final class PomXmlRegistry {
 
@@ -43,9 +49,19 @@ public final class PomXmlRegistry {
     private PomXmlRegistry() {
     }
 
+    private static final class Entry {
+        final byte[] xml;
+        final Pom source;
+
+        Entry(byte[] xml, Pom source) {
+            this.xml = xml;
+            this.source = source;
+        }
+    }
+
     @SuppressWarnings("unchecked")
-    private static Map<String, byte[]> bytes(ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(BYTES_KEY, k -> new ConcurrentHashMap<String, byte[]>());
+    private static Map<String, Entry> entries(ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(BYTES_KEY, k -> new ConcurrentHashMap<String, Entry>());
     }
 
     private static String pathKey(Path sourcePath) {
@@ -57,29 +73,40 @@ public final class PomXmlRegistry {
     }
 
     /** Record a project pom's printed XML, keyed by both its source path and its GAV so either lookup finds it. */
-    public static void put(ExecutionContext ctx, @Nullable Path sourcePath, @Nullable ResolvedGroupArtifactVersion gav, byte[] xml) {
-        Map<String, byte[]> bytes = bytes(ctx);
-        if (sourcePath != null) {
-            bytes.put(pathKey(sourcePath), xml);
+    public static void put(ExecutionContext ctx, Pom source, byte[] xml) {
+        Map<String, Entry> entries = entries(ctx);
+        Entry entry = new Entry(xml, source);
+        if (source.getSourcePath() != null) {
+            entries.put(pathKey(source.getSourcePath()), entry);
         }
-        if (gav != null) {
-            bytes.put(gavKey(gav), xml);
+        if (source.getGav() != null) {
+            entries.put(gavKey(source.getGav()), entry);
         }
     }
 
-    public static byte @Nullable [] get(ExecutionContext ctx, @Nullable Path sourcePath, @Nullable ResolvedGroupArtifactVersion gav) {
-        Map<String, byte[]> bytes = bytes(ctx);
-        byte[] found = sourcePath == null ? null : bytes.get(pathKey(sourcePath));
-        if (found == null && gav != null) {
-            found = bytes.get(gavKey(gav));
+    /**
+     * The printed XML for {@code requested}, or {@code null} if no entry matches it. An entry matches only when the pom
+     * its bytes were printed from still equals {@code requested}, so a mutated re-resolution never reads stale bytes.
+     */
+    public static byte @Nullable [] get(ExecutionContext ctx, Pom requested) {
+        Map<String, Entry> entries = entries(ctx);
+        Entry entry = requested.getSourcePath() == null ? null : entries.get(pathKey(requested.getSourcePath()));
+        if ((entry == null || !entry.source.equals(requested)) && requested.getGav() != null) {
+            entry = entries.get(gavKey(requested.getGav()));
         }
-        return found;
+        return entry != null && entry.source.equals(requested) ? entry.xml : null;
     }
 
     /** The {@code Function<Path, byte[]>} a {@link ReactorWorkspace} reads printed bytes through. */
     public static Function<Path, byte @Nullable []> pathSource(ExecutionContext ctx) {
-        Map<String, byte[]> bytes = bytes(ctx);
-        return path -> path == null ? null : bytes.get(pathKey(path));
+        Map<String, Entry> entries = entries(ctx);
+        return path -> {
+            if (path == null) {
+                return null;
+            }
+            Entry entry = entries.get(pathKey(path));
+            return entry == null ? null : entry.xml;
+        };
     }
 
     private static AtomicInteger epochCounter(ExecutionContext ctx) {

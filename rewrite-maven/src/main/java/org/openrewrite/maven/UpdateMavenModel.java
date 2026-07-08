@@ -27,8 +27,10 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.emptyList;
@@ -140,6 +142,27 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(emptyList());
         }
 
+        // Re-read each profile's <properties> from the document so a recipe that edits a profile property (e.g.
+        // ChangePropertyValue in a <profile>) doesn't leave the re-resolved model's profile properties stale.
+        List<Xml.Tag> profileTags = document.getRoot().getChild("profiles")
+                .map(ps -> ps.getChildren("profile")).orElse(emptyList());
+        if (!requested.getProfiles().isEmpty() && !profileTags.isEmpty()) {
+            requested = requested.withProfiles(ListUtils.map(requested.getProfiles(), profile -> {
+                for (Xml.Tag profileTag : profileTags) {
+                    if (Objects.equals(profileTag.getChildValue("id").orElse(null), profile.getId())) {
+                        Map<String, String> profileProperties = new LinkedHashMap<>();
+                        profileTag.getChild("properties").ifPresent(pt -> {
+                            for (Xml.Tag propertyTag : pt.getChildren()) {
+                                profileProperties.put(propertyTag.getName(), propertyTag.getValue().orElse(""));
+                            }
+                        });
+                        return profile.withProperties(profileProperties);
+                    }
+                }
+                return profile;
+            }));
+        }
+
         try {
             Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
             Path sourcePath = requested.getSourcePath();
@@ -148,7 +171,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             }
             // XML-first re-resolution: feed the engine the mutated document's current bytes and bump the reactor epoch
             // so any GAV-keyed engine cache re-reads them (DESIGN §5.5). Inert unless the maven/shadow engine is active.
-            PomXmlRegistry.put(ctx, sourcePath, requested.getGav(), document.printAll().getBytes(StandardCharsets.UTF_8));
+            PomXmlRegistry.put(ctx, requested, document.printAll().getBytes(StandardCharsets.UTF_8));
             PomXmlRegistry.setInjectedProperties(ctx, resolutionResult.getUserProperties());
             PomXmlRegistry.bumpEpoch(ctx);
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),

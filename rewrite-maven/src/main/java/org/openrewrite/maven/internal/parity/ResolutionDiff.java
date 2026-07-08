@@ -53,7 +53,7 @@ public class ResolutionDiff {
         for (Entry entry : entries) {
             boolean masked = false;
             for (SnapshotNormalizer.Mask mask : masks) {
-                if (entry.getPath().startsWith(mask.getJsonPathPrefix())) {
+                if (matches(mask.getJsonPathPrefix(), entry)) {
                     masked = true;
                     break;
                 }
@@ -63,6 +63,25 @@ public class ResolutionDiff {
             }
         }
         return new ResolutionDiff(unmasked);
+    }
+
+    // A plain prefix masks by path; a `metaversion:<prefix>` mask additionally requires the engine (right) value to be a
+    // metaversion literal (latest/release) — narrow enough to suppress only a legacy-resolves/engine-keeps-literal flip
+    // (a real regression never keeps a metaversion literal), so it never hides a genuine version divergence.
+    private static boolean matches(String jsonPathPrefix, Entry entry) {
+        if (jsonPathPrefix.startsWith("metaversion:")) {
+            String prefix = jsonPathPrefix.substring("metaversion:".length());
+            return entry.getPath().startsWith(prefix) && isMetaversion(entry.getRight());
+        }
+        return entry.getPath().startsWith(jsonPathPrefix);
+    }
+
+    private static boolean isMetaversion(String rendered) {
+        String value = rendered;
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            value = value.substring(1, value.length() - 1);
+        }
+        return "latest".equalsIgnoreCase(value) || "release".equalsIgnoreCase(value);
     }
 
     private static void diff(String path, @Nullable JsonNode left, @Nullable JsonNode right, List<Entry> entries) {
