@@ -1,0 +1,37 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>scope-matrix-app</artifactId>
+    <version>1</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>c-dep</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>r-dep</artifactId>
+            <version>1.0</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>t-dep</artifactId>
+            <version>1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>p-dep</artifactId>
+            <version>1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>o-dep</artifactId>
+            <version>1.0</version>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>

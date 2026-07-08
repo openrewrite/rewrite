@@ -34,3 +34,8 @@ L-P2-E-001 outcome:system-scope-missing-path
 # (nondeterministic); Maven — and the engine — keep the literal. Value-conditioned so only the engine-keeps-literal flip
 # is suppressed, never a real version divergence.
 L-P2-E-002 metaversion:$.pom.dependencyManagement
+# The engine includes managed entries from a property-negation-activated <profile> in a transitively imported BOM
+# (spring-boot-dependencies:3.2.4 → infinispan-bom:14.0.27.Final's `community` profile, active when
+# `release-mode != downstream`); legacy's env-var-based profile activation drops them. Engine is Maven-correct.
+# Directional: suppresses only engine-added managed entries (left == <missing>), never a value divergence or an engine drop.
+L-P2-E-003 dm-superset:$.pom.dependencyManagement

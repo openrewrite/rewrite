@@ -20,7 +20,9 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -73,6 +75,13 @@ public class ResolutionDiff {
             String prefix = jsonPathPrefix.substring("metaversion:".length());
             return entry.getPath().startsWith(prefix) && isMetaversion(entry.getRight());
         }
+        // A `dm-superset:<prefix>` mask suppresses only entries the ENGINE adds that legacy dropped (left == <missing>):
+        // Maven-correct managed entries legacy omits (e.g. a property-negation-activated <profile> in a transitively
+        // imported BOM). Directional — it never hides a value divergence on a shared key, nor an engine DROP.
+        if (jsonPathPrefix.startsWith("dm-superset:")) {
+            String prefix = jsonPathPrefix.substring("dm-superset:".length());
+            return entry.getPath().startsWith(prefix) && MISSING.equals(entry.getLeft());
+        }
         return entry.getPath().startsWith(jsonPathPrefix);
     }
 
@@ -99,9 +108,23 @@ public class ResolutionDiff {
                 diff(path + "." + name, left.get(name), right.get(name), entries);
             }
         } else if (left.isArray() && right.isArray()) {
-            int max = Math.max(left.size(), right.size());
-            for (int i = 0; i < max; i++) {
-                diff(path + "[" + i + "]", left.get(i), right.get(i), entries);
+            // dependencyManagement is a gact-keyed, gact-sorted collection on both sides; aligning by gact (rather than
+            // by index) keeps a set difference from cascading into a positional shift across every later entry. For
+            // equal sets this is identical to the index diff (same sorted order); it only differs when the sets differ.
+            if (path.endsWith(".dependencyManagement")) {
+                Map<String, JsonNode> leftByKey = keyed(left);
+                Map<String, JsonNode> rightByKey = keyed(right);
+                SortedSet<String> keys = new TreeSet<>();
+                keys.addAll(leftByKey.keySet());
+                keys.addAll(rightByKey.keySet());
+                for (String key : keys) {
+                    diff(path + "{" + key + "}", leftByKey.get(key), rightByKey.get(key), entries);
+                }
+            } else {
+                int max = Math.max(left.size(), right.size());
+                for (int i = 0; i < max; i++) {
+                    diff(path + "[" + i + "]", left.get(i), right.get(i), entries);
+                }
             }
         } else if (!left.equals(right)) {
             entries.add(new Entry(path, render(left), render(right)));
@@ -110,6 +133,16 @@ public class ResolutionDiff {
 
     private static String render(@Nullable JsonNode node) {
         return node == null ? MISSING : node.toString();
+    }
+
+    // Index dependencyManagement entries by their `gact` field (unique — legacy and the mapper both dedup by g:a:c:t).
+    private static Map<String, JsonNode> keyed(JsonNode array) {
+        Map<String, JsonNode> byKey = new LinkedHashMap<>();
+        for (JsonNode element : array) {
+            JsonNode gact = element.get("gact");
+            byKey.putIfAbsent(gact == null ? "?" + byKey.size() : gact.asText(), element);
+        }
+        return byKey;
     }
 
     public boolean isEmpty() {
