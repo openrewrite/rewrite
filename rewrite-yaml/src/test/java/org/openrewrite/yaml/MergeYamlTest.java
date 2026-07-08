@@ -3752,4 +3752,164 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void newEntryMatchesSiblingIndentWhenGreaterThanDetected() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  # Tool will only check for accesses, only within the last N days
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    keep: 'none'
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  # Tool will only check for accesses, only within the last N days
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    keep: 'none'
+                  retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenDeeplyNested() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.parent.child",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              parent:
+                child:
+                        access_days_threshold: 30
+                        ignore_dependencies: false
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              parent:
+                child:
+                        access_days_threshold: 30
+                        ignore_dependencies: false
+                        retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newNestedEntryMatchesSiblingIndentAndKeepsRelativeChildIndent() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            """
+              vms_options:
+                cleanup: true
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    cleanup: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenLessThanDetected() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                  foo: 1
+                  bar: 2
+                  nested:
+                      baz: 3
+              settings:
+                access_days_threshold: 30
+                ignore_dependencies: false
+              """,
+            """
+              common:
+                  foo: 1
+                  bar: 2
+                  nested:
+                      baz: 3
+              settings:
+                access_days_threshold: 30
+                ignore_dependencies: false
+                retry_on_error: true
+              """
+          )
+        );
+    }
+
 }
