@@ -39,6 +39,20 @@ public interface MavenPomCache {
 
     void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom);
 
+    /**
+     * Raw POM bytes keyed exactly like {@link #getPom}. The model builder needs real XML, which the
+     * parsed {@link Pom} is lossy for, so the bytes are the durable cache unit. Tri-state as elsewhere:
+     * {@code null} = unknown, {@link Optional#empty()} = known-absent, present = hit.
+     */
+    @SuppressWarnings("OptionalAssignedToNull")
+    @Nullable
+    default Optional<byte[]> getPomBytes(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
+        return null;
+    }
+
+    default void putPomBytes(ResolvedGroupArtifactVersion gav, byte @Nullable [] bytes) {
+    }
+
     @Nullable
     Optional<MavenRepository> getNormalizedRepository(MavenRepository repository);
 

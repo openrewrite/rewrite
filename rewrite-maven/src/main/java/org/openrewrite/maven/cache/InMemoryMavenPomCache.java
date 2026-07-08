@@ -34,6 +34,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     private final Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache;
+    private final Cache<ResolvedGroupArtifactVersion, Optional<byte[]>> pomBytesCache;
     private final Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache;
     private final Cache<MavenRepository, Optional<MavenRepository>> repositoryCache;
     private final Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache;
@@ -66,6 +67,9 @@ public class InMemoryMavenPomCache implements MavenPomCache {
                                  Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
 
         this.pomCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs - " + cacheNickname);
+        // Bytes region is created internally to keep the existing constructor signatures host-compatible; sized like the pom region.
+        this.pomBytesCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry,
+                Caffeine.newBuilder().recordStats().maximumSize(100_000).build(), "Maven POM bytes - " + cacheNickname);
         this.mavenMetadataCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata - " + cacheNickname);
         this.repositoryCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories - " + cacheNickname);
         this.dependencyCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, dependencyCache, "Resolved dependency POMs - " + cacheNickname);
@@ -106,6 +110,16 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     @Override
     public void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom) {
         pomCache.put(gav, Optional.ofNullable(pom));
+    }
+
+    @Override
+    public @Nullable Optional<byte[]> getPomBytes(ResolvedGroupArtifactVersion gav) {
+        return pomBytesCache.getIfPresent(gav);
+    }
+
+    @Override
+    public void putPomBytes(ResolvedGroupArtifactVersion gav, byte @Nullable [] bytes) {
+        pomBytesCache.put(gav, Optional.ofNullable(bytes));
     }
 
     @Override
