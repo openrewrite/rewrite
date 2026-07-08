@@ -71,7 +71,7 @@ public class EngineEffectivePom {
         DefaultModelBuilder builder = new EngineModelBuilderFactory().newInstance();
         DefaultModelBuildingRequest request = new DefaultModelBuildingRequest();
         request.setModelSource(new StringModelSource(new String(requestedPomXml, StandardCharsets.UTF_8), sourceLabel(requested)));
-        request.setModelResolver(new EngineModelResolver(bridge, requestRepositories));
+        request.setModelResolver(new EngineModelResolver(bridge, reactor, requestRepositories));
         request.setWorkspaceModelResolver(reactor);
         // A fresh per-build model cache: the model-building walk (resolvePom for parents/BOMs) must run each build so
         // the servedBy gav→repo attribution the mappers depend on is complete even on a warm run. Byte downloads are

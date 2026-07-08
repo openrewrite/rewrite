@@ -21,10 +21,12 @@ import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Parent;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Repository;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.RepositoryPolicy;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.ModelSource;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.StringModelSource;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.resolution.ModelResolver;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.resolution.UnresolvableModelException;
 import org.openrewrite.maven.tree.MavenRepository;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,16 +44,28 @@ import java.util.List;
 public class EngineModelResolver implements ModelResolver {
 
     private final CacheBridge bridge;
+    private final ReactorWorkspace reactor;
     private final List<MavenRepository> repositories;
 
-    public EngineModelResolver(CacheBridge bridge, List<MavenRepository> repositories) {
+    public EngineModelResolver(CacheBridge bridge, ReactorWorkspace reactor, List<MavenRepository> repositories) {
         this.bridge = bridge;
+        this.reactor = reactor;
         this.repositories = new ArrayList<>(repositories);
     }
 
     @Override
     public ModelSource resolveModel(String groupId, String artifactId, String version)
             throws UnresolvableModelException {
+        // Workspace-first, mirroring parent resolution: an imported BOM (or its transitive imports) that lives in the
+        // reactor is served from its printed XML instead of the repository. Maven consults the workspace for imports
+        // only via resolveEffectiveModel (which we defer), so intercept here and let the model builder build it.
+        byte[] reactorXml = reactor.reactorPomXml(groupId, artifactId, version);
+        if (reactorXml != null) {
+            byte[] xml = MavenEngineResolution.ensureModelVersion(reactorXml);
+            // Record it as served so the mappers attribute the imported BOM's gav→repo and thread its managed entries.
+            bridge.recordReactorServed(groupId, artifactId, version, xml);
+            return new StringModelSource(new String(xml, StandardCharsets.UTF_8), groupId + ":" + artifactId + ":" + version);
+        }
         return bridge.resolvePom(groupId, artifactId, version, repositories);
     }
 
@@ -91,7 +105,7 @@ public class EngineModelResolver implements ModelResolver {
 
     @Override
     public ModelResolver newCopy() {
-        return new EngineModelResolver(bridge, repositories);
+        return new EngineModelResolver(bridge, reactor, repositories);
     }
 
     private static MavenRepository toMavenRepository(Repository repository) {

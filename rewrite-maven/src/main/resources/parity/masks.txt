@@ -19,3 +19,13 @@ L-P2-C-004 $.pom.repositories
 # Legacy resolution drops <pluginRepositories> entirely (they survive only when resolve() returns
 # `this` unchanged); the engine carries declared+inherited plugin repositories per Maven.
 L-P2-C-005 $.pom.pluginRepositories
+#
+# Outcome masks (`outcome:<category>`): the engine's ModelBuilder is Maven-identically stricter than rewrite's lenient
+# snippet parser. Legacy resolves the effective pom; the engine throws exactly where real Maven throws. Shadow returns
+# legacy's result for these; the tolerance tests flip at the Phase-5 cutover. Only legacy-resolves/engine-throws is
+# masked — the reverse is always an unexplained regression.
+L-P2-D-001 outcome:self-parent
+L-P2-D-002 outcome:expression-cycle
+L-P2-D-003 outcome:parent-packaging
+L-P2-D-004 outcome:aggregator-packaging
+L-P2-D-005 outcome:missing-dependency-version

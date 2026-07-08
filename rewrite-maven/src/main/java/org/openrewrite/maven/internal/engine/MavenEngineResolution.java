@@ -135,7 +135,7 @@ public final class MavenEngineResolution {
 
     // Rewrite's RawPom parses poms with no explicit <modelVersion> (it defaults to 4.0.0); Maven's ModelBuilder rejects
     // them. Default it so the engine reads the same lenient model rewrite's parser does (KEEP_REWRITE, L-P2-C-003).
-    private static byte[] ensureModelVersion(byte[] xml) {
+    static byte[] ensureModelVersion(byte[] xml) {
         String s = new String(xml, StandardCharsets.UTF_8);
         if (s.contains("<modelVersion")) {
             return xml;
@@ -203,8 +203,15 @@ public final class MavenEngineResolution {
     static void assertShadowParity(Pom requested, List<String> profiles, Map<String, String> injected,
                                    Attempt legacy, Attempt engine) {
         if (legacy.failure != null || engine.failure != null) {
-            // One threw and the other did not: an unexplained outcome mismatch (report both). Both threw: consistent.
+            // One threw and the other did not: an outcome mismatch. Legacy-resolves/engine-fails where the engine is
+            // Maven-identically stricter than rewrite's lenient parser (cycles, self-parent, non-pom parent/aggregator
+            // packaging, a genuinely missing dependency version) is a known class that flips at Phase 5; a ledgered
+            // outcome mask lets shadow return legacy's result rather than failing. Anything else is unexplained.
             if (legacy.failure == null || engine.failure == null) {
+                String category = classifyEngineStrictness(legacy, engine);
+                if (category != null && isOutcomeMaskLedgered(category)) {
+                    return;
+                }
                 throw new AssertionError("Shadow resolution outcome mismatch for " + requested.getGav() + ":\n" +
                         "  legacy: " + describe(legacy) + "\n" +
                         "  engine: " + describe(engine));
@@ -240,6 +247,44 @@ public final class MavenEngineResolution {
         MavenResolutionResult wrapper = new MavenResolutionResult(
                 UUID.randomUUID(), null, pom, emptyList(), null, new LinkedHashMap<>(), null, profiles, injected);
         return ResolutionSnapshot.of(wrapper, emptyList(), emptyList(), normalizer, null);
+    }
+
+    // Classifies a legacy-resolves/engine-throws mismatch into an engine-strictness category (or null if it is not a
+    // known Maven-stricter-than-rewrite case and must surface). The reverse direction is never masked.
+    static @Nullable String classifyEngineStrictness(Attempt legacy, Attempt engine) {
+        if (legacy.failure != null || engine.failure == null) {
+            return null;
+        }
+        String message = engine.failure.getMessage();
+        if (message == null) {
+            return null;
+        }
+        if (message.contains("cannot have the same groupId:artifactId as the project")) {
+            return "self-parent";
+        }
+        if (message.contains("recursive expression cycle")) {
+            return "expression-cycle";
+        }
+        if (message.contains("Invalid packaging for parent POM")) {
+            return "parent-packaging";
+        }
+        if (message.contains("Aggregator projects require 'pom' as packaging")) {
+            return "aggregator-packaging";
+        }
+        if (message.contains("dependencies.dependency.version") && message.contains("is missing")) {
+            return "missing-dependency-version";
+        }
+        return null;
+    }
+
+    private static boolean isOutcomeMaskLedgered(String category) {
+        String token = "outcome:" + category;
+        for (SnapshotNormalizer.Mask mask : SnapshotNormalizer.loadMasks()) {
+            if (token.equals(mask.getJsonPathPrefix())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String describe(Attempt attempt) {

@@ -32,6 +32,9 @@ import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.Artifac
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.VersionRangeRequest;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.VersionRangeResolutionException;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.VersionRangeResult;
+import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.VersionRequest;
+import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.VersionResolutionException;
+import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.VersionResult;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.transfer.ArtifactNotFoundException;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.version.Version;
@@ -80,9 +83,28 @@ public class CacheBridge {
         this.materializeDir = materializeDir;
     }
 
+    // A synthetic repository standing in for reactor-served poms so an imported reactor BOM is recorded in servedBy /
+    // the pom regions exactly like a repository-resolved one (its identity never surfaces — bomGav renders g:a:v only).
+    private static final MavenRepository REACTOR =
+            new MavenRepository("reactor", "reactor:workspace", "true", "true", true, null, null, null, false);
+
     /** {@code gav → repository} that served it this run; empty for GAVs answered from the warm bytes region (no repo re-derived). */
     public Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy() {
         return servedBy;
+    }
+
+    /**
+     * Record a reactor-served import BOM (bytes already model-version-ensured) into {@code servedBy} and the pom-bytes /
+     * parsed-{@link Pom} regions so {@link BomGavAttributor} and {@link EffectivePomMapper}'s declaring-pom join treat it
+     * uniformly with a repository-resolved BOM. The model builder reads the import from the {@code ModelSource}
+     * {@link EngineModelResolver} returns; this only backs the mappers' cache lookups.
+     */
+    public void recordReactorServed(String groupId, String artifactId, String version, byte[] bytes) {
+        ResolvedGroupArtifactVersion key =
+                new ResolvedGroupArtifactVersion(REACTOR.getUri(), groupId, artifactId, version, null);
+        servedBy.put(key, REACTOR);
+        pomCache.putPomBytes(key, bytes);
+        parseThrough(key, REACTOR, bytes);
     }
 
     /** The per-repository responses recorded for a GAV that failed to resolve, for {@link ModelParityErrorMapper}. */
@@ -142,11 +164,15 @@ public class CacheBridge {
     }
 
     /**
-     * Resolve a {@code <parent>}/BOM version that may be a range (e.g. {@code [1.0,2.0)}) to the highest matching
-     * version via the engine's {@code VersionRangeResolver}; a plain version is returned unchanged with no I/O.
+     * Resolve a {@code <parent>}/BOM version to a concrete version: a range (e.g. {@code [1.0,2.0)}) via the engine's
+     * {@code VersionRangeResolver}, a {@code RELEASE}/{@code LATEST} metaversion (case-insensitive, as legacy
+     * up-cases them) via the {@code VersionResolver}/metadata path; a plain version is returned unchanged with no I/O.
      */
     public String resolveHighestMatchingVersion(String groupId, String artifactId, String version,
                                                 List<MavenRepository> repositories) throws UnresolvableModelException {
+        if (isMetaVersion(version)) {
+            return resolveMetaVersion(groupId, artifactId, version.toUpperCase(), repositories);
+        }
         if (!isRange(version)) {
             return version;
         }
@@ -163,6 +189,23 @@ public class CacheBridge {
             return highest.toString();
         } catch (VersionRangeResolutionException e) {
             throw new UnresolvableModelException(e, groupId, artifactId, version);
+        }
+    }
+
+    private String resolveMetaVersion(String groupId, String artifactId, String metaVersion,
+                                      List<MavenRepository> repositories) throws UnresolvableModelException {
+        VersionRequest request = new VersionRequest(
+                new DefaultArtifact(groupId, artifactId, "", "pom", metaVersion), toRemote(repositories), "");
+        try {
+            VersionResult result = system.resolveVersion(session, request);
+            if (result.getVersion() == null || isMetaVersion(result.getVersion())) {
+                throw new UnresolvableModelException(
+                        "No " + metaVersion + " version available for " + groupId + ":" + artifactId,
+                        groupId, artifactId, metaVersion);
+            }
+            return result.getVersion();
+        } catch (VersionResolutionException e) {
+            throw new UnresolvableModelException(e, groupId, artifactId, metaVersion);
         }
     }
 
@@ -247,6 +290,10 @@ public class CacheBridge {
 
     private static boolean isRange(String version) {
         return version.startsWith("[") || version.startsWith("(");
+    }
+
+    private static boolean isMetaVersion(String version) {
+        return "RELEASE".equalsIgnoreCase(version) || "LATEST".equalsIgnoreCase(version);
     }
 
     private static String rootMessage(Throwable t) {

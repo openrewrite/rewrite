@@ -24,15 +24,19 @@ import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Dependency;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.DependencyManagement;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Model;
 import org.openrewrite.maven.tree.GroupArtifactClassifierType;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ManagedDependency;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -64,10 +68,10 @@ public class BomGavAttributor {
 
     public Attribution attribute(Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
         List<Membership> memberships = new ArrayList<>();
-        for (ManagedDependency md : requested.getDependencyManagement()) {
-            if (!(md instanceof ManagedDependency.Imported)) {
-                continue;
-            }
+        // BOM imports declared in the requested pom AND inherited from its ancestry (a parent's import contributes its
+        // managed entries to the child's effective DM — see indirectBomImportedFromParent). Import declaration order,
+        // child-first, matches Maven's first-wins merge.
+        for (ManagedDependency md : inheritedImports(requested, servedBy)) {
             ResolvedGroupArtifactVersion bomKey = findServedKey(md, servedBy);
             if (bomKey == null) {
                 continue;
@@ -80,6 +84,49 @@ public class BomGavAttributor {
             }
         }
         return new Attribution(memberships);
+    }
+
+    private List<ManagedDependency> inheritedImports(Pom requested,
+                                                     Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
+        List<ManagedDependency> imports = new ArrayList<>();
+        Set<GroupArtifactVersion> visited = new HashSet<>();
+        for (Pom pom = requested; pom != null && visited.add(pom.getGav().asGroupArtifactVersion()); pom = parentOf(pom, servedBy)) {
+            for (ManagedDependency md : pom.getDependencyManagement()) {
+                if (md instanceof ManagedDependency.Imported) {
+                    imports.add(md);
+                }
+            }
+        }
+        return imports;
+    }
+
+    private @Nullable Pom parentOf(Pom pom, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
+        Parent parent = pom.getParent();
+        if (parent == null) {
+            return null;
+        }
+        String groupId = parent.getGroupId();
+        String artifactId = parent.getArtifactId();
+        String version = parent.getVersion();
+        Pom fromReactor = reactor.findReactorPom(groupId, artifactId, version);
+        if (fromReactor != null) {
+            return fromReactor;
+        }
+        for (ResolvedGroupArtifactVersion key : servedBy.keySet()) {
+            if (Objects.equals(groupId, key.getGroupId()) && Objects.equals(artifactId, key.getArtifactId()) &&
+                    (version == null || Objects.equals(version, key.getVersion()))) {
+                try {
+                    Optional<Pom> parentPom = pomCache.getPom(key);
+                    //noinspection OptionalAssignedToNull
+                    if (parentPom != null && parentPom.isPresent()) {
+                        return parentPom.get();
+                    }
+                } catch (Exception ignored) {
+                    // fall through
+                }
+            }
+        }
+        return null;
     }
 
     private @Nullable Set<GroupArtifactClassifierType> effectiveManagementKeys(ResolvedGroupArtifactVersion bomKey) {

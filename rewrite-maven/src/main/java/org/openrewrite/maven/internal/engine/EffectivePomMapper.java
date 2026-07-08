@@ -64,19 +64,23 @@ public class EffectivePomMapper {
         ModelBuildingResult result = requireResult(outcome);
         Model effective = result.getEffectiveModel();
         List<String> lineage = result.getModelIds();
-        Set<String> lineageIds = new HashSet<>(lineage);
         String rootModelId = lineage.get(0);
         Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy = outcome.getServedBy();
+
+        // getModelIds() are interpolated g:a:v; an InputLocation's source modelId is the RAW g:a:v (may hold ${...}).
+        // Map every source-id form to its interpolated lineage id so declared entries in a ${revision}/${project.version}
+        // pom still resolve to their lineage model.
+        Map<String, String> lineageIdBySourceId = lineageIdBySourceId(result, lineage);
 
         // Real contributing models (the inheritance lineage + imported BOMs); the super-POM contributes an empty model
         // id and is excluded, so its injected pluginManagement/repositories/pluginRepositories never surface — rewrite
         // only carries declared/inherited entries. Derived from the lineage (not servedBy) so it holds on a warm cache,
         // where a served-from-bytes parent is absent from servedBy (shadow mode warms the cache before the engine runs).
-        Set<String> knownModelIds = knownModelIds(lineage, servedBy);
+        Set<String> knownModelIds = knownModelIds(lineageIdBySourceId, servedBy);
 
         Map<String, String> properties = mergeProperties(result, lineage, injectedProperties);
         List<ResolvedManagedDependency> dependencyManagement =
-                dependencyManagement(result, requested, servedBy, lineageIds, rootModelId);
+                dependencyManagement(result, requested, servedBy, lineageIdBySourceId, rootModelId);
         List<org.openrewrite.maven.tree.Dependency> requestedDependencies =
                 requestedDependencies(result, requested, servedBy, lineage, rootModelId);
         List<MavenRepository> repositories = repositories(effective.getRepositories(), knownModelIds);
@@ -84,7 +88,7 @@ public class EffectivePomMapper {
         List<org.openrewrite.maven.tree.Plugin> plugins = plugins(buildPlugins(effective), knownModelIds);
         List<org.openrewrite.maven.tree.Plugin> pluginManagement = plugins(buildPluginManagement(effective), knownModelIds);
 
-        return ResolvedPom.builder()
+        ResolvedPom resolved = ResolvedPom.builder()
                 .requested(requested)
                 .activeProfiles(activeProfiles)
                 .properties(properties)
@@ -98,6 +102,21 @@ public class EffectivePomMapper {
                 .pluginManagement(pluginManagement)
                 .subprojects(requested.getSubprojects())
                 .build();
+        return withInterpolatedGav(resolved);
+    }
+
+    // Legacy interpolates the requested gav's coordinates once properties are merged (ResolvedPom.Resolver ~L448); the
+    // projected gav is rewrite output shape, so mirror it via the same getValue path — same properties, same result
+    // (CI-friendly ${revision}, ${project.version}, g/a-as-property).
+    private static ResolvedPom withInterpolatedGav(ResolvedPom resolved) {
+        ResolvedGroupArtifactVersion gav = resolved.getGav();
+        ResolvedGroupArtifactVersion interpolated = gav
+                .withRepository(resolved.getValue(gav.getRepository()))
+                .withGroupId(resolved.getValue(gav.getGroupId()))
+                .withArtifactId(resolved.getValue(gav.getArtifactId()))
+                .withVersion(resolved.getValue(gav.getVersion()))
+                .withDatedSnapshotVersion(resolved.getValue(gav.getDatedSnapshotVersion()));
+        return interpolated.equals(gav) ? resolved : resolved.withRequested(resolved.getRequested().withGav(interpolated));
     }
 
     // ---- properties (raw lineage merge + injected overlay) ----
@@ -114,10 +133,9 @@ public class EffectivePomMapper {
                 putAllIfAbsent(merged, raw.getProperties());
             }
         }
-        // Injected properties stay visible (getProperties()/getValue()) but do not override a POM-declared value (DESIGN §9).
-        for (Map.Entry<String, String> entry : injected.entrySet()) {
-            merged.putIfAbsent(entry.getKey(), entry.getValue());
-        }
+        // Parser/config-injected properties (MavenParser.builder().property(...)) override POM-declared values: legacy
+        // bakes them into every project pom at parse time (MavenParser ~L83 putAll), so they win the raw-lineage merge.
+        merged.putAll(injected);
         return merged;
     }
 
@@ -135,25 +153,33 @@ public class EffectivePomMapper {
 
     private List<ResolvedManagedDependency> dependencyManagement(
             ModelBuildingResult result, Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
-            Set<String> lineageIds, String rootModelId) {
+            Map<String, String> lineageIdBySourceId, String rootModelId) {
         DependencyManagement dm = result.getEffectiveModel().getDependencyManagement();
         if (dm == null || dm.getDependencies().isEmpty()) {
             return new ArrayList<>();
         }
         BomGavAttributor.Attribution attribution = bomGavAttributor.attribute(requested, servedBy);
         List<ResolvedManagedDependency> managed = new ArrayList<>(dm.getDependencies().size());
+        // Maven keeps every raw dependencyManagement entry (its ModelNormalizer dedups only <dependencies>); legacy's
+        // effective DM is keyed on g:a:classifier:type first-wins (a4 #5402). Match that output shape so duplicate
+        // type/classifier variants collapse identically and getManagedDependency's g:a:classifier:type lookup is exact.
+        Set<GroupArtifactClassifierType> seenManaged = new HashSet<>();
         for (Dependency e : dm.getDependencies()) {
+            if (!seenManaged.add(BomGavAttributor.key(e.getGroupId(), e.getArtifactId(), e.getClassifier(), e.getType()))) {
+                continue;
+            }
             GroupArtifactVersion gav = new GroupArtifactVersion(e.getGroupId(), e.getArtifactId(), e.getVersion());
             Scope scope = e.getScope() == null ? null : Scope.fromName(e.getScope());
             List<GroupArtifact> exclusions = exclusions(e.getExclusions());
             InputLocation location = e.getLocation("");
-            String modelId = location == null ? rootModelId : location.getSource().getModelId();
+            String sourceId = location == null ? rootModelId : location.getSource().getModelId();
+            String lineageId = lineageIdBySourceId.get(sourceId);
 
             ManagedDependency requestedInstance =
-                    joinRequested(result, modelId, location, e, requested, servedBy, lineageIds, rootModelId);
+                    joinRequested(result, sourceId, lineageId, location, e, requested, servedBy, rootModelId);
             ManagedDependency requestedBom = null;
             ResolvedGroupArtifactVersion bomGav = null;
-            if (!lineageIds.contains(modelId)) {
+            if (lineageId == null) {
                 BomGavAttributor.Match match = attribution.match(
                         BomGavAttributor.key(e.getGroupId(), e.getArtifactId(), e.getClassifier(), e.getType()));
                 if (match != null) {
@@ -168,21 +194,21 @@ public class EffectivePomMapper {
     }
 
     /**
-     * The declaring {@link ManagedDependency} instance for an effective management entry. Lineage models (root + parents,
-     * available via {@code getRawModel}) join by {@link InputLocation} line/column then map by index into the declaring
-     * pom's {@code <dependencyManagement>} (raw order == parsed order). Imported BOM models have no {@code getRawModel},
-     * so fall back to a within-pom GACT match — collisions inside a single raw pom are not the case the line/column rule
-     * guards against.
+     * The declaring {@link ManagedDependency} instance for an effective management entry. Lineage models (root + parents)
+     * join by {@link InputLocation} line/column then map by index into the declaring pom's {@code <dependencyManagement>}
+     * (raw order == parsed order); {@code lineageId} is the interpolated id for the entry's raw source id. Imported BOM
+     * entries (no lineage id) fall back to a within-pom GACT match against the BOM's own pom.
      */
     private ManagedDependency joinRequested(
-            ModelBuildingResult result, String modelId, @Nullable InputLocation location, Dependency effective,
-            Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy, Set<String> lineageIds,
+            ModelBuildingResult result, String sourceId, @Nullable String lineageId, @Nullable InputLocation location,
+            Dependency effective, Pom requested, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
             String rootModelId) {
-        Pom declaring = declaringPom(modelId, rootModelId, requested, servedBy);
+        String declaringId = lineageId != null ? lineageId : sourceId;
+        Pom declaring = declaringPom(declaringId, rootModelId, requested, servedBy);
         List<ManagedDependency> declared = declaring == null ? Collections.emptyList() : declaring.getDependencyManagement();
 
-        if (location != null && lineageIds.contains(modelId)) {
-            int index = indexByLocation(result.getRawModel(modelId), location);
+        if (location != null && lineageId != null) {
+            int index = indexByLocation(result.getRawModel(lineageId), location);
             if (index >= 0 && index < declared.size()) {
                 return declared.get(index);
             }
@@ -273,18 +299,51 @@ public class EffectivePomMapper {
         return result;
     }
 
-    private static Set<String> knownModelIds(List<String> lineage, Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
-        Set<String> known = new HashSet<>();
+    // Maps an InputLocation source modelId (raw g:a:v, possibly with ${...}) to the interpolated lineage id it belongs
+    // to, plus the identity mapping for the interpolated id, so concrete- and property-versioned poms both resolve.
+    private static Map<String, String> lineageIdBySourceId(ModelBuildingResult result, List<String> lineage) {
+        Map<String, String> map = new HashMap<>();
         for (String id : lineage) {
             // The super-POM's inheritance entry carries an empty model id; every real model has a g:a:v id.
-            if (!id.isEmpty()) {
-                known.add(id);
+            if (id.isEmpty()) {
+                continue;
+            }
+            map.put(id, id);
+            Model raw = result.getRawModel(id);
+            if (raw != null) {
+                map.put(rawId(raw), id);
             }
         }
+        return map;
+    }
+
+    private static Set<String> knownModelIds(Map<String, String> lineageIdBySourceId,
+                                             Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy) {
+        Set<String> known = new HashSet<>(lineageIdBySourceId.keySet());
         for (ResolvedGroupArtifactVersion key : servedBy.keySet()) {
             known.add(key.getGroupId() + ":" + key.getArtifactId() + ":" + key.getVersion());
         }
         return known;
+    }
+
+    // Mirrors Maven's ModelProblemUtils.toId(Model): the raw g:a:v an InputLocation source carries, with parent-fallback
+    // for groupId/version and Maven's placeholder tokens for absent coordinates.
+    private static String rawId(Model model) {
+        String groupId = model.getGroupId();
+        if (groupId == null && model.getParent() != null) {
+            groupId = model.getParent().getGroupId();
+        }
+        String version = model.getVersion();
+        if (version == null && model.getParent() != null) {
+            version = model.getParent().getVersion();
+        }
+        return coordinate(groupId, "[unknown-group-id]") + ":" +
+                coordinate(model.getArtifactId(), "[unknown-artifact-id]") + ":" +
+                coordinate(version, "[unknown-version]");
+    }
+
+    private static String coordinate(@Nullable String value, String fallback) {
+        return value != null && !value.isEmpty() ? value : fallback;
     }
 
     // A declared/inherited element carries a real contributing model id; the super-POM's do not (it is never fetched).

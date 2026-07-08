@@ -109,6 +109,11 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
         return match(groupId, artifactId, version) != null;
     }
 
+    /** The reactor {@link Pom} for a GAV (three-tier match), or {@code null} if this GAV is not a reactor member. */
+    public @Nullable Pom findReactorPom(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+        return match(groupId, artifactId, version);
+    }
+
     /** Increment the epoch (on marker replacement) and drop cached models so re-resolution re-reads printed bytes. */
     public synchronized void bumpEpoch() {
         epoch++;
@@ -168,6 +173,29 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
         // The workspace serves raw models only; effective models are the model builder's job. Returning null defers
         // reactor-BOM effective resolution to slice B rather than fabricating a half-built model here.
         return null;
+    }
+
+    /**
+     * Raw pom XML for a reactor member, for import-BOM resolution (Maven consults the workspace only via
+     * {@link #resolveEffectiveModel}, which we defer, so {@link EngineModelResolver} serves the raw bytes here and lets
+     * the model builder build the import itself — mirroring how a reactor parent is served). Synthetic
+     * {@code Pom.builder()} graphs with no backing XML are printed from the converter.
+     */
+    public byte @Nullable [] reactorPomXml(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+        Pom pom = match(groupId, artifactId, version);
+        if (pom == null) {
+            return null;
+        }
+        Path path = pathByPom.get(pom);
+        byte[] bytes = path == null ? null : pomXmlSource.apply(path);
+        if (bytes != null) {
+            return bytes;
+        }
+        try {
+            return printModel(new PomToModelConverter().convert(pom));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
