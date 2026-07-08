@@ -34,6 +34,11 @@ type GoResolutionResult struct {
 	Excludes             []GoExclude
 	Retracts             []GoRetract
 	ResolvedDependencies []GoResolvedDependency
+	// PackageModules maps an imported package path to its providing module.
+	// Go-specific: unlike other ecosystems the import path is not the module
+	// coordinate, so this mapping requires toolchain resolution. Empty unless
+	// the parse-time resolution gate is on.
+	PackageModules []GoPackageModule
 }
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
@@ -51,6 +56,15 @@ func (m GoResolutionResult) FindResolved(modulePath string) *GoResolvedDependenc
 	for i := range m.ResolvedDependencies {
 		if m.ResolvedDependencies[i].ModulePath == modulePath {
 			return &m.ResolvedDependencies[i]
+		}
+	}
+	return nil
+}
+
+func (m GoResolutionResult) FindPackageModule(importPath string) *GoPackageModule {
+	for i := range m.PackageModules {
+		if m.PackageModules[i].ImportPath == importPath {
+			return &m.PackageModules[i]
 		}
 	}
 	return nil
@@ -84,11 +98,41 @@ type GoRetract struct {
 	Rationale    string // empty if no `// ...` comment
 }
 
+// GoResolvedDependency is one node in the resolved build list. It merges what
+// go.sum records (content hashes) with what the toolchain resolves (`go list -m`
+// build-list metadata and `go mod graph` edges). The toolchain-sourced fields
+// are zero-valued when the parse-time resolution gate is off (go.sum-only).
 type GoResolvedDependency struct {
+	ModulePath      string
+	Version         string
+	ModuleHash      string // h1:... — empty if only the go.mod hash is recorded
+	GoModHash       string
+	Indirect        bool   // from `go list -m`: present only transitively
+	Main            bool   // from `go list -m`: this is the main module
+	ReplacePath     string // toolchain-applied replace target, empty if none
+	ReplaceVersion  string
+	ModuleGoVersion string // this module's own `go` directive, from `go list -m`
+	// Deps are the direct module dependencies of this node (from `go mod graph`),
+	// referenced by module@version. Resolve against ResolvedDependencies. Nil when
+	// the graph is unavailable. Edges (not nested nodes) keep this cycle-safe and
+	// value-typed; Go's MVS gives one selected version per module path.
+	Deps []GoModuleRef
+}
+
+// GoModuleRef identifies a module version, used as a graph edge target.
+type GoModuleRef struct {
 	ModulePath string
 	Version    string
-	ModuleHash string // h1:... — empty if only the go.mod hash is recorded
-	GoModHash  string
+}
+
+// GoPackageModule maps an imported package path to the module that provides it,
+// from `go list -deps -json ./...`. ModulePath is empty for the standard library
+// (Standard is true).
+type GoPackageModule struct {
+	ImportPath string
+	ModulePath string
+	Version    string
+	Standard   bool
 }
 
 // The directive slices are initialized to empty (non-nil) values. Go has no
@@ -108,5 +152,6 @@ func NewGoResolutionResult(modulePath, goVersion, toolchain, path string) GoReso
 		Excludes:             []GoExclude{},
 		Retracts:             []GoRetract{},
 		ResolvedDependencies: []GoResolvedDependency{},
+		PackageModules:       []GoPackageModule{},
 	}
 }

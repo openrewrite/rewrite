@@ -39,6 +39,10 @@ import (
 //  9. retracts (List<Retract>, ref-by-key)
 //
 // 10. resolvedDependencies (List<ResolvedDependency>, ref-by-key)
+// 11. packageModules (List<PackageModule>, ref-by-key)
+//
+// Each ResolvedDependency element sends, after goModHash: indirect, main,
+// replacePath, replaceVersion, moduleGoVersion, then deps (List<ModuleRef>).
 //
 // Each list element invokes its own rpcSend on the Java side; we mirror
 // the same field order in the per-element onChange callback.
@@ -109,6 +113,33 @@ func sendGoResolutionResult(m golang.GoResolutionResult, q *SendQueue) {
 			q.GetAndSend(d, func(y any) any { return y.(golang.GoResolvedDependency).Version }, nil)
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ModuleHash) }, nil)
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).GoModHash) }, nil)
+			q.GetAndSend(d, func(y any) any { return y.(golang.GoResolvedDependency).Indirect }, nil)
+			q.GetAndSend(d, func(y any) any { return y.(golang.GoResolvedDependency).Main }, nil)
+			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ReplacePath) }, nil)
+			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ReplaceVersion) }, nil)
+			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ModuleGoVersion) }, nil)
+			q.GetAndSendListAsRef(d,
+				func(y any) []any { return moduleRefSlice(y.(golang.GoResolvedDependency).Deps) },
+				func(y any) any {
+					r := y.(golang.GoModuleRef)
+					return r.ModulePath + "@" + r.Version
+				},
+				func(y any) {
+					r := y.(golang.GoModuleRef)
+					q.GetAndSend(r, func(z any) any { return z.(golang.GoModuleRef).ModulePath }, nil)
+					q.GetAndSend(r, func(z any) any { return z.(golang.GoModuleRef).Version }, nil)
+				})
+		})
+
+	q.GetAndSendListAsRef(m,
+		func(x any) []any { return packageModuleSlice(x.(golang.GoResolutionResult).PackageModules) },
+		func(x any) any { return x.(golang.GoPackageModule).ImportPath },
+		func(x any) {
+			p := x.(golang.GoPackageModule)
+			q.GetAndSend(p, func(y any) any { return y.(golang.GoPackageModule).ImportPath }, nil)
+			q.GetAndSend(p, func(y any) any { return emptyAsNil(y.(golang.GoPackageModule).ModulePath) }, nil)
+			q.GetAndSend(p, func(y any) any { return emptyAsNil(y.(golang.GoPackageModule).Version) }, nil)
+			q.GetAndSend(p, func(y any) any { return y.(golang.GoPackageModule).Standard }, nil)
 		})
 }
 
@@ -131,6 +162,7 @@ func receiveGoResolutionResult(before golang.GoResolutionResult, q *ReceiveQueue
 	before.Excludes = recvExcludes(q, before.Excludes)
 	before.Retracts = recvRetracts(q, before.Retracts)
 	before.ResolvedDependencies = recvResolvedDeps(q, before.ResolvedDependencies)
+	before.PackageModules = recvPackageModules(q, before.PackageModules)
 	return before
 }
 
@@ -217,6 +249,12 @@ func recvResolvedDeps(q *ReceiveQueue, before []golang.GoResolvedDependency) []g
 		d.Version = receiveScalar[string](q, d.Version)
 		d.ModuleHash = receiveNullableString(q, d.ModuleHash)
 		d.GoModHash = receiveNullableString(q, d.GoModHash)
+		d.Indirect = receiveScalar[bool](q, d.Indirect)
+		d.Main = receiveScalar[bool](q, d.Main)
+		d.ReplacePath = receiveNullableString(q, d.ReplacePath)
+		d.ReplaceVersion = receiveNullableString(q, d.ReplaceVersion)
+		d.ModuleGoVersion = receiveNullableString(q, d.ModuleGoVersion)
+		d.Deps = recvModuleRefs(q, d.Deps)
 		return d
 	})
 	if afterAny == nil {
@@ -225,6 +263,44 @@ func recvResolvedDeps(q *ReceiveQueue, before []golang.GoResolvedDependency) []g
 	out := make([]golang.GoResolvedDependency, len(afterAny))
 	for i, v := range afterAny {
 		out[i] = v.(golang.GoResolvedDependency)
+	}
+	return out
+}
+
+func recvModuleRefs(q *ReceiveQueue, before []golang.GoModuleRef) []golang.GoModuleRef {
+	beforeAny := moduleRefSlice(before)
+	afterAny := q.ReceiveList(beforeAny, func(v any) any {
+		r := v.(golang.GoModuleRef)
+		r.ModulePath = receiveScalar[string](q, r.ModulePath)
+		r.Version = receiveScalar[string](q, r.Version)
+		return r
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]golang.GoModuleRef, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(golang.GoModuleRef)
+	}
+	return out
+}
+
+func recvPackageModules(q *ReceiveQueue, before []golang.GoPackageModule) []golang.GoPackageModule {
+	beforeAny := packageModuleSlice(before)
+	afterAny := q.ReceiveList(beforeAny, func(v any) any {
+		p := v.(golang.GoPackageModule)
+		p.ImportPath = receiveScalar[string](q, p.ImportPath)
+		p.ModulePath = receiveNullableString(q, p.ModulePath)
+		p.Version = receiveNullableString(q, p.Version)
+		p.Standard = receiveScalar[bool](q, p.Standard)
+		return p
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]golang.GoPackageModule, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(golang.GoPackageModule)
 	}
 	return out
 }
@@ -274,6 +350,28 @@ func retractSlice(s []golang.GoRetract) []any {
 }
 
 func resolvedSlice(s []golang.GoResolvedDependency) []any {
+	if s == nil {
+		return nil
+	}
+	out := make([]any, len(s))
+	for i, v := range s {
+		out[i] = v
+	}
+	return out
+}
+
+func moduleRefSlice(s []golang.GoModuleRef) []any {
+	if s == nil {
+		return nil
+	}
+	out := make([]any, len(s))
+	for i, v := range s {
+		out[i] = v
+	}
+	return out
+}
+
+func packageModuleSlice(s []golang.GoPackageModule) []any {
 	if s == nil {
 		return nil
 	}

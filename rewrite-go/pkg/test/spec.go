@@ -157,6 +157,34 @@ func mergeGoSumIntoGoMod(specs []SourceSpec) {
 	specs[modIdx].Markers[markerIdx] = mrr
 }
 
+// GoModGraph decorates a GoMod SourceSpec with a resolved build list and
+// package->module map, as if parse-time toolchain resolution (ResolveModuleGraph)
+// had run. It lets recipes that consume ResolvedDependency.Deps / PackageModules
+// be unit-tested without invoking the go toolchain (which the Go unit harness
+// cannot run). No-op when the spec carries no GoResolutionResult marker.
+//
+// Example:
+//
+//	test.GoModGraph(
+//	    test.GoMod("module example.com/foo\ngo 1.22\n"),
+//	    []golang.GoResolvedDependency{{ModulePath: "example.com/foo", Main: true}},
+//	    []golang.GoPackageModule{{ImportPath: "fmt", Standard: true}},
+//	)
+func GoModGraph(mod SourceSpec, resolved []golang.GoResolvedDependency, pkgs []golang.GoPackageModule) SourceSpec {
+	markers := make([]java.Marker, len(mod.Markers))
+	copy(markers, mod.Markers)
+	for i, m := range markers {
+		if mrr, ok := m.(golang.GoResolutionResult); ok {
+			mrr.ResolvedDependencies = resolved
+			mrr.PackageModules = pkgs
+			markers[i] = mrr
+			break
+		}
+	}
+	mod.Markers = markers
+	return mod
+}
+
 // GoProject groups a go.mod and one or more .go SourceSpecs as siblings of
 // a single project. Every child receives a golang.GoProject marker. Mirrors
 // the Java-side Assertions.goProject(name, sources...).

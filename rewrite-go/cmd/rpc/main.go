@@ -2102,6 +2102,16 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if sumData, err := os.ReadFile(sumPath); err == nil {
 			mrr.ResolvedDependencies = goparser.ParseGoSum(string(sumData))
 		}
+		// Enrich the resolved build list with go list/go mod graph metadata + the
+		// package->module map. Best-effort: on any toolchain/network failure keep
+		// the go.sum-only result (never fail the parse).
+		moduleDir := filepath.Dir(modPath)
+		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
+			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
+		} else {
+			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
+			mrr.PackageModules = pkgs
+		}
 		mods[filepath.Dir(modPath)] = &modCtx{dir: filepath.Dir(modPath), mrr: mrr}
 	}
 
