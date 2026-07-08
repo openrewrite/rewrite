@@ -586,6 +586,8 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 			parsed[i].tree = spec.parseGoSource(t, p, parsedByIdx, i, src)
 		case path.Base(src.Path) == "go.mod":
 			parsed[i].tree = spec.parseGoMod(t, src)
+		case path.Base(src.Path) == "go.sum":
+			parsed[i].tree = spec.parseGoSum(t, src)
 		}
 	}
 
@@ -690,6 +692,28 @@ func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	return gm
 }
 
+func (spec *RecipeSpec) parseGoSum(t *testing.T, src SourceSpec) *golang.GoSum {
+	t.Helper()
+
+	gs, err := parser.ParseGoSumFile(src.Path, src.Before)
+	if err != nil {
+		t.Fatalf("go.sum parse error: %v", err)
+	}
+
+	for _, m := range src.Markers {
+		gs = gs.WithMarkers(java.AddMarker(gs.Markers, m))
+	}
+
+	if spec.CheckParsePrintIdempotence {
+		if printed := printer.PrintGoSum(gs); printed != src.Before {
+			t.Errorf("go.sum parse-print idempotence failed\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff positions:", src.Before, printed)
+			showDiff(t, src.Before, printed)
+		}
+	}
+
+	return gs
+}
+
 func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	t.Helper()
 	src := ps.spec
@@ -772,6 +796,9 @@ func (spec *RecipeSpec) markerPrinter() printer.MarkerPrinter {
 func printTree(t java.Tree, mp printer.MarkerPrinter) string {
 	if gm, ok := t.(*golang.GoMod); ok {
 		return printer.PrintGoModWithMarkers(gm, mp)
+	}
+	if gs, ok := t.(*golang.GoSum); ok {
+		return printer.PrintGoSumWithMarkers(gs, mp)
 	}
 	return printer.PrintWithMarkers(t, mp)
 }

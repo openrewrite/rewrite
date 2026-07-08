@@ -56,6 +56,10 @@ func (r *GoReceiver) Visit(t java.Tree, p any) java.Tree {
 		c := *gm
 		return receiveGoMod(&c, p.(*ReceiveQueue))
 	}
+	if gs, ok := t.(*golang.GoSum); ok {
+		c := *gs
+		return receiveGoSum(&c, p.(*ReceiveQueue))
+	}
 	return r.GoVisitor.Visit(t, p)
 }
 
