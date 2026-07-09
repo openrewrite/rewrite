@@ -19,10 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.engine.MavenEngine;
 import org.openrewrite.maven.engine.SessionConfig;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Model;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystemSession;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -34,7 +36,9 @@ import org.openrewrite.maven.internal.parity.SnapshotNormalizer;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Scope;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -44,6 +48,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 /**
  * Routes effective-POM construction between the legacy resolver and the shaded Maven engine, per the dev/CI
@@ -56,11 +61,17 @@ import static java.util.Collections.emptyList;
 public final class MavenEngineResolution {
 
     private static final String ENGINE_HANDLE_KEY = "org.openrewrite.maven.internal.engine.handle";
+    private static final String COLLECTOR_HANDLE_KEY = "org.openrewrite.maven.internal.engine.collector";
 
     // The legacy resolver resolves imported BOMs and parents through nested Pom.resolve calls (ResolvedPom line ~941);
     // those are internal to the legacy algorithm and have no engine equivalent (the engine imports BOMs inside Maven's
     // ModelBuilder). Only the outermost facade call dispatches; re-entrant calls run the legacy path directly.
     private static final ThreadLocal<Boolean> DISPATCHING = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    // Dependency-graph analogue of DISPATCHING: the legacy per-scope pass (and the engine's own internal resolves,
+    // plus the shadow legacy re-run) must not re-enter the graph facade and double-collect/double-compare. Only the
+    // outermost dependencyGraph/dependencyGraphScope call dispatches.
+    private static final ThreadLocal<Boolean> DISPATCHING_DEPS = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     private MavenEngineResolution() {
     }
@@ -119,8 +130,16 @@ public final class MavenEngineResolution {
 
     private static ResolvedPom engineEffectivePom(Pom requested, Iterable<String> activeProfiles,
                                                   MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
+        return buildEngineEffective(requested, toList(activeProfiles), downloader, ctx).pom;
+    }
+
+    // The engine's effective pom plus the shaded Maven Model and settings the dependency collector needs. The effective
+    // model already had every scope's direct deps DM-injected by model building; the collector seeds a single verbose
+    // collect from it (DESIGN §4.2). Model builds are served warm from the bytes cache, so rebuilding here (rather than
+    // stashing the Model on the frozen ResolvedPom) stays cheap.
+    private static EngineEffective buildEngineEffective(Pom requested, List<String> profiles,
+                                                        MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-        List<String> profiles = toList(activeProfiles);
         Map<String, String> injected = PomXmlRegistry.injectedProperties(ctx);
 
         byte[] xml = PomXmlRegistry.get(ctx, requested);
@@ -152,7 +171,250 @@ public final class MavenEngineResolution {
         }
         BomGavAttributor attributor = new BomGavAttributor(service, effectiveSettings, reactor, ctx, mctx.getPomCache());
         EffectivePomMapper mapper = new EffectivePomMapper(mctx.getPomCache(), attributor, reactor);
-        return mapper.map(outcome, requested, profiles, injected);
+        ResolvedPom pom = mapper.map(outcome, requested, profiles, injected);
+        Model effectiveModel = requireNonNull(outcome.getResult()).getEffectiveModel();
+        return new EngineEffective(pom, effectiveModel, requestRepositories, effectiveSettings, reactor);
+    }
+
+    private static final class EngineEffective {
+        final ResolvedPom pom;
+        final Model effectiveModel;
+        final List<MavenRepository> requestRepositories;
+        final EffectiveSettings effectiveSettings;
+        final ReactorWorkspace reactor;
+
+        EngineEffective(ResolvedPom pom, Model effectiveModel, List<MavenRepository> requestRepositories,
+                        EffectiveSettings effectiveSettings, ReactorWorkspace reactor) {
+            this.pom = pom;
+            this.effectiveModel = effectiveModel;
+            this.requestRepositories = requestRepositories;
+            this.effectiveSettings = effectiveSettings;
+            this.reactor = reactor;
+        }
+    }
+
+    // --- dependency-graph routing ---------------------------------------------------------------------------------
+
+    /** A legacy all-scopes dependency resolution, deferred so MAVEN mode never runs it. */
+    @FunctionalInterface
+    public interface LegacyDependencyResolution {
+        Map<Scope, List<ResolvedDependency>> resolve() throws MavenDownloadingExceptions;
+    }
+
+    /** A legacy single-scope dependency resolution (the external per-scope entry point). */
+    @FunctionalInterface
+    public interface LegacyScopeResolution {
+        List<ResolvedDependency> resolve() throws MavenDownloadingExceptions;
+    }
+
+    /**
+     * Routes the all-scopes dependency graph. LEGACY runs the caller's per-scope legacy pass untouched; MAVEN runs a
+     * single verbose collect and projects all four scopes ({@link EngineDependencyCollector} + {@link DependencyGraphMapper});
+     * SHADOW runs both, diffs the full {@code pom}+{@code scopes}+{@code errors} snapshot with the ledgered masks, throws
+     * on any unexplained difference, and returns the legacy result. Direct-dependency failures preserve the
+     * {@code partialResult} contract (L-P0-004) on either path.
+     */
+    public static Map<Scope, List<ResolvedDependency>> dependencyGraph(
+            ResolvedPom legacyPom, Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx,
+            LegacyDependencyResolution legacy) throws MavenDownloadingExceptions {
+        Engine engine = ResolutionEngineSelector.select(ctx);
+        if (engine == Engine.LEGACY || DISPATCHING_DEPS.get()) {
+            return legacy.resolve();
+        }
+        DISPATCHING_DEPS.set(Boolean.TRUE);
+        try {
+            Pom requested = legacyPom.getRequested();
+            List<String> profiles = toList(activeProfiles);
+            if (engine == Engine.MAVEN) {
+                EngineGraph graph;
+                try {
+                    graph = attemptEngineGraph(requested, profiles, downloader, ctx);
+                } catch (MavenDownloadingException e) {
+                    throw MavenDownloadingExceptions.append(null, e);
+                }
+                if (graph.failure != null) {
+                    throw graph.failure;
+                }
+                return graph.dependencies;
+            }
+            // SHADOW: run both, diff, return legacy (never change behavior).
+            DepAttempt legacyAttempt = attemptDeps(legacy);
+            EngineGraph engineGraph;
+            try {
+                engineGraph = attemptEngineGraph(requested, profiles, downloader, ctx);
+            } catch (MavenDownloadingException | MavenParsingException e) {
+                // The engine's effective-pom rebuild threw. When Maven is stricter than rewrite's lenient parser
+                // (parent-packaging, self-parent, expression-cycle, ...) the effective-pom shadow already ledgered the
+                // outcome and returned legacy; there is no engine graph to compare, so mirror that here.
+                String category = strictnessCategory(e.getMessage());
+                if (category != null && isOutcomeMaskLedgered(category)) {
+                    // Ledgered Maven-stricter outcome. Return legacy's outcome — which may itself be a (deferred)
+                    // failure, e.g. a missing dependency version legacy tolerates at model build then fails at download.
+                    if (legacyAttempt.failure != null) {
+                        throw legacyAttempt.failure;
+                    }
+                    return requireNonNull(legacyAttempt.result);
+                }
+                throw new AssertionError("Shadow dependency resolution: engine effective-pom rebuild failed for " +
+                        requested.getGav() + ": " + firstLine(e.getMessage()), e);
+            }
+            assertShadowDependencyParity(legacyPom, profiles, legacyAttempt, engineGraph);
+            if (legacyAttempt.failure != null) {
+                throw legacyAttempt.failure;
+            }
+            return requireNonNull(legacyAttempt.result);
+        } finally {
+            DISPATCHING_DEPS.set(Boolean.FALSE);
+        }
+    }
+
+    /**
+     * Routes a single scope's projection for external callers (rewrite-gradle). MAVEN projects just this scope from the
+     * one verbose collect; LEGACY and SHADOW defer to the legacy pass (the all-scopes {@link #dependencyGraph} carries the
+     * shadow census). Re-entrant calls under an active all-scopes dispatch run legacy directly.
+     */
+    public static List<ResolvedDependency> dependencyGraphScope(
+            ResolvedPom pom, Scope scope, MavenPomDownloader downloader, ExecutionContext ctx,
+            LegacyScopeResolution legacy) throws MavenDownloadingExceptions {
+        Engine engine = ResolutionEngineSelector.select(ctx);
+        if (engine != Engine.MAVEN || DISPATCHING_DEPS.get()) {
+            return legacy.resolve();
+        }
+        DISPATCHING_DEPS.set(Boolean.TRUE);
+        try {
+            EngineGraph graph;
+            try {
+                graph = attemptEngineGraph(pom.getRequested(), toList(pom.getActiveProfiles()), downloader, ctx);
+            } catch (MavenDownloadingException e) {
+                throw MavenDownloadingExceptions.append(null, e);
+            }
+            if (graph.dependencies.containsKey(scope)) {
+                return graph.dependencies.get(scope);
+            }
+            if (graph.failure != null) {
+                throw graph.failure;
+            }
+            return new ArrayList<>();
+        } finally {
+            DISPATCHING_DEPS.set(Boolean.FALSE);
+        }
+    }
+
+    // Builds the engine effective model, runs one verbose collect, and projects all four scopes. A direct-dependency
+    // failure is captured (with the partial projection) rather than thrown, so shadow can compare both outcomes.
+    private static EngineGraph attemptEngineGraph(Pom requested, List<String> profiles,
+                                                  MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
+        EngineEffective effective = buildEngineEffective(requested, profiles, downloader, ctx);
+        CollectorHandle handle = collectorHandle(ctx);
+        EngineCollectOutcome outcome = handle.collector.collect(effective.effectiveModel, requested,
+                effective.requestRepositories, effective.effectiveSettings, effective.reactor, handle.scratch, ctx);
+        DependencyGraphMapper mapper = new DependencyGraphMapper(MavenExecutionContextView.view(ctx).getPomCache());
+        try {
+            return new EngineGraph(effective.pom, mapper.map(outcome, effective.pom, requested, ctx), null);
+        } catch (MavenDownloadingExceptions e) {
+            Map<Scope, List<ResolvedDependency>> partial = e.getPartialResult() == null ?
+                    new LinkedHashMap<>() : e.getPartialResult().getDependencies();
+            return new EngineGraph(effective.pom, partial, e);
+        }
+    }
+
+    private static final class EngineGraph {
+        final ResolvedPom pom;
+        final Map<Scope, List<ResolvedDependency>> dependencies;
+        final @Nullable MavenDownloadingExceptions failure;
+
+        EngineGraph(ResolvedPom pom, Map<Scope, List<ResolvedDependency>> dependencies, @Nullable MavenDownloadingExceptions failure) {
+            this.pom = pom;
+            this.dependencies = dependencies;
+            this.failure = failure;
+        }
+    }
+
+    // A legacy dependency attempt: the resolved scopes, or the failure carrying the partial projection. Both feed the
+    // shadow snapshot so a failing resolution still compares its resolvable scopes and its error set.
+    private static final class DepAttempt {
+        final @Nullable Map<Scope, List<ResolvedDependency>> result;
+        final @Nullable MavenDownloadingExceptions failure;
+        final Map<Scope, List<ResolvedDependency>> forSnapshot;
+
+        DepAttempt(@Nullable Map<Scope, List<ResolvedDependency>> result, @Nullable MavenDownloadingExceptions failure,
+                   Map<Scope, List<ResolvedDependency>> forSnapshot) {
+            this.result = result;
+            this.failure = failure;
+            this.forSnapshot = forSnapshot;
+        }
+    }
+
+    private static DepAttempt attemptDeps(LegacyDependencyResolution legacy) throws MavenDownloadingExceptions {
+        try {
+            Map<Scope, List<ResolvedDependency>> resolved = legacy.resolve();
+            return new DepAttempt(resolved, null, resolved);
+        } catch (MavenDownloadingExceptions e) {
+            Map<Scope, List<ResolvedDependency>> partial = e.getPartialResult() == null ?
+                    new LinkedHashMap<>() : e.getPartialResult().getDependencies();
+            return new DepAttempt(null, e, partial);
+        }
+    }
+
+    static void assertShadowDependencyParity(ResolvedPom legacyPom, List<String> profiles,
+                                             DepAttempt legacy, EngineGraph engine) {
+        Pom requested = legacyPom.getRequested();
+        SnapshotNormalizer normalizer = requested.getSourcePath() != null && requested.getSourcePath().getParent() != null ?
+                new SnapshotNormalizer(requested.getSourcePath().getParent()) : new SnapshotNormalizer();
+        // Each side threads requestedRef against its own pom's requested dependencies, so snapshot legacy deps with the
+        // legacy pom and engine deps with the engine pom. The pom section then diffs exactly as the effective-pom shadow
+        // (same ledgered masks); scopes/errors carry the dependency comparison.
+        ResolutionSnapshot legacySnapshot = dependencySnapshot(legacyPom, legacy.forSnapshot, legacy.failure, profiles, normalizer);
+        ResolutionSnapshot engineSnapshot = dependencySnapshot(engine.pom, engine.dependencies, engine.failure, profiles, normalizer);
+
+        List<ResolutionDiff.Entry> entries = new ArrayList<>();
+        for (ResolutionDiff.Entry entry : ResolutionDiff.between(legacySnapshot, engineSnapshot).getEntries()) {
+            String path = entry.getPath();
+            if (path.startsWith("$.pom") || path.startsWith("$.scopes") || path.startsWith("$.errors")) {
+                entries.add(entry);
+            }
+        }
+        ResolutionDiff diff = new ResolutionDiff(entries).masked(SnapshotNormalizer.loadMasks());
+        if (!diff.isEmpty()) {
+            throw new AssertionError("Shadow dependency resolution mismatch for " + requested.getGav() +
+                    " (legacy=left, engine=right):\n" + diff.render());
+        }
+    }
+
+    private static ResolutionSnapshot dependencySnapshot(ResolvedPom pom, Map<Scope, List<ResolvedDependency>> dependencies,
+                                                         @Nullable MavenDownloadingExceptions failure, List<String> profiles,
+                                                         SnapshotNormalizer normalizer) {
+        MavenResolutionResult wrapper = new MavenResolutionResult(
+                UUID.randomUUID(), null, pom, emptyList(), null, dependencies, null, profiles, emptyMap());
+        List<Throwable> errors = new ArrayList<>();
+        if (failure != null) {
+            errors.addAll(failure.getExceptions());
+        }
+        return ResolutionSnapshot.of(wrapper, errors, emptyList(), normalizer, null);
+    }
+
+    private static CollectorHandle collectorHandle(ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(COLLECTOR_HANDLE_KEY, k -> {
+            try {
+                Path scratch = Files.createTempDirectory("rewrite-engine-collect-");
+                scratch.toFile().deleteOnExit();
+                return new CollectorHandle(new EngineDependencyCollector(), scratch);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    // Bootstrapped once per ExecutionContext; its RepositorySystem + shared RepositoryCache keep re-collects warm across
+    // a reactor's modules. Dev/CI-only, so the collector (Closeable) is intentionally not closed — it dies with the ctx.
+    private static final class CollectorHandle {
+        final EngineDependencyCollector collector;
+        final Path scratch;
+
+        CollectorHandle(EngineDependencyCollector collector, Path scratch) {
+            this.collector = collector;
+            this.scratch = scratch;
+        }
     }
 
     // Rewrite's RawPom parses poms with no explicit <modelVersion> (it defaults to 4.0.0); Maven's ModelBuilder rejects
@@ -277,7 +539,11 @@ public final class MavenEngineResolution {
         if (legacy.failure != null || engine.failure == null) {
             return null;
         }
-        String message = engine.failure.getMessage();
+        return strictnessCategory(engine.failure.getMessage());
+    }
+
+    // The engine-strictness category of a thrown message (or null if not a known Maven-stricter-than-rewrite case).
+    static @Nullable String strictnessCategory(@Nullable String message) {
         if (message == null) {
             return null;
         }
@@ -293,7 +559,10 @@ public final class MavenEngineResolution {
         if (message.contains("Aggregator projects require 'pom' as packaging")) {
             return "aggregator-packaging";
         }
-        if (message.contains("dependencies.dependency.version") && message.contains("is missing")) {
+        if ((message.contains("dependencies.dependency.version") && message.contains("is missing")) ||
+                message.contains("'version' is missing")) {
+            // Maven rejects a dependency (or transitive descriptor) with no resolvable version at model build; legacy
+            // tolerates it and defers to download. Same ALIGN_TO_MAVEN class whether reported as the full path or bare.
             return "missing-dependency-version";
         }
         // Any system-scope <systemPath> validation Maven enforces but rewrite tolerates: absent, or non-absolute

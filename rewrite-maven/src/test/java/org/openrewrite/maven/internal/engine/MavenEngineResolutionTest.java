@@ -24,6 +24,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.ResolutionEngineSelector;
 import org.openrewrite.maven.tree.*;
 
@@ -33,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.*;
@@ -143,7 +145,62 @@ class MavenEngineResolutionTest {
                 new MavenEngineResolution.Attempt(null, failure));
     }
 
+    // ---- dependency-graph routing (LEGACY / MAVEN / SHADOW at the resolveDependencies level) ----
+
+    @Test
+    void dependencyResolutionRoutesAcrossModesAndAgrees() {
+        Map<Scope, List<String>> legacy = scopeGavs(resolve("scope-matrix", "legacy"));
+        Map<Scope, List<String>> maven = scopeGavs(resolve("scope-matrix", "maven"));
+        // Every scope is populated on both the legacy and the engine (MAVEN) path, and the engine's projection agrees
+        // with legacy on this clean fixture — proving MAVEN routes resolveDependencies through the collect+map.
+        assertThat(legacy).containsKeys(Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided);
+        assertThat(maven).isEqualTo(legacy);
+    }
+
+    @Test
+    void shadowDependencyModeReturnsLegacyWithoutThrowing() {
+        // SHADOW routes both engines through resolveDependencies, diffs pom+scopes+errors, and (masks absorbing the
+        // ledgered flips) returns the legacy graph. Reaching here without an AssertionError also proves the re-entrancy
+        // guard: the legacy pass calls pom.resolveDependencies(scope) per scope while the facade is dispatching, and
+        // those nested calls run legacy rather than re-collecting/re-comparing.
+        Map<Scope, List<String>> shadow = scopeGavs(resolve("scope-matrix", "shadow"));
+        Map<Scope, List<String>> legacy = scopeGavs(resolve("scope-matrix", "legacy"));
+        assertThat(shadow).isEqualTo(legacy);
+    }
+
+    @Test
+    void mavenModeNeverInvokesTheLegacyAllScopesLambda() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, "legacy");
+        MavenExecutionContextView.view(ctx).setPomCache(new InMemoryMavenPomCache());
+        // A dependency-free pom resolves offline on the engine, so the routing is observable without any download.
+        ResolvedPom pom = new ResolvedPom(
+                Pom.builder().sourcePath(Paths.get("pom.xml"))
+                        .gav(new ResolvedGroupArtifactVersion(null, "com.example", "leaf", "1.0.0", null)).build(),
+                emptyList());
+        MavenPomDownloader downloader = new MavenPomDownloader(emptyMap(), ctx);
+
+        Map<Scope, List<ResolvedDependency>> sentinel = singletonMap(Scope.Compile, emptyList());
+        // LEGACY dispatches to the lambda and returns it verbatim.
+        assertThatCode(() -> assertThat(MavenEngineResolution.dependencyGraph(pom, emptyList(), downloader, ctx, () -> sentinel))
+                .isSameAs(sentinel)).doesNotThrowAnyException();
+
+        // MAVEN must never run the legacy lambda (it routes to the engine instead).
+        ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, "maven");
+        assertThatCode(() -> MavenEngineResolution.dependencyGraph(pom, emptyList(), downloader, ctx, () -> {
+            throw new AssertionError("legacy lambda must not run in MAVEN mode");
+        })).doesNotThrowAnyException();
+    }
+
     // ---- helpers ----
+
+    private static Map<Scope, List<String>> scopeGavs(MavenResolutionResult mrr) {
+        Map<Scope, List<String>> out = new java.util.LinkedHashMap<>();
+        mrr.getDependencies().forEach((scope, deps) -> out.put(scope, deps.stream()
+                .map(d -> d.getGroupId() + ":" + d.getArtifactId() + ":" + d.getVersion())
+                .collect(java.util.stream.Collectors.toList())));
+        return out;
+    }
 
     private static List<String> pluginGas(ResolvedPom pom) {
         return pom.getPlugins().stream().map(p -> p.getGroupId() + ":" + p.getArtifactId()).collect(java.util.stream.Collectors.toList());

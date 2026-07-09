@@ -24,7 +24,9 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -37,6 +39,12 @@ public class SnapshotNormalizer {
     private static final Pattern LOCALHOST_PORT = Pattern.compile("localhost:\\d+");
     private static final Pattern DATED_SNAPSHOT = Pattern.compile("\\d{8}\\.\\d{6}-\\d+");
     private static final Pattern URL_AUTHORITY = Pattern.compile("(https?://)[^/\\s]+");
+
+    // The one local repository denoted by every equivalent spelling: legacy stores MAVEN_LOCAL_USER_NEUTRAL's
+    // `~/.m2/repository`, while the engine's servedBy records the resolved file URI (`file:///.../.m2/repository/`).
+    // Both are the same repository; collapse every form to a single token (longest-first so trailing-slash wins).
+    private static final String LOCAL_REPOSITORY_TOKEN = "<localrepo>";
+    private static final List<String> LOCAL_REPOSITORY_FORMS = localRepositoryForms();
 
     private final List<String> rootReplacements = new ArrayList<>();
 
@@ -55,9 +63,26 @@ public class SnapshotNormalizer {
         for (String root : rootReplacements) {
             s = s.replace(root, "<path>/");
         }
+        for (String form : LOCAL_REPOSITORY_FORMS) {
+            s = s.replace(form, LOCAL_REPOSITORY_TOKEN);
+        }
         s = LOCALHOST_PORT.matcher(s).replaceAll("<local>");
         s = DATED_SNAPSHOT.matcher(s).replaceAll("<ts>");
         return s;
+    }
+
+    private static List<String> localRepositoryForms() {
+        Path local = Paths.get(System.getProperty("user.home"), ".m2", "repository");
+        String uri = local.toUri().toString();
+        List<String> forms = new ArrayList<>();
+        forms.add(uri);
+        forms.add(uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri + "/");
+        forms.add(local + "/");
+        forms.add(local.toString());
+        forms.add("~/.m2/repository/");
+        forms.add("~/.m2/repository");
+        forms.sort(Comparator.comparingInt(String::length).reversed());
+        return forms;
     }
 
     public @Nullable String normalizeMessage(@Nullable String message) {

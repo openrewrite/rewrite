@@ -131,10 +131,11 @@ public class DependencyGraphMapper {
                     continue;
                 }
                 flat.add(node);
+                Pom declaringPom = index.pomFor(node.gav);
                 for (DependencyNode child : winners(frame.aether)) {
                     Scope childScope = scopeOf(child);
                     if (childScope.isInClasspathOf(frame.propagationScope)) {
-                        next.putIfAbsent(gact(child), new Frame(child, childScope, node, transitiveRequested(child)));
+                        next.putIfAbsent(gact(child), new Frame(child, childScope, node, transitiveRequested(child, declaringPom)));
                     }
                 }
             }
@@ -202,33 +203,45 @@ public class DependencyGraphMapper {
     }
 
     // The original declared Dependency instance from the requesting pom, so getResolvedDependency stays reference-exact.
+    // Duplicate direct declarations resolve last-declaration-wins, mirroring legacy's g:a-keyed rootDependencies map
+    // (a later put replacing an earlier), so a doubly-declared coordinate threads its LAST declared instance.
     private @Nullable Dependency matchRequested(DependencyNode node, List<Dependency> requestedDependencies) {
         Artifact artifact = node.getArtifact();
         String classifier = emptyToNull(artifact.getClassifier());
+        Dependency exact = null;
         Dependency byGa = null;
         for (Dependency dependency : requestedDependencies) {
             if (Objects.equals(dependency.getGroupId(), artifact.getGroupId()) &&
                     dependency.getArtifactId().equals(artifact.getArtifactId())) {
+                byGa = dependency;
                 if (Objects.equals(emptyToNull(dependency.getClassifier()), classifier)) {
-                    return dependency;
-                }
-                if (byGa == null) {
-                    byGa = dependency;
+                    exact = dependency;
                 }
             }
+        }
+        if (exact != null) {
+            return exact;
         }
         return byGa != null ? byGa : synthetic(artifact);
     }
 
-    // A transitive node's requested coordinates are the declaring pom's declared version (the pre-management version when
-    // the root dependencyManagement overrode it), matching what the legacy BFS threads as ResolvedDependency.requested.
-    private static Dependency transitiveRequested(DependencyNode node) {
+    // A transitive node's requested coordinates match what the legacy BFS threads as ResolvedDependency.requested: the
+    // declaring pom's declared version, which is null when the dependency was declared without one (its version came
+    // from management). Fall back to the aether (pre-management) version when the declaring pom is unavailable — e.g. a
+    // reactor member absent from servedBy — or when the declared version is an unresolved ${...} legacy interpolates.
+    private static Dependency transitiveRequested(DependencyNode node, @Nullable Pom declaringPom) {
         Artifact artifact = node.getArtifact();
-        String version = artifact.getBaseVersion();
-        if ((node.getManagedBits() & DependencyNode.MANAGED_VERSION) != 0) {
-            String premanaged = DependencyManagerUtils.getPremanagedVersion(node);
-            if (premanaged != null) {
-                version = premanaged;
+        Dependency declared = matchDeclared(declaringPom, artifact);
+        String version;
+        if (declared != null && (declared.getVersion() == null || !declared.getVersion().contains("${"))) {
+            version = declared.getVersion();
+        } else {
+            version = artifact.getBaseVersion();
+            if ((node.getManagedBits() & DependencyNode.MANAGED_VERSION) != 0) {
+                String premanaged = DependencyManagerUtils.getPremanagedVersion(node);
+                if (premanaged != null) {
+                    version = premanaged;
+                }
             }
         }
         return Dependency.builder()
@@ -236,6 +249,25 @@ public class DependencyGraphMapper {
                 .classifier(emptyToNull(artifact.getClassifier()))
                 .type(artifact.getExtension())
                 .build();
+    }
+
+    private static @Nullable Dependency matchDeclared(@Nullable Pom declaringPom, Artifact artifact) {
+        if (declaringPom == null) {
+            return null;
+        }
+        String classifier = emptyToNull(artifact.getClassifier());
+        Dependency byGa = null;
+        for (Dependency d : declaringPom.getDependencies()) {
+            if (Objects.equals(d.getGroupId(), artifact.getGroupId()) && artifact.getArtifactId().equals(d.getArtifactId())) {
+                if (Objects.equals(emptyToNull(d.getClassifier()), classifier)) {
+                    return d;
+                }
+                if (byGa == null) {
+                    byGa = d;
+                }
+            }
+        }
+        return byGa;
     }
 
     private static Dependency synthetic(Artifact artifact) {

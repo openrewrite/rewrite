@@ -122,9 +122,12 @@ public class EngineDependencyCollector implements Closeable {
             Integer depth = depths.get(gav);
             if (depth != null && depth == 1) {
                 // A direct dependency the user declared that could not be read: Maven tolerates it during collect,
-                // rewrite fails on it (KEEP_REWRITE per-file error containment), matching the legacy downloader.
+                // rewrite fails on it (KEEP_REWRITE per-file error containment), matching the legacy downloader. The
+                // message embeds the GAV to mirror MavenPomDownloader's ("Unable to download POM: <gav>."), so
+                // consumers that grep the message for coordinates keep working.
+                String message = failure.isMissing() ? "Unable to download POM: " + gav + "." : failure.getReason();
                 MavenDownloadingException ex =
-                        new MavenDownloadingException(failure.getReason(), null, gav).setRoot(gav);
+                        new MavenDownloadingException(message, null, gav).setRoot(gav);
                 if (!failure.getRepositoryResponses().isEmpty()) {
                     ex.setRepositoryResponses(failure.getRepositoryResponses());
                 }

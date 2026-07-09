@@ -1000,7 +1000,10 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx));
+        // Route the single-scope projection through the engine facade (MAVEN maps just this scope from one verbose
+        // collect; LEGACY/SHADOW run the legacy pass, whose nested BOM/parent Pom.resolve calls stay legacy).
+        return MavenEngineResolution.dependencyGraphScope(this, scope, downloader, ctx,
+                () -> MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx)));
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,

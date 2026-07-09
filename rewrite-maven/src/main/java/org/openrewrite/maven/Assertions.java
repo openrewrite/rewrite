@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -41,6 +42,13 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 public class Assertions {
+
+    // Tests run concurrently (junit.jupiter.execution.parallel.mode.default = concurrent), yet withLocalRepository
+    // publishes to the process-global ~/.m2/repository. Two tests publishing the same GAV with different bodies would
+    // otherwise clobber each other's file and cleanup. Serialize the publish -> run -> cleanup window so the on-disk
+    // pom always matches the test currently running.
+    private static final ReentrantLock LOCAL_REPOSITORY_LOCK = new ReentrantLock();
+
     private Assertions() {
     }
 
@@ -131,6 +139,7 @@ public class Assertions {
         ));
 
         java.util.List<Path> publishedFiles = new java.util.ArrayList<>();
+        LOCAL_REPOSITORY_LOCK.lock();
         try {
             Path localRepo = Paths.get(System.getProperty("user.home"), ".m2", "repository");
 
@@ -200,6 +209,7 @@ public class Assertions {
                     System.err.println("Warning: Failed to clean up test POM: " + file + " - " + e.getMessage());
                 }
             }
+            LOCAL_REPOSITORY_LOCK.unlock();
         }
     }
 

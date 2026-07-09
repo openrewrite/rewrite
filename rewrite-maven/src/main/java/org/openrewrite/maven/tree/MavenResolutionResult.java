@@ -28,6 +28,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.engine.MavenEngineResolution;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -184,6 +185,21 @@ public class MavenResolutionResult implements Marker {
     private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        try {
+            Map<Scope, List<ResolvedDependency>> dependencies = MavenEngineResolution.dependencyGraph(
+                    pom, getActiveProfiles(), downloader, ctx, () -> legacyResolveDependencies(downloader, ctx));
+            return withDependencies(dependencies);
+        } catch (MavenDownloadingExceptions e) {
+            // Re-attach the partial model with the full marker (id/parent/modules/settings preserved), whether the
+            // failure came from the legacy pass or the engine mapper's minimal partial result.
+            Map<Scope, List<ResolvedDependency>> partial = e.getPartialResult() == null ?
+                    new LinkedHashMap<>() : e.getPartialResult().getDependencies();
+            throw e.setPartialResult(withDependencies(partial));
+        }
+    }
+
+    // The legacy all-scopes pass: resolve each scope, aggregating one exception per (root GA, failed GAV) across scopes.
+    private Map<Scope, List<ResolvedDependency>> legacyResolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         Map<Scope, List<ResolvedDependency>> dependencies = new LinkedHashMap<>();
         MavenDownloadingExceptions exceptions = null;
 
@@ -206,7 +222,7 @@ public class MavenResolutionResult implements Marker {
         if (exceptions != null) {
             throw exceptions.setPartialResult(withDependencies(dependencies));
         }
-        return withDependencies(dependencies);
+        return dependencies;
     }
 
     public Map<Path, Pom> getProjectPoms() {
