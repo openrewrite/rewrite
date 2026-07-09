@@ -25,6 +25,7 @@ import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.engine.HttpSenderTransporterFactory;
 import org.openrewrite.maven.engine.ResolutionTimeRecorder;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Model;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.resolution.UnresolvableModelException;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.ConfigurationProperties;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.DefaultRepositoryCache;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositoryCache;
@@ -98,7 +99,7 @@ public class EngineDependencyCollector implements Closeable {
 
         try (CloseableSession session = newSession(scratch.resolve("lrm"),
                 HttpSenderExecutionContextView.view(ctx).getHttpSender(), cc)) {
-            CollectRequest request = collectRequest(session, rootEffectiveModel, requestRepositories);
+            CollectRequest request = collectRequest(session, rootEffectiveModel, requestRepositories, cc);
             DependencyNode root;
             List<MavenDownloadingException> hardFailures = new ArrayList<>();
             try {
@@ -158,16 +159,32 @@ public class EngineDependencyCollector implements Closeable {
     }
 
     private CollectRequest collectRequest(RepositorySystemSession session, Model model,
-                                          List<MavenRepository> requestRepositories) {
+                                          List<MavenRepository> requestRepositories, CollectContext cc) {
+        CacheBridge bridge = new CacheBridge(system, session, cc.getPomCache(), cc.getMaterializeDir());
         List<Dependency> direct = new ArrayList<>();
         for (Dependency dependency : DependencyConversions.toAether(model.getDependencies(),
                 session.getArtifactTypeRegistry())) {
             // A direct dependency with no resolvable version cannot be collected (a model-level problem the
             // effective-pom mapper reports); the collector seeds only what aether can descend into.
-            String version = dependency.getArtifact().getVersion();
-            if (version != null && !version.isEmpty()) {
-                direct.add(dependency);
+            Artifact artifact = dependency.getArtifact();
+            String version = artifact.getVersion();
+            if (version == null || version.isEmpty()) {
+                continue;
             }
+            // A RELEASE/LATEST metaversion is resolved through merged metadata before collection, exactly as the legacy
+            // downloader does. Maven's effective model keeps the metaversion literal (concrete selection is deferred),
+            // so the descriptor read would request e.g. guava-latest.pom → 404; resolve it here so the seeded node
+            // carries the concrete version aether can descend into.
+            if (isMetaVersion(version)) {
+                try {
+                    String concrete = bridge.resolveHighestMatchingVersion(
+                            artifact.getGroupId(), artifact.getArtifactId(), version, requestRepositories);
+                    dependency = dependency.setArtifact(artifact.setVersion(concrete));
+                } catch (UnresolvableModelException e) {
+                    // Leave the metaversion literal; aether then fails it exactly as before (no regression).
+                }
+            }
+            direct.add(dependency);
         }
         CollectRequest request = new CollectRequest();
         request.setRootArtifact(rootArtifact(model));
@@ -175,6 +192,10 @@ public class EngineDependencyCollector implements Closeable {
         request.setManagedDependencies(DependencyConversions.managedOf(model, session.getArtifactTypeRegistry()));
         request.setRepositories(toRemote(requestRepositories));
         return request;
+    }
+
+    private static boolean isMetaVersion(String version) {
+        return "RELEASE".equalsIgnoreCase(version) || "LATEST".equalsIgnoreCase(version);
     }
 
     private static Artifact rootArtifact(Model model) {
