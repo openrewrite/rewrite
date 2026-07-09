@@ -491,6 +491,65 @@ class KotlinTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceAnnotationArgumentsOnMethodWithKotlinOnlyClassMembers() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && annotation.getArguments().size() == 1) {
+                      return KotlinTemplate.builder("#{any()}, \"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          annotation.getArguments().getFirst());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              interface Api {
+                  fun fetch(): String
+              }
+              """
+          ),
+          kotlin(
+            """
+              class Gateway(private val endpoint: String) : Api {
+                  companion object {
+                      const val REASON = "UNCHECKED_CAST"
+                  }
+
+                  enum class Status { ACTIVE, INACTIVE }
+
+                  init {
+                      require(endpoint.isNotEmpty())
+                  }
+
+                  @Suppress(REASON)
+                  override fun fetch(): String = endpoint
+              }
+              """,
+            """
+              class Gateway(private val endpoint: String) : Api {
+                  companion object {
+                      const val REASON = "UNCHECKED_CAST"
+                  }
+
+                  enum class Status { ACTIVE, INACTIVE }
+
+                  init {
+                      require(endpoint.isNotEmpty())
+                  }
+
+                  @Suppress(REASON, "RedundantSuppression")
+                  override fun fetch(): String = endpoint
+              }
+              """
+          ));
+    }
+
+    @Test
     void replaceAnnotationArgumentsOnMethodWithParameterSubstitution() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
