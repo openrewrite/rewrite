@@ -1568,13 +1568,6 @@ class ChangeParentPomTest implements RewriteTest {
         @Issue("https://github.com/moderneinc/customer-requests/issues/2589")
         @Test
         void bringsDownRemovedManagedVersionDeclaredInChildModuleOfLocalParent() {
-            // A child module declares a dependency without an explicit version, relying on management
-            // inherited from Spring Boot through the local parent. When the local parent is upgraded to a
-            // Spring Boot version that no longer manages that dependency, the management must be restored
-            // in the local parent so the child still resolves; otherwise the build fails with resolution
-            // errors. (The transient warning marker rendered on the child below reflects the child's
-            // in-memory model not yet being re-resolved against the parent's newly added management; it
-            // is not written to the file and is cleared on the next parse. It is present on `main` too.)
             rewriteRun(
               spec -> spec.recipe(new ChangeParentPom(
                 "org.springframework.boot", "org.springframework.boot",
