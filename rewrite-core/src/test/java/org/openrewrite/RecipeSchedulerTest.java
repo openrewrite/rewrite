@@ -26,7 +26,7 @@ import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 import org.openrewrite.table.RecipeRunStats;
@@ -182,13 +182,13 @@ class RecipeSchedulerTest implements RewriteTest {
 
         RecipeScheduler trackingScheduler = new RecipeScheduler() {
             @Override
-            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(
+            protected RecipeRunStage<LargeSourceSet> createRecipeRunStage(
                     Recipe recipe, int cycle, Cursor rootCursor,
                     WatchableExecutionContext ctxWithWatch,
                     RecipeRunStats recipeRunStats, SearchResults searchResults,
                     SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
                 cyclesFromFactory.add(cycle);
-                return super.createRecipeRunCycle(recipe, cycle, rootCursor, ctxWithWatch,
+                return super.createRecipeRunStage(recipe, cycle, rootCursor, ctxWithWatch,
                         recipeRunStats, searchResults, sourceFileResults, errorsTable);
             }
         };
@@ -224,12 +224,12 @@ class RecipeSchedulerTest implements RewriteTest {
 
         RecipeScheduler trackingScheduler = new RecipeScheduler() {
             @Override
-            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(
+            protected RecipeRunStage<LargeSourceSet> createRecipeRunStage(
                     Recipe recipe, int cycle, Cursor rootCursor,
                     WatchableExecutionContext ctxWithWatch,
                     RecipeRunStats recipeRunStats, SearchResults searchResults,
                     SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
-                return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                return new RecipeRunStage<>(recipe, cycle, rootCursor, ctxWithWatch,
                         recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit) {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
@@ -296,12 +296,12 @@ class RecipeSchedulerTest implements RewriteTest {
 
         RecipeScheduler trackingScheduler = new RecipeScheduler() {
             @Override
-            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(
+            protected RecipeRunStage<LargeSourceSet> createRecipeRunStage(
                     Recipe recipe, int cycle, Cursor rootCursor,
                     WatchableExecutionContext ctxWithWatch,
                     RecipeRunStats recipeRunStats, SearchResults searchResults,
                     SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
-                return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                return new RecipeRunStage<>(recipe, cycle, rootCursor, ctxWithWatch,
                         recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit) {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
@@ -445,7 +445,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
           .getWorkingDirectory();
         assertThat(workingDirectory).isDirectory();
         assertThat(workingDirectory).hasParent(ctx.getMessage(WORKING_DIRECTORY_ROOT));
-        assertThat(ctx.getCycleDetails().getRecipePosition()).isEqualTo(position);
+        assertThat(ctx.getStageDetails().getRecipePosition()).isEqualTo(position);
         assertThat(workingDirectory.getFileName().toString())
           .isEqualTo("cycle" + ctx.getCycle() + "_recipe" + position);
         return workingDirectory;

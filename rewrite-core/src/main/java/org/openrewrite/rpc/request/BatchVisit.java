@@ -23,7 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
-import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SearchResults;
@@ -112,7 +112,7 @@ public class BatchVisit implements RpcRequest {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, Set<String> ctx) {
                     if (marker instanceof SearchResult) {
-                        ctx.add(((SearchResult) marker).getId().toString());
+                        ctx.add(marker.getId().toString());
                     }
                     return super.visitMarker(marker, ctx);
                 }
@@ -129,7 +129,7 @@ public class BatchVisit implements RpcRequest {
                         Recipe recipe = preparedRecipes.getInstantiated().get(
                                 visitorName.substring("edit:".length()));
                         WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
-                        ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
+                        ctx.putStage(new RecipeRunStage<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
                                 new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
                                 new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
                                 LargeSourceSet::edit));

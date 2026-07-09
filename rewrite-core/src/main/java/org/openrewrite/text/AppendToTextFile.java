@@ -103,7 +103,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public Collection<PlainText> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
+    public Collection<PlainText> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisStage, ExecutionContext ctx) {
         // A glob can match multiple existing files but doesn't specify a concrete path to create.
         if (relativeFileName.matches(".*[*?\\[{].*")) {
             return emptyList();
@@ -116,7 +116,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         boolean exists = fileExists.get();
         Path path = Paths.get(relativeFileName);
         if (!exists) {
-            for (SourceFile generated : generatedInThisCycle) {
+            for (SourceFile generated : generatedInThisStage) {
                 if (generated.getSourcePath().toString().equals(path.toString())) {
                     exists = true;
                     break;

@@ -49,6 +49,18 @@ public class RecipeList {
         return recipes == null ? emptyList() : recipes;
     }
 
+    /**
+     * Add a recipe only if an equal recipe is not already present. Useful when several recipes
+     * independently decide to schedule the same next-stage recipe (e.g. multiple recipes in a
+     * composite each re-emitting the stage root for another cycle) and it should run only once.
+     */
+    public RecipeList addIfAbsent(Recipe recipe) {
+        if (recipes != null && recipes.contains(recipe)) {
+            return this;
+        }
+        return addRecipe(recipe);
+    }
+
     private RecipeList addRecipe(Recipe recipe) {
         if (recipes == null) {
             recipes = new ArrayList<>();

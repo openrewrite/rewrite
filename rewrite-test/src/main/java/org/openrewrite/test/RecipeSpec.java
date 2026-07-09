@@ -87,6 +87,9 @@ public class RecipeSpec {
     Integer expectedCyclesThatMakeChanges;
 
     @Nullable
+    Boolean assertIdempotent;
+
+    @Nullable
     TypeValidation typeValidation;
 
     @Nullable
@@ -249,7 +252,6 @@ public class RecipeSpec {
                         .map(it -> it.getType().getName().replace("$", "."))
                         .collect(joining(","));
             }
-            //noinspection ResultOfMethodCallIgnored
             fail(message);
         });
     }
@@ -297,13 +299,33 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec expectedCyclesThatMakeChanges(int expectedCyclesThatMakeChanges) {
+    /**
+     * @deprecated Recipes should use {@link Recipe#nextStage(RecipeList, ExecutionContext)} rather than
+     * cycles. RewriteTest will naturally run stages without having to force and assert on a certain
+     * number of cycles.
+     */
+    public @Deprecated RecipeSpec expectedCyclesThatMakeChanges(int expectedCyclesThatMakeChanges) {
         this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
+        return this;
+    }
+
+    /**
+     * Whether the test verifies the recipe is idempotent by running an extra stage that must make no
+     * change. Defaults to {@code true}. Set {@code false} for recipes that are intentionally not
+     * idempotent on a re-run and are only ever meant to run in isolation — not within a larger composite
+     * that could run them across stages.
+     */
+    public RecipeSpec assertIdempotent(boolean assertIdempotent) {
+        this.assertIdempotent = assertIdempotent;
         return this;
     }
 
     int getCycles() {
         return cycles == null ? 2 : cycles;
+    }
+
+    boolean getAssertIdempotent() {
+        return assertIdempotent == null || assertIdempotent;
     }
 
     int getExpectedCyclesThatMakeChanges(int cycles) {

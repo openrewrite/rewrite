@@ -57,7 +57,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                 VALIDATE_CURSOR_ACYCLIC.equals(key) ||
                 VALIDATE_CTX_MUTATION.equals(key) ||
                 PANIC.equals(key) ||
-                ExecutionContext.CURRENT_CYCLE.equals(key) ||
+                ExecutionContext.CURRENT_STAGE.equals(key) ||
                 ExecutionContext.CURRENT_RECIPE.equals(key) ||
                 DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
                 WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||

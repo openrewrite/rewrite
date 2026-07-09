@@ -21,7 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
-import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SearchResults;
@@ -87,11 +87,8 @@ public class Visit implements RpcRequest {
                 if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
                     Recipe recipe = preparedRecipes.getInstantiated().get(visitorName.substring(
                             "edit:".length() /* 'scan:' has same length*/));
-                    // This is really probably particular to the Java implementation,
-                    // because we are carrying forward the legacy of cycles that are likely to be
-                    // removed from OpenRewrite in the future.
                     WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
-                    ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
+                    ctx.putStage(new RecipeRunStage<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
                             new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
                             new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
                             LargeSourceSet::edit));

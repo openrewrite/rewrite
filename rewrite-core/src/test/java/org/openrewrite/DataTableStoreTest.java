@@ -608,10 +608,11 @@ class DataTableStoreTest {
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     if (acc.isEmpty()) {
                         // Cycle 1: no read-back data yet; make a change to trigger cycle 2
-                        return text.withText(text.getText() + "-scanned");
+                        return text.getText().contains("-scanned") ? text : text.withText(text.getText() + "-scanned");
                     }
-                    // Cycle 2: append the data read back from the store
-                    return text.withText(text.getText() + "-read:" + String.join(",", acc));
+                    // Cycle 2: append the data read back from the store. Idempotent so a converging
+                    // third stage makes no change (the recipe causesAnotherCycle every stage it changes).
+                    return text.getText().contains("-read:") ? text : text.withText(text.getText() + "-read:" + String.join(",", acc));
                 }
             };
         }
@@ -662,7 +663,7 @@ class DataTableStoreTest {
         RecipeRun run = new RecipeScheduler().scheduleRun(
                 new WriteThenReadRecipe(),
                 new InMemoryLargeSourceSet(sources),
-                ctx, 2, 1
+                ctx, 3, 1
         );
 
         // The recipe should have run 2 cycles:

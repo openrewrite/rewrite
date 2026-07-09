@@ -36,6 +36,7 @@ import org.openrewrite.config.*;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
+import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
@@ -425,9 +426,30 @@ public abstract class Recipe implements Cloneable {
      * visitors never need to cause another cycle, such as those that format whitespace or add search markers. Note that even when this is false,
      * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
      * another cycle (or if there are no changes made in a cycle), then another will not run.
+     * @deprecated Use {@link #nextStage(RecipeList, ExecutionContext)} instead. Cycles are just a special case
+     * of the more general stage concept.
      */
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
     public boolean causesAnotherCycle() {
         return false;
+    }
+
+    /**
+     * Contribute recipes to the next execution stage. Called once per recipe after a stage's
+     * scan/generate/edit pass.
+     *
+     * @param next The recipe list to append next-stage recipes to.
+     * @param ctx  The current execution context, from which the running stage is read.
+     */
+    @Incubating(since = "8.87.0")
+    public void nextStage(RecipeList next, ExecutionContext ctx) {
+        RecipeRunStage<?> stage = ctx.getStageDetails();
+
+        // This only exists to preserve the original cycle semantics.
+        if (causesAnotherCycle() && stage.getMadeChangesInThisStage().contains(this)) {
+            next.addIfAbsent(stage.getRecipe());
+        }
     }
 
     /**
@@ -508,12 +530,12 @@ public abstract class Recipe implements Cloneable {
         return run(before, ctx, 3);
     }
 
-    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, maxCycles, 1);
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxStages) {
+        return run(before, ctx, maxStages, 1);
     }
 
-    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
-        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxStages, int minStages) {
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxStages, minStages);
     }
 
     @SuppressWarnings("unused")

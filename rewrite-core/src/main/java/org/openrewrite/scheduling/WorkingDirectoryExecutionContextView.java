@@ -52,7 +52,7 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
      *             be created.
      */
     public void setRoot(Path path) {
-        if (getMessage(CURRENT_CYCLE) != null) {
+        if (getMessage(CURRENT_STAGE) != null) {
             throw new IllegalStateException("The root working directory cannot be set once " +
                                             "recipe execution has begun.");
         }
@@ -70,9 +70,9 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
                 root = Files.createTempDirectory("rewrite-work");
                 putMessage(WORKING_DIRECTORY_ROOT, root);
             }
-            RecipeRunCycle<?> cycle = getCycleDetails();
-            return Files.createDirectories(root.resolve("cycle" + cycle.getCycle() + "_" +
-                                                        "recipe" + cycle.getRecipePosition()));
+            RecipeRunStage<?> stage = getStageDetails();
+            return Files.createDirectories(root.resolve("cycle" + stage.getStage() + "_" +
+                                                        "recipe" + stage.getRecipePosition()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

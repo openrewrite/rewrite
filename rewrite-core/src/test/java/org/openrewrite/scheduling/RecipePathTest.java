@@ -19,8 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
 import org.openrewrite.text.ChangeText;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -33,8 +31,8 @@ class RecipePathTest {
 
         assertThat(path.size()).isEqualTo(1);
         assertThat(path.leaf()).isSameAs(root);
-        assertThat(path.get(0)).isSameAs(root);
-        assertThat((List<Recipe>) path).containsExactly(root);
+        assertThat(path.getFirst()).isSameAs(root);
+        assertThat(path).containsExactly(root);
     }
 
     @Test
@@ -48,7 +46,7 @@ class RecipePathTest {
         assertThat(path.size()).isEqualTo(3);
         assertThat(path.leaf()).isSameAs(b);
         // Ordered root-first, leaf-last, mirroring the previous Stack representation.
-        assertThat((List<Recipe>) path).containsExactly(root, a, b);
+        assertThat(path).containsExactly(root, a, b);
         assertThat(path.get(0)).isSameAs(root);
         assertThat(path.get(1)).isSameAs(a);
         assertThat(path.get(2)).isSameAs(b);
@@ -66,8 +64,8 @@ class RecipePathTest {
         assertThat(parent.size()).isEqualTo(1);
         assertThat(childA.size()).isEqualTo(2);
         assertThat(childB.size()).isEqualTo(2);
-        assertThat(childA.get(0)).isSameAs(root);
-        assertThat(childB.get(0)).isSameAs(root);
+        assertThat(childA.getFirst()).isSameAs(root);
+        assertThat(childB.getFirst()).isSameAs(root);
     }
 
     @Test

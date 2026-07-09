@@ -49,7 +49,7 @@ import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
  * <em>subclass</em> of the canonical tree type (as produced by lazily-loaded LSTs such as
  * the Moderne CLI's V3 format), every batched recipe but the last was silently skipped.
  * <p>
- * The cause was {@code RecipeRunCycle} keying off the raw {@code src.getClass().getName()}
+ * The cause was {@code RecipeRunStage} keying off the raw {@code src.getClass().getName()}
  * (the subclass name) instead of {@link org.openrewrite.rpc.DynamicDispatchRpcCodec#canonicalSourceFileType}.
  * {@code getLanguages()} advertises canonical type names, so the batch language gate never
  * matched for subclasses and the batch was abandoned; only the trailing recipe (which falls

@@ -29,6 +29,8 @@ import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
+@SuppressWarnings("DeprecatedIsStillUsed")
+@Deprecated
 class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final int expectedCyclesThatMakeChanges;
     private int cyclesThatResultedInChanges = 0;
@@ -66,18 +68,18 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     }
 
     @Override
-    public void afterCycle(boolean lastCycle) {
+    public void afterStage(boolean lastCycle) {
         boolean detectedChangeInThisCycle = false;
         Map<SourceFile, SourceFile> thisCycleEdits = new HashMap<>();
         Set<SourceFile> thisCycleGenerated = new HashSet<>();
         Set<SourceFile> thisCycleDeleted = new HashSet<>();
 
         for (Result result : getChangeset().getAllResults()) {
-            SourceFile before = null; // this source file as it existed after the last cycle
+            SourceFile before = null; // this source file as it existed after the last stage
             SourceFile after = result.getAfter();
 
             if (result.getBefore() == null) {
-                // a source file generated on a prior cycle
+                // a source file generated on a prior stage
                 before = after == null ? null : lastCycleGenerated.stream()
                         .filter(it -> Objects.equals(it.getId(), result.getAfter().getId()))
                         .findFirst()
@@ -101,8 +103,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
                     assertThat(after.printAllTrimmed())
                             .as(
-                                    "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                    "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
+                                    "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " stage" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
+                                    "but took at least one more stage. Between the last two executed stages there were changes to \"" + before.getSourcePath() + "\""
                             )
                             .isEqualTo(before.printAllTrimmed());
                 }

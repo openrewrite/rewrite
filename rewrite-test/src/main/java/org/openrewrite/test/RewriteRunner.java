@@ -49,7 +49,7 @@ public interface RewriteRunner {
      */
     default RecipeRun run(Recipe recipe, Context context) {
         return recipe.run(context.getSources(), context.getExecutionContext(),
-                context.getCycles(), context.getExpectedCyclesThatMakeChanges() + 1);
+                context.getCycles(), context.getMinStages());
     }
 
     /**
@@ -72,6 +72,13 @@ public interface RewriteRunner {
         ExecutionContext executionContext;
         int cycles;
         int expectedCyclesThatMakeChanges;
+
+        /**
+         * The minimum number of stages to run. RewriteTest forces an extra idempotency stage here (which
+         * must make no change) unless the recipe opts out via {@code assertIdempotent(false)}.
+         */
+        int minStages;
+
         Collection<SourceSpec<?>> sourceSpecs;
         RecipeSpec testClassSpec;
         RecipeSpec testMethodSpec;

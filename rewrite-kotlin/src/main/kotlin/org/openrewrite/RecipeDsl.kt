@@ -250,14 +250,14 @@ public class RecipeBuilder internal constructor() {
 
             override fun generate(
                 acc: A,
-                generatedInThisCycle: MutableCollection<SourceFile>,
+                generatedInThisStage: MutableCollection<SourceFile>,
                 ctx: ExecutionContext,
             ): MutableCollection<SourceFile> {
                 val genBlock = scan.generateBlock ?: return mutableListOf()
                 val scope = GenerateScope(ctx)
                 val produced = genBlock(scope, acc).toMutableList()
                 // 3-arg form: filter against already-generated files for cycle-2 stability.
-                val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
+                val alreadyByPath = generatedInThisStage.mapNotNull { it.sourcePath?.toString() }.toSet()
                 produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
                 return produced
             }
@@ -280,12 +280,12 @@ public class RecipeBuilder internal constructor() {
             override fun getScanner(acc: Unit): TreeVisitor<*, ExecutionContext> = TreeVisitor.noop<Tree, ExecutionContext>()
             override fun generate(
                 acc: Unit,
-                generatedInThisCycle: MutableCollection<SourceFile>,
+                generatedInThisStage: MutableCollection<SourceFile>,
                 ctx: ExecutionContext,
             ): MutableCollection<SourceFile> {
                 val scope = GenerateScope(ctx)
                 val produced = scope.genBlock().toMutableList()
-                val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
+                val alreadyByPath = generatedInThisStage.mapNotNull { it.sourcePath?.toString() }.toSet()
                 produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
                 return produced
             }

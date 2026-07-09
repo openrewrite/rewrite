@@ -20,7 +20,7 @@ import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Visit;
-import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.RecipeRunStage;
 
 import java.util.*;
 import java.util.function.*;
@@ -34,7 +34,7 @@ import static java.util.Objects.requireNonNull;
  * back to the process controlling parsing or recipe execution.
  */
 public interface ExecutionContext extends RpcCodec<ExecutionContext> {
-    String CURRENT_CYCLE = "org.openrewrite.currentCycle";
+    String CURRENT_STAGE = "org.openrewrite.currentStage";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
@@ -111,11 +111,11 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
 
     default int getCycle() {
-        return getCycleDetails().getCycle();
+        return getStageDetails().getStage();
     }
 
-    default RecipeRunCycle<?> getCycleDetails() {
-        return requireNonNull(getMessage(CURRENT_CYCLE));
+    default RecipeRunStage<?> getStageDetails() {
+        return requireNonNull(getMessage(CURRENT_STAGE));
     }
 
     /**

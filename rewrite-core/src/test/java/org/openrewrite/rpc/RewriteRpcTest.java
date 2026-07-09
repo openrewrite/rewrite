@@ -31,7 +31,6 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
-import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;

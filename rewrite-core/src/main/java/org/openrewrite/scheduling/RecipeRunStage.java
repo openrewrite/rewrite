@@ -18,6 +18,7 @@ package org.openrewrite.scheduling;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -56,20 +57,22 @@ import static org.openrewrite.Recipe.PANIC;
 
 @RequiredArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class RecipeRunCycle<LSS extends LargeSourceSet> {
+public class RecipeRunStage<LSS extends LargeSourceSet> {
 
     /**
      * The root recipe that is running, which may contain a recipe list which will
-     * also be iterated as part of this cycle.
+     * also be iterated as part of this stage.
      */
+    @Getter
     Recipe recipe;
 
     /**
-     * The current cycle in the range [1, maxCycles].
+     * The current stage in the range [1, maxStages].
      */
     @Getter
-    int cycle;
+    int stage;
 
+    @Getter
     Cursor rootCursor;
     WatchableExecutionContext ctx;
     RecipeRunStats recipeRunStats;
@@ -79,7 +82,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     BiFunction<LSS, UnaryOperator<@Nullable SourceFile>, LSS> sourceSetEditor;
 
     RecipeStack allRecipeStack = new RecipeStack();
-    long cycleStartTime = System.nanoTime();
+    long stageStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
     /**
@@ -90,17 +93,28 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     long runTimeoutNanos = -1;
 
+    /**
+     * Whether this is the first stage in which its recipe lineage runs: {@code true} for the initial
+     * stage and each data-dependent successor stage, {@code false} for a stage's self-edge re-runs
+     * (convergence cycles). Data tables key on this so a re-run doesn't duplicate rows while any
+     * genuinely new stage still writes. Defaults to {@code true} so one-off stages (e.g. RPC visits) write.
+     */
     @Getter
-    Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
+    @Setter
+    @NonFinal
+    boolean firstStageInLineage = true;
+
+    @Getter
+    Set<Recipe> madeChangesInThisStage = newSetFromMap(new IdentityHashMap<>());
 
     public int getRecipePosition() {
         return allRecipeStack.getRecipePosition();
     }
 
     /**
-     * Whether the elapsed time for this cycle has exceeded the run timeout, firing the
+     * Whether the elapsed time for this stage has exceeded the run timeout, firing the
      * timeout callbacks (at most once) if so. The run timeout is fixed for the duration of a
-     * cycle, so it is resolved from the {@link ExecutionContext} lazily on first access and
+     * stage, so it is resolved from the {@link ExecutionContext} lazily on first access and
      * cached to avoid a message lookup for every recipe and source file. Resolved lazily
      * (rather than in a field initializer) because {@code ctx} is not yet assigned when field
      * initializers run.
@@ -109,7 +123,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (runTimeoutNanos < 0) {
             runTimeoutNanos = ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4)).toNanos();
         }
-        if (System.nanoTime() - cycleStartTime > runTimeoutNanos) {
+        if (System.nanoTime() - stageStartTime > runTimeoutNanos) {
             if (thrownErrorOnTimeout.compareAndSet(false, true)) {
                 RecipeTimeoutException t = new RecipeTimeoutException(recipe);
                 ctx.getOnError().accept(t);
@@ -272,7 +286,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
                             generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
-                            madeChangesInThisCycle.add(recipe);
+                            madeChangesInThisStage.add(recipe);
                         }
                     } catch (Throwable t) {
                         handleError(recipe, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
@@ -414,7 +428,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 });
 
                 if (after != src) {
-                    madeChangesInThisCycle.add(recipe);
+                    madeChangesInThisStage.add(recipe);
                     recordSourceFileResultAndSearchResults(src, after, recipeStack, ctx);
                     if (src.getMarkers().findFirst(Generated.class).isPresent()) {
                         // skip edits made to generated source files so that they don't show up in a diff
@@ -423,8 +437,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     }
                     recipeRunStats.recordSourceFileChanged(src, after);
                 } else if (ctx.hasNewMessages()) {
-                    // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                    madeChangesInThisCycle.add(recipe);
+                    // consider any recipes adding new messages as a changing recipe (which can request another stage)
+                    madeChangesInThisStage.add(recipe);
                     ctx.resetHasNewMessages();
                 }
             } catch (Throwable t) {
@@ -486,7 +500,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             Recipe recipe = leaf(recipeStack);
 
             if (r.isModified() || r.isHasNewMessages()) {
-                madeChangesInThisCycle.add(recipe);
+                madeChangesInThisStage.add(recipe);
             }
 
             if (r.isModified()) {
@@ -495,7 +509,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
             if (r.isDeleted()) {
                 deleted = true;
-                madeChangesInThisCycle.add(recipe);
+                madeChangesInThisStage.add(recipe);
                 break;
             }
 
@@ -662,7 +676,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 parentName,
                 recipe.getName(),
                 effortSeconds,
-                cycle));
+                stage));
 
         // Use pre-collected search results — O(1) lookup instead of O(treeSize) traversal
         List<SearchResults.Row> rows = searchResultsByRecipe.getOrDefault(recipe.getName(), emptyList());
@@ -702,7 +716,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 parentName,
                 recipe.getName(),
                 effortSeconds,
-                cycle));
+                stage));
 
         // Use the attribution map: only include search results created by this recipe
         String recipeName = recipe.getName();
@@ -734,7 +748,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 parentName,
                 recipe.getName(),
                 effortSeconds,
-                cycle));
+                stage));
 
         List<SearchResults.Row> searchMarkers = collectSearchResults(before, after, recipe.getInstanceName());
         for (SearchResults.Row searchResult : searchMarkers) {
@@ -765,7 +779,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 parentName,
                 recipe.getName(),
                 0L, // Zero here, as we later sum only the recipes that themselves made changes
-                cycle));
+                stage));
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
     }
 
@@ -785,7 +799,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
         // Use the original source file to record the error, not the one that may have been modified by the visitor.
         // This is so the error is associated with the original source file, and its original source path.
-        errorsTable.insertRow(ctx, new SourcesFileErrors.Row(
+        // Errors are framework bookkeeping, not recipe re-emissions, so write straight to the store to bypass
+        // the per-stage gate and record every error, including those on self-edge re-runs.
+        DataTableExecutionContextView.view(ctx).getDataTableStore().insertRow(errorsTable, ctx, new SourcesFileErrors.Row(
                 sourceFile.getSourcePath().toString(),
                 recipe.getName(),
                 ExceptionUtils.sanitizeStackTrace(t, RecipeScheduler.class)

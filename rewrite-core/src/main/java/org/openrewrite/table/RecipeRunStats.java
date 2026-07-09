@@ -74,15 +74,10 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                     timers.edit.getTotalNs(),
                     timers.edit.getMaxNs()
             );
-            insertRow(ctx, row);
+            // Written by the scheduler once after all stages complete, not re-emitted by a recipe, so it
+            // bypasses the per-stage gate and always records.
+            DataTableExecutionContextView.view(ctx).getDataTableStore().insertRow(this, ctx, row);
         }
-    }
-
-    @Override
-    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
-        // RecipeRunStats.flush() is called once after all cycles complete.
-        // It must always be allowed to write.
-        return true;
     }
 
     @Value

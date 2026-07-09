@@ -45,11 +45,13 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String remoteId;
 
     private final RecipeDescriptor descriptor;
+
     @Getter
     private final String editVisitor;
+
     /**
      * Composite of all editPreconditions resolved during PrepareRecipe. Exposed so that the
-     * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunCycle} can
+     * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunStage} can
      * evaluate preconditions locally before adding a visitor to the batch — otherwise the
      * batch would dispatch the visit RPC for files that the precondition would have rejected.
      * The non-batch path uses {@link #getVisitor()}, which already wraps with
@@ -57,8 +59,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+
     @Getter
     private final @Nullable String scanVisitor;
+
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 

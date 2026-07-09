@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SearchResults;
@@ -839,11 +839,11 @@ class DeclarativeRecipeTest implements RewriteTest {
           .hasMessageContaining("RecipeC");
     }
 
-    // Uses separate RecipeRunCycles for scan and edit to verify that the accumulator
+    // Uses separate RecipeRunStages for scan and edit to verify that the accumulator
     // survives when getRecipeList() is called again from a fresh RecipeStack.
-    // This can't be tested via rewriteRun() which uses a single RecipeRunCycle per cycle.
+    // This can't be tested via rewriteRun() which uses a single RecipeRunStage per cycle.
     @Test
-    void scanningRecipeAccumulatorSurvivesAcrossRecipeRunCycles() {
+    void scanningRecipeAccumulatorSurvivesAcrossRecipeRunStages() {
         var recipe = new DeclarativeRecipe(
           "test.WithPrecondition", "With precondition", "Test with precondition.",
           emptySet(), null, URI.create("test"), true, emptyList()
@@ -862,23 +862,23 @@ class DeclarativeRecipeTest implements RewriteTest {
         Recipe noop = Recipe.noop();
 
         // Cycle 1: scan (simulates first yield batch on the platform)
-        var scanCycle = new RecipeRunCycle<>(
+        var scanCycle = new RecipeRunStage<>(
           recipe, 1, rootCursor, ctx,
           new RecipeRunStats(noop), new SearchResults(noop),
           new SourcesFileResults(noop), new SourcesFileErrors(noop),
           LargeSourceSet::edit
         );
-        ctx.putCycle(scanCycle);
+        ctx.putStage(scanCycle);
         scanCycle.scanSources(new InMemoryLargeSourceSet(sources));
 
-        // Cycle 2: edit (simulates new RecipeRunCycle after worker yield — new RecipeStack, fresh getRecipeList() calls)
-        var editCycle = new RecipeRunCycle<>(
+        // Cycle 2: edit (simulates new RecipeRunStage after worker yield — new RecipeStack, fresh getRecipeList() calls)
+        var editCycle = new RecipeRunStage<>(
           recipe, 1, rootCursor, ctx,
           new RecipeRunStats(noop), new SearchResults(noop),
           new SourcesFileResults(noop), new SourcesFileErrors(noop),
           LargeSourceSet::edit
         );
-        ctx.putCycle(editCycle);
+        ctx.putStage(editCycle);
         LargeSourceSet edited = editCycle.editSources(new InMemoryLargeSourceSet(sources));
 
         List<SourceFile> results = edited.getChangeset().getAllResults().stream()

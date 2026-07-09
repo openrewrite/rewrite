@@ -42,9 +42,4 @@ public class SourcesFileErrors extends DataTable<SourcesFileErrors.Row> {
                 description = "The stack trace of the failure.")
         String stackTrace;
     }
-
-    @Override
-    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
-        return true;
-    }
 }

@@ -35,4 +35,9 @@ public class RecipeRunException extends RuntimeException {
         super(cause);
         this.cursor = cursor;
     }
+
+    public RecipeRunException(String message, @Nullable Cursor cursor) {
+        super(message);
+        this.cursor = cursor;
+    }
 }

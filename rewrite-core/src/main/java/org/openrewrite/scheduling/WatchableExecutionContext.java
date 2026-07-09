@@ -42,7 +42,7 @@ public class WatchableExecutionContext extends DelegatingExecutionContext {
         }
     }
 
-    public void putCycle(RecipeRunCycle<?> cycle) {
-        super.putMessage(CURRENT_CYCLE, cycle);
+    public void putStage(RecipeRunStage<?> stage) {
+        super.putMessage(CURRENT_STAGE, stage);
     }
 }

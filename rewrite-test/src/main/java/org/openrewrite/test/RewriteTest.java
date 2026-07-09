@@ -239,14 +239,26 @@ public interface RewriteTest extends SourceSpecs {
                 testMethodSpec.expectedCyclesThatMakeChanges;
 
         // If there are any tests that have assertions (an "after"), then set the expected cycles.
+        boolean anySourceHasAfter = false;
         for (SourceSpec<?> s : sourceSpecs) {
             if (s.after != null) {
+                anySourceHasAfter = true;
                 expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
                         testClassSpec.getExpectedCyclesThatMakeChanges(cycles) :
                         testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
                 break;
             }
         }
+
+        boolean expectedCyclesExplicitlySet = testMethodSpec.expectedCyclesThatMakeChanges != null ||
+                                              testClassSpec.expectedCyclesThatMakeChanges != null;
+        boolean assertIdempotent = testMethodSpec.assertIdempotent == null ?
+                testClassSpec.getAssertIdempotent() : testMethodSpec.assertIdempotent;
+        // Deprecated path: an explicit expectedCyclesThatMakeChanges keeps the count-checking source set and
+        // its min-cycle forcing. Otherwise force the extra idempotency stage only when a change is expected
+        // (unless opted out); the per-source assertions verify the result, with no cycle count to declare.
+        int minStages = expectedCyclesExplicitlySet ? expectedCyclesThatMakeChanges + 1 :
+                (assertIdempotent && anySourceHasAfter ? cycles : 1);
 
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
@@ -437,8 +449,11 @@ public interface RewriteTest extends SourceSpecs {
             lss = testMethodSpec.getSourceSet().apply(runnableSourceFiles);
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
-        } else {
+        } else if (expectedCyclesExplicitlySet) {
+            //noinspection deprecation
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
+        } else {
+            lss = new InMemoryLargeSourceSet(runnableSourceFiles);
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
@@ -448,7 +463,7 @@ public interface RewriteTest extends SourceSpecs {
                 testClassSpec.getRunner() != null ? testClassSpec.getRunner() :
                         runner();
         RewriteRunner.Context runnerContext = new RewriteRunner.Context(
-                lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges,
+                lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges, minStages,
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
         RecipeRun recipeRun = runner.run(recipe, runnerContext);
 

@@ -142,21 +142,22 @@ public class DataTable<Row> {
 
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (!allowWritingInThisCycle(ctx)) {
+        if (!allowWritingInThisStage(ctx)) {
             return;
         }
         DataTableExecutionContextView.view(ctx).getDataTableStore().insertRow(this, ctx, row);
     }
 
     /**
-     * This method is used to decide whether to ignore any row insertions in the current cycle.
-     * This prevents (by default) data table producing recipes from having to keep track of state across
-     * multiple cycles to prevent duplicate row entries.
+     * Decides whether to ignore row insertions in the current stage. By default a table writes on the
+     * first stage of a recipe's lineage — the initial stage and each data-dependent successor stage — but
+     * not on a stage's self-edge re-runs (convergence cycles). This lets a recipe stay stateless: it can
+     * re-emit the same rows every pass without producing duplicates, while a genuinely new stage still writes.
      *
      * @param ctx the execution context
-     * @return whether to allow writing in this cycle
+     * @return whether to allow writing in this stage
      */
-    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
-        return ctx.getCycle() <= 1;
+    protected boolean allowWritingInThisStage(ExecutionContext ctx) {
+        return ctx.getStageDetails().isFirstStageInLineage();
     }
 }

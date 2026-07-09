@@ -34,24 +34,9 @@ import java.util.function.UnaryOperator;
 public interface LargeSourceSet {
 
     /**
-     * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit cycle.
-     *
-     * @deprecated Override {@link #beforeCycle(boolean)} instead
+     * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit stage.
      */
-    @Deprecated
-    default void beforeCycle() {
-    }
-
-    /**
-     * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit cycle.
-     *
-     * @param definitelyLastCycle {@code true} if this is definitely the last cycle of a recipe; when called with a
-     *                            value of {@code false} the next call to {@link #afterCycle(boolean)} could still be
-     *                            called with {@code true}. This depends on whether any of the recipes requested an
-     *                            additional cycle.
-     */
-    default void beforeCycle(boolean definitelyLastCycle) {
-        beforeCycle();
+    default void beforeStage() {
     }
 
     /**
@@ -82,7 +67,7 @@ public interface LargeSourceSet {
     /**
      * Called by {@link RecipeScheduler} at the conclusion of a scan/generate/edit cycle.
      */
-    default void afterCycle(boolean lastCycle) {
+    default void afterStage(boolean lastCycle) {
     }
 
     /**
@@ -106,9 +91,9 @@ public interface LargeSourceSet {
      * dropped. Implementations may override this to detect the collision (e.g. the test
      * framework raises an assertion failure).
      *
-     * @param sourcePath    The colliding source path.
-     * @param existingFile  {@code true} if the collision is with an existing source file,
-     *                      {@code false} if it's with another generated file.
+     * @param sourcePath   The colliding source path.
+     * @param existingFile {@code true} if the collision is with an existing source file,
+     *                     {@code false} if it's with another generated file.
      */
     default void onGenerateCollision(Path sourcePath, boolean existingFile) {
     }
