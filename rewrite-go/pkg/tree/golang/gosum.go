@@ -38,8 +38,6 @@ func (*GoSum) IsSourceFile() {}
 
 func (n *GoSum) GetSourcePath() string { return n.SourcePath }
 
-func (n *GoSum) GetMarkers() java.Markers { return n.Markers }
-
 func (n *GoSum) WithPrefix(prefix java.Space) *GoSum {
 	c := *n
 	c.Prefix = prefix
@@ -76,8 +74,6 @@ type GoSumLine struct {
 }
 
 func (*GoSumLine) IsTree() {}
-
-func (n *GoSumLine) GetMarkers() java.Markers { return n.Markers }
 
 func (n *GoSumLine) WithPrefix(prefix java.Space) *GoSumLine {
 	c := *n

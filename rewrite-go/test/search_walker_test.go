@@ -69,9 +69,9 @@ func TestCollectSearchResultIDsAfterMark(t *testing.T) {
 	}
 }
 
-// go.mod nodes are Tree, not J. The walk still reaches them and reads their
-// markers through the shared GetMarkers accessor, matching what the former
-// reflection walker collected from the struct field directly.
+// go.mod nodes are Tree, not J. The collector still reaches their markers
+// because every node routes its Markers through visitMarkers -> VisitMarker,
+// matching what the former reflection walker collected from the struct field.
 func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
 	// given
 	mark := java.NewSearchResult("found a require value")
@@ -92,6 +92,43 @@ func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
 	// then
 	if len(ids) != 1 || ids[0] != mark.Ident {
 		t.Fatalf("expected [%v], got %v", mark.Ident, ids)
+	}
+}
+
+// rewriteMarkerVisitor swaps the ID of every SearchResult it encounters via
+// the VisitMarker dispatch seam, proving the returned marker threads back
+// into the tree (not just observed, like the collector).
+type rewriteMarkerVisitor struct {
+	visitor.GoVisitor
+	newID uuid.UUID
+}
+
+func (v *rewriteMarkerVisitor) VisitMarker(m java.Marker, p any) java.Marker {
+	if sr, ok := m.(java.SearchResult); ok {
+		sr.Ident = v.newID
+		return sr
+	}
+	return m
+}
+
+func TestVisitMarkerRewritesInPlace(t *testing.T) {
+	// given
+	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked := visitor.Init(&markBinaryVisitor{marker: java.NewSearchResult("orig")}).
+		Visit(cu, recipe.NewExecutionContext()).(java.Tree)
+
+	// when
+	newID := uuid.New()
+	rewritten := visitor.Init(&rewriteMarkerVisitor{newID: newID}).
+		Visit(marked, recipe.NewExecutionContext()).(java.Tree)
+
+	// then
+	ids := visitor.CollectSearchResultIDs(rewritten)
+	if len(ids) != 1 || ids[0] != newID {
+		t.Fatalf("expected VisitMarker to rewrite the id to %v, got %v", newID, ids)
 	}
 }
 

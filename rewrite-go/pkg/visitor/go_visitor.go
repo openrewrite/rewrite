@@ -363,6 +363,7 @@ type VisitorI interface {
 	VisitGoVariadic(v *golang.Variadic, p any) java.J
 	VisitSpace(space java.Space, p any) java.Space
 	VisitType(javaType java.JavaType, p any) java.JavaType
+	VisitMarker(marker java.Marker, p any) java.Marker
 }
 
 // Ensure GoVisitor satisfies VisitorI.
@@ -1183,8 +1184,31 @@ func (v *GoVisitor) VisitType(javaType java.JavaType, p any) java.JavaType {
 	return javaType
 }
 
+// VisitMarker is the per-marker dispatch seam, mirroring
+// TreeVisitor.visitMarker in rewrite-java (and visit_marker / visitMarker in
+// the Python, JS, and C# ports). Every Visit* method routes its node's
+// markers through visitMarkers, which invokes VisitMarker on each entry via
+// virtual dispatch, so subclasses collect or rewrite markers without
+// touching individual node types. The default returns the marker unchanged.
+func (v *GoVisitor) VisitMarker(marker java.Marker, p any) java.Marker {
+	return marker
+}
+
+// visitMarkers maps VisitMarker over every entry. Nodes carrying no markers
+// (the vast majority) short-circuit with no allocation; marker-bearing nodes
+// rebuild the slice. We can't skip the rebuild via an == comparison because
+// marker types may be uncomparable (they hold slices/maps), which would
+// panic — and it would buy nothing anyway, since WithMarkers already
+// reallocates the node regardless of marker identity.
 func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
-	return markers
+	if len(markers.Entries) == 0 {
+		return markers
+	}
+	entries := make([]java.Marker, len(markers.Entries))
+	for i, m := range markers.Entries {
+		entries[i] = v.self().VisitMarker(m, p)
+	}
+	return java.Markers{ID: markers.ID, Entries: entries}
 }
 
 func visitAndCast[T java.Tree](v *GoVisitor, t java.Tree, p any) T {

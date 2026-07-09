@@ -66,35 +66,43 @@ func (w *walker) PreVisit(t java.Tree, p any) java.Tree {
 // CollectSearchResultIDs walks t and returns the IDs of every SearchResult
 // and SearchResultMarker found on any node's Markers. The returned slice
 // has stable first-seen order; duplicates are dropped.
+//
+// It rides the VisitMarker dispatch seam, matching the JS and C# batch-visit
+// collectors, so every marker on every node (J and non-J alike) is reached
+// through the shared visitor rather than a bespoke traversal.
 func CollectSearchResultIDs(t java.Tree) []uuid.UUID {
-	var ids []uuid.UUID
-	seen := make(map[uuid.UUID]struct{})
-	Walk(t, func(node java.Tree) bool {
-		m, ok := node.(interface{ GetMarkers() java.Markers })
-		if !ok {
-			return true
-		}
-		for _, marker := range m.GetMarkers().Entries {
-			var id uuid.UUID
-			switch x := marker.(type) {
-			case java.SearchResult:
-				id = x.Ident
-			case *java.SearchResult:
-				id = x.Ident
-			case java.SearchResultMarker:
-				id = x.Ident
-			case *java.SearchResultMarker:
-				id = x.Ident
-			default:
-				continue
-			}
-			if _, dup := seen[id]; dup {
-				continue
-			}
-			seen[id] = struct{}{}
-			ids = append(ids, id)
-		}
-		return true
-	})
-	return ids
+	if t == nil {
+		return nil
+	}
+	c := &searchCollector{seen: make(map[uuid.UUID]struct{})}
+	c.GoVisitor.Self = c
+	c.Visit(t, nil)
+	return c.ids
+}
+
+type searchCollector struct {
+	GoVisitor
+	ids  []uuid.UUID
+	seen map[uuid.UUID]struct{}
+}
+
+func (c *searchCollector) VisitMarker(marker java.Marker, p any) java.Marker {
+	var id uuid.UUID
+	switch x := marker.(type) {
+	case java.SearchResult:
+		id = x.Ident
+	case *java.SearchResult:
+		id = x.Ident
+	case java.SearchResultMarker:
+		id = x.Ident
+	case *java.SearchResultMarker:
+		id = x.Ident
+	default:
+		return marker
+	}
+	if _, dup := c.seen[id]; !dup {
+		c.seen[id] = struct{}{}
+		c.ids = append(c.ids, id)
+	}
+	return marker
 }

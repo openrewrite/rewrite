@@ -53,8 +53,6 @@ func (*GoMod) IsSourceFile() {}
 
 func (n *GoMod) GetSourcePath() string { return n.SourcePath }
 
-func (n *GoMod) GetMarkers() java.Markers { return n.Markers }
-
 func (n *GoMod) WithPrefix(prefix java.Space) *GoMod {
 	c := *n
 	c.Prefix = prefix
@@ -109,8 +107,6 @@ type GoModDirective struct {
 func (*GoModDirective) IsTree()           {}
 func (*GoModDirective) isGoModStatement() {}
 
-func (n *GoModDirective) GetMarkers() java.Markers { return n.Markers }
-
 func (n *GoModDirective) WithPrefix(prefix java.Space) *GoModDirective {
 	c := *n
 	c.Prefix = prefix
@@ -148,8 +144,6 @@ type GoModBlock struct {
 func (*GoModBlock) IsTree()           {}
 func (*GoModBlock) isGoModStatement() {}
 
-func (n *GoModBlock) GetMarkers() java.Markers { return n.Markers }
-
 func (n *GoModBlock) WithPrefix(prefix java.Space) *GoModBlock {
 	c := *n
 	c.Prefix = prefix
@@ -179,8 +173,6 @@ type GoModValue struct {
 }
 
 func (*GoModValue) IsTree() {}
-
-func (n *GoModValue) GetMarkers() java.Markers { return n.Markers }
 
 func (n *GoModValue) WithPrefix(prefix java.Space) *GoModValue {
 	c := *n
