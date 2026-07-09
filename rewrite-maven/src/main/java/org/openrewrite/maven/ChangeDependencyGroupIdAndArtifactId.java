@@ -260,7 +260,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             @Nullable
             private Collection<String> availableVersions;
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
-            private final boolean dedupeEnabled = newGroupId != null && newArtifactId != null;
+            // Coordinates the matched dependencies are renamed to; a null option keeps the existing value.
+            private final String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
+            private final String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
+            // Dedupe applies whenever the coordinates actually change (a new group id and/or artifact id).
+            private final boolean dedupeEnabled = (newGroupId != null || newArtifactId != null) &&
+                    !(effectiveNewGroupId.equals(oldGroupId) && effectiveNewArtifactId.equals(oldArtifactId));
             private List<ResolvedDependency> existingNewDirectDependencies = new ArrayList<>();
             private List<ResolvedDependency> existingOldDirectDependencies = new ArrayList<>();
             private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
@@ -269,7 +274,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 if (dedupeEnabled) {
-                    existingNewDirectDependencies = directDependencies(newGroupId, newArtifactId);
+                    existingNewDirectDependencies = directDependencies(effectiveNewGroupId, effectiveNewArtifactId);
                     existingOldDirectDependencies = directDependencies(oldGroupId, oldArtifactId);
                 }
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
@@ -338,18 +343,20 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
 
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
-                boolean isNewDependencyTag = dedupeEnabled && isDependencyTag(newGroupId, newArtifactId);
-                // The new coordinates are already declared directly with the same classifier, type, and scope;
-                // drop the old declaration rather than renaming it into a duplicate of the existing one.
-                if (isOldDependencyTag && !isNewDependencyTag && matchesAnyDirectDependency(t, existingNewDirectDependencies)) {
+                boolean isNewDependencyTag = dedupeEnabled && isDependencyTag(effectiveNewGroupId, effectiveNewArtifactId);
+                // Renaming this old declaration would land on coordinates (including classifier, type, and scope)
+                // that are already declared directly; drop it rather than creating a duplicate. The
+                // !isNewDependencyTag guard skips tags whose old and new coordinates overlap (e.g. via globs),
+                // so we never remove a declaration that is itself the intended new dependency.
+                if (isOldDependencyTag && !isNewDependencyTag && renamedOldTagWouldDuplicate(t)) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                     return t;
                 }
-                // When the old declaration is being dropped as a duplicate, upgrade the surviving new
+                // When an old declaration is being dropped as a duplicate, upgrade the surviving new
                 // declaration in place to the requested version instead of leaving it untouched.
                 boolean isSurvivingNewDependencyTag = isNewDependencyTag && newVersion != null &&
-                        matchesAnyDirectDependency(t, existingOldDirectDependencies);
+                        isSurvivorOfRemovedOldDependency(t);
                 boolean isPluginDependency = isPluginDependencyTag(oldGroupId, oldArtifactId);
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
@@ -434,20 +441,49 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 return direct;
             }
 
-            // Matches a declared dependency tag against resolved dependencies on the full coordinates that
-            // determine identity: groupId/artifactId (already filtered) plus classifier, type, and scope.
-            private boolean matchesAnyDirectDependency(Xml.Tag tag, List<ResolvedDependency> dependencies) {
-                String classifier = emptyToNull(tag.getChildValue("classifier").orElse(null));
-                String type = defaultType(tag.getChildValue("type").orElse(null));
-                Scope scope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
-                for (ResolvedDependency rd : dependencies) {
-                    if (Objects.equals(classifier, emptyToNull(rd.getClassifier())) &&
-                            type.equals(defaultType(rd.getType())) &&
-                            scope == Scope.fromName(rd.getRequested().getScope() == null ? "compile" : rd.getRequested().getScope())) {
+            // The old dependency declaration, once renamed to the new coordinates, would duplicate a
+            // dependency that is already declared directly under those same coordinates (matching on
+            // groupId, artifactId, classifier, type, and scope).
+            private boolean renamedOldTagWouldDuplicate(Xml.Tag oldTag) {
+                String renamedGroupId = newGroupId != null ? newGroupId : oldTag.getChildValue("groupId").orElse(null);
+                String renamedArtifactId = newArtifactId != null ? newArtifactId : oldTag.getChildValue("artifactId").orElse(null);
+                for (ResolvedDependency rd : existingNewDirectDependencies) {
+                    if (Objects.equals(renamedGroupId, rd.getGroupId()) &&
+                            Objects.equals(renamedArtifactId, rd.getArtifactId()) &&
+                            sameClassifierTypeScope(oldTag, rd)) {
                         return true;
                     }
                 }
                 return false;
+            }
+
+            // This declaration already carries the new coordinates and lines up with an old dependency that
+            // is being removed as a duplicate (its renamed coordinates, classifier, type, and scope match),
+            // making it the surviving declaration that should take the requested new version.
+            private boolean isSurvivorOfRemovedOldDependency(Xml.Tag newTag) {
+                String newTagGroupId = newTag.getChildValue("groupId").orElse(null);
+                String newTagArtifactId = newTag.getChildValue("artifactId").orElse(null);
+                for (ResolvedDependency rd : existingOldDirectDependencies) {
+                    String renamedGroupId = newGroupId != null ? newGroupId : rd.getGroupId();
+                    String renamedArtifactId = newArtifactId != null ? newArtifactId : rd.getArtifactId();
+                    if (Objects.equals(newTagGroupId, renamedGroupId) &&
+                            Objects.equals(newTagArtifactId, renamedArtifactId) &&
+                            sameClassifierTypeScope(newTag, rd)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // Compares the classifier, type, and scope of a declared dependency tag against a resolved
+            // dependency, defaulting absent classifier/type/scope to their Maven defaults.
+            private boolean sameClassifierTypeScope(Xml.Tag tag, ResolvedDependency rd) {
+                String classifier = emptyToNull(tag.getChildValue("classifier").orElse(null));
+                String type = defaultType(tag.getChildValue("type").orElse(null));
+                Scope scope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+                return Objects.equals(classifier, emptyToNull(rd.getClassifier())) &&
+                        type.equals(defaultType(rd.getType())) &&
+                        scope == Scope.fromName(rd.getRequested().getScope() == null ? "compile" : rd.getRequested().getScope());
             }
 
             private @Nullable String emptyToNull(@Nullable String value) {

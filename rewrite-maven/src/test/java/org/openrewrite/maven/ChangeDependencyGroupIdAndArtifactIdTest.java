@@ -438,6 +438,57 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void shouldDeduplicateWhenOnlyArtifactIdChanges() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter",
+            "junit-jupiter-api",
+            null,
+            "junit-jupiter-engine",
+            "5.9.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>5.8.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-engine</artifactId>
+                          <version>5.8.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-engine</artifactId>
+                          <version>5.9.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExistsWithVersion() {
