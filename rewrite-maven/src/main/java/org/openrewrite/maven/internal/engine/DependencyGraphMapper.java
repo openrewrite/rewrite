@@ -131,16 +131,16 @@ public class DependencyGraphMapper {
                     continue;
                 }
                 flat.add(node);
-                Pom declaringPom = index.pomFor(node.gav);
+                List<Pom> declaringLineage = index.lineageFor(node.gav);
                 for (DependencyNode child : winners(frame.aether)) {
                     // The child's scope as DECLARED in its containing pom (legacy ResolvedPom.getDependencyScope) — not
                     // aether's scope, which the JavaScopeDeriver has already promoted (a compile dependency of a
                     // test/provided parent becomes test/provided). Legacy propagates every root as Compile, so a
                     // test-scoped direct dependency's compile transitives stay compile-reachable and populate the
                     // Test/Provided classpath (verified against `mvn dependency:tree`).
-                    Scope childScope = childScope(child, declaringPom, rootPom);
+                    Scope childScope = childScope(child, declaringLineage, rootPom);
                     if (childScope.isInClasspathOf(frame.propagationScope)) {
-                        next.putIfAbsent(gact(child), new Frame(child, childScope, node, transitiveRequested(child, declaringPom)));
+                        next.putIfAbsent(gact(child), new Frame(child, childScope, node, transitiveRequested(child, declaringLineage)));
                     }
                 }
             }
@@ -252,15 +252,19 @@ public class DependencyGraphMapper {
     }
 
     // A transitive node's requested coordinates match what the legacy BFS threads as ResolvedDependency.requested: the
-    // declaring pom's declared version, which is null when the dependency was declared without one (its version came
-    // from management). Fall back to the aether (pre-management) version when the declaring pom is unavailable — e.g. a
-    // reactor member absent from servedBy — or when the declared version is an unresolved ${...} legacy interpolates.
-    private static Dependency transitiveRequested(DependencyNode node, @Nullable Pom declaringPom) {
+    // declaring pom's *parent-merged* declared version (legacy's getRequestedDependencies merges ancestor-declared
+    // <dependencies>, child-wins), interpolated through the lineage's properties exactly as ResolvedPom.getValue —
+    // null when declared without a version (management supplied it), the literal when a placeholder cannot resolve.
+    // Fall back to the aether (pre-management) version only when no lineage pom declares the coordinate at all.
+    private static Dependency transitiveRequested(DependencyNode node, List<Pom> declaringLineage) {
         Artifact artifact = node.getArtifact();
-        Dependency declared = matchDeclared(declaringPom, artifact);
+        Dependency declared = matchDeclared(declaringLineage, artifact);
         String version;
-        if (declared != null && (declared.getVersion() == null || !declared.getVersion().contains("${"))) {
+        if (declared != null) {
             version = declared.getVersion();
+            if (version != null && version.contains("${")) {
+                version = interpolate(declaringLineage, version);
+            }
         } else {
             version = artifact.getBaseVersion();
             if ((node.getManagedBits() & DependencyNode.MANAGED_VERSION) != 0) {
@@ -277,70 +281,79 @@ public class DependencyGraphMapper {
                 .build();
     }
 
-    private static @Nullable Dependency matchDeclared(@Nullable Pom declaringPom, Artifact artifact) {
-        if (declaringPom == null) {
-            return null;
-        }
+    // The declaring instance for a coordinate: the declaring pom's own <dependencies> first, then each ancestor's
+    // (child-wins, mirroring legacy's parent-merged getRequestedDependencies).
+    private static @Nullable Dependency matchDeclared(List<Pom> declaringLineage, Artifact artifact) {
         String classifier = emptyToNull(artifact.getClassifier());
-        Dependency byGa = null;      // exact interpolated g:a match, classifier not yet confirmed
-        Dependency byArtifact = null; // artifactId (+classifier) match, groupId a placeholder we could not resolve
-        for (Dependency d : declaringPom.getDependencies()) {
-            if (!artifact.getArtifactId().equals(d.getArtifactId())) {
-                continue;
+        for (Pom pom : declaringLineage) {
+            Dependency byGa = null;      // exact interpolated g:a match, classifier not yet confirmed
+            Dependency byArtifact = null; // artifactId (+classifier) match, groupId a placeholder we could not resolve
+            for (Dependency d : pom.getDependencies()) {
+                if (!artifact.getArtifactId().equals(d.getArtifactId())) {
+                    continue;
+                }
+                boolean classifierMatches = Objects.equals(emptyToNull(d.getClassifier()), classifier);
+                if (groupIdMatches(declaringLineage, d.getGroupId(), artifact.getGroupId())) {
+                    if (classifierMatches) {
+                        return d;
+                    }
+                    if (byGa == null) {
+                        byGa = d;
+                    }
+                } else if (classifierMatches && byArtifact == null) {
+                    byArtifact = d;
+                }
             }
-            boolean classifierMatches = Objects.equals(emptyToNull(d.getClassifier()), classifier);
-            if (groupIdMatches(declaringPom, d.getGroupId(), artifact.getGroupId())) {
-                if (classifierMatches) {
-                    return d;
-                }
-                if (byGa == null) {
-                    byGa = d;
-                }
-            } else if (classifierMatches && byArtifact == null) {
-                byArtifact = d;
+            if (byGa != null || byArtifact != null) {
+                return byGa != null ? byGa : byArtifact;
             }
         }
-        return byGa != null ? byGa : byArtifact;
+        return null;
     }
 
     // A declared groupId may be inherited (null → the containing pom's) or an uninterpolated placeholder like
-    // ${project.groupId}; resolve those against the declaring pom before comparing, so the raw declared version still
-    // threads onto the child (legacy interpolates the coordinate but keeps the requested version raw).
-    private static boolean groupIdMatches(Pom declaringPom, @Nullable String declaredGroupId, String artifactGroupId) {
+    // ${project.groupId}; resolve those against the declaring lineage before comparing, so the raw declared version
+    // still threads onto the child (legacy interpolates the coordinate but keeps the requested version raw).
+    private static boolean groupIdMatches(List<Pom> declaringLineage, @Nullable String declaredGroupId, String artifactGroupId) {
         if (declaredGroupId == null || artifactGroupId.equals(declaredGroupId)) {
             return true;
         }
-        return declaredGroupId.contains("${") && artifactGroupId.equals(interpolate(declaringPom, declaredGroupId));
+        return declaredGroupId.contains("${") && artifactGroupId.equals(interpolate(declaringLineage, declaredGroupId));
     }
 
-    private static @Nullable String interpolate(Pom declaringPom, String value) {
-        String result = value;
-        int start;
-        while ((start = result.indexOf("${")) >= 0) {
-            int end = result.indexOf('}', start);
-            if (end < 0) {
-                break;
-            }
-            String key = result.substring(start + 2, end);
-            String resolved;
-            switch (key) {
-                case "project.groupId":
-                case "pom.groupId":
-                    resolved = declaringPom.getGroupId();
-                    break;
-                case "project.version":
-                case "pom.version":
-                    resolved = declaringPom.getVersion();
-                    break;
-                default:
-                    resolved = declaringPom.getProperties().get(key);
-            }
-            if (resolved == null) {
-                return null;
-            }
-            result = result.substring(0, start) + resolved + result.substring(end + 1);
+    // Mirrors ResolvedPom.getValue over the declaring pom's raw-lineage property merge (child-first, first-wins):
+    // placeholders resolve recursively; an unresolvable placeholder stays literal, exactly as legacy threads it.
+    private static @Nullable String interpolate(List<Pom> lineage, String value) {
+        return ResolvedPom.placeholderHelper.replacePlaceholders(value, key -> lineageProperty(lineage, key));
+    }
+
+    private static @Nullable String lineageProperty(List<Pom> lineage, String key) {
+        if (lineage.isEmpty()) {
+            return null;
         }
-        return result;
+        Pom pom = lineage.get(0);
+        switch (key) {
+            case "groupId":
+            case "project.groupId":
+            case "pom.groupId":
+                return pom.getGroupId();
+            case "artifactId":
+            case "project.artifactId":
+            case "pom.artifactId":
+                return pom.getArtifactId();
+            case "version":
+            case "project.version":
+            case "pom.version":
+                return pom.getVersion();
+            default:
+                for (Pom p : lineage) {
+                    String v = p.getProperties().get(key);
+                    if (v != null) {
+                        return v;
+                    }
+                }
+                return null;
+        }
     }
 
     private static Dependency synthetic(Artifact artifact) {
@@ -404,9 +417,9 @@ public class DependencyGraphMapper {
 
     // Legacy ResolvedPom.getDependencyScope: the child's scope declared in its containing pom (else Compile), then the
     // root pom's managed scope only when that would not promote the dependency into a classpath it was not already in.
-    private static Scope childScope(DependencyNode child, @Nullable Pom declaringPom, ResolvedPom rootPom) {
+    private static Scope childScope(DependencyNode child, List<Pom> declaringLineage, ResolvedPom rootPom) {
         Artifact a = child.getArtifact();
-        Dependency declared = matchDeclared(declaringPom, a);
+        Dependency declared = matchDeclared(declaringLineage, a);
         Scope inContaining = declared != null && declared.getScope() != null ?
                 Scope.fromName(declared.getScope()) : Scope.Compile;
         Scope inProject = rootPom.getManagedScope(a.getGroupId(), a.getArtifactId(), a.getExtension(),
@@ -516,6 +529,40 @@ public class DependencyGraphMapper {
                 // treat as absent
             }
             return null;
+        }
+
+        // The raw pom plus its ancestors (child-first), resolved through the collect's servedBy attribution; a parent
+        // gav's ${...} coordinates are interpolated against the chain gathered so far. Cycle-guarded.
+        List<Pom> lineageFor(GroupArtifactVersion gav) {
+            List<Pom> lineage = new ArrayList<>(4);
+            Set<GroupArtifactVersion> visited = new HashSet<>();
+            for (Pom pom = pomFor(gav); pom != null; ) {
+                GroupArtifactVersion id = new GroupArtifactVersion(pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
+                if (!visited.add(id)) {
+                    break;
+                }
+                lineage.add(pom);
+                Parent parent = pom.getParent();
+                if (parent == null) {
+                    break;
+                }
+                GroupArtifactVersion parentGav = parent.getGav();
+                String parentGroupId = resolveCoordinate(lineage, parentGav.getGroupId());
+                String parentVersion = resolveCoordinate(lineage, parentGav.getVersion());
+                if (parentGroupId == null || parentVersion == null) {
+                    break;
+                }
+                pom = pomFor(new GroupArtifactVersion(parentGroupId, parentGav.getArtifactId(), parentVersion));
+            }
+            return lineage;
+        }
+
+        private static @Nullable String resolveCoordinate(List<Pom> lineage, @Nullable String value) {
+            if (value == null || !value.contains("${")) {
+                return value;
+            }
+            String resolved = interpolate(lineage, value);
+            return resolved == null || resolved.contains("${") ? null : resolved;
         }
 
         List<License> licensesFor(GroupArtifactVersion gav) {

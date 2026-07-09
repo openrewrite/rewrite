@@ -37,6 +37,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.tree.Scope;
 
@@ -228,7 +229,7 @@ public final class MavenEngineResolution {
             if (engine == Engine.MAVEN) {
                 EngineGraph graph;
                 try {
-                    graph = attemptEngineGraph(requested, profiles, downloader, ctx);
+                    graph = attemptEngineGraph(legacyPom, profiles, downloader, ctx);
                 } catch (MavenDownloadingException e) {
                     throw MavenDownloadingExceptions.append(null, e);
                 }
@@ -241,7 +242,7 @@ public final class MavenEngineResolution {
             DepAttempt legacyAttempt = attemptDeps(legacy);
             EngineGraph engineGraph;
             try {
-                engineGraph = attemptEngineGraph(requested, profiles, downloader, ctx);
+                engineGraph = attemptEngineGraph(legacyPom, profiles, downloader, ctx);
             } catch (MavenDownloadingException | MavenParsingException e) {
                 // The engine's effective-pom rebuild threw. When Maven is stricter than rewrite's lenient parser
                 // (parent-packaging, self-parent, expression-cycle, ...) the effective-pom shadow already ledgered the
@@ -284,7 +285,7 @@ public final class MavenEngineResolution {
         try {
             EngineGraph graph;
             try {
-                graph = attemptEngineGraph(pom.getRequested(), toList(pom.getActiveProfiles()), downloader, ctx);
+                graph = attemptEngineGraph(pom, toList(pom.getActiveProfiles()), downloader, ctx);
             } catch (MavenDownloadingException e) {
                 throw MavenDownloadingExceptions.append(null, e);
             }
@@ -302,20 +303,60 @@ public final class MavenEngineResolution {
 
     // Builds the engine effective model, runs one verbose collect, and projects all four scopes. A direct-dependency
     // failure is captured (with the partial projection) rather than thrown, so shadow can compare both outcomes.
-    private static EngineGraph attemptEngineGraph(Pom requested, List<String> profiles,
+    private static EngineGraph attemptEngineGraph(ResolvedPom callerPom, List<String> profiles,
                                                   MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
+        Pom requested = callerPom.getRequested();
         EngineEffective effective = buildEngineEffective(requested, profiles, downloader, ctx);
+        // ResolvedPom.resolve's no-change contract: a value-unchanged re-resolution returns the caller's instance, whose
+        // requested/requestedBom thread the PREVIOUS requested pom's declarations (UpdateMavenModel swaps a re-mapped
+        // requested onto it). Thread against the caller's pom whenever the engine's threading inputs are value-equal, so
+        // consumers' reference lookups — and the shadow's requestedRef — see exactly what legacy leaves in place.
+        ResolvedPom enginePom = threadingEqual(effective.pom, callerPom) ? callerPom : effective.pom;
         CollectorHandle handle = collectorHandle(ctx);
         EngineCollectOutcome outcome = handle.collector.collect(effective.effectiveModel, requested,
                 effective.requestRepositories, effective.effectiveSettings, effective.reactor, handle.scratch, ctx);
         DependencyGraphMapper mapper = new DependencyGraphMapper(MavenExecutionContextView.view(ctx).getPomCache());
         try {
-            return new EngineGraph(effective.pom, mapper.map(outcome, effective.pom, requested, ctx), null);
+            return new EngineGraph(enginePom, mapper.map(outcome, enginePom, requested, ctx), null);
         } catch (MavenDownloadingExceptions e) {
             Map<Scope, List<ResolvedDependency>> partial = e.getPartialResult() == null ?
                     new LinkedHashMap<>() : e.getPartialResult().getDependencies();
-            return new EngineGraph(effective.pom, partial, e);
+            return new EngineGraph(enginePom, partial, e);
         }
+    }
+
+    // The dependency-threading inputs (requested dependencies + managed coordinates) compared by value; managed entries
+    // align by g:a:classifier:type (unique on both sides) and ignore the resolved repository spelling and the threaded
+    // requested/requestedBom instances, so a value-unchanged re-resolution reuses the caller's pom exactly as legacy does.
+    private static boolean threadingEqual(ResolvedPom engine, ResolvedPom caller) {
+        if (!engine.getRequestedDependencies().equals(caller.getRequestedDependencies())) {
+            return false;
+        }
+        List<ResolvedManagedDependency> a = engine.getDependencyManagement();
+        List<ResolvedManagedDependency> b = caller.getDependencyManagement();
+        if (a.size() != b.size()) {
+            return false;
+        }
+        Map<String, ResolvedManagedDependency> byKey = new HashMap<>(b.size() * 2);
+        for (ResolvedManagedDependency dm : b) {
+            byKey.put(dmKey(dm), dm);
+        }
+        for (ResolvedManagedDependency dm : a) {
+            ResolvedManagedDependency other = byKey.get(dmKey(dm));
+            if (other == null ||
+                    !Objects.equals(dm.getVersion(), other.getVersion()) ||
+                    dm.getScope() != other.getScope() ||
+                    !Objects.equals(dm.getExclusions(), other.getExclusions())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String dmKey(ResolvedManagedDependency dm) {
+        return dm.getGroupId() + ':' + dm.getArtifactId() + ':' +
+                (dm.getClassifier() == null ? "" : dm.getClassifier()) + ':' +
+                (dm.getType() == null ? "jar" : dm.getType());
     }
 
     private static final class EngineGraph {

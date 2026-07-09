@@ -268,7 +268,6 @@ public class EffectivePomMapper {
             ModelBuildingResult result, Pom requested,
             Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy, List<String> lineage, String rootModelId) {
         List<org.openrewrite.maven.tree.Dependency> requestedDependencies = new ArrayList<>();
-        Set<GroupArtifact> seen = new HashSet<>();
         for (String id : lineage) {
             Pom pom = declaringPom(id, rootModelId, requested, servedBy);
             if (pom == null) {
@@ -277,18 +276,36 @@ public class EffectivePomMapper {
             Set<String> activeProfileIds = activeProfileIds(result, id);
             for (org.openrewrite.maven.tree.Profile profile : pom.getProfiles()) {
                 if (activeProfileIds.contains(profile.getId())) {
-                    threadDependencies(profile.getDependencies(), seen, requestedDependencies);
+                    mergeRequested(requestedDependencies, profile.getDependencies());
                 }
             }
-            threadDependencies(pom.getDependencies(), seen, requestedDependencies);
+            mergeRequested(requestedDependencies, pom.getDependencies());
         }
         return requestedDependencies;
     }
 
-    private static void threadDependencies(List<org.openrewrite.maven.tree.Dependency> incoming, Set<GroupArtifact> seen,
-                                           List<org.openrewrite.maven.tree.Dependency> target) {
+    // Mirrors ResolvedPom.mergeRequestedDependencies: the first non-empty contribution is copied whole (so a pom's own
+    // duplicate g:a declarations are BOTH retained — legacy resolves last-declaration-wins and threads the resolved dep
+    // to the last instance); every later (ancestor/profile) contribution adds only a g:a not already present (child-wins).
+    private static void mergeRequested(List<org.openrewrite.maven.tree.Dependency> target,
+                                       List<org.openrewrite.maven.tree.Dependency> incoming) {
+        if (incoming.isEmpty()) {
+            return;
+        }
+        if (target.isEmpty()) {
+            target.addAll(incoming);
+            return;
+        }
         for (org.openrewrite.maven.tree.Dependency dependency : incoming) {
-            if (seen.add(new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId()))) {
+            boolean found = false;
+            for (org.openrewrite.maven.tree.Dependency existing : target) {
+                if (Objects.equals(existing.getGroupId(), dependency.getGroupId()) &&
+                        existing.getArtifactId().equals(dependency.getArtifactId())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
                 target.add(dependency);
             }
         }
@@ -394,7 +411,7 @@ public class EffectivePomMapper {
                 continue;
             }
             result.add(new org.openrewrite.maven.tree.Plugin(
-                    plugin.getGroupId(),
+                    unshade(plugin.getGroupId()),
                     plugin.getArtifactId(),
                     plugin.getVersion(),
                     plugin.getExtensions(),
@@ -418,6 +435,15 @@ public class EffectivePomMapper {
                     configuration));
         }
         return result;
+    }
+
+    // Maven's super-POM is a shaded classpath resource, so a plugin declared without a groupId inherits its default
+    // groupId through the relocation prefix (`…engine.shaded.org.apache.maven.plugins`). Strip it so the projected
+    // coordinate is the real `org.apache.maven.plugins` legacy records (phase2-b2 deviation #5).
+    private static final String SHADED_PREFIX = "org.openrewrite.maven.engine.shaded.";
+
+    private static @Nullable String unshade(@Nullable String groupId) {
+        return groupId != null && groupId.startsWith(SHADED_PREFIX) ? groupId.substring(SHADED_PREFIX.length()) : groupId;
     }
 
     private static List<org.openrewrite.maven.tree.Dependency> dependencies(List<Dependency> dependencies) {

@@ -243,20 +243,20 @@ class EngineDependencyCollectorTest {
         }
     }
 
-    // (i) A missing transitive descriptor warns-and-continues; a missing direct descriptor fails.
+    // (i) A jar-typed transitive whose POM 404s fails at any depth (legacy + real Maven both fail it — L-P3-D-003);
+    // the collect still completes over the partial graph so the resolvable scopes are projected.
     @Test
-    void missingTransitiveTolerated(@TempDir Path tmp) throws Exception {
+    void missingJarTransitiveFails(@TempDir Path tmp) throws Exception {
         try (MockMavenServer server = new MockMavenServer()) {
             server.pom(G, "a", "1", project("a", "jar", deps(dep("gone", "1"))));
             String rootXml = project("root", "jar", deps(dep("a", "1")));
 
             EngineCollectOutcome outcome = collect(server, tmp, ctx(new InMemoryMavenPomCache()), emptyReactor(), rootXml);
 
-            assertNotNull(outcome.getRoot(), "collect completes; the missing transitive is tolerated");
-            assertTrue(outcome.getDirectFailures().isEmpty(), "a missing transitive is not a failure");
-            assertTrue(outcome.getToleratedTransitiveFailures().stream()
-                            .anyMatch(g -> "gone".equals(g.getArtifactId())),
-                    () -> "the missing transitive is recorded as tolerated: " + outcome.getToleratedTransitiveFailures());
+            assertNotNull(outcome.getRoot(), "collect completes over the partial graph");
+            assertTrue(outcome.getDirectFailures().stream().anyMatch(e -> e.getFailedOn() != null &&
+                            "gone".equals(e.getFailedOn().getArtifactId())),
+                    () -> "the unavailable jar transitive is a failure: " + outcome.getDirectFailures());
         }
     }
 

@@ -46,6 +46,7 @@ import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.net.URI;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -142,6 +143,14 @@ public class CacheBridge {
                 ArtifactResult result = resolveArtifact(repo, groupId, artifactId, version);
                 File pomFile = result.getArtifact().getFile();
                 byte[] bytes = Files.readAllBytes(pomFile.toPath());
+                // A file repository (notably the local ~/.m2) only *serves* a jar-packaged artifact when its jar is
+                // present and non-empty, mirroring MavenPomDownloader's local-repo gate (a2 §1). Otherwise skip it so
+                // attribution falls through to the remote — a partially-populated ~/.m2 never rewrites the repository
+                // attribution (L-P3-D-002).
+                if (isFileRepository(repo) && !jarPresentForJarPackaging(repo, groupId, artifactId, version, bytes)) {
+                    responses.put(repo, "not found");
+                    continue;
+                }
                 pomCache.putPomBytes(key, bytes);
                 parseThrough(key, repo, bytes);
                 servedBy.put(key, repo);
@@ -215,6 +224,37 @@ public class CacheBridge {
             return pomCache.getPomBytes(key);
         } catch (MavenDownloadingException e) {
             return null; // a cache read failure is treated as unknown; the engine resolves it fresh
+        }
+    }
+
+    private static boolean isFileRepository(MavenRepository repo) {
+        return repo.getUri().regionMatches(true, 0, "file:", 0, 5);
+    }
+
+    // Mirrors MavenPomDownloader's local/file-repo gate: a jar-packaged artifact (packaging null/jar/bundle) is only
+    // resolvable from a file repo when a non-empty sibling jar exists; a pom/other-packaged artifact needs no jar.
+    private static boolean jarPresentForJarPackaging(MavenRepository repo, String groupId, String artifactId,
+                                                     String version, byte[] pomBytes) {
+        String packaging = RawPom.parse(new ByteArrayInputStream(pomBytes), null).getPackaging();
+        boolean jarLike = packaging == null || "jar".equals(packaging) || "bundle".equals(packaging);
+        if (!jarLike) {
+            return true;
+        }
+        File jar = fileRepoArtifact(repo, groupId, artifactId, version, ".jar");
+        return jar != null && jar.isFile() && jar.length() > 0;
+    }
+
+    private static @Nullable File fileRepoArtifact(MavenRepository repo, String groupId, String artifactId,
+                                                   String version, String extension) {
+        String base = repo.getUri();
+        if (!base.endsWith("/")) {
+            base += "/";
+        }
+        try {
+            return new File(URI.create(base + groupId.replace('.', '/') + '/' + artifactId + '/' + version + '/' +
+                    artifactId + '-' + version + extension));
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 

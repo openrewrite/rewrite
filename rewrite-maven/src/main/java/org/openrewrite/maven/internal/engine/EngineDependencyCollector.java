@@ -119,23 +119,31 @@ public class EngineDependencyCollector implements Closeable {
 
     private EngineCollectOutcome outcome(@Nullable DependencyNode root, CollectContext cc, List<DependencyCycle> cycles,
                                          List<MavenDownloadingException> hardFailures) {
-        Map<GroupArtifactVersion, Integer> depths = new LinkedHashMap<>();
+        Map<GroupArtifactVersion, NodeInfo> nodes = new LinkedHashMap<>();
         if (root != null) {
-            recordDepths(root, 0, depths, Collections.newSetFromMap(new IdentityHashMap<>()));
+            walk(root, 0, null, nodes, Collections.newSetFromMap(new IdentityHashMap<>()));
         }
 
         List<MavenDownloadingException> directFailures = new ArrayList<>(hardFailures);
         List<GroupArtifactVersion> toleratedTransitive = new ArrayList<>();
         cc.getDescriptorFailures().forEach((gav, failure) -> {
-            Integer depth = depths.get(gav);
-            if (depth != null && depth == 1) {
-                // A direct dependency the user declared that could not be read: Maven tolerates it during collect,
-                // rewrite fails on it (KEEP_REWRITE per-file error containment), matching the legacy downloader. The
-                // message embeds the GAV to mirror MavenPomDownloader's ("Unable to download POM: <gav>."), so
-                // consumers that grep the message for coordinates keep working.
+            NodeInfo info = nodes.get(gav);
+            int depth = info == null ? -1 : info.depth;
+            // Maven tolerates a missing/invalid descriptor during collect, but rewrite (matching the legacy downloader)
+            // fails a *jar-typed* dependency whose POM 404s at ANY depth (a1 §3.9) — a genuinely-unavailable transitive
+            // jar makes a real build fail. Only a resolved-graph member is failed: a pom-typed entry, an optional
+            // dependency, or a conflict-loser (a superseded version legacy never downloads) is left tolerated. A direct
+            // (depth-1) dependency fails on any descriptor error.
+            boolean failsBuild = depth == 1 ||
+                    (depth >= 2 && failure.isMissing() && info != null && info.jarLike && !info.optional && info.winner);
+            if (failsBuild) {
+                // Attribute the failure to its direct (depth-1) ancestor so the mapper fails only the scopes that
+                // ancestor participates in; a direct failure is its own root. The message embeds the GAV to mirror
+                // MavenPomDownloader's ("Unable to download POM: <gav>.") so coordinate-grepping consumers keep working.
+                GroupArtifactVersion root0 = info != null && info.directAncestor != null ? info.directAncestor : gav;
                 String message = failure.isMissing() ? "Unable to download POM: " + gav + "." : failure.getReason();
                 MavenDownloadingException ex =
-                        new MavenDownloadingException(message, null, gav).setRoot(gav);
+                        new MavenDownloadingException(message, null, gav).setRoot(root0);
                 if (!failure.getRepositoryResponses().isEmpty()) {
                     ex.setRepositoryResponses(failure.getRepositoryResponses());
                 }
@@ -200,19 +208,53 @@ public class EngineDependencyCollector implements Closeable {
                 .build();
     }
 
-    private static void recordDepths(DependencyNode node, int depth, Map<GroupArtifactVersion, Integer> depths,
-                                     Set<DependencyNode> visited) {
+    // Walks the collected graph recording, per gav, its shallowest depth, its declared type/optional, and the direct
+    // (depth-1) dependency it descends from — the inputs the tolerate-vs-fail split and per-scope failure attribution need.
+    private static void walk(DependencyNode node, int depth, @Nullable GroupArtifactVersion directAncestor,
+                             Map<GroupArtifactVersion, NodeInfo> nodes, Set<DependencyNode> visited) {
         if (!visited.add(node)) {
             return;
         }
         Artifact artifact = node.getArtifact();
+        GroupArtifactVersion gav = null;
         if (artifact != null) {
-            GroupArtifactVersion gav =
-                    new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
-            depths.merge(gav, depth, Math::min);
+            gav = new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+            String extension = artifact.getExtension();
+            boolean jarLike = extension == null || extension.isEmpty() ||
+                    "jar".equals(extension) || "ejb".equals(extension);
+            boolean optional = node.getDependency() != null && node.getDependency().isOptional();
+            boolean winner = node.getData().get(ConflictResolver.NODE_DATA_WINNER) == null;
+            NodeInfo info = new NodeInfo(depth, directAncestor, jarLike, optional, winner);
+            // Keep the shallowest depth; OR the winner flag so a coordinate that wins anywhere is failable.
+            nodes.merge(gav, info, (existing, added) -> new NodeInfo(
+                    Math.min(existing.depth, added.depth),
+                    existing.depth <= added.depth ? existing.directAncestor : added.directAncestor,
+                    existing.jarLike, existing.optional && added.optional, existing.winner || added.winner));
         }
         for (DependencyNode child : node.getChildren()) {
-            recordDepths(child, depth + 1, depths, visited);
+            walk(child, depth + 1, depth == 0 ? gavOf(child) : directAncestor, nodes, visited);
+        }
+    }
+
+    private static @Nullable GroupArtifactVersion gavOf(DependencyNode node) {
+        Artifact a = node.getArtifact();
+        return a == null ? null : new GroupArtifactVersion(a.getGroupId(), a.getArtifactId(), a.getVersion());
+    }
+
+    private static final class NodeInfo {
+        final int depth;
+        final @Nullable GroupArtifactVersion directAncestor;
+        final boolean jarLike;
+        final boolean optional;
+        final boolean winner;
+
+        NodeInfo(int depth, @Nullable GroupArtifactVersion directAncestor, boolean jarLike, boolean optional,
+                 boolean winner) {
+            this.depth = depth;
+            this.directAncestor = directAncestor;
+            this.jarLike = jarLike;
+            this.optional = optional;
+            this.winner = winner;
         }
     }
 
