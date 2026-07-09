@@ -433,10 +433,18 @@ public class DependencyGraphMapper {
                 Scope.fromName(declared.getScope()) : Scope.Compile;
         Scope inProject = rootPom.getManagedScope(a.getGroupId(), a.getArtifactId(), a.getExtension(),
                 emptyToNull(a.getClassifier()));
-        if (inProject == null) {
-            return inContaining;
-        }
-        return inContaining.isInClasspathOf(inProject) ? inProject : inContaining;
+        Scope legacyScope = inProject == null ? inContaining :
+                (inContaining.isInClasspathOf(inProject) ? inProject : inContaining);
+        // Maven selects a coordinate's effective scope as the widest (most-visible) across every path that reaches its
+        // winning version; aether records that selection as the winner edge's scope. When the raw declared scope in the
+        // containing pom is NARROWER than what Maven kept (e.g. grpc-core declares error_prone_annotations `runtime`
+        // while grpc-api declares it `compile`, so Maven keeps it `compile`), trust aether's wider scope so the
+        // coordinate lands in the classpaths Maven does. When aether instead PROMOTED it narrower — a compile child of a
+        // test/provided parent that its JavaScopeDeriver moved to test/provided — the declared scope is wider and wins,
+        // preserving the test-closure population (L-P3-D-001).
+        Scope aetherScope = scopeOf(child);
+        return Scope.maxPrecedence(aetherScope, legacyScope) == aetherScope && aetherScope != legacyScope ?
+                aetherScope : legacyScope;
     }
 
     private static GroupArtifactClassifierType gact(DependencyNode node) {
