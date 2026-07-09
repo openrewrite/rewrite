@@ -3,8 +3,19 @@ plugins {
 }
 
 repositories {
+    // Maven Local first so the worktree's freshly-published rewrite-maven SNAPSHOT wins over any
+    // released artifact; mavenCentral supplies the third-party deps (jackson, junit, lombok).
+    mavenLocal()
     mavenCentral()
 }
+
+// The worktree's rewrite-maven version. Publish it (and its local transitives) with:
+//   ./gradlew :rewrite-core:publishToMavenLocal :rewrite-xml:publishToMavenLocal \
+//             :rewrite-java:publishToMavenLocal :rewrite-properties:publishToMavenLocal \
+//             :rewrite-yaml:publishToMavenLocal :rewrite-maven-engine:publishToMavenLocal \
+//             :rewrite-maven:publishToMavenLocal
+// Override with -PrewriteVersion=... if the worktree's version has moved.
+val rewriteVersion = (findProperty("rewriteVersion") as String?) ?: "8.87.0-SNAPSHOT"
 
 java {
     toolchain {
@@ -16,7 +27,7 @@ dependencies {
     compileOnly("org.projectlombok:lombok:latest.release")
     annotationProcessor("org.projectlombok:lombok:latest.release")
 
-    implementation("org.openrewrite:rewrite-maven:latest.release")
+    implementation("org.openrewrite:rewrite-maven:$rewriteVersion")
     implementation(platform("com.fasterxml.jackson:jackson-bom:latest.release"))
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
@@ -60,6 +71,11 @@ tasks.register<JavaExec>("corpusRun") {
     maxHeapSize = "6g"
     val mode = (project.findProperty("mode") as String?) ?: "replay"
     systemProperty("corpus.mode", mode)
+    // Dual-engine selector (dev/CI-only): legacy (default) | maven | shadow. Passed as the real
+    // ResolutionEngineSelector system property so the runner can thread it onto the ExecutionContext.
+    (project.findProperty("engine") as String?)?.let {
+        systemProperty("org.openrewrite.maven.resolution.engine", it)
+    }
     if (mode == "replay") {
         // Belt and suspenders on top of RecordingHttpSender's no-delegate REPLAY mode: any
         // HttpURLConnection that slips past the sender dies against a dead proxy.

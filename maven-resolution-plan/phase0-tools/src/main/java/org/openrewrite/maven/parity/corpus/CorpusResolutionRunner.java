@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -34,9 +35,12 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.ResolutionEngineSelector;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -94,11 +98,21 @@ public class CorpusResolutionRunner {
     public static void main(String[] args) throws Exception {
         String mode = System.getProperty("corpus.mode", "replay");
         boolean record = "record".equals(mode);
+        String engine = System.getProperty(ResolutionEngineSelector.ENGINE_KEY);
+        boolean shadow = "shadow".equalsIgnoreCase(engine);
         Set<String> filter = new HashSet<>(Arrays.asList(args));
         CorpusManifest manifest = CorpusManifest.load(CorpusPaths.manifest());
         Files.createDirectories(CorpusPaths.snapshots());
 
+        // Local-build wiring proof: ResolutionEngineSelector ships only in this worktree's
+        // rewrite-maven (the released artifact has no dual-engine seam). Loading it here confirms
+        // the composite-build substitution took.
+        System.out.println("[wiring] ResolutionEngineSelector loaded from " +
+                ResolutionEngineSelector.class.getProtectionDomain().getCodeSource().getLocation());
+        System.out.println("[run] mode=" + mode + " engine=" + (engine == null ? "legacy" : engine));
+
         List<String> findings = new ArrayList<>();
+        List<String> census = new ArrayList<>();
         for (CorpusManifest.Entry entry : manifest.getEntries()) {
             if (!filter.isEmpty() && !filter.contains(entry.getName())) {
                 continue;
@@ -108,22 +122,27 @@ public class CorpusResolutionRunner {
                 continue;
             }
             try {
-                runEntry(entry, record, findings);
-            } catch (Exception e) {
+                runEntry(entry, record, shadow, engine, findings, census);
+            } catch (Throwable e) {
                 findings.add(entry.getName() + ": " + e);
+                census.add(entry.getName() + "\tERROR\t" + firstLine(String.valueOf(e)));
                 System.err.println("[run] FAILED " + entry.getName() + ": " + e);
             }
         }
 
+        if (shadow && !record) {
+            writeCensus(census);
+        }
         if (!findings.isEmpty()) {
             System.err.println("[run] FINDINGS (" + findings.size() + "):");
             findings.forEach(f -> System.err.println("  - " + f));
             System.exit(1);
         }
-        System.out.println("[run] all entries green in " + mode + " mode");
+        System.out.println("[run] all entries green in " + mode + " mode" + (shadow ? " (shadow)" : ""));
     }
 
-    private static void runEntry(CorpusManifest.Entry entry, boolean record, List<String> findings) throws IOException {
+    private static void runEntry(CorpusManifest.Entry entry, boolean record, boolean shadow, @Nullable String engine,
+                                 List<String> findings, List<String> census) throws IOException {
         List<Path> poms;
         Path relativeTo;
         if (entry.isPom()) {
@@ -141,14 +160,31 @@ public class CorpusResolutionRunner {
 
         long start = System.currentTimeMillis();
         if (record) {
-            resolveToSnapshot(entry, poms, relativeTo, RecordingHttpSender.record(CorpusPaths.store(),
-                    new HttpUrlConnectionSender(Duration.ofSeconds(10), Duration.ofSeconds(60))));
+            try {
+                resolveToSnapshot(entry, poms, relativeTo, engine, RecordingHttpSender.record(CorpusPaths.store(),
+                        new HttpUrlConnectionSender(Duration.ofSeconds(10), Duration.ofSeconds(60))));
+            } catch (AssertionError e) {
+                // A shadow assertion fires only after both engines have made (and recorded) their
+                // HTTP for the offending pom, so the exchange is captured; the diff is not a record
+                // failure. (Reactors abort at the first diff — top-up runs engine=maven instead.)
+                System.out.println("[run] recorded " + entry.getName() + " (shadow diff: " + firstLine(e.getMessage()) + ")");
+                return;
+            }
             System.out.println("[run] recorded " + entry.getName() + " in " + (System.currentTimeMillis() - start) + "ms");
             return;
         }
 
-        byte[] first = resolveToSnapshot(entry, poms, relativeTo, RecordingHttpSender.replay(CorpusPaths.store()));
-        byte[] second = resolveToSnapshot(entry, poms, relativeTo, RecordingHttpSender.replay(CorpusPaths.store()));
+        if (shadow) {
+            Outcome first = capture(entry, poms, relativeTo, engine);
+            Outcome second = capture(entry, poms, relativeTo, engine);
+            censusEntry(entry, first, second, findings, census);
+            System.out.println("[run] shadow-replayed " + entry.getName() + " twice in " +
+                               (System.currentTimeMillis() - start) + "ms -> " + first.status());
+            return;
+        }
+
+        byte[] first = resolveToSnapshot(entry, poms, relativeTo, engine, RecordingHttpSender.replay(CorpusPaths.store()));
+        byte[] second = resolveToSnapshot(entry, poms, relativeTo, engine, RecordingHttpSender.replay(CorpusPaths.store()));
         Path snapshot = CorpusPaths.snapshots().resolve(entry.getName() + ".json");
         Files.write(snapshot, first);
         if (!Arrays.equals(first, second)) {
@@ -160,11 +196,82 @@ public class CorpusResolutionRunner {
                            (System.currentTimeMillis() - start) + "ms -> " + snapshot);
     }
 
+    /** One shadow-REPLAY pass: either a clean snapshot or the facade's unexplained-diff assertion text. */
+    private static final class Outcome {
+        final byte @Nullable [] snapshot;
+        final @Nullable String assertion;
+
+        Outcome(byte @Nullable [] snapshot, @Nullable String assertion) {
+            this.snapshot = snapshot;
+            this.assertion = assertion;
+        }
+
+        boolean unexplained() {
+            return assertion != null;
+        }
+
+        String status() {
+            return unexplained() ? "UNEXPLAINED" : "clean/masked";
+        }
+    }
+
+    private static Outcome capture(CorpusManifest.Entry entry, List<Path> poms, Path relativeTo, @Nullable String engine) {
+        try {
+            return new Outcome(resolveToSnapshot(entry, poms, relativeTo, engine, RecordingHttpSender.replay(CorpusPaths.store())), null);
+        } catch (AssertionError e) {
+            // The shadow facade throws on any difference the ledgered masks do not explain; that
+            // text IS the census evidence for this entry.
+            return new Outcome(null, e.getMessage() == null ? e.toString() : e.getMessage());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void censusEntry(CorpusManifest.Entry entry, Outcome first, Outcome second,
+                                    List<String> findings, List<String> census) throws IOException {
+        String name = entry.getName();
+        if (first.unexplained() != second.unexplained()) {
+            findings.add(name + ": shadow outcome differs across twice-run (one asserted, one clean)");
+            census.add(name + "\tNONDETERMINISTIC-OUTCOME");
+            return;
+        }
+        if (first.unexplained()) {
+            Files.createDirectories(CorpusPaths.corpus().resolve("census"));
+            Files.write(CorpusPaths.corpus().resolve("census").resolve(name + ".diff"),
+                    first.assertion.getBytes(StandardCharsets.UTF_8));
+            boolean deterministic = first.assertion.equals(second.assertion);
+            if (!deterministic) {
+                findings.add(name + ": NONDETERMINISTIC shadow assertion text across twice-run");
+            }
+            census.add(name + "\tUNEXPLAINED" + (deterministic ? "" : "\tNONDETERMINISTIC"));
+            return;
+        }
+        Path snapshot = CorpusPaths.snapshots().resolve(name + ".json");
+        Files.write(snapshot, first.snapshot);
+        boolean deterministic = Arrays.equals(first.snapshot, second.snapshot);
+        if (!deterministic) {
+            Files.write(CorpusPaths.snapshots().resolve(name + ".nondeterministic.json"), second.snapshot);
+            findings.add(name + ": NONDETERMINISTIC output across twice-run with fresh caches");
+        }
+        census.add(name + "\tCLEAN" + (deterministic ? "" : "\tNONDETERMINISTIC"));
+    }
+
+    private static void writeCensus(List<String> census) throws IOException {
+        Files.createDirectories(CorpusPaths.corpus().resolve("census"));
+        Files.write(CorpusPaths.corpus().resolve("census").resolve("summary.tsv"),
+                String.join("\n", census).getBytes(StandardCharsets.UTF_8));
+        System.out.println("[census]");
+        census.forEach(c -> System.out.println("  " + c));
+    }
+
     private static byte[] resolveToSnapshot(CorpusManifest.Entry entry, List<Path> poms, Path relativeTo,
-                                            HttpSender sender) throws IOException {
+                                            @Nullable String engine, HttpSender sender) throws IOException {
         ExecutionContext ctx = new InMemoryExecutionContext(t -> {
             // Errors surface as ParseExceptionResult markers captured in the snapshot.
         });
+        if (engine != null) {
+            ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, engine);
+        }
         HttpSenderExecutionContextView.view(ctx).setHttpSender(sender);
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         mavenCtx.setPomCache(new InMemoryMavenPomCache());
