@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * -------------------THIS FILE IS AUTO GENERATED--------------------------
- * Changes to this file may cause incorrect behavior and will be lost if
- * the code is regenerated.
-*/
-
 package org.openrewrite.csharp;
 
 import org.jspecify.annotations.Nullable;
