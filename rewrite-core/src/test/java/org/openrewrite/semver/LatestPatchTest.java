@@ -63,6 +63,18 @@ class LatestPatchTest {
     }
 
     @Test
+    void xRangeWildcardMinorAllowsAnyMinorWithinTheMajor() {
+        // A wildcard in the minor position ("2.x"/"2.+") deliberately leaves the minor unspecified,
+        // so any minor within the major is eligible, but a higher major is not.
+        for (String current : List.of("2.x", "2.X", "2.+", "2.*")) {
+            assertThat(latestPatch.isValid(current, "2.1.0")).as(current).isTrue();
+            assertThat(latestPatch.isValid(current, "2.9.9")).as(current).isTrue();
+            assertThat(latestPatch.isValid(current, "3.0.0")).as(current).isFalse();
+            assertThat(latestPatch.upgrade(current, List.of("2.1.0", "2.9.9", "3.0.0"))).contains("2.9.9");
+        }
+    }
+
+    @Test
     void upgrade() {
         var upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.0"));
         assertThat(upgrade).isEmpty();

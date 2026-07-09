@@ -20,8 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 
-import java.util.Scanner;
-
 @Value
 public class LatestPatch implements VersionComparator {
     @Nullable
@@ -57,27 +55,18 @@ public class LatestPatch implements VersionComparator {
 
     private static String buildTildeRange(String currentVersion) {
         String major = Semver.majorVersion(currentVersion);
-        String minor = minorSegment(currentVersion);
-        if (minor != null && StringUtils.isNumeric(minor)) {
+        String minor = Semver.versionSegment(currentVersion, 1);
+        if (StringUtils.isNumeric(minor)) {
             return "~" + major + "." + minor;
         }
-        // X-range wildcard minor (e.g. "2.x", "2.+") allows any minor; an absent or non-numeric
-        // minor (e.g. "1", "1.Final") pins the minor to 0 so we stay within the patch range.
-        return minor != null && isXRangeWildcard(minor) ? "~" + major : "~" + major + ".0";
-    }
-
-    private static @Nullable String minorSegment(String version) {
-        Scanner scanner = new Scanner(version);
-        scanner.useDelimiter("[.\\-$]");
-        if (scanner.hasNext()) {
-            scanner.next();
+        if (minor != null && XRange.isWildcard(minor)) {
+            // An X-range wildcard minor (e.g. "2.x", "2.+") leaves the minor unspecified, so allow
+            // any minor within the major.
+            return "~" + major;
         }
-        return scanner.hasNext() ? scanner.next() : null;
-    }
-
-    private static boolean isXRangeWildcard(String segment) {
-        char c = segment.charAt(0);
-        return c == 'x' || c == 'X' || c == '*' || c == '+';
+        // An absent or non-numeric minor (e.g. "1", "1.Final") pins the minor to 0 so we stay
+        // within the patch range instead of ranging across minor versions.
+        return "~" + major + ".0";
     }
 
     public static Validated<LatestPatch> build(String toVersion, @Nullable String metadataPattern) {
