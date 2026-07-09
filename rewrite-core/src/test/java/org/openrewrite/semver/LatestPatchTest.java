@@ -49,10 +49,6 @@ class LatestPatchTest {
 
     @Test
     void staysWithinPatchRangeWhenMinorIsAbsentOrNonNumeric() {
-        // Current versions with no numeric minor segment must not range across minor (or major)
-        // versions. Previously "1" built a "~1.1" range and "1.Final" built a "~1" range, both of
-        // which let "latest.patch" pick a higher minor version.
-
         // Bare major: pin minor to 0, so only 1.0.x patches are eligible.
         assertThat(latestPatch.isValid("1", "1.0.1")).isTrue();
         assertThat(latestPatch.isValid("1", "1.1.0")).isFalse();
