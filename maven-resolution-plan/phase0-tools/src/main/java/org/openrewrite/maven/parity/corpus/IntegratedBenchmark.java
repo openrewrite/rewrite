@@ -60,6 +60,7 @@ public class IntegratedBenchmark {
             System.err.println("usage: IntegratedBenchmark <reactorDirName> <cap|full>");
             System.exit(2);
         }
+        maybeStartFdWatch();
         String reactorName = args[0];
         int cap = "full".equalsIgnoreCase(args[1]) ? -1 : Integer.parseInt(args[1]);
         int warmups = Integer.getInteger("bench.warmups", 2);
@@ -104,19 +105,30 @@ public class IntegratedBenchmark {
         // Warm full-reactor median: fresh pom cache per iteration, zero network (replay).
         List<Long> warm = new ArrayList<>();
         long peakHeap = 0;
+        long fdBefore = openFds();
+        String profile = null;
         for (int i = 0; i < warmups + iters; i++) {
             MavenPomCache cache = fresh();
+            boolean lastMeasured = i == warmups + iters - 1;
+            if (lastMeasured) {
+                org.openrewrite.maven.internal.engine.EngineProfiler.reset();
+            }
             long t0 = System.nanoTime();
             parse(selected, reactorDir, engine, RecordingHttpSender.replay(CorpusPaths.store()), cache);
             long ms = (System.nanoTime() - t0) / 1_000_000;
             if (i >= warmups) {
                 warm.add(ms);
             }
+            if (lastMeasured && org.openrewrite.maven.internal.engine.EngineProfiler.ENABLED) {
+                profile = org.openrewrite.maven.internal.engine.EngineProfiler.report(selected.size());
+            }
             peakHeap = Math.max(peakHeap, usedHeapMb());
         }
+        long fdAfter = openFds();
 
-        // Warm-cache re-resolution loop: one shared warm pom cache, re-resolve the reactor repeatedly (the
-        // UpdateMavenModel steady state — every remote descriptor is a cache hit). Reported per iteration.
+        // Warm-cache re-resolution loop, FRESH ctx per iteration: one shared warm pom cache, but a new ExecutionContext
+        // each parse (engine handle + DataPool/model cache rebuilt each iteration). Every remote descriptor is a bytes
+        // cache hit, so this isolates the cost of reconstructing the engine's per-ctx state.
         MavenPomCache shared = fresh();
         parse(selected, reactorDir, engine, RecordingHttpSender.replay(CorpusPaths.store()), shared); // warm the cache
         List<Long> loopTimes = new ArrayList<>();
@@ -126,25 +138,113 @@ public class IntegratedBenchmark {
             loopTimes.add((System.nanoTime() - t0) / 1_000_000);
         }
 
+        // Warm-cache re-resolution loop, SHARED ctx (the actual UpdateMavenModel steady state — a recipe run reuses one
+        // ExecutionContext across every resolution cycle, so the engine's RepositorySystem, session, and DataPool/model
+        // cache stay warm). Legacy is ctx-insensitive (its cache is the shared MavenPomCache), so this is a fair mirror.
+        MavenPomCache sharedCtxCache = fresh();
+        ExecutionContext loopCtx = newCtx(engine, RecordingHttpSender.replay(CorpusPaths.store()), sharedCtxCache);
+        parseOn(loopCtx, selected, reactorDir); // warm the ctx
+        List<Long> loopCtxTimes = new ArrayList<>();
+        for (int i = 0; i < loop; i++) {
+            long t0 = System.nanoTime();
+            parseOn(loopCtx, selected, reactorDir);
+            loopCtxTimes.add((System.nanoTime() - t0) / 1_000_000);
+        }
+
         double warmMedian = median(warm);
         double loopMedian = median(loopTimes);
+        double loopCtxMedian = median(loopCtxTimes);
         System.out.println("RESULT\tcorpus=" + reactorName + "\ttier=" + (cap < 0 ? "full" : cap) +
                 "\tmodules=" + selected.size() + "\tengine=" + engine +
                 "\tSTATUS=OK\twarmMedianMs=" + fmt(warmMedian) +
                 "\twarmMsPerModule=" + fmt(warmMedian / selected.size()) +
                 "\tloopMedianMs=" + fmt(loopMedian) +
                 "\tloopMsPerModule=" + fmt(loopMedian / selected.size()) +
+                "\tloopCtxMedianMs=" + fmt(loopCtxMedian) +
+                "\tloopCtxMsPerModule=" + fmt(loopCtxMedian / selected.size()) +
                 "\tpeakHeapMb=" + peakHeap +
+                "\tfdBefore=" + fdBefore + "\tfdAfter=" + fdAfter +
                 "\twarm=" + warm + "\tloop=" + loopMedian);
+        if (profile != null) {
+            System.out.println("PROFILE\tengine=" + engine + "\t" + profile);
+        }
+    }
+
+    // Diagnostic: when -Dbench.fdwatch=N, a daemon polls open FDs and, on crossing N, dumps a basename histogram of
+    // this process's open files (lsof) then exits — captures exactly what is leaking just before the OS cap.
+    private static void maybeStartFdWatch() {
+        int threshold = Integer.getInteger("bench.fdwatch", -1);
+        if (threshold <= 0) {
+            return;
+        }
+        Thread t = new Thread(() -> {
+            String pid = String.valueOf(ProcessHandle.current().pid());
+            while (true) {
+                long fds = openFds();
+                if (fds >= threshold) {
+                    try {
+                        System.out.println("[fdwatch] FD=" + fds + " >= " + threshold + " — dumping lsof");
+                        Process p = new ProcessBuilder("lsof", "-p", pid).redirectErrorStream(true).start();
+                        java.util.Map<String, Integer> hist = new java.util.HashMap<>();
+                        try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()))) {
+                            String line;
+                            while ((line = r.readLine()) != null) {
+                                String[] parts = line.trim().split("\\s+");
+                                String name = parts.length > 0 ? parts[parts.length - 1] : line;
+                                String key = name.replaceAll("[0-9]+", "N");
+                                if (key.length() > 60) {
+                                    key = key.substring(key.length() - 60);
+                                }
+                                hist.merge(key, 1, Integer::sum);
+                            }
+                        }
+                        hist.entrySet().stream()
+                                .sorted((a, b) -> b.getValue() - a.getValue())
+                                .limit(30)
+                                .forEach(e -> System.out.println("[fdwatch] " + e.getValue() + "\t" + e.getKey()));
+                    } catch (Exception e) {
+                        System.out.println("[fdwatch] dump failed: " + e);
+                    }
+                    Runtime.getRuntime().halt(7);
+                }
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        }, "fdwatch");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // Open file-descriptor count (Unix), for the FD-leak gate; -1 where unavailable.
+    private static long openFds() {
+        try {
+            java.lang.management.OperatingSystemMXBean os = java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            if (os instanceof com.sun.management.UnixOperatingSystemMXBean) {
+                return ((com.sun.management.UnixOperatingSystemMXBean) os).getOpenFileDescriptorCount();
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1;
     }
 
     private static void parse(List<Path> poms, Path relativeTo, String engine, HttpSender sender, MavenPomCache cache) {
+        parseOn(newCtx(engine, sender, cache), poms, relativeTo);
+    }
+
+    private static ExecutionContext newCtx(String engine, HttpSender sender, MavenPomCache cache) {
         ExecutionContext ctx = new InMemoryExecutionContext(t -> { /* errors surface as ParseExceptionResult markers */ });
         ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, engine);
         HttpSenderExecutionContextView.view(ctx).setHttpSender(sender);
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         mavenCtx.setPomCache(cache);
         mavenCtx.setAddLocalRepository(false);
+        return ctx;
+    }
+
+    private static void parseOn(ExecutionContext ctx, List<Path> poms, Path relativeTo) {
         List<Parser.Input> inputs = poms.stream().map(Parser.Input::fromFile).collect(Collectors.toList());
         List<SourceFile> parsed = MavenParser.builder().build().parseInputs(inputs, relativeTo, ctx)
                 .collect(Collectors.toList());

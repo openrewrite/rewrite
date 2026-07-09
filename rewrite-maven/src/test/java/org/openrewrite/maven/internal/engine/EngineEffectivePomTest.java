@@ -217,7 +217,7 @@ class EngineEffectivePomTest {
             ExecutionContext ctx = ctx(new InMemoryMavenPomCache());
             try (CloseableSession session = engine.newSession(tmp.resolve("lrm"), SessionConfig.forSender(sender()))) {
                 EngineEffectivePom service = new EngineEffectivePom(engine.getRepositorySystem(), session,
-                        repos(server), tmp.resolve("materialize"));
+                        repos(server), null);
 
                 EngineModelBuildingOutcome first = service.build(rootXml.getBytes(StandardCharsets.UTF_8),
                         requestedPom(), settings(), reactor, ctx);
@@ -280,7 +280,7 @@ class EngineEffectivePomTest {
                                              ReactorWorkspace reactor, String rootXml) throws Exception {
         try (CloseableSession session = engine.newSession(tmp.resolve("lrm"), SessionConfig.forSender(sender()))) {
             EngineEffectivePom service = new EngineEffectivePom(engine.getRepositorySystem(), session,
-                    repos(server), tmp.resolve("materialize"));
+                    repos(server), null);
             return service.build(rootXml.getBytes(StandardCharsets.UTF_8), requestedPom(), settings(), reactor, ctx);
         }
     }

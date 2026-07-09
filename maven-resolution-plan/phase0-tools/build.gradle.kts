@@ -74,6 +74,8 @@ tasks.register<JavaExec>("integratedBenchmark") {
     (project.findProperty("bench.warmups") as String?)?.let { systemProperty("bench.warmups", it) }
     (project.findProperty("bench.iters") as String?)?.let { systemProperty("bench.iters", it) }
     (project.findProperty("bench.loop") as String?)?.let { systemProperty("bench.loop", it) }
+    (project.findProperty("engine.profile") as String?)?.let { systemProperty("engine.profile", it) }
+    (project.findProperty("bench.fdwatch") as String?)?.let { systemProperty("bench.fdwatch", it) }
     args(entryArgs())
 }
 

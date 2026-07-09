@@ -72,11 +72,18 @@ class EngineDescriptorReader implements ArtifactDescriptorReader {
             throws ArtifactDescriptorException {
         CollectContext cc = CollectContext.from(session);
         cc.getDescriptorReads().incrementAndGet();
+        if (EngineProfiler.ENABLED) {
+            EngineProfiler.descriptorReads.incrementAndGet();
+        }
         ArtifactDescriptorResult result = new ArtifactDescriptorResult(request);
         List<MavenRepository> repositories = toMavenRepositories(request.getRepositories(), cc);
-        CacheBridge bridge = new CacheBridge(cc.getSystem(), session, cc.getPomCache(), cc.getMaterializeDir());
+        CacheBridge bridge = new CacheBridge(cc.getSystem(), session, cc.getPomCache());
+        // Share the session's model cache across every descriptor read: a shared parent/BOM builds its model once for
+        // the whole reactor instead of once per dependent. Safe here because gav→repo attribution is accumulated on the
+        // collector (cc.getServedBy()), so a warm cache-served build that skips resolvePom keeps the attribution the
+        // first (cold) build recorded — unlike the root project build, whose servedBy stands alone.
         EngineEffectivePom effectivePom =
-                new EngineEffectivePom(cc.getSystem(), session, repositories, cc.getMaterializeDir());
+                new EngineEffectivePom(cc.getSystem(), session, repositories, session.getCache());
 
         Set<String> visited = new LinkedHashSet<>();
         Artifact artifact = request.getArtifact();

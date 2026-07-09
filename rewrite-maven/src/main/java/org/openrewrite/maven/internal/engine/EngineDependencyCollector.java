@@ -160,7 +160,7 @@ public class EngineDependencyCollector implements Closeable {
 
     private CollectRequest collectRequest(RepositorySystemSession session, Model model,
                                           List<MavenRepository> requestRepositories, CollectContext cc) {
-        CacheBridge bridge = new CacheBridge(system, session, cc.getPomCache(), cc.getMaterializeDir());
+        CacheBridge bridge = new CacheBridge(system, session, cc.getPomCache());
         List<Dependency> direct = new ArrayList<>();
         for (Dependency dependency : DependencyConversions.toAether(model.getDependencies(),
                 session.getArtifactTypeRegistry())) {
@@ -217,6 +217,10 @@ public class EngineDependencyCollector implements Closeable {
                 .setResolutionErrorPolicy(new SimpleResolutionErrorPolicy(0, ResolutionErrorPolicy.CACHE_NOT_FOUND))
                 .setIgnoreArtifactDescriptorRepositories(false)
                 .setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(true, true))
+                // In-JVM named locks over the private scratch LRM (mirrors MavenEngine.newSession): the default
+                // file-lock factory holds an open FileChannel per artifact .lock, which the verbose multi-threaded
+                // collect on a BOM-heavy reactor accumulates to the OS file-descriptor cap.
+                .setConfigProperty("aether.syncContext.named.factory", "rwlock-local")
                 .setConfigProperty(HttpSenderTransporterFactory.HTTP_SENDER_KEY, sender)
                 .setConfigProperty(HttpSenderTransporterFactory.UNREACHABLE_HOSTS_KEY,
                         Collections.newSetFromMap(new ConcurrentHashMap<>()))

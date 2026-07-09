@@ -142,7 +142,7 @@ class NestedImportBomTest {
         ReactorWorkspace reactor = new ReactorWorkspace(emptyMap(), (Function<Path, byte[]>) p -> null);
         try (CloseableSession session = engine.newSession(tmp.resolve("lrm"), SessionConfig.forSender(sender()))) {
             EngineEffectivePom service = new EngineEffectivePom(
-                    engine.getRepositorySystem(), session, repositories, tmp.resolve("materialize"));
+                    engine.getRepositorySystem(), session, repositories, null);
             EngineModelBuildingOutcome outcome = service.build(
                     rootXml.getBytes(StandardCharsets.UTF_8), requested, settings, reactor, ctx);
             assertTrue(outcome.isSuccess(), () -> "model build failed: " + outcome.getFailure());

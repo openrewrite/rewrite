@@ -1,0 +1,62 @@
+{
+  "benchmark": "integrated-perf-gate-post",
+  "date": "2026-07-09",
+  "supersedes": "integrated-2026-07-09.{json,md} (the failing gate, slice C)",
+  "slice": "Phase 4 slice D — lifecycle/config fixes; see maven-resolution-plan/phase4-results-d.md",
+  "harness": "maven-resolution-plan/phase0-tools IntegratedBenchmark: MavenParser end-to-end, one JVM, ctx engine=legacy vs engine=maven over identical reactor inputs; warm iterations zero-download (RecordingHttpSender replay).",
+  "fixes": {
+    "D-1": "resolver named-lock factory file-lock -> rwlock-local on both session templates (MavenEngine.newSession, EngineDependencyCollector.newSession): eliminates the per-artifact lrm/.locks/*.lock FileChannel that was the FD leak AND the dominant collect cost.",
+    "D-2": "shared singleton DefaultModelBuilder (EngineModelBuilderFactory.shared()): super-POM read once, not per model build; removes the JarURLConnection/ZipFileInputStream churn.",
+    "D-3": "descriptor-read model cache shared across the collect via session.getCache(); servedBy preserved by collector-level accumulation; root build keeps a fresh store.",
+    "D-4": "CacheBridge.resolvePom returns a byte-backed StringModelSource; dropped materialize/materializeDir.",
+    "D-5": "ctx-wide cache of BomGavAttributor effective-management keys, keyed by (reactorEpoch, bomGav): collapses the superlinear O(modules x BOMs) BOM rebuild in the root effective phase (camel-400 effectiveMs 8915 -> 3049, modelBuilds 6831 -> 3615)."
+  },
+  "environment": {
+    "cpu": "Apple Mac16,7",
+    "jdk": "Temurin 17.0.6",
+    "rewriteVersion": "8.87.0-SNAPSHOT (worktree, incl. slice-D)",
+    "engineStack": "maven-resolver 2.0.20 + maven-model-builder 3.9.16 (shaded)",
+    "kernMaxfilesperproc": 92160,
+    "heap": "all tiers at -Xmx2g (the D-1 FD fix makes 2g viable for BOM-heavy reactors that crashed at 2g before)"
+  },
+  "protocol": {
+    "mavenFullAndCamel50": {"warmups": 2, "iters": 5},
+    "camel150and400": {"warmups": 1, "iters": 3},
+    "warm": "fresh MavenPomCache per iteration, zero network (replay); median",
+    "loopCtx": "warm-cache re-resolution reusing ONE ExecutionContext (engine + DataPool warm) - the true UpdateMavenModel steady state",
+    "note": "legacy and maven within a tier are one JVM run (same-load ratio)"
+  },
+  "fdFix": {
+    "rootCause": "resolver default named-lock factory is file-based: one FileChannel/FileLock on lrm/.locks/artifact~g~a~pom~v.lock per artifact during the verbose collect; concurrent BOM-heavy reactors hold thousands, and fresh-ctx parses build never-closed RepositorySystems, accumulating to the 92160 per-process cap.",
+    "evidence": "lsof at crash (via -Dbench.fdwatch histogram) showed the open set was almost entirely lrm/.locks/*.lock channels.",
+    "result": "camel-50 at 2g crashed before; now completes with fdBefore=61 -> fdAfter=60 (stable). FD stable at every tier."
+  },
+  "tiers": [
+    {
+      "corpus": "apache-maven-3.9.16", "tier": "full", "modules": 15, "heap": "2g",
+      "legacy": {"warmMedianMs": 154.0, "loopCtxMedianMs": 106.0, "peakHeapMb": 159, "fdBefore": 57, "fdAfter": 57, "warm": [173,168,152,148,154]},
+      "maven":  {"warmMedianMs": 369.0, "loopCtxMedianMs": 178.0, "peakHeapMb": 1115, "fdBefore": 60, "fdAfter": 60, "warm": [591,319,373,369,279]},
+      "warmRatioLegacyOverMaven": 0.42, "mavenSlowerWarm": 2.40, "loopCtxMavenSlower": 1.68,
+      "heapNote": "maven peakHeapMb is reserved-not-live on a ~370ms/2g run; not a meaningful allocation ratio at this scale"
+    },
+    {
+      "corpus": "apache-camel-4.4.0", "tier": "50", "modules": 50, "heap": "2g",
+      "legacy": {"warmMedianMs": 1876.0, "loopCtxMedianMs": 998.0, "peakHeapMb": 1368, "fdBefore": 57, "fdAfter": 57, "warm": [1947,1860,1876,1881,1859]},
+      "maven":  {"warmMedianMs": 2757.0, "loopCtxMedianMs": 1457.0, "peakHeapMb": 1630, "fdBefore": 61, "fdAfter": 60, "warm": [2757,2750,3849,2967,2475]},
+      "warmRatioLegacyOverMaven": 0.68, "mavenSlowerWarm": 1.47, "loopCtxMavenSlower": 1.46, "heapRatioMavenOverLegacy": 1.19
+    },
+    {
+      "corpus": "apache-camel-4.4.0", "tier": "150", "modules": 150, "heap": "2g",
+      "legacy": {"warmMedianMs": 2827.0, "loopCtxMedianMs": 1665.0, "peakHeapMb": 1202, "fdBefore": 57, "fdAfter": 57, "warm": [2784,2827,2840]},
+      "maven":  {"warmMedianMs": 5237.0, "loopCtxMedianMs": 3296.0, "peakHeapMb": 1353, "fdBefore": 62, "fdAfter": 60, "warm": [4907,5638,5237], "profile": {"effectiveMs": 745, "collectMs": 2368, "projectMs": 150, "modelBuildMs": 4765, "modelBuilds": 2566, "descriptorReads": 2258, "modelCacheHit": 8592, "modelCacheMiss": 4486}},
+      "warmRatioLegacyOverMaven": 0.54, "mavenSlowerWarm": 1.85, "loopCtxMavenSlower": 1.98, "heapRatioMavenOverLegacy": 1.13
+    },
+    {
+      "corpus": "apache-camel-4.4.0", "tier": "400", "modules": 400, "heap": "2g",
+      "legacy": {"warmMedianMs": 7305.0, "loopCtxMedianMs": 3620.0, "peakHeapMb": 1150, "fdBefore": 57, "fdAfter": 57, "warm": [7918,7305,6457]},
+      "maven":  {"warmMedianMs": 12042.0, "loopCtxMedianMs": 9546.0, "peakHeapMb": 1575, "fdBefore": 60, "fdAfter": 60, "warm": [12042,11233,12391], "profile": {"effectiveMs": 3049, "collectMs": 3141, "projectMs": 380, "modelBuildMs": 8149, "modelBuilds": 3615, "descriptorReads": 2803, "modelCacheHit": 16939, "modelCacheMiss": 10809}},
+      "warmRatioLegacyOverMaven": 0.61, "mavenSlowerWarm": 1.65, "loopCtxMavenSlower": 2.64, "heapRatioMavenOverLegacy": 1.37,
+      "note": "before D-5 the BomGav rebuild made this tier warm 20544ms (3.38x) with GC-thrash variance [20544,16060,27555]; D-5 dropped it to 12042ms with tight variance."
+    }
+  ]
+}

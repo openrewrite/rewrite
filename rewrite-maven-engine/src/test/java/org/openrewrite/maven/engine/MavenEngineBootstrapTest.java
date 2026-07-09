@@ -104,4 +104,21 @@ class MavenEngineBootstrapTest {
                     "warm session should reuse the shared cache: " + warm.requests());
         }
     }
+
+    /**
+     * FD-leak pin (Phase 4 slice D). The resolver's default named-lock factory is file-based: it holds a FileChannel on
+     * a {@code .locks/*.lock} file per artifact for the duration of the concurrent collect, which a BOM-heavy reactor
+     * accumulates to the OS file-descriptor cap (locks are only released on session close — the fresh-ctx parses that
+     * exhausted the cap never closed theirs). The session template pins the in-JVM {@code rwlock-local} factory, which
+     * synchronizes the collector's worker threads with zero files. Guarding the config knob directly is stable across
+     * platforms (an FD-count assertion is not).
+     */
+    @Test
+    void sessionUsesInJvmNamedLocks(@TempDir Path scratch) {
+        try (MavenEngine engine = new MavenEngine();
+             CloseableSession session = engine.newSession(scratch, SessionConfig.forSender(new RecordingHttpSender(sender())))) {
+            assertEquals("rwlock-local", session.getConfigProperties().get("aether.syncContext.named.factory"),
+                    "session must select the file-free in-JVM named-lock factory (file locks leak FDs on BOM-heavy reactors)");
+        }
+    }
 }

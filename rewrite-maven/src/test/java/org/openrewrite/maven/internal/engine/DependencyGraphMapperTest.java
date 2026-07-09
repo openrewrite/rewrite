@@ -160,7 +160,7 @@ class DependencyGraphMapperTest {
         try (MavenEngine engine = new MavenEngine();
              CloseableSession session = engine.newSession(tmp.resolve("lrm"), SessionConfig.forSender(sender()))) {
             EngineEffectivePom effectivePom = new EngineEffectivePom(
-                    engine.getRepositorySystem(), session, repositories, tmp.resolve("mat"));
+                    engine.getRepositorySystem(), session, repositories, null);
             EngineModelBuildingOutcome outcome = effectivePom.build(
                     rootXml.getBytes(StandardCharsets.UTF_8), requested, settings, reactor, ctx);
             assertTrue(outcome.isSuccess(), () -> "root model build failed: " + outcome.getFailure());

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.internal.engine;
 
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.DefaultModelBuilder;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.DefaultModelBuilderFactory;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.management.PluginManagementInjector;
 
@@ -25,6 +26,18 @@ import org.openrewrite.maven.engine.shaded.org.apache.maven.model.management.Plu
  * {@code new} (no DI container).
  */
 public class EngineModelBuilderFactory extends DefaultModelBuilderFactory {
+
+    // One shared builder for the whole process, as Maven treats its DefaultModelBuilder: every per-build input lives on
+    // the ModelBuildingRequest, and the wired components (super-pom provider, readers, injectors) are stateless and
+    // thread-safe. Building a fresh instance per model build re-read the super-POM resource from the jar every time
+    // (the DefaultSuperPomProvider cache is per-instance) — a jar-URL open and full super-POM re-parse on each of the
+    // ~9 builds/module, the dominant model-phase allocation and the file-handle churn a BOM-heavy reactor exhausts on.
+    private static final DefaultModelBuilder SHARED = new EngineModelBuilderFactory().newInstance();
+
+    /** The shared, reusable model builder. The first (single-threaded) root build warms the super-POM cache before any concurrent collect reads it. */
+    public static DefaultModelBuilder shared() {
+        return SHARED;
+    }
 
     @Override
     protected PluginManagementInjector newPluginManagementInjector() {

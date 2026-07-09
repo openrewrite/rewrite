@@ -46,6 +46,10 @@ public class MavenEngine implements Closeable {
     @Getter
     private final EngineOptions options;
 
+    // Resolver's named-lock selection: use the in-JVM ReentrantReadWriteLock factory, never the default file locks.
+    static final String NAMED_LOCK_FACTORY_KEY = "aether.syncContext.named.factory";
+    static final String NAMED_LOCK_FACTORY_LOCAL = "rwlock-local";
+
     // Shared across every session this engine serves (descriptor/model results), like the factory's request cache.
     private final RepositoryCache repositoryCache = new DefaultRepositoryCache();
 
@@ -89,6 +93,11 @@ public class MavenEngine implements Closeable {
                 .setIgnoreArtifactDescriptorRepositories(false)
                 // newSession() L124: tolerate missing/invalid transitive descriptors, matching mvn dependency:tree.
                 .setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(true, true))
+                // In-JVM named locks (ReentrantReadWriteLock) instead of the default file-lock factory: the private
+                // per-run scratch LRM has no cross-process contention, so file locks are pure overhead — and each holds
+                // an open FileChannel on a .locks/ file, which a BOM-heavy reactor's concurrent collect accumulates to
+                // the OS file-descriptor cap. rwlock-local synchronizes the collector's worker threads with zero files.
+                .setConfigProperty(NAMED_LOCK_FACTORY_KEY, NAMED_LOCK_FACTORY_LOCAL)
                 // Per-session inputs the transport resolves on each newInstance.
                 .setConfigProperty(HttpSenderTransporterFactory.HTTP_SENDER_KEY, config.getHttpSender())
                 .setConfigProperty(HttpSenderTransporterFactory.UNREACHABLE_HOSTS_KEY, config.getUnreachableHosts())

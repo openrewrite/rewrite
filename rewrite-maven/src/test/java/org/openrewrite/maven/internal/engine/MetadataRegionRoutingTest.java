@@ -108,7 +108,7 @@ class MetadataRegionRoutingTest {
         try (MavenEngine engine = new MavenEngine();
              CloseableSession session = engine.newSession(tmp.resolve("eff-lrm"), SessionConfig.forSender(sender()))) {
             EngineEffectivePom service = new EngineEffectivePom(engine.getRepositorySystem(), session,
-                    repos(server), tmp.resolve("eff-mat"));
+                    repos(server), null);
             EngineModelBuildingOutcome outcome = service.build(rootXml.getBytes(StandardCharsets.UTF_8),
                     requested(rootXml), settings(), emptyReactor(), ctx);
             assertTrue(outcome.isSuccess(), () -> "root effective model build failed: " + outcome.getFailure());

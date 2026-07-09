@@ -111,7 +111,7 @@ class PomToModelConverterTest {
              CloseableSession session = engine.newSession(tmp.resolve("lrm"),
                      SessionConfig.forSender(new HttpUrlConnectionSender(Duration.ofSeconds(10), Duration.ofSeconds(10))))) {
             EngineEffectivePom service = new EngineEffectivePom(
-                    engine.getRepositorySystem(), session, emptyList(), tmp.resolve("materialize"));
+                    engine.getRepositorySystem(), session, emptyList(), null);
             EngineModelBuildingOutcome outcome = service.build(
                     childXml.getBytes(StandardCharsets.UTF_8), requested, settings, reactor, ctx);
 

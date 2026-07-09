@@ -56,7 +56,11 @@ public class EngineModelCache implements ModelCache {
         if (reactor.isReactorMember(groupId, artifactId, version)) {
             return null;
         }
-        return cache.get(session, key(groupId, artifactId, version, tag));
+        Object hit = cache.get(session, key(groupId, artifactId, version, tag));
+        if (EngineProfiler.ENABLED) {
+            (hit == null ? EngineProfiler.modelCacheMisses : EngineProfiler.modelCacheHits).incrementAndGet();
+        }
+        return hit;
     }
 
     private static String key(String groupId, String artifactId, String version, String tag) {

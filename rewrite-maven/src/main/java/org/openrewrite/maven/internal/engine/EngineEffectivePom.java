@@ -26,13 +26,13 @@ import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.Model
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.ModelBuildingResult;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.StringModelSource;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.DefaultRepositoryCache;
+import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositoryCache;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystem;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystemSession;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Pom;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -54,31 +54,37 @@ public class EngineEffectivePom {
     private final RepositorySystem system;
     private final RepositorySystemSession session;
     private final List<MavenRepository> requestRepositories;
-    private final Path materializeDir;
+    private final @Nullable RepositoryCache modelCacheStore;
 
+    /**
+     * @param modelCacheStore backs the per-build model cache. {@code null} gives a fresh store per build — the
+     *                        model-building walk (resolvePom for parents/BOMs) then runs each build so the
+     *                        {@code servedBy} gav→repo attribution the mappers read is complete on its own (the root
+     *                        project build, whose servedBy is not accumulated elsewhere). A shared store lets warm
+     *                        parents/BOMs serve their model from cache across builds — safe where servedBy is
+     *                        accumulated at a higher level (the collector's descriptor reads, see
+     *                        {@link EngineDependencyCollector}).
+     */
     public EngineEffectivePom(RepositorySystem system, RepositorySystemSession session,
-                              List<MavenRepository> requestRepositories, Path materializeDir) {
+                              List<MavenRepository> requestRepositories, @Nullable RepositoryCache modelCacheStore) {
         this.system = system;
         this.session = session;
         this.requestRepositories = requestRepositories;
-        this.materializeDir = materializeDir;
+        this.modelCacheStore = modelCacheStore;
     }
 
     public EngineModelBuildingOutcome build(byte[] requestedPomXml, Pom requested, EffectiveSettings settings,
                                             ReactorWorkspace reactor, ExecutionContext ctx) {
         MavenPomCache pomCache = MavenExecutionContextView.view(ctx).getPomCache();
-        CacheBridge bridge = new CacheBridge(system, session, pomCache, materializeDir);
+        CacheBridge bridge = new CacheBridge(system, session, pomCache);
 
-        DefaultModelBuilder builder = new EngineModelBuilderFactory().newInstance();
+        DefaultModelBuilder builder = EngineModelBuilderFactory.shared();
         DefaultModelBuildingRequest request = new DefaultModelBuildingRequest();
         request.setModelSource(new StringModelSource(new String(requestedPomXml, StandardCharsets.UTF_8), sourceLabel(requested)));
         request.setModelResolver(new EngineModelResolver(bridge, reactor, requestRepositories));
         request.setWorkspaceModelResolver(reactor);
-        // A fresh per-build model cache: the model-building walk (resolvePom for parents/BOMs) must run each build so
-        // the servedBy gav→repo attribution the mappers depend on is complete even on a warm run. Byte downloads are
-        // still avoided by the MavenPomCache bytes region; only the cheap re-parse repeats. Reusing the shared session
-        // cache would let a second resolve serve a BOM's model from cache, skipping resolvePom and emptying servedBy.
-        request.setModelCache(new EngineModelCache(new DefaultRepositoryCache(), session, reactor));
+        request.setModelCache(new EngineModelCache(
+                modelCacheStore != null ? modelCacheStore : new DefaultRepositoryCache(), session, reactor));
         request.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
         request.setProcessPlugins(false);
         request.setTwoPhaseBuilding(false);
@@ -88,11 +94,17 @@ public class EngineEffectivePom {
         request.setSystemProperties(systemProperties(MavenExecutionContextView.view(ctx).getActivationSystemProperties()));
         request.setUserProperties(userProperties(settings.getUserProperties()));
 
+        long t0 = EngineProfiler.ENABLED ? System.nanoTime() : 0;
         try {
             ModelBuildingResult result = builder.build(request);
             return EngineModelBuildingOutcome.success(result, bridge.servedBy());
         } catch (ModelBuildingException e) {
             return EngineModelBuildingOutcome.failure(ModelParityErrorMapper.map(e, bridge), bridge.servedBy());
+        } finally {
+            if (EngineProfiler.ENABLED) {
+                EngineProfiler.modelBuildNanos.addAndGet(System.nanoTime() - t0);
+                EngineProfiler.modelBuilds.incrementAndGet();
+            }
         }
     }
 

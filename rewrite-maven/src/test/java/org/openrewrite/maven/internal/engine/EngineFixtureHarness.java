@@ -91,7 +91,7 @@ public final class EngineFixtureHarness {
             try (MavenEngine engine = new MavenEngine();
                  CloseableSession session = engine.newSession(scratch.resolve("lrm"), SessionConfig.forSender(sender()))) {
                 EngineEffectivePom service = new EngineEffectivePom(
-                        engine.getRepositorySystem(), session, repositories, scratch.resolve("materialize"));
+                        engine.getRepositorySystem(), session, repositories, null);
                 EngineModelBuildingOutcome outcome = service.build(xml, requested, settings, reactor, ctx);
                 if (!outcome.isSuccess()) {
                     throw new IllegalStateException("Engine failed to resolve fixture " + fixture, outcome.getFailure());
@@ -144,7 +144,7 @@ public final class EngineFixtureHarness {
             try (MavenEngine engine = new MavenEngine();
                  CloseableSession session = engine.newSession(scratch.resolve("lrm"), SessionConfig.forSender(sender()))) {
                 EngineEffectivePom service = new EngineEffectivePom(
-                        engine.getRepositorySystem(), session, repositories, scratch.resolve("materialize"));
+                        engine.getRepositorySystem(), session, repositories, null);
                 EngineModelBuildingOutcome outcome = service.build(xml, requested, settings, reactor, ctx);
                 if (!outcome.isSuccess()) {
                     throw new IllegalStateException("Engine failed to resolve fixture " + fixture, outcome.getFailure());

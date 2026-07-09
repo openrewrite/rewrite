@@ -18,8 +18,8 @@ package org.openrewrite.maven.internal.engine;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.FileModelSource;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.ModelSource;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.StringModelSource;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.resolution.UnresolvableModelException;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystem;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystemSession;
@@ -48,6 +48,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URI;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,17 +72,14 @@ public class CacheBridge {
     private final RepositorySystem system;
     private final RepositorySystemSession session;
     private final MavenPomCache pomCache;
-    private final Path materializeDir;
 
     private final Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy = new ConcurrentHashMap<>();
     private final Map<GroupArtifactVersion, Map<MavenRepository, String>> responsesByGav = new ConcurrentHashMap<>();
 
-    public CacheBridge(RepositorySystem system, RepositorySystemSession session, MavenPomCache pomCache,
-                       Path materializeDir) {
+    public CacheBridge(RepositorySystem system, RepositorySystemSession session, MavenPomCache pomCache) {
         this.system = system;
         this.session = session;
         this.pomCache = pomCache;
-        this.materializeDir = materializeDir;
     }
 
     // A synthetic repository standing in for reactor-served poms so an imported reactor BOM is recorded in servedBy /
@@ -118,9 +116,10 @@ public class CacheBridge {
     }
 
     /**
-     * Resolve a pom to a {@link ModelSource}, walking {@code repositories} in order. A bytes-region hit is materialized
-     * to a real file (the resolver requires a {@link Path}); a known-absent entry short-circuits that repository with no
-     * I/O; a miss is resolved through the engine and cached (positive bytes + parse-through, or a 4xx negative).
+     * Resolve a pom to a {@link ModelSource}, walking {@code repositories} in order. The source is byte-backed (the
+     * model builder reads bytes, not a {@link Path}; a repository pom needs no local file), so a warm hit is served with
+     * no file I/O. A known-absent entry short-circuits that repository with no I/O; a miss is resolved through the engine
+     * and cached (positive bytes + parse-through, or a 4xx negative).
      */
     public ModelSource resolvePom(String groupId, String artifactId, String version, List<MavenRepository> repositories)
             throws UnresolvableModelException {
@@ -133,7 +132,7 @@ public class CacheBridge {
             if (cached != null) {
                 if (cached.isPresent()) {
                     servedBy.put(key, repo);
-                    return new FileModelSource(materialize(groupId, artifactId, version, cached.get()));
+                    return byteSource(groupId, artifactId, version, cached.get());
                 }
                 responses.put(repo, "not found (cached)");
                 continue;
@@ -154,7 +153,7 @@ public class CacheBridge {
                 pomCache.putPomBytes(key, bytes);
                 parseThrough(key, repo, bytes);
                 servedBy.put(key, repo);
-                return new FileModelSource(pomFile);
+                return byteSource(groupId, artifactId, version, bytes);
             } catch (ArtifactResolutionException e) {
                 if (isNotFound(e)) {
                     pomCache.putPomBytes(key, null); // deterministic 4xx → cache the negative
@@ -264,19 +263,13 @@ public class CacheBridge {
         pomCache.putPom(key, raw.toPom(inputPath, repo).withGav(key));
     }
 
-    private File materialize(String groupId, String artifactId, String version, byte[] bytes) {
-        Path file = materializeDir
-                .resolve(groupId.replace('.', '/')).resolve(artifactId).resolve(version)
-                .resolve(artifactId + "-" + version + ".pom");
-        try {
-            if (!Files.exists(file)) {
-                Files.createDirectories(file.getParent());
-                Files.write(file, bytes);
-            }
-        } catch (IOException e) {
-            throw new UncheckedMaterializationException(file, e);
-        }
-        return file.toFile();
+    // A byte-backed ModelSource: the model builder reads its bytes directly, so a repository pom is served with no
+    // FileInputStream and no scratch file (a repository parent/BOM legitimately has no local pomFile; the reactor path
+    // is already served from a StringModelSource). Eliminates the per-resolution file write and the GC-reclaimable
+    // FileInputStream the model reader opened on the materialized file.
+    private static ModelSource byteSource(String groupId, String artifactId, String version, byte[] bytes) {
+        return new StringModelSource(new String(bytes, StandardCharsets.UTF_8),
+                groupId + ':' + artifactId + ':' + version);
     }
 
     private ArtifactResult resolveArtifact(MavenRepository repo, String groupId, String artifactId, String version)
@@ -342,11 +335,5 @@ public class CacheBridge {
             root = root.getCause();
         }
         return root.getMessage() == null ? root.getClass().getSimpleName() : root.getMessage();
-    }
-
-    private static final class UncheckedMaterializationException extends RuntimeException {
-        UncheckedMaterializationException(Path file, IOException cause) {
-            super("Could not materialize cached pom bytes to " + file, cause);
-        }
     }
 }

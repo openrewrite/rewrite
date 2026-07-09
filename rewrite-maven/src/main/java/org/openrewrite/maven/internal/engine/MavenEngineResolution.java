@@ -166,8 +166,10 @@ public final class MavenEngineResolution {
         EffectiveSettings effectiveSettings = bridge.effectiveSettings(injected);
 
         EngineHandle handle = handle(ctx);
+        // Root project build: a fresh per-build model cache (null store) so its own servedBy is complete — the mapper
+        // reads this build's attribution directly, not an accumulated one.
         EngineEffectivePom service = new EngineEffectivePom(
-                handle.engine.getRepositorySystem(), handle.session, requestRepositories, handle.materializeDir);
+                handle.engine.getRepositorySystem(), handle.session, requestRepositories, null);
         EngineModelBuildingOutcome outcome = service.build(xml, requested, effectiveSettings, reactor, ctx);
         if (!outcome.isSuccess()) {
             throw rethrow(outcome.getFailure());
@@ -347,18 +349,31 @@ public final class MavenEngineResolution {
     private static EngineGraph attemptEngineGraph(ResolvedPom callerPom, List<String> profiles,
                                                   MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
         Pom requested = callerPom.getRequested();
+        long t0 = EngineProfiler.ENABLED ? System.nanoTime() : 0;
         EngineEffective effective = buildEngineEffective(requested, profiles, downloader, ctx);
+        if (EngineProfiler.ENABLED) {
+            EngineProfiler.effectiveNanos.addAndGet(System.nanoTime() - t0);
+        }
         // ResolvedPom.resolve's no-change contract: a value-unchanged re-resolution returns the caller's instance, whose
         // requested/requestedBom thread the PREVIOUS requested pom's declarations (UpdateMavenModel swaps a re-mapped
         // requested onto it). Thread against the caller's pom whenever the engine's threading inputs are value-equal, so
         // consumers' reference lookups — and the shadow's requestedRef — see exactly what legacy leaves in place.
         ResolvedPom enginePom = threadingEqual(effective.pom, callerPom) ? callerPom : effective.pom;
         CollectorHandle handle = collectorHandle(ctx);
+        long tCollect = EngineProfiler.ENABLED ? System.nanoTime() : 0;
         EngineCollectOutcome outcome = handle.collector.collect(effective.effectiveModel, requested,
                 effective.collectRepositories, effective.effectiveSettings, effective.reactor, handle.scratch, ctx);
+        if (EngineProfiler.ENABLED) {
+            EngineProfiler.collectNanos.addAndGet(System.nanoTime() - tCollect);
+        }
         DependencyGraphMapper mapper = new DependencyGraphMapper(MavenExecutionContextView.view(ctx).getPomCache());
+        long tProject = EngineProfiler.ENABLED ? System.nanoTime() : 0;
         try {
-            return new EngineGraph(enginePom, mapper.map(outcome, enginePom, requested, ctx), null);
+            EngineGraph g = new EngineGraph(enginePom, mapper.map(outcome, enginePom, requested, ctx), null);
+            if (EngineProfiler.ENABLED) {
+                EngineProfiler.projectNanos.addAndGet(System.nanoTime() - tProject);
+            }
+            return g;
         } catch (MavenDownloadingExceptions e) {
             Map<Scope, List<ResolvedDependency>> partial = e.getPartialResult() == null ?
                     new LinkedHashMap<>() : e.getPartialResult().getDependencies();
@@ -478,9 +493,14 @@ public final class MavenEngineResolution {
     private static CollectorHandle collectorHandle(ExecutionContext ctx) {
         return ctx.computeMessageIfAbsent(COLLECTOR_HANDLE_KEY, k -> {
             try {
+                long t0 = EngineProfiler.ENABLED ? System.nanoTime() : 0;
                 Path scratch = Files.createTempDirectory("rewrite-engine-collect-");
                 scratch.toFile().deleteOnExit();
-                return new CollectorHandle(new EngineDependencyCollector(), scratch);
+                CollectorHandle h = new CollectorHandle(new EngineDependencyCollector(), scratch);
+                if (EngineProfiler.ENABLED) {
+                    EngineProfiler.bootstrapNanos.addAndGet(System.nanoTime() - t0);
+                }
+                return h;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -687,17 +707,22 @@ public final class MavenEngineResolution {
     private static final class EngineHandle {
         final MavenEngine engine;
         final RepositorySystemSession session;
-        final Path materializeDir;
 
-        EngineHandle(MavenEngine engine, RepositorySystemSession session, Path materializeDir) {
+        EngineHandle(MavenEngine engine, RepositorySystemSession session) {
             this.engine = engine;
             this.session = session;
-            this.materializeDir = materializeDir;
         }
     }
 
     private static EngineHandle handle(ExecutionContext ctx) {
-        return ctx.computeMessageIfAbsent(ENGINE_HANDLE_KEY, k -> newHandle(ctx));
+        return ctx.computeMessageIfAbsent(ENGINE_HANDLE_KEY, k -> {
+            long t0 = EngineProfiler.ENABLED ? System.nanoTime() : 0;
+            EngineHandle h = newHandle(ctx);
+            if (EngineProfiler.ENABLED) {
+                EngineProfiler.bootstrapNanos.addAndGet(System.nanoTime() - t0);
+            }
+            return h;
+        });
     }
 
     private static EngineHandle newHandle(ExecutionContext ctx) {
@@ -707,7 +732,7 @@ public final class MavenEngineResolution {
             MavenEngine engine = new MavenEngine();
             RepositorySystemSession session = engine.newSession(scratch.resolve("lrm"),
                     SessionConfig.forSender(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
-            return new EngineHandle(engine, session, scratch.resolve("materialize"));
+            return new EngineHandle(engine, session);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

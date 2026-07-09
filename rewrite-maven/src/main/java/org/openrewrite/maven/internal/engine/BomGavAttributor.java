@@ -52,6 +52,8 @@ import java.util.Set;
  */
 public class BomGavAttributor {
 
+    private static final String KEYS_CACHE_KEY = "org.openrewrite.maven.internal.engine.bomManagementKeys";
+
     private final EngineEffectivePom service;
     private final EffectiveSettings settings;
     private final ReactorWorkspace reactor;
@@ -131,7 +133,25 @@ public class BomGavAttributor {
         return null;
     }
 
+    // A directly-imported BOM's effective management key set is a pure function of its gav (its pom bytes + parent
+    // chain), so caching it ctx-wide collapses the O(modules × BOMs) rebuild the per-module fresh model cache otherwise
+    // pays on a large reactor (the superlinear effective phase at 400 modules). Keyed with the reactor epoch so an
+    // in-place UpdateMavenModel re-resolution (bumpEpoch) never serves a stale reactor-BOM key set.
     private @Nullable Set<GroupArtifactClassifierType> effectiveManagementKeys(ResolvedGroupArtifactVersion bomKey) {
+        Map<String, Optional<Set<GroupArtifactClassifierType>>> cache = ctx.computeMessageIfAbsent(
+                KEYS_CACHE_KEY, k -> new java.util.concurrent.ConcurrentHashMap<String, Optional<Set<GroupArtifactClassifierType>>>());
+        String key = reactor.epoch() + ":" + bomKey;
+        Optional<Set<GroupArtifactClassifierType>> cached = cache.get(key);
+        //noinspection OptionalAssignedToNull
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+        Set<GroupArtifactClassifierType> computed = computeEffectiveManagementKeys(bomKey);
+        cache.put(key, Optional.ofNullable(computed));
+        return computed;
+    }
+
+    private @Nullable Set<GroupArtifactClassifierType> computeEffectiveManagementKeys(ResolvedGroupArtifactVersion bomKey) {
         try {
             Optional<byte[]> bytes = pomCache.getPomBytes(bomKey);
             Optional<Pom> bomPom = pomCache.getPom(bomKey);
