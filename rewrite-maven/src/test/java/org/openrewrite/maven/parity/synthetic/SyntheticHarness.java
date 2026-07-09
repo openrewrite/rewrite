@@ -25,6 +25,7 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.ResolutionEngineSelector;
 import org.openrewrite.maven.parity.ParityHarness;
 import org.openrewrite.maven.internal.parity.RecordingResolutionListener;
 import org.openrewrite.maven.internal.parity.ResolutionSnapshot;
@@ -57,10 +58,10 @@ class SyntheticHarness {
     }
 
     /**
-     * True when the suite runs under the dual-engine SHADOW oracle
-     * ({@code -Dorg.openrewrite.maven.resolution.engine=shadow}): both engines resolve against the same mock, so an
-     * exact request-log / HEAD-shape assertion double-counts. Resolution correctness is asserted in every mode (and the
-     * shadow facade diffs the two engines during {@code resolve}); only the transport-exact assertions are legacy-scoped.
+     * True when the suite is launched under {@code -Dorg.openrewrite.maven.resolution.engine=shadow}. The {@link Session}
+     * pins legacy in this case (see its constructor), so the dual-run never fires and transport correctness is asserted
+     * as in legacy. These guards keep the exact request-log / HEAD-shape assertions legacy-scoped: harmless while the pin
+     * is in place, and a safety net if a future test lifts the pin (both engines against one mock would double-count).
      */
     static boolean shadowMode() {
         return "shadow".equalsIgnoreCase(System.getProperty("org.openrewrite.maven.resolution.engine"));
@@ -122,6 +123,17 @@ class SyntheticHarness {
             ctx.setAddLocalRepository(false);
             ctx.setResolutionListener(listener);
             HttpSenderExecutionContextView.view(ctx).setHttpSender(new FailFastHttpsSender());
+            // This suite validates the LEGACY downloader's transport semantics (negative caching, snapshot
+            // timestamps, mirrors, HTML-index derivation, pom-less jar synthesis) against single-engine stateful
+            // mocks. Both engines share that same downloader for byte fetch, so under the dual-engine SHADOW oracle
+            // the only divergences are engine-side projection differences ledgered elsewhere (L-P0-005 datedSnapshot,
+            // L-P0-006 html-index, L-P3-C-005 message shape, ctx-injected repo universe) — not new parity bugs the
+            // oracle should compare. The transport suite therefore pins legacy in every mode; per-engine parity is
+            // exercised by the hermetic parity fixtures and the census. A test wanting the engine (e.g. a MAVEN-mode
+            // pin) overrides this via customize, which runs last.
+            if (shadowMode()) {
+                ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, "legacy");
+            }
             customize.accept(ctx);
         }
 

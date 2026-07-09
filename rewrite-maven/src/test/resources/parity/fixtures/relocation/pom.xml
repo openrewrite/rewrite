@@ -1,0 +1,13 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>relocation-app</artifactId>
+    <version>1</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>oldg</artifactId>
+            <version>1.0</version>
+        </dependency>
+    </dependencies>
+</project>

@@ -51,7 +51,13 @@ class EngineDependencyGraphComparisonTest {
                     // L-P2-B2-002: active-profile dependencies are ordered by profile DECLARATION order under Maven
                     // (jdk-any before explicit), whereas legacy reverses profiles into precedence order (a1 §1.3) and so
                     // contributes explicit-dep before jdk-dep. Pure ordering flip across all four scope lists.
-                    new ExpectedDiff("$.scopes", "L-P2-B2-002")));
+                    new ExpectedDiff("$.scopes", "L-P2-B2-002")),
+            "relocation", List.of(
+                    // L-P4-B-001: `oldg:1.0` declares a <distributionManagement><relocation> to `newg`. Maven (and the
+                    // engine's real maven-resolver descriptor read) follows it, resolving `newg:1.0`; legacy never reads
+                    // <relocation>, so it keeps `oldg:1.0`. Engine is Maven-correct, legacy is the outlier (this is the
+                    // real cause of the census "org.apache.commons:commons-io vs commons-io:commons-io" family). Flip P5.
+                    new ExpectedDiff("$.scopes", "L-P4-B-001")));
 
     static List<String> fixtures() {
         return ParityHarness.fixtureNames();

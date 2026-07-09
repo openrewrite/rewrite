@@ -274,9 +274,14 @@ public class DependencyGraphMapper {
                 }
             }
         }
+        // Thread the declaring pom's raw declared classifier (legacy threads dd.getDependency().getClassifier()): an
+        // explicit empty <classifier></classifier> in a transitive descriptor stays "" — not aether's null — so the
+        // resolved classifier and its snapshot ref (`val:g:a:v:`) match legacy exactly. Only synthesize from aether when
+        // no lineage pom declares the coordinate.
+        String classifier = declared != null ? declared.getClassifier() : emptyToNull(artifact.getClassifier());
         return Dependency.builder()
                 .gav(new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), version))
-                .classifier(emptyToNull(artifact.getClassifier()))
+                .classifier(classifier)
                 .type(artifact.getExtension())
                 .build();
     }
