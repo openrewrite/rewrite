@@ -329,19 +329,18 @@ func (n *Return) WithMarkers(markers Markers) *Return {
 	return &c
 }
 
-// If represents an if statement. Mirrors Java's J.If exactly: the condition is a
-// ControlParentheses (as in Java) whose inner element is the bare Go condition —
-// Go has no parens, so the wrapper carries no whitespace of its own and the
-// printer emits only the inner element. Go's optional init clause
-// (`if x := f(); cond {}`) has no slot here — it lives on a wrapping
-// golang.StatementWithInit instead.
+// If represents an if statement. The condition is a ControlParentheses whose
+// inner element is the bare Go condition. Go has no parens, so the wrapper
+// carries no whitespace of its own and the printer emits only the inner
+// element. Go's optional init clause (`if x := f(); cond {}`) has no slot here;
+// it lives on a wrapping golang.StatementWithInit instead.
 type If struct {
 	ID        uuid.UUID
 	Prefix    Space
 	Markers   Markers
 	Condition *ControlParentheses
-	Then      *Block
-	ElsePart  *RightPadded[J] // nil if no else clause
+	ThenPart  RightPadded[Statement]
+	ElsePart  *Else // nil if no else clause
 }
 
 func (*If) IsTree()      {}
@@ -366,9 +365,15 @@ func (n *If) WithCondition(condition *ControlParentheses) *If {
 	return &c
 }
 
-func (n *If) WithThen(then *Block) *If {
+func (n *If) WithThenPart(thenPart RightPadded[Statement]) *If {
 	c := *n
-	c.Then = then
+	c.ThenPart = thenPart
+	return &c
+}
+
+func (n *If) WithElsePart(elsePart *Else) *If {
+	c := *n
+	c.ElsePart = elsePart
 	return &c
 }
 

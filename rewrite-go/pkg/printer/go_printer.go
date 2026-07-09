@@ -210,11 +210,12 @@ func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	p.visitSpace(cond.Prefix, out)
 	p.Visit(cond.Tree.Element, out)
 	p.visitSpace(cond.Tree.After, out)
-	p.Visit(ifStmt.Then, out)
+	p.Visit(ifStmt.ThenPart.Element, out)
+	p.visitSpace(ifStmt.ThenPart.After, out)
 	if ifStmt.ElsePart != nil {
-		p.visitSpace(ifStmt.ElsePart.After, out)
+		p.visitSpace(ifStmt.ElsePart.Prefix, out)
 		out.Append("else")
-		p.Visit(ifStmt.ElsePart.Element, out)
+		p.Visit(ifStmt.ElsePart.Body.Element, out)
 	}
 	p.afterSyntax(ifStmt.Markers, out)
 	return ifStmt
