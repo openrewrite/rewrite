@@ -47,7 +47,9 @@ class PomlessJarTest {
             SyntheticHarness.Resolution resolution = session.resolve(rootPom(dependencies(G + ":nopom:1.0")));
 
             assertThat(resolution.failed()).isFalse();
-            assertThat(repo.requests()).containsExactly("GET " + POM, "HEAD " + JAR);
+            if (!SyntheticHarness.shadowMode()) {
+                assertThat(repo.requests()).containsExactly("GET " + POM, "HEAD " + JAR);
+            }
 
             var node = resolution.snapshot().getJson().at("/scopes/Compile/0");
             assertThat(node.get("gav").asText()).isEqualTo(G + ":nopom:1.0");

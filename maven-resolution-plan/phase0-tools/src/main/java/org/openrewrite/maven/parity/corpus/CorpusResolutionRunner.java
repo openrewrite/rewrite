@@ -74,6 +74,27 @@ public class CorpusResolutionRunner {
     private static final Pattern UUID_PATTERN =
             Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
+    // Canonical <os>/<jdk> profile-activation snapshot: a copy of the host System.getProperties() with the
+    // activation-relevant keys pinned to Linux/amd64/JDK-17 so the SHADOW census is byte-reproducible across machines
+    // (only os.*/java.version leak into the resolved model; everything else the model builder reads for interpolation is
+    // kept from the host). Documented canonical set for NEW-2.
+    private static final Map<String, String> CANONICAL_ACTIVATION_PROPERTIES = canonicalActivationProperties();
+
+    private static Map<String, String> canonicalActivationProperties() {
+        Map<String, String> props = new java.util.LinkedHashMap<>();
+        System.getProperties().forEach((k, v) -> props.put(String.valueOf(k), String.valueOf(v)));
+        props.put("os.name", "Linux");
+        props.put("os.arch", "amd64");
+        props.put("os.version", "5.15.0");
+        props.put("sun.arch.data.model", "64");
+        props.put("java.version", "17.0.9");
+        // A canonical sources-free JDK home so <file><exists>${java.home}/.../src.zip</exists> JDK profiles (guava's
+        // srczip system dep, NEW-4) never activate in the census — a modern JDK without bundled sources, the common CI
+        // shape. Only the model builder's activation copy sees this; the real JVM java.home is untouched.
+        props.put("java.home", "/opt/canonical-jdk-17");
+        return props;
+    }
+
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
             .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
@@ -276,6 +297,9 @@ public class CorpusResolutionRunner {
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         mavenCtx.setPomCache(new InMemoryMavenPomCache());
         mavenCtx.setAddLocalRepository(false);
+        // Pin the engine's <os>/<jdk> profile-activation snapshot to a canonical Linux/x86_64/JDK-17 set so the census
+        // is byte-reproducible across machines (netty/hadoop <os>-profile activation is otherwise host-dependent).
+        mavenCtx.setActivationSystemProperties(CANONICAL_ACTIVATION_PROPERTIES);
 
         List<Parser.Input> inputs = poms.stream()
                 .map(Parser.Input::fromFile)

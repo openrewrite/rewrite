@@ -44,6 +44,7 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_SETTINGS = "org.openrewrite.maven.settings";
     private static final String MAVEN_ACTIVE_PROFILES = "org.openrewrite.maven.activeProfiles";
+    private static final String MAVEN_ACTIVATION_SYSTEM_PROPERTIES = "org.openrewrite.maven.activationSystemProperties";
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
     private static final String MAVEN_CREDENTIALS = "org.openrewrite.maven.auth";
     private static final String MAVEN_LOCAL_REPOSITORY = "org.openrewrite.maven.localRepo";
@@ -287,6 +288,21 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public List<String> getActiveProfiles() {
         return getMessage(MAVEN_ACTIVE_PROFILES, emptyList());
+    }
+
+    /**
+     * The system properties the resolution engine's model builder reads when evaluating {@code <os>}/{@code <jdk>}/
+     * property-condition profile activations (a resolution input, like {@link #setActiveProfiles}). When unset the engine
+     * snapshots the host's {@link System#getProperties()} — Maven parity. Pinning a canonical map here makes profile
+     * activation reproducible across machines (e.g. the SHADOW corpus gate).
+     */
+    public MavenExecutionContextView setActivationSystemProperties(@Nullable Map<String, String> activationSystemProperties) {
+        putMessage(MAVEN_ACTIVATION_SYSTEM_PROPERTIES, activationSystemProperties);
+        return this;
+    }
+
+    public @Nullable Map<String, String> getActivationSystemProperties() {
+        return getMessage(MAVEN_ACTIVATION_SYSTEM_PROPERTIES, null);
     }
 
     /**

@@ -56,6 +56,16 @@ class SyntheticHarness {
         return new Session(customize).resolve(pomXml, normalizerRoots);
     }
 
+    /**
+     * True when the suite runs under the dual-engine SHADOW oracle
+     * ({@code -Dorg.openrewrite.maven.resolution.engine=shadow}): both engines resolve against the same mock, so an
+     * exact request-log / HEAD-shape assertion double-counts. Resolution correctness is asserted in every mode (and the
+     * shadow facade diffs the two engines during {@code resolve}); only the transport-exact assertions are legacy-scoped.
+     */
+    static boolean shadowMode() {
+        return "shadow".equalsIgnoreCase(System.getProperty("org.openrewrite.maven.resolution.engine"));
+    }
+
     //language=xml
     static String rootPom(String body) {
         return """

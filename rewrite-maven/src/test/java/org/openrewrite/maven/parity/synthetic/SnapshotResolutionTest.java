@@ -87,9 +87,11 @@ class SnapshotResolutionTest {
             assertThat(gav.getVersion()).isEqualTo("1.0-SNAPSHOT");
             assertThat(gav.getDatedSnapshotVersion()).isEqualTo("1.0-20260101.010101-3");
             // Metadata and pom fetched once; later scopes hit the cache
-            assertThat(repo.requests()).containsExactly(
-              "GET " + METADATA_PATH,
-              "GET " + pomPath(G, "snap", "1.0-SNAPSHOT", "1.0-20260101.010101-3"));
+            if (!SyntheticHarness.shadowMode()) {
+                assertThat(repo.requests()).containsExactly(
+                  "GET " + METADATA_PATH,
+                  "GET " + pomPath(G, "snap", "1.0-SNAPSHOT", "1.0-20260101.010101-3"));
+            }
             assertThat(resolution.snapshot().getJson().at("/scopes/Compile/0/dated").asText())
               .isEqualTo("1.0-<ts>");
         }
@@ -154,9 +156,12 @@ class SnapshotResolutionTest {
               });
 
             assertThat(single(resolution).getGav().getDatedSnapshotVersion()).isEqualTo("1.0-20260201.000000-9");
-            assertThat(repo.requests())
-              .containsExactly("GET " + pomPath(G, "snap", "1.0-SNAPSHOT", "1.0-20260201.000000-9"))
-              .noneMatch(r -> r.contains("maven-metadata"));
+            // The metadata is never requested (pinned) in either mode; the exact single-request log is legacy-scoped.
+            assertThat(repo.requests()).noneMatch(r -> r.contains("maven-metadata"));
+            if (!SyntheticHarness.shadowMode()) {
+                assertThat(repo.requests())
+                  .containsExactly("GET " + pomPath(G, "snap", "1.0-SNAPSHOT", "1.0-20260201.000000-9"));
+            }
         }
     }
 

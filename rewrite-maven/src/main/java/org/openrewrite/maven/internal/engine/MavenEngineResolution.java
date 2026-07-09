@@ -25,6 +25,8 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.engine.MavenEngine;
 import org.openrewrite.maven.engine.SessionConfig;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Model;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Repository;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.RepositoryPolicy;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystemSession;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -174,21 +176,60 @@ public final class MavenEngineResolution {
         EffectivePomMapper mapper = new EffectivePomMapper(mctx.getPomCache(), attributor, reactor);
         ResolvedPom pom = mapper.map(outcome, requested, profiles, injected);
         Model effectiveModel = requireNonNull(outcome.getResult()).getEffectiveModel();
-        return new EngineEffective(pom, effectiveModel, requestRepositories, effectiveSettings, reactor);
+        // The collect resolves transitives through the parent-merged effective repositories (declared order), so a
+        // pom that inherits a repository from its parent attributes bytes to it exactly as legacy does — legacy's
+        // download walks the resolved pom's parent-merged repositories, not the requested pom's own list (NEW-3: spark
+        // declares gcs-maven-central-mirror before central in its parent, so bytes are attributed to the GCS mirror).
+        List<MavenRepository> collectRepositories = bridge.requestRepositories(
+                modelRepositories(effectiveModel), SettingsBridge.addLocalRepository(mctx),
+                SettingsBridge.addCentralRepository(mctx), requested.getProperties());
+        return new EngineEffective(pom, effectiveModel, requestRepositories, collectRepositories, effectiveSettings, reactor);
+    }
+
+    // The parent-merged declared repositories the effective model carries, in declaration order (the request universe
+    // the collect resolves and attributes bytes through). Unlike EffectivePomMapper's projected list this is unfiltered
+    // by super-POM provenance — it is a resolution input, not output shape.
+    private static List<MavenRepository> modelRepositories(Model effectiveModel) {
+        List<MavenRepository> repositories = new ArrayList<>();
+        for (Repository repo : effectiveModel.getRepositories()) {
+            // Drop the canonical Maven Central (super-POM injected, or a declared central pointing at it): it is re-added
+            // by the addCentralRepository seam, and letting it into the request universe would clobber a ctx-injected
+            // repo sharing the id 'central' (e.g. a mock/mirror central).
+            if (isCanonicalCentral(repo.getUrl())) {
+                continue;
+            }
+            repositories.add(new MavenRepository(repo.getId(), repo.getUrl(),
+                    enabled(repo.getReleases()), enabled(repo.getSnapshots()), false, null, null, null, null));
+        }
+        return repositories;
+    }
+
+    private static boolean isCanonicalCentral(@Nullable String url) {
+        if (url == null) {
+            return false;
+        }
+        String normalized = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        return normalized.equals(MavenRepository.MAVEN_CENTRAL.getUri());
+    }
+
+    private static @Nullable String enabled(@Nullable RepositoryPolicy policy) {
+        return policy == null ? null : policy.getEnabled();
     }
 
     private static final class EngineEffective {
         final ResolvedPom pom;
         final Model effectiveModel;
         final List<MavenRepository> requestRepositories;
+        final List<MavenRepository> collectRepositories;
         final EffectiveSettings effectiveSettings;
         final ReactorWorkspace reactor;
 
         EngineEffective(ResolvedPom pom, Model effectiveModel, List<MavenRepository> requestRepositories,
-                        EffectiveSettings effectiveSettings, ReactorWorkspace reactor) {
+                        List<MavenRepository> collectRepositories, EffectiveSettings effectiveSettings, ReactorWorkspace reactor) {
             this.pom = pom;
             this.effectiveModel = effectiveModel;
             this.requestRepositories = requestRepositories;
+            this.collectRepositories = collectRepositories;
             this.effectiveSettings = effectiveSettings;
             this.reactor = reactor;
         }
@@ -314,7 +355,7 @@ public final class MavenEngineResolution {
         ResolvedPom enginePom = threadingEqual(effective.pom, callerPom) ? callerPom : effective.pom;
         CollectorHandle handle = collectorHandle(ctx);
         EngineCollectOutcome outcome = handle.collector.collect(effective.effectiveModel, requested,
-                effective.requestRepositories, effective.effectiveSettings, effective.reactor, handle.scratch, ctx);
+                effective.collectRepositories, effective.effectiveSettings, effective.reactor, handle.scratch, ctx);
         DependencyGraphMapper mapper = new DependencyGraphMapper(MavenExecutionContextView.view(ctx).getPomCache());
         try {
             return new EngineGraph(enginePom, mapper.map(outcome, enginePom, requested, ctx), null);

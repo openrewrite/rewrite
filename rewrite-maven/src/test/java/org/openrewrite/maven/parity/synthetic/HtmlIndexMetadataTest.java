@@ -65,10 +65,12 @@ class HtmlIndexMetadataTest {
             assertThat(resolution.snapshot().getJson().at("/scopes/Compile/0/gav").asText())
               .isEqualTo(G + ":idx:2.0");
             // Metadata miss, index scrape, then the pom of the highest in-range derived version
-            assertThat(repo.requests()).containsExactly(
-              "GET /org/parity/synthetic/idx/maven-metadata.xml",
-              "GET /org/parity/synthetic/idx/",
-              "GET " + pomPath(G, "idx", "2.0", "2.0"));
+            if (!SyntheticHarness.shadowMode()) {
+                assertThat(repo.requests()).containsExactly(
+                  "GET /org/parity/synthetic/idx/maven-metadata.xml",
+                  "GET /org/parity/synthetic/idx/",
+                  "GET " + pomPath(G, "idx", "2.0", "2.0"));
+            }
         }
     }
 
@@ -91,10 +93,12 @@ class HtmlIndexMetadataTest {
             assertThat(resolution.failed()).isFalse();
             assertThat(resolution.errored()).isTrue();
             assertThat(resolution.errors()).isNotEmpty();
-            assertThat(repo.requests()).containsExactly(
-              "GET /org/parity/synthetic/idx1/maven-metadata.xml",
-              "GET /org/parity/synthetic/idx1/",
-              "GET /org/parity/synthetic/idx2/maven-metadata.xml");
+            if (!SyntheticHarness.shadowMode()) {
+                assertThat(repo.requests()).containsExactly(
+                  "GET /org/parity/synthetic/idx1/maven-metadata.xml",
+                  "GET /org/parity/synthetic/idx1/",
+                  "GET /org/parity/synthetic/idx2/maven-metadata.xml");
+            }
         }
     }
 }

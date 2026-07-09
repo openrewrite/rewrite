@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.internal.engine;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
@@ -84,7 +85,7 @@ public class EngineEffectivePom {
         request.setLocationTracking(true);
         request.setProfiles(settings.getExternalProfiles());
         request.setActiveProfileIds(settings.getActiveProfiles());
-        request.setSystemProperties(systemProperties());
+        request.setSystemProperties(systemProperties(MavenExecutionContextView.view(ctx).getActivationSystemProperties()));
         request.setUserProperties(userProperties(settings.getUserProperties()));
 
         try {
@@ -100,10 +101,16 @@ public class EngineEffectivePom {
     }
 
     // Maven's own precedence has POM properties beat system properties, so os/jdk profile activation reads these
-    // without them overriding the model (DESIGN §9). A copy keeps the model builder off the live System.getProperties().
-    private static Properties systemProperties() {
+    // without them overriding the model (DESIGN §9). Defaults to a copy of the live System.getProperties() (Maven
+    // parity); a caller-pinned map (MavenExecutionContextView.setActivationSystemProperties) makes <os>/<jdk> profile
+    // activation reproducible across machines.
+    private static Properties systemProperties(@Nullable Map<String, String> pinned) {
         Properties properties = new Properties();
-        properties.putAll(System.getProperties());
+        if (pinned == null) {
+            properties.putAll(System.getProperties());
+        } else {
+            properties.putAll(pinned);
+        }
         return properties;
     }
 

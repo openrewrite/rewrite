@@ -337,14 +337,23 @@ public class DependencyGraphMapper {
             case "project.groupId":
             case "pom.groupId":
                 return pom.getGroupId();
+            case "project.parent.groupId":
+            case "parent.groupId":
+                return pom.getParent() == null ? null : pom.getParent().getGroupId();
             case "artifactId":
             case "project.artifactId":
             case "pom.artifactId":
                 return pom.getArtifactId();
+            case "project.parent.artifactId":
+            case "parent.artifactId":
+                return pom.getParent() == null ? null : pom.getParent().getArtifactId();
             case "version":
             case "project.version":
             case "pom.version":
                 return pom.getVersion();
+            case "project.parent.version":
+            case "parent.version":
+                return pom.getParent() == null ? null : pom.getParent().getVersion();
             default:
                 for (Pom p : lineage) {
                     String v = p.getProperties().get(key);
