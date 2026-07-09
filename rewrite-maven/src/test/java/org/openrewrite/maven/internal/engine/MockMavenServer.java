@@ -76,6 +76,13 @@ class MockMavenServer implements AutoCloseable {
         return this;
     }
 
+    /** Serve {@code maven-metadata.xml} at the group/artifact directory (the GA-level version listing). */
+    MockMavenServer metadata(String groupId, String artifactId, String xml) {
+        pomsByPath.put("/" + groupId.replace('.', '/') + "/" + artifactId + "/maven-metadata.xml",
+                xml.getBytes(StandardCharsets.UTF_8));
+        return this;
+    }
+
     private static String path(String groupId, String artifactId, String version) {
         return "/" + groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/" + artifactId + "-" + version + ".pom";
     }

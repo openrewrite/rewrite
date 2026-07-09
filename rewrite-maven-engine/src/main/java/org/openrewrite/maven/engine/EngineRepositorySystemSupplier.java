@@ -34,8 +34,12 @@ import java.util.Map;
  *       even reach live Central — non-hermetic and a parity divergence (Maven 3.9's resolver does not). Disabling
  *       them is spike-proven necessary (SPIKE-RESULTS discrepancy #1, DESIGN §5.3).</li>
  * </ul>
+ * <p>
+ * This is the single owner of the transport-monopoly and RRF-off overrides: the collect-side supplier in rewrite-maven
+ * subclasses it (adding only its descriptor reader / version resolver / metadata resolver) rather than re-declaring
+ * them, so both {@code RepositorySystem}s expose the identical override set by construction.
  */
-class EngineRepositorySystemSupplier extends RepositorySystemSupplier {
+public class EngineRepositorySystemSupplier extends RepositorySystemSupplier {
 
     @Override
     protected Map<String, TransporterFactory> createTransporterFactories() {

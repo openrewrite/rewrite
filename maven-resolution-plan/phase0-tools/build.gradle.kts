@@ -62,6 +62,21 @@ tasks.register<JavaExec>("groundTruthCapture") {
     args(entryArgs())
 }
 
+tasks.register<JavaExec>("integratedBenchmark") {
+    group = "corpus"
+    description = "Integrated perf gate: MavenParser end-to-end, one JVM, engine=legacy vs engine=maven, per tier"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "org.openrewrite.maven.parity.corpus.IntegratedBenchmark"
+    workingDir = projectDir
+    val heap = (project.findProperty("bench.heap") as String?) ?: "2g"
+    maxHeapSize = heap
+    jvmArgs("-Xms$heap")
+    (project.findProperty("bench.warmups") as String?)?.let { systemProperty("bench.warmups", it) }
+    (project.findProperty("bench.iters") as String?)?.let { systemProperty("bench.iters", it) }
+    (project.findProperty("bench.loop") as String?)?.let { systemProperty("bench.loop", it) }
+    args(entryArgs())
+}
+
 tasks.register<JavaExec>("corpusRun") {
     group = "corpus"
     description = "Resolve corpus entries with released rewrite-maven; -Pmode=record populates the store, -Pmode=replay (default) is hermetic + twice-run determinism check"
