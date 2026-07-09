@@ -359,6 +359,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                         d = d.withMarkers(d.getMarkers().computeByType(mrr,
                                 (original, ignored) -> updatedMarker));
                         maybeUpdateModel();
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, except).getVisitor());
                     }
                 }
                 return d;
