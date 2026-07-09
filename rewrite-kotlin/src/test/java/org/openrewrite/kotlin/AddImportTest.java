@@ -453,4 +453,32 @@ public class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8214")
+    @Test
+    void shortensFullyQualifiedReferencesToNewlyImportedType() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("a.b.Target")),
+          kotlin(
+            """
+              package a.b
+              class Target
+              """
+          ),
+          kotlin(
+            """
+              class A {
+                  val type: a.b.Target = a.b.Target()
+              }
+              """,
+            """
+              import a.b.Target
+
+              class A {
+                  val type: Target = Target()
+              }
+              """
+          )
+        );
+    }
 }

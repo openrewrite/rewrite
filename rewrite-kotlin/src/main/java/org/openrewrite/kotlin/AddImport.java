@@ -204,6 +204,11 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                   stmt.getPrefix().isEmpty() ? stmt.withPrefix(stmt.getPrefix().withWhitespace(generalFormatStyle.isUseCRLFNewLines() ? "\r\n\r\n" : "\n\n")) : stmt));
             }
 
+            // Shorten fully qualified references to the imported type, as the Java `AddImport` does.
+            if (member == null && alias == null) {
+                cu = (K.CompilationUnit) new ShortenFullyQualifiedTypeReference().visitNonNull(cu, p, getCursor().getParentOrThrow());
+            }
+
             j = cu;
         }
         return j;
@@ -226,6 +231,21 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
             isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName);
         }
         return isTypRef;
+    }
+
+    private class ShortenFullyQualifiedTypeReference extends KotlinVisitor<P> {
+        @Override
+        public J visitImport(J.Import anImport, P p) {
+            return anImport;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.isFullyQualifiedClassReference(fullyQualifiedName)) {
+                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
     }
 
     /**
