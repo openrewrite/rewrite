@@ -15,6 +15,10 @@
     "dist/**",
     "src/**"
   ],
+  "allowScripts": {
+    "bun": true,
+    "@datadog/pprof": true
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
