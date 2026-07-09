@@ -20,6 +20,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 
+import java.util.Scanner;
+
 @Value
 public class LatestPatch implements VersionComparator {
     @Nullable
@@ -55,8 +57,41 @@ public class LatestPatch implements VersionComparator {
 
     private static String buildTildeRange(String currentVersion) {
         String major = Semver.majorVersion(currentVersion);
-        String minor = Semver.minorVersion(currentVersion);
-        return StringUtils.isNumeric(minor) ? "~" + major + "." + minor : "~" + major;
+        String minor = minorSegment(currentVersion);
+        if (minor != null && StringUtils.isNumeric(minor)) {
+            // A numeric minor is present: hold both major and minor fixed and allow only
+            // patch-level (and finer) changes, e.g. "1.2.3" -> "~1.2".
+            return "~" + major + "." + minor;
+        }
+        if (minor != null && isXRangeWildcard(minor)) {
+            // The minor position is an X-range wildcard (e.g. "2.x", "2.+"): the minor is
+            // deliberately unspecified, so allow any minor within the major.
+            return "~" + major;
+        }
+        // No minor segment at all (e.g. "1") or a non-numeric qualifier in the minor position
+        // (e.g. "1.Final"): pin the minor to 0 so "latest.patch" stays within the patch range
+        // instead of ranging across minor versions.
+        return "~" + major + ".0";
+    }
+
+    /**
+     * @return the raw second version segment (the "minor" position) of {@code version}, or
+     * {@code null} if the version has no second segment. Unlike {@link Semver#minorVersion(String)}
+     * this does not fall back to returning the whole version string when the minor is absent or
+     * non-numeric, which would otherwise let "latest.patch" build a too-wide tilde range.
+     */
+    private static @Nullable String minorSegment(String version) {
+        Scanner scanner = new Scanner(version);
+        scanner.useDelimiter("[.\\-$]");
+        if (scanner.hasNext()) {
+            scanner.next();
+        }
+        return scanner.hasNext() ? scanner.next() : null;
+    }
+
+    private static boolean isXRangeWildcard(String segment) {
+        char c = segment.charAt(0);
+        return c == 'x' || c == 'X' || c == '*' || c == '+';
     }
 
     public static Validated<LatestPatch> build(String toVersion, @Nullable String metadataPattern) {

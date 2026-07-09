@@ -48,6 +48,25 @@ class LatestPatchTest {
     }
 
     @Test
+    void staysWithinPatchRangeWhenMinorIsAbsentOrNonNumeric() {
+        // Current versions with no numeric minor segment must not range across minor (or major)
+        // versions. Previously "1" built a "~1.1" range and "1.Final" built a "~1" range, both of
+        // which let "latest.patch" pick a higher minor version.
+
+        // Bare major: pin minor to 0, so only 1.0.x patches are eligible.
+        assertThat(latestPatch.isValid("1", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1", "1.1.0")).isFalse();
+        assertThat(latestPatch.isValid("1", "2.0.0")).isFalse();
+        assertThat(latestPatch.upgrade("1", List.of("1.0.5", "1.1.0", "2.0.0"))).contains("1.0.5");
+
+        // Qualifier in the minor position: treat as 1.0.x, not "any 1.x".
+        assertThat(latestPatch.isValid("1.Final", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1.Final", "1.9.9")).isFalse();
+        assertThat(latestPatch.isValid("1.Final", "2.0.0")).isFalse();
+        assertThat(latestPatch.upgrade("1.Final", List.of("1.0.5", "1.9.9", "2.0.0"))).contains("1.0.5");
+    }
+
+    @Test
     void upgrade() {
         var upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.0"));
         assertThat(upgrade).isEmpty();
