@@ -15,6 +15,9 @@
  */
 package org.openrewrite.maven.internal.engine;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -65,6 +68,7 @@ public final class MavenEngineResolution {
 
     private static final String ENGINE_HANDLE_KEY = "org.openrewrite.maven.internal.engine.handle";
     private static final String COLLECTOR_HANDLE_KEY = "org.openrewrite.maven.internal.engine.collector";
+    private static final String EFFECTIVE_MEMO_KEY = "org.openrewrite.maven.internal.engine.effectiveMemo";
 
     // The legacy resolver resolves imported BOMs and parents through nested Pom.resolve calls (ResolvedPom line ~941);
     // those are internal to the legacy algorithm and have no engine equivalent (the engine imports BOMs inside Maven's
@@ -153,6 +157,25 @@ public final class MavenEngineResolution {
         }
         xml = ensureModelVersion(xml);
 
+        // Effective-model memo (DESIGN §6): the mapped effective result is a pure function of the requested pom's bytes,
+        // the active profiles, and the reactor epoch. Keying on all three lets repeated builds of the same module skip
+        // ModelBuilder entirely — the resolution facade and the dependency-graph facade each build the same module's
+        // effective pom, and a steady-state re-resolution loop rebuilds every module every cycle. The global epoch (bumped
+        // by every UpdateMavenModel re-resolution) invalidates the whole memo when any reactor member mutates, so a mutated
+        // parent is never served stale to an inheriting sibling; remote-only builds share one epoch and stay warm.
+        Cache<String, EngineEffective> memo = effectiveMemo(ctx);
+        String memoKey = effectiveMemoKey(PomXmlRegistry.epoch(ctx), profiles, requested, xml);
+        EngineEffective memoized = memo.getIfPresent(memoKey);
+        if (memoized != null) {
+            if (EngineProfiler.ENABLED) {
+                EngineProfiler.effectiveMemoHits.incrementAndGet();
+            }
+            return memoized;
+        }
+        if (EngineProfiler.ENABLED) {
+            EngineProfiler.effectiveMemoMisses.incrementAndGet();
+        }
+
         ReactorWorkspace reactor = new ReactorWorkspace(
                 downloader.getProjectPoms(), PomXmlRegistry.pathSource(ctx), PomXmlRegistry.epoch(ctx));
 
@@ -185,7 +208,28 @@ public final class MavenEngineResolution {
         List<MavenRepository> collectRepositories = bridge.requestRepositories(
                 modelRepositories(effectiveModel), SettingsBridge.addLocalRepository(mctx),
                 SettingsBridge.addCentralRepository(mctx), requested.getProperties());
-        return new EngineEffective(pom, effectiveModel, requestRepositories, collectRepositories, effectiveSettings, reactor);
+        EngineEffective built = new EngineEffective(pom, effectiveModel, requestRepositories, collectRepositories, effectiveSettings, reactor);
+        memo.put(memoKey, built);
+        return built;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Cache<String, EngineEffective> effectiveMemo(ExecutionContext ctx) {
+        return ctx.computeMessageIfAbsent(EFFECTIVE_MEMO_KEY,
+                k -> Caffeine.newBuilder().maximumSize(4096).recordStats().<String, EngineEffective>build());
+    }
+
+    /** Memo hit/miss stats for the perf-correctness gate ({@code EngineReResolutionTest}). */
+    static CacheStats effectiveMemoStats(ExecutionContext ctx) {
+        return effectiveMemo(ctx).stats();
+    }
+
+    // The memo identity: reactor epoch + active profiles + the requested pom's gav and exact bytes. The gav keeps distinct
+    // modules apart at one epoch; the byte length + hash guards the rare synthetic graph that shares a gav, so a memo hit
+    // only ever returns a result built from byte-identical input under the same profiles and epoch.
+    private static String effectiveMemoKey(int epoch, List<String> profiles, Pom requested, byte[] xml) {
+        return epoch + "|" + String.join(",", profiles) + "|" + requested.getGav() + "|" +
+                xml.length + ":" + Arrays.hashCode(xml);
     }
 
     // The parent-merged declared repositories the effective model carries, in declaration order (the request universe

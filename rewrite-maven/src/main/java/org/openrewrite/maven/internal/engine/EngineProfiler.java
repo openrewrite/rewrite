@@ -35,6 +35,8 @@ public final class EngineProfiler {
     public static final AtomicLong descriptorReads = new AtomicLong();
     public static final AtomicLong modelCacheHits = new AtomicLong();
     public static final AtomicLong modelCacheMisses = new AtomicLong();
+    public static final AtomicLong effectiveMemoHits = new AtomicLong();   // buildEngineEffective served from the memo
+    public static final AtomicLong effectiveMemoMisses = new AtomicLong();
 
     private EngineProfiler() {
     }
@@ -49,6 +51,8 @@ public final class EngineProfiler {
         descriptorReads.set(0);
         modelCacheHits.set(0);
         modelCacheMisses.set(0);
+        effectiveMemoHits.set(0);
+        effectiveMemoMisses.set(0);
     }
 
     public static String report(int modules) {
@@ -60,7 +64,8 @@ public final class EngineProfiler {
                 " bootstrapMs=" + ms(bootstrapNanos) +
                 " modelBuilds=" + modelBuilds.get() +
                 " descriptorReads=" + descriptorReads.get() +
-                " modelCache(hit/miss)=" + modelCacheHits.get() + "/" + modelCacheMisses.get();
+                " modelCache(hit/miss)=" + modelCacheHits.get() + "/" + modelCacheMisses.get() +
+                " effectiveMemo(hit/miss)=" + effectiveMemoHits.get() + "/" + effectiveMemoMisses.get();
     }
 
     private static long ms(AtomicLong nanos) {

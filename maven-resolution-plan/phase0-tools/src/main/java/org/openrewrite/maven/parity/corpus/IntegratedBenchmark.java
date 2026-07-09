@@ -145,10 +145,18 @@ public class IntegratedBenchmark {
         ExecutionContext loopCtx = newCtx(engine, RecordingHttpSender.replay(CorpusPaths.store()), sharedCtxCache);
         parseOn(loopCtx, selected, reactorDir); // warm the ctx
         List<Long> loopCtxTimes = new ArrayList<>();
+        String loopProfile = null;
         for (int i = 0; i < loop; i++) {
+            boolean lastLoop = i == loop - 1;
+            if (lastLoop) {
+                org.openrewrite.maven.internal.engine.EngineProfiler.reset();
+            }
             long t0 = System.nanoTime();
             parseOn(loopCtx, selected, reactorDir);
             loopCtxTimes.add((System.nanoTime() - t0) / 1_000_000);
+            if (lastLoop && org.openrewrite.maven.internal.engine.EngineProfiler.ENABLED) {
+                loopProfile = org.openrewrite.maven.internal.engine.EngineProfiler.report(selected.size());
+            }
         }
 
         double warmMedian = median(warm);
@@ -167,6 +175,9 @@ public class IntegratedBenchmark {
                 "\twarm=" + warm + "\tloop=" + loopMedian);
         if (profile != null) {
             System.out.println("PROFILE\tengine=" + engine + "\t" + profile);
+        }
+        if (loopProfile != null) {
+            System.out.println("PROFILE-LOOP\tengine=" + engine + "\t" + loopProfile);
         }
     }
 
