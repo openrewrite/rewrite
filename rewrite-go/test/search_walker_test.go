@@ -19,8 +19,11 @@ package test
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -42,7 +45,7 @@ func TestCollectSearchResultIDsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := java.CollectSearchResultIDs(cu); len(got) != 0 {
+	if got := visitor.CollectSearchResultIDs(cu); len(got) != 0 {
 		t.Fatalf("expected no search results, got %v", got)
 	}
 }
@@ -57,12 +60,38 @@ func TestCollectSearchResultIDsAfterMark(t *testing.T) {
 	visitor.Init(v)
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
-	ids := java.CollectSearchResultIDs(result)
+	ids := visitor.CollectSearchResultIDs(result)
 	if len(ids) != 1 {
 		t.Fatalf("expected exactly one search result id, got %d (%v)", len(ids), ids)
 	}
 	if ids[0] != mark.Ident {
 		t.Fatalf("collected id %v does not match marker id %v", ids[0], mark.Ident)
+	}
+}
+
+// go.mod nodes are Tree, not J. The walk still reaches them and reads their
+// markers through the shared GetMarkers accessor, matching what the former
+// reflection walker collected from the struct field directly.
+func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
+	// given
+	mark := java.NewSearchResult("found a require value")
+	val := &golang.GoModValue{
+		Ident:   uuid.New(),
+		Text:    "example.com/x",
+		Markers: java.AddMarker(java.Markers{}, mark),
+	}
+	dir := &golang.GoModDirective{Ident: uuid.New(), Keyword: "require", Values: []*golang.GoModValue{val}}
+	gm := &golang.GoMod{
+		Ident:      uuid.New(),
+		Statements: []java.RightPadded[golang.GoModStatement]{{Element: dir}},
+	}
+
+	// when
+	ids := visitor.CollectSearchResultIDs(gm)
+
+	// then
+	if len(ids) != 1 || ids[0] != mark.Ident {
+		t.Fatalf("expected [%v], got %v", mark.Ident, ids)
 	}
 }
 
@@ -78,7 +107,7 @@ func TestCollectSearchResultIDsDedupes(t *testing.T) {
 	visitor.Init(v)
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
-	ids := java.CollectSearchResultIDs(result)
+	ids := visitor.CollectSearchResultIDs(result)
 	if len(ids) != 1 {
 		t.Fatalf("expected dedup to produce 1 id, got %d (%v)", len(ids), ids)
 	}

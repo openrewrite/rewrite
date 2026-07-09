@@ -1,0 +1,100 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package visitor
+
+import (
+	"github.com/google/uuid"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
+
+// Walk performs a read-only, pre-order traversal of the LST rooted at t,
+// invoking visit on every node (t included). Returning false from visit
+// stops the walk immediately.
+//
+// Descent is driven by GoVisitor's type-switch dispatch, so Walk stays in
+// lockstep with the RPC visitor rather than modelling the tree shape a
+// second time. Callers therefore need not enumerate concrete node shapes.
+func Walk(t java.Tree, visit func(java.Tree) bool) {
+	if t == nil {
+		return
+	}
+	w := &walker{visit: visit}
+	w.GoVisitor.Self = w
+	defer func() {
+		if r := recover(); r != nil {
+			if _, stop := r.(walkStop); !stop {
+				panic(r)
+			}
+		}
+	}()
+	w.Visit(t, nil)
+}
+
+// walkStop unwinds the visitor stack when visit requests an early stop.
+// GoVisitor has no first-class short-circuit, and PreVisit returning nil
+// prunes only the current subtree (leaving siblings to run), so a sentinel
+// panic is the only way to abandon the rest of the traversal.
+type walkStop struct{}
+
+type walker struct {
+	GoVisitor
+	visit func(java.Tree) bool
+}
+
+func (w *walker) PreVisit(t java.Tree, p any) java.Tree {
+	if !w.visit(t) {
+		panic(walkStop{})
+	}
+	return t
+}
+
+// CollectSearchResultIDs walks t and returns the IDs of every SearchResult
+// and SearchResultMarker found on any node's Markers. The returned slice
+// has stable first-seen order; duplicates are dropped.
+func CollectSearchResultIDs(t java.Tree) []uuid.UUID {
+	var ids []uuid.UUID
+	seen := make(map[uuid.UUID]struct{})
+	Walk(t, func(node java.Tree) bool {
+		m, ok := node.(interface{ GetMarkers() java.Markers })
+		if !ok {
+			return true
+		}
+		for _, marker := range m.GetMarkers().Entries {
+			var id uuid.UUID
+			switch x := marker.(type) {
+			case java.SearchResult:
+				id = x.Ident
+			case *java.SearchResult:
+				id = x.Ident
+			case java.SearchResultMarker:
+				id = x.Ident
+			case *java.SearchResultMarker:
+				id = x.Ident
+			default:
+				continue
+			}
+			if _, dup := seen[id]; dup {
+				continue
+			}
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+		return true
+	})
+	return ids
+}

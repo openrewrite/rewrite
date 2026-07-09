@@ -1914,7 +1914,7 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 	// only carries the IDs *newly added* by that visitor (matches
 	// JS batch-visit.ts:46+).
 	knownIDs := map[string]struct{}{}
-	for _, id := range java.CollectSearchResultIDs(current) {
+	for _, id := range visitor.CollectSearchResultIDs(current) {
 		knownIDs[id.String()] = struct{}{}
 	}
 
@@ -1947,7 +1947,7 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 		if !deleted {
 			afterTree, _ := after.(java.Tree)
 			if afterTree != nil {
-				for _, id := range java.CollectSearchResultIDs(afterTree) {
+				for _, id := range visitor.CollectSearchResultIDs(afterTree) {
 					sid := id.String()
 					if _, seen := knownIDs[sid]; seen {
 						continue
