@@ -85,6 +85,49 @@ func TestParseProjectResolvesModuleGraph(t *testing.T) {
 	}
 }
 
+func TestParseProjectResolvesTestOnlyDependency(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+
+	// given: a module whose only use of example.com/bar is from a _test.go file
+	s, _ := newTestServer(t)
+	projectDir := t.TempDir()
+	writeFile(t, filepath.Join(projectDir, "go.mod"),
+		"module example.com/foo\n\ngo 1.21\n\nrequire example.com/bar v0.0.0\n\nreplace example.com/bar => ./bar\n")
+	writeFile(t, filepath.Join(projectDir, "main.go"),
+		"package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"hi\") }\n")
+	writeFile(t, filepath.Join(projectDir, "main_test.go"),
+		"package main\n\nimport (\n\t\"testing\"\n\n\t\"example.com/bar\"\n)\n\nfunc TestBar(t *testing.T) { _ = bar.Hello() }\n")
+	writeFile(t, filepath.Join(projectDir, "bar", "go.mod"), "module example.com/bar\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(projectDir, "bar", "bar.go"),
+		"package bar\n\nfunc Hello() string { return \"hi\" }\n")
+
+	relativeTo := projectDir
+	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
+	if err != nil {
+		t.Fatalf("marshal params: %v", err)
+	}
+
+	// when
+	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
+		t.Fatalf("handleParseProject: %v", rpcErr.Message)
+	}
+
+	// then: the test-only dependency is mapped to its providing module
+	mrr := findGoResolutionResult(t, s)
+
+	var sawTestDep bool
+	for _, p := range mrr.PackageModules {
+		if p.ImportPath == "example.com/bar" && p.ModulePath == "example.com/bar" {
+			sawTestDep = true
+		}
+	}
+	if !sawTestDep {
+		t.Errorf("expected test-only dependency example.com/bar in PackageModules: %+v", mrr.PackageModules)
+	}
+}
+
 func findGoResolutionResult(t *testing.T, s *server) golang.GoResolutionResult {
 	t.Helper()
 	for _, obj := range s.localObjects {
