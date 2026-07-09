@@ -55,4 +55,42 @@ class GroovyTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("SuppressWarnings".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("all"))) {
+                      return GroovyTemplate.builder("\"all\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          groovy(
+            """
+              class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("unchecked")
+                  def method() {}
+              }
+              """,
+            """
+              class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("all")
+                  def method() {}
+              }
+              """
+          ));
+    }
 }

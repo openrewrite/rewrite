@@ -164,7 +164,7 @@ public class AnnotationTemplateGenerator {
             }
             return;
         } else if (j instanceof J.ClassDeclaration) {
-            classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, prior);
+            classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, prior, false);
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.MethodDeclaration) {
@@ -289,9 +289,12 @@ public class AnnotationTemplateGenerator {
         template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, J prior) {
+    private void classDeclaration(StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, J prior, boolean sibling) {
         J.ClassDeclaration c = parent;
         boolean annotated = isAnnotated(cursor, prior);
+        if (sibling) {
+            before.insert(0, "}\n");
+        }
         if (!annotated) {
             for (Statement statement : c.getBody().getStatements()) {
                 if (templated.contains(statement)) {
@@ -304,10 +307,7 @@ public class AnnotationTemplateGenerator {
                         before.insert(0, variable((J.VariableDeclarations) statement, cursor) + ";\n");
                     }
                 } else if (statement instanceof J.ClassDeclaration) {
-                    // this is a sibling class. we need declarations for all variables and methods.
-                    // setting prior to null will cause them all to be written.
-                    before.insert(0, '}');
-                    classDeclaration(before, after, (J.ClassDeclaration) statement, templated, cursor, prior);
+                    classDeclaration(before, after, (J.ClassDeclaration) statement, templated, cursor, prior, true);
                 }
             }
         }
@@ -323,7 +323,9 @@ public class AnnotationTemplateGenerator {
         } else {
             before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
         }
-        after.append('}');
+        if (!sibling) {
+            after.append('}');
+        }
     }
 
     private void anonymousClassDeclaration(StringBuilder before, StringBuilder after, J.NewClass nc, Cursor cursor, J prior) {
