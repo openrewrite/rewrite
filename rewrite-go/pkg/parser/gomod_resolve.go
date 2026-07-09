@@ -115,7 +115,7 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 }
 
 func goListPackages(dir string) ([]golang.GoPackageModule, error) {
-	stdout, err := runGo(dir, "list", "-mod=readonly", "-e", "-deps", "-json", "./...")
+	stdout, err := runGo(dir, "list", "-mod=readonly", "-e", "-deps", "-test", "-json", "./...")
 	if err != nil && len(stdout) == 0 {
 		return nil, err
 	}
