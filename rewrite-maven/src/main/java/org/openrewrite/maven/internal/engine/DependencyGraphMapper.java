@@ -60,7 +60,7 @@ public class DependencyGraphMapper {
 
     public Map<Scope, List<ResolvedDependency>> map(EngineCollectOutcome outcome, ResolvedPom engineResolvedPom,
                                                     Pom requested, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        Index index = new Index(outcome.getServedBy(), pomCache);
+        Index index = new Index(outcome.getServedBy(), outcome.getDeclaredDependencies(), pomCache);
         List<Dependency> requestedDependencies = engineResolvedPom.getRequestedDependencies();
 
         Map<Scope, List<ResolvedDependency>> result = new LinkedHashMap<>();
@@ -81,7 +81,7 @@ public class DependencyGraphMapper {
                 // A failure in a scope discards that whole scope's list, exactly as the legacy per-scope catch does.
                 continue;
             }
-            result.put(scope, project(outcome.getRoot(), scope, requestedDependencies, index));
+            result.put(scope, project(outcome.getRoot(), scope, requestedDependencies, engineResolvedPom, index));
         }
 
         if (exceptions != null) {
@@ -93,7 +93,7 @@ public class DependencyGraphMapper {
     // ---- per-scope projection ----
 
     private List<ResolvedDependency> project(@Nullable DependencyNode root, Scope scope,
-                                             List<Dependency> requestedDependencies, Index index) {
+                                             List<Dependency> requestedDependencies, ResolvedPom rootPom, Index index) {
         if (root == null) {
             return new ArrayList<>();
         }
@@ -105,7 +105,7 @@ public class DependencyGraphMapper {
         for (DependencyNode child : winners(root)) {
             Scope dScope = scopeOf(child);
             if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                seeds.putIfAbsent(gact(child), new Frame(child, Scope.Compile, null, matchRequested(child, requestedDependencies)));
+                seeds.putIfAbsent(gact(child), new Frame(child, Scope.Compile, null, matchRequested(child, requestedDependencies, rootPom)));
             }
         }
 
@@ -133,7 +133,12 @@ public class DependencyGraphMapper {
                 flat.add(node);
                 Pom declaringPom = index.pomFor(node.gav);
                 for (DependencyNode child : winners(frame.aether)) {
-                    Scope childScope = scopeOf(child);
+                    // The child's scope as DECLARED in its containing pom (legacy ResolvedPom.getDependencyScope) — not
+                    // aether's scope, which the JavaScopeDeriver has already promoted (a compile dependency of a
+                    // test/provided parent becomes test/provided). Legacy propagates every root as Compile, so a
+                    // test-scoped direct dependency's compile transitives stay compile-reachable and populate the
+                    // Test/Provided classpath (verified against `mvn dependency:tree`).
+                    Scope childScope = childScope(child, declaringPom, rootPom);
                     if (childScope.isInClasspathOf(frame.propagationScope)) {
                         next.putIfAbsent(gact(child), new Frame(child, childScope, node, transitiveRequested(child, declaringPom)));
                     }
@@ -143,7 +148,7 @@ public class DependencyGraphMapper {
             depth++;
         }
 
-        new ExclusionAttributor(index::pomFor).attribute(roots);
+        new ExclusionAttributor(index::declaredDepsFor).attribute(roots);
 
         Map<Node, ResolvedDependency> resolved = new IdentityHashMap<>();
         List<ResolvedDependency> out = new ArrayList<>(flat.size());
@@ -199,24 +204,45 @@ public class DependencyGraphMapper {
         node.optional = Boolean.valueOf(frame.requested.getOptional());
         node.depth = depth;
         node.licenses = index.licensesFor(gav);
+        // Effective exclusions (requested + dependencyManagement-sourced) prune the accumulated set; the requested-only
+        // subset drives legacy's attribution walk (which ancestor an effective exclusion is reported on).
+        node.ownExclusions = toGroupArtifacts(frame.aether.getDependency() == null ? null :
+                frame.aether.getDependency().getExclusions());
+        node.requestedExclusions = (frame.aether.getManagedBits() & DependencyNode.MANAGED_EXCLUSIONS) != 0 ?
+                toGroupArtifacts(DependencyManagerUtils.getPremanagedExclusions(frame.aether)) : node.ownExclusions;
         return node;
+    }
+
+    private static List<GroupArtifact> toGroupArtifacts(@Nullable Collection<org.openrewrite.maven.engine.shaded.org.eclipse.aether.graph.Exclusion> exclusions) {
+        if (exclusions == null || exclusions.isEmpty()) {
+            return emptyList();
+        }
+        List<GroupArtifact> out = new ArrayList<>(exclusions.size());
+        for (org.openrewrite.maven.engine.shaded.org.eclipse.aether.graph.Exclusion e : exclusions) {
+            out.add(new GroupArtifact(e.getGroupId(), e.getArtifactId()));
+        }
+        return out;
     }
 
     // The original declared Dependency instance from the requesting pom, so getResolvedDependency stays reference-exact.
     // Duplicate direct declarations resolve last-declaration-wins, mirroring legacy's g:a-keyed rootDependencies map
     // (a later put replacing an earlier), so a doubly-declared coordinate threads its LAST declared instance.
-    private @Nullable Dependency matchRequested(DependencyNode node, List<Dependency> requestedDependencies) {
+    private @Nullable Dependency matchRequested(DependencyNode node, List<Dependency> requestedDependencies, ResolvedPom rootPom) {
         Artifact artifact = node.getArtifact();
         String classifier = emptyToNull(artifact.getClassifier());
         Dependency exact = null;
         Dependency byGa = null;
+        // Interpolate each requested coordinate against the root pom's effective properties (groupId/artifactId can both
+        // be ${...}, possibly inherited), so the depth-0 requested threads the original declared instance — the identity
+        // getResolvedDependency relies on — rather than a value-equal synthetic.
         for (Dependency dependency : requestedDependencies) {
-            if (Objects.equals(dependency.getGroupId(), artifact.getGroupId()) &&
-                    dependency.getArtifactId().equals(artifact.getArtifactId())) {
-                byGa = dependency;
-                if (Objects.equals(emptyToNull(dependency.getClassifier()), classifier)) {
-                    exact = dependency;
-                }
+            if (!artifact.getArtifactId().equals(rootPom.getValue(dependency.getArtifactId())) ||
+                    !artifact.getGroupId().equals(rootPom.getValue(dependency.getGroupId()))) {
+                continue;
+            }
+            byGa = dependency;
+            if (Objects.equals(emptyToNull(rootPom.getValue(dependency.getClassifier())), classifier)) {
+                exact = dependency;
             }
         }
         if (exact != null) {
@@ -256,18 +282,65 @@ public class DependencyGraphMapper {
             return null;
         }
         String classifier = emptyToNull(artifact.getClassifier());
-        Dependency byGa = null;
+        Dependency byGa = null;      // exact interpolated g:a match, classifier not yet confirmed
+        Dependency byArtifact = null; // artifactId (+classifier) match, groupId a placeholder we could not resolve
         for (Dependency d : declaringPom.getDependencies()) {
-            if (Objects.equals(d.getGroupId(), artifact.getGroupId()) && artifact.getArtifactId().equals(d.getArtifactId())) {
-                if (Objects.equals(emptyToNull(d.getClassifier()), classifier)) {
+            if (!artifact.getArtifactId().equals(d.getArtifactId())) {
+                continue;
+            }
+            boolean classifierMatches = Objects.equals(emptyToNull(d.getClassifier()), classifier);
+            if (groupIdMatches(declaringPom, d.getGroupId(), artifact.getGroupId())) {
+                if (classifierMatches) {
                     return d;
                 }
                 if (byGa == null) {
                     byGa = d;
                 }
+            } else if (classifierMatches && byArtifact == null) {
+                byArtifact = d;
             }
         }
-        return byGa;
+        return byGa != null ? byGa : byArtifact;
+    }
+
+    // A declared groupId may be inherited (null → the containing pom's) or an uninterpolated placeholder like
+    // ${project.groupId}; resolve those against the declaring pom before comparing, so the raw declared version still
+    // threads onto the child (legacy interpolates the coordinate but keeps the requested version raw).
+    private static boolean groupIdMatches(Pom declaringPom, @Nullable String declaredGroupId, String artifactGroupId) {
+        if (declaredGroupId == null || artifactGroupId.equals(declaredGroupId)) {
+            return true;
+        }
+        return declaredGroupId.contains("${") && artifactGroupId.equals(interpolate(declaringPom, declaredGroupId));
+    }
+
+    private static @Nullable String interpolate(Pom declaringPom, String value) {
+        String result = value;
+        int start;
+        while ((start = result.indexOf("${")) >= 0) {
+            int end = result.indexOf('}', start);
+            if (end < 0) {
+                break;
+            }
+            String key = result.substring(start + 2, end);
+            String resolved;
+            switch (key) {
+                case "project.groupId":
+                case "pom.groupId":
+                    resolved = declaringPom.getGroupId();
+                    break;
+                case "project.version":
+                case "pom.version":
+                    resolved = declaringPom.getVersion();
+                    break;
+                default:
+                    resolved = declaringPom.getProperties().get(key);
+            }
+            if (resolved == null) {
+                return null;
+            }
+            result = result.substring(0, start) + resolved + result.substring(end + 1);
+        }
+        return result;
     }
 
     private static Dependency synthetic(Artifact artifact) {
@@ -329,6 +402,21 @@ public class DependencyGraphMapper {
         return scope == null || scope.isEmpty() ? Scope.Compile : Scope.fromName(scope);
     }
 
+    // Legacy ResolvedPom.getDependencyScope: the child's scope declared in its containing pom (else Compile), then the
+    // root pom's managed scope only when that would not promote the dependency into a classpath it was not already in.
+    private static Scope childScope(DependencyNode child, @Nullable Pom declaringPom, ResolvedPom rootPom) {
+        Artifact a = child.getArtifact();
+        Dependency declared = matchDeclared(declaringPom, a);
+        Scope inContaining = declared != null && declared.getScope() != null ?
+                Scope.fromName(declared.getScope()) : Scope.Compile;
+        Scope inProject = rootPom.getManagedScope(a.getGroupId(), a.getArtifactId(), a.getExtension(),
+                emptyToNull(a.getClassifier()));
+        if (inProject == null) {
+            return inContaining;
+        }
+        return inContaining.isInClasspathOf(inProject) ? inProject : inContaining;
+    }
+
     private static GroupArtifactClassifierType gact(DependencyNode node) {
         Artifact artifact = node.getArtifact();
         return new GroupArtifactClassifierType(artifact.getGroupId(), artifact.getArtifactId(),
@@ -350,6 +438,8 @@ public class DependencyGraphMapper {
         Boolean optional;
         int depth;
         List<License> licenses = emptyList();
+        List<GroupArtifact> ownExclusions = emptyList();      // requested + managed — prunes the accumulated set
+        List<GroupArtifact> requestedExclusions = emptyList(); // requested only — drives the attribution walk
         final List<Node> children = new ArrayList<>();
         final List<GroupArtifact> effectiveExclusions = new ArrayList<>();
     }
@@ -372,9 +462,12 @@ public class DependencyGraphMapper {
     static final class Index {
         private final Map<GroupArtifactVersion, MavenRepository> repositoryByGav = new HashMap<>();
         private final Map<GroupArtifactVersion, ResolvedGroupArtifactVersion> keyByGav = new HashMap<>();
+        private final Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies;
         private final MavenPomCache pomCache;
 
-        Index(Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy, MavenPomCache pomCache) {
+        Index(Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
+              Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies, MavenPomCache pomCache) {
+            this.declaredDependencies = declaredDependencies;
             this.pomCache = pomCache;
             for (Map.Entry<ResolvedGroupArtifactVersion, MavenRepository> entry : servedBy.entrySet()) {
                 ResolvedGroupArtifactVersion key = entry.getKey();
@@ -382,6 +475,24 @@ public class DependencyGraphMapper {
                 repositoryByGav.putIfAbsent(gav, entry.getValue());
                 keyByGav.putIfAbsent(gav, key);
             }
+        }
+
+        // The node's effective (parent-merged) declared dependencies captured at descriptor-read time; falls back to the
+        // cached pom's own <dependencies> when the descriptor was never read (e.g. a purely reactor-local pom).
+        List<GroupArtifact> declaredDepsFor(GroupArtifactVersion gav) {
+            List<GroupArtifact> declared = declaredDependencies.get(gav);
+            if (declared != null) {
+                return declared;
+            }
+            Pom pom = pomFor(gav);
+            if (pom == null) {
+                return emptyList();
+            }
+            List<GroupArtifact> out = new ArrayList<>(pom.getDependencies().size());
+            for (Dependency d : pom.getDependencies()) {
+                out.add(new GroupArtifact(d.getGroupId() == null ? "" : d.getGroupId(), d.getArtifactId()));
+            }
+            return out;
         }
 
         @Nullable MavenRepository repoFor(GroupArtifactVersion gav) {

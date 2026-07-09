@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.graph.DependencyCycle;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.graph.DependencyNode;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -46,6 +47,9 @@ public class EngineCollectOutcome {
     @Nullable DependencyNode root;
 
     Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy;
+
+    /** {@code gav → effective (parent-merged, managed-injected) declared dependencies} for the exclusion-report post-pass. */
+    Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies;
 
     List<DependencyCycle> cycles;
 

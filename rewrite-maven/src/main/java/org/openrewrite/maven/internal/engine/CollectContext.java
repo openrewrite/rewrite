@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystem;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.RepositorySystemSession;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -56,7 +57,13 @@ class CollectContext {
     List<MavenRepository> requestRepositories;
     Collection<ResolvedGroupArtifactVersion> pinnedSnapshotVersions;
 
-    Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy = new ConcurrentHashMap<>();
+    // Cumulative across every collect sharing the collector's DataPool: a descriptor served warm from the pool skips
+    // EngineDescriptorReader entirely (descriptorReads == 0), so per-collect attribution would drop it. Keying the
+    // attribution on the collector (not the collect) keeps a gav's repository / effective dependencies attributed on the
+    // warm reads that follow — the reactor's later modules and any repeat coordinate.
+    Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy;
+    Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies;
+
     Map<GroupArtifactVersion, DescriptorFailure> descriptorFailures = new ConcurrentHashMap<>();
 
     /** Descriptor reads (effective-model builds) this collect performed; 0 on a warm re-collect served from the DataPool. */

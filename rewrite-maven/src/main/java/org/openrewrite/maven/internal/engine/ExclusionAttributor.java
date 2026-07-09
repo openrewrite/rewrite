@@ -17,10 +17,8 @@ package org.openrewrite.maven.internal.engine;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.engine.DependencyGraphMapper.Node;
-import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.Pom;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,18 +27,21 @@ import java.util.function.Function;
 
 /**
  * The {@code effectiveExclusions} reporting post-pass (DESIGN §4.2). Walks each scope's resolved tree, accumulating the
- * exclusions declared along the path root→leaf; for every declared dependency of a node's pom that an accumulated
- * exclusion prunes, the excluded coordinate is attributed to the <em>shallowest</em> ancestor that declared that
- * exclusion — the same attribution the legacy BFS records inline via its {@code includedByMap} walk. Matching is Maven's
- * stock exact/{@code *} semantics (the glob superset is a removed parity bug), so this only reports what the stock
+ * exclusions declared along the path root→leaf; for every effective (parent-merged) declared dependency of a node that
+ * an accumulated exclusion prunes, the excluded coordinate is attributed to the <em>shallowest</em> ancestor that
+ * declared that exclusion — the same attribution the legacy BFS records inline via its {@code includedByMap} walk. The
+ * per-node exclusion set is the one Maven actually applied (requested + dependencyManagement-sourced, taken from the
+ * aether node), and the enumerated dependencies are the effective set (a parent-inherited dependency included), so the
+ * report matches legacy's {@code getRequestedDependencies()} walk over accumulated exclusions. Matching is Maven's stock
+ * exact/{@code *} semantics (the glob superset is a removed parity bug), so this reports what the stock
  * {@code ExclusionDependencySelector} actually pruned from the verbose graph.
  */
 final class ExclusionAttributor {
 
-    private final Function<GroupArtifactVersion, Pom> pomForGav;
+    private final Function<GroupArtifactVersion, List<GroupArtifact>> declaredDepsForGav;
 
-    ExclusionAttributor(Function<GroupArtifactVersion, Pom> pomForGav) {
-        this.pomForGav = pomForGav;
+    ExclusionAttributor(Function<GroupArtifactVersion, List<GroupArtifact>> declaredDepsForGav) {
+        this.declaredDepsForGav = declaredDepsForGav;
     }
 
     void attribute(List<Node> roots) {
@@ -49,66 +50,56 @@ final class ExclusionAttributor {
         }
     }
 
-    private void visit(Node node, List<Owner> inherited) {
-        List<Owner> active = inherited;
-        List<GroupArtifact> own = node.requested.getExclusions();
-        if (own != null && !own.isEmpty()) {
-            active = new ArrayList<>(inherited);
-            for (GroupArtifact exclusion : own) {
-                active.add(new Owner(exclusion, node));
-            }
+    // {@code ancestors} is the path from the root down to (but excluding) {@code node}, root-most first.
+    private void visit(Node node, List<Node> ancestors) {
+        // The set that prunes this node's children: its own effective exclusions (requested + managed) plus every
+        // ancestor's, accumulated deepest-first to mirror legacy's ListUtils.concatAll(child, parent) order.
+        List<GroupArtifact> accumulated = new ArrayList<>(node.ownExclusions);
+        for (int i = ancestors.size() - 1; i >= 0; i--) {
+            accumulated.addAll(ancestors.get(i).ownExclusions);
         }
 
-        if (!active.isEmpty()) {
-            Pom pom = pomForGav.apply(node.gav);
-            if (pom != null) {
-                for (Dependency declared : pom.getDependencies()) {
-                    String groupId = declared.getGroupId() == null ? "" : declared.getGroupId();
-                    String artifactId = declared.getArtifactId();
-                    Owner shallowest = shallowestExcluding(active, groupId, artifactId);
-                    if (shallowest != null) {
-                        shallowest.node.effectiveExclusions.add(new GroupArtifact(groupId, artifactId));
-                    }
+        if (!accumulated.isEmpty()) {
+            for (GroupArtifact declared : declaredDepsForGav.apply(node.gav)) {
+                GroupArtifact matched = firstMatch(accumulated, declared.getGroupId(), declared.getArtifactId());
+                if (matched != null) {
+                    attributionTarget(node, ancestors, matched).effectiveExclusions.add(declared);
                 }
             }
         }
 
+        List<Node> childAncestors = new ArrayList<>(ancestors);
+        childAncestors.add(node);
         for (Node child : node.children) {
-            visit(child, active);
+            visit(child, childAncestors);
         }
     }
 
-    // The first (root-most) exclusion that matches, then the first owner declaring that exclusion — matching legacy's
-    // shallowest-declaring-ancestor attribution.
-    private static @Nullable Owner shallowestExcluding(List<Owner> active, String groupId, String artifactId) {
-        for (Owner candidate : active) {
-            if (matches(candidate.exclusion, groupId, artifactId)) {
-                for (Owner owner : active) {
-                    if (owner.exclusion.equals(candidate.exclusion)) {
-                        return owner;
-                    }
-                }
-                return candidate;
+    // Attribute a pruned coordinate to the shallowest ancestor in the unbroken chain (starting at the node whose child
+    // matched, walking up) whose *requested* exclusions declare the matching exclusion — legacy's includedByMap walk.
+    private static Node attributionTarget(Node node, List<Node> ancestors, GroupArtifact exclusion) {
+        Node declaredOn = node;
+        for (int i = ancestors.size() - 1; i >= 0; i--) {
+            Node ancestor = ancestors.get(i);
+            if (ancestor.requestedExclusions.contains(exclusion)) {
+                declaredOn = ancestor;
+            } else {
+                break;
+            }
+        }
+        return declaredOn;
+    }
+
+    private static @Nullable GroupArtifact firstMatch(List<GroupArtifact> exclusions, String groupId, String artifactId) {
+        for (GroupArtifact exclusion : exclusions) {
+            if (matches(exclusion.getGroupId(), groupId) && matches(exclusion.getArtifactId(), artifactId)) {
+                return exclusion;
             }
         }
         return null;
     }
 
-    private static boolean matches(GroupArtifact exclusion, String groupId, String artifactId) {
-        return matches(exclusion.getGroupId(), groupId) && matches(exclusion.getArtifactId(), artifactId);
-    }
-
     private static boolean matches(String pattern, String value) {
         return "*".equals(pattern) || pattern.equals(value);
-    }
-
-    private static final class Owner {
-        final GroupArtifact exclusion;
-        final Node node;
-
-        Owner(GroupArtifact exclusion, Node node) {
-            this.exclusion = exclusion;
-            this.node = node;
-        }
     }
 }

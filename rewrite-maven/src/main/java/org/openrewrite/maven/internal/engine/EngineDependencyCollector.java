@@ -48,9 +48,11 @@ import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.graph.transfo
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.repository.SimpleResolutionErrorPolicy;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.io.Closeable;
 import java.nio.file.Path;
@@ -78,6 +80,12 @@ public class EngineDependencyCollector implements Closeable {
     // collect reads its descriptors from the pool and rebuilds no models.
     private final RepositoryCache repositoryCache = new DefaultRepositoryCache();
 
+    // Attribution accumulated across every collect on this collector: because a warm read skips EngineDescriptorReader,
+    // the gav → repository / effective-dependency attribution a descriptor produced on its first (cold) read must
+    // outlive that collect so the reactor's later modules — which reach the same coordinate warm — stay attributed.
+    private final Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy = new ConcurrentHashMap<>();
+    private final Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies = new ConcurrentHashMap<>();
+
     public EngineCollectOutcome collect(Model rootEffectiveModel, Pom requested,
                                         List<MavenRepository> requestRepositories, EffectiveSettings settings,
                                         ReactorWorkspace reactor, Path scratch, ExecutionContext ctx) {
@@ -86,7 +94,7 @@ public class EngineDependencyCollector implements Closeable {
         Path materializeDir = scratch.resolve("materialize");
 
         CollectContext cc = new CollectContext(system, materializeDir, pomCache, reactor, settings, ctx,
-                requestRepositories, mctx.getPinnedSnapshotVersions());
+                requestRepositories, mctx.getPinnedSnapshotVersions(), servedBy, declaredDependencies);
 
         try (CloseableSession session = newSession(scratch.resolve("lrm"),
                 HttpSenderExecutionContextView.view(ctx).getHttpSender(), cc)) {
@@ -137,8 +145,8 @@ public class EngineDependencyCollector implements Closeable {
             }
         });
 
-        return new EngineCollectOutcome(root, cc.getServedBy(), cycles, directFailures, toleratedTransitive,
-                cc.getDescriptorReads().get());
+        return new EngineCollectOutcome(root, cc.getServedBy(), cc.getDeclaredDependencies(), cycles, directFailures,
+                toleratedTransitive, cc.getDescriptorReads().get());
     }
 
     private CollectRequest collectRequest(RepositorySystemSession session, Model model,

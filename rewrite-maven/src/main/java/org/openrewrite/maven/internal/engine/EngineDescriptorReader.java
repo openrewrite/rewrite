@@ -34,6 +34,7 @@ import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.Artifac
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.ArtifactDescriptorPolicyRequest;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.ArtifactDescriptorRequest;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.resolution.ArtifactDescriptorResult;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Pom;
@@ -118,6 +119,7 @@ class EngineDescriptorReader implements ArtifactDescriptorReader {
             Relocation relocation = relocation(model);
             if (relocation == null) {
                 populateResult(session, result, model);
+                recordDeclaredDependencies(cc, artifact, model);
                 return result;
             }
             result.addRelocation(artifact);
@@ -131,7 +133,12 @@ class EngineDescriptorReader implements ArtifactDescriptorReader {
                                      String g, String a, String v) {
         byte[] reactorXml = cc.getReactor().reactorPomXml(g, a, v);
         if (reactorXml != null) {
-            return MavenEngineResolution.ensureModelVersion(reactorXml);
+            byte[] ensured = MavenEngineResolution.ensureModelVersion(reactorXml);
+            // Attribute the reactor member into servedBy / the parsed-pom region like a repository-resolved one, so a
+            // dependency reached THROUGH it is attributed (repository=null, licenses from the pom) and the mapper can
+            // read this pom's raw declared versions when threading `requested` onto its transitive children.
+            bridge.recordReactorServed(g, a, v, ensured);
+            return ensured;
         }
         try {
             return MavenEngineResolution.ensureModelVersion(readAll(bridge.resolvePom(g, a, v, repositories)));
@@ -168,6 +175,20 @@ class EngineDescriptorReader implements ArtifactDescriptorReader {
                 result.addManagedDependency(DependencyConversions.toAether(d, stereotypes));
             }
         }
+    }
+
+    // Records the node's effective (parent-merged) declared dependencies as g:a so the exclusion-report post-pass can
+    // enumerate the same set legacy's resolveParentsRecursively merges into getRequestedDependencies() — notably a
+    // dependency inherited from a parent pom, which a node's own <dependencies> omit. Keyed by base version to match the
+    // mapper's node gav; putIfAbsent because a warm re-read would otherwise be a no-op anyway.
+    private static void recordDeclaredDependencies(CollectContext cc, Artifact artifact, Model model) {
+        GroupArtifactVersion gav =
+                new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion());
+        List<GroupArtifact> declared = new ArrayList<>(model.getDependencies().size());
+        for (org.openrewrite.maven.engine.shaded.org.apache.maven.model.Dependency d : model.getDependencies()) {
+            declared.add(new GroupArtifact(d.getGroupId() == null ? "" : d.getGroupId(), d.getArtifactId()));
+        }
+        cc.getDeclaredDependencies().putIfAbsent(gav, declared);
     }
 
     // --- helpers ---------------------------------------------------------------------------------------------------
