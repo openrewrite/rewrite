@@ -17,9 +17,12 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
@@ -238,6 +241,326 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
               class Foo {
                   void foo() {
                       BigInteger one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Set<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.Set;
+
+              class Foo {
+                  void foo() {
+                      Set<java.lang.String> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithNestedGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Map<java.lang.String, java.util.List<java.lang.Integer>>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import java.util.List;
+              import java.util.Map;
+
+              class Foo {
+                  void foo() {
+                      Map<java.lang.String, List<java.lang.Integer>> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithDeeplyNestedGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Map<java.lang.String, java.util.Map<java.lang.Integer, java.lang.Long>>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.Map;
+                  public class Bar {
+                      public static Map<String, String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.Map;
+              class Foo {
+                  void foo() {
+                      Map<String, String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import java.util.Map;
+              class Foo {
+                  void foo() {
+                      Map<java.lang.String, Map<java.lang.Integer, java.lang.Long>> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParameterizedReturnTypeWithRaw() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.lang.Object"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      java.lang.Object one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeIsResolvedAgainstTheClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.ArrayList<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.ArrayList;
+
+              class Foo {
+                  void foo() {
+                      ArrayList<java.lang.String> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType()).isNotInstanceOf(JavaType.ShallowClass.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void resolvesExternalRawTypeWithExternalTypeArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "jakarta.validation.ConstraintViolation<org.springframework.http.ResponseEntity>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import jakarta.validation.ConstraintViolation;
+              import org.springframework.http.ResponseEntity;
+
+              class Foo {
+                  void foo() {
+                      ConstraintViolation<ResponseEntity> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType()).isNotInstanceOf(JavaType.ShallowClass.class);
+                        assertThat(type.getTypeParameters().get(0)).isNotInstanceOf(JavaType.ShallowClass.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeMayUseSimpleNamesForJavaLangTypeArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.List<String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.List;
+
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
                   }
               }
               """
