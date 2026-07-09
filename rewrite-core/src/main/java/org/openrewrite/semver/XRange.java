@@ -103,8 +103,7 @@ public class XRange extends LatestRelease {
     }
 
     /**
-     * @return whether {@code segment} is an X-range wildcard, i.e. one of {@code *}, {@code x},
-     * {@code X}, or {@code +}.
+     * @return whether {@code segment} is an X-range wildcard: {@code *}, {@code x}, {@code X}, or {@code +}.
      */
     static boolean isWildcard(String segment) {
         return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);

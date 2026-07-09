@@ -60,12 +60,10 @@ public class LatestPatch implements VersionComparator {
             return "~" + major + "." + minor;
         }
         if (minor != null && XRange.isWildcard(minor)) {
-            // An X-range wildcard minor (e.g. "2.x", "2.+") leaves the minor unspecified, so allow
-            // any minor within the major.
+            // A wildcard minor (e.g. "2.x", "2.+") allows any minor within the major.
             return "~" + major;
         }
-        // An absent or non-numeric minor (e.g. "1", "1.Final") pins the minor to 0 so we stay
-        // within the patch range instead of ranging across minor versions.
+        // An absent or non-numeric minor (e.g. "1", "1.Final") stays within the patch range.
         return "~" + major + ".0";
     }
 

@@ -142,8 +142,7 @@ public class Semver {
     }
 
     /**
-     * @return the raw version segment at {@code index} (0 = major, 1 = minor, ...) delimited by
-     * {@code '.'}, {@code '-'}, or {@code '$'}, or {@code null} if the version has no such segment.
+     * @return the raw version segment at {@code index} (0 = major, 1 = minor, ...), or {@code null} if absent.
      */
     static @Nullable String versionSegment(String version, int index) {
         Scanner scanner = new Scanner(version);
