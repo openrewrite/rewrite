@@ -1116,7 +1116,7 @@ public class MavenPomDownloader {
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         // If this host has already required credentials in this session, authenticate preemptively rather than
         // paying another anonymous round-trip. Otherwise request anonymously first.
-        if (hasCredentials(repo) && MavenAuthenticationCache.requiresAuthentication(ctx, uriString)) {
+        if (hasCredentials(repo) && MavenAuthenticationCache.requiresAuthentication(uriString, ctx)) {
             return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
         }
         try {
@@ -1134,7 +1134,7 @@ public class MavenPomDownloader {
         try {
             byte[] responseBody = sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
             // Remember so later requests to this host authenticate preemptively
-            MavenAuthenticationCache.rememberRequiresAuthentication(ctx, uriString);
+            MavenAuthenticationCache.rememberRequiresAuthentication(uriString, ctx);
             return responseBody;
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {

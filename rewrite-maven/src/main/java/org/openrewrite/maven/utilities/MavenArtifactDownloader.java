@@ -136,7 +136,7 @@ public class MavenArtifactDownloader {
                     // Mirror Apache Maven's DeferredCredentialsProvider: anonymous first, unless this host has
                     // already required credentials in this session, in which case authenticate preemptively.
                     boolean preemptive = hasAuthentication(repository) &&
-                                         MavenAuthenticationCache.requiresAuthentication(ctx, uri);
+                                         MavenAuthenticationCache.requiresAuthentication(uri, ctx);
                     byte[] responseBytes = null;
                     int responseCode;
                     HttpSender.Request firstRequest = preemptive ?
@@ -161,7 +161,7 @@ public class MavenArtifactDownloader {
                         }
                         if (responseBytes != null) {
                             // Remember so later artifacts from this host authenticate preemptively
-                            MavenAuthenticationCache.rememberRequiresAuthentication(ctx, uri);
+                            MavenAuthenticationCache.rememberRequiresAuthentication(uri, ctx);
                         }
                     }
                     if (responseBytes == null) {

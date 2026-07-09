@@ -41,7 +41,7 @@ public final class MavenAuthenticationCache {
     /**
      * @return {@code true} if the endpoint for the given URI has already required authentication in this session.
      */
-    public static boolean requiresAuthentication(ExecutionContext ctx, String uri) {
+    public static boolean requiresAuthentication(String uri, ExecutionContext ctx) {
         String endpoint = endpoint(uri);
         return endpoint != null && endpoints(ctx).contains(endpoint);
     }
@@ -50,7 +50,7 @@ public final class MavenAuthenticationCache {
      * Record that the endpoint for the given URI required authentication, so later requests to the same
      * endpoint can authenticate preemptively.
      */
-    public static void rememberRequiresAuthentication(ExecutionContext ctx, String uri) {
+    public static void rememberRequiresAuthentication(String uri, ExecutionContext ctx) {
         String endpoint = endpoint(uri);
         if (endpoint != null) {
             endpoints(ctx).add(endpoint);
