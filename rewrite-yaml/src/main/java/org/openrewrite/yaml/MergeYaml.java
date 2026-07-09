@@ -226,6 +226,9 @@ public class MergeYaml extends Recipe {
                     m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, accptTheirs,
                             objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
+                if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+                    m = MergeYamlVisitor.removeInlineCommentFromLastEntry(m);
+                }
                 return m;
             }
 

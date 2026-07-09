@@ -15,7 +15,11 @@
  */
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
@@ -23,11 +27,14 @@ import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.Last;
 
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
@@ -1717,6 +1724,77 @@ class MergeYamlTest implements RewriteTest {
               new-property: value
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertPropertyOptions")
+    void doesNotCopyTrailingCommentOfPrecedingEntryToInsertedEntry(MergeYaml.@Nullable InsertMode insertMode,
+                                                                   @Nullable String insertProperty,
+                                                                   String after) {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.config",
+              //language=yaml
+              """
+                new-property: value
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+          yaml(
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+              other: x
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertPropertyOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          arguments(Last, null,
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          // Inserted after the commented last entry — also becomes the last entry
+          arguments(After, "activate-mep",
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          // Inserted before the commented last entry — comment must remain on `activate-mep`
+          arguments(Before, "activate-mep",
+            """
+              config:
+                activate-auto: true
+                new-property: value
+                activate-mep: true # Some comment
+              other: x
+              """)
         );
     }
 
