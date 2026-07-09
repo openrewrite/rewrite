@@ -229,7 +229,7 @@ class ScalaParserTest {
     }
 
     @Test
-    void doesNotLeakTempDirectories() throws java.io.IOException {
+    void doesNotLeakTempDirectories() throws Exception {
         // given
         java.nio.file.Path tmpRoot = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
         java.util.Set<java.nio.file.Path> before = listRewriteScalaTempDirs(tmpRoot);
@@ -242,8 +242,17 @@ class ScalaParserTest {
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
 
+        // Concurrently running test classes create their own rewrite-scala temp dirs
+        // and delete them when their compile finishes, so a single snapshot comparison
+        // is racy. Poll until only genuinely leaked dirs (which persist) would remain.
         java.util.Set<java.nio.file.Path> after = listRewriteScalaTempDirs(tmpRoot);
         after.removeAll(before);
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (!after.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(250);
+            after = listRewriteScalaTempDirs(tmpRoot);
+            after.removeAll(before);
+        }
         assertThat(after)
             .as("Parsing should not leak any rewrite-scala temp directories")
             .isEmpty();

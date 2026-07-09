@@ -129,6 +129,10 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitGoModBlock(n, p)
 	case *golang.GoModValue:
 		return v.self().VisitGoModValue(n, p)
+	case *golang.GoSum:
+		return v.self().VisitGoSum(n, p)
+	case *golang.GoSumLine:
+		return v.self().VisitGoSumLine(n, p)
 	case *java.Identifier:
 		return v.self().VisitIdentifier(n, p)
 	case *java.Literal:
@@ -288,6 +292,8 @@ type VisitorI interface {
 	VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree
 	VisitGoModBlock(b *golang.GoModBlock, p any) java.Tree
 	VisitGoModValue(val *golang.GoModValue, p any) java.Tree
+	VisitGoSum(gs *golang.GoSum, p any) java.Tree
+	VisitGoSumLine(l *golang.GoSumLine, p any) java.Tree
 	VisitIdentifier(ident *java.Identifier, p any) java.J
 	VisitLiteral(lit *java.Literal, p any) java.J
 	VisitBinary(bin *java.Binary, p any) java.J
@@ -427,6 +433,20 @@ func (v *GoVisitor) VisitGoModValue(val *golang.GoModValue, p any) java.Tree {
 	val = val.WithPrefix(v.self().VisitSpace(val.Prefix, p))
 	val = val.WithMarkers(v.visitMarkers(val.Markers, p))
 	return val
+}
+
+func (v *GoVisitor) VisitGoSum(gs *golang.GoSum, p any) java.Tree {
+	gs = gs.WithPrefix(v.self().VisitSpace(gs.Prefix, p))
+	gs = gs.WithMarkers(v.visitMarkers(gs.Markers, p))
+	gs = gs.WithLines(visitGoSumLineList(v, gs.Lines, p))
+	gs = gs.WithEof(v.self().VisitSpace(gs.Eof, p))
+	return gs
+}
+
+func (v *GoVisitor) VisitGoSumLine(l *golang.GoSumLine, p any) java.Tree {
+	l = l.WithPrefix(v.self().VisitSpace(l.Prefix, p))
+	l = l.WithMarkers(v.visitMarkers(l.Markers, p))
+	return l
 }
 
 func (v *GoVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
@@ -1187,6 +1207,20 @@ func visitGoModStatementList(v *GoVisitor, list []java.RightPadded[golang.GoModS
 			continue
 		}
 		rp.Element = visited.(golang.GoModStatement)
+		rp.After = v.self().VisitSpace(rp.After, p)
+		result = append(result, rp)
+	}
+	return result
+}
+
+func visitGoSumLineList(v *GoVisitor, list []java.RightPadded[*golang.GoSumLine], p any) []java.RightPadded[*golang.GoSumLine] {
+	result := make([]java.RightPadded[*golang.GoSumLine], 0, len(list))
+	for _, rp := range list {
+		visited := v.self().Visit(rp.Element, p)
+		if visited == nil {
+			continue
+		}
+		rp.Element = visited.(*golang.GoSumLine)
 		rp.After = v.self().VisitSpace(rp.After, p)
 		result = append(result, rp)
 	}

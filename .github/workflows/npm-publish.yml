@@ -60,9 +60,11 @@ jobs:
 
       # Trusted Publisher auto-detection in `npm publish` requires npm >= 11.5.1.
       # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x, and the
-      # global install needs sudo to write under /usr/local.
+      # global install needs sudo to write under /usr/local. Pinned off `@latest`
+      # because npm 12 breaks provenance publish with `Cannot find module 'sigstore'`
+      # (https://github.com/npm/cli/issues/9722); revisit once that ships fixed.
       - shell: bash
-        run: sudo npm install -g npm@latest
+        run: sudo npm install -g npm@11.18.0
 
       # The `ci` run records the exact version string baked into its rewrite-javascript jar
       # (META-INF/rewrite-javascript-version.txt) and uploads it as the

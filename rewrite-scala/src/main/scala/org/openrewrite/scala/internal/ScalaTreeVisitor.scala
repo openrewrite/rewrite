@@ -1905,7 +1905,10 @@ class ScalaTreeVisitor(
               args.add(prevRp.withAfter(Space.format(between.substring(0, commaIndex))))
             }
             argPrefix = Space.format(between.substring(commaIndex + 1))
-            cursor = prevEnd + commaIndex + 1
+            // argPrefix owns this whitespace — advance the cursor to the argument
+            // start so the argument's visit doesn't also consume it into a nested
+            // prefix, which withPrefix below couldn't replace.
+            cursor = thisStart
           }
         }
       }
@@ -2097,7 +2100,8 @@ class ScalaTreeVisitor(
                             val commaIndex = positionOfNextIn(between, ",", 0)
                             if (commaIndex >= 0) {
                               argPrefix = Space.format(between.substring(commaIndex + 1))
-                              updateCursor(prevEnd + commaIndex + 1)
+                              // argPrefix owns this whitespace (see visitNewClassWithArgs)
+                              updateCursor(thisStart)
                             }
                           }
                         }
@@ -4225,6 +4229,19 @@ class ScalaTreeVisitor(
   }
   
   private def visitWhileDo(whileTree: Trees.WhileDo[?]): J = {
+    // Scala 2 `do <body> while (<cond>)` — its span starts at the `do` keyword
+    // rather than `while`; route to visitDoWhile (which documents the desugared
+    // tree shape dotty produces for it).
+    val doWhileStart = Math.max(0, whileTree.span.start - offsetAdjustment)
+    if (source.startsWith("do", doWhileStart) &&
+        (doWhileStart + 2 >= source.length || !Character.isLetterOrDigit(source.charAt(doWhileStart + 2)) && source.charAt(doWhileStart + 2) != '_')) {
+      whileTree.cond match {
+        case condBlock: Trees.Block[?] if condBlock.stats.nonEmpty =>
+          return visitDoWhile(whileTree, condBlock)
+        case _ =>
+      }
+    }
+
     val prefix = extractPrefix(whileTree.span)
 
     // Find where the condition parentheses start
@@ -4354,7 +4371,74 @@ class ScalaTreeVisitor(
       body
     )
   }
-  
+
+  /**
+   * Maps a Scala 2 `do <body> while (<cond>)` to J.DoWhileLoop. Dotty desugars it
+   * to `WhileDo(Block(<body>, <cond>), ())`: the loop body is the block's single
+   * stat and the condition is the block's result expression (a `Parens`).
+   */
+  private def visitDoWhile(whileTree: Trees.WhileDo[?], condBlock: Trees.Block[?]): J = {
+    val savedCursor = cursor
+    val prefix = extractPrefix(whileTree.span)
+
+    // Move past the `do` keyword so the body picks up its own prefix.
+    val doStart = Math.max(0, whileTree.span.start - offsetAdjustment)
+    if (cursor <= doStart + 2) cursor = doStart + 2
+
+    val bodyStmt: Statement = visitTree(condBlock.stats.head) match {
+      case stmt: Statement => stmt
+      case j: J => new S.StatementExpression(Tree.randomId(), j).asInstanceOf[Statement]
+      case _ => cursor = savedCursor; return visitUnknown(whileTree)
+    }
+
+    // Space between the body and the `while` keyword.
+    val whileIdx = positionOfNext("while", cursor)
+    if (whileIdx < 0) { cursor = savedCursor; return visitUnknown(whileTree) }
+    val beforeWhile = if (whileIdx > cursor) ScalaSpace.format(source, cursor, whileIdx) else Space.EMPTY
+    cursor = whileIdx + 5
+
+    // Space between `while` and the opening parenthesis.
+    val parenIdx = positionOfNext("(", cursor)
+    if (parenIdx < 0) { cursor = savedCursor; return visitUnknown(whileTree) }
+    val condParenPrefix = if (parenIdx > cursor) ScalaSpace.format(source, cursor, parenIdx) else Space.EMPTY
+    cursor = parenIdx + 1
+
+    val condTree = condBlock.expr match {
+      case parens: untpd.Parens if parens.productArity > 0 =>
+        parens.productElement(0).asInstanceOf[Trees.Tree[?]]
+      case other => other
+    }
+    val condition = visitTree(condTree) match {
+      case expr: Expression => expr
+      case j: J => new S.StatementExpression(Tree.randomId(), j)
+      case _ => cursor = savedCursor; return visitUnknown(whileTree)
+    }
+
+    // Space before the closing parenthesis.
+    val condEnd = Math.max(0, condTree.span.end - offsetAdjustment)
+    val closeIdx = positionOfNext(")", Math.max(cursor, condEnd))
+    val beforeClose = if (closeIdx > condEnd) ScalaSpace.format(source, condEnd, closeIdx) else Space.EMPTY
+    if (closeIdx >= 0) cursor = closeIdx + 1
+    updateCursor(whileTree.span.end)
+
+    new J.DoWhileLoop(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JRightPadded.build(bodyStmt),
+      new JLeftPadded(
+        beforeWhile,
+        new J.ControlParentheses[Expression](
+          Tree.randomId(),
+          condParenPrefix,
+          Markers.EMPTY,
+          new JRightPadded(condition, beforeClose, Markers.EMPTY)
+        ),
+        Markers.EMPTY
+      )
+    )
+  }
+
   private def visitForDo(forTree: untpd.ForDo): J = {
     // Detect Scala 3 paren-less form (`for x <- xs do body`): after `for`, the next
     // non-whitespace is neither `(` nor `{`. The single-generator J.ForEachLoop
@@ -4615,7 +4699,13 @@ class ScalaTreeVisitor(
           var trailingSpace = Space.EMPTY
           var rpMarkers = Markers.EMPTY
           val trailStart = Math.max(statEnd, cursor)
-          if (trailStart < nextStart && nextStart <= source.length) {
+          if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+            // A `;` already absorbed into the statement's span, which the forward scan
+            // below can't see — same recognition and cursor catch-up as
+            // consumeTrailingSemicolon (which documents the Dotty span behavior).
+            rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
+            cursor = Math.max(cursor, trailStart)
+          } else if (trailStart < nextStart && nextStart <= source.length) {
             val between = source.substring(trailStart, nextStart)
             // An explicit ';' separator appears before any newline and with only
             // horizontal whitespace between it and the preceding statement.
@@ -4683,21 +4773,37 @@ class ScalaTreeVisitor(
       }
       if (isSyntheticResult) {
         // Synthetic ??? slipped through — skip it
-      } else exprResult match {
-        case expr: Expression =>
-          // In Scala, the last expression in a block is the return value
-          // Wrap it in a J.Return with ImplicitReturn marker
-          val implicitReturn = new J.Return(
-            Tree.randomId(),
-            expr.getPrefix(),
-            Markers.build(Collections.singletonList(new ImplicitReturn(Tree.randomId()))),
-            expr.withPrefix(Space.EMPTY)
-          )
-          
-          statements.add(JRightPadded.build(implicitReturn.asInstanceOf[Statement]))
-        case stmt: Statement =>
-          statements.add(JRightPadded.build(stmt))
-        case _ => // Skip
+      } else {
+        // A `;` after the final expression of a braced block belongs to the block —
+        // consume it and preserve it via the Semicolon marker. In a braceless block
+        // (e.g. a match case body) it is the enclosing construct's separator and is
+        // preserved there.
+        def trailingSemicolon(): (Space, Markers) =
+          if (hasBraces) {
+            val exprEnd = Math.max(0, block.expr.span.end - offsetAdjustment)
+            val exprNext = Math.max(0, block.span.end - offsetAdjustment)
+            consumeTrailingSemicolon(exprEnd, exprNext)
+          } else {
+            (Space.EMPTY, Markers.EMPTY)
+          }
+        exprResult match {
+          case expr: Expression =>
+            // In Scala, the last expression in a block is the return value
+            // Wrap it in a J.Return with ImplicitReturn marker
+            val implicitReturn = new J.Return(
+              Tree.randomId(),
+              expr.getPrefix(),
+              Markers.build(Collections.singletonList(new ImplicitReturn(Tree.randomId()))),
+              expr.withPrefix(Space.EMPTY)
+            )
+
+            val (trailingSpace, rpMarkers) = trailingSemicolon()
+            statements.add(new JRightPadded[Statement](implicitReturn, trailingSpace, rpMarkers))
+          case stmt: Statement =>
+            val (trailingSpace, rpMarkers) = trailingSemicolon()
+            statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
+          case _ => // Skip
+        }
       }
     }
     
@@ -8369,7 +8475,15 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(po.span)
     val elementType = visitTypeTree(po.od)
     val innerEnd = if (po.od.span.exists) Math.max(0, po.od.span.end - offsetAdjustment) else cursor
-    val starStart = if (po.op.span.exists) Math.max(0, po.op.span.start - offsetAdjustment) else innerEnd
+    val repeatedEnd = if (po.span.exists) Math.min(source.length, Math.max(0, po.span.end - offsetAdjustment)) else source.length
+    val starStart =
+      if (po.op.span.exists && po.op.span.start != po.op.span.end) {
+        Math.max(0, po.op.span.start - offsetAdjustment)
+      } else {
+        val searchStart = Math.min(Math.max(cursor, innerEnd), repeatedEnd)
+        val found = positionOfNext("*", searchStart)
+        if (found >= 0 && found < repeatedEnd) found else innerEnd
+      }
     val beforeStar = if (cursor < starStart && starStart <= source.length) {
       ScalaSpace.format(source, cursor, starStart)
     } else Space.EMPTY
@@ -8816,6 +8930,9 @@ class ScalaTreeVisitor(
     // forward scan below would miss it, dropping the explicit separator on print.
     // Recognize that already-absorbed `;` here so it is preserved via the marker.
     if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      // The cursor may still sit before the `;` when the statement visit didn't
+      // consume its full span — move past it so it doesn't leak into whitespace.
+      cursor = Math.max(cursor, trailStart)
       return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
     }
     if (trailStart >= nextStart || nextStart > source.length) {
