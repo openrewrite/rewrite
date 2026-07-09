@@ -1564,6 +1564,105 @@ class ChangeParentPomTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/2589")
+        @Test
+        void bringsDownRemovedManagedVersionDeclaredInChildModuleOfLocalParent() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeParentPom(
+                "org.springframework.boot", "org.springframework.boot",
+                "spring-boot-starter-parent", "spring-boot-starter-parent",
+                "3.2.4",
+                null, null, null, null, null)),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.7.18</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>3.2.4</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>javax.servlet</groupId>
+                                    <artifactId>javax.servlet-api</artifactId>
+                                    <version>4.0.1</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.servlet</groupId>
+                                  <artifactId>javax.servlet-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <!--~~(No version provided for direct dependency javax.servlet:javax.servlet-api:compile)~~>--><dependency>
+                                  <groupId>javax.servlet</groupId>
+                                  <artifactId>javax.servlet-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
