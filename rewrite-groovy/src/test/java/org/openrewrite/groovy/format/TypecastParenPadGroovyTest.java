@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin.format;
+package org.openrewrite.groovy.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.format.TypecastParenPad;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.groovy.Assertions.groovy;
 
-class TypecastParenPadKotlinTest implements RewriteTest {
+class TypecastParenPadGroovyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -30,27 +30,25 @@ class TypecastParenPadKotlinTest implements RewriteTest {
     }
 
     @Test
-    void asCast() {
+    void removesPadding() {
         rewriteRun(
-          kotlin(
+          groovy(
             """
-              fun method(list: List<Any>) {
-                  val b = list.get(0) as List<*>
-                  val c = list.get(0) as String
-              }
+              def a = ( int ) 0L
+              """,
+            """
+              def a = (int) 0L
               """
           )
         );
     }
 
     @Test
-    void nullSafeCast() {
+    void doesNotCorruptAsStyleCast() {
         rewriteRun(
-          kotlin(
+          groovy(
             """
-              fun method(a: Any) {
-                  val b = a as? List<*>
-              }
+              def a = 0L as Integer
               """
           )
         );

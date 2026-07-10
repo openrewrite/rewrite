@@ -691,14 +691,6 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
-        // Kotlin (and other non-Java languages) reuse J.TypeCast to model `expr as Type`, which has
-        // no parentheses. The Java spacing rules for `(Type) expr` assume the expression follows the
-        // cast and the type sits inside parentheses, so applying them here moves and drops whitespace
-        // and corrupts the source (`x as Foo` becomes `x asFoo`). Only touch Java type casts.
-        if (getCursor().firstEnclosing(J.CompilationUnit.class) == null) {
-            return typeCast;
-        }
-
         String afterTypeCast = evaluate(() -> spacesStyle.getOther().getAfterTypeCast(), true) ? " " : "";
 
         return super.visitTypeCast(typeCast.withExpression(minimized(typeCast.getExpression(), afterTypeCast)), p);

@@ -20,13 +20,16 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.kotlin.format.AutoFormatVisitor;
 import org.openrewrite.kotlin.format.BlankLinesVisitor;
 import org.openrewrite.kotlin.format.NormalizeFormatVisitor;
+import org.openrewrite.kotlin.format.SpacesVisitor;
 import org.openrewrite.kotlin.style.BlankLinesStyle;
 import org.openrewrite.style.Style;
 
 import static org.openrewrite.kotlin.style.IntelliJ.blankLines;
+import static org.openrewrite.kotlin.style.IntelliJ.spaces;
 
 public class KotlinAutoFormatService extends AutoFormatService {
 
@@ -43,5 +46,10 @@ public class KotlinAutoFormatService extends AutoFormatService {
     @Override
     public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
         return new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, sourceFile, () -> blankLines()), stopAfter);
+    }
+
+    @Override
+    public <P> JavaVisitor<P> spacesVisitor(SourceFile sourceFile, SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
+        return new SpacesVisitor<>(Style.from(org.openrewrite.kotlin.style.SpacesStyle.class, sourceFile, () -> spaces()), stopAfter);
     }
 }
