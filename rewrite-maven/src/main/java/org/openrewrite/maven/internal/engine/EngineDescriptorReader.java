@@ -82,8 +82,10 @@ class EngineDescriptorReader implements ArtifactDescriptorReader {
         // the whole reactor instead of once per dependent. Safe here because gav→repo attribution is accumulated on the
         // collector (cc.getServedBy()), so a warm cache-served build that skips resolvePom keeps the attribution the
         // first (cold) build recorded — unlike the root project build, whose servedBy stands alone.
+        // Descriptor-grade (locationTracking off, as Maven's own DefaultArtifactDescriptorReader.loadPom builds): the
+        // descriptor projection reads only dependencies/management/repositories, never an InputLocation.
         EngineEffectivePom effectivePom =
-                new EngineEffectivePom(cc.getSystem(), session, repositories, session.getCache());
+                new EngineEffectivePom(cc.getSystem(), session, repositories, session.getCache(), false);
 
         Set<String> visited = new LinkedHashSet<>();
         Artifact artifact = request.getArtifact();

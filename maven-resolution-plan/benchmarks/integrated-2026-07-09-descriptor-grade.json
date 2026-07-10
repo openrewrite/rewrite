@@ -1,0 +1,39 @@
+{
+  "slice": "phase4-F-descriptor-grade",
+  "date": "2026-07-09",
+  "hypothesis": "transitive descriptor builds with locationTracking off (Maven's own loadPom config) recover part of slice E's warm gap",
+  "verdict": "no recovery above noise floor; locationTracking was not the cost; change retained as correctness-neutral Maven-fidelity alignment",
+  "host": "shared dev box under heavy ambient load (15-min load avg peaked ~40, calmed to ~9); reference-host absolutes not reproducible; F measured as same-host E-vs-F A/B",
+  "heapXmx": "2g",
+  "correctness": {
+    "unitNet": {"suites": ["parity.*", "internal.engine.*", "cache.*"], "tests": 265, "failures": 0, "errors": 0, "skipped": 1},
+    "structuralInvariance": "modelBuilds/descriptorReads byte-identical across grades at every tier",
+    "corpusDeterminism": {
+      "apache-maven-3.9.16": {"maven": "green+deterministic", "legacy": "green+deterministic"},
+      "apache-dubbo-3.2.10": {"maven": "green+deterministic", "legacy": "green+deterministic"}
+    }
+  },
+  "ratioProgression": {
+    "camel-150": {"D_warm": 1.85, "E_warm": 1.42, "F_warm_note": "within noise (A/B E 1.60 <-> F 2.34*)", "E_loopCtx": 1.10, "F_loopCtx_note": "~1.16 grade-independent"},
+    "camel-400": {"D_warm": 1.65, "E_warm": 1.49, "F_warm_note": "within noise (A/B E 1.40 <-> F 1.12)", "E_loopCtx": 1.04, "F_loopCtx_note": "~0.90 grade-independent"}
+  },
+  "sameHostAB": {
+    "protocol": "warmups=2/iters=5 at camel-150, warmups=1/iters=3 at camel-400, loop=5, engine.profile=true; revert->publish->measure->reapply->publish->measure adjacent",
+    "results": [
+      {"tier": "camel-150", "arm": "E-provenance", "legacyWarmMs": 3035, "mavenWarmMs": 4851, "mavenOverLegacy": 1.60, "mavenLoopCtxMs": 2372, "loopCtxOverLegacy": 1.16, "modelBuilds": 2416, "descriptorReads": 2258, "modelBuildMsLastIter": 4426, "mavenWarmArray": [5367, 4851, 4317, 5275, 4335]},
+      {"tier": "camel-150", "arm": "F-descriptor", "legacyWarmMs": 2539, "mavenWarmMs": 5929, "mavenOverLegacy": 2.34, "mavenLoopCtxMs": 2237, "loopCtxOverLegacy": 1.39, "modelBuilds": 2416, "descriptorReads": 2258, "modelBuildMsLastIter": 14650, "gcStorm": true, "mavenWarmArray": [4393, 5561, 7194, 5929, 11728]},
+      {"tier": "camel-400", "arm": "E-provenance", "legacyWarmMs": 7198, "mavenWarmMs": 10099, "mavenOverLegacy": 1.40, "mavenLoopCtxMs": 3616, "loopCtxOverLegacy": 0.90, "modelBuilds": 3215, "descriptorReads": 2803, "modelBuildMsLastIter": 8833, "mavenWarmArray": [9818, 10099, 10394]},
+      {"tier": "camel-400", "arm": "F-descriptor", "legacyWarmMs": 8735, "mavenWarmMs": 9754, "mavenOverLegacy": 1.12, "mavenLoopCtxMs": 4094, "loopCtxOverLegacy": 0.89, "modelBuilds": 3215, "descriptorReads": 2803, "modelBuildMsLastIter": 5578, "mavenWarmArray": [12788, 9754, 8592]}
+    ]
+  },
+  "corpusTiming": {
+    "note": "twice-run wall incl. snapshot serialization; rough, not a resolution benchmark",
+    "apache-maven-3.9.16": {"legacy2xMs": 1022, "maven2xMs": 1131},
+    "apache-dubbo-3.2.10": {"legacy2xMs": 4625, "maven2xMs": 8209}
+  },
+  "perBuildAttribution": {
+    "camel-150-maven-warm-profile-E-arm": {"collectMs": 2154, "modelBuildMsThreadSummed": 4426, "projectMs": 136, "effectiveMs": 1, "warmTotalMs": 4851},
+    "perEffectiveModelMs": 1.8,
+    "conclusion": "warm cost is DefaultModelBuilder pipeline per descriptor (inheritance assembly + interpolation + import-DM), not InputLocation allocation; closing it needs Phase-5 descriptor-only projection"
+  }
+}

@@ -40,7 +40,8 @@ import java.util.Properties;
 /**
  * The service B2 consumes: real Maven's {@link DefaultModelBuilder} wired to rewrite's seams, producing an effective
  * {@link ModelBuildingResult} from real pom XML (DESIGN §0 XML-first). The request is configured per DESIGN §4.1 —
- * {@code validationLevel=MINIMAL}, {@code processPlugins=false}, {@code locationTracking=true}, the
+ * {@code validationLevel=MINIMAL}, {@code processPlugins=false}, {@code locationTracking} per grade (on for the
+ * provenance-grade root/BOM builds, off for the transitive descriptor path, mirroring Maven's own reader), the
  * {@link EngineModelBuilderFactory} whose no-op {@code PluginManagementInjector} keeps management out of the effective
  * plugin list, external profiles + user properties from {@link EffectiveSettings}, {@link ReactorWorkspace} as the
  * {@code WorkspaceModelResolver}, {@link EngineModelResolver} over {@link CacheBridge} as the {@code ModelResolver}, and
@@ -55,6 +56,7 @@ public class EngineEffectivePom {
     private final RepositorySystemSession session;
     private final List<MavenRepository> requestRepositories;
     private final @Nullable RepositoryCache modelCacheStore;
+    private final boolean locationTracking;
 
     /**
      * @param modelCacheStore backs the per-build model cache. {@code null} gives a fresh store per build — the
@@ -67,10 +69,25 @@ public class EngineEffectivePom {
      */
     public EngineEffectivePom(RepositorySystem system, RepositorySystemSession session,
                               List<MavenRepository> requestRepositories, @Nullable RepositoryCache modelCacheStore) {
+        this(system, session, requestRepositories, modelCacheStore, true);
+    }
+
+    /**
+     * @param locationTracking whether the model builder records {@code InputLocation}s. The provenance-grade root and
+     *                         imported-BOM builds need them ({@link EffectivePomMapper} joins managed entries to their
+     *                         declaring pom by line/column). The transitive descriptor path never reads a location — it
+     *                         projects only {@code <dependencies>}/{@code <dependencyManagement>}/{@code <repositories>}
+     *                         into an {@code ArtifactDescriptorResult} — so it builds descriptor-grade (tracking off),
+     *                         mirroring Maven's own {@code DefaultArtifactDescriptorReader.loadPom}.
+     */
+    public EngineEffectivePom(RepositorySystem system, RepositorySystemSession session,
+                              List<MavenRepository> requestRepositories, @Nullable RepositoryCache modelCacheStore,
+                              boolean locationTracking) {
         this.system = system;
         this.session = session;
         this.requestRepositories = requestRepositories;
         this.modelCacheStore = modelCacheStore;
+        this.locationTracking = locationTracking;
     }
 
     public EngineModelBuildingOutcome build(byte[] requestedPomXml, Pom requested, EffectiveSettings settings,
@@ -88,7 +105,7 @@ public class EngineEffectivePom {
         request.setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
         request.setProcessPlugins(false);
         request.setTwoPhaseBuilding(false);
-        request.setLocationTracking(true);
+        request.setLocationTracking(locationTracking);
         request.setProfiles(settings.getExternalProfiles());
         request.setActiveProfileIds(settings.getActiveProfiles());
         request.setSystemProperties(systemProperties(MavenExecutionContextView.view(ctx).getActivationSystemProperties()));
