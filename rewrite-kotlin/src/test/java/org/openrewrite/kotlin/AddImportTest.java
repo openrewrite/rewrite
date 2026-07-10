@@ -491,4 +491,80 @@ public class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8214")
+    @Test
+    void shortensFullyQualifiedReferencesToNewlyImportedType() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("a.b.Target")),
+          kotlin(
+            """
+              package a.b
+              class Target
+              """
+          ),
+          kotlin(
+            """
+              class A {
+                  val type: a.b.Target = a.b.Target()
+              }
+              """,
+            """
+              import a.b.Target
+
+              class A {
+                  val type: Target = Target()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8214")
+    @Test
+    void doesNotShortenWhenSimpleNameIsAmbiguous() {
+        Recipe recipe = toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport("b.Foo", null, true);
+                return cu;
+            }
+        });
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          kotlin(
+            """
+              package a
+              class Foo
+              """
+          ),
+          kotlin(
+            """
+              package b
+              class Foo
+              """
+          ),
+          // `a.Foo` is already imported, so `b.Foo` must stay fully qualified rather than collapse to an
+          // ambiguous `Foo`. (Not adding the conflicting `import b.Foo` is a separate concern; see #8213.)
+          kotlin(
+            """
+              import a.Foo
+
+              class A {
+                  val x: Foo = Foo()
+                  val y: b.Foo = b.Foo()
+              }
+              """,
+            """
+              import a.Foo
+              import b.Foo
+
+              class A {
+                  val x: Foo = Foo()
+                  val y: b.Foo = b.Foo()
+              }
+              """
+          )
+        );
+    }
 }

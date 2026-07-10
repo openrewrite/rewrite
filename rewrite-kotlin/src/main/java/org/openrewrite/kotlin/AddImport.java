@@ -215,6 +215,12 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                   stmt.getPrefix().isEmpty() ? stmt.withPrefix(stmt.getPrefix().withWhitespace(generalFormatStyle.isUseCRLFNewLines() ? "\r\n\r\n" : "\n\n")) : stmt));
             }
 
+            // Shorten fully qualified references to the imported type, as the Java `AddImport` does. Skip this
+            // when the simple name is already bound to a different type, since shortening would be ambiguous.
+            if (member == null && alias == null && !simpleNameIsAmbiguous(cu)) {
+                cu = (K.CompilationUnit) new ShortenFullyQualifiedTypeReference().visitNonNull(cu, p, getCursor().getParentOrThrow());
+            }
+
             j = cu;
         }
         return j;
@@ -237,6 +243,29 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
             isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName);
         }
         return isTypRef;
+    }
+
+    private boolean simpleNameIsAmbiguous(K.CompilationUnit cu) {
+        String simpleName = fullyQualifiedName.substring(fullyQualifiedName.lastIndexOf('.') + 1);
+        return cu.getImports().stream().anyMatch(i ->
+                !i.isStatic() && i.getAlias() == null &&
+                simpleName.equals(i.getQualid().getSimpleName()) &&
+                !fullyQualifiedName.equals(i.getTypeName().replace('$', '.')));
+    }
+
+    private class ShortenFullyQualifiedTypeReference extends KotlinVisitor<P> {
+        @Override
+        public J visitImport(J.Import anImport, P p) {
+            return anImport;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.isFullyQualifiedClassReference(fullyQualifiedName)) {
+                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
     }
 
     /**
