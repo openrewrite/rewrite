@@ -259,14 +259,21 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             @Nullable
             private Collection<String> availableVersions;
-            private boolean isNewDependencyPresent;
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
+            private final String effectiveNewGroupId = renamedGroupId(oldGroupId);
+            private final String effectiveNewArtifactId = renamedArtifactId(oldArtifactId);
+            private final boolean dedupeEnabled = !effectiveNewGroupId.equals(oldGroupId) || !effectiveNewArtifactId.equals(oldArtifactId);
+            private List<ResolvedDependency> existingNewDirectDependencies = new ArrayList<>();
+            private List<ResolvedDependency> existingOldDirectDependencies = new ArrayList<>();
             private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
             private final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;  // True by default
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
+                if (dedupeEnabled) {
+                    existingNewDirectDependencies = directDependencies(effectiveNewGroupId, effectiveNewArtifactId);
+                    existingOldDirectDependencies = directDependencies(oldGroupId, oldArtifactId);
+                }
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
                 if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -277,8 +284,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
                 // Add sibling exclusions for the new coordinates alongside existing old exclusions
                 if (newGroupId != null || newArtifactId != null) {
-                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
-                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
                     doAfterVisit(new MavenVisitor<ExecutionContext>() {
                         @Override
                         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -333,15 +338,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
 
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
-                if (isOldDependencyTag && isNewDependencyPresent) {
+                boolean isNewDependencyTag = dedupeEnabled && isDependencyTag(effectiveNewGroupId, effectiveNewArtifactId);
+                if (isOldDependencyTag && !isNewDependencyTag && renamedOldTagWouldDuplicate(t)) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                     return t;
                 }
+                boolean isSurvivingNewDependencyTag = isNewDependencyTag && newVersion != null &&
+                        isSurvivorOfRemovedOldDependency(t);
                 boolean isPluginDependency = isPluginDependencyTag(oldGroupId, oldArtifactId);
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
-                if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
+                if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath || isSurvivingNewDependencyTag) {
                     if (newVersion != null) {
                         String currentVersionValue = t.getChildValue("version").orElse(null);
                         if (isImplicitlyDefinedVersionProperty(currentVersionValue)) {
@@ -373,7 +381,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             boolean versionTagPresent = versionTag.isPresent();
                             // dependencyManagement does not apply to plugin dependencies or annotation processor paths
                             boolean oldDependencyDefinedManaged = isOldDependencyTag && canAffectManagedDependency(getResolutionResult(), scope, oldGroupId, oldArtifactId);
-                            boolean newDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, groupId, artifactId);
+                            boolean newDependencyManaged = (isOldDependencyTag || isSurvivingNewDependencyTag) && isDependencyManaged(scope, groupId, artifactId);
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
@@ -412,15 +420,58 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 return t;
             }
 
-            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
-                if ((groupId == null) || (artifactId == null)) {
-                    return false;
+            private List<ResolvedDependency> directDependencies(String groupId, String artifactId) {
+                List<ResolvedDependency> direct = new ArrayList<>();
+                for (ResolvedDependency rd : findDependencies(groupId, artifactId)) {
+                    if (rd.isDirect()) {
+                        direct.add(rd);
+                    }
                 }
-                List<ResolvedDependency> dependencies = findDependencies(groupId, artifactId);
-                return dependencies.stream()
-                        .filter(ResolvedDependency::isDirect)
-                        .anyMatch(rd -> version == null ||
-                                versionComparator != null && versionComparator.compare(null, version, rd.getVersion()) <= 0);
+                return direct;
+            }
+
+            private boolean renamedOldTagWouldDuplicate(Xml.Tag oldTag) {
+                String groupId = renamedGroupId(oldTag.getChildValue("groupId").orElse(null));
+                String artifactId = renamedArtifactId(oldTag.getChildValue("artifactId").orElse(null));
+                for (ResolvedDependency rd : existingNewDirectDependencies) {
+                    if (Objects.equals(groupId, rd.getGroupId()) &&
+                            Objects.equals(artifactId, rd.getArtifactId()) &&
+                            sameClassifierTypeScope(oldTag, rd)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private boolean isSurvivorOfRemovedOldDependency(Xml.Tag newTag) {
+                String newTagGroupId = newTag.getChildValue("groupId").orElse(null);
+                String newTagArtifactId = newTag.getChildValue("artifactId").orElse(null);
+                for (ResolvedDependency rd : existingOldDirectDependencies) {
+                    if (Objects.equals(newTagGroupId, renamedGroupId(rd.getGroupId())) &&
+                            Objects.equals(newTagArtifactId, renamedArtifactId(rd.getArtifactId())) &&
+                            sameClassifierTypeScope(newTag, rd)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private boolean sameClassifierTypeScope(Xml.Tag tag, ResolvedDependency rd) {
+                return Objects.equals(emptyToNull(tag.getChildValue("classifier").orElse(null)), emptyToNull(rd.getClassifier())) &&
+                        tag.getChildValue("type").orElse("jar").equals(rd.getType()) &&
+                        Scope.fromName(tag.getChildValue("scope").orElse(null)) == Scope.fromName(rd.getRequested().getScope());
+            }
+
+            private @Nullable String renamedGroupId(@Nullable String fallback) {
+                return newGroupId != null ? newGroupId : fallback;
+            }
+
+            private @Nullable String renamedArtifactId(@Nullable String fallback) {
+                return newArtifactId != null ? newArtifactId : fallback;
+            }
+
+            private @Nullable String emptyToNull(@Nullable String value) {
+                return isBlank(value) ? null : value;
             }
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
