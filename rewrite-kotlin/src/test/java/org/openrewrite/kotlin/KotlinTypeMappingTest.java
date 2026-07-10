@@ -1862,6 +1862,204 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedFieldAccessViaImportedOuter() {
+            rewriteRun(
+              spec -> spec.parser(KotlinParser.builder().classpath("apiguardian-api")),
+              kotlin(
+                """
+                  import org.apiguardian.api.API
+
+                  @API(status = API.Status.EXPERIMENTAL, since = "5.6")
+                  class Foo
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            // `API.Status` must keep its own nested type rather than collapsing to the imported outer `API`,
+                            // otherwise ShortenFullyQualifiedTypeReferences would rewrite `API.Status` to an unresolved `Status`.
+                            if ("Status".equals(fieldAccess.getSimpleName())) {
+                                JavaType.Class type = (JavaType.Class) fieldAccess.getType();
+                                assertThat(type.getFullyQualifiedName()).isEqualTo("org.apiguardian.api.API$Status");
+                                assertThat(type.getOwningClass()).isNotNull();
+                                assertThat(type.getOwningClass().getFullyQualifiedName()).isEqualTo("org.apiguardian.api.API");
+                                assertThat(fieldAccess.getName().getType()).isEqualTo(type);
+
+                                J.Identifier target = (J.Identifier) fieldAccess.getTarget();
+                                assertThat(((JavaType.FullyQualified) target.getType()).getFullyQualifiedName()).isEqualTo("org.apiguardian.api.API");
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(1);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedFieldAccessViaImportedOuterMultiLevel() {
+            // Same shape as `nestedFieldAccessType`, but the outer type is imported, so the reference is
+            // package-relative (`A.B.A.C`) rather than root-package or fully qualified. Every nested level must
+            // keep its own class id instead of collapsing to the imported outer `foo.bar.A`.
+            rewriteRun(
+              kotlin(
+                """
+                  package    foo.bar
+                  class A {
+                      class B {
+                          class A {
+                              class C
+                          }
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  import foo.bar.A
+
+                  val x = A.B.A.C()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            String expected = null;
+                            switch (fieldAccess.toString()) {
+                                case "A.B.A.C":
+                                    expected = "foo.bar.A$B$A$C";
+                                    break;
+                                case "A.B.A":
+                                    expected = "foo.bar.A$B$A";
+                                    break;
+                                case "A.B":
+                                    expected = "foo.bar.A$B";
+                                    // The outermost `A` is the imported top-level type, not a nested one.
+                                    J.Identifier target = (J.Identifier) fieldAccess.getTarget();
+                                    assertThat(((JavaType.FullyQualified) target.getType()).getFullyQualifiedName()).isEqualTo("foo.bar.A");
+                                    break;
+                            }
+                            if (expected != null) {
+                                assertThat(fieldAccess.getType()).isNotNull();
+                                assertThat(fieldAccess.getType().toString()).isEqualTo(expected);
+                                assertThat(fieldAccess.getName().getType()).isEqualTo(fieldAccess.getType());
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(3);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedTypesWithSameSimpleNameFromDifferentOuters() {
+            // `Status` is nested in both `Alpha` and `Beta`. The package-relative match must select
+            // each reference's own outer, not confuse the two because the leaf name is identical.
+            rewriteRun(
+              kotlin(
+                """
+                  package p
+
+                  class Alpha { enum class Status { A } }
+                  class Beta { enum class Status { B } }
+
+                  val a = Alpha.Status.A
+                  val b = Beta.Status.B
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            String expected = null;
+                            switch (fieldAccess.toString()) {
+                                case "Alpha.Status":
+                                    expected = "p.Alpha$Status";
+                                    break;
+                                case "Beta.Status":
+                                    expected = "p.Beta$Status";
+                                    break;
+                            }
+                            if (expected != null) {
+                                JavaType.Class type = (JavaType.Class) fieldAccess.getType();
+                                assertThat(type.getFullyQualifiedName()).isEqualTo(expected);
+                                assertThat(type.getOwningClass().getFullyQualifiedName()).isEqualTo(expected.replace("$Status", ""));
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(2);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedFieldAccessViaImportedNestedClass() {
+            // The imported type is itself nested (`foo.bar.A.B`), so `B.A.C` is only a trailing run of
+            // the nested names. Each level must still keep its own class id rather than collapsing to
+            // the outer `foo.bar.A`.
+            rewriteRun(
+              kotlin(
+                """
+                  package    foo.bar
+                  class A {
+                      class B {
+                          class A {
+                              class C
+                          }
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  import foo.bar.A.B
+
+                  val y = B.A.C()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            String expected = null;
+                            switch (fieldAccess.toString()) {
+                                case "B.A.C":
+                                    expected = "foo.bar.A$B$A$C";
+                                    break;
+                                case "B.A":
+                                    expected = "foo.bar.A$B$A";
+                                    break;
+                            }
+                            if (expected != null) {
+                                assertThat(fieldAccess.getType()).isNotNull();
+                                assertThat(fieldAccess.getType().toString()).isEqualTo(expected);
+                                assertThat(fieldAccess.getName().getType()).isEqualTo(fieldAccess.getType());
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(2);
+                })
+              )
+            );
+        }
+
         @Test
         void packageFieldAccess() {
             rewriteRun(
