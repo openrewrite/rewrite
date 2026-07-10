@@ -444,6 +444,25 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     /**
+     * Strips an inline comment that is stored as the leading part (before the first line break) of
+     * the last entry's prefix. This is used to remove a trailing comment that was copied onto a
+     * newly-inserted entry, so that the comment is not rendered twice. When the mapping being merged
+     * is nested, the comment lives on a sibling entry of an ancestor mapping that is traversed by the
+     * outer visitor rather than the {@link MergeYamlVisitor}, hence this method is invoked from there.
+     */
+    static Yaml.Mapping removeInlineCommentFromLastEntry(Yaml.Mapping mapping) {
+        return mapping.withEntries(mapLast(mapping.getEntries(), entry -> {
+            String prefix = entry.getPrefix();
+            String[] lines = LINE_BREAK.split(prefix, -1);
+            if (lines.length <= 1) {
+                return entry;
+            }
+            String linebreak = prefix.contains("\r\n") ? "\r\n" : "\n";
+            return entry.withPrefix(linebreak + String.join(linebreak, Arrays.copyOfRange(lines, 1, lines.length)));
+        }));
+    }
+
+    /**
      * The indentation column shared by the entries of an existing mapping, or {@code -1} when it
      * cannot be determined (e.g. an empty mapping or a mapping whose only entry is on the same line
      * as its parent key).
