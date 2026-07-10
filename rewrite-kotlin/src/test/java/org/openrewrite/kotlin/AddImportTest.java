@@ -141,6 +141,44 @@ public class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8213")
+    @Test
+    void doesNotAddImportConflictingWithExistingSimpleName() {
+        Recipe recipe = toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport("c.d.Target", null, true);
+                return cu;
+            }
+        });
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          kotlin(
+            """
+              package a.b
+              class Target
+              """
+          ),
+          kotlin(
+            """
+              package c.d
+              class Target
+              """
+          ),
+          // `a.b.Target` is already imported, so the same-named `c.d.Target` stays fully qualified.
+          kotlin(
+            """
+              import a.b.Target
+
+              class A {
+                  val local: Target = Target()
+                  val other: c.d.Target = c.d.Target()
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void starFoldPackageTypes() {
         rewriteRun(

@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.FullyQualifyTypeReference;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
@@ -138,6 +139,16 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                        (ending.equals(member) || "*".equals(ending));
             })) {
                 return cu;
+            }
+
+            // A different type already imported under the same simple name would be ambiguous; fully-qualify
+            // the reference instead of adding a conflicting import, matching `org.openrewrite.java.AddImport`.
+            if (alias == null && member == null && !"*".equals(typeName) &&
+                cu.getImports().stream().anyMatch(i ->
+                        i.getAlias() == null && !i.isStatic() &&
+                        typeName.equals(i.getQualid().getSimpleName()) &&
+                        !fullyQualifiedName.equals(i.getTypeName().replace('$', '.')))) {
+                return new FullyQualifyTypeReference<P>(JavaType.ShallowClass.build(fullyQualifiedName)).visitNonNull(cu, p);
             }
 
             J.Import importToAdd = new J.Import(randomId(),
