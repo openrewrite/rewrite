@@ -141,6 +141,44 @@ public class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8213")
+    @Test
+    void doesNotAddImportConflictingWithExistingSimpleName() {
+        Recipe recipe = toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport("c.d.Target", null, true);
+                return cu;
+            }
+        });
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          kotlin(
+            """
+              package a.b
+              class Target
+              """
+          ),
+          kotlin(
+            """
+              package c.d
+              class Target
+              """
+          ),
+          // `a.b.Target` is already imported, so the same-named `c.d.Target` stays fully qualified.
+          kotlin(
+            """
+              import a.b.Target
+
+              class A {
+                  val local: Target = Target()
+                  val other: c.d.Target = c.d.Target()
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void starFoldPackageTypes() {
         rewriteRun(
@@ -449,6 +487,73 @@ public class AddImportTest implements RewriteTest {
               import java.util.List
 
               class A
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8214")
+    @Test
+    void shortensFullyQualifiedReferencesToNewlyImportedType() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("a.b.Target")),
+          kotlin(
+            """
+              package a.b
+              class Target
+              """
+          ),
+          kotlin(
+            """
+              class A {
+                  val type: a.b.Target = a.b.Target()
+              }
+              """,
+            """
+              import a.b.Target
+
+              class A {
+                  val type: Target = Target()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8214")
+    @Test
+    void doesNotShortenWhenSimpleNameIsAmbiguous() {
+        Recipe recipe = toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport("b.Foo", null, true);
+                return cu;
+            }
+        });
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          kotlin(
+            """
+              package a
+              class Foo
+              """
+          ),
+          kotlin(
+            """
+              package b
+              class Foo
+              """
+          ),
+          // `a.Foo` is already imported, so the conflicting `b.Foo` is not imported and its usages stay fully
+          // qualified rather than collapse to an ambiguous `Foo` (see #8213).
+          kotlin(
+            """
+              import a.Foo
+
+              class A {
+                  val x: Foo = Foo()
+                  val y: b.Foo = b.Foo()
+              }
               """
           )
         );

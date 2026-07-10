@@ -138,10 +138,16 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		if !c.matchNode(p.Condition, cand.Condition) {
 			return false
 		}
-		if !c.matchNode(p.Then, cand.Then) {
+		if !c.matchNode(p.ThenPart.Element, cand.ThenPart.Element) {
 			return false
 		}
-		return c.matchOptionalRightPaddedJ(p.ElsePart, cand.ElsePart)
+		if p.ElsePart == nil && cand.ElsePart == nil {
+			return true
+		}
+		if p.ElsePart == nil || cand.ElsePart == nil {
+			return false
+		}
+		return c.matchNode(p.ElsePart.Body.Element, cand.ElsePart.Body.Element)
 	case *golang.StatementWithInit:
 		cand := candidate.(*golang.StatementWithInit)
 		if !c.matchNode(p.Init.Element, cand.Init.Element) {
@@ -430,16 +436,6 @@ func (c *patternComparator) matchOptionalRightPaddedStmt(pattern, candidate *jav
 }
 
 func (c *patternComparator) matchOptionalRightPaddedExpr(pattern, candidate *java.RightPadded[java.Expression]) bool {
-	if pattern == nil && candidate == nil {
-		return true
-	}
-	if pattern == nil || candidate == nil {
-		return false
-	}
-	return c.matchNode(pattern.Element, candidate.Element)
-}
-
-func (c *patternComparator) matchOptionalRightPaddedJ(pattern, candidate *java.RightPadded[java.J]) bool {
 	if pattern == nil && candidate == nil {
 		return true
 	}

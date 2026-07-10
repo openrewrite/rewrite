@@ -233,7 +233,8 @@ public class GoModParser implements Parser {
                 replaces,
                 excludes,
                 retracts,
-                resolved
+                resolved,
+                new ArrayList<>()
         );
     }
 
@@ -326,7 +327,8 @@ public class GoModParser implements Parser {
         }
         for (java.util.Map.Entry<String, String[]> e : byKey.entrySet()) {
             String[] parts = e.getKey().split("@", 2);
-            resolved.add(new ResolvedDependency(parts[0], parts[1], e.getValue()[0], e.getValue()[1]));
+            resolved.add(new ResolvedDependency(parts[0], parts[1], e.getValue()[0], e.getValue()[1],
+                    false, false, null, null, null, null));
         }
         return resolved;
     }

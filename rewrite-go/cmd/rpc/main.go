@@ -467,6 +467,7 @@ func (s *server) handleGetLanguages() []string {
 	return []string{
 		"org.openrewrite.golang.tree.Go$CompilationUnit",
 		"org.openrewrite.golang.tree.GoMod",
+		"org.openrewrite.golang.tree.GoSum",
 	}
 }
 
@@ -674,6 +675,33 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		goModByIdx[r.idx] = gm
 	}
 
+	// Index each go.mod's GoResolutionResult by directory for sibling go.sum.
+	mrrByDir := make(map[string]*golang.GoResolutionResult, len(goModByIdx))
+	for _, gm := range goModByIdx {
+		for i := range gm.Markers.Entries {
+			if mrr, ok := gm.Markers.Entries[i].(golang.GoResolutionResult); ok {
+				mrrByDir[filepath.Dir(gm.SourcePath)] = &mrr
+				break
+			}
+		}
+	}
+
+	goSumByIdx := make(map[int]*golang.GoSum, len(resolvedInputs))
+	for _, r := range resolvedInputs {
+		if filepath.Base(r.sourcePath) != "go.sum" {
+			continue
+		}
+		gs, err := goparser.ParseGoSumFile(r.sourcePath, r.source)
+		if err != nil {
+			parseErrByIdx[r.idx] = err
+			continue
+		}
+		if mrr, ok := mrrByDir[filepath.Dir(r.sourcePath)]; ok && mrr != nil {
+			gs.Markers.Entries = append(gs.Markers.Entries, *mrr)
+		}
+		goSumByIdx[r.idx] = gs
+	}
+
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
@@ -685,6 +713,12 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		if gm, ok := goModByIdx[r.idx]; ok && gm != nil {
 			id := gm.Ident.String()
 			s.localObjects[id] = gm
+			ids = append(ids, id)
+			continue
+		}
+		if gs, ok := goSumByIdx[r.idx]; ok && gs != nil {
+			id := gs.Ident.String()
+			s.localObjects[id] = gs
 			ids = append(ids, id)
 			continue
 		}
@@ -772,7 +806,16 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 		return printer.Print(cu), nil
 	}
 	if gm, ok := obj.(*golang.GoMod); ok {
+		if mp != nil {
+			return printer.PrintGoModWithMarkers(gm, mp), nil
+		}
 		return printer.PrintGoMod(gm), nil
+	}
+	if gs, ok := obj.(*golang.GoSum); ok {
+		if mp != nil {
+			return printer.PrintGoSumWithMarkers(gs, mp), nil
+		}
+		return printer.PrintGoSum(gs), nil
 	}
 	if t, ok := obj.(java.Tree); ok {
 		if mp != nil {
@@ -951,6 +994,9 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		info, err := s.installer.InstallFromPath(localPath, s.registry)
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install from path failed: %v", err)}
+		}
+		for _, r := range info.Recipes {
+			s.recipeOrigin[r.Name] = localPath
 		}
 		afterCount := len(s.registry.AllRecipes())
 		return &installRecipesResponse{
@@ -1868,7 +1914,7 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 	// only carries the IDs *newly added* by that visitor (matches
 	// JS batch-visit.ts:46+).
 	knownIDs := map[string]struct{}{}
-	for _, id := range java.CollectSearchResultIDs(current) {
+	for _, id := range visitor.CollectSearchResultIDs(current) {
 		knownIDs[id.String()] = struct{}{}
 	}
 
@@ -1901,7 +1947,7 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 		if !deleted {
 			afterTree, _ := after.(java.Tree)
 			if afterTree != nil {
-				for _, id := range java.CollectSearchResultIDs(afterTree) {
+				for _, id := range visitor.CollectSearchResultIDs(afterTree) {
 					sid := id.String()
 					if _, seen := knownIDs[sid]; seen {
 						continue
@@ -2101,6 +2147,16 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		sumPath := filepath.Join(filepath.Dir(modPath), "go.sum")
 		if sumData, err := os.ReadFile(sumPath); err == nil {
 			mrr.ResolvedDependencies = goparser.ParseGoSum(string(sumData))
+		}
+		// Enrich the resolved build list with go list/go mod graph metadata + the
+		// package->module map. Best-effort: on any toolchain/network failure keep
+		// the go.sum-only result (never fail the parse).
+		moduleDir := filepath.Dir(modPath)
+		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
+			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
+		} else {
+			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
+			mrr.PackageModules = pkgs
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{dir: filepath.Dir(modPath), mrr: mrr}
 	}
@@ -2315,6 +2371,36 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		items = append(items, parseProjectResponseItem{
 			ID:             id,
 			SourceFileType: "org.openrewrite.golang.tree.GoMod",
+			SourcePath:     sourcePath,
+		})
+	}
+
+	// Emit each sibling go.sum as a GoSum LST, carrying the module's marker.
+	for _, modPath := range disc.goMods {
+		sumPath := filepath.Join(filepath.Dir(modPath), "go.sum")
+		data, err := os.ReadFile(sumPath)
+		if err != nil {
+			continue
+		}
+		sourcePath := sumPath
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, err := filepath.Rel(*req.RelativeTo, sumPath); err == nil {
+				sourcePath = rel
+			}
+		}
+		gs, err := goparser.ParseGoSumFile(sourcePath, string(data))
+		if err != nil {
+			s.logger.Printf("ParseProject: skip go.sum LST %s: %v", sumPath, err)
+			continue
+		}
+		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
+			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr)
+		}
+		id := gs.Ident.String()
+		s.localObjects[id] = gs
+		items = append(items, parseProjectResponseItem{
+			ID:             id,
+			SourceFileType: "org.openrewrite.golang.tree.GoSum",
 			SourcePath:     sourcePath,
 		})
 	}

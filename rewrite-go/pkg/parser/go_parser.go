@@ -1296,7 +1296,7 @@ func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 	cond := ctx.mapExpr(stmt.Cond)
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	var elsePart *java.RightPadded[java.J]
+	var elsePart *java.Else
 	if stmt.Else != nil {
 		// Find the `else` keyword between the closing `}` of Then and the start of Else
 		elseOff := ctx.findNextString("else")
@@ -1305,8 +1305,11 @@ func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 			ctx.skip(len("else"))
 			elseBody := ctx.mapStmt(stmt.Else)
 			if elseBody != nil {
-				rp := java.RightPadded[java.J]{Element: elseBody, After: elsePrefix}
-				elsePart = &rp
+				elsePart = &java.Else{
+					ID:     uuid.New(),
+					Prefix: elsePrefix,
+					Body:   java.RightPadded[java.Statement]{Element: elseBody},
+				}
 			}
 		}
 	}
@@ -1319,7 +1322,7 @@ func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 		ID:        uuid.New(),
 		Prefix:    innerPrefix,
 		Condition: controlParentheses(cond),
-		Then:      body,
+		ThenPart:  java.RightPadded[java.Statement]{Element: body},
 		ElsePart:  elsePart,
 	})
 }

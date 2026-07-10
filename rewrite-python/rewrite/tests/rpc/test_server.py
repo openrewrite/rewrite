@@ -271,8 +271,46 @@ def test_get_marketplace_row_carries_package_name(monkeypatch):
     assert row["packageName"] == "my-recipes-package"
 
 
+def test_handle_install_recipes_local_path_attributes_to_the_path(tmp_path, monkeypatch):
+    """A local-path install attributes its recipes to the install path (the host's bundle identity),
+    not the distribution name — the host's marketplace filter keys on that path."""
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
+
+    class _MyRecipe(Recipe):
+        @property
+        def name(self): return "org.example.MyRecipe"
+        @property
+        def display_name(self): return "My Recipe"
+        @property
+        def description(self): return "A recipe."
+
+    marketplace = RecipeMarketplace()
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+    monkeypatch.setattr(server, "_attribution", RecipeAttribution())
+    monkeypatch.setattr(server, "_recipe_install_dir", None)
+    # The distribution name deliberately differs from the install path — attributing to it was the bug.
+    monkeypatch.setattr(server, "_find_package_name", lambda path: "some-distribution-name")
+    monkeypatch.setattr(server, "_import_and_activate_package",
+                        lambda pkg, mkt, local_path=None: mkt.install(_MyRecipe, [CategoryDescriptor(display_name="Test")]))
+
+    local = tmp_path / "my-recipe"
+    local.mkdir()
+
+    response = server.handle_install_recipes({"recipes": str(local)})
+
+    assert response["recipesInstalled"] == 1
+    # Attributed to the path, not the distribution name.
+    assert server._attribution.package_for("org.example.MyRecipe") == str(local)
+    # And GetMarketplace surfaces that path as the row's origin, so the host keeps the recipe.
+    rows = server._collect_marketplace_rows(marketplace)
+    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.MyRecipe")
+    assert row["packageName"] == str(local)
+
+
 def test_get_marketplace_row_unattributed_has_none_package_name(monkeypatch):
-    """An unattributed recipe (e.g. a local-path install with no package identity)
+    """An unattributed recipe (e.g. a built-in the server recorded no origin for)
     leaves packageName None so the host falls back to the requested bundle."""
     import rewrite.rpc.server as server
     from rewrite.discovery import RecipeAttribution

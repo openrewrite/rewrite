@@ -187,6 +187,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void methodWithSpaceBeforeVarargsStar() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def replace(indexVectorTuples: (Int, ColumnVector) *): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void methodWithDefaultParameter() {
         rewriteRun(
             scala(

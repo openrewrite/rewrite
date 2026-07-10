@@ -165,6 +165,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return existingEntry;
         });
 
+        // The indentation of the existing entries, so newly added entries can be aligned to match them.
+        // `autoFormat` derives indentation from the file's auto-detected indent size, which does not
+        // necessarily match a block whose actual indentation deviates from that size.
+        int existingIndent = shouldAutoFormat ? blockIndent(m1) : -1;
+
         // Transform new entries with spacing, remove entries already existing in original mapping
         List<Yaml.Mapping.Entry> newEntries = map(m2.getEntries(), it -> {
             for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
@@ -176,7 +181,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 MultilineScalarChanged marker = new MultilineScalarChanged(randomId(), true, calculateMultilineIndent(it));
                 it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(marker)));
             }
-            return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
+            if (!shouldAutoFormat) {
+                return it;
+            }
+            return alignToIndent((Yaml.Mapping.Entry) autoFormat(it, p, cursor), existingIndent);
         });
 
         // Merge existing and new entries together
@@ -433,6 +441,60 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private String substringOfAfterFirstLineBreak(String s) {
         String[] lines = LINE_BREAK.split(s, -1);
         return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
+    }
+
+    /**
+     * Strips an inline comment that is stored as the leading part (before the first line break) of
+     * the last entry's prefix. This is used to remove a trailing comment that was copied onto a
+     * newly-inserted entry, so that the comment is not rendered twice. When the mapping being merged
+     * is nested, the comment lives on a sibling entry of an ancestor mapping that is traversed by the
+     * outer visitor rather than the {@link MergeYamlVisitor}, hence this method is invoked from there.
+     */
+    static Yaml.Mapping removeInlineCommentFromLastEntry(Yaml.Mapping mapping) {
+        return mapping.withEntries(mapLast(mapping.getEntries(), entry -> {
+            String prefix = entry.getPrefix();
+            String[] lines = LINE_BREAK.split(prefix, -1);
+            if (lines.length <= 1) {
+                return entry;
+            }
+            String linebreak = prefix.contains("\r\n") ? "\r\n" : "\n";
+            return entry.withPrefix(linebreak + String.join(linebreak, Arrays.copyOfRange(lines, 1, lines.length)));
+        }));
+    }
+
+    /**
+     * The indentation column shared by the entries of an existing mapping, or {@code -1} when it
+     * cannot be determined (e.g. an empty mapping or a mapping whose only entry is on the same line
+     * as its parent key).
+     */
+    private static int blockIndent(Yaml.Mapping mapping) {
+        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+            int indent = lastLineIndent(entry.getPrefix());
+            if (indent >= 0) {
+                return indent;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Re-indents a newly added entry (and its nested content) so it lines up with the existing
+     * sibling entries, preserving the relative indentation produced by {@code autoFormat}.
+     */
+    private Yaml.Mapping.Entry alignToIndent(Yaml.Mapping.Entry entry, int targetIndent) {
+        if (targetIndent < 0) {
+            return entry;
+        }
+        return (Yaml.Mapping.Entry) ShiftIndentVisitor.<Integer>toIndent(entry, targetIndent).visitNonNull(entry, 0);
+    }
+
+    /**
+     * The number of whitespace characters after the last line break of a prefix, or {@code -1} when
+     * the prefix has no line break (i.e. the element is not on its own line).
+     */
+    private static int lastLineIndent(String prefix) {
+        int idx = Math.max(prefix.lastIndexOf('\n'), prefix.lastIndexOf('\r'));
+        return idx < 0 ? -1 : prefix.length() - idx - 1;
     }
 
     private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {

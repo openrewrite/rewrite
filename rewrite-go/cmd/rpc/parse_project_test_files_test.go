@@ -22,6 +22,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // TestParseProjectParsesTestFiles pins down that `_test.go` files are parsed
@@ -78,7 +79,7 @@ func TestParseProjectParsesTestFiles(t *testing.T) {
 		t.Fatal("black-box test CU missing; cannot check attribution")
 	}
 	var attributed bool
-	java.WalkTree(blackBox, func(tr java.Tree) bool {
+	visitor.Walk(blackBox, func(tr java.Tree) bool {
 		if mi, ok := tr.(*java.MethodInvocation); ok && mi.Name != nil &&
 			mi.Name.Name == "helper" && mi.MethodType != nil {
 			attributed = true

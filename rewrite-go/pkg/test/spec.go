@@ -37,6 +37,7 @@ type SourceSpec struct {
 	Path        string
 	Markers     []java.Marker                                  // markers attached to the parsed source after parse
 	AfterRecipe func(t *testing.T, cu *golang.CompilationUnit) // optional post-parse assertion callback (.go files only)
+	generated   bool                                           // true for a file the recipe is expected to Generate (see Generated)
 }
 
 // Sources is the unit RewriteRun consumes. Single SourceSpecs and project
@@ -155,6 +156,34 @@ func mergeGoSumIntoGoMod(specs []SourceSpec) {
 	mrr := specs[modIdx].Markers[markerIdx].(golang.GoResolutionResult)
 	mrr.ResolvedDependencies = resolved
 	specs[modIdx].Markers[markerIdx] = mrr
+}
+
+// GoModGraph decorates a GoMod SourceSpec with a resolved build list and
+// package->module map, as if parse-time toolchain resolution (ResolveModuleGraph)
+// had run. It lets recipes that consume ResolvedDependency.Deps / PackageModules
+// be unit-tested without invoking the go toolchain (which the Go unit harness
+// cannot run). No-op when the spec carries no GoResolutionResult marker.
+//
+// Example:
+//
+//	test.GoModGraph(
+//	    test.GoMod("module example.com/foo\ngo 1.22\n"),
+//	    []golang.GoResolvedDependency{{ModulePath: "example.com/foo", Main: true}},
+//	    []golang.GoPackageModule{{ImportPath: "fmt", Standard: true}},
+//	)
+func GoModGraph(mod SourceSpec, resolved []golang.GoResolvedDependency, pkgs []golang.GoPackageModule) SourceSpec {
+	markers := make([]java.Marker, len(mod.Markers))
+	copy(markers, mod.Markers)
+	for i, m := range markers {
+		if mrr, ok := m.(golang.GoResolutionResult); ok {
+			mrr.ResolvedDependencies = resolved
+			mrr.PackageModules = pkgs
+			markers[i] = mrr
+			break
+		}
+	}
+	mod.Markers = markers
+	return mod
 }
 
 // GoProject groups a go.mod and one or more .go SourceSpecs as siblings of
@@ -403,6 +432,15 @@ func GolangRaw(before string, after ...string) SourceSpec {
 	return spec
 }
 
+func Generated(sourcePath, after string) SourceSpec {
+	a := TrimIndent(after)
+	return SourceSpec{
+		After:     &a,
+		Path:      sourcePath,
+		generated: true,
+	}
+}
+
 // TrimIndent removes the common leading whitespace from all non-empty lines,
 // and strips a single leading and trailing blank line (artifacts of backtick
 // string literals that start/end on their own line).
@@ -499,6 +537,12 @@ func (spec *RecipeSpec) WithMarkerPrinter(mp printer.MarkerPrinter) *RecipeSpec 
 	return spec
 }
 
+type parsedSource struct {
+	spec   SourceSpec
+	tree   java.Tree
+	result java.Tree
+}
+
 // RewriteRun parses each source, checks parse-print idempotence, attaches
 // any markers contributed by project wrappers (GoProject), and (if
 // configured) applies a recipe and checks the result. Accepts both bare
@@ -510,8 +554,15 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	// Flatten any project wrappers into a flat list of SourceSpecs, with
 	// project markers already attached.
 	var flat []SourceSpec
+	var genSpecs []SourceSpec
 	for _, s := range sources {
-		flat = append(flat, s.Expand()...)
+		for _, ss := range s.Expand() {
+			if ss.generated {
+				genSpecs = append(genSpecs, ss)
+			} else {
+				flat = append(flat, ss)
+			}
+		}
 	}
 
 	p := parser.NewGoParser()
@@ -526,103 +577,98 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 		parsedByIdx = parsePackageGroups(t, p, flat)
 	}
 
+	// Pass 1: parse every source.
+	parsed := make([]parsedSource, len(flat))
 	for i, src := range flat {
-		if !strings.HasSuffix(src.Path, ".go") {
-			// go.mod parses into a lossless LST, so recipes can run against
-			// it. Other non-Go sources (e.g. go.sum) have no LST yet and
-			// round-trip verbatim.
-			if path.Base(src.Path) == "go.mod" {
-				spec.rewriteGoMod(t, src)
-			} else if src.After != nil && *src.After != src.Before {
-				t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
-			}
-			continue
-		}
-
-		var cu *golang.CompilationUnit
-		if parsedByIdx != nil {
-			cu = parsedByIdx[i]
-		}
-		if cu == nil {
-			// No project context (or project parse missed this source) —
-			// parse this file in isolation so two bare specs sharing a
-			// default Path don't clobber each other.
-			parsed, err := p.Parse(src.Path, src.Before)
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
-			cu = parsed
-		}
-
-		// Attach any project markers contributed by GoProject(...) wrappers.
-		for _, m := range src.Markers {
-			cu.Markers = java.AddMarker(cu.Markers, m)
-		}
-
-		// Validate that no Space contains non-whitespace syntax
-		if errs := ValidateSpaces(cu); len(errs) > 0 {
-			for _, e := range errs {
-				t.Errorf("space validation: %s", e)
-			}
-		}
-
-		// Assert leading whitespace is attached to the outermost LST element
-		// for every parsed source.
-		if errs := WhitespaceAttachmentViolations(cu); len(errs) > 0 {
-			for _, e := range errs {
-				t.Errorf("whitespace attachment: %s", e)
-			}
-		}
-
-		if src.AfterRecipe != nil {
-			src.AfterRecipe(t, cu)
-		}
-
-		if spec.CheckParsePrintIdempotence {
-			printed := printer.Print(cu)
-			if printed != src.Before {
-				t.Errorf("parse-print idempotence failed\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff positions:", src.Before, printed)
-				showDiff(t, src.Before, printed)
-			}
-		}
-
-		// Apply recipe if configured
-		if spec.Recipe != nil {
-			result := runRecipe(spec.Recipe, cu)
-			if result == nil {
-				if src.After != nil {
-					t.Error("recipe returned nil (deleted source file) but expected an after state")
-				}
-				continue
-			}
-			mp := spec.MarkerPrinter
-			if mp == nil {
-				mp = printer.DefaultMarkerPrinter
-			}
-			actual := printer.PrintWithMarkers(result, mp)
-			if src.After != nil {
-				if actual != *src.After {
-					t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
-					showDiff(t, *src.After, actual)
-				}
-			} else {
-				// No after state: expect no changes
-				if actual != src.Before {
-					t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
-				}
-			}
-		} else if src.After != nil {
-			t.Error("after state specified but no recipe configured")
+		parsed[i].spec = src
+		switch {
+		case strings.HasSuffix(src.Path, ".go"):
+			parsed[i].tree = spec.parseGoSource(t, p, parsedByIdx, i, src)
+		case path.Base(src.Path) == "go.mod":
+			parsed[i].tree = spec.parseGoMod(t, src)
+		case path.Base(src.Path) == "go.sum":
+			parsed[i].tree = spec.parseGoSum(t, src)
 		}
 	}
+
+	// Pass 2: apply the recipe over the parsed set.
+	var generated []java.Tree
+	if spec.Recipe != nil {
+		for i := range parsed {
+			parsed[i].result = parsed[i].tree
+		}
+		if recipeIsScanning(spec.Recipe) {
+			generated = spec.runScanningLifecycle(parsed)
+		} else {
+			for i := range parsed {
+				if parsed[i].tree != nil {
+					parsed[i].result = runRecipe(spec.Recipe, parsed[i].tree)
+				}
+			}
+		}
+	}
+
+	// Pass 3: compare each source (and any generated files) to expectations.
+	for i := range parsed {
+		spec.compareSource(t, parsed[i])
+	}
+	spec.compareGenerated(t, genSpecs, generated)
 }
 
-// rewriteGoMod parses a go.mod source into its lossless LST, checks
-// parse-print idempotence, and (if a recipe is configured) applies it and
-// compares the printed result to the expected after-state. Mirrors the
-// .go path in RewriteRun, but uses the go.mod-specific parser/printer since
-// GoMod is a SourceFile that is not a *golang.CompilationUnit.
-func (spec *RecipeSpec) rewriteGoMod(t *testing.T, src SourceSpec) {
+func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedByIdx map[int]*golang.CompilationUnit, i int, src SourceSpec) *golang.CompilationUnit {
+	t.Helper()
+
+	var cu *golang.CompilationUnit
+	if parsedByIdx != nil {
+		cu = parsedByIdx[i]
+	}
+	if cu == nil {
+		// No project context (or project parse missed this source) —
+		// parse this file in isolation so two bare specs sharing a
+		// default Path don't clobber each other.
+		parsed, err := p.Parse(src.Path, src.Before)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		cu = parsed
+	}
+
+	// Attach any project markers contributed by GoProject(...) wrappers.
+	for _, m := range src.Markers {
+		cu.Markers = java.AddMarker(cu.Markers, m)
+	}
+
+	// Validate that no Space contains non-whitespace syntax.
+	if errs := ValidateSpaces(cu); len(errs) > 0 {
+		for _, e := range errs {
+			t.Errorf("space validation: %s", e)
+		}
+	}
+
+	// Assert leading whitespace is attached to the outermost LST element
+	// for every parsed source.
+	if errs := WhitespaceAttachmentViolations(cu); len(errs) > 0 {
+		for _, e := range errs {
+			t.Errorf("whitespace attachment: %s", e)
+		}
+	}
+
+	if src.AfterRecipe != nil {
+		src.AfterRecipe(t, cu)
+	}
+
+	if spec.CheckParsePrintIdempotence {
+		printed := printer.Print(cu)
+		if printed != src.Before {
+			t.Errorf("parse-print idempotence failed\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff positions:", src.Before, printed)
+			showDiff(t, src.Before, printed)
+		}
+	}
+
+	return cu
+}
+
+func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	t.Helper()
 
 	gm, err := parser.ParseGoModFile(src.Path, src.Before)
@@ -643,6 +689,42 @@ func (spec *RecipeSpec) rewriteGoMod(t *testing.T, src SourceSpec) {
 		}
 	}
 
+	return gm
+}
+
+func (spec *RecipeSpec) parseGoSum(t *testing.T, src SourceSpec) *golang.GoSum {
+	t.Helper()
+
+	gs, err := parser.ParseGoSumFile(src.Path, src.Before)
+	if err != nil {
+		t.Fatalf("go.sum parse error: %v", err)
+	}
+
+	for _, m := range src.Markers {
+		gs = gs.WithMarkers(java.AddMarker(gs.Markers, m))
+	}
+
+	if spec.CheckParsePrintIdempotence {
+		if printed := printer.PrintGoSum(gs); printed != src.Before {
+			t.Errorf("go.sum parse-print idempotence failed\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff positions:", src.Before, printed)
+			showDiff(t, src.Before, printed)
+		}
+	}
+
+	return gs
+}
+
+func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
+	t.Helper()
+	src := ps.spec
+
+	if ps.tree == nil {
+		if src.After != nil && *src.After != src.Before {
+			t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
+		}
+		return
+	}
+
 	if spec.Recipe == nil {
 		if src.After != nil {
 			t.Error("after state specified but no recipe configured")
@@ -650,30 +732,153 @@ func (spec *RecipeSpec) rewriteGoMod(t *testing.T, src SourceSpec) {
 		return
 	}
 
-	result := runRecipe(spec.Recipe, gm)
-	if result == nil {
+	if ps.result == nil {
 		if src.After != nil {
 			t.Error("recipe returned nil (deleted source file) but expected an after state")
 		}
 		return
 	}
-	resultGoMod, ok := result.(*golang.GoMod)
-	if !ok {
-		t.Fatalf("recipe returned %T, want *golang.GoMod", result)
-	}
 
-	mp := spec.MarkerPrinter
-	if mp == nil {
-		mp = printer.DefaultMarkerPrinter
-	}
-	actual := printer.PrintGoModWithMarkers(resultGoMod, mp)
+	actual := printTree(ps.result, spec.markerPrinter())
 	if src.After != nil {
 		if actual != *src.After {
 			t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
 			showDiff(t, *src.After, actual)
 		}
-	} else if actual != src.Before {
+		return
+	}
+	// No after state: expect no changes.
+	if actual != src.Before {
 		t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
+	}
+}
+
+func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, generated []java.Tree) {
+	t.Helper()
+	if len(specs) == 0 && len(generated) == 0 {
+		return
+	}
+
+	mp := spec.markerPrinter()
+	matched := make([]bool, len(generated))
+	for _, gs := range specs {
+		found := false
+		for j, gt := range generated {
+			if matched[j] || gt == nil || generatedSourcePath(gt) != gs.Path {
+				continue
+			}
+			matched[j] = true
+			found = true
+			if actual := printTree(gt, mp); gs.After != nil && actual != *gs.After {
+				t.Errorf("generated file %q mismatch\n\nexpected:\n%s\n\nactual:\n%s", gs.Path, *gs.After, actual)
+				showDiff(t, *gs.After, actual)
+			}
+			break
+		}
+		if !found {
+			t.Errorf("expected recipe to generate file %q, but it was not generated", gs.Path)
+		}
+	}
+	for j, gt := range generated {
+		if !matched[j] && gt != nil {
+			t.Errorf("recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", generatedSourcePath(gt))
+		}
+	}
+}
+
+func (spec *RecipeSpec) markerPrinter() printer.MarkerPrinter {
+	if spec.MarkerPrinter != nil {
+		return spec.MarkerPrinter
+	}
+	return printer.DefaultMarkerPrinter
+}
+
+func printTree(t java.Tree, mp printer.MarkerPrinter) string {
+	if gm, ok := t.(*golang.GoMod); ok {
+		return printer.PrintGoModWithMarkers(gm, mp)
+	}
+	if gs, ok := t.(*golang.GoSum); ok {
+		return printer.PrintGoSumWithMarkers(gs, mp)
+	}
+	return printer.PrintWithMarkers(t, mp)
+}
+
+func generatedSourcePath(t java.Tree) string {
+	if sp, ok := t.(interface{ GetSourcePath() string }); ok {
+		return sp.GetSourcePath()
+	}
+	return ""
+}
+
+func recipeIsScanning(r recipe.Recipe) bool {
+	if _, ok := r.(recipe.ScanningRecipe); ok {
+		return true
+	}
+	for _, sub := range r.RecipeList() {
+		if recipeIsScanning(sub) {
+			return true
+		}
+	}
+	return false
+}
+
+func (spec *RecipeSpec) runScanningLifecycle(parsed []parsedSource) []java.Tree {
+	ctx := recipe.NewExecutionContext()
+
+	working := make([]java.Tree, 0, len(parsed))
+	idx := make([]int, 0, len(parsed))
+	for i := range parsed {
+		if parsed[i].tree != nil {
+			working = append(working, parsed[i].tree)
+			idx = append(idx, i)
+		}
+	}
+	nExisting := len(working)
+
+	var walk func(r recipe.Recipe)
+	walk = func(r recipe.Recipe) {
+		if sr, ok := r.(recipe.ScanningRecipe); ok {
+			acc := sr.InitialValue(ctx)
+			if scanner := sr.Scanner(acc); scanner != nil {
+				for _, tr := range working {
+					if tr != nil {
+						scanner.Visit(tr, ctx)
+					}
+				}
+			}
+			for _, g := range sr.Generate(acc, ctx) {
+				if g != nil {
+					working = append(working, g)
+				}
+			}
+			if editor := sr.EditorWithData(acc); editor != nil {
+				applyEditorAcross(editor, working, ctx)
+			}
+		} else if editor := r.Editor(); editor != nil {
+			applyEditorAcross(editor, working, ctx)
+		}
+		for _, sub := range r.RecipeList() {
+			walk(sub)
+		}
+	}
+	walk(spec.Recipe)
+
+	for k, i := range idx {
+		parsed[i].result = working[k]
+	}
+	return working[nExisting:]
+}
+
+func applyEditorAcross(editor recipe.TreeVisitor, trees []java.Tree, ctx *recipe.ExecutionContext) {
+	for i, tr := range trees {
+		if tr == nil {
+			continue
+		}
+		result := editor.Visit(tr, ctx)
+		if result != nil {
+			tr = result
+		}
+		trees[i] = visitor.DrainAfterVisits(editor, tr, ctx)
 	}
 }
 

@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.GolangParser;
+import org.openrewrite.golang.internal.GoExecutor;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
@@ -478,8 +479,12 @@ public class GoRewriteRpc extends RewriteRpc {
     }
 
     private static @Nullable String queryGoEnvGoRoot() {
+        String go = GoExecutor.GO.find();
+        if (go == null) {
+            return null;
+        }
         try {
-            Process p = new ProcessBuilder("go", "env", "GOROOT").start();
+            Process p = new ProcessBuilder(go, "env", "GOROOT").start();
             String line;
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
@@ -493,7 +498,7 @@ public class GoRewriteRpc extends RewriteRpc {
                 return line.trim();
             }
         } catch (IOException ignored) {
-            // `go` not on PATH — nothing to inject; behavior is unchanged.
+            // Couldn't run the go toolchain — nothing to inject; behavior is unchanged.
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
