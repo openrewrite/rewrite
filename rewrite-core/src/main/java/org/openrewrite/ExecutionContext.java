@@ -35,6 +35,11 @@ import static java.util.Objects.requireNonNull;
  */
 public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String CURRENT_STAGE = "org.openrewrite.currentStage";
+    /**
+     * @deprecated Use {@link #CURRENT_STAGE}.
+     */
+    @Deprecated
+    String CURRENT_CYCLE = CURRENT_STAGE;
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";

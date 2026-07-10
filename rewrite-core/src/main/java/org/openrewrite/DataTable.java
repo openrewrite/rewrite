@@ -154,10 +154,24 @@ public class DataTable<Row> {
      * not on a stage's self-edge re-runs (convergence cycles). This lets a recipe stay stateless: it can
      * re-emit the same rows every pass without producing duplicates, while a genuinely new stage still writes.
      *
+     * <p>
+     * Delegates to {@link #allowWritingInThisCycle} so recipes that overrode the older cycle-named
+     * gate continue to take effect.
+     *
      * @param ctx the execution context
      * @return whether to allow writing in this stage
      */
     protected boolean allowWritingInThisStage(ExecutionContext ctx) {
+        return allowWritingInThisCycle(ctx);
+    }
+
+    /**
+     * @deprecated Use {@link #allowWritingInThisStage(ExecutionContext)}. Retained as the default
+     * gate implementation so existing overrides of this cycle-named method keep working;
+     * {@link #allowWritingInThisStage} delegates here.
+     */
+    @Deprecated
+    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
         return ctx.getStageDetails().isFirstStageInLineage();
     }
 }
