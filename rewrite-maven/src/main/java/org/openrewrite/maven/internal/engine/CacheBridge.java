@@ -145,7 +145,7 @@ public class CacheBridge {
                 // A file repository (notably the local ~/.m2) only *serves* a jar-packaged artifact when its jar is
                 // present and non-empty, mirroring MavenPomDownloader's local-repo gate (a2 §1). Otherwise skip it so
                 // attribution falls through to the remote — a partially-populated ~/.m2 never rewrites the repository
-                // attribution (L-P3-D-002).
+                // attribution.
                 if (isFileRepository(repo) && !jarPresentForJarPackaging(repo, groupId, artifactId, version, bytes)) {
                     responses.put(repo, "not found");
                     continue;

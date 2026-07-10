@@ -21,9 +21,9 @@ L-P2-C-004 $.pom.repositories
 L-P2-C-005 $.pom.pluginRepositories
 #
 # Outcome masks (`outcome:<category>`): the engine's ModelBuilder is Maven-identically stricter than rewrite's lenient
-# snippet parser. Legacy resolves the effective pom; the engine throws exactly where real Maven throws. Shadow returns
-# legacy's result for these; the tolerance tests flip at the Phase-5 cutover. Only legacy-resolves/engine-throws is
-# masked — the reverse is always an unexplained regression.
+# snippet parser. Legacy resolves the effective pom; the engine throws exactly where real Maven throws. Shadow
+# classifies these as explained and propagates the engine's Maven-identical outcome (flipped at the Phase-5 cutover).
+# Only legacy-resolves/engine-throws is masked — the reverse is always an unexplained regression.
 L-P2-D-001 outcome:self-parent
 L-P2-D-002 outcome:expression-cycle
 L-P2-D-003 outcome:parent-packaging

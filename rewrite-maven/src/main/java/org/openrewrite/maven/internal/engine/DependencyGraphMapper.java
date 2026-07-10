@@ -45,8 +45,8 @@ import static java.util.Collections.emptyMap;
  *       nodes carry the declaring pom's declared coordinates.</li>
  * </ul>
  * Direct (depth-1) failures are aggregated into {@link MavenDownloadingExceptions} legacy-shaped (deduped by root GA +
- * failed GAV, the failing scope omitted), carrying the complete model of the resolvable scopes as {@code partialResult}
- * (L-P0-004). {@code effectiveExclusions} are attributed by {@link ExclusionAttributor} as a reporting post-pass.
+ * failed GAV, the failing scope omitted), carrying the complete model of the resolvable scopes as {@code partialResult}.
+ * {@code effectiveExclusions} are attributed by {@link ExclusionAttributor} as a reporting post-pass.
  */
 public class DependencyGraphMapper {
 
@@ -188,8 +188,8 @@ public class DependencyGraphMapper {
         GroupArtifactVersion gav = new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion());
         MavenRepository repository = index.repoFor(gav);
         String repositoryUri = repository == null ? null : repository.getUri();
-        // L-P0-005 reproduction: a remote pom carries datedSnapshotVersion == the resolved version (the dated form for a
-        // snapshot, the plain version duplicated for a release); a project/reactor pom carries null.
+        // Mirrors the legacy shape: a remote pom carries datedSnapshotVersion == the resolved version (the dated form
+        // for a snapshot, the plain version duplicated for a release); a project/reactor pom carries null.
         String datedSnapshotVersion = repositoryUri == null ? null : artifact.getVersion();
         ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
                 repositoryUri, artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion(), datedSnapshotVersion);
@@ -446,7 +446,7 @@ public class DependencyGraphMapper {
         // while grpc-api declares it `compile`, so Maven keeps it `compile`), trust aether's wider scope so the
         // coordinate lands in the classpaths Maven does. When aether instead PROMOTED it narrower — a compile child of a
         // test/provided parent that its JavaScopeDeriver moved to test/provided — the declared scope is wider and wins,
-        // preserving the test-closure population (L-P3-D-001).
+        // preserving the test-closure population.
         Scope aetherScope = scopeOf(child);
         return Scope.maxPrecedence(aetherScope, legacyScope) == aetherScope && aetherScope != legacyScope ?
                 aetherScope : legacyScope;

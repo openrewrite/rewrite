@@ -299,7 +299,7 @@ public final class MavenEngineResolution {
      * single verbose collect and projects all four scopes ({@link EngineDependencyCollector} + {@link DependencyGraphMapper});
      * SHADOW runs both, diffs the full {@code pom}+{@code scopes}+{@code errors} snapshot with the ledgered masks, throws
      * on any unexplained difference, and returns the engine result (never changing behavior relative to the MAVEN
-     * default). Direct-dependency failures preserve the {@code partialResult} contract (L-P0-004) on either path.
+     * default). Direct-dependency failures preserve the {@code partialResult} contract on either path.
      */
     public static Map<Scope, List<ResolvedDependency>> dependencyGraph(
             ResolvedPom legacyPom, Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx,
@@ -561,7 +561,7 @@ public final class MavenEngineResolution {
     }
 
     // Rewrite's RawPom parses poms with no explicit <modelVersion> (it defaults to 4.0.0); Maven's ModelBuilder rejects
-    // them. Default it so the engine reads the same lenient model rewrite's parser does (KEEP_REWRITE, L-P2-C-003).
+    // them. Default it so the engine deliberately reads the same lenient model rewrite's parser does.
     static byte[] ensureModelVersion(byte[] xml) {
         String s = new String(xml, StandardCharsets.UTF_8);
         if (s.contains("<modelVersion")) {
@@ -705,7 +705,7 @@ public final class MavenEngineResolution {
         if ((message.contains("dependencies.dependency.version") && message.contains("is missing")) ||
                 message.contains("'version' is missing")) {
             // Maven rejects a dependency (or transitive descriptor) with no resolvable version at model build; legacy
-            // tolerates it and defers to download. Same ALIGN_TO_MAVEN class whether reported as the full path or bare.
+            // tolerates it and defers to download. Same strictness class whether reported as the full path or bare.
             return "missing-dependency-version";
         }
         // Any system-scope <systemPath> validation Maven enforces but rewrite tolerates: absent, or non-absolute
