@@ -179,7 +179,25 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     }
 
     private fun matchClassId0(psi: PsiElement, classId: ClassId): ClassId {
-        if (psi.text == classId.asFqNameString()) {
+        // A reference to a (possibly nested) type can be written several ways, and each must resolve to
+        // its own class id rather than collapsing to the outer class id via the `outerClassId` walk below:
+        //   - fully qualified:               `foo.bar.A.B`     -> matches the fully-qualified name
+        //   - relative to an imported outer: `A.B`             -> matches the package-relative name
+        //   - through an import alias:        `Alias.B`         -> same nesting depth and same leaf name
+        //   - relative to an imported nested: `B.A` for `A.B.A` -> a trailing run of the nested names
+        // The two multi-segment fallbacks require at least two segments so a single receiver name (e.g.
+        // the outer `A` of `A.B.A.C`, whose leaf coincidentally repeats deeper) is not matched too deep.
+        val text = psi.text
+        if (text == classId.asFqNameString() || text == classId.relativeClassName.asString()) {
+            return classId
+        }
+        val segments = text.split('.')
+        val relSegments = classId.relativeClassName.pathSegments().map { it.asString() }
+        if (segments.size >= 2 && segments.size == relSegments.size && segments.last() == relSegments.last()) {
+            return classId
+        }
+        if (segments.size in 2..relSegments.size &&
+            relSegments.subList(relSegments.size - segments.size, relSegments.size) == segments) {
             return classId
         }
 
