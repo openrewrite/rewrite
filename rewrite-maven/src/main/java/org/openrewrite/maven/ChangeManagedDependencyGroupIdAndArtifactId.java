@@ -234,7 +234,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return true;
                 }
                 if ((versionComparator != null) && (foundVersion != null)) {
-                    return versionComparator.isValid(targetVersion, foundVersion);
+                    // Pass the found version as both arguments so relative comparators
+                    // (`latest.patch`/`latest.minor`) build their range off an actual
+                    // version rather than the selector string, matching the
+                    // `isValid(actualVersion, actualVersion)` idiom used elsewhere.
+                    return versionComparator.isValid(foundVersion, foundVersion);
                 } else {
                     return targetVersion.equals(foundVersion);
                 }
