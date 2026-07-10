@@ -3819,32 +3819,43 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void systemPropertyTakesPrecedence() {
-        System.setProperty("hatversion", "2.3.0");
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>parent</artifactId>
-                <version>1.0-SNAPSHOT</version>
-                <packaging>pom</packaging>
-                <name>parent</name>
-                <url>https://www.example.com</url>
-                <properties>
-                  <hatversion>SYSTEM_PROPERTY_SHOULD_OVERRIDE_THIS</hatversion>
-                </properties>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.springframework.hateoas</groupId>
-                        <artifactId>spring-hateoas</artifactId>
-                        <version>${hatversion}</version>
-                    </dependency>
-                </dependencies>
-              </project>
-              """
-          )
-        );
+    void pomPropertyTakesPrecedenceOverSystemProperty() {
+        // Maven interpolates from user properties, then pom properties, then system properties — a plain JVM
+        // system property never overrides a pom-declared value; only injected (user) properties do.
+        System.setProperty("hatversion", "9.9.9-nonexistent");
+        try {
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <name>parent</name>
+                    <url>https://www.example.com</url>
+                    <properties>
+                      <hatversion>2.3.0</hatversion>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.hateoas</groupId>
+                            <artifactId>spring-hateoas</artifactId>
+                            <version>${hatversion}</version>
+                        </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(p -> {
+                    var result = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(result.findDependencies("org.springframework.hateoas", "spring-hateoas", null))
+                      .anySatisfy(d -> assertThat(d.getVersion()).isEqualTo("2.3.0"));
+                })
+              )
+            );
+        } finally {
+            System.clearProperty("hatversion");
+        }
     }
 
     @Test
