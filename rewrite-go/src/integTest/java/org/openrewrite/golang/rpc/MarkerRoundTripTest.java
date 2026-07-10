@@ -122,7 +122,15 @@ class MarkerRoundTripTest {
                         new GoResolutionResult.ResolvedDependency(
                                 "github.com/google/uuid", "v1.6.0",
                                 "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
-                                "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=")
+                                "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=",
+                                false, true, null, null, "1.22",
+                                Collections.singletonList(
+                                        new GoResolutionResult.ModuleRef("golang.org/x/mod", "v0.35.0")))
+                ),
+                Arrays.asList(
+                        new GoResolutionResult.PackageModule("fmt", null, null, true),
+                        new GoResolutionResult.PackageModule("github.com/google/uuid",
+                                "github.com/google/uuid", "v1.6.0", false)
                 )
         );
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
@@ -147,6 +155,7 @@ class MarkerRoundTripTest {
                 null,
                 null,
                 "go.mod",
+                Collections.emptyList(),
                 Collections.emptyList(),
                 Collections.emptyList(),
                 Collections.emptyList(),
@@ -180,6 +189,7 @@ class MarkerRoundTripTest {
                         Collections.emptyList(),
                         Collections.emptyList(),
                         Collections.emptyList(),
+                        Collections.emptyList(),
                         Collections.emptyList()
                 ));
         cu = cu.withMarkers(markers);
@@ -208,7 +218,16 @@ class MarkerRoundTripTest {
                         Collections.singletonList(
                                 new GoResolutionResult.Require("github.com/google/uuid", "v1.6.0", false)),
                         Collections.emptyList(), Collections.emptyList(),
-                        Collections.emptyList(), Collections.emptyList())));
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new GoResolutionResult.ResolvedDependency(
+                                        "github.com/google/uuid", "v1.6.0", "h1:abc=", "h1:def=",
+                                        false, true, null, null, "1.22",
+                                        Collections.singletonList(
+                                                new GoResolutionResult.ModuleRef("golang.org/x/mod", "v0.35.0")))),
+                        Collections.singletonList(
+                                new GoResolutionResult.PackageModule("github.com/google/uuid",
+                                        "github.com/google/uuid", "v1.6.0", false)))));
 
         var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
         Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());
@@ -226,6 +245,16 @@ class MarkerRoundTripTest {
         assertThat(mrr.getModulePath()).isEqualTo("example.com/foo");
         assertThat(mrr.getRequires()).hasSize(1);
         assertThat(mrr.getRequires().get(0).getModulePath()).isEqualTo("github.com/google/uuid");
+        assertThat(mrr.getResolvedDependencies()).hasSize(1);
+        GoResolutionResult.ResolvedDependency rd = mrr.getResolvedDependencies().get(0);
+        assertThat(rd.isMain()).isTrue();
+        assertThat(rd.getModuleGoVersion()).isEqualTo("1.22");
+        assertThat(rd.getDeps()).singleElement().satisfies(ref ->
+                assertThat(ref.getModulePath()).isEqualTo("golang.org/x/mod"));
+        assertThat(mrr.getPackageModules()).singleElement().satisfies(pm -> {
+            assertThat(pm.getImportPath()).isEqualTo("github.com/google/uuid");
+            assertThat(pm.getModulePath()).isEqualTo("github.com/google/uuid");
+        });
     }
 
     /**

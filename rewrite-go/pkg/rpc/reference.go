@@ -18,12 +18,10 @@ package rpc
 
 import "reflect"
 
-// Reference wraps a value to indicate it should be ref-tracked during RPC serialization.
 type Reference struct {
 	Value any
 }
 
-// AsRef wraps a value in a Reference for ref tracking.
 // Returns nil if the value is nil (including typed nil pointers/interfaces).
 func AsRef(v any) any {
 	if isNilValue(v) {
@@ -32,7 +30,6 @@ func AsRef(v any) any {
 	return &Reference{Value: v}
 }
 
-// isNilValue checks if a value is nil, handling both untyped nil and typed nil pointers/interfaces.
 func isNilValue(v any) bool {
 	if v == nil {
 		return true
@@ -63,7 +60,6 @@ func GetValueNonNull(maybeRef any) any {
 	return v
 }
 
-// IsRef reports whether the given value is a Reference.
 func IsRef(v any) bool {
 	_, ok := v.(*Reference)
 	return ok

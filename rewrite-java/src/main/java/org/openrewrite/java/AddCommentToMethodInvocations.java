@@ -18,15 +18,10 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.MethodCall;
-import org.openrewrite.java.tree.TextComment;
-import org.openrewrite.marker.Markers;
-
-import java.util.List;
+import org.openrewrite.trait.Comments;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -57,39 +52,28 @@ public class AddCommentToMethodInvocations extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                return handleMethodCallComment(m, ctx);
+                return handleMethodCallComment(m);
             }
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                 J.NewClass nc = super.visitNewClass(newClass, ctx);
-                return handleMethodCallComment(nc, ctx);
+                return handleMethodCallComment(nc);
             }
 
-            private <T extends MethodCall> T handleMethodCallComment(T t, ExecutionContext ctx) {
+            private <T extends MethodCall> T handleMethodCallComment(T t) {
                 if (methodMatcher.matches(t)) {
-                    String prefixWhitespace = t.getPrefix().getWhitespace();
                     String newCommentText = comment.trim()
                             /* First Line * Second Line */
                             .replaceAll("\\R", " * ")
                             // Prevent closing the comment early
                             .replace("*/", "*");
-                    if (doesNotHaveComment(newCommentText, t.getComments())) {
-                        TextComment textComment = new TextComment(true, " " + newCommentText + " ", prefixWhitespace, Markers.EMPTY);
-                        return t.withComments(ListUtils.concat(t.getComments(), textComment));
-                    }
+                    // The trait is idempotent: an equivalent existing comment (including a `//` line
+                    // comment with the same text) is left alone.
+                    return Comments.of(new Cursor(getCursor().getParentOrThrow(), t))
+                            .multilineComment(" " + newCommentText + " ");
                 }
                 return t;
-            }
-
-            private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
-                for (Comment c : comments) {
-                    if (c instanceof TextComment &&
-                            lookFor.trim().equals(((TextComment) c).getText().trim())) {
-                        return false;
-                    }
-                }
-                return true;
             }
         });
     }

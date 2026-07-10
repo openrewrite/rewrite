@@ -22,7 +22,6 @@ import (
 
 // PrintGoMod renders a GoMod LST back to source. Because every byte of
 // whitespace and every comment is preserved on the tree, an unmodified
-// GoMod prints to exactly the bytes it was parsed from.
 func PrintGoMod(gm *golang.GoMod) string {
 	return printGoMod(gm, NewPrintOutputCapture())
 }

@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -453,5 +454,368 @@ class KotlinTemplateTest implements RewriteTest {
         // caller-scope T appeared in the template as `<T>` without bound. With the fix the bound
         // round-trips, so the captured template includes "T : ".
         assertThat(capturedTemplate.toString()).contains("class Template<T");
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  @Suppress("UNCHECKED_CAST")
+                  fun foo() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @Suppress("RedundantSuppression")
+                  fun foo() {
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithKotlinOnlyClassMembers() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && annotation.getArguments().size() == 1) {
+                      return KotlinTemplate.builder("#{any()}, \"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          annotation.getArguments().getFirst());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              interface Api {
+                  fun fetch(): String
+              }
+              """
+          ),
+          kotlin(
+            """
+              class Gateway(private val endpoint: String) : Api {
+                  companion object {
+                      const val REASON = "UNCHECKED_CAST"
+                  }
+
+                  enum class Status { ACTIVE, INACTIVE }
+
+                  init {
+                      require(endpoint.isNotEmpty())
+                  }
+
+                  @Suppress(REASON)
+                  override fun fetch(): String = endpoint
+              }
+              """,
+            """
+              class Gateway(private val endpoint: String) : Api {
+                  companion object {
+                      const val REASON = "UNCHECKED_CAST"
+                  }
+
+                  enum class Status { ACTIVE, INACTIVE }
+
+                  init {
+                      require(endpoint.isNotEmpty())
+                  }
+
+                  @Suppress(REASON, "RedundantSuppression")
+                  override fun fetch(): String = endpoint
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithParameterSubstitution() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && annotation.getArguments().size() == 1) {
+                      return KotlinTemplate.builder("#{any()}, \"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          annotation.getArguments().getFirst());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  @Suppress("UNCHECKED_CAST")
+                  fun foo() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @Suppress("UNCHECKED_CAST", "RedundantSuppression")
+                  fun foo() {
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnProperty() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  @Suppress("UNCHECKED_CAST")
+                  val foo: Int = 0
+              }
+              """,
+            """
+              class Test {
+                  @Suppress("RedundantSuppression")
+                  val foo: Int = 0
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              @Suppress("UNCHECKED_CAST")
+              class Test
+              """,
+            """
+              @Suppress("RedundantSuppression")
+              class Test
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnTopLevelFunction() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              @Suppress("UNCHECKED_CAST")
+              fun foo() {
+              }
+              """,
+            """
+              @Suppress("RedundantSuppression")
+              fun foo() {
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnLocalVariableInFunctionWithReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo(): Int {
+                      @Suppress("UNCHECKED_CAST")
+                      val x = 0
+                      return x
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun foo(): Int {
+                      @Suppress("RedundantSuppression")
+                      val x = 0
+                      return x
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnLocalVariablePrecededByTypedLocal() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo() {
+                      val y: Int = 1
+                      @Suppress("UNCHECKED_CAST")
+                      val x = y
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun foo() {
+                      val y: Int = 1
+                      @Suppress("RedundantSuppression")
+                      val x = y
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnLocalVariablePrecededByUntypedLocal() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo() {
+                      val y = 1
+                      @Suppress("UNCHECKED_CAST")
+                      val x = y
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun foo() {
+                      val y = 1
+                      @Suppress("RedundantSuppression")
+                      val x = y
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void addAnnotationToMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getLeadingAnnotations().isEmpty()) {
+                      return KotlinTemplate.builder("@Suppress(\"RedundantSuppression\")")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().addAnnotation(
+                          Comparator.comparing(J.Annotation::getSimpleName)));
+                  }
+                  return method;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @Suppress("RedundantSuppression")
+                  fun foo() {
+                  }
+              }
+              """
+          ));
     }
 }

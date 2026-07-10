@@ -21,6 +21,12 @@ import {RecipeDescriptor} from "../../recipe";
 export interface GetMarketplaceResponseRow {
     readonly descriptor: RecipeDescriptor
     readonly categoryPaths: CategoryDescriptor[][]
+    /**
+     * The package this recipe was contributed by, recorded at install time. Lets the host attribute
+     * each row to its own bundle instead of force-tagging every row with the one requested bundle.
+     * Undefined for recipes installed from a local path (no package identity).
+     */
+    readonly packageName?: string
 }
 
 /**
@@ -38,7 +44,8 @@ export async function toMarketplace(rows: GetMarketplaceResponseRow[]): Promise<
 }
 
 export class GetMarketplace {
-    static handle(connection: rpc.MessageConnection, marketplace: RecipeMarketplace, metricsCsv?: string): void {
+    static handle(connection: rpc.MessageConnection, marketplace: RecipeMarketplace,
+                  recipeOrigin: Map<string, string>, metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType0<GetMarketplaceResponseRow[], Error>("GetMarketplace"),
             withMetrics0<GetMarketplaceResponseRow[]>(
@@ -46,7 +53,7 @@ export class GetMarketplace {
                 metricsCsv,
                 (context) => async () => {
                     // Group recipes by name, collecting all category paths for each
-                    const rowByRecipeId = new Map<string, { descriptor: RecipeDescriptor, categoryPaths: CategoryDescriptor[][] }>();
+                    const rowByRecipeId = new Map<string, { descriptor: RecipeDescriptor, categoryPaths: CategoryDescriptor[][], packageName?: string }>();
 
                     function collectRecipes(category: RecipeMarketplace.Category, categoryPath: CategoryDescriptor[]): void {
                         const currentPath = [...categoryPath, category.descriptor];
@@ -59,7 +66,8 @@ export class GetMarketplace {
                             } else {
                                 rowByRecipeId.set(recipe.name, {
                                     descriptor: recipe,
-                                    categoryPaths: [currentPath]
+                                    categoryPaths: [currentPath],
+                                    packageName: recipeOrigin.get(recipe.name)
                                 });
                             }
                         }

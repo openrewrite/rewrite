@@ -262,8 +262,8 @@ class TestPerPackageAttribution:
         server._marketplace = self._saved_marketplace
         server._attribution = self._saved_attribution
 
-    def test_install_response_returns_only_packages_own_recipes(self, monkeypatch):
-        """Installing pkg-a then pkg-b: each response carries only its own recipe."""
+    def test_get_marketplace_attributes_each_recipe_to_its_package(self, monkeypatch):
+        """Installing pkg-a then pkg-b: each GetMarketplace row carries its own package."""
         import rewrite.rpc.server as server
 
         def fake_import_and_activate(name, marketplace, local_path=None):
@@ -275,21 +275,22 @@ class TestPerPackageAttribution:
 
         monkeypatch.setattr(server, "_import_and_activate_package", fake_import_and_activate)
 
-        a_response = server.handle_install_recipes({"recipes": {"packageName": "pkg-a"}})
-        b_response = server.handle_install_recipes({"recipes": {"packageName": "pkg-b"}})
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-a"}})
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-b"}})
 
-        a_names = {r["descriptor"]["name"] for r in a_response["recipes"]}
-        b_names = {r["descriptor"]["name"] for r in b_response["recipes"]}
+        # Each row carries its origin packageName, so the host attributes each recipe to the
+        # package that actually contributed it instead of the single requested bundle.
+        package_of = {r["descriptor"]["name"]: r["packageName"]
+                      for r in server.handle_get_marketplace({})}
 
-        assert a_names == {"org.openrewrite.test.pkga.RecipeA"}
-        assert b_names == {"org.openrewrite.test.pkgb.RecipeB"}
+        assert package_of["org.openrewrite.test.pkga.RecipeA"] == "pkg-a"
+        assert package_of["org.openrewrite.test.pkgb.RecipeB"] == "pkg-b"
 
-    def test_install_response_for_package_with_no_recipes_is_empty(self, monkeypatch):
-        """Visualization-only pip packages (no recipes) must not be assigned others' recipes.
+    def test_noop_install_does_not_inherit_other_packages_recipes(self, monkeypatch):
+        """A visualization-only pip package (no recipes) must not be assigned others' recipes.
 
-        Reproduces the moderne-visualizations-misc case: pkg-a contributed
-        recipes earlier; pkg-b is a no-op (no openrewrite.recipes entry point).
-        Installing pkg-b must NOT inherit pkg-a's recipes.
+        pkg-a contributed recipes earlier; pkg-b is a no-op (no openrewrite.recipes entry
+        point). Installing pkg-b must NOT inherit pkg-a's recipes.
         """
         import rewrite.rpc.server as server
 
@@ -303,8 +304,13 @@ class TestPerPackageAttribution:
         server.handle_install_recipes({"recipes": {"packageName": "pkg-a"}})
         b_response = server.handle_install_recipes({"recipes": {"packageName": "pkg-b"}})
 
-        assert b_response["recipes"] == []
+        # pkg-b contributed nothing, so no GetMarketplace row is attributed to it, and pkg-a's
+        # recipe keeps its own attribution.
         assert b_response["recipesInstalled"] == 0
+        package_of = {r["descriptor"]["name"]: r["packageName"]
+                      for r in server.handle_get_marketplace({})}
+        assert package_of["org.openrewrite.test.pkga.RecipeA"] == "pkg-a"
+        assert "pkg-b" not in package_of.values()
 
     def test_get_marketplace_filters_by_package_name(self, monkeypatch):
         """GetMarketplace with packageName returns only that package's recipes."""

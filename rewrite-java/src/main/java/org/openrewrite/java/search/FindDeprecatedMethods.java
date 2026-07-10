@@ -81,7 +81,7 @@ public class FindDeprecatedMethods extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
 
-        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new JavaIsoVisitor<ExecutionContext>() {
             @SuppressWarnings("NullableProblems")
             @Override
             public J visit(Tree tree, ExecutionContext ctx) {
@@ -99,7 +99,15 @@ public class FindDeprecatedMethods extends Recipe {
                 }
                 return (J) tree;
             }
-        }, new JavaIsoVisitor<ExecutionContext>() {
+        };
+
+        // When a method pattern is provided, also require a matching method use so the recipe
+        // only runs on source files that reference it.
+        if (methodMatcher != null) {
+            precondition = Preconditions.and(new UsesMethod<>(methodMatcher), precondition);
+        }
+
+        return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

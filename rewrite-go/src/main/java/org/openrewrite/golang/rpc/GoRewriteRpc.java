@@ -17,10 +17,12 @@ package org.openrewrite.golang.rpc;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.GolangParser;
+import org.openrewrite.golang.internal.GoExecutor;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
@@ -32,10 +34,13 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -47,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Spliterator;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -318,7 +324,7 @@ public class GoRewriteRpc extends RewriteRpc {
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
-        private @Nullable Path dataTablesCsvDir;
+        private @Nullable DataTableStore dataTableStore;
         private @Nullable Path workingDirectory;
         private boolean traceRpcMessages;
 
@@ -370,8 +376,8 @@ public class GoRewriteRpc extends RewriteRpc {
             return this;
         }
 
-        public Builder dataTablesCsvDir(@Nullable Path dataTablesCsvDir) {
-            this.dataTablesCsvDir = dataTablesCsvDir;
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
             return this;
         }
 
@@ -415,7 +421,6 @@ public class GoRewriteRpc extends RewriteRpc {
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize(),
-                    dataTablesCsvDir == null ? null : "--data-tables-csv-dir=" + dataTablesCsvDir.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null
             );
 
@@ -427,6 +432,7 @@ public class GoRewriteRpc extends RewriteRpc {
             }
             process.setStderrRedirect(log);
             process.environment().putAll(environment);
+            ensureGoRoot(process.environment());
             process.start();
 
             try {
@@ -434,10 +440,68 @@ public class GoRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    private static volatile boolean goRootResolved;
+    private static volatile @Nullable String resolvedGoRoot;
+
+    // The RPC binary is built with `-trimpath`, which strips its baked-in
+    // GOROOT. Without GOROOT the parser's go/types importer can't resolve the
+    // stdlib, so every J.MethodInvocation loses its JavaType.Method. If nothing
+    // else supplies GOROOT, discover it from the host toolchain and pass it in.
+    private static void ensureGoRoot(Map<String, String> env) {
+        String parent = System.getenv("GOROOT");
+        if (env.containsKey("GOROOT") || (parent != null && !parent.trim().isEmpty())) {
+            return;
+        }
+        String goRoot = discoverGoRoot();
+        if (goRoot != null) {
+            env.put("GOROOT", goRoot);
+        }
+    }
+
+    private static @Nullable String discoverGoRoot() {
+        if (!goRootResolved) {
+            synchronized (GoRewriteRpc.class) {
+                if (!goRootResolved) {
+                    resolvedGoRoot = queryGoEnvGoRoot();
+                    goRootResolved = true;
+                }
+            }
+        }
+        return resolvedGoRoot;
+    }
+
+    private static @Nullable String queryGoEnvGoRoot() {
+        String go = GoExecutor.GO.find();
+        if (go == null) {
+            return null;
+        }
+        try {
+            Process p = new ProcessBuilder(go, "env", "GOROOT").start();
+            String line;
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                line = reader.readLine();
+            }
+            if (!p.waitFor(10, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return null;
+            }
+            if (p.exitValue() == 0 && line != null && !line.trim().isEmpty()) {
+                return line.trim();
+            }
+        } catch (IOException ignored) {
+            // Couldn't run the go toolchain — nothing to inject; behavior is unchanged.
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return null;
     }
 }

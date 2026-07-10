@@ -37,11 +37,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StreamUtils.readAllBytes;
@@ -110,15 +112,35 @@ public class MavenArtifactDownloader {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
-                     InputStream body = response.getBody()) {
-                    if (!response.isSuccessful() || body == null) {
-                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
+                try {
+                    byte[] responseBytes = null;
+                    int responseCode;
+                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
+                         InputStream body = response.getBody()) {
+                        responseCode = response.getCode();
+                        if (response.isSuccessful() && body != null) {
+                            responseBytes = readAllBytes(body);
+                        }
+                    }
+                    // Fall back to anonymous if authenticated request fails with a client error
+                    if (responseBytes == null && isClientSideError(responseCode) && hasAuthentication(dependency.getRepository())) {
+                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(httpSender.get(uri).build()));
+                             InputStream body = response.getBody()) {
+                            responseCode = response.getCode();
+                            if (response.isSuccessful() && body != null) {
+                                responseBytes = readAllBytes(body);
+                            }
+                        }
+                    }
+                    if (responseBytes == null) {
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
+                                dependency.getClassifier() == null ? "" : ":" + dependency.getClassifier(),
+                                uri, responseCode), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }
-                    bodyStream = new ByteArrayInputStream(readAllBytes(body));
+                    bodyStream = new ByteArrayInputStream(responseBytes);
                 } catch (Throwable t) {
                     Throwable cause = t instanceof FailsafeException && t.getCause() != null ? t.getCause() : t;
                     throw new MavenDownloadingException("Unable to download dependency", cause,
@@ -130,14 +152,44 @@ public class MavenArtifactDownloader {
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
+        for (MavenSettings.HttpHeader header : resolveHttpHeaders(repository)) {
+            request.withHeader(header.getName(), header.getValue());
+        }
+        String[] credentials = resolveCredentials(repository);
+        if (credentials != null) {
+            return request.withBasicAuthentication(credentials[0], credentials[1]);
+        }
+        return request;
+    }
+
+    private boolean hasAuthentication(MavenRepository repository) {
+        return !resolveHttpHeaders(repository).isEmpty() || resolveCredentials(repository) != null;
+    }
+
+    /**
+     * All 400s are client-side errors, but 408 (timeout), 425 (too early) and 429 (too many requests) are transient
+     * rather than credential rejections, so an anonymous retry is pointless for them. Mirrors
+     * {@code MavenPomDownloader.HttpSenderResponseException#isClientSideException()}.
+     */
+    private static boolean isClientSideError(int responseCode) {
+        if (responseCode < 400 || responseCode > 499) {
+            return false;
+        }
+        return responseCode != 408 && responseCode != 425 && responseCode != 429;
+    }
+
+    private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if (authInfo != null && authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
+            return authInfo.getConfiguration().getHttpHeaders();
+        }
+        return emptyList();
+    }
+
+    private String @Nullable [] resolveCredentials(MavenRepository repository) {
         String username, password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
-            if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
-                for (MavenSettings.HttpHeader header : authInfo.getConfiguration().getHttpHeaders()) {
-                    request.withHeader(header.getName(), header.getValue());
-                }
-            }
             username = authInfo.getUsername();
             password = authInfo.getPassword();
         } else {
@@ -146,8 +198,8 @@ public class MavenArtifactDownloader {
         }
         if (username != null && !username.contains("${") &&
                 password != null && !password.contains("${")) {
-            return request.withBasicAuthentication(username, password);
+            return new String[]{username, password};
         }
-        return request;
+        return null;
     }
 }

@@ -97,7 +97,23 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 			{VersionRange: "[v1.0.0, v1.0.5]"},
 		},
 		ResolvedDependencies: []golang.GoResolvedDependency{
-			{ModulePath: "github.com/google/uuid", Version: "v1.6.0", ModuleHash: "h1:abc=", GoModHash: "h1:def="},
+			{
+				ModulePath: "github.com/google/uuid", Version: "v1.6.0",
+				ModuleHash: "h1:abc=", GoModHash: "h1:def=",
+				Main: true, ModuleGoVersion: "1.22",
+				Deps: []golang.GoModuleRef{
+					{ModulePath: "golang.org/x/mod", Version: "v0.35.0"},
+				},
+			},
+			{
+				ModulePath: "golang.org/x/mod", Version: "v0.35.0",
+				ModuleHash: "h1:ghi=", GoModHash: "h1:jkl=",
+				Indirect: true, ReplacePath: "github.com/forked/mod", ReplaceVersion: "v0.35.1",
+			},
+		},
+		PackageModules: []golang.GoPackageModule{
+			{ImportPath: "fmt", Standard: true},
+			{ImportPath: "github.com/google/uuid", ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
 		},
 	}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}

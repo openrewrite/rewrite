@@ -142,6 +142,48 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void boundedCapturedWildcardMapsToQuestionMark() {
+        // Inferring `wrap`'s type variable from a bounded wildcard argument involves capture conversion
+        // (`List<CAP of (? extends Number)>`). javac names a captured wildcard "<captured wildcard>",
+        // which is not valid Java. Whether the capture reaches the type mapper depends on the JDK: modern
+        // javac upward-projects it back to a `?` wildcard, while older builders leave the capture in place,
+        // where the mapper must normalize it. Either way the LST must never surface "<captured wildcard>".
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  static <T> List<T> wrap(List<T> list) {
+                      return list;
+                  }
+
+                  void test(List<? extends Number> list) {
+                      Object o = wrap(list);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> wrapInvocationType = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("wrap".equals(method.getSimpleName())) {
+                            wrapInvocationType.set(method.getType());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                Parameterized list = asParameterized(wrapInvocationType.get());
+                assertThat(list.getTypeParameters().get(0).toString())
+                  .isEqualTo("Generic{? extends java.lang.Number}")
+                  .doesNotContain("captured wildcard");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test

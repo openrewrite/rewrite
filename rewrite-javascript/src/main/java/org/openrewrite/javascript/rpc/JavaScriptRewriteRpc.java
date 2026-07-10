@@ -271,6 +271,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         private @Nullable Path workingDirectory;
 
+        private @Nullable DataTableStore dataTableStore;
+
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
@@ -399,6 +401,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Where recipes in the JavaScript runtime write data table rows, conveyed via the
+         * {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Path npxPath = npxPathSupplier.get();
@@ -430,8 +441,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
                 cmd = Stream.of(
                         npxPath.toString(),
-                        // For unpublished local builds, assume npm link has been run and don't use --package
-                        isLocallyLinkedVersion(version) ? null : "--package=@openrewrite/rewrite@" + version,
+                        // For SNAPSHOT versions, assume npm link has been run and don't use --package
+                        version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
@@ -465,6 +476,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(openLog(log)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -480,19 +492,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 Files.createDirectories(parent);
             }
             return Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-        }
-
-        /**
-         * Whether {@code version} refers to a locally-built, unpublished package that must be
-         * resolved through {@code npm link} rather than fetched from the npm registry via
-         * {@code npx --package}. This covers plain {@code -SNAPSHOT} versions (local builds) as
-         * well as the dated-snapshot form produced on CI, where the {@code SNAPSHOT} token is
-         * replaced by a {@code yyyyMMdd-HHmmss} commit timestamp (e.g. {@code 0.1.0-20260624-090742}).
-         * Passing such a version to {@code npx --package} fails with npm {@code ETARGET} because no
-         * matching version exists in the registry.
-         */
-        static boolean isLocallyLinkedVersion(String version) {
-            return version.endsWith("-SNAPSHOT") || version.matches(".*-\\d{8}-\\d{6}");
         }
     }
 }

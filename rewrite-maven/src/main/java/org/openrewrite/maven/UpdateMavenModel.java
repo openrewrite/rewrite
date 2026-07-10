@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -199,28 +198,22 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
                 getResolutionResult().getActiveProfiles());
 
-        AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
-            MavenResolutionResult mrr = resolutionResult
+            return resolutionResult
                     .withPom(resolved)
+                    // Re-resolve modules best-effort: a module that is transiently unresolvable mid-recipe keeps
+                    // its previous resolution rather than discarding this pom's own valid update.
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
                             return updateResult(ctx, module, projectPoms);
                         } catch (MavenDownloadingExceptions e) {
-                            exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
                             return module;
                         }
                     }))
                     .resolveDependencies(downloader, ctx);
-            if (exceptions.get() != null) {
-                throw exceptions.get();
-            }
-            return mrr;
-        } catch (MavenDownloadingExceptions e) {
-            throw MavenDownloadingExceptions.append(exceptions.get(), e);
         } catch (MavenDownloadingException e) {
-            throw MavenDownloadingExceptions.append(exceptions.get(), e);
+            throw MavenDownloadingExceptions.append(null, e);
         }
     }
 }

@@ -39,7 +39,6 @@ import (
 // is built as Container[T] directly — no inference, no guessing for empty
 // containers, no raw cross-instantiation assertion.
 
-// makeImport returns an *Import shaped like a Go import (Qualid is a string Literal).
 func makeImport(path string) *java.Import {
 	return &java.Import{
 		ID: uuid.New(),
@@ -97,8 +96,6 @@ func TestRawCastPanics_ContainerImportFromExpression(t *testing.T) {
 		_ = wire.(java.Container[*java.Import])
 	})
 }
-
-// ----- Full send->receive round trip through VisitCompilationUnit (Print path) -----
 
 func TestCompilationUnitRoundTrip_EmptyImports(t *testing.T) {
 	// given: a CU with a non-nil but EMPTY imports container — this is what

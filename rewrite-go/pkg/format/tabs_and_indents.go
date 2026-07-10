@@ -47,8 +47,6 @@ type TabsAndIndentsVisitor struct {
 	depth int
 }
 
-// NewTabsAndIndentsVisitor returns a visitor configured with the given
-// stopAfter bound. Pass nil to format the entire visited tree.
 func NewTabsAndIndentsVisitor(stopAfter java.Tree) *TabsAndIndentsVisitor {
 	return visitor.Init(&TabsAndIndentsVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},

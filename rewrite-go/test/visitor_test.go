@@ -24,7 +24,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// deletingVisitor returns nil for Return nodes, exercising the nil guard in visitAndCast/visitExpression.
 type deletingVisitor struct {
 	visitor.GoVisitor
 }
@@ -49,7 +48,6 @@ func TestVisitorReturningNilDoesNotPanic(t *testing.T) {
 	}
 }
 
-// importCountingVisitor counts how many Import nodes are visited.
 type importCountingVisitor struct {
 	visitor.GoVisitor
 	count int
@@ -75,7 +73,6 @@ func TestVisitorVisitsImports(t *testing.T) {
 	}
 }
 
-// identCountingVisitor counts how many Identifier nodes are visited.
 type identCountingVisitor struct {
 	visitor.GoVisitor
 	names []string

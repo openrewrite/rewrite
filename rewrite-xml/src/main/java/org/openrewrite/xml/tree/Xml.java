@@ -23,6 +23,8 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
@@ -30,6 +32,7 @@ import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
+import org.openrewrite.xml.service.XmlCommentService;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
@@ -54,6 +57,7 @@ public interface Xml extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection DataFlowIssue
         return (R) acceptXml(v.adapt(XmlVisitor.class), p);
     }
 
@@ -163,6 +167,8 @@ public interface Xml extends Tree {
         public <S, T extends S> T service(Class<S> service) {
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new XmlWhitespaceValidationService();
+            } else if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new XmlCommentService();
             }
             return SourceFileWithReferences.super.service(service);
         }
@@ -398,7 +404,7 @@ public interface Xml extends Tree {
                 return Optional.empty();
             }
             if (content.size() == 1 && content.get(0) instanceof Xml.CharData) {
-                return Optional.ofNullable(((CharData) content.get(0)).getText());
+                return Optional.of(((CharData) content.get(0)).getText());
             }
             if (content.stream().allMatch(c -> c instanceof Xml.CharData)) {
                 return Optional.of(content.stream()
@@ -626,7 +632,7 @@ public interface Xml extends Tree {
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append("text = \"").append(text).append("\"");
-            if (afterText != null && !afterText.isEmpty()) {
+            if (StringUtils.isNotEmpty(afterText)) {
                 sb.append(" afterText = \"").append(afterText).append("\"");
             }
             return sb.toString();

@@ -120,6 +120,42 @@ func TestGoProjectWiresImporterIntoHarness(t *testing.T) {
 	)
 }
 
+// TestGoProjectWithAbsolutePathsResolvesSiblingPackageImports documents the
+// production ParseProject shape without writing files to disk. ParseProject
+// discovers absolute file paths, but ProjectImporter must receive
+// module-relative paths so sibling package imports are indexed under the
+// module import path.
+func TestGoProjectWithAbsolutePathsResolvesSiblingPackageImports(t *testing.T) {
+	mainSrc := test.Golang(`
+		package main
+
+		import "example.com/foo/sub"
+
+		func main() { _ = sub.Hello() }
+	`).WithPath("/workspace/main.go")
+	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
+		t.Helper()
+		test.ExpectMethodType(t, cu, "Hello", "example.com/foo/sub")
+	}
+
+	spec := test.NewRecipeSpec()
+	spec.RewriteRun(t,
+		test.GoProject("foo",
+			test.GoMod(`
+				module example.com/foo
+
+				go 1.22
+			`),
+			test.Golang(`
+				package sub
+
+				func Hello() string { return "hi" }
+			`).WithPath("/workspace/sub/sub.go"),
+			mainSrc,
+		),
+	)
+}
+
 // collectIdentTypes walks the tree and returns a map of identifier name
 // → its Type (whichever last assignment wins; sufficient for these tests).
 func collectIdentTypes(cu *golang.CompilationUnit) map[string]java.JavaType {
