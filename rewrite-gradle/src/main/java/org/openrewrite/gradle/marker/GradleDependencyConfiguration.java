@@ -31,6 +31,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Version;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -277,13 +278,11 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                                     : singleDependencyResolved.resolveDirectDependencies(Scope.Compile, mpd, ctx);
                             newResolved.add(resolvedList.get(0));
                         }
-                    } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
-                        MavenDownloadingException m;
-                        if (e instanceof MavenDownloadingException) {
-                            m = (MavenDownloadingException) e;
-                        } else {
-                            m = ((MavenDownloadingExceptions) e).getExceptions().get(0);
-                        }
+                    } catch (MavenDownloadingException | MavenDownloadingExceptions | MavenParsingException e) {
+                        // MavenParsingException covers model-invalid states like a version-less dependency whose
+                        // constraint or BOM was just edited away; degrade gracefully rather than fail the recipe run.
+                        Throwable m = e instanceof MavenDownloadingExceptions ?
+                                ((MavenDownloadingExceptions) e).getExceptions().get(0) : e;
                         exceptionType = m.getClass().getName();
                         message = m.getMessage();
                         // There are some dependencies that we cannot resolve with a maven resolver
