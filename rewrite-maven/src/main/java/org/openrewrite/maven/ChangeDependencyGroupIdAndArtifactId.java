@@ -260,8 +260,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             @Nullable
             private Collection<String> availableVersions;
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
-            private final String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
-            private final String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
+            private final String effectiveNewGroupId = renamedGroupId(oldGroupId);
+            private final String effectiveNewArtifactId = renamedArtifactId(oldArtifactId);
             private final boolean dedupeEnabled = !effectiveNewGroupId.equals(oldGroupId) || !effectiveNewArtifactId.equals(oldArtifactId);
             private List<ResolvedDependency> existingNewDirectDependencies = new ArrayList<>();
             private List<ResolvedDependency> existingOldDirectDependencies = new ArrayList<>();
