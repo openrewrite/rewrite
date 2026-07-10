@@ -16,7 +16,6 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangeType;
@@ -118,7 +117,6 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
     @Issue("https://github.com/openrewrite/rewrite/issues/3058")
     @SuppressWarnings("DataFlowIssue")
     @Test
