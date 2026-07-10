@@ -25,7 +25,6 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.text.PlainText;
@@ -59,9 +58,25 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     String description = "Detect and remove Maven property declarations which do not have any usage within the project.";
 
     public static class Accumulator {
+        /**
+         * Property name to the poms containing a "real" usage of it, i.e. a {@code ${prop}} reference that is
+         * <em>not</em> itself another property's declaration. Property-to-property references are recorded
+         * separately in {@link #propertyDeclarationRefs} so that a reference living inside a declaration that
+         * will itself be removed does not keep its target alive.
+         */
         public Map<String, Set<MavenResolutionResult>> propertiesToUsingPoms = new HashMap<>();
         public Map<Path, MavenResolutionResult> filteredResourcePathsToDeclaringPoms = new HashMap<>();
         public Map<Path, Set<String>> nonPomPathsToUsages = new HashMap<>();
+
+        /** For each pom, a declared property name to the set of property names referenced in its value. */
+        public Map<MavenResolutionResult, Map<String, Set<String>>> propertyDeclarationRefs = new HashMap<>();
+
+        void recordDeclarationRef(MavenResolutionResult pom, String declaredProperty, String referencedProperty) {
+            propertyDeclarationRefs
+                    .computeIfAbsent(pom, k -> new HashMap<>())
+                    .computeIfAbsent(declaredProperty, k -> new HashSet<>())
+                    .add(referencedProperty);
+        }
 
         public Map<String, Set<MavenResolutionResult>> getFilteredResourceUsages() {
             Map<String, Set<MavenResolutionResult>> result = new HashMap<>();
@@ -77,6 +92,76 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                     ));
             return result;
         }
+
+        /**
+         * Resolves the effective set of using-poms per property, growing {@link #propertiesToUsingPoms} to a
+         * fixed point: a property-declaration reference only counts once the declaration that contains it is
+         * itself kept (used through a real usage, a filtered resource, a builtin name, or transitively another
+         * kept declaration). This lets a chain like {@code <bar>${foo}</bar>} where {@code bar} is unused
+         * collapse in a single pass, since {@code foo}'s only reference lives in a declaration that is dropped.
+         */
+        Map<String, Set<MavenResolutionResult>> resolveUsingPoms() {
+            Map<String, Set<MavenResolutionResult>> used = new HashMap<>();
+            propertiesToUsingPoms.forEach((property, poms) -> used.put(property, new HashSet<>(poms)));
+            Map<String, Set<MavenResolutionResult>> filteredResourceUsages = getFilteredResourceUsages();
+
+            boolean changed = true;
+            while (changed) {
+                changed = false;
+                for (Map.Entry<MavenResolutionResult, Map<String, Set<String>>> pomEntry : propertyDeclarationRefs.entrySet()) {
+                    MavenResolutionResult pom = pomEntry.getKey();
+                    for (Map.Entry<String, Set<String>> decl : pomEntry.getValue().entrySet()) {
+                        if (!declarationKept(decl.getKey(), pom, used, filteredResourceUsages)) {
+                            continue;
+                        }
+                        for (String referenced : decl.getValue()) {
+                            if (used.computeIfAbsent(referenced, k -> new HashSet<>()).add(pom)) {
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            return used;
+        }
+
+        private static boolean declarationKept(String property, MavenResolutionResult declaringPom,
+                                               Map<String, Set<MavenResolutionResult>> used,
+                                               Map<String, Set<MavenResolutionResult>> filteredResourceUsages) {
+            if (isMavenBuiltinProperty(property)) {
+                return true;
+            }
+            ResolvedGroupArtifactVersion gav = declaringPom.getPom().getGav();
+            return usedByAncestorOf(used.get(property), gav) ||
+                    usedByAncestorOf(filteredResourceUsages.get(property), gav);
+        }
+
+        private static boolean usedByAncestorOf(@Nullable Set<MavenResolutionResult> usingPoms,
+                                                ResolvedGroupArtifactVersion declaringGav) {
+            if (usingPoms != null) {
+                for (MavenResolutionResult pomWhereUsed : usingPoms) {
+                    if (isAncestor(pomWhereUsed, declaringGav)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+    private static boolean isMavenBuiltinProperty(String propertyName) {
+        return propertyName.startsWith("project.") || propertyName.startsWith("maven.");
+    }
+
+    private static boolean isAncestor(MavenResolutionResult project, ResolvedGroupArtifactVersion possibleAncestorGav) {
+        MavenResolutionResult projectAncestor = project;
+        while (projectAncestor != null) {
+            if (projectAncestor.getPom().getGav().equals(possibleAncestorGav)) {
+                return true;
+            }
+            projectAncestor = projectAncestor.getParent();
+        }
+        return false;
     }
 
     @Override
@@ -124,18 +209,9 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     @Override
-    public void nextStage(RecipeList stage, ExecutionContext ctx, Accumulator acc) {
-        // Removing a property can leave another one (referenced only by the removed property) unused;
-        // re-run until removals stop cascading.
-        RecipeRunStage<?> details = ctx.getStageDetails();
-        if (details.getMadeChangesInThisStage().contains(this)) {
-            stage.addIfAbsent(details.getRecipe());
-        }
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(RemoveUnusedProperties.Accumulator acc) {
         Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
+        Map<String, Set<MavenResolutionResult>> usingPoms = acc.resolveUsingPoms();
         Map<String, Set<MavenResolutionResult>> filteredResourceUsages = acc.getFilteredResourceUsages();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -151,8 +227,8 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                         return t;
                     }
 
-                    if (acc.propertiesToUsingPoms.containsKey(propertyName)) {
-                        for (MavenResolutionResult pomWhereUsed : acc.propertiesToUsingPoms.get(propertyName)) {
+                    if (usingPoms.containsKey(propertyName)) {
+                        for (MavenResolutionResult pomWhereUsed : usingPoms.get(propertyName)) {
                             if (isAncestor(pomWhereUsed, getResolutionResult().getPom().getGav())) {
                                 return t;
                             }
@@ -171,21 +247,6 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                     maybeUpdateModel();
                 }
                 return t;
-            }
-
-            private boolean isMavenBuiltinProperty(String propertyName) {
-                return propertyName.startsWith("project.") || propertyName.startsWith("maven.");
-            }
-
-            private boolean isAncestor(MavenResolutionResult project, ResolvedGroupArtifactVersion possibleAncestorGav) {
-                MavenResolutionResult projectAncestor = project;
-                while (projectAncestor != null) {
-                    if (projectAncestor.getPom().getGav().equals(possibleAncestorGav)) {
-                        return true;
-                    }
-                    projectAncestor = projectAncestor.getParent();
-                }
-                return false;
             }
 
             private boolean parentHasProperty(MavenResolutionResult resolutionResult, String propertyName,
@@ -223,10 +284,16 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             Xml.Tag t = super.visitTag(tag, ctx);
             Optional<String> value = t.getValue();
             if (value.isPresent()) {
+                boolean insideDeclaration = isPropertyTag();
                 Matcher matcher = propertyUsageMatcher.matcher(value.get());
                 while (matcher.find()) {
-                    acc.propertiesToUsingPoms.putIfAbsent(matcher.group(1), new HashSet<>());
-                    acc.propertiesToUsingPoms.get(matcher.group(1)).add(getResolutionResult());
+                    String referenced = matcher.group(1);
+                    if (insideDeclaration) {
+                        acc.recordDeclarationRef(getResolutionResult(), t.getName(), referenced);
+                    } else {
+                        acc.propertiesToUsingPoms.putIfAbsent(referenced, new HashSet<>());
+                        acc.propertiesToUsingPoms.get(referenced).add(getResolutionResult());
+                    }
                 }
             }
             return t;
