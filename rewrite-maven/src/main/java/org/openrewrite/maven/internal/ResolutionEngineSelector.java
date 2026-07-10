@@ -20,6 +20,9 @@ import org.openrewrite.ExecutionContext;
 /**
  * Selects the dependency resolution engine for dev/CI purposes only. Deliberately not part of
  * {@link org.openrewrite.maven.MavenExecutionContextView}; this never becomes public API.
+ * <p>
+ * The default is the Maven engine (Phase 5 cutover). The legacy resolver remains in-tree for one
+ * release as revert-by-release insurance, reachable only through this internal dev/CI key.
  */
 public class ResolutionEngineSelector {
     public static final String ENGINE_KEY = "org.openrewrite.maven.resolution.engine";
@@ -35,12 +38,12 @@ public class ResolutionEngineSelector {
 
     public static Engine select(ExecutionContext ctx) {
         String engine = ctx.getMessage(ENGINE_KEY, System.getProperty(ENGINE_KEY));
-        if ("maven".equalsIgnoreCase(engine)) {
-            return Engine.MAVEN;
+        if ("legacy".equalsIgnoreCase(engine)) {
+            return Engine.LEGACY;
         }
         if ("shadow".equalsIgnoreCase(engine)) {
             return Engine.SHADOW;
         }
-        return Engine.LEGACY;
+        return Engine.MAVEN;
     }
 }

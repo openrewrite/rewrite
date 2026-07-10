@@ -92,11 +92,12 @@ class MavenEngineResolutionTest {
     }
 
     @Test
-    void shadowModeReturnsLegacyResultAndMasksTheExpectedPluginFlip() {
+    void shadowModeReturnsEngineResultAndMasksTheExpectedPluginFlip() {
         // The only legacy-vs-engine $.pom diff on this fixture is the ledgered L-P0-002/003 plugin flip; masks absorb it,
-        // so shadow does not throw and returns the LEGACY plugin order (shadow never changes behavior).
+        // so shadow does not throw and returns the ENGINE plugin order (shadow never changes behavior relative to the
+        // MAVEN default).
         ResolvedPom pom = resolve("plugins-executions", "shadow").getPom();
-        assertThat(pluginGas(pom)).containsExactly("org.parity.plugins:own-plugin", "org.apache.maven.plugins:maven-enforcer-plugin");
+        assertThat(pluginGas(pom)).containsExactly("org.apache.maven.plugins:maven-enforcer-plugin", "org.parity.plugins:own-plugin");
     }
 
     // ---- shadow comparison: report both outcomes ----
@@ -158,14 +159,14 @@ class MavenEngineResolutionTest {
     }
 
     @Test
-    void shadowDependencyModeReturnsLegacyWithoutThrowing() {
+    void shadowDependencyModeReturnsEngineGraphWithoutThrowing() {
         // SHADOW routes both engines through resolveDependencies, diffs pom+scopes+errors, and (masks absorbing the
-        // ledgered flips) returns the legacy graph. Reaching here without an AssertionError also proves the re-entrancy
+        // ledgered flips) returns the engine graph. Reaching here without an AssertionError also proves the re-entrancy
         // guard: the legacy pass calls pom.resolveDependencies(scope) per scope while the facade is dispatching, and
         // those nested calls run legacy rather than re-collecting/re-comparing.
         Map<Scope, List<String>> shadow = scopeGavs(resolve("scope-matrix", "shadow"));
-        Map<Scope, List<String>> legacy = scopeGavs(resolve("scope-matrix", "legacy"));
-        assertThat(shadow).isEqualTo(legacy);
+        Map<Scope, List<String>> maven = scopeGavs(resolve("scope-matrix", "maven"));
+        assertThat(shadow).isEqualTo(maven);
     }
 
     @Test

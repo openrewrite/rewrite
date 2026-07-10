@@ -61,8 +61,7 @@ import static java.util.Collections.emptyMap;
  * {@link ResolutionEngineSelector}. LEGACY runs the caller's existing path untouched; MAVEN builds the effective pom on
  * {@link EngineEffectivePom} + {@link EffectivePomMapper}; SHADOW runs both, diffs the {@code $.pom} snapshot section with
  * the ledgered {@code parity/masks.txt} applied, throws an {@link AssertionError} on any unexplained difference, and
- * returns the legacy result (shadow must never change behavior). Dependency resolution stays legacy in every mode
- * (Phase 3).
+ * returns the engine result (shadow must never change behavior relative to the MAVEN default).
  */
 public final class MavenEngineResolution {
 
@@ -122,14 +121,14 @@ public final class MavenEngineResolution {
             if (engine == Engine.MAVEN) {
                 return engineEffectivePom(requested, activeProfiles, downloader, ctx);
             }
-            // SHADOW: run both, diff, return legacy (never change behavior).
+            // SHADOW: run both, diff, return the engine result (never change behavior relative to the MAVEN default).
             Attempt legacyAttempt = attempt(legacy::resolve);
             Attempt engineAttempt = attempt(() -> engineEffectivePom(requested, activeProfiles, downloader, ctx));
             assertShadowParity(requested, toList(activeProfiles), PomXmlRegistry.injectedProperties(ctx), legacyAttempt, engineAttempt);
-            if (legacyAttempt.failure != null) {
-                throw legacyAttempt.rethrow();
+            if (engineAttempt.failure != null) {
+                throw engineAttempt.rethrow();
             }
-            return requireNonNull(legacyAttempt.result);
+            return requireNonNull(engineAttempt.result);
         } finally {
             DISPATCHING.set(Boolean.FALSE);
         }
@@ -299,8 +298,8 @@ public final class MavenEngineResolution {
      * Routes the all-scopes dependency graph. LEGACY runs the caller's per-scope legacy pass untouched; MAVEN runs a
      * single verbose collect and projects all four scopes ({@link EngineDependencyCollector} + {@link DependencyGraphMapper});
      * SHADOW runs both, diffs the full {@code pom}+{@code scopes}+{@code errors} snapshot with the ledgered masks, throws
-     * on any unexplained difference, and returns the legacy result. Direct-dependency failures preserve the
-     * {@code partialResult} contract (L-P0-004) on either path.
+     * on any unexplained difference, and returns the engine result (never changing behavior relative to the MAVEN
+     * default). Direct-dependency failures preserve the {@code partialResult} contract (L-P0-004) on either path.
      */
     public static Map<Scope, List<ResolvedDependency>> dependencyGraph(
             ResolvedPom legacyPom, Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx,
@@ -325,47 +324,45 @@ public final class MavenEngineResolution {
                 }
                 return graph.dependencies;
             }
-            // SHADOW: run both, diff, return legacy (never change behavior).
+            // SHADOW: run both, diff, return the engine result (never change behavior relative to the MAVEN default).
             DepAttempt legacyAttempt = attemptDeps(legacy);
             EngineGraph engineGraph;
             try {
                 engineGraph = attemptEngineGraph(legacyPom, profiles, downloader, ctx);
             } catch (MavenDownloadingException | MavenParsingException e) {
                 // The engine's effective-pom rebuild threw. When Maven is stricter than rewrite's lenient parser
-                // (parent-packaging, self-parent, expression-cycle, ...) the effective-pom shadow already ledgered the
-                // outcome and returned legacy; there is no engine graph to compare, so mirror that here.
+                // (parent-packaging, self-parent, expression-cycle, ...) the outcome is ledgered; there is no engine
+                // graph to compare, so propagate the engine's strict failure exactly as MAVEN mode does.
                 String category = strictnessCategory(e.getMessage());
                 if (category != null && isOutcomeMaskLedgered(category)) {
-                    // Ledgered Maven-stricter outcome. Return legacy's outcome — which may itself be a (deferred)
-                    // failure, e.g. a missing dependency version legacy tolerates at model build then fails at download.
-                    if (legacyAttempt.failure != null) {
-                        throw legacyAttempt.failure;
+                    if (e instanceof MavenDownloadingException) {
+                        throw MavenDownloadingExceptions.append(null, (MavenDownloadingException) e);
                     }
-                    return requireNonNull(legacyAttempt.result);
+                    throw (MavenParsingException) e;
                 }
                 throw new AssertionError("Shadow dependency resolution: engine effective-pom rebuild failed for " +
                         requested.getGav() + ": " + firstLine(e.getMessage()), e);
             }
             assertShadowDependencyParity(legacyPom, profiles, legacyAttempt, engineGraph);
-            if (legacyAttempt.failure != null) {
-                throw legacyAttempt.failure;
+            if (engineGraph.failure != null) {
+                throw engineGraph.failure;
             }
-            return requireNonNull(legacyAttempt.result);
+            return engineGraph.dependencies;
         } finally {
             DISPATCHING_DEPS.set(Boolean.FALSE);
         }
     }
 
     /**
-     * Routes a single scope's projection for external callers (rewrite-gradle). MAVEN projects just this scope from the
-     * one verbose collect; LEGACY and SHADOW defer to the legacy pass (the all-scopes {@link #dependencyGraph} carries the
-     * shadow census). Re-entrant calls under an active all-scopes dispatch run legacy directly.
+     * Routes a single scope's projection for external callers (rewrite-gradle). MAVEN and SHADOW project just this scope
+     * from the one verbose collect (the all-scopes {@link #dependencyGraph} carries the shadow census); LEGACY defers to
+     * the legacy pass. Re-entrant calls under an active all-scopes dispatch run legacy directly.
      */
     public static List<ResolvedDependency> dependencyGraphScope(
             ResolvedPom pom, Scope scope, MavenPomDownloader downloader, ExecutionContext ctx,
             LegacyScopeResolution legacy) throws MavenDownloadingExceptions {
         Engine engine = ResolutionEngineSelector.select(ctx);
-        if (engine != Engine.MAVEN || DISPATCHING_DEPS.get()) {
+        if (engine == Engine.LEGACY || DISPATCHING_DEPS.get()) {
             return legacy.resolve();
         }
         DISPATCHING_DEPS.set(Boolean.TRUE);
@@ -635,8 +632,8 @@ public final class MavenEngineResolution {
         if (legacy.failure != null || engine.failure != null) {
             // One threw and the other did not: an outcome mismatch. Legacy-resolves/engine-fails where the engine is
             // Maven-identically stricter than rewrite's lenient parser (cycles, self-parent, non-pom parent/aggregator
-            // packaging, a genuinely missing dependency version) is a known class that flips at Phase 5; a ledgered
-            // outcome mask lets shadow return legacy's result rather than failing. Anything else is unexplained.
+            // packaging, a genuinely missing dependency version) is the ledgered strictness class; a ledgered outcome
+            // mask classifies it as explained and shadow propagates the engine's outcome. Anything else is unexplained.
             if (legacy.failure == null || engine.failure == null) {
                 String category = classifyEngineStrictness(legacy, engine);
                 if (category != null && isOutcomeMaskLedgered(category)) {
