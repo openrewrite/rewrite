@@ -1082,22 +1082,34 @@ public class MavenPomDownloader {
 
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
         String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
+        // If this host has already required credentials in this session, authenticate preemptively rather than
+        // paying another anonymous round-trip. Otherwise probe anonymously first.
+        String endpoint = endpointOrNull(URI.create(jarUrl));
+        boolean preemptive = hasCredentials(repo) && endpoint != null &&
+                             ctx.getAuthenticationRequiredEndpoints().contains(endpoint);
         try {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
-                    HttpSender.Request unauthenticated = applyTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
-                    try (HttpSender.Response response = httpSender.send(unauthenticated)) {
+                    HttpSender.Request request = preemptive ?
+                            applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build() :
+                            applyTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
+                    try (HttpSender.Response response = httpSender.send(request)) {
                         return response.isSuccessful();
                     }
                 });
             } catch (FailsafeException failsafeException) {
                 Throwable cause = failsafeException.getCause();
-                if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
+                if (cause instanceof HttpSenderResponseException && !preemptive && hasCredentials(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
                         HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
                         try (HttpSender.Response response = httpSender.send(authenticated)) {
-                            return response.isSuccessful();
+                            boolean successful = response.isSuccessful();
+                            if (successful && endpoint != null) {
+                                // Remember so later requests to this host authenticate preemptively
+                                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
+                            }
+                            return successful;
                         }
                     });
                 }
@@ -1116,7 +1128,8 @@ public class MavenPomDownloader {
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
         // If this host has already required credentials in this session, authenticate preemptively rather than
         // paying another anonymous round-trip. Otherwise request anonymously first.
-        if (hasCredentials(repo) && MavenAuthenticationCache.requiresAuthentication(uriString, ctx)) {
+        String endpoint = endpointOrNull(URI.create(uriString));
+        if (hasCredentials(repo) && endpoint != null && ctx.getAuthenticationRequiredEndpoints().contains(endpoint)) {
             return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
         }
         try {
@@ -1134,7 +1147,10 @@ public class MavenPomDownloader {
         try {
             byte[] responseBody = sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
             // Remember so later requests to this host authenticate preemptively
-            MavenAuthenticationCache.rememberRequiresAuthentication(uriString, ctx);
+            String endpoint = endpointOrNull(URI.create(uriString));
+            if (endpoint != null) {
+                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
+            }
             return responseBody;
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {

@@ -24,9 +24,9 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
-import org.openrewrite.maven.internal.MavenAuthenticationCache;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -135,8 +136,10 @@ public class MavenArtifactDownloader {
                     MavenRepository repository = dependency.getRepository();
                     // Mirror Apache Maven's DeferredCredentialsProvider: anonymous first, unless this host has
                     // already required credentials in this session, in which case authenticate preemptively.
-                    boolean preemptive = hasAuthentication(repository) &&
-                                         MavenAuthenticationCache.requiresAuthentication(uri, ctx);
+                    Set<String> authenticationRequiredEndpoints = MavenExecutionContextView.view(ctx).getAuthenticationRequiredEndpoints();
+                    String endpoint = endpointOrNull(uri);
+                    boolean preemptive = hasAuthentication(repository) && endpoint != null &&
+                                         authenticationRequiredEndpoints.contains(endpoint);
                     byte[] responseBytes = null;
                     int responseCode;
                     HttpSender.Request firstRequest = preemptive ?
@@ -159,9 +162,9 @@ public class MavenArtifactDownloader {
                                 responseBytes = readAllBytes(body);
                             }
                         }
-                        if (responseBytes != null) {
+                        if (responseBytes != null && endpoint != null) {
                             // Remember so later artifacts from this host authenticate preemptively
-                            MavenAuthenticationCache.rememberRequiresAuthentication(uri, ctx);
+                            authenticationRequiredEndpoints.add(endpoint);
                         }
                     }
                     if (responseBytes == null) {
@@ -196,6 +199,12 @@ public class MavenArtifactDownloader {
 
     private boolean hasAuthentication(MavenRepository repository) {
         return !resolveHttpHeaders(repository).isEmpty() || resolveCredentials(repository) != null;
+    }
+
+    private static @Nullable String endpointOrNull(String uri) {
+        URI parsed = URI.create(uri);
+        String host = parsed.getHost();
+        return host == null ? null : host + ':' + parsed.getPort();
     }
 
     /**

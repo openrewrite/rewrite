@@ -56,6 +56,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
     private static final String MAVEN_UNREACHABLE_ENDPOINTS = "org.openrewrite.maven.unreachableEndpoints";
+    private static final String MAVEN_AUTHENTICATION_REQUIRED_ENDPOINTS = "org.openrewrite.maven.authenticationRequiredEndpoints";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -90,6 +91,20 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      */
     public Set<String> getUnreachableEndpoints() {
         return computeMessageIfAbsent(MAVEN_UNREACHABLE_ENDPOINTS, k -> ConcurrentHashMap.newKeySet());
+    }
+
+    /**
+     * The authentication-side counterpart to {@link #getUnreachableEndpoints()}: connection endpoints, each a
+     * {@code host:port}, that challenged an anonymous request and required credentials during this execution.
+     * Once an endpoint is known to require authentication, subsequent requests send credentials preemptively
+     * instead of paying another anonymous round-trip, mirroring the per-session {@code BasicAuthCache} that
+     * Apache Maven Resolver keeps on its HTTP client. As with unreachable endpoints, the key is {@code host:port}
+     * rather than the full URI because the challenge is a property of the endpoint, not the requested path, so the
+     * same host contacted under different paths or ids is deduped. The set is concurrent because resolution runs
+     * across multiple threads sharing one execution context.
+     */
+    public Set<String> getAuthenticationRequiredEndpoints() {
+        return computeMessageIfAbsent(MAVEN_AUTHENTICATION_REQUIRED_ENDPOINTS, k -> ConcurrentHashMap.newKeySet());
     }
 
     public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {
