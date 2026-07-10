@@ -973,9 +973,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     } else {
                         visit(element, p);
                     }
-                    visitSpace(rp.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
-                    if (i < ctorElements.size() - 1) {
+                    boolean isTrailingComma = rp.getMarkers().findFirst(org.openrewrite.scala.marker.TrailingComma.class).isPresent();
+                    if (isTrailingComma) {
                         p.append(',');
+                        visitSpace(rp.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+                    } else {
+                        visitSpace(rp.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+                        if (i < ctorElements.size() - 1) {
+                            p.append(',');
+                        }
                     }
                 }
                 p.append(')');
