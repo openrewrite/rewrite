@@ -234,7 +234,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return true;
                 }
                 if ((versionComparator != null) && (foundVersion != null)) {
-                    return versionComparator.isValid(targetVersion, foundVersion);
+                    return versionComparator.isValid(foundVersion, foundVersion);
                 } else {
                     return targetVersion.equals(foundVersion);
                 }
