@@ -321,7 +321,6 @@ class JavaTemplateSemanticallyEqualVarargsTest implements RewriteTest {
         void extractVarargsMatchedElements() {
             rewriteRun(
               spec -> spec
-                .cycles(1)
                 .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                     final JavaTemplate template = JavaTemplate
                       .builder("java.util.Arrays.asList(#{items:anyArray(Object)})")

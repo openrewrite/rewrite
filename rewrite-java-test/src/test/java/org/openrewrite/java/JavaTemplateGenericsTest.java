@@ -296,7 +296,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
                   .bindType("java.util.function.Function<T, String>")
@@ -352,7 +351,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
                   .bindType("java.util.function.Function<T, String>")
@@ -410,7 +408,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
                   .bindType("java.util.function.Function<T, String>")
@@ -467,7 +464,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.intValue()")
                   .bindType("java.util.function.ToIntFunction<T>")
@@ -564,7 +560,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("#{any(java.util.Set<T>)}::contains")
                   .bindType("java.util.function.Predicate<T>")

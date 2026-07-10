@@ -58,7 +58,7 @@ class CreateEmptyJavaClassTest implements RewriteTest {
             "ExampleClass",
             true,
             null
-          )).cycles(1),
+          )),
           java(
             """
               package org.openrewrite.example;
@@ -130,7 +130,7 @@ class CreateEmptyJavaClassTest implements RewriteTest {
             "ExampleClass2",
             true,
             null
-          )).cycles(1),
+          )),
           java(
             """
               package org.openrewrite.example;

@@ -539,7 +539,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
                         addIfMissing: false
                 """,
               "org.openrewrite.gradle.MultipleWrapperUpdates")
-            .cycles(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");

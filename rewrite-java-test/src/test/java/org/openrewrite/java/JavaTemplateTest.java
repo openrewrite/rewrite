@@ -112,8 +112,7 @@ class JavaTemplateTest implements RewriteTest {
                 public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
                     return JavaTemplate.apply("#{any()}", getCursor(), parens.getCoordinates().replace(), parens.getTree());
                 }
-            }))
-            .cycles(1),
+            })),
           java(
             """
               public class A {
@@ -138,7 +137,7 @@ class JavaTemplateTest implements RewriteTest {
                     return JavaTemplate.apply("#{any(int)} * 3", getCursor(), binary.getCoordinates().replace(), binary);
                 }
             }))
-            .cycles(1),
+            .assertIdempotent(false),
           java(
             """
               public class A {
@@ -1454,8 +1453,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void recursiveType() {
         rewriteRun(
-          spec -> spec.cycles(1)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
                     var param = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();

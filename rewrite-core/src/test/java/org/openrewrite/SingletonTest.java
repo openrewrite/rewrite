@@ -146,7 +146,6 @@ class SingletonTest implements RewriteTest {
         // is included multiple times the singleton instance is shared only the first gets to make changes.
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .expectedCyclesThatMakeChanges(1)
             .recipeFromYaml(
             """
@@ -229,7 +228,6 @@ class SingletonTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .expectedCyclesThatMakeChanges(1)
             .recipe(recipe),
           text(
@@ -339,7 +337,6 @@ class SingletonTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .expectedCyclesThatMakeChanges(0)
             .recipe(recipe)
             .validateRecipeSerialization(false)

@@ -1038,7 +1038,6 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchMemberReferenceContainingParameter() {
         rewriteRun(
           spec -> spec
-            .cycles(1)
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 JavaTemplate template = JavaTemplate.builder("java.util.function.Predicate.not(#{any(java.util.Set)}::contains)").build();
 
@@ -1086,7 +1085,7 @@ class JavaTemplateMatchTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            .cycles(1)
+            .assertIdempotent(false)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
                   .bindType("java.util.function.Function<Object, String>")

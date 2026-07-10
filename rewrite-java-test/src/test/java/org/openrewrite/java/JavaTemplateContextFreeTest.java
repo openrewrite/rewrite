@@ -171,7 +171,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return multiVariable;
               }
-          })).cycles(1),
+          })),
           java(
             """
               import java.util.Optional;
@@ -195,6 +195,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("TypeParameterHidesVisibleType")
     @Test
     void contextFreeTypeParameterConflictNames() {
         rewriteRun(
@@ -209,7 +210,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
-          })).cycles(1),
+          })),
           java(
             """
               class Test<T extends Number> {
@@ -243,7 +244,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
-          })).cycles(1),
+          })),
           java(
             """
               class Test<T extends Number> {
@@ -277,7 +278,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return multiVariable;
               }
-          })).cycles(1),
+          })),
           java(
             """
               import java.util.Map;
@@ -315,7 +316,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return multiVariable;
               }
-          })).cycles(1),
+          })),
           java(
             """
               import java.util.Comparator;
@@ -355,7 +356,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return multiVariable;
               }
-          })).cycles(1),
+          })),
           java(
             """
               import java.io.Serializable;

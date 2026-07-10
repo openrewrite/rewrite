@@ -39,7 +39,7 @@ class RecipeListTest implements RewriteTest {
     void declarativeRecipeInCode() {
         rewriteRun(
           specs -> specs.recipe(new FormalHello("jon", "jonathan"))
-            .cycles(1),
+            .assertIdempotent(false),
           text(
             "hi jon",
             "hello jonathan",

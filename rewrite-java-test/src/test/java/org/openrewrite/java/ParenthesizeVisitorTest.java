@@ -36,8 +36,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .recipe(toRecipe(Reparenthesize::new))
-          .cycles(1);
+          .recipe(toRecipe(Reparenthesize::new));
     }
 
     @DocumentExample
