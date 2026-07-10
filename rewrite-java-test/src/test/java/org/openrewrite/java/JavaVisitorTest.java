@@ -35,7 +35,6 @@ class JavaVisitorTest implements RewriteTest {
     void javaVisitorHandlesPaddedWithNullElem() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipes(
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
@@ -139,7 +138,6 @@ class JavaVisitorTest implements RewriteTest {
     void javaVisitorHandlesErroneousNodes() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipes(
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override

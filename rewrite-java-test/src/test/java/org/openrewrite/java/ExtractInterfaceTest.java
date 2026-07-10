@@ -74,7 +74,7 @@ class ExtractInterfaceTest implements RewriteTest {
     @Test
     void extractInterface() {
         rewriteRun(
-          spec -> spec.recipe(new ExtractTestInterface()).cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new ExtractTestInterface()).cycles(1),
           java(
             """
               package org.openrewrite;

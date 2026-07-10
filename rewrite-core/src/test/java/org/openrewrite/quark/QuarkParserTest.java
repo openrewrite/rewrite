@@ -69,7 +69,6 @@ class QuarkParserTest implements RewriteTest {
         rewriteRun(
           spec ->
             spec
-              .expectedCyclesThatMakeChanges(1)
               .recipe(toRecipe(() -> new TreeVisitor<>() {
                   @Override
                   public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {

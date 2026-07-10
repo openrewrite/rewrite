@@ -50,7 +50,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void method() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -68,7 +67,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void methodWithThrows() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.lang.Exception;
@@ -88,7 +86,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void returnExpression() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -107,7 +104,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInClass() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -128,7 +124,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInMethod() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -151,7 +146,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void variableDeclarationsInForLoops() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class Test {
@@ -178,7 +172,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void spacesBetweenModifiers() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               public final class A {
@@ -197,7 +190,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void multiAnnotatedOnClass() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.lang.Deprecated;
@@ -295,7 +287,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void importStatement() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serial;
@@ -312,7 +303,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void fieldWithModifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class Clazz {
@@ -329,7 +319,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void fieldWithModifiers() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               class Clazz {
@@ -346,7 +335,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void multiAnnotatedFieldWithModifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serial;
@@ -366,7 +354,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void annotatedFieldWithModifier() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serial;
@@ -385,7 +372,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void annotatedFieldWithModifiers() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serial;
@@ -404,7 +390,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classExtends() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.lang.Exception;
@@ -422,7 +407,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classImplements() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serializable;
@@ -440,7 +424,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classImplementsSeveral() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serializable;
@@ -459,7 +442,6 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void classExtendsAndImplementsSeveral() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.io.Serializable;

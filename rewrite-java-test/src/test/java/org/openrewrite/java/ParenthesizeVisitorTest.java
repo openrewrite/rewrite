@@ -37,8 +37,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .recipe(toRecipe(Reparenthesize::new))
-          .cycles(1)
-          .expectedCyclesThatMakeChanges(1);
+          .cycles(1);
     }
 
     @DocumentExample
@@ -429,8 +428,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
     @Test
     void alreadyParenthesized() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new ParenthesizeVisitor()))
-            .expectedCyclesThatMakeChanges(0),
+          spec -> spec.recipe(toRecipe(() -> new ParenthesizeVisitor())),
           java(
             """
               class Test {

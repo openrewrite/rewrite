@@ -58,10 +58,9 @@ public class RecipeScheduler {
     public RecipeRun scheduleRun(Recipe recipe,
                                  LargeSourceSet sourceSet,
                                  ExecutionContext ctx,
-                                 int maxStages,
-                                 int minStages) {
+                                 int maxStages) {
         try {
-            LargeSourceSet after = runRecipeStages(recipe, sourceSet, ctx, maxStages, minStages);
+            LargeSourceSet after = runRecipeStages(recipe, sourceSet, ctx, maxStages);
             return new RecipeRun(
                     after.getChangeset(),
                     DataTableExecutionContextView.view(ctx).getDataTableStore()
@@ -74,7 +73,7 @@ public class RecipeScheduler {
         }
     }
 
-    private LargeSourceSet runRecipeStages(Recipe recipe, LargeSourceSet sourceSet, ExecutionContext ctx, int maxStages, int minStages) {
+    private LargeSourceSet runRecipeStages(Recipe recipe, LargeSourceSet sourceSet, ExecutionContext ctx, int maxStages) {
         WatchableExecutionContext ctxWithWatch = new WatchableExecutionContext(ctx);
 
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
@@ -102,7 +101,7 @@ public class RecipeScheduler {
                 if (firstStageInLineage) {
                     executedStages.add(stageRecipe);
                 }
-                after = runStage(stageRecipe, stage, firstStageInLineage, after, ctxWithWatch, maxStages, minStages,
+                after = runStage(stageRecipe, stage, firstStageInLineage, after, ctxWithWatch, maxStages,
                         recipeRunStats, searchResults, sourceFileResults, errorsTable, stageQueue);
             }
         } finally {
@@ -115,7 +114,7 @@ public class RecipeScheduler {
     }
 
     private LargeSourceSet runStage(Recipe recipe, int stage, boolean firstStageInLineage, LargeSourceSet after, WatchableExecutionContext ctxWithWatch,
-                                    int maxStages, int minStages, RecipeRunStats recipeRunStats,
+                                    int maxStages, RecipeRunStats recipeRunStats,
                                     SearchResults searchResults, SourcesFileResults sourceFileResults,
                                     SourcesFileErrors errorsTable, Deque<Recipe> stageQueue) {
         // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
@@ -150,9 +149,11 @@ public class RecipeScheduler {
                                               "set by this recipe runtime.");
                 }
                 stageQueue.add(scheduled.size() == 1 ? scheduled.get(0) : new StageRecipe(scheduled));
-            } else if (stage < minStages && stage < maxStages) {
-                // Nothing left to run, but the run's stage floor isn't met: run the stage once more to
-                // confirm stability (how tests assert idempotency).
+            } else if (runAdditionalStage(stage, maxStages)) {
+                // Nothing left to run, but a subclass wants another pass — e.g. the test harness
+                // re-running a converged stage to confirm stability (idempotency). Kept as a scheduler
+                // seam rather than a recipe self-edge, which would tangle with recipes that themselves
+                // schedule a nextStage.
                 stageQueue.add(recipe);
             }
 
@@ -184,6 +185,15 @@ public class RecipeScheduler {
         }
     }
 
+    /**
+     * Whether to run another stage once a run has otherwise converged (nothing scheduled for a
+     * successor stage). Always {@code false} for normal runs; the test harness overrides this to
+     * force a minimum number of stages when verifying idempotency.
+     */
+    protected boolean runAdditionalStage(int stage, int maxStages) {
+        return false;
+    }
+
     protected RecipeRunStage<LargeSourceSet> createRecipeRunStage(Recipe recipe, int cycle, Cursor rootCursor, WatchableExecutionContext ctxWithWatch, RecipeRunStats recipeRunStats, SearchResults searchResults, SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
         return new RecipeRunStage<>(recipe, cycle, rootCursor, ctxWithWatch,
                 recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
@@ -200,7 +210,7 @@ public class RecipeScheduler {
      * A synthetic root recipe wrapping the recipes a stage scheduled for its successor stage, so they run
      * together as one downstream stage rather than as separate full-source passes.
      */
-    private static class StageRecipe extends Recipe {
+    private static class StageRecipe extends Recipe implements Recipe.Synthetic {
         private final List<Recipe> recipeList;
 
         private StageRecipe(List<Recipe> recipeList) {

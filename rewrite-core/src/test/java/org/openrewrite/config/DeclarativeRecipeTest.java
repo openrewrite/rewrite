@@ -289,8 +289,7 @@ class DeclarativeRecipeTest implements RewriteTest {
                   assertThat(s.getAfter()).isNotNull();
                   assertThat(s.getAfter().getSourcePath()).isEqualTo(Path.of("test.txt"));
               }
-            ))
-            .expectedCyclesThatMakeChanges(1),
+            )),
           text("1")
         );
     }

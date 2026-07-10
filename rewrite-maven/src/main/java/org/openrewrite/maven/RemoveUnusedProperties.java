@@ -25,6 +25,7 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.scheduling.RecipeRunStage;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.text.PlainText;
@@ -120,6 +121,16 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
 
     private static Pattern atPropertyMatcher(String patternOrDefault) {
         return Pattern.compile("@(" + patternOrDefault + ")@");
+    }
+
+    @Override
+    public void nextStage(RecipeList stage, ExecutionContext ctx, Accumulator acc) {
+        // Removing a property can leave another one (referenced only by the removed property) unused;
+        // re-run until removals stop cascading.
+        RecipeRunStage<?> details = ctx.getStageDetails();
+        if (details.getMadeChangesInThisStage().contains(this)) {
+            stage.addIfAbsent(details.getRecipe());
+        }
     }
 
     @Override

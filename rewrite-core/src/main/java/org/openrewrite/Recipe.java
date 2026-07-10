@@ -531,11 +531,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxStages) {
-        return run(before, ctx, maxStages, 1);
-    }
-
-    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxStages, int minStages) {
-        return new RecipeScheduler().scheduleRun(this, before, ctx, maxStages, minStages);
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxStages);
     }
 
     @SuppressWarnings("unused")
@@ -608,6 +604,17 @@ public abstract class Recipe implements Cloneable {
 
     public interface DelegatingRecipe {
         Recipe getDelegate();
+    }
+
+    /**
+     * Marks a recipe as structural scaffolding rather than a user-facing transformation — e.g. a
+     * scheduler-generated grouping of recipes scheduled for a downstream stage, or a test-harness
+     * driver that forces additional stages. Recipes implementing this are omitted from the recipe
+     * stack recorded in {@link org.openrewrite.marker.RecipesThatMadeChanges} and the
+     * {@code SourcesFileResults} data table, so they never appear as a phantom parent of the real
+     * recipes that made changes.
+     */
+    public interface Synthetic {
     }
 
     /**

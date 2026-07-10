@@ -58,8 +58,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build()
               )))
             .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .cycles(1),
           pomXml(
             """
               <project>
@@ -90,7 +89,6 @@ class MavenDependencyFailuresTest implements RewriteTest {
               .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .dataTable(MavenMetadataFailures.Row.class, failures ->
                 assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
           pomXml(
@@ -158,8 +156,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
               .setLocalRepository(mavenLocal)
               .setPomCache(new InMemoryMavenPomCache())
             )
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .cycles(1),
           pomXml(
             """
               <project>

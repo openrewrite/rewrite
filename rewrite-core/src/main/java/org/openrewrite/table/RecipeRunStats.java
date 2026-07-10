@@ -53,10 +53,18 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
+        if (recipe instanceof Recipe.Synthetic) {
+            // Structural scaffolding (e.g. a stage grouping); don't give it a stats row.
+            scan.call();
+            return;
+        }
         recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).recordScan(scan);
     }
 
     public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
+        if (recipe instanceof Recipe.Synthetic) {
+            return edit.call();
+        }
         return recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).recordEdit(edit);
     }
 

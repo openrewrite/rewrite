@@ -132,7 +132,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void addGradleWrapper() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
+          spec -> spec.afterRecipe(run -> {
               assertThat(run.getChangeset().getAllResults()).hasSize(4);
 
               var gradleSh = result(run, PlainText.class, "gradlew");
@@ -540,7 +540,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 """,
               "org.openrewrite.gradle.MultipleWrapperUpdates")
             .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
@@ -682,7 +681,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-bin.zip", null))
-            .expectedCyclesThatMakeChanges(1)
             .executionContext(ctx)
             .afterRecipe(run -> {
                 assertThat(run.getChangeset().getAllResults()).hasSize(4);
@@ -730,7 +728,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-bin.zip", wrapperJarChecksum))
-            .expectedCyclesThatMakeChanges(1)
             .executionContext(ctx)
             .afterRecipe(run -> {
                 var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
@@ -1241,8 +1238,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void usesExecutableJarFrom8_14() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateGradleWrapper("8.14", null, null, null, null))
-            .expectedCyclesThatMakeChanges(1).afterRecipe(run -> {
+          spec -> spec.recipe(new UpdateGradleWrapper("8.14", null, null, null, null)).afterRecipe(run -> {
                 assertThat(run.getChangeset().getAllResults()).hasSize(4);
 
                 var gradleSh = result(run, PlainText.class, "gradlew");

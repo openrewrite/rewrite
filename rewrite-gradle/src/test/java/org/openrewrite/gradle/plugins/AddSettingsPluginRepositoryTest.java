@@ -436,7 +436,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     void idempotentAfterAddingGradlePluginPortalWithExistingContent() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+            .cycles(3),
           settingsGradle(
             """
               rootProject.name = "demo"
@@ -458,7 +458,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     void idempotentAfterAddingGradlePluginPortalWithExistingContentKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+            .cycles(3),
           settingsGradleKts(
             """
               rootProject.name = "demo"
@@ -512,7 +512,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     void addToExistingPluginManagementNotFirstStatementKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+            .cycles(3),
           settingsGradleKts(
             """
               rootProject.name = "demo"
@@ -646,7 +646,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     void addSecondMavenRepoKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.spring.io"))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+            .cycles(3),
           settingsGradleKts(
             """
               pluginManagement {
@@ -677,7 +677,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     void addToExistingPluginManagementWithPluginsBlockKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+            .cycles(3),
           settingsGradleKts(
             """
               pluginManagement {

@@ -1661,8 +1661,7 @@ class MergeYamlTest implements RewriteTest {
                 null,
                 null
               ),
-              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null))
-            .expectedCyclesThatMakeChanges(2),
+              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null)),
           yaml(
             """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -3512,7 +3511,6 @@ class MergeYamlTest implements RewriteTest {
     void deleteKeyFollowedByMergeYamlCompletesInTwoCycles() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
             .recipe(
               new CompositeRecipe(
                 List.of(

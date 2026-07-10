@@ -113,8 +113,7 @@ class JavaTemplateTest implements RewriteTest {
                     return JavaTemplate.apply("#{any()}", getCursor(), parens.getCoordinates().replace(), parens.getTree());
                 }
             }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .cycles(1),
           java(
             """
               public class A {
@@ -139,8 +138,7 @@ class JavaTemplateTest implements RewriteTest {
                     return JavaTemplate.apply("#{any(int)} * 3", getCursor(), binary.getCoordinates().replace(), binary);
                 }
             }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .cycles(1),
           java(
             """
               public class A {
@@ -577,7 +575,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
@@ -1456,7 +1454,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void recursiveType() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+          spec -> spec.cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {

@@ -731,6 +731,7 @@ public class RecipeRunStage<LSS extends LargeSourceSet> {
     }
 
     protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {
+        recipeStack = visible(recipeStack);
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
         Recipe recipe = leaf(recipeStack);
@@ -819,12 +820,36 @@ public class RecipeRunStage<LSS extends LargeSourceSet> {
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
         return afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                RecipesThatMadeChanges.create(recipeStack),
+                RecipesThatMadeChanges.create(visible(recipeStack)),
                 (r1, r2) -> {
                     r1.getRecipes().addAll(r2.getRecipes());
                     return r1;
                 })
         );
+    }
+
+    /**
+     * Strips {@link Recipe.Synthetic} scaffolding (stage groupings, test-harness drivers) from a
+     * recipe stack so it doesn't surface as a phantom parent in results or data tables.
+     */
+    private static List<Recipe> visible(List<Recipe> recipeStack) {
+        boolean anySynthetic = false;
+        for (Recipe r : recipeStack) {
+            if (r instanceof Recipe.Synthetic) {
+                anySynthetic = true;
+                break;
+            }
+        }
+        if (!anySynthetic) {
+            return recipeStack;
+        }
+        List<Recipe> result = new ArrayList<>(recipeStack.size());
+        for (Recipe r : recipeStack) {
+            if (!(r instanceof Recipe.Synthetic)) {
+                result.add(r);
+            }
+        }
+        return result;
     }
 
     @NonFinal

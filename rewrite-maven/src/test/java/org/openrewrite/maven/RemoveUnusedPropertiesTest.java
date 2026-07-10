@@ -167,7 +167,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
     @Test
     void requiresCyclesForCascadingRemovals() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
+          spec -> spec.cycles(3),
           pomXml(
             """
               <project>

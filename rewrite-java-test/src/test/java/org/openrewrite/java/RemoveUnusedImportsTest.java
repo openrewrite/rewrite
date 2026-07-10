@@ -1308,7 +1308,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveWildCardImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               package com.Source.mine;
@@ -1687,7 +1686,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeMultipleImportsWhileUnfoldingWildcard() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.Set;

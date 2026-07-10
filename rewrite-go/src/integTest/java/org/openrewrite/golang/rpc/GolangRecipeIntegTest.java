@@ -91,7 +91,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })).cycles(1),
           go(
             """
               package main
@@ -131,7 +131,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })).cycles(1),
           go(
             """
               package main
@@ -328,7 +328,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })).cycles(1),
           go(
             """
               package main
@@ -361,7 +361,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return m;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })).cycles(1),
           go(
             """
               package main
@@ -475,7 +475,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })).cycles(1),
           go(
             """
               package main

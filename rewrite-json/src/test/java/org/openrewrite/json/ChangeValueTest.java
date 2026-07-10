@@ -349,7 +349,7 @@ class ChangeValueTest implements RewriteTest {
           spec -> spec.recipes(
             new ChangeValue("$.node", "18"),
             new ChangeValue("$.node", "20")
-          ).expectedCyclesThatMakeChanges(2),
+          ),
           json(
             """
             { "node": 14 }

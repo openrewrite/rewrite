@@ -64,6 +64,18 @@ public class RemoveUnusedImports extends Recipe {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+            // Unfolding a wildcard can surface a duplicate of an explicit import already kept this pass.
+            // Removal is independent per source file, so drive a local fixpoint rather than relying on
+            // an additional recipe cycle to clean up.
+            J.CompilationUnit c = removeUnusedImports(cu, ctx);
+            while (c != cu) {
+                cu = c;
+                c = removeUnusedImports(cu, ctx);
+            }
+            return c;
+        }
+
+        private J.CompilationUnit removeUnusedImports(J.CompilationUnit cu, ExecutionContext ctx) {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
                     .orElse(IntelliJ.importLayout());
             String sourcePackage = cu.getPackageDeclaration() == null ? "" :

@@ -466,7 +466,7 @@ class RewriteRpcTest implements RewriteTest {
         // when
         RecipeRun run = new RecipeScheduler().scheduleRun(
           new CompositeRecipe(List.of(r1, r2)),
-          new InMemoryLargeSourceSet(List.of(source)), ctx, 1, 1);
+          new InMemoryLargeSourceSet(List.of(source)), ctx, 1);
 
         // then
         assertThat(errors).isNotEmpty();
@@ -497,7 +497,7 @@ class RewriteRpcTest implements RewriteTest {
         var ctx = new InMemoryExecutionContext();
         RecipeRun run = new RecipeScheduler().scheduleRun(
           new CompositeRecipe(List.of(r1, r2)),
-          new InMemoryLargeSourceSet(List.of(quark)), ctx, 1, 1);
+          new InMemoryLargeSourceSet(List.of(quark)), ctx, 1);
 
         // then
         assertThat(run.getChangeset().getAllResults())

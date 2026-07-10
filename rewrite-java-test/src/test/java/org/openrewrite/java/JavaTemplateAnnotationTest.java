@@ -38,7 +38,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceClassAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
@@ -65,7 +65,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceNestedClassAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
@@ -104,8 +104,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   }
               }
             ))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .cycles(1),
           java(
             """
               @Deprecated(since = "1.0", forRemoval = true)

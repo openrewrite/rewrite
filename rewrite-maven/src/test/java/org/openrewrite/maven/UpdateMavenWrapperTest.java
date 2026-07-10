@@ -319,7 +319,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
     void addsWrapperToRootWhenMultipleIndependentMavenProjectsExist() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
-            .expectedCyclesThatMakeChanges(1)
             .afterRecipe(run -> {
                 assertThat(run.getChangeset().getAllResults()).hasSize(4);
 
@@ -783,7 +782,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
               "org.openrewrite.maven.MultipleWrapperUpdates"
             )
             .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.0")))
             .afterRecipe(run -> {
                 var mvnw = result(run, PlainText.class, "mvnw");

@@ -48,8 +48,8 @@ public interface RewriteRunner {
      * Default in-JVM behavior. Out-of-process runners override this.
      */
     default RecipeRun run(Recipe recipe, Context context) {
-        return recipe.run(context.getSources(), context.getExecutionContext(),
-                context.getCycles(), context.getMinStages());
+        return new MinStagesScheduler(context.getMinStages())
+                .scheduleRun(recipe, context.getSources(), context.getExecutionContext(), context.getCycles());
     }
 
     /**

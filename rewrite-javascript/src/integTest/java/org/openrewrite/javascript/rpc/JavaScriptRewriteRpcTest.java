@@ -384,8 +384,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of()))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .cycles(1),
           text("file1", "file1 (count: 2)"),
           text("file2", "file2 (count: 2)")
         );

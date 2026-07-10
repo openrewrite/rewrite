@@ -663,7 +663,7 @@ class DataTableStoreTest {
         RecipeRun run = new RecipeScheduler().scheduleRun(
                 new WriteThenReadRecipe(),
                 new InMemoryLargeSourceSet(sources),
-                ctx, 3, 1
+                ctx, 3
         );
 
         // The recipe should have run 2 cycles:

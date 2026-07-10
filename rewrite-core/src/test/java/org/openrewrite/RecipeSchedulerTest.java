@@ -209,7 +209,7 @@ class RecipeSchedulerTest implements RewriteTest {
 
         var ctx = new InMemoryExecutionContext();
         List<SourceFile> sources = List.of(PlainText.builder().text("v").sourcePath(Path.of("test.txt")).build());
-        trackingScheduler.scheduleRun(multiCycleRecipe, new InMemoryLargeSourceSet(sources), ctx, 5, 1);
+        trackingScheduler.scheduleRun(multiCycleRecipe, new InMemoryLargeSourceSet(sources), ctx, 5);
 
         // Verify cycle numbers increment correctly: Cycle 1, 2, 3 (stops after no change in cycle 3)
         assertThat(cyclesFromFactory).containsExactly(1, 2, 3);
@@ -259,7 +259,7 @@ class RecipeSchedulerTest implements RewriteTest {
                 PlainText.builder().text("a").sourcePath(Path.of("a.txt")).build(),
                 PlainText.builder().text("b").sourcePath(Path.of("b.txt")).build()
         );
-        trackingScheduler.scheduleRun(recipe, new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+        trackingScheduler.scheduleRun(recipe, new InMemoryLargeSourceSet(sources), ctx, 3);
 
         assertThat(beforeContents).containsExactlyInAnyOrder("a", "b");
         assertThat(afterContents).containsExactlyInAnyOrder("modified:a", "modified:b");
@@ -321,7 +321,7 @@ class RecipeSchedulerTest implements RewriteTest {
 
         var ctx = new InMemoryExecutionContext();
         List<SourceFile> sources = List.of(PlainText.builder().text("existing").sourcePath(Path.of("existing.txt")).build());
-        trackingScheduler.scheduleRun(generatingRecipe, new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+        trackingScheduler.scheduleRun(generatingRecipe, new InMemoryLargeSourceSet(sources), ctx, 3);
 
         assertThat(generatedPaths).containsExactly("generated.txt");
     }

@@ -115,7 +115,7 @@ class CompositeBatchVisitSubclassTest {
         });
         RecipeRun run = new RecipeScheduler().scheduleRun(
           new CompositeRecipe(List.of(changeChild, changeAttr)),
-          new InMemoryLargeSourceSet(List.of(subclass)), ctx, 2, 1);
+          new InMemoryLargeSourceSet(List.of(subclass)), ctx, 2);
 
         SourceFile after = run.getChangeset().getAllResults().get(0).getAfter();
         String printed = after.printAll();
