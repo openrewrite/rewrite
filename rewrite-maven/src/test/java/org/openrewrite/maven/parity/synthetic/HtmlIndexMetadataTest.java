@@ -28,10 +28,10 @@ import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.rootPom;
 /**
  * Metadata derivation from a Nexus/Artifactory-style HTML index when {@code maven-metadata.xml}
  * 404s (a2 §1.3, a4 catalog #66). This AUGMENTS Maven — real Maven has no equivalent, and the
- * behavior is deliberately kept — but the engine path has NO html-index derivation: the metadata
- * 404 fails the range outright and the index is never scraped. That is a feature regression when
- * the engine becomes the default, so these tests stay LEGACY-pinned to keep the kept behavior
- * pinned until the engine implements it.
+ * behavior is deliberately kept: it only produces an answer where Maven produces an error. The
+ * engine path derives at its metadata-not-found seam ({@code RegionMetadataResolver}) with the
+ * same self-disable semantics as the legacy downloader, so these tests run under the default
+ * engine (shadow mode pins legacy in the harness, where the same behavior holds).
  */
 class HtmlIndexMetadataTest {
     private static final String G = "org.parity.synthetic";
@@ -62,24 +62,34 @@ class HtmlIndexMetadataTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom("<dependencies>" + rangeDependency("idx") + "</dependencies>"),
-              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("nexus")))));
+              ctx -> ctx.setRepositories(List.of(repo.repo("nexus"))));
 
             assertThat(resolution.failed()).isFalse();
             assertThat(resolution.snapshot().getJson().at("/scopes/Compile/0/gav").asText())
               .isEqualTo(G + ":idx:2.0");
-            // Metadata miss, index scrape, then the pom of the highest in-range derived version
+            // Metadata miss, index scrape, then the derived versions' poms. The engine (like real Maven) reads
+            // every in-range version's descriptor, so 1.0's pom is requested too (its 404 is tolerated as a
+            // conflict loser); legacy read only the highest. Descriptor reads may run in parallel, so only the
+            // metadata-then-index prefix is order-asserted.
             if (!SyntheticHarness.shadowMode()) {
-                assertThat(repo.requests()).containsExactly(
-                  "GET /org/parity/synthetic/idx/maven-metadata.xml",
-                  "GET /org/parity/synthetic/idx/",
-                  "GET " + pomPath(G, "idx", "2.0", "2.0"));
+                assertThat(repo.requests())
+                  .startsWith(
+                    "GET /org/parity/synthetic/idx/maven-metadata.xml",
+                    "GET /org/parity/synthetic/idx/")
+                  .containsExactlyInAnyOrder(
+                    "GET /org/parity/synthetic/idx/maven-metadata.xml",
+                    "GET /org/parity/synthetic/idx/",
+                    "GET " + pomPath(G, "idx", "2.0", "2.0"),
+                    "GET " + pomPath(G, "idx", "1.0", "1.0"));
             }
         }
     }
 
     /**
      * A non-404 client error on the index scrape disables derivation on that repository for the
-     * rest of the run: the second artifact's index is never requested.
+     * rest of the run: the second artifact's index is never requested. Two sequential resolutions
+     * share one session, so the disable's run-scoped persistence is what keeps idx2 unscraped
+     * (a single resolution would race the two ranges through the engine's parallel collect).
      */
     @Test
     void accessDeniedDisablesDerivationForTheRestOfTheRun() {
@@ -89,13 +99,18 @@ class HtmlIndexMetadataTest {
               <html><body><a href="1.0/">1.0/</a></body></html>
               """);
 
-            SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
-              rootPom("<dependencies>" + rangeDependency("idx1") + rangeDependency("idx2") + "</dependencies>"),
-              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("nexus")))));
+            SyntheticHarness.Session session =
+              new SyntheticHarness.Session(ctx -> ctx.setRepositories(List.of(repo.repo("nexus"))));
 
-            assertThat(resolution.failed()).isFalse();
-            assertThat(resolution.errored()).isTrue();
-            assertThat(resolution.errors()).isNotEmpty();
+            SyntheticHarness.Resolution first = session.resolve(
+              rootPom("<dependencies>" + rangeDependency("idx1") + "</dependencies>"));
+            assertThat(first.failed()).isFalse();
+            assertThat(first.errored()).isTrue();
+
+            SyntheticHarness.Resolution second = session.resolve(
+              rootPom("<dependencies>" + rangeDependency("idx2") + "</dependencies>"));
+            assertThat(second.failed()).isFalse();
+            assertThat(second.errors()).isNotEmpty();
             if (!SyntheticHarness.shadowMode()) {
                 assertThat(repo.requests()).containsExactly(
                   "GET /org/parity/synthetic/idx1/maven-metadata.xml",

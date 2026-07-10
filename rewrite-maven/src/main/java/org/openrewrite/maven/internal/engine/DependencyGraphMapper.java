@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.artifact.Artifact;
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.graph.DependencyNode;
@@ -26,6 +27,7 @@ import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.graph.manager
 import org.openrewrite.maven.engine.shaded.org.eclipse.aether.util.graph.transformer.ConflictResolver;
 import org.openrewrite.maven.tree.*;
 
+import java.net.URI;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -60,7 +62,8 @@ public class DependencyGraphMapper {
 
     public Map<Scope, List<ResolvedDependency>> map(EngineCollectOutcome outcome, ResolvedPom engineResolvedPom,
                                                     Pom requested, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        Index index = new Index(outcome.getServedBy(), outcome.getDeclaredDependencies(), pomCache);
+        Index index = new Index(outcome.getServedBy(), outcome.getDeclaredDependencies(), pomCache,
+                MavenExecutionContextView.view(ctx).getPinnedSnapshotVersions());
         List<Dependency> requestedDependencies = engineResolvedPom.getRequestedDependencies();
 
         Map<Scope, List<ResolvedDependency>> result = new LinkedHashMap<>();
@@ -188,9 +191,10 @@ public class DependencyGraphMapper {
         GroupArtifactVersion gav = new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion());
         MavenRepository repository = index.repoFor(gav);
         String repositoryUri = repository == null ? null : repository.getUri();
-        // Mirrors the legacy shape: a remote pom carries datedSnapshotVersion == the resolved version (the dated form
-        // for a snapshot, the plain version duplicated for a release); a project/reactor pom carries null.
-        String datedSnapshotVersion = repositoryUri == null ? null : artifact.getVersion();
+        // Mirrors the legacy shape: a remote pom carries datedSnapshotVersion (the timestamped build for a snapshot,
+        // the plain version duplicated for a release); a project/reactor pom carries null.
+        String datedSnapshotVersion = repository == null ? null :
+                index.datedSnapshotVersion(artifact, frame.requested.getClassifier(), repository);
         ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
                 repositoryUri, artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion(), datedSnapshotVersion);
 
@@ -261,10 +265,7 @@ public class DependencyGraphMapper {
         Dependency declared = matchDeclared(declaringLineage, artifact);
         String version;
         if (declared != null) {
-            version = declared.getVersion();
-            if (version != null && version.contains("${")) {
-                version = interpolate(declaringLineage, version);
-            }
+            version = interpolateIfPlaceholder(declaringLineage, declared.getVersion());
         } else {
             version = artifact.getBaseVersion();
             if ((node.getManagedBits() & DependencyNode.MANAGED_VERSION) != 0) {
@@ -274,11 +275,12 @@ public class DependencyGraphMapper {
                 }
             }
         }
-        // Thread the declaring pom's raw declared classifier (legacy threads dd.getDependency().getClassifier()): an
-        // explicit empty <classifier></classifier> in a transitive descriptor stays "" — not aether's null — so the
-        // resolved classifier and its snapshot ref (`val:g:a:v:`) match legacy exactly. Only synthesize from aether when
-        // no lineage pom declares the coordinate.
-        String classifier = declared != null ? declared.getClassifier() : emptyToNull(artifact.getClassifier());
+        // Thread the declaring pom's declared classifier, interpolated through its lineage (legacy resolves ${...}
+        // against the declaring pom's properties): an explicit empty <classifier></classifier> in a transitive
+        // descriptor stays "" — not aether's null — so the resolved classifier and its snapshot ref (`val:g:a:v:`)
+        // match legacy exactly. Only synthesize from aether when no lineage pom declares the coordinate.
+        String classifier = declared != null ? interpolateIfPlaceholder(declaringLineage, declared.getClassifier()) :
+                emptyToNull(artifact.getClassifier());
         return Dependency.builder()
                 .gav(new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), version))
                 .classifier(classifier)
@@ -297,7 +299,8 @@ public class DependencyGraphMapper {
                 if (!artifact.getArtifactId().equals(d.getArtifactId())) {
                     continue;
                 }
-                boolean classifierMatches = Objects.equals(emptyToNull(d.getClassifier()), classifier);
+                boolean classifierMatches = Objects.equals(
+                        emptyToNull(interpolateIfPlaceholder(declaringLineage, d.getClassifier())), classifier);
                 if (groupIdMatches(declaringLineage, d.getGroupId(), artifact.getGroupId())) {
                     if (classifierMatches) {
                         return d;
@@ -324,6 +327,10 @@ public class DependencyGraphMapper {
             return true;
         }
         return declaredGroupId.contains("${") && artifactGroupId.equals(interpolate(declaringLineage, declaredGroupId));
+    }
+
+    private static @Nullable String interpolateIfPlaceholder(List<Pom> lineage, @Nullable String value) {
+        return value != null && value.contains("${") ? interpolate(lineage, value) : value;
     }
 
     // Mirrors ResolvedPom.getValue over the declaring pom's raw-lineage property merge (child-first, first-wins):
@@ -499,11 +506,14 @@ public class DependencyGraphMapper {
         private final Map<GroupArtifactVersion, ResolvedGroupArtifactVersion> keyByGav = new HashMap<>();
         private final Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies;
         private final MavenPomCache pomCache;
+        private final Collection<ResolvedGroupArtifactVersion> pinnedSnapshotVersions;
 
         Index(Map<ResolvedGroupArtifactVersion, MavenRepository> servedBy,
-              Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies, MavenPomCache pomCache) {
+              Map<GroupArtifactVersion, List<GroupArtifact>> declaredDependencies, MavenPomCache pomCache,
+              Collection<ResolvedGroupArtifactVersion> pinnedSnapshotVersions) {
             this.declaredDependencies = declaredDependencies;
             this.pomCache = pomCache;
+            this.pinnedSnapshotVersions = pinnedSnapshotVersions;
             for (Map.Entry<ResolvedGroupArtifactVersion, MavenRepository> entry : servedBy.entrySet()) {
                 ResolvedGroupArtifactVersion key = entry.getKey();
                 GroupArtifactVersion gav = new GroupArtifactVersion(key.getGroupId(), key.getArtifactId(), key.getVersion());
@@ -528,6 +538,59 @@ public class DependencyGraphMapper {
                 out.add(new GroupArtifact(d.getGroupId() == null ? "" : d.getGroupId(), d.getArtifactId()));
             }
             return out;
+        }
+
+        // Mirrors the legacy downloader's dated-snapshot derivation for a repository-resolved coordinate: a pinned
+        // snapshot wins with no metadata read, then the newest <snapshotVersion> whose classifier matches the declared
+        // one, then the <snapshot> timestamp/buildNumber fallback; a release, an explicitly timestamped declaration,
+        // or a snapshot without usable metadata duplicates the plain version. The metadata region was populated when
+        // the collect resolved the pom.
+        @Nullable String datedSnapshotVersion(Artifact artifact, @Nullable String declaredClassifier,
+                                              MavenRepository repository) {
+            String version = artifact.getVersion();
+            if (!version.endsWith("-SNAPSHOT")) {
+                return version;
+            }
+            for (ResolvedGroupArtifactVersion pinned : pinnedSnapshotVersions) {
+                if (pinned.getDatedSnapshotVersion() != null &&
+                        pinned.getGroupId().equals(artifact.getGroupId()) &&
+                        pinned.getArtifactId().equals(artifact.getArtifactId()) &&
+                        pinned.getVersion().equals(version)) {
+                    return pinned.getDatedSnapshotVersion();
+                }
+            }
+            MavenMetadata metadata = metadataFor(repository,
+                    new GroupArtifactVersion(artifact.getGroupId(), artifact.getArtifactId(), artifact.getBaseVersion()));
+            MavenMetadata.Versioning versioning = metadata == null ? null : metadata.getVersioning();
+            if (versioning == null) {
+                return version;
+            }
+            List<MavenMetadata.SnapshotVersion> snapshotVersions = versioning.getSnapshotVersions();
+            if (snapshotVersions != null) {
+                MavenMetadata.SnapshotVersion match = snapshotVersions.stream()
+                        .sorted(Comparator.comparing(MavenMetadata.SnapshotVersion::getUpdated).reversed())
+                        .filter(s -> Objects.equals(s.getClassifier(), declaredClassifier))
+                        .findFirst()
+                        .orElse(null);
+                if (match != null) {
+                    return match.getValue();
+                }
+            }
+            MavenMetadata.Snapshot snapshot = versioning.getSnapshot();
+            if (snapshot != null && snapshot.getTimestamp() != null) {
+                return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
+            }
+            return version;
+        }
+
+        private @Nullable MavenMetadata metadataFor(MavenRepository repository, GroupArtifactVersion gav) {
+            try {
+                Optional<MavenMetadata> metadata = pomCache.getMavenMetadata(URI.create(repository.getUri()), gav);
+                //noinspection OptionalAssignedToNull
+                return metadata != null && metadata.isPresent() ? metadata.get() : null;
+            } catch (Exception ignored) {
+                return null; // treat as absent
+            }
         }
 
         @Nullable MavenRepository repoFor(GroupArtifactVersion gav) {

@@ -30,7 +30,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
-import java.net.URL;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +40,8 @@ import java.util.concurrent.TimeoutException;
  * The sole network {@link org.eclipse.aether.spi.connector.transport.Transporter}: every byte is pumped through an
  * injected OpenRewrite {@link HttpSender}. All checksum/resume/negative-caching logic lives above this in
  * BasicRepositoryConnector; this owns byte transfer plus the load-bearing {@link #classify(Throwable)}, timeout-only
- * retry, authenticated&rarr;anonymous fallback, per-server headers/timeouts, and run-scoped dead-endpoint memory —
- * ported from {@code MavenPomDownloader} to match its behavior exactly.
+ * retry, authenticated&rarr;anonymous fallback, http&rarr;https upgrade, per-server headers/timeouts, and run-scoped
+ * dead-endpoint memory — ported from {@code MavenPomDownloader} to match its behavior exactly.
  */
 class HttpSenderTransporter extends AbstractTransporter {
 
@@ -57,6 +56,11 @@ class HttpSenderTransporter extends AbstractTransporter {
 
     private final HttpSender httpSender;
     private final URI baseUri;
+
+    // Legacy MavenPomDownloader.normalizeRepository prefers https for an http:// repository URL. Here the upgrade is
+    // learned on demand: an http request failing at the connection level (e.g. a TLS-only endpoint answering plaintext
+    // with garbage) is retried once over https, and a TLS answer sticks for the rest of this transport's life.
+    private volatile boolean httpsUpgraded;
 
     private final @Nullable String username;
     private final @Nullable String password;
@@ -163,24 +167,53 @@ class HttpSenderTransporter extends AbstractTransporter {
         }
     }
 
-    /** Sends one request with timeout-only retry; throws {@link HttpResponseException} on any HTTP &ge; 400. */
+    /**
+     * Sends one request, retrying an http connection-level failure once over https (see {@link #httpsUpgraded}).
+     * When both fail, the host is remembered as unreachable this run so sibling requests short-circuit, and the
+     * original http failure propagates.
+     */
     private HttpSender.Response send(HttpSender.Method method, String url, boolean authenticated)
+            throws HttpResponseException, IOException {
+        String effectiveUrl = httpsUpgraded ? toHttps(url) : url;
+        try {
+            return sendOnce(method, effectiveUrl, authenticated);
+        } catch (HttpResponseException e) {
+            throw e;
+        } catch (IOException e) {
+            if (httpsUpgraded || !url.regionMatches(true, 0, "http://", 0, 7)) {
+                if (!(e instanceof SocketTimeoutException)) {
+                    markUnreachable(url);
+                }
+                throw e;
+            }
+            try {
+                HttpSender.Response response = sendOnce(method, toHttps(url), authenticated);
+                httpsUpgraded = true;
+                return response;
+            } catch (HttpResponseException tls) {
+                httpsUpgraded = true; // the server answered over TLS; its status is the authoritative answer
+                throw tls;
+            } catch (IOException tlsFailure) {
+                if (!(e instanceof SocketTimeoutException)) {
+                    markUnreachable(url);
+                }
+                throw e;
+            }
+        }
+    }
+
+    private static String toHttps(String url) {
+        return "https://" + url.substring("http://".length());
+    }
+
+    /** Sends one request with timeout-only retry; throws {@link HttpResponseException} on any HTTP &ge; 400. */
+    private HttpSender.Response sendOnce(HttpSender.Method method, String url, boolean authenticated)
             throws HttpResponseException, IOException {
         HttpSender.Request request = build(method, url, authenticated);
         long start = System.nanoTime();
         try {
             return Failsafe.with(RETRY_POLICY).get(() -> {
-                HttpSender.Response response;
-                try {
-                    response = httpSender.send(request);
-                } catch (UncheckedIOException e) {
-                    // A timeout is retried by the policy; any other connection-level failure means the host is
-                    // unreachable this run — remember it so sibling requests short-circuit.
-                    if (!(e.getCause() instanceof SocketTimeoutException)) {
-                        markUnreachable(request.getUrl());
-                    }
-                    throw e;
-                }
+                HttpSender.Response response = httpSender.send(request);
                 int code = response.getCode();
                 if (code >= 400) {
                     response.close();
@@ -227,8 +260,8 @@ class HttpSenderTransporter extends AbstractTransporter {
         }
     }
 
-    private void markUnreachable(URL url) {
-        String authority = authority(URI.create(url.toString()));
+    private void markUnreachable(String url) {
+        String authority = authority(URI.create(url));
         if (authority != null) {
             unreachableHosts.add(authority);
         }

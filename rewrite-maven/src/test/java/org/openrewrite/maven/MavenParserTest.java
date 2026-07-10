@@ -3269,6 +3269,10 @@ class MavenParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4093")
     @Test
     void circularImportDependency() {
+        // scope=import without <type>pom</type> is not a BOM import to Maven: 3.9 keeps the entry in
+        // dependencyManagement unexpanded and only warns ("must be 'pom' to import the managed dependencies").
+        // With <type>pom</type> this reactor shape would instead fail the build with "The dependencies of
+        // type=pom and with scope=import form a cycle". The child still sees junit through parent inheritance.
         rewriteRun(
           mavenProject("root",
             pomXml(
@@ -3296,9 +3300,9 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml -> {
                   MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                   GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().getFirst().getGav();
-                  assertThat(gav.getGroupId()).isEqualTo("junit");
-                  assertThat(gav.getArtifactId()).isEqualTo("junit");
-                  assertThat(gav.getVersion()).isEqualTo("4.13.2");
+                  assertThat(gav.getGroupId()).isEqualTo("com.example");
+                  assertThat(gav.getArtifactId()).isEqualTo("circular-example-child");
+                  assertThat(gav.getVersion()).isEqualTo("0.0.1-SNAPSHOT");
               })
             ),
             mavenProject("circular-example-child",
@@ -3325,10 +3329,7 @@ class MavenParserTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(pomXml -> {
                     MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().getFirst().getGav();
-                    assertThat(gav.getGroupId()).isEqualTo("junit");
-                    assertThat(gav.getArtifactId()).isEqualTo("junit");
-                    assertThat(gav.getVersion()).isEqualTo("4.13.2");
+                    assertThat(resolution.getPom().getManagedVersion("junit", "junit", null, null)).isEqualTo("4.13.2");
                 })
               )
             )

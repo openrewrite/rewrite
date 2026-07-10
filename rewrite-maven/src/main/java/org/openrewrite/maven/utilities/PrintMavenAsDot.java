@@ -30,7 +30,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
-import static java.util.Collections.newSetFromMap;
 import static java.util.stream.Collectors.toList;
 
 public class PrintMavenAsDot extends Recipe {
@@ -85,7 +84,7 @@ public class PrintMavenAsDot extends Recipe {
                     }
                 }
 
-                Set<ResolvedGroupArtifactVersion> seen = newSetFromMap(new IdentityHashMap<>());
+                Set<ResolvedGroupArtifactVersion> seen = new HashSet<>();
                 for (Scope scope : Scope.values()) {
                     if (scope.ordinal() < Scope.Compile.ordinal() || Scope.Test.ordinal() < scope.ordinal()) {
                         continue;

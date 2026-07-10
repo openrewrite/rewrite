@@ -200,7 +200,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             // version is not managed here
                             return tag;
                         }
-                        Plugin p = findManagedPlugin(tag);
+                        Plugin p = findPlugin(tag, getResolutionResult().getPom().getPluginManagement());
                         if (p != null && matchesGroup(p) && matchesArtifact(p) && matchesManagedVersion(p, ctx)) {
                             Set<String> gavTags = new HashSet<>(Arrays.asList("groupId", "artifactId", "version"));
                             if (tag.getChildren().stream().allMatch(t -> gavTags.contains(t.getName()))) {
@@ -211,7 +211,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             return tag.withContent(withoutVersion(tag, version));
                         }
                     } else {
-                        Plugin p = findPlugin(tag);
+                        Plugin p = findPlugin(tag, getResolutionResult().getPom().getPlugins());
                         if (p != null && matchesGroup(p) && matchesArtifact(p) && matchesVersion(p)) {
                             Xml.Tag version = tag.getChild("version").orElse(null);
                             return tag.withContent(withoutVersion(tag, version));
@@ -232,6 +232,25 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     }
                     return c;
                 });
+            }
+
+            /**
+             * Unlike {@link MavenVisitor#findPlugin(Xml.Tag)}, interpolates properties in the tag's version
+             * so that a declaration like {@code ${kotlin.version}} matches the effective plugin version.
+             */
+            private @Nullable Plugin findPlugin(Xml.Tag tag, List<Plugin> plugins) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                String tagGroupId = tag.getChildValue("groupId").orElse(Plugin.PLUGIN_DEFAULT_GROUPID);
+                String tagArtifactId = tag.getChildValue("artifactId").orElse(null);
+                String tagVersion = tag.getChildValue("version").map(pom::getValue).orElse(null);
+                for (Plugin plugin : plugins) {
+                    if (plugin.getGroupId().equals(tagGroupId) &&
+                            plugin.getArtifactId().equals(tagArtifactId) &&
+                            (plugin.getVersion() == null || tagVersion == null || tagVersion.equals(pom.getValue(plugin.getVersion())))) {
+                        return plugin;
+                    }
+                }
+                return null;
             }
 
             private boolean matchesGroup(ResolvedManagedDependency d) {
@@ -325,6 +344,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             .resolve(emptyList(), mpd, ctx);
                     return parentPom.getPluginManagement().stream()
                             .filter(plugin -> plugin.getGroupId().equals(p.getGroupId()) && plugin.getArtifactId().equals(p.getArtifactId()))
+                            // an entry the parent declares with inherited=false never reaches this pom
+                            .filter(plugin -> !"false".equals(parentPom.getValue(plugin.getInherited())))
                             .findFirst()
                             .map(Plugin::getVersion)
                             .map(versionAccordingToParent -> matchesComparator(parentPom.getValue(versionAccordingToParent), p.getVersion()))

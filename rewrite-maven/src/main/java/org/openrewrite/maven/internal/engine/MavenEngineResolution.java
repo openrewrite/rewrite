@@ -305,7 +305,11 @@ public final class MavenEngineResolution {
             ResolvedPom legacyPom, Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx,
             LegacyDependencyResolution legacy) throws MavenDownloadingExceptions {
         Engine engine = ResolutionEngineSelector.select(ctx);
-        if (engine == Engine.LEGACY || DISPATCHING_DEPS.get()) {
+        // A Maven-1 pom (<pomVersion>) is deliberately parsed without dependency resolution — its Pom carries no
+        // dependencies so recipes like ModernizeObsoletePoms can rewrite it. The engine would rebuild the model from
+        // the raw XML (and fail it); the legacy pass resolves the empty declared set without any download.
+        if (engine == Engine.LEGACY || DISPATCHING_DEPS.get() ||
+                legacyPom.getRequested().getObsoletePomVersion() != null) {
             return legacy.resolve();
         }
         DISPATCHING_DEPS.set(Boolean.TRUE);
@@ -362,7 +366,9 @@ public final class MavenEngineResolution {
             ResolvedPom pom, Scope scope, MavenPomDownloader downloader, ExecutionContext ctx,
             LegacyScopeResolution legacy) throws MavenDownloadingExceptions {
         Engine engine = ResolutionEngineSelector.select(ctx);
-        if (engine == Engine.LEGACY || DISPATCHING_DEPS.get()) {
+        // Maven-1 poms skip engine resolution; see dependencyGraph.
+        if (engine == Engine.LEGACY || DISPATCHING_DEPS.get() ||
+                pom.getRequested().getObsoletePomVersion() != null) {
             return legacy.resolve();
         }
         DISPATCHING_DEPS.set(Boolean.TRUE);

@@ -131,18 +131,20 @@ public class EngineDependencyCollector implements Closeable {
             NodeInfo info = nodes.get(gav);
             int depth = info == null ? -1 : info.depth;
             // Maven tolerates a missing/invalid descriptor during collect, but rewrite (matching the legacy downloader)
-            // fails a *jar-typed* dependency whose POM 404s at ANY depth (a1 §3.9) — a genuinely-unavailable transitive
-            // jar makes a real build fail. Only a resolved-graph member is failed: a pom-typed entry, an optional
-            // dependency, or a conflict-loser (a superseded version legacy never downloads) is left tolerated. A direct
-            // (depth-1) dependency fails on any descriptor error.
-            boolean failsBuild = depth == 1 ||
-                    (depth >= 2 && failure.isMissing() && info != null && info.jarLike && !info.optional && info.winner);
+            // fails a dependency whose POM 404s — a genuinely-unavailable artifact makes a real build fail. An INVALID
+            // descriptor of a pom that exists (e.g. an obsolete Maven-1 format) is tolerated at every depth, as Maven's
+            // IGNORE_INVALID policy and rewrite's lenient parser both do: the dependency resolves, contributing no
+            // transitives. A missing POM fails a direct (depth-1) dependency unconditionally; a transitive one only when
+            // it is a resolved-graph member (a1 §3.9) — a pom-typed entry, an optional dependency, or a conflict-loser
+            // (a superseded version legacy never downloads) is left tolerated.
+            boolean failsBuild = failure.isMissing() && (depth == 1 ||
+                    (depth >= 2 && info != null && info.jarLike && !info.optional && info.winner));
             if (failsBuild) {
                 // Attribute the failure to its direct (depth-1) ancestor so the mapper fails only the scopes that
                 // ancestor participates in; a direct failure is its own root. The message embeds the GAV to mirror
                 // MavenPomDownloader's ("Unable to download POM: <gav>.") so coordinate-grepping consumers keep working.
                 GroupArtifactVersion root0 = info != null && info.directAncestor != null ? info.directAncestor : gav;
-                String message = failure.isMissing() ? "Unable to download POM: " + gav + "." : failure.getReason();
+                String message = "Unable to download POM: " + gav + ".";
                 MavenDownloadingException ex =
                         new MavenDownloadingException(message, null, gav).setRoot(root0);
                 if (!failure.getRepositoryResponses().isEmpty()) {

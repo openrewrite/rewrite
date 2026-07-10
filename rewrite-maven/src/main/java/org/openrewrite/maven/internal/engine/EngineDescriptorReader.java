@@ -61,8 +61,8 @@ import java.util.*;
  *   <li>any other model-building failure (invalid model, cycle) → {@code IGNORE_INVALID} returns an empty descriptor;</li>
  *   <li>{@code <distributionManagement><relocation>} is followed with a g:a:baseVersion cycle guard.</li>
  * </ul>
- * The {@link CollectContext#getDescriptorFailures()} record lets {@link EngineDependencyCollector} fail direct
- * dependencies whose descriptor was tolerated here while warning on the transitive ones.
+ * The {@link CollectContext#getDescriptorFailures()} record lets {@link EngineDependencyCollector} fail dependencies
+ * whose pom is genuinely missing while warning on the tolerated-invalid ones.
  */
 class EngineDescriptorReader implements ArtifactDescriptorReader {
 

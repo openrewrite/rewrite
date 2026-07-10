@@ -17,6 +17,7 @@ package org.openrewrite.maven.internal.engine;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.ModelSource;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.building.StringModelSource;
@@ -124,6 +125,7 @@ public class CacheBridge {
     public ModelSource resolvePom(String groupId, String artifactId, String version, List<MavenRepository> repositories)
             throws UnresolvableModelException {
         Map<MavenRepository, String> responses = new LinkedHashMap<>();
+        List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : repositories) {
             ResolvedGroupArtifactVersion key =
                     new ResolvedGroupArtifactVersion(repo.getUri(), groupId, artifactId, version, null);
@@ -137,6 +139,7 @@ public class CacheBridge {
                 responses.put(repo, "not found (cached)");
                 continue;
             }
+            attemptedUris.add(pomUrl(repo, groupId, artifactId, version));
 
             try {
                 ArtifactResult result = resolveArtifact(repo, groupId, artifactId, version);
@@ -165,10 +168,27 @@ public class CacheBridge {
                 responses.put(repo, rootMessage(e));
             }
         }
-        responsesByGav.put(new GroupArtifactVersion(groupId, artifactId, version), responses);
+        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, version);
+        responsesByGav.put(gav, responses);
+        // The definitive pom-download failure: every repository declined. Mirrors the legacy downloader's event.
+        notifyDownloadError(gav, attemptedUris);
         throw new UnresolvableModelException(
                 "Could not resolve " + groupId + ":" + artifactId + ":" + version + " " + responses,
                 groupId, artifactId, version);
+    }
+
+    private void notifyDownloadError(GroupArtifactVersion gav, List<String> attemptedUris) {
+        Object cc = session.getConfigProperties().get(CollectContext.SESSION_KEY);
+        if (cc instanceof CollectContext) {
+            MavenExecutionContextView.view(((CollectContext) cc).getCtx())
+                    .getResolutionListener().downloadError(gav, attemptedUris, null);
+        }
+    }
+
+    private static String pomUrl(MavenRepository repo, String groupId, String artifactId, String version) {
+        return repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
+                groupId.replace('.', '/') + '/' + artifactId + '/' + version + '/' +
+                artifactId + '-' + version + ".pom";
     }
 
     /**
