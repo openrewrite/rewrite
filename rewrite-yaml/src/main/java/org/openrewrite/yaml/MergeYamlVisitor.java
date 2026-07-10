@@ -207,14 +207,19 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
                     String partTwo = substringOfAfterFirstLineBreak(afterInsertEntry.getPrefix());
 
-                    String newFirstPrefix = partOne + firstNewlyAddedEntry.getPrefix();
-                    if (afterInsertEntry.getPrefix().isEmpty() && partOne.isEmpty() && newFirstPrefix.startsWith("\n")) {
-                        // Remove leading newline since the previous element already provides line separation
-                        newFirstPrefix = newFirstPrefix.substring(1);
-                    }
+                    if (insertMode == Before && partOne.isEmpty() && hasLineBreak(partTwo) && !partTwo.contains("#")) {
+                        mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(firstNewlyAddedEntry.getPrefix()));
+                        mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(afterInsertEntry.getPrefix()));
+                    } else {
+                        String newFirstPrefix = partOne + firstNewlyAddedEntry.getPrefix();
+                        if (afterInsertEntry.getPrefix().isEmpty() && partOne.isEmpty() && newFirstPrefix.startsWith("\n")) {
+                            // Remove leading newline since the previous element already provides line separation
+                            newFirstPrefix = newFirstPrefix.substring(1);
+                        }
 
-                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(newFirstPrefix));
-                    mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
+                        mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(newFirstPrefix));
+                        mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
+                    }
                 }
             } else {
                 Cursor c = getCursor().dropParentUntil(it -> {
@@ -236,7 +241,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     Yaml.Document doc = c.getValue();
                     // Don't treat document end prefix as comment if it contains a document separator
                     if (!preserveDocumentSeparator(doc)) {
-                        comment = doc.getEnd().getPrefix();
+                        String endPrefix = doc.getEnd().getPrefix();
+                        if (endPrefix != null && endPrefix.contains("#")) {
+                            comment = endPrefix;
+                        }
                     }
                 } else if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
