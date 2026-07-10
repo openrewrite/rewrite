@@ -266,7 +266,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
+                // The XML is the source of truth and is always current. The resolution model can lag
+                // across recipes when UpdateMavenModel afterVisits haven't drained, so consult the XML
+                // first to decide whether the new GA is already present as a direct dep.
+                isNewDependencyPresent = isNewDependencyTagInXml(document, newGroupId, newArtifactId) ||
+                        checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
                 if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -421,6 +425,31 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         .filter(ResolvedDependency::isDirect)
                         .anyMatch(rd -> version == null ||
                                 versionComparator != null && versionComparator.compare(null, version, rd.getVersion()) <= 0);
+            }
+
+            private boolean isNewDependencyTagInXml(Xml.Document document, @Nullable String groupId, @Nullable String artifactId) {
+                if (groupId == null || artifactId == null) {
+                    return false;
+                }
+                return document.getRoot().getChild("dependencies")
+                        .map(deps -> deps.getChildren("dependency").stream()
+                                .anyMatch(d -> groupId.equals(d.getChildValue("groupId").orElse(null)) &&
+                                        artifactId.equals(d.getChildValue("artifactId").orElse(null)) &&
+                                        isTagVersionAcceptable(d)))
+                        .orElse(false);
+            }
+
+            // Mirrors the version check in checkIfNewDependencyPresent: an explicit declared version must
+            // satisfy the recipe's newVersion selector; an absent/empty version (BOM-managed) is accepted.
+            private boolean isTagVersionAcceptable(Xml.Tag dep) {
+                if (newVersion == null) {
+                    return true;
+                }
+                String depVersion = dep.getChildValue("version").orElse(null);
+                if (depVersion == null || depVersion.isEmpty()) {
+                    return true;
+                }
+                return versionComparator != null && versionComparator.compare(null, newVersion, depVersion) <= 0;
             }
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {

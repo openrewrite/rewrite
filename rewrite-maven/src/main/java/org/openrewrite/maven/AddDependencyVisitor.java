@@ -130,6 +130,13 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                             }
                         }
                     }
+                    // If the managed version is already higher than anything in the recipe's selector range,
+                    // the BOM provides a superset of what AddDependency was asking for. Leave the existing
+                    // dep alone rather than scheduling a downgrade.
+                    if (versionToUse != null && managedVersion != null &&
+                            new Version(managedVersion).compareTo(new Version(versionToUse)) > 0) {
+                        versionToUse = null;
+                    }
                     if (versionToUse == null && requestedScope == existingScope) {
                         getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "doNotAlterDependency", true);
                         return tag;
