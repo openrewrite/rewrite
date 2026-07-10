@@ -96,7 +96,7 @@ export function* jsonFragments(value: unknown): Generator<string> {
  * serializes a message to UTF-8 bytes without ever materializing the whole document as a single JS
  * string. The default encoder does {@code Buffer.from(JSON.stringify(msg))}; a large enough
  * PrepareRecipe response (a deep recipe tree) overflows V8's single-string limit and throws
- * "Cannot create a string longer than 0x1fffffe8 characters", hanging the RPC call. Streaming the
+ * "RangeError: Invalid string length", hanging the RPC call. Streaming the
  * fragments into a Buffer raises the ceiling to Node's Buffer.MAX_LENGTH (multiple GB) while
  * producing byte-identical output. (True unbounded streaming needs chunked framing — Content-Length
  * still requires the whole body up front — so this is a ceiling raise, not a removal.)
