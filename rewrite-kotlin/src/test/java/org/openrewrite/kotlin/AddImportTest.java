@@ -544,20 +544,11 @@ public class AddImportTest implements RewriteTest {
               class Foo
               """
           ),
-          // `a.Foo` is already imported, so `b.Foo` must stay fully qualified rather than collapse to an
-          // ambiguous `Foo`. (Not adding the conflicting `import b.Foo` is a separate concern; see #8213.)
+          // `a.Foo` is already imported, so the conflicting `b.Foo` is not imported and its usages stay fully
+          // qualified rather than collapse to an ambiguous `Foo` (see #8213).
           kotlin(
             """
               import a.Foo
-
-              class A {
-                  val x: Foo = Foo()
-                  val y: b.Foo = b.Foo()
-              }
-              """,
-            """
-              import a.Foo
-              import b.Foo
 
               class A {
                   val x: Foo = Foo()
