@@ -17,6 +17,7 @@ package org.openrewrite.golang.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
@@ -26,6 +27,9 @@ import org.openrewrite.java.tree.Space;
 public class TabsAndIndentsVisitor<P> extends GolangVisitor<P> {
     @Nullable
     private final Tree stopAfter;
+
+    @Nullable
+    private String indentUnit;
 
     public TabsAndIndentsVisitor(@Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
@@ -65,18 +69,100 @@ public class TabsAndIndentsVisitor<P> extends GolangVisitor<P> {
                 depth++;
             }
         }
-        // Build indentation: newlines preserved, then tabs for depth
+        // Build indentation: newlines preserved, then one indent unit per depth level
         String ws = space.getWhitespace();
         int lastNewline = ws.lastIndexOf('\n');
         if (lastNewline >= 0) {
             String beforeLastNewline = ws.substring(0, lastNewline + 1);
+            String unit = indentUnit();
             StringBuilder indent = new StringBuilder();
             for (int i = 0; i < depth; i++) {
-                indent.append('\t');
+                indent.append(unit);
             }
             return space.withWhitespace(beforeLastNewline + indent);
         }
         return space;
+    }
+
+    /**
+     * The indentation string used for a single level of nesting, detected from the
+     * source file's existing style so that space-indented sources stay space-indented
+     * and tab-indented (canonical gofmt) sources stay tab-indented. Defaults to a tab
+     * when the source has no indentation to sample.
+     */
+    private String indentUnit() {
+        if (indentUnit == null) {
+            indentUnit = detectIndentUnit(getCursor().firstEnclosing(SourceFile.class));
+        }
+        return indentUnit;
+    }
+
+    private static String detectIndentUnit(@Nullable Tree cu) {
+        if (cu == null) {
+            return "\t";
+        }
+        IndentUnitCollector collector = new IndentUnitCollector();
+        collector.visit(cu, 0);
+        return collector.indentUnit();
+    }
+
+    private static class IndentUnitCollector extends GolangVisitor<Integer> {
+        private boolean sawTab;
+        private int spaceIndentGcd;
+
+        @Override
+        public Space visitSpace(Space space, Space.Location loc, Integer p) {
+            String ws = space.getWhitespace();
+            int lastNewline = ws.lastIndexOf('\n');
+            if (lastNewline >= 0) {
+                String indent = ws.substring(lastNewline + 1);
+                if (!indent.isEmpty()) {
+                    if (indent.indexOf('\t') >= 0) {
+                        sawTab = true;
+                    } else {
+                        // Fold every observed space-indent width into a running GCD so a
+                        // 4-space file (seen as 4, 8, 12, ...) resolves to 4 while an
+                        // outlier line can't drag the unit below the true step, the way a
+                        // plain minimum would.
+                        spaceIndentGcd = gcd(spaceIndentGcd, indent.length());
+                    }
+                }
+            }
+            return space;
+        }
+
+        private String indentUnit() {
+            if (sawTab || spaceIndentGcd == 0) {
+                return "\t";
+            }
+            StringBuilder unit = new StringBuilder();
+            for (int i = 0; i < normalizeIndentWidth(spaceIndentGcd); i++) {
+                unit.append(' ');
+            }
+            return unit.toString();
+        }
+
+        private static int normalizeIndentWidth(int gcd) {
+            if (gcd == 2 || gcd == 4 || gcd == 8) {
+                return gcd;
+            }
+            if (gcd % 4 == 0) {
+                return 4;
+            }
+            if (gcd % 2 == 0) {
+                return 2;
+            }
+            return 4;
+        }
+
+        private static int gcd(int a, int b) {
+            while (b != 0) {
+                int t = b;
+                b = a % b;
+                a = t;
+            }
+            return a;
+        }
     }
 
     /**
