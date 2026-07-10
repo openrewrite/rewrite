@@ -34,9 +34,9 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVersion>> {
     @Option(displayName = "Java version",
-            description = "A minimum version number, a node-style semver selector, or an exact version prefixed with " +
-                          "`=`. Plain values like `17` or `17.0.1` match that version or higher. Use `=17` to require " +
-                          "an exact match.",
+            description = "A minimum version number or a node-style semver selector. Plain values like `17` or " +
+                          "`17.0.1` match that version or higher. To match an exact version, use `HasJavaVersion` " +
+                          "instead.",
             example = "17")
     String version;
 
@@ -70,11 +70,10 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     /**
      * A plain version like "17" or "17.0.1" is treated as "N or higher" so the option
      * matches the recipe's "minimum" semantics. Any selector the user writes explicitly
-     * (X-ranges, hyphen ranges, tildes, carets, set ranges) is left alone. An explicit
-     * "=" prefix opts in to exact-version matching.
+     * (X-ranges, hyphen ranges, tildes, carets, set ranges) is left alone.
      */
     private static String canonicalizeVersion(String version) {
-        if (version.isEmpty() || version.startsWith("=")) {
+        if (version.isEmpty()) {
             return version;
         }
         for (int i = 0; i < version.length(); i++) {

@@ -122,38 +122,6 @@ class HasMinimumJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void equalsPrefixOptsInToExactMatch() {
-        rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("=17", false)),
-          java(
-            """
-              class Test {
-              }
-              """,
-            """
-              /*~~(Java version 17)~~>*/class Test {
-              }
-              """,
-            spec -> spec.markers(javaVersion(17))
-          )
-        );
-    }
-
-    @Test
-    void equalsPrefixDoesNotMatchHigherVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("=17", false)),
-          java(
-            """
-              class Test {
-              }
-              """,
-            spec -> spec.markers(javaVersion(21))
-          )
-        );
-    }
-
-    @Test
     void xRangeMatchesMajorOnly() {
         rewriteRun(
           spec -> spec.recipe(new HasMinimumJavaVersion("17.X", false)),
