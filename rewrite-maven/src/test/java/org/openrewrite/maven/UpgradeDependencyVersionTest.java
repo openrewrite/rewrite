@@ -385,6 +385,105 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8145")
+    @Test
+    void changeDependencyThenUpgradeManagedVersionInParentOfMultiModule() {
+        rewriteRun(
+          spec -> spec.recipes(
+            // Phase 1: rename javax -> jakarta (EE9 migration)
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.servlet", "javax.servlet-api",
+              "jakarta.servlet", "jakarta.servlet-api",
+              "5.0.x", null),
+            // Phase 2: bump jakarta EE9 -> EE10, which must upgrade the parent's managed version
+            new UpgradeDependencyVersion(
+              "jakarta.servlet", "jakarta.servlet-api",
+              "6.0.x", null, null, null)
+          ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.servlet</groupId>
+                                <artifactId>javax.servlet-api</artifactId>
+                                <version>4.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.servlet</groupId>
+                                <artifactId>jakarta.servlet-api</artifactId>
+                                <version>6.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            // The child inherits the version from the parent, so it must remain version-less
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.servlet</groupId>
+                              <artifactId>javax.servlet-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.servlet</groupId>
+                              <artifactId>jakarta.servlet-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
     @Test
     void upgradeVersionSuccessively() {
         rewriteRun(
@@ -3165,6 +3264,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(doc -> doc.getMarkers().findFirst(MavenResolutionResult.class)
               .ifPresent(mrr -> mrr.getPom().getDependencyManagement().replaceAll(dm -> dm.withRequested(null))))
+          )
+        );
+    }
+
+    @Test
+    void upgradesDependencyWhenResolvedRepositoryIsNull() {
+        // Some LSTs are built without recording the origin repository on resolved dependencies (the
+        // repository ends up null even for genuine external dependencies). Historically the recipe used a
+        // null repository as the signal for "parsed from source" and silently skipped every such dependency.
+        // The dependency is now recognized as external via the project artifacts collected during scanning,
+        // so it is upgraded regardless of a missing origin repository. Here the version is defined by a
+        // property in the same POM, mirroring the reported reproduction.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <junit.version>5.6.2</junit.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>${junit.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <junit.version>5.7.2</junit.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>${junit.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(doc -> doc.getMarkers().findFirst(MavenResolutionResult.class)
+              .ifPresent(mrr -> mrr.getDependencies().values()
+                .forEach(deps -> deps.replaceAll(d -> d.withRepository(null)))))
           )
         );
     }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.google.errorprone.annotations.MustBeClosed;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
@@ -63,6 +64,7 @@ public interface DataTableStore {
      * @deprecated Use {@link #getRows(Class)} or {@link #getRows(Class, String)} for type-safe deserialization.
      */
     @Deprecated
+    @MustBeClosed
     Stream<?> getRows(String dataTableName, @Nullable String group);
 
     /**
@@ -74,6 +76,7 @@ public interface DataTableStore {
      * @param <Row>          the row type
      * @return a stream of typed rows, or an empty stream if no rows exist
      */
+    @MustBeClosed
     @SuppressWarnings("unchecked")
     default <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass, @Nullable String group) {
         return (Stream<Row>) getRows(dataTableClass.getName(), group);
@@ -86,6 +89,7 @@ public interface DataTableStore {
      * @param <Row>          the row type
      * @return a stream of typed rows, or an empty stream if no rows exist
      */
+    @MustBeClosed
     default <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass) {
         return getRows(dataTableClass, null);
     }

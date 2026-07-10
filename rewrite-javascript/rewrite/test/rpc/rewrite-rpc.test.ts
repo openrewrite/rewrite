@@ -140,6 +140,20 @@ describe("Rewrite RPC", () => {
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
     });
 
+    test("prepareRecipe rejects a missing required option", async () => {
+        // The server validates required options when preparing a recipe. `text` is required, so
+        // omitting it must fail rather than silently preparing a broken recipe.
+        await expect(client.prepareRecipe("org.openrewrite.example.text.change-text", {}))
+            .rejects.toThrow("Missing required option `text`");
+    });
+
+    test("prepareRecipe validates required options of child recipes", async () => {
+        // The composite's child ChangeText is missing its required `text`. Validation recurses through
+        // the whole prepared tree (like the C# server), so preparing the composite must fail.
+        await expect(client.prepareRecipe("org.openrewrite.example.text.composite-with-invalid-child"))
+            .rejects.toThrow("Missing required option `text`");
+    });
+
     // TODO: Re-enable once @openrewrite/recipes-npm is updated to use RecipeMarketplace API
     test.skip("installRecipes", async () => {
         const installed = await client.installRecipes(

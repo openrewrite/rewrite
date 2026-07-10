@@ -46,7 +46,6 @@ func TestDetectScaffoldKind(t *testing.T) {
 }
 
 func TestNewRecipeSimpleRewrite(t *testing.T) {
-	// Replace identifier `x` with `y`
 	r := NewRecipe(
 		RecipeName("test.ReplaceXWithY"),
 		WithDisplayName("Replace x with y"),
@@ -112,7 +111,6 @@ func TestNewRecipeNoChangeWhenNoMatch(t *testing.T) {
 }
 
 func TestNewRecipeMultipleBefores(t *testing.T) {
-	// Replace both `1 + 2` and `2 + 1` with `3`
 	r := NewRecipe(
 		RecipeName("test.OnePlusTwo"),
 		WithDisplayName("Simplify 1+2"),
@@ -123,7 +121,6 @@ func TestNewRecipeMultipleBefores(t *testing.T) {
 
 	spec := test.NewRecipeSpec().WithRecipe(r)
 
-	// First alternative matches
 	spec.RewriteRun(t,
 		test.Golang(`
 			package main
@@ -148,7 +145,6 @@ func TestNewRecipeMultipleBeforeSecondMatches(t *testing.T) {
 
 	spec := test.NewRecipeSpec().WithRecipe(r)
 
-	// Second alternative matches
 	spec.RewriteRun(t,
 		test.Golang(`
 			package main

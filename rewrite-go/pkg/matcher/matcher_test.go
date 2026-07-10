@@ -24,8 +24,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// --- TypeUtils tests ---
-
 func TestGetFullyQualifiedName(t *testing.T) {
 	tests := []struct {
 		name string
@@ -107,8 +105,6 @@ func TestAsClass(t *testing.T) {
 		t.Error("AsClass should return nil for non-class types")
 	}
 }
-
-// --- MethodMatcher tests ---
 
 func TestGlobToRegexp(t *testing.T) {
 	tests := []struct {
@@ -234,8 +230,6 @@ func TestMethodMatcherMatchesMethod(t *testing.T) {
 		t.Error("expected match for time.Time Sub(..)")
 	}
 }
-
-// --- Integration test: MethodMatcher against parsed Go code ---
 
 func TestMethodMatcherOnParsedCode(t *testing.T) {
 	p := parser.NewGoParser()

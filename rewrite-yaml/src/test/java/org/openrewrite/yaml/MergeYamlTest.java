@@ -15,7 +15,11 @@
  */
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
@@ -23,11 +27,14 @@ import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.Last;
 
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
@@ -1717,6 +1724,77 @@ class MergeYamlTest implements RewriteTest {
               new-property: value
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertPropertyOptions")
+    void doesNotCopyTrailingCommentOfPrecedingEntryToInsertedEntry(MergeYaml.@Nullable InsertMode insertMode,
+                                                                   @Nullable String insertProperty,
+                                                                   String after) {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.config",
+              //language=yaml
+              """
+                new-property: value
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+          yaml(
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+              other: x
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertPropertyOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          arguments(Last, null,
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          // Inserted after the commented last entry — also becomes the last entry
+          arguments(After, "activate-mep",
+            """
+              config:
+                activate-auto: true
+                activate-mep: true # Some comment
+                new-property: value
+              other: x
+              """),
+          // Inserted before the commented last entry — comment must remain on `activate-mep`
+          arguments(Before, "activate-mep",
+            """
+              config:
+                activate-auto: true
+                new-property: value
+                activate-mep: true # Some comment
+              other: x
+              """)
         );
     }
 
@@ -3747,6 +3825,166 @@ class MergeYamlTest implements RewriteTest {
                 containers:
                   - name: <container name>  # comment
                     imagePullPolicy: Always
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenGreaterThanDetected() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  # Tool will only check for accesses, only within the last N days
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    keep: 'none'
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  # Tool will only check for accesses, only within the last N days
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    keep: 'none'
+                  retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenDeeplyNested() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.parent.child",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              parent:
+                child:
+                        access_days_threshold: 30
+                        ignore_dependencies: false
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              parent:
+                child:
+                        access_days_threshold: 30
+                        ignore_dependencies: false
+                        retry_on_error: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newNestedEntryMatchesSiblingIndentAndKeepsRelativeChildIndent() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            """
+              vms_options:
+                cleanup: true
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+              """,
+            """
+              common:
+                foo: 1
+                bar: 2
+              settings:
+                  access_days_threshold: 30
+                  ignore_dependencies: false
+                  vms_options:
+                    cleanup: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void newEntryMatchesSiblingIndentWhenLessThanDetected() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.settings",
+            //language=yaml
+            "retry_on_error: true",
+            false,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+              common:
+                  foo: 1
+                  bar: 2
+                  nested:
+                      baz: 3
+              settings:
+                access_days_threshold: 30
+                ignore_dependencies: false
+              """,
+            """
+              common:
+                  foo: 1
+                  bar: 2
+                  nested:
+                      baz: 3
+              settings:
+                access_days_threshold: 30
+                ignore_dependencies: false
+                retry_on_error: true
               """
           )
         );

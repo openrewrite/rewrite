@@ -154,6 +154,11 @@
   eolDate: "2026-01-17"
   suggestedReplacement: plucky (26.04)
 
+- imageName: ubuntu
+  tagPatterns: [questing, "questing-*", "25.10", "25.10.*"]
+  eolDate: "2026-07-01"
+  suggestedReplacement: plucky (26.04)
+
 - imageName: alpine
   tagPatterns: ["2.6", "2.6.*", "2.6-*"]
   eolDate: "2015-05-01"

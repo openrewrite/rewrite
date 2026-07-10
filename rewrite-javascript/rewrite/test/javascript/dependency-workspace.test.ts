@@ -20,6 +20,7 @@ import {RecipeSpec} from "../../src/test";
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 
 describe('dependency workspace', () => {
     afterAll(() => {
@@ -114,6 +115,31 @@ describe('dependency workspace', () => {
 
         expect(foundMethodInvocation).toBe(true);
     }, 60000);
+
+    test('reaper keeps temp dirs owned by a live process', () => {
+        // given
+        const base = path.join(os.tmpdir(), 'openrewrite-js-workspaces');
+        fs.mkdirSync(base, {recursive: true});
+        const tag = `reapertest-${process.pid}-${Date.now()}`;
+        const alive = path.join(base, `${tag}_Npm.tmp-${process.pid}-123-abc`);
+        const dead = path.join(base, `${tag}_Npm.tmp-2147483647-456-def`);
+        const legacyRecent = path.join(base, `${tag}_Npm.tmp-legacyname`);
+        for (const dir of [alive, dead, legacyRecent]) {
+            fs.mkdirSync(dir, {recursive: true});
+        }
+
+        // when
+        DependencyWorkspace.cleanupOldWorkspaces();
+
+        // then
+        expect(fs.existsSync(alive)).toBe(true);
+        expect(fs.existsSync(dead)).toBe(false);
+        expect(fs.existsSync(legacyRecent)).toBe(true);
+
+        for (const dir of [alive, legacyRecent]) {
+            fs.rmSync(dir, {recursive: true, force: true});
+        }
+    });
 
     test('type attribution with on-disk dependencies (comparison)', async () => {
         const spec = new RecipeSpec();

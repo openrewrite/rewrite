@@ -82,14 +82,16 @@ function sha256Prefix(input: string, hexChars: number): string {
     return hash.substring(0, hexChars);
 }
 
+/**
+ * Sanitize a value for a filename, byte-identical to the Java host's
+ * {@code CsvDataTableStore.sanitize} so a shared data table resolves to the same file.
+ */
 export function sanitizeScope(scope: string): string {
     // 1. lowercase
     let s = scope.toLowerCase();
-    // 2. replace non-alphanumeric with '-'
-    s = s.replace(/[^a-z0-9]/g, '-');
-    // 3. collapse consecutive '-', trim leading/trailing
+    // \p{L}\p{Nd} mirrors Java's Character.isLetterOrDigit, for cross-runtime parity
+    s = s.replace(/[^\p{L}\p{Nd}]/gu, '-');
     s = s.replace(/-+/g, '-').replace(/^-|-$/g, '');
-    // 4. truncate to ~30 chars at word boundary
     if (s.length > 30) {
         s = s.substring(0, 30);
         const lastDash = s.lastIndexOf('-');
@@ -97,7 +99,6 @@ export function sanitizeScope(scope: string): string {
             s = s.substring(0, lastDash);
         }
     }
-    // 5. append 4-char hash
     const hash = sha256Prefix(scope, 4);
     return `${s}-${hash}`;
 }
@@ -182,41 +183,45 @@ function escapeCsv(value: unknown): string {
  * Uses the data table's file-safe key for filenames.
  */
 export class CsvDataTableStore implements DataTableStore {
-    private readonly _initializedTables = new Set<string>();
     private readonly _rowCounts: { [key: string]: number } = {};
     private readonly _dataTables = new Map<string, DataTable<any>>();
 
-    constructor(private readonly outputDir: string) {
+    constructor(private readonly outputDir: string,
+                private readonly prefixColumns: { [key: string]: string } = {},
+                private readonly suffixColumns: { [key: string]: string } = {}) {
         fs.mkdirSync(outputDir, {recursive: true});
     }
 
     insertRow<Row>(dataTable: DataTable<Row>, _ctx: ExecutionContext, row: Row): void {
         const fileKey = CsvDataTableStore.fileKey(dataTable);
         const csvPath = path.join(this.outputDir, fileKey + '.csv');
+        this._dataTables.set(fileKey, dataTable);
 
-        if (!this._initializedTables.has(fileKey)) {
-            this._initializedTables.add(fileKey);
-            this._rowCounts[fileKey] = 0;
-            this._dataTables.set(fileKey, dataTable);
+        const columns = dataTable.descriptor.columns;
 
-            const columns = dataTable.descriptor.columns;
-            const headerRow = columns.map(col => escapeCsv(col.displayName)).join(',');
-            // Write metadata comments + header
+        // Key the header on file existence, not in-memory state, so writers sharing one file
+        // (Java host + RPC runtimes) emit it once; column names (not display names) match the Java writer.
+        if (!fs.existsSync(csvPath)) {
+            const header = [
+                ...Object.keys(this.prefixColumns),
+                ...columns.map(col => col.name),
+                ...Object.keys(this.suffixColumns),
+            ].map(escapeCsv).join(',');
             const comments = [
                 `# @name ${dataTable.descriptor.name}`,
                 `# @instanceName ${dataTable.instanceName}`,
                 `# @group ${dataTable.group ?? ''}`,
             ].join('\n');
-            fs.writeFileSync(csvPath, comments + '\n' + headerRow + '\n');
+            fs.writeFileSync(csvPath, comments + '\n' + header + '\n');
         }
 
-        const columns = dataTable.descriptor.columns;
-        const rowValues = columns.map(col => {
-            const value = (row as any)[col.name];
-            return escapeCsv(value);
-        });
+        const rowValues = [
+            ...Object.values(this.prefixColumns),
+            ...columns.map(col => (row as any)[col.name]),
+            ...Object.values(this.suffixColumns),
+        ].map(escapeCsv);
         fs.appendFileSync(csvPath, rowValues.join(',') + '\n');
-        this._rowCounts[fileKey]++;
+        this._rowCounts[fileKey] = (this._rowCounts[fileKey] ?? 0) + 1;
     }
 
     getRows(_dataTableName: string, _group?: string): any[] {
@@ -233,14 +238,27 @@ export class CsvDataTableStore implements DataTableStore {
     }
 
     get tableKeys(): string[] {
-        return [...this._initializedTables];
+        return Array.from(this._dataTables.keys());
     }
 
+    /**
+     * Filesystem-safe key for a data table; mirrors the Java host's
+     * {@code CsvDataTableStore.fileKey} so a shared table resolves to the same filename.
+     */
     static fileKey(dataTable: DataTable<any>): string {
-        const suffix = dataTable.group ?? dataTable.instanceName;
-        if (suffix === dataTable.descriptor.name) {
-            return dataTable.descriptor.name;
+        const name = dataTable.descriptor.name;
+        const group = dataTable.group;
+        if (group != null) {
+            if (group === name) {
+                return name;
+            }
+            return `${name}--${sanitizeScope(group)}`;
         }
-        return `${dataTable.descriptor.name}--${sanitizeScope(suffix)}`;
+        // Suffix only when instanceName was customized (differs from the display name).
+        const instanceName = dataTable.instanceName;
+        if (instanceName === dataTable.descriptor.displayName) {
+            return name;
+        }
+        return `${name}--${sanitizeScope(instanceName)}`;
     }
 }

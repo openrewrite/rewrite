@@ -60,18 +60,22 @@ jobs:
 
       # Trusted Publisher auto-detection in `npm publish` requires npm >= 11.5.1.
       # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x, and the
-      # global install needs sudo to write under /usr/local.
+      # global install needs sudo to write under /usr/local. Pinned off `@latest`
+      # because npm 12 breaks provenance publish with `Cannot find module 'sigstore'`
+      # (https://github.com/npm/cli/issues/9722); revisit once that ships fixed.
       - shell: bash
-        run: sudo npm install -g npm@latest
+        run: sudo npm install -g npm@11.18.0
 
-      # The `ci` run records the exact Maven snapshot version it deployed for
-      # rewrite-javascript and uploads it as the `published-snapshot-version` artifact.
-      # Download it so the npm package can mirror that version 1:1. Best-effort: absent
-      # on the `publish` tag path (and on older `ci` runs), in which case the step below
+      # The `ci` run records the exact version string baked into its rewrite-javascript jar
+      # (META-INF/rewrite-javascript-version.txt) and uploads it as the
+      # `published-snapshot-version` artifact. Download it so the npm package publishes that
+      # identical string — a downstream consumer feeds the jar's embedded value to
+      # `npx --package=@openrewrite/rewrite@<version>`, so npm must match it exactly. Best-effort:
+      # absent on the `publish` tag path (and on older `ci` runs), in which case the step below
       # falls back to Gradle's own snapshot-version derivation.
       - if: github.event.workflow_run.name == 'ci'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: published-snapshot-version
           path: .published-version
@@ -80,9 +84,9 @@ jobs:
 
       # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
       # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
-      # Otherwise this is the `ci`-triggered snapshot path: mirror the exact Maven
-      # snapshot version handed off above (so every Maven snapshot gets a 1:1 npm
-      # counterpart), and publish to dist-tag `next`.
+      # Otherwise this is the `ci`-triggered snapshot path: publish the exact version string
+      # handed off above (= the version embedded in the ci run's jar), and publish to
+      # dist-tag `next`.
       - id: ver
         shell: bash
         env:
@@ -97,7 +101,7 @@ jobs:
           F=$(find .published-version -name publishedVersion.txt 2>/dev/null | head -1)
           if [[ -n "$F" ]]; then
             V=$(tr -d '[:space:]' < "$F")
-            echo "Mirroring Maven snapshot version handed off from the ci run: $V"
+            echo "Publishing the version handed off from the ci run (== jar's embedded version): $V"
           else
             echo "No handed-off version found; falling back to Gradle-derived snapshot version"
           fi

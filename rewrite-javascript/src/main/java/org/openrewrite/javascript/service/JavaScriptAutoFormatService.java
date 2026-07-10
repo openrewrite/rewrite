@@ -16,19 +16,52 @@
 package org.openrewrite.javascript.service;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 
+/**
+ * Auto-format service for JavaScript/TypeScript that dispatches formatting to the
+ * JavaScript RPC side, where the actual formatting visitors (whitespace, spacing,
+ * blank lines, indentation, etc.) are implemented in {@code AutoformatVisitor}.
+ * <p>
+ * When no RPC connection is available the tree is returned unchanged.
+ */
 public class JavaScriptAutoFormatService extends AutoFormatService {
+
+    private static final String AUTO_FORMAT_VISITOR = "org.openrewrite.javascript.format.AutoformatVisitor";
 
     @Override
     public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
         return new JavaIsoVisitor<P>() {
             @Override
-            public @Nullable J visit(@Nullable Tree tree, P ctx) {
+            public @Nullable J visit(@Nullable Tree tree, P p, Cursor parent) {
+                if (tree == null) {
+                    return null;
+                }
+                JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.get();
+                if (rpc == null) {
+                    return (J) tree;
+                }
+                return (J) rpc.visit(tree, AUTO_FORMAT_VISITOR, p, parent);
+            }
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, P p) {
+                if (tree == null) {
+                    return null;
+                }
+                if (tree instanceof SourceFile) {
+                    JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.get();
+                    if (rpc != null) {
+                        return (J) rpc.visit((SourceFile) tree, AUTO_FORMAT_VISITOR, p);
+                    }
+                }
                 return (J) tree;
             }
         };

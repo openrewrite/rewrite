@@ -59,10 +59,12 @@ func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 		sendGoMod(gm, p.(*SendQueue))
 		return gm
 	}
+	if gs, ok := t.(*golang.GoSum); ok {
+		sendGoSum(gs, p.(*SendQueue))
+		return gs
+	}
 	return s.GoVisitor.Visit(t, p)
 }
-
-// --- G nodes ---
 
 func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	q := p.(*SendQueue)

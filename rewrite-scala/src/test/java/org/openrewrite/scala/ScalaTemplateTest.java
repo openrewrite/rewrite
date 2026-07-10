@@ -136,4 +136,42 @@ class ScalaTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("deprecated".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
+                      return ScalaTemplate.builder("\"new\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          scala(
+            """
+              class Test {
+                  class Sibling {
+                  }
+
+                  @deprecated("old")
+                  def foo(): Unit = {}
+              }
+              """,
+            """
+              class Test {
+                  class Sibling {
+                  }
+
+                  @deprecated("new")
+                  def foo(): Unit = {}
+              }
+              """
+          ));
+    }
 }

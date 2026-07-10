@@ -63,7 +63,6 @@ func substitute(templateTree java.J, values *MatchResult) java.J {
 	return result.(java.J)
 }
 
-// setPrefix creates a copy of the node with the given prefix Space.
 func setPrefix(j java.J, prefix java.Space) java.J {
 	switch n := j.(type) {
 	case *java.Identifier:

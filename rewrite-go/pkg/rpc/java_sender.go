@@ -81,8 +81,6 @@ func (s *JavaSender) visitType(t java.JavaType, q *SendQueue) {
 	s.typeSender.Visit(t, q)
 }
 
-// --- J nodes ---
-
 func (s *JavaSender) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (list)
@@ -194,26 +192,12 @@ func (s *JavaSender) VisitIf(i *java.If, p any) java.J {
 	// ifCondition - the condition is already a ControlParentheses, matching J.If
 	q.GetAndSend(i, func(v any) any { return v.(*java.If).Condition },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	// thenPart (right-padded)
-	q.GetAndSend(i, func(v any) any {
-		return java.RightPadded[java.Statement]{
-			Element: v.(*java.If).Then,
-			After:   java.EmptySpace,
-		}
-	}, func(v any) { sendRightPadded(s, v, q) })
-	// elsePart - wrap in Else node for Java's J.If.Else model
-	q.GetAndSend(i, func(v any) any {
-		ep := v.(*java.If).ElsePart
-		if ep == nil {
-			return nil
-		}
-		return &java.Else{
-			ID:      uuid.New(),
-			Prefix:  ep.After,
-			Markers: java.Markers{ID: uuid.New()},
-			Body:    java.RightPadded[java.Statement]{Element: ep.Element.(java.Statement), After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// thenPart
+	q.GetAndSend(i, func(v any) any { return v.(*java.If).ThenPart },
+		func(v any) { sendRightPadded(s, v, q) })
+	// elsePart
+	q.GetAndSend(i, func(v any) any { return v.(*java.If).ElsePart },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return i
 }
 

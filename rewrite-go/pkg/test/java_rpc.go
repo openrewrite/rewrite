@@ -230,14 +230,12 @@ func (c *JavaRpcClient) readMessage() (*jsonRPCResponse, error) {
 	}
 }
 
-// RecipeEntry describes a recipe for the marketplace CSV.
 type RecipeEntry struct {
 	Name        string
 	PackageName string
 	Version     string
 }
 
-// DefaultJavaRecipes returns the common Java recipes used for testing.
 func DefaultJavaRecipes() []RecipeEntry {
 	return []RecipeEntry{
 		{Name: "org.openrewrite.java.ChangeType", PackageName: "org.openrewrite:rewrite-java", Version: "8.73.0"},

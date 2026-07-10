@@ -311,7 +311,7 @@ public sealed class DelegateInvocation(
     public DelegateInvocation RpcReceive(DelegateInvocation before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
-    public static DelegateInvocation Instance { get; } = new(Guid.Empty);
+    public static DelegateInvocation Instance { get; } = new(new Guid("1e5a0003-0000-4000-8000-000000000003"));
 
     public bool Equals(DelegateInvocation? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as DelegateInvocation);
@@ -471,7 +471,7 @@ public sealed class NullCoalescing(
     public NullCoalescing RpcReceive(NullCoalescing before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
-    public static NullCoalescing Instance { get; } = new(Guid.Empty);
+    public static NullCoalescing Instance { get; } = new(new Guid("1e5a0004-0000-4000-8000-000000000004"));
 
     public bool Equals(NullCoalescing? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as NullCoalescing);
@@ -496,7 +496,7 @@ public sealed class MultiDimensionalArray(
     public MultiDimensionalArray RpcReceive(MultiDimensionalArray before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
-    public static MultiDimensionalArray Instance { get; } = new(Guid.Empty);
+    public static MultiDimensionalArray Instance { get; } = new(new Guid("1e5a0005-0000-4000-8000-000000000005"));
 
     public bool Equals(MultiDimensionalArray? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as MultiDimensionalArray);
@@ -515,7 +515,7 @@ public sealed class PatternCombinator(Guid id)
     public PatternCombinator WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static PatternCombinator Instance { get; } = new(Guid.Empty);
+    public static PatternCombinator Instance { get; } = new(new Guid("1e5a0006-0000-4000-8000-000000000006"));
     public void RpcSend(PatternCombinator after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public PatternCombinator RpcReceive(PatternCombinator before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
@@ -597,7 +597,7 @@ public sealed class MultiDimensionContinuation(Guid id)
     public MultiDimensionContinuation WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static MultiDimensionContinuation Instance { get; } = new(Guid.Empty);
+    public static MultiDimensionContinuation Instance { get; } = new(new Guid("1e5a0007-0000-4000-8000-000000000007"));
     public void RpcSend(MultiDimensionContinuation after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public MultiDimensionContinuation RpcReceive(MultiDimensionContinuation before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));

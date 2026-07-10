@@ -26,6 +26,7 @@ import org.openrewrite.text.Find;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -81,8 +82,10 @@ class RecipeRunTest implements RewriteTest {
                         .findFirst().orElseThrow();
 
                 // Verify the row has multiline content
-                List<?> rows = store.getRows(parseFailuresDt.getName(), parseFailuresDt.getGroup())
-                        .toList();
+                List<?> rows;
+                try (Stream<?> stream = store.getRows(parseFailuresDt.getName(), parseFailuresDt.getGroup())) {
+                    rows = stream.toList();
+                }
                 assertThat(rows).hasSize(1);
             }),
           text(

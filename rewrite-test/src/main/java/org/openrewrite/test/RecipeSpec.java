@@ -37,9 +37,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -228,9 +230,12 @@ public class RecipeSpec {
             DataTableStore store = run.getDataTableStore();
             for (DataTable<?> dt : store.getDataTables()) {
                 if (dt.getType().equals(rowType)) {
-                    @SuppressWarnings("unchecked")
-                    List<E> rows = (List<E>) store.getRows(dt.getName(), dt.getGroup())
-                            .collect(java.util.stream.Collectors.toList());
+                    List<E> rows;
+                    try (Stream<?> stream = store.getRows(dt.getName(), dt.getGroup())) {
+                        @SuppressWarnings("unchecked")
+                        List<E> typed = (List<E>) stream.collect(toList());
+                        rows = typed;
+                    }
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
@@ -266,8 +271,10 @@ public class RecipeSpec {
                 }
             }
             assertThat(dataTable).isNotNull();
-            List<?> rows = store.getRows(dataTable.getName(), dataTable.getGroup())
-                    .collect(java.util.stream.Collectors.toList());
+            List<?> rows;
+            try (Stream<?> stream = store.getRows(dataTable.getName(), dataTable.getGroup())) {
+                rows = stream.collect(toList());
+            }
             StringWriter writer = new StringWriter();
             CsvMapper mapper = CsvMapper.builder()
                     .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)

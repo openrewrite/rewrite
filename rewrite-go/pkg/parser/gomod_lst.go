@@ -23,7 +23,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// ParseGoModFile parses go.mod content into a lossless golang.GoMod LST.
 // Mirrors org.openrewrite.golang.GoModParser on the Java side (the LST
 // path, not the legacy PlainText+marker path).
 //

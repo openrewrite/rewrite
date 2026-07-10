@@ -45,7 +45,6 @@ const (
 	Local
 )
 
-// ImportPath returns the unquoted import path of an Import (e.g. "fmt").
 // Returns "" when Qualid isn't a Literal (defensive — shouldn't happen
 // for well-formed Go source).
 //
@@ -82,7 +81,6 @@ func AliasName(imp *java.Import) string {
 	return imp.Alias.Element.Name
 }
 
-// FindImport returns the first import in cu whose path equals importPath.
 // Returns nil if no match.
 func FindImport(cu *golang.CompilationUnit, importPath string) *java.Import {
 	if cu == nil || cu.Imports == nil {

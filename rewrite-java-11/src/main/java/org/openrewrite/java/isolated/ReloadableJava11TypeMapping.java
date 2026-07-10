@@ -183,7 +183,10 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
 
     private JavaType generic(Type.TypeVar type, String signature) {
         String name;
-        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+        if (type instanceof Type.CapturedType) {
+            // A captured wildcard is javac's internal representation of the wildcard it was captured
+            // from; represent it as "?" (as the signature builder already does) rather than leaking
+            // javac's invalid-Java name "<captured wildcard>".
             name = "?";
         } else {
             name = type.tsym.name.toString();

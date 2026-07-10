@@ -24,6 +24,7 @@ import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
 import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.java.marker.OmitParentheses
+import org.openrewrite.java.marker.Quoted
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
@@ -346,11 +347,9 @@ class ScalaTreeVisitor(
       )
       wildcard
     } else {
-      // Preserve backtick-quoted form when source uses it — id.name.toString strips the backticks.
-      if (sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2) {
-        simpleName = sourceText
-      }
-      ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id))
+      // Record backtick quoting with a Quoted marker — id.name.toString already gives the bare name.
+      val quoted = sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2
+      ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id), quoted = quoted)
     }
   }
 
@@ -763,6 +762,7 @@ class ScalaTreeVisitor(
         }
 
         val opName = postfixOp.op.name.toString
+        val opQuoted = isBacktickQuoted(postfixOp.op.span)
         val odEnd = Math.max(0, postfixOp.od.span.end - offsetAdjustment)
         val opStart = Math.max(0, postfixOp.op.span.start - offsetAdjustment)
         val namePrefix = if (odEnd <= opStart && odEnd >= 0 && opStart <= source.length) {
@@ -773,7 +773,7 @@ class ScalaTreeVisitor(
 
         updateCursor(postfixOp.span.end)
 
-        val name = ident(opName, namePrefix, typeFor(postfixOp.op.span))
+        val name = ident(opName, namePrefix, typeFor(postfixOp.op.span), quoted = opQuoted)
 
         val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
         markersList.add(InfixNotation.create())
@@ -950,6 +950,7 @@ class ScalaTreeVisitor(
     var select: Expression = null
     var selectAfterSpace: Space = Space.EMPTY
     var methodName: String = ""
+    var methodNameQuoted: Boolean = false
     var typeParamsContainer: JContainer[Expression] = null
     app.fun match {
       case sel: Trees.Select[?] =>
@@ -973,9 +974,11 @@ class ScalaTreeVisitor(
         select = target
         selectAfterSpace = selectAfter
         methodName = sel.name.toString
+        methodNameQuoted = isBacktickQuoted(sel.nameSpan)
 
       case id: Trees.Ident[?] =>
         methodName = id.name.toString
+        methodNameQuoted = isBacktickQuoted(id.span)
 
       case typeApp: Trees.TypeApply[?] =>
         // TypeApply as method invocation target (e.g., Option.apply[String]("hi"), __P__.p[int])
@@ -998,11 +1001,13 @@ class ScalaTreeVisitor(
             select = target
             selectAfterSpace = selectAfter
             methodName = sel.name.toString
+            methodNameQuoted = isBacktickQuoted(sel.nameSpan)
             typeParamsContainer = parseTypeApplyArgs(typeApp)
           case id: Trees.Ident[?] =>
             val nameEnd = if (id.span.exists) Math.max(0, id.span.end - offsetAdjustment) else cursor
             if (nameEnd > cursor) cursor = nameEnd
             methodName = id.name.toString
+            methodNameQuoted = isBacktickQuoted(id.span)
             typeParamsContainer = parseTypeApplyArgs(typeApp)
           case _ =>
             cursor = savedCursor; return visitUnknown(app)
@@ -1235,7 +1240,7 @@ class ScalaTreeVisitor(
       case _ => Space.EMPTY
     }
 
-    val name = ident(methodName, nameSpace)
+    val name = ident(methodName, nameSpace, quoted = methodNameQuoted)
 
     val argContainer = JContainer.build(
       argContainerPrefix,
@@ -1473,23 +1478,21 @@ class ScalaTreeVisitor(
 
       // Create the name identifier with type from the Select node.
       // sel.name.toString strips backticks for names with special characters (e.g. text/html(UTF-8)),
-      // so we reconstruct the backtick-quoted form when the source has one.
+      // so we take the raw source slice for the bare name and record quoting with a Quoted marker.
       // nameSpan covers only the raw name (without backticks); the opening backtick sits at
       // nameSpan.start-1 and the closing one at nameSpan.end in the source.
-      val nameStr = {
+      val (nameStr, nameQuoted) = {
         val ns = sel.nameSpan
         if (ns.exists) {
           val adjStart = Math.max(0, ns.start - offsetAdjustment)
           val adjEnd = Math.max(0, ns.end - offsetAdjustment)
           if (adjStart >= 0 && adjEnd <= source.length && adjEnd > adjStart) {
-            if (adjStart > 0 && source.charAt(adjStart - 1) == '`' && adjEnd < source.length && source.charAt(adjEnd) == '`')
-              "`" + source.substring(adjStart, adjEnd) + "`"
-            else
-              source.substring(adjStart, adjEnd)
-          } else sel.name.toString
-        } else sel.name.toString
+            val quoted = adjStart > 0 && source.charAt(adjStart - 1) == '`' && adjEnd < source.length && source.charAt(adjEnd) == '`'
+            (source.substring(adjStart, adjEnd), quoted)
+          } else (sel.name.toString, false)
+        } else (sel.name.toString, false)
       }
-      val name = ident(nameStr, dotSpace, typeOfTree(sel), variableTypeOfTree(sel))
+      val name = ident(nameStr, dotSpace, typeOfTree(sel), variableTypeOfTree(sel), quoted = nameQuoted)
       
       if (sel.span.exists) {
         updateCursor(sel.span.end)
@@ -1663,6 +1666,7 @@ class ScalaTreeVisitor(
     }
 
     val methodName = infixOp.op.name.toString
+    val methodNameQuoted = isBacktickQuoted(infixOp.op.span)
     // Scala: any operator ending in ':' is right-associative, so `a op: b` means `b.op:(a)`.
     val rightAssoc = methodName.endsWith(":")
 
@@ -1704,7 +1708,7 @@ class ScalaTreeVisitor(
     }
 
     // Create the method name identifier
-    val name = ident(methodName, methodNameSpace)
+    val name = ident(methodName, methodNameSpace, quoted = methodNameQuoted)
 
     // For right-associative operators, store semantically: select = right, argument = left.
     // The printer checks for RightAssociative to restore the syntactic order on output.
@@ -1905,7 +1909,10 @@ class ScalaTreeVisitor(
               args.add(prevRp.withAfter(Space.format(between.substring(0, commaIndex))))
             }
             argPrefix = Space.format(between.substring(commaIndex + 1))
-            cursor = prevEnd + commaIndex + 1
+            // argPrefix owns this whitespace — advance the cursor to the argument
+            // start so the argument's visit doesn't also consume it into a nested
+            // prefix, which withPrefix below couldn't replace.
+            cursor = thisStart
           }
         }
       }
@@ -2097,7 +2104,8 @@ class ScalaTreeVisitor(
                             val commaIndex = positionOfNextIn(between, ",", 0)
                             if (commaIndex >= 0) {
                               argPrefix = Space.format(between.substring(commaIndex + 1))
-                              updateCursor(prevEnd + commaIndex + 1)
+                              // argPrefix owns this whitespace (see visitNewClassWithArgs)
+                              updateCursor(thisStart)
                             }
                           }
                         }
@@ -2435,10 +2443,10 @@ class ScalaTreeVisitor(
           case is @ untpd.ImportSelector(sIdent: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
             if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
             val selName = wildcardOrName(is, sIdent, tree.span)
-            val displaySelName = if (cursor < source.length && source.charAt(cursor) == '`') "`" + selName + "`" else selName
+            val selQuoted = cursor < source.length && source.charAt(cursor) == '`'
             val selectorType: JavaType = lookupSelectorType(tree.expr, selName)
             new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-              id, JLeftPadded.build(ident(displaySelName, Space.EMPTY, selectorType)), selectorType)
+              id, JLeftPadded.build(ident(selName, Space.EMPTY, selectorType, quoted = selQuoted)), selectorType)
           case _ =>
             throw new IllegalStateException("Unexpected non-simple selector in continuation")
         }
@@ -2455,10 +2463,10 @@ class ScalaTreeVisitor(
         case is @ untpd.ImportSelector(idTree: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
           if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
           val selectorName = wildcardOrName(is, idTree, tree.span)
-          val displaySelectorName = if (cursor < source.length && source.charAt(cursor) == '`') "`" + selectorName + "`" else selectorName
+          val selectorQuoted = cursor < source.length && source.charAt(cursor) == '`'
           val selectorType: JavaType = lookupSelectorType(tree.expr, selectorName)
           qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-            qualid, JLeftPadded.build(ident(displaySelectorName, Space.EMPTY, selectorType)), selectorType)
+            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, selectorType, quoted = selectorQuoted)), selectorType)
         case _ =>
       }
     }
@@ -2890,6 +2898,11 @@ class ScalaTreeVisitor(
       } else rawName
     }
 
+    // `displayName` is the source form (backticks kept) used below for source-position math;
+    // the identifier itself carries the bare name and a Quoted marker.
+    val identNameQuoted = displayName.length >= 2 && displayName.startsWith("`") && displayName.endsWith("`")
+    val identName = if (identNameQuoted) displayName.substring(1, displayName.length - 1) else displayName
+
     // Detect `implicit` modifier on the lambda parameter. The Scala 3 parser
     // exposes it on `vd.mods` but it sits in the source *before* `vd.span.start`
     // (the span covers only the name and optional type). The whitespace before
@@ -2934,9 +2947,9 @@ class ScalaTreeVisitor(
     // that can carry it.
     if (!hasExplicitType || vd.tpt == untpd.EmptyTree) {
       if (implicitModifier == null) {
-        ident(displayName, prefix)
+        ident(identName, prefix, quoted = identNameQuoted)
       } else {
-        val name = ident(displayName, namePrefix)
+        val name = ident(identName, namePrefix, quoted = identNameQuoted)
         val variable = new J.VariableDeclarations.NamedVariable(
           Tree.randomId(),
           Space.EMPTY,
@@ -2960,7 +2973,7 @@ class ScalaTreeVisitor(
       }
     } else {
       // With a type, we need a full variable declaration
-      val name = ident(displayName, namePrefix)
+      val name = ident(identName, namePrefix, quoted = identNameQuoted)
 
       // Extract the type
       val sourceText = extractSource(vd.span)
@@ -3314,14 +3327,15 @@ class ScalaTreeVisitor(
         ident(vd.name.toString, afterValVar)
       }
     } else {
-      // Preserve backtick-quoted form when source uses it — vd.name.toString strips the backticks.
+      // Record backtick quoting with a Quoted marker — vd.name.toString gives the bare name.
       // The opening backtick (if any) was already consumed into afterValVar by the index-based
       // search above. Use the flag captured before the type-annotation path moved the cursor.
       if (nameIsBacktickQuoted) {
-        // Move the opening backtick out of afterValVar (back) and onto the identifier name itself.
+        // Drop the opening backtick from afterValVar so the prefix stays pure whitespace;
+        // the printer re-adds both backticks from the Quoted marker.
         val afterValVarStr = afterValVar.getWhitespace
         val newAfterValVar = if (afterValVarStr.endsWith("`")) Space.format(afterValVarStr.dropRight(1)) else afterValVar
-        ident("`" + rawValName + "`", newAfterValVar, typeOfTree(vd), variableTypeOfTree(vd))
+        ident(rawValName, newAfterValVar, typeOfTree(vd), variableTypeOfTree(vd), quoted = true)
       } else {
         ident(rawValName, afterValVar, typeOfTree(vd), variableTypeOfTree(vd))
       }
@@ -3697,16 +3711,16 @@ class ScalaTreeVisitor(
     )
     
     // Extract space between "object" and the name, accounting for backtick-quoted names.
-    val (nameSpace, displayName, nameEndCursor) = if (md.nameSpan.exists) {
+    val (nameSpace, displayName, nameEndCursor, nameQuoted) = if (md.nameSpan.exists) {
       val rawNameStart = Math.max(0, md.nameSpan.start - offsetAdjustment)
       val rawNameLen = Math.max(0, md.nameSpan.end - md.nameSpan.start)
       backtickAwareName(objectKeywordPos, rawNameStart, rawNameLen, md.name.toString)
     } else {
-      (Space.format(" "), md.name.toString, cursor)
+      (Space.format(" "), md.name.toString, cursor, false)
     }
 
     // Extract object name
-    val name = ident(displayName, nameSpace)
+    val name = ident(displayName, nameSpace, quoted = nameQuoted)
 
     // Update cursor to after the name (past closing backtick if present)
     if (md.nameSpan.exists) {
@@ -4225,6 +4239,19 @@ class ScalaTreeVisitor(
   }
   
   private def visitWhileDo(whileTree: Trees.WhileDo[?]): J = {
+    // Scala 2 `do <body> while (<cond>)` — its span starts at the `do` keyword
+    // rather than `while`; route to visitDoWhile (which documents the desugared
+    // tree shape dotty produces for it).
+    val doWhileStart = Math.max(0, whileTree.span.start - offsetAdjustment)
+    if (source.startsWith("do", doWhileStart) &&
+        (doWhileStart + 2 >= source.length || !Character.isLetterOrDigit(source.charAt(doWhileStart + 2)) && source.charAt(doWhileStart + 2) != '_')) {
+      whileTree.cond match {
+        case condBlock: Trees.Block[?] if condBlock.stats.nonEmpty =>
+          return visitDoWhile(whileTree, condBlock)
+        case _ =>
+      }
+    }
+
     val prefix = extractPrefix(whileTree.span)
 
     // Find where the condition parentheses start
@@ -4354,7 +4381,74 @@ class ScalaTreeVisitor(
       body
     )
   }
-  
+
+  /**
+   * Maps a Scala 2 `do <body> while (<cond>)` to J.DoWhileLoop. Dotty desugars it
+   * to `WhileDo(Block(<body>, <cond>), ())`: the loop body is the block's single
+   * stat and the condition is the block's result expression (a `Parens`).
+   */
+  private def visitDoWhile(whileTree: Trees.WhileDo[?], condBlock: Trees.Block[?]): J = {
+    val savedCursor = cursor
+    val prefix = extractPrefix(whileTree.span)
+
+    // Move past the `do` keyword so the body picks up its own prefix.
+    val doStart = Math.max(0, whileTree.span.start - offsetAdjustment)
+    if (cursor <= doStart + 2) cursor = doStart + 2
+
+    val bodyStmt: Statement = visitTree(condBlock.stats.head) match {
+      case stmt: Statement => stmt
+      case j: J => new S.StatementExpression(Tree.randomId(), j).asInstanceOf[Statement]
+      case _ => cursor = savedCursor; return visitUnknown(whileTree)
+    }
+
+    // Space between the body and the `while` keyword.
+    val whileIdx = positionOfNext("while", cursor)
+    if (whileIdx < 0) { cursor = savedCursor; return visitUnknown(whileTree) }
+    val beforeWhile = if (whileIdx > cursor) ScalaSpace.format(source, cursor, whileIdx) else Space.EMPTY
+    cursor = whileIdx + 5
+
+    // Space between `while` and the opening parenthesis.
+    val parenIdx = positionOfNext("(", cursor)
+    if (parenIdx < 0) { cursor = savedCursor; return visitUnknown(whileTree) }
+    val condParenPrefix = if (parenIdx > cursor) ScalaSpace.format(source, cursor, parenIdx) else Space.EMPTY
+    cursor = parenIdx + 1
+
+    val condTree = condBlock.expr match {
+      case parens: untpd.Parens if parens.productArity > 0 =>
+        parens.productElement(0).asInstanceOf[Trees.Tree[?]]
+      case other => other
+    }
+    val condition = visitTree(condTree) match {
+      case expr: Expression => expr
+      case j: J => new S.StatementExpression(Tree.randomId(), j)
+      case _ => cursor = savedCursor; return visitUnknown(whileTree)
+    }
+
+    // Space before the closing parenthesis.
+    val condEnd = Math.max(0, condTree.span.end - offsetAdjustment)
+    val closeIdx = positionOfNext(")", Math.max(cursor, condEnd))
+    val beforeClose = if (closeIdx > condEnd) ScalaSpace.format(source, condEnd, closeIdx) else Space.EMPTY
+    if (closeIdx >= 0) cursor = closeIdx + 1
+    updateCursor(whileTree.span.end)
+
+    new J.DoWhileLoop(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JRightPadded.build(bodyStmt),
+      new JLeftPadded(
+        beforeWhile,
+        new J.ControlParentheses[Expression](
+          Tree.randomId(),
+          condParenPrefix,
+          Markers.EMPTY,
+          new JRightPadded(condition, beforeClose, Markers.EMPTY)
+        ),
+        Markers.EMPTY
+      )
+    )
+  }
+
   private def visitForDo(forTree: untpd.ForDo): J = {
     // Detect Scala 3 paren-less form (`for x <- xs do body`): after `for`, the next
     // non-whitespace is neither `(` nor `{`. The single-generator J.ForEachLoop
@@ -4615,7 +4709,13 @@ class ScalaTreeVisitor(
           var trailingSpace = Space.EMPTY
           var rpMarkers = Markers.EMPTY
           val trailStart = Math.max(statEnd, cursor)
-          if (trailStart < nextStart && nextStart <= source.length) {
+          if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+            // A `;` already absorbed into the statement's span, which the forward scan
+            // below can't see — same recognition and cursor catch-up as
+            // consumeTrailingSemicolon (which documents the Dotty span behavior).
+            rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
+            cursor = Math.max(cursor, trailStart)
+          } else if (trailStart < nextStart && nextStart <= source.length) {
             val between = source.substring(trailStart, nextStart)
             // An explicit ';' separator appears before any newline and with only
             // horizontal whitespace between it and the preceding statement.
@@ -4683,21 +4783,37 @@ class ScalaTreeVisitor(
       }
       if (isSyntheticResult) {
         // Synthetic ??? slipped through — skip it
-      } else exprResult match {
-        case expr: Expression =>
-          // In Scala, the last expression in a block is the return value
-          // Wrap it in a J.Return with ImplicitReturn marker
-          val implicitReturn = new J.Return(
-            Tree.randomId(),
-            expr.getPrefix(),
-            Markers.build(Collections.singletonList(new ImplicitReturn(Tree.randomId()))),
-            expr.withPrefix(Space.EMPTY)
-          )
-          
-          statements.add(JRightPadded.build(implicitReturn.asInstanceOf[Statement]))
-        case stmt: Statement =>
-          statements.add(JRightPadded.build(stmt))
-        case _ => // Skip
+      } else {
+        // A `;` after the final expression of a braced block belongs to the block —
+        // consume it and preserve it via the Semicolon marker. In a braceless block
+        // (e.g. a match case body) it is the enclosing construct's separator and is
+        // preserved there.
+        def trailingSemicolon(): (Space, Markers) =
+          if (hasBraces) {
+            val exprEnd = Math.max(0, block.expr.span.end - offsetAdjustment)
+            val exprNext = Math.max(0, block.span.end - offsetAdjustment)
+            consumeTrailingSemicolon(exprEnd, exprNext)
+          } else {
+            (Space.EMPTY, Markers.EMPTY)
+          }
+        exprResult match {
+          case expr: Expression =>
+            // In Scala, the last expression in a block is the return value
+            // Wrap it in a J.Return with ImplicitReturn marker
+            val implicitReturn = new J.Return(
+              Tree.randomId(),
+              expr.getPrefix(),
+              Markers.build(Collections.singletonList(new ImplicitReturn(Tree.randomId()))),
+              expr.withPrefix(Space.EMPTY)
+            )
+
+            val (trailingSpace, rpMarkers) = trailingSemicolon()
+            statements.add(new JRightPadded[Statement](implicitReturn, trailingSpace, rpMarkers))
+          case stmt: Statement =>
+            val (trailingSpace, rpMarkers) = trailingSemicolon()
+            statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
+          case _ => // Skip
+        }
       }
     }
     
@@ -4840,12 +4956,12 @@ class ScalaTreeVisitor(
     }
 
     // Extract space between the kind keyword and the name, accounting for backtick-quoted names.
-    val (nameSpace, displayClassName, classNameEndCursor) = if (td.nameSpan.exists) {
+    val (nameSpace, displayClassName, classNameEndCursor, classNameQuoted) = if (td.nameSpan.exists) {
       val rawNameStart = Math.max(0, td.nameSpan.start - offsetAdjustment)
       val rawNameLen = Math.max(0, td.nameSpan.end - td.nameSpan.start)
       backtickAwareName(cursor, rawNameStart, rawNameLen, td.name.toString)
     } else {
-      (Space.format(" "), td.name.toString, cursor)
+      (Space.format(" "), td.name.toString, cursor, false)
     }
 
     val kindType = if (isEnum) {
@@ -4865,7 +4981,7 @@ class ScalaTreeVisitor(
     )
 
     // Extract class name
-    val name = ident(displayClassName, nameSpace)
+    val name = ident(displayClassName, nameSpace, quoted = classNameQuoted)
 
     // Update cursor to after name (past closing backtick if present)
     if (td.nameSpan.exists && classNameEndCursor > cursor && classNameEndCursor <= source.length) {
@@ -6141,15 +6257,15 @@ class ScalaTreeVisitor(
     // render it as `this` rather than leaking the internal `<init>` name.
     val rawName = if (dd.name.toString == "<init>") "this" else dd.name.toString
 
-    val (nameSpace, displayMethodName, methodNameEndCursor) = if (dd.nameSpan.exists) {
+    val (nameSpace, displayMethodName, methodNameEndCursor, methodNameQuoted) = if (dd.nameSpan.exists) {
       val rawNameStart = Math.max(0, dd.nameSpan.start - offsetAdjustment)
       val rawNameLen = Math.max(0, dd.nameSpan.end - dd.nameSpan.start)
       backtickAwareName(defKeywordPos, rawNameStart, rawNameLen, rawName)
     } else {
-      (Space.format(" "), rawName, cursor)
+      (Space.format(" "), rawName, cursor, false)
     }
 
-    val name = ident(displayMethodName, nameSpace)
+    val name = ident(displayMethodName, nameSpace, quoted = methodNameQuoted)
 
     if (dd.nameSpan.exists) {
       cursor = Math.max(cursor, methodNameEndCursor)
@@ -6583,14 +6699,14 @@ class ScalaTreeVisitor(
     // Space between modifiers (or annotations) and the parameter name. Use the backtick-aware
     // helper so `case class CC(`type`: String)` keeps both backticks — `vd.name.toString` strips
     // them, and the closing backtick lives one past `vd.nameSpan.end`.
-    val (namePrefix, displayName, nameEndCursor) =
+    val (namePrefix, displayName, nameEndCursor, nameQuoted) =
       if (vd.nameSpan.exists && !anonymousParam) {
         val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
         backtickAwareName(cursor, nameStart, rawNameLen, rawParamName)
       } else {
-        (Space.EMPTY, rawParamName, cursor)
+        (Space.EMPTY, rawParamName, cursor, false)
       }
-    val paramName = ident(displayName, namePrefix, variableTypeOfTree(vd))
+    val paramName = ident(displayName, namePrefix, variableTypeOfTree(vd), quoted = nameQuoted)
     if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, nameEndCursor)
     }
@@ -6743,14 +6859,14 @@ class ScalaTreeVisitor(
       } else paramSource.contains(rawParamName)
     }
     val anonymousParam: Boolean = isUsing && (rawParamName.matches("x\\$\\d+") || !nameInSource)
-    val (namePrefix, displayParamName, paramNameEnd) =
+    val (namePrefix, displayParamName, paramNameEnd, paramNameQuoted) =
       if (vd.nameSpan.exists && !anonymousParam) {
         val rawNameStart = Math.max(0, vd.nameSpan.start - offsetAdjustment)
         val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
         backtickAwareName(cursor, rawNameStart, rawNameLen, rawParamName)
-      } else (Space.EMPTY, rawParamName, cursor)
+      } else (Space.EMPTY, rawParamName, cursor, false)
 
-    val paramName = ident(displayParamName, namePrefix, variableTypeOfTree(vd))
+    val paramName = ident(displayParamName, namePrefix, variableTypeOfTree(vd), quoted = paramNameQuoted)
 
     if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, paramNameEnd)
@@ -7386,12 +7502,11 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(namedArg.span)
     val nameText = namedArg.name.toString
 
-    // Detect backtick-quoted name and preserve the backticks on the identifier.
-    // namedArg.name.toString strips them, but the source may show `name`.
+    // Detect backtick-quoted name and record it with a Quoted marker.
+    // namedArg.name.toString strips the backticks, but the source may show `name`.
     val spanStart = Math.max(0, namedArg.span.start - offsetAdjustment)
     val isBacktickQuoted = isBacktickQuotedNameAt(spanStart + 1, nameText.length)
-    val displayName = if (isBacktickQuoted) "`" + nameText + "`" else nameText
-    val nameId = ident(displayName)
+    val nameId = ident(nameText, quoted = isBacktickQuoted)
 
     // Advance past name (and surrounding backticks if any), then find "="
     val nameLen = if (isBacktickQuoted) nameText.length + 2 else nameText.length
@@ -8369,7 +8484,15 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(po.span)
     val elementType = visitTypeTree(po.od)
     val innerEnd = if (po.od.span.exists) Math.max(0, po.od.span.end - offsetAdjustment) else cursor
-    val starStart = if (po.op.span.exists) Math.max(0, po.op.span.start - offsetAdjustment) else innerEnd
+    val repeatedEnd = if (po.span.exists) Math.min(source.length, Math.max(0, po.span.end - offsetAdjustment)) else source.length
+    val starStart =
+      if (po.op.span.exists && po.op.span.start != po.op.span.end) {
+        Math.max(0, po.op.span.start - offsetAdjustment)
+      } else {
+        val searchStart = Math.min(Math.max(cursor, innerEnd), repeatedEnd)
+        val found = positionOfNext("*", searchStart)
+        if (found >= 0 && found < repeatedEnd) found else innerEnd
+      }
     val beforeStar = if (cursor < starStart && starStart <= source.length) {
       ScalaSpace.format(source, cursor, starStart)
     } else Space.EMPTY
@@ -8518,19 +8641,20 @@ class ScalaTreeVisitor(
 
   /**
    * For an identifier whose raw (backtick-stripped) name occupies `[rawNameStart, rawNameStart + rawNameLen)`
-   * in `source`, returns the display name to put on the `J.Identifier` and the cursor position to advance to
+   * in `source`, returns the bare name to put on the `J.Identifier`, whether it is backtick-quoted (so the
+   * caller can attach a [[org.openrewrite.java.marker.Quoted]] marker), and the cursor position to advance to
    * (just past the closing backtick, if the source is backtick-quoted). The `prefix` covers `[prefixStart, openOfName)`,
    * where `openOfName` is the opening backtick when quoted and `rawNameStart` otherwise — this ensures the prefix
    * stays pure whitespace.
    */
-  private def backtickAwareName(prefixStart: Int, rawNameStart: Int, rawNameLen: Int, rawName: String): (Space, String, Int) = {
+  private def backtickAwareName(prefixStart: Int, rawNameStart: Int, rawNameLen: Int, rawName: String): (Space, String, Int, Boolean) = {
     if (isBacktickQuotedNameAt(rawNameStart, rawNameLen)) {
       val openTick = rawNameStart - 1
       val prefix = if (prefixStart < openTick) ScalaSpace.format(source, prefixStart, openTick) else Space.EMPTY
-      (prefix, "`" + rawName + "`", rawNameStart + rawNameLen + 1)
+      (prefix, rawName, rawNameStart + rawNameLen + 1, true)
     } else {
       val prefix = if (prefixStart < rawNameStart) ScalaSpace.format(source, prefixStart, rawNameStart) else Space.EMPTY
-      (prefix, rawName, rawNameStart + rawNameLen)
+      (prefix, rawName, rawNameStart + rawNameLen, false)
     }
   }
 
@@ -8643,16 +8767,42 @@ class ScalaTreeVisitor(
    * Build a `J.Identifier` with sensible defaults (random id, empty markers,
    * no annotations). Mirrors the JS parser's `mapIdentifier` convenience.
    */
+  /**
+   * Whether the name at `nameSpan` is backtick-quoted in the source. Dotty's `name.toString`
+   * strips the backticks that escape reserved words or special characters (e.g. `type`), so
+   * callers detect the quoting here and record it with a [[org.openrewrite.java.marker.Quoted]]
+   * marker rather than baking the backticks into the identifier name. For a Select the nameSpan
+   * excludes the backticks (they sit at start-1 and end); for an Ident the span includes them.
+   */
+  private def isBacktickQuoted(nameSpan: Spans.Span): Boolean = {
+    if (nameSpan.exists) {
+      val adjStart = Math.max(0, nameSpan.start - offsetAdjustment)
+      val adjEnd = Math.max(0, nameSpan.end - offsetAdjustment)
+      if (adjEnd > adjStart && adjEnd <= source.length) {
+        val text = source.substring(adjStart, adjEnd)
+        if (text.length >= 2 && text.charAt(0) == '`' && text.charAt(text.length - 1) == '`') {
+          return true
+        }
+        if (adjStart > 0 && adjEnd < source.length &&
+            source.charAt(adjStart - 1) == '`' && source.charAt(adjEnd) == '`') {
+          return true
+        }
+      }
+    }
+    false
+  }
+
   private def ident(
     name: String,
     prefix: Space = Space.EMPTY,
     typeInfo: JavaType = null,
-    fieldType: JavaType.Variable = null
+    fieldType: JavaType.Variable = null,
+    quoted: Boolean = false
   ): J.Identifier =
     new J.Identifier(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      if (quoted) Markers.build(Collections.singletonList(new Quoted(Tree.randomId()))) else Markers.EMPTY,
       Collections.emptyList(),
       name,
       typeInfo,
@@ -8816,6 +8966,9 @@ class ScalaTreeVisitor(
     // forward scan below would miss it, dropping the explicit separator on print.
     // Recognize that already-absorbed `;` here so it is preserved via the marker.
     if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      // The cursor may still sit before the `;` when the statement visit didn't
+      // consume its full span — move past it so it doesn't leak into whitespace.
+      cursor = Math.max(cursor, trailStart)
       return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
     }
     if (trailStart >= nextStart || nextStart > source.length) {

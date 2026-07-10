@@ -46,16 +46,12 @@ func applyVisitor(t *testing.T, src string, v recipe.TreeVisitor) string {
 	return printer.Print(final)
 }
 
-// ---- Service registry ----
-
 func TestAutoFormatService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.AutoFormatService](nil)
 	if svc == nil {
 		t.Fatal("expected AutoFormatService to be registered, got nil")
 	}
 }
-
-// ---- RemoveTrailingWhitespaceVisitor ----
 
 func TestRemoveTrailingWhitespace_StripsTrailingTabsFromLines(t *testing.T) {
 	src := "package main   \n\nfunc main() {}\n"
@@ -65,8 +61,6 @@ func TestRemoveTrailingWhitespace_StripsTrailingTabsFromLines(t *testing.T) {
 		t.Errorf("got %q, want %q", out, want)
 	}
 }
-
-// ---- BlankLinesVisitor ----
 
 // Regression: the leading blank line above the first statement of a
 // block lives on the *leftmost descendant* of that statement (e.g.
@@ -145,8 +139,6 @@ func main() {
 	}
 }
 
-// ---- TabsAndIndentsVisitor ----
-
 func TestTabsAndIndents_ReindentsFunctionBody(t *testing.T) {
 	src := "package main\n\nfunc main() {\n\t\t   a := 1\n\t_ = a\n}\n"
 	want := "package main\n\nfunc main() {\n\ta := 1\n\t_ = a\n}\n"
@@ -180,8 +172,6 @@ func main() {
 		t.Errorf("got:\n%s\nwant:\n%s", out, want)
 	}
 }
-
-// ---- SpacesVisitor ----
 
 func TestSpaces_NormalizesBinaryOperatorSpacing(t *testing.T) {
 	src := `package main
@@ -285,8 +275,6 @@ func main() {
 		t.Errorf("got:\n%s\nwant:\n%s", out, want)
 	}
 }
-
-// ---- AutoFormatVisitor (composition) ----
 
 func TestAutoFormat_FullPipelineEndToEnd(t *testing.T) {
 	// Combines: trailing whitespace on `func main() {`, blank line at

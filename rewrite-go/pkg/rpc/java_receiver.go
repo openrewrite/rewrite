@@ -31,7 +31,7 @@ type Receiver interface {
 }
 
 // receiveBlockBody receives a `*Block` field that Java ships as a
-// RightPadded<Statement> (J.If.thenPart, J.ForLoop/ForEachLoop.body, ...).
+// RightPadded<Statement> (J.ForLoop/ForEachLoop.body, ...).
 //
 // Passing the existing block as the receive baseline is essential. On a CHANGE
 // — e.g. a recipe edited a single nested statement — the unchanged siblings and
@@ -115,8 +115,6 @@ func (r *JavaReceiver) receiveType(before java.JavaType, q *ReceiveQueue) java.J
 	}
 	return result.(java.JavaType)
 }
-
-// --- J nodes ---
 
 func (r *JavaReceiver) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q := p.(*ReceiveQueue)
@@ -472,15 +470,13 @@ func (r *JavaReceiver) VisitIf(i *java.If, p any) java.J {
 	if cpResult := q.Receive(i.Condition, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
 		i.Condition = cpResult.(*java.ControlParentheses)
 	}
-	// thenPart - Java sends RightPadded<Statement> wrapping the Block
-	i.Then = receiveBlockBody(r, q, i.Then)
-	// elsePart - Java sends Else node, convert to RightPadded
-	if elseResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); elseResult != nil {
-		el := elseResult.(*java.Else)
-		i.ElsePart = &java.RightPadded[java.J]{
-			Element: el.Body.Element,
-			After:   el.Prefix,
-		}
+	// thenPart
+	if thenResult := q.Receive(i.ThenPart, func(v any) any { return receiveRightPadded(r, q, v) }); thenResult != nil {
+		i.ThenPart = coerceToStatementRP(thenResult)
+	}
+	// elsePart
+	if elseResult := q.Receive(i.ElsePart, func(v any) any { return r.Visit(v.(java.Tree), q) }); elseResult != nil {
+		i.ElsePart = elseResult.(*java.Else)
 	} else {
 		i.ElsePart = nil
 	}

@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.google.errorprone.annotations.MustBeClosed;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -58,6 +59,7 @@ public class InMemoryDataTableStore implements DataTableStore {
         bucket.rows.add(row);
     }
 
+    @MustBeClosed
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
         // Scan for matching bucket

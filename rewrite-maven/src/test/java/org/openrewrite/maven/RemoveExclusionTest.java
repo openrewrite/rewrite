@@ -186,6 +186,44 @@ class RemoveExclusionTest implements RewriteTest {
     }
 
     @Test
+    void keepsExclusionEffectiveOnlyOnDeeperTransitiveDependency() {
+        // spring-context -> spring-core -> spring-jcl, so excluding spring-jcl on spring-context is effective
+        // even though the excluded artifact is two levels deep in the transitive graph.
+        // https://github.com/openrewrite/rewrite/issues/8112
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-context</artifactId>
+                    <version>5.3.39</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-jcl</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void removeUsedExclusions() {
         rewriteRun(
           spec -> spec.recipe(new RemoveExclusion(

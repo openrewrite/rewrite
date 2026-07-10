@@ -444,6 +444,8 @@ public class PythonRewriteRpc extends RewriteRpc {
          */
         private String pythonVersion = "3";
 
+        private @Nullable DataTableStore dataTableStore;
+
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
@@ -606,6 +608,15 @@ public class PythonRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Configures where recipes in the Python runtime write data table rows, conveyed via
+         * the {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public PythonRewriteRpc get() {
             Path pythonPath = pythonPathSupplier.get();
@@ -735,6 +746,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

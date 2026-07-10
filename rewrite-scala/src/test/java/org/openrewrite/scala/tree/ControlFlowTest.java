@@ -66,7 +66,24 @@ class ControlFlowTest implements RewriteTest {
         );
     }
     
-    @Test 
+    @Test
+    void doWhileLoop() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  var i = 0
+                  do {
+                    println(i)
+                    i += 1
+                  } while (i < 10)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void ifWithBlock() {
         rewriteRun(
             scala(

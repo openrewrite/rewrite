@@ -21,14 +21,12 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// JavaTypeReceiver deserializes JavaType objects from the receive queue.
 // Field ordering MUST match JavaTypeReceiver.java exactly.
 // Embeds JavaTypeVisitor for dispatch; override methods deserialize each type.
 type JavaTypeReceiver struct {
 	visitor.JavaTypeVisitor
 }
 
-// NewJavaTypeReceiver creates a JavaTypeReceiver with virtual dispatch wired.
 func NewJavaTypeReceiver() *JavaTypeReceiver {
 	r := &JavaTypeReceiver{}
 	r.Self = r // wire virtual dispatch

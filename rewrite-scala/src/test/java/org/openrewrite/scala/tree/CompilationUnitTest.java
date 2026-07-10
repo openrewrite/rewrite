@@ -16,8 +16,11 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.marker.Quoted;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class CompilationUnitTest implements RewriteTest {
@@ -96,6 +99,27 @@ class CompilationUnitTest implements RewriteTest {
             
             val message = "Hello"
             """
+          )
+        );
+    }
+
+    @Test
+    void packageWithBacktickedSegment() {
+        rewriteRun(
+          scala(
+            """
+            package com.example.`trait`
+
+            val x = 42
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // The backticks are source syntax only: the identifier's simple name is
+                // bare and the quoting is carried by a Quoted marker.
+                J.FieldAccess pkg = (J.FieldAccess) cu.getPackageDeclaration().getExpression();
+                assertThat(pkg.getSimpleName()).isEqualTo("trait");
+                assertThat(pkg.getName().getMarkers().findFirst(Quoted.class)).isPresent();
+                assertThat(cu.getPackageDeclaration().getPackageName()).isEqualTo("com.example.trait");
+            })
           )
         );
     }

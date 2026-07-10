@@ -29,6 +29,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -161,6 +162,11 @@ public class ChangePluginVersion extends Recipe {
                 }
             }
         };
-        return Preconditions.or(Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor));
+        // Also require the plugin `version(..)` method to be used so the recipe only runs on
+        // build/settings scripts that reference it.
+        return Preconditions.check(
+                Preconditions.and(new UsesMethod<>(versionMatcher),
+                        Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>())),
+                groovyVisitor);
     }
 }

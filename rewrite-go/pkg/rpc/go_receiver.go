@@ -23,7 +23,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// GoReceiver deserializes Go AST nodes via the visitor pattern.
 // Mirrors org.openrewrite.golang.internal.rpc.GolangReceiver, which
 // extends JavaReceiver, which extends JavaVisitor.
 //
@@ -36,7 +35,6 @@ type GoReceiver struct {
 	JavaReceiver
 }
 
-// NewGoReceiver creates a GoReceiver ready to deserialize trees.
 func NewGoReceiver() *GoReceiver {
 	gr := &GoReceiver{}
 	gr.typeReceiver = NewJavaTypeReceiver()
@@ -58,10 +56,12 @@ func (r *GoReceiver) Visit(t java.Tree, p any) java.Tree {
 		c := *gm
 		return receiveGoMod(&c, p.(*ReceiveQueue))
 	}
+	if gs, ok := t.(*golang.GoSum); ok {
+		c := *gs
+		return receiveGoSum(&c, p.(*ReceiveQueue))
+	}
 	return r.GoVisitor.Visit(t, p)
 }
-
-// --- G nodes ---
 
 // receiveParseError deserializes a ParseError matching Java's ParseError.rpcReceive field order:
 // id, markers, sourcePath, charsetName, charsetBomMarked, checksum, fileAttributes, text.
@@ -135,7 +135,6 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 			cu.Statements[i] = coerceToStatementRP(s)
 		}
 	}
-	// EOF
 	cu.EOF = receiveValue(q, cu.EOF, func(e java.Space) any { return receiveSpace(e, q) })
 	return cu
 }
@@ -443,7 +442,6 @@ func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) jav
 	q := p.(*ReceiveQueue)
 	c := *ma // shallow copy to avoid mutating remoteObjects baseline
 	ma = &c
-	// Variables
 	beforeVars := make([]any, len(ma.Variables))
 	for i, v := range ma.Variables {
 		beforeVars[i] = v
@@ -455,11 +453,9 @@ func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) jav
 			ma.Variables[i] = coerceToExpressionRP(v)
 		}
 	}
-	// Operator
 	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		ma.Operator = result.(java.LeftPadded[java.Space])
 	}
-	// Values
 	beforeVals := make([]any, len(ma.Values))
 	for i, v := range ma.Values {
 		beforeVals[i] = v
@@ -518,7 +514,6 @@ func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	cc = &c
 	cc.Comm = receiveValue(q, cc.Comm, func(e java.Statement) any { return r.Visit(e, q) })
 	cc.Colon = receiveValue(q, cc.Colon, func(e java.Space) any { return receiveSpace(e, q) })
-	// Body
 	beforeBody := make([]any, len(cc.Body))
 	for i, s := range cc.Body {
 		beforeBody[i] = s

@@ -50,9 +50,15 @@ public class GolangRecipeBundleResolver implements RecipeBundleResolver {
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         Path pkgPath = Paths.get(bundle.getPackageName());
-        InstallRecipesResponse response = Files.exists(pkgPath)
-                ? rpc.installRecipes(pkgPath.toFile())
-                : rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+        InstallRecipesResponse response;
+        if (Files.exists(pkgPath)) {
+            // Key the bundle on the absolute, normalized path so it matches the origin the server records for it.
+            Path absolute = pkgPath.toAbsolutePath().normalize();
+            bundle.setPackageName(absolute.toString());
+            response = rpc.installRecipes(absolute.toFile());
+        } else {
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+        }
         this.lastResponse = response;
         if (response.getVersion() != null) {
             bundle.setVersion(response.getVersion());

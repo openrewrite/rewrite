@@ -35,7 +35,6 @@ import (
 // pre-fix; the "Coerce…" tests demonstrate the same input flowing through
 // the coerce helpers without panicking.
 
-// makeIdent returns an *Identifier (which implements Expression only).
 func makeIdent(name string) *java.Identifier {
 	return &java.Identifier{ID: uuid.New(), Name: name}
 }
@@ -59,8 +58,6 @@ func expectPanic(t *testing.T, label string, fn func()) {
 	fn()
 	t.Fatalf("%s: unreachable — fn returned without panic", label)
 }
-
-// ----- Group 1: RightPadded[Statement] vs RightPadded[Expression] -----
 
 func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	// given: a RightPadded[Expression] wrapping a *MethodInvocation
@@ -97,8 +94,6 @@ func TestRawCastPanics_RightPaddedStatementFromExpression(t *testing.T) {
 	})
 }
 
-// ----- Group 2: LeftPadded[*Identifier] from LeftPadded[Expression] -----
-
 func TestCoerceLeftPaddedIdent_AcceptsExpressionVariant(t *testing.T) {
 	// given: a LeftPadded[Expression] wrapping an *Identifier — the shape
 	// Java emits for FieldAccess.name and Import.alias.
@@ -128,8 +123,6 @@ func TestRawCastPanics_LeftPaddedIdentFromExpression(t *testing.T) {
 	})
 }
 
-// ----- Group 4: coerceRightPaddedTyped[T] element coercion -----
-//
 // receiveContainerTyped[T] builds Container[T] by running each received element
 // through coerceRightPaddedTyped[T], so these element-level tests lock in the
 // guarantees the deleted coerceContainerStatement/coerceContainerExpression/

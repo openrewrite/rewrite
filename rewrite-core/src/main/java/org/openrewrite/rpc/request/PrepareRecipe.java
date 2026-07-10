@@ -23,6 +23,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
@@ -44,8 +46,16 @@ public class PrepareRecipe implements RpcRequest {
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
             Recipe recipe = recipeLoader.load(request.id, request.getOptions());
+            return prepareTree(recipe, preparedRecipes);
+        }
+
+        static PrepareRecipeResponse prepareTree(Recipe recipe, PreparedRecipeCache preparedRecipes) {
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);
+            List<PrepareRecipeResponse> children = new ArrayList<>();
+            for (Recipe child : recipe.getRecipeList()) {
+                children.add(prepareTree(child, preparedRecipes));
+            }
             return new PrepareRecipeResponse(
                     instanceId,
                     recipe.getDescriptor(),
@@ -56,8 +66,8 @@ public class PrepareRecipe implements RpcRequest {
                     emptyList(),
                     recipe instanceof ScanningRecipe ? "scan:" + instanceId : null,
                     emptyList(),
-                    null
-            );
+                    null,
+                    children);
         }
     }
 }

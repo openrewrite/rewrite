@@ -359,6 +359,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                         d = d.withMarkers(d.getMarkers().computeByType(mrr,
                                 (original, ignored) -> updatedMarker));
                         maybeUpdateModel();
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, except).getVisitor());
                     }
                 }
                 return d;
@@ -414,7 +415,18 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                     .resolve(emptyList(), mpd, ctx);
                             ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
-                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
+                            // Inspect this pom plus any descendant modules that inherit from it, so dependency
+                            // management dropped by the new parent can be restored in this (local) parent on
+                            // behalf of child modules that declare those dependencies without an explicit version.
+                            List<MavenResolutionResult> modulesToInspect = new ArrayList<>();
+                            modulesToInspect.add(mrr);
+                            ResolvedGroupArtifactVersion thisGav = mrr.getPom().getGav();
+                            for (MavenResolutionResult candidate : acc.gavToOriginalMarker.values()) {
+                                if (isDescendantOf(candidate, thisGav)) {
+                                    modulesToInspect.add(candidate);
+                                }
+                            }
+                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(modulesToInspect, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
                                         dep.getGroupId(), dep.getArtifactId(), dep.getVersion() == null ? "" : dep.getVersion(),
@@ -530,7 +542,31 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 .collect(toMap(p -> p, cascadedProps::get));
     }
 
-    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
+    private static boolean isDescendantOf(MavenResolutionResult module, ResolvedGroupArtifactVersion ancestorGav) {
+        for (MavenResolutionResult parent = module.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent.getPom().getGav().equals(ancestorGav)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(List<MavenResolutionResult> modules, ResolvedPom newParent) {
+        // Remove from the list any that would still be managed under the new parent
+        Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
+                .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
+                .collect(toSet());
+
+        Map<GroupArtifact, ResolvedManagedDependency> unmanaged = new LinkedHashMap<>();
+        for (MavenResolutionResult module : modules) {
+            for (ResolvedManagedDependency dep : getDependenciesUnmanagedByNewParentForModule(module, newParentManagedGa)) {
+                unmanaged.putIfAbsent(new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()), dep);
+            }
+        }
+        return new ArrayList<>(unmanaged.values());
+    }
+
+    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParentForModule(MavenResolutionResult mrr, Set<GroupArtifact> newParentManagedGa) {
         ResolvedPom resolvedPom = mrr.getPom();
 
         // Dependencies managed by the current pom's own dependency management are irrelevant to parent upgrade
@@ -566,11 +602,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         if (depsWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
-
-        // Remove from the list any that would still be managed under the new parent
-        Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
-                .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
-                .collect(toSet());
 
         return depsWithoutExplicitVersion.stream()
                 .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))

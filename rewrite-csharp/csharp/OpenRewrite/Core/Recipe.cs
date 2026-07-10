@@ -42,6 +42,8 @@ public abstract class Recipe
 
     public virtual TimeSpan? EstimatedEffortPerOccurrence => TimeSpan.FromMinutes(5);
 
+    public virtual IReadOnlyList<DataTableDescriptor> DataTables => [];
+
     public virtual List<Recipe> GetRecipeList() => [];
 
     public virtual ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
@@ -61,7 +63,7 @@ public abstract class Recipe
         return new RecipeDescriptor(
             Name, DisplayName, Description,
             Tags, EstimatedEffortPerOccurrence,
-            options, recipeList
+            options, recipeList, DataTables
         );
     }
 

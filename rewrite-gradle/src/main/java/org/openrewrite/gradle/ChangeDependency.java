@@ -44,6 +44,7 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -55,10 +56,10 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     // Individual dependencies tend to appear in several places within a given dependency graph.
     // Minimize the number of allocations by caching the updated dependencies.
     @EqualsAndHashCode.Exclude
-    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
+    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new ConcurrentHashMap<>();
 
     @EqualsAndHashCode.Exclude
-    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
+    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new ConcurrentHashMap<>();
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);

@@ -41,8 +41,6 @@ type SpacesVisitor struct {
 	stopAfterTracker
 }
 
-// NewSpacesVisitor returns a visitor configured with the given
-// stopAfter bound. Pass nil to format the entire visited tree.
 func NewSpacesVisitor(stopAfter java.Tree) *SpacesVisitor {
 	return visitor.Init(&SpacesVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},

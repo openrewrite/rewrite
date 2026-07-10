@@ -25,6 +25,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -119,6 +123,54 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        // javac recovers from unbalanced braces in the parse stub, so additionally assert the
+        // stub is well-formed; stricter parsers (Kotlin, Groovy, Scala) reject unbalanced stubs
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("SuppressWarnings".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("all"))) {
+                      return JavaTemplate.builder("\"all\"")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          java(
+            """
+              class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("unchecked")
+                  void method() {}
+              }
+              """,
+            """
+              class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("all")
+                  void method() {}
+              }
+              """
+          )
+        );
+        assertThat(stubs)
+          .isNotEmpty()
+          .allSatisfy(stub -> assertThat(stub.chars().filter(c -> c == '{').count())
+            .as("balanced braces in template stub:%n%s", stub)
+            .isEqualTo(stub.chars().filter(c -> c == '}').count()));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4634")

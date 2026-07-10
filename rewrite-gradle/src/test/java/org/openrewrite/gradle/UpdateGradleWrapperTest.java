@@ -1162,6 +1162,82 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
+    /**
+     * A dynamic version selector can't be resolved for a distribution hosted at a non-standard URL (here the host
+     * merely contains "artifactory" while the path does not) without querying services.gradle.org, which is frequently
+     * blocked where such URLs are used, so the wrapper is left unchanged rather than failing the recipe run.
+     */
+    @Test
+    void leavesCustomDistributionUrlUnchangedForDynamicVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.x", null, false, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "6.9.1")))
+            .executionContext(rejectGradleOrgRequests()),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.example.com/gradle-distributions/gradle-6.9.1-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          )
+        );
+    }
+
+    /**
+     * An exact version is substituted into a non-standard distribution URL without any call to gradle.org, preserving
+     * the custom host and path.
+     */
+    @Test
+    void updatesCustomDistributionUrlForExactVersionWithoutQueryingGradleOrg() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.6.6", null, false, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "6.9.1")))
+            .executionContext(rejectGradleOrgRequests()),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://nexus.company.com/repository/gradle-distributions/gradle-6.9.1-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://nexus.company.com/repository/gradle-distributions/gradle-7.6.6-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .afterRecipe(gradleWrapperProperties ->
+                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
+                    assertThat(buildTool.getVersion()).isEqualTo("7.6.6");
+                }))
+          )
+        );
+    }
+
+    /**
+     * Distributions hosted at a non-standard URL must never fall back to gradle.org for version detection, since that
+     * host is commonly unavailable in the environments that rely on such URLs.
+     */
+    private static HttpSenderExecutionContextView rejectGradleOrgRequests() {
+        HttpSender noGradleOrg = request -> {
+            if (request.getUrl().toString().contains("gradle.org")) {
+                throw new IllegalStateException("Unexpected request to " + request.getUrl() +
+                                                "; custom distribution URLs must not query gradle.org");
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        return HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(noGradleOrg)
+          .setLargeFileHttpSender(noGradleOrg);
+    }
+
     @Test
     void usesExecutableJarFrom8_14() {
         rewriteRun(

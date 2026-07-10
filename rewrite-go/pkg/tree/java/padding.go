@@ -16,7 +16,6 @@
 
 package java
 
-// RightPadded wraps an element with trailing whitespace/comments.
 // Used for list elements where whitespace appears after the element
 // (e.g., before a comma or closing delimiter).
 type RightPadded[T any] struct {
@@ -25,7 +24,6 @@ type RightPadded[T any] struct {
 	Markers Markers
 }
 
-// LeftPadded wraps an element with preceding whitespace/comments.
 // Used for operators and delimiters where whitespace appears before
 // the element (e.g., the space before an operator in a binary expression).
 type LeftPadded[T any] struct {

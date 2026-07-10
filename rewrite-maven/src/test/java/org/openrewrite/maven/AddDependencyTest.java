@@ -2421,6 +2421,37 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/8211")
+    void latestPatchWithManagedDependencyDoesNotUpgradeToLatestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.springframework.boot:spring-boot-starter-actuator:latest.patch", null, null, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.2.12</version>
+                  <relativePath/>
+                </parent>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-actuator</artifactId>
+                    <version>3.2.12</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }
