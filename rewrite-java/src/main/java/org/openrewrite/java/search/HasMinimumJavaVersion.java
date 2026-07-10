@@ -51,11 +51,12 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     String displayName = "Has minimum Java version";
 
     String description = "Finds source files when the oldest Java version in use meets the " +
-               "supplied minimum version. The oldest Java version in use is the lowest Java " +
-               "version in use in any source set of any subproject of a repository. It is " +
-               "possible that, for example, the main source set of a project uses Java 8, but " +
-               "a test source set uses Java 17. In this case, the oldest Java version in use is " +
-               "Java 8.";
+               "supplied minimum version. Java version is attributed per source set (for " +
+               "example `src/main/java` and `src/test/java`), so the oldest Java version in " +
+               "use is the lowest version across every source set of every subproject in a " +
+               "repository. For example, the main source set of a project may use Java 8 " +
+               "while its test source set uses Java 17; in that case the oldest Java version " +
+               "in use is Java 8.";
 
     @SuppressWarnings("ConstantConditions")
     @Override
