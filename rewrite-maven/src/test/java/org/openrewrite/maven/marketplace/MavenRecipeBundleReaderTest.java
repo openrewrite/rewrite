@@ -65,7 +65,8 @@ class MavenRecipeBundleReaderTest {
                 artifactCache,
                 null,
                 new HttpUrlConnectionSender(),
-                Throwable::printStackTrace
+                Throwable::printStackTrace,
+                ctx
         );
 
         resolver = new MavenRecipeBundleResolver(ctx, downloader, RecipeClassLoader::new);

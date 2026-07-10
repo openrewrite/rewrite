@@ -68,6 +68,12 @@ public class MavenArtifactDownloader {
     private final ExecutionContext ctx;
 
 
+    /**
+     * @deprecated Use {@link #MavenArtifactDownloader(MavenArtifactCache, MavenSettings, Consumer, ExecutionContext)}
+     * and pass the session {@link ExecutionContext} so the anonymous-first authentication cache is shared with
+     * POM/metadata resolution instead of living on a throwaway context.
+     */
+    @Deprecated
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    Consumer<Throwable> onError) {
@@ -81,6 +87,12 @@ public class MavenArtifactDownloader {
         this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, ctx);
     }
 
+    /**
+     * @deprecated Use {@link #MavenArtifactDownloader(MavenArtifactCache, MavenSettings, HttpSender, Consumer, ExecutionContext)}
+     * and pass the session {@link ExecutionContext} so the anonymous-first authentication cache is shared with
+     * POM/metadata resolution instead of living on a throwaway context.
+     */
+    @Deprecated
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    HttpSender httpSender,

@@ -46,7 +46,7 @@ class MavenArtifactDownloaderTest {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-          artifactCache, null, t -> ctx.getOnError().accept(t));
+          artifactCache, null, ctx.getOnError(), ctx);
         ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
           "https://repo1.maven.org/maven2",
           "org.openrewrite.recipe",
@@ -93,7 +93,7 @@ class MavenArtifactDownloaderTest {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-          artifactCache, null, t -> ctx.getOnError().accept(t));
+          artifactCache, null, ctx.getOnError(), ctx);
 
         MavenParser mavenParser = MavenParser.builder().build();
         SourceFile parsed = mavenParser.parse(ctx,
@@ -168,7 +168,7 @@ class MavenArtifactDownloaderTest {
             MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
             AtomicReference<Throwable> error = new AtomicReference<>();
             MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-              artifactCache, settings, error::set);
+              artifactCache, settings, error::set, new InMemoryExecutionContext());
 
             MavenRepository repo = new MavenRepository(
               "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
@@ -231,7 +231,7 @@ class MavenArtifactDownloaderTest {
             MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
             AtomicReference<Throwable> error = new AtomicReference<>();
             MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-              artifactCache, settings, error::set);
+              artifactCache, settings, error::set, new InMemoryExecutionContext());
 
             MavenRepository repo = new MavenRepository(
               "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
@@ -283,7 +283,7 @@ class MavenArtifactDownloaderTest {
             MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
             AtomicReference<Throwable> error = new AtomicReference<>();
             MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-              artifactCache, settings, error::set);
+              artifactCache, settings, error::set, new InMemoryExecutionContext());
 
             MavenRepository repo = new MavenRepository(
               "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
@@ -339,7 +339,7 @@ class MavenArtifactDownloaderTest {
             MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
             AtomicReference<Throwable> error = new AtomicReference<>();
             MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-              artifactCache, settings, error::set);
+              artifactCache, settings, error::set, new InMemoryExecutionContext());
 
             MavenRepository repo = new MavenRepository(
               "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
