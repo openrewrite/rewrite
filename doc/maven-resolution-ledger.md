@@ -100,6 +100,12 @@ plugin-goal `HashSet` ordering (study a1) is order-scrambling but stable, hence 
 L-P0-002/L-P0-003 rather than masks. DESIGN.md §9 seeds are deliberately not yet copied here;
 they land with the phases that flip them.
 
+Phase-5 (the flip) surfaced one new divergence class while inverting the ALIGN pins:
+
+| id | area | current behavior | Maven / engine behavior | class | evidence | pinning test | status |
+|---|---|---|---|---|---|---|---|
+| L-P5-A-001 | plugin `<configuration>` interpolation from session system properties | Legacy keeps `${java.version}`-style placeholders literal in effective plugin configuration (only pom/parser-injected properties interpolate) | Maven's model interpolator resolves plugin configuration values from the session system properties — the same property set as `<os>`/`<jdk>` activation, so `MavenExecutionContextView.setActivationSystemProperties` pins it for fleet determinism (extends L-P3-G-002) | ALIGN_TO_MAVEN (engine Maven-correct; legacy is the outlier). Recipes that ask "does the declared config reference property X" must read the requested pom's plugins, where the placeholder survives — `UpdateMavenProjectPropertyJavaVersion` fixed accordingly | `UpdateMavenProjectPropertyJavaVersionTest.updateChildProperty` in MAVEN mode (parent's `<source>${java.version}</source>` projects as the JVM's `java.version`) | the same test, green post-fix | FLIPPED (Phase 5) |
+
 Phase-4 slice C (integrated perf gate + engine debt) unified the duplicated collect-side supplier overrides and routed
 collect-time metadata through the pluggable cache region. Both are non-semantic engine/cache seams (KEEP_REWRITE).
 

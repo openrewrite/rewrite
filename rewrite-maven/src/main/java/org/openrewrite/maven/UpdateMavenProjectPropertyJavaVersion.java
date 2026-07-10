@@ -23,7 +23,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Plugin;
-import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -84,10 +83,11 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
 
                 // Return early if the parent is within the current repository, as properties defined there will be updated
                 if (getResolutionResult().parentPomIsProjectPom()) {
-                    // Unless the plugin config in the parent defines source/target/release with a property
+                    // Unless the plugin config in the parent declares source/target/release with a property. The
+                    // requested pom keeps the ${...} placeholder the effective model interpolates away.
                     for (Plugin plugin : Optional.ofNullable(getResolutionResult().getParent())
                             .map(MavenResolutionResult::getPom)
-                            .map(ResolvedPom::getPlugins)
+                            .map(p -> p.getRequested().getPlugins())
                             .orElse(emptyList())) {
                         if ("org.apache.maven.plugins".equals(plugin.getGroupId()) && "maven-compiler-plugin".equals(plugin.getArtifactId()) && plugin.getConfiguration() != null) {
                             for (String property : JAVA_VERSION_PROPERTIES) {

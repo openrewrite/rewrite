@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.engine.PomXmlRegistry;
 import org.openrewrite.maven.tree.*;
@@ -181,6 +182,11 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
+        } catch (MavenParsingException e) {
+            // A recipe's intermediate edit can leave the document transiently invalid under Maven's model
+            // validation (e.g. a managed version renamed before its dependency); keep the previous resolution
+            // and let the update after the completing edit re-resolve.
+            return document;
         }
     }
 
@@ -237,7 +243,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
                             return updateResult(ctx, module, projectPoms);
-                        } catch (MavenDownloadingExceptions e) {
+                        } catch (MavenDownloadingExceptions | MavenParsingException e) {
                             return module;
                         }
                     }))
