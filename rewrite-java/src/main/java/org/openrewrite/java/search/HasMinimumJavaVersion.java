@@ -34,8 +34,10 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVersion>> {
     @Option(displayName = "Java version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "17.X")
+            description = "A minimum version number, a node-style semver selector, or an exact version prefixed with " +
+                          "`=`. Plain values like `17` or `17.0.1` match that version or higher. Use `=17` to require " +
+                          "an exact match.",
+            example = "17")
     String version;
 
     @Option(displayName = "Version check against target compatibility",
@@ -60,9 +62,28 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
         if (version != null) {
-            validated = validated.and(Semver.validate(version, null));
+            validated = validated.and(Semver.validate(canonicalizeVersion(version), null));
         }
         return validated;
+    }
+
+    /**
+     * A plain version like "17" or "17.0.1" is treated as "N or higher" so the option
+     * matches the recipe's "minimum" semantics. Any selector the user writes explicitly
+     * (X-ranges, hyphen ranges, tildes, carets, set ranges) is left alone. An explicit
+     * "=" prefix opts in to exact-version matching.
+     */
+    private static String canonicalizeVersion(String version) {
+        if (version.isEmpty() || version.startsWith("=")) {
+            return version;
+        }
+        for (int i = 0; i < version.length(); i++) {
+            char c = version.charAt(i);
+            if (c != '.' && !Character.isDigit(c)) {
+                return version;
+            }
+        }
+        return "[" + version + ",)";
     }
 
     @Override
@@ -89,7 +110,7 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicReference<JavaVersion> acc) {
-        VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
+        VersionComparator versionComparator = requireNonNull(Semver.validate(canonicalizeVersion(version), null).getValue());
         return Preconditions.check(minimumVersionInRange(acc, versionComparator), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
