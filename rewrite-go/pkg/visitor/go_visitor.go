@@ -499,20 +499,16 @@ func (v *GoVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 	ifStmt = ifStmt.WithPrefix(v.self().VisitSpace(ifStmt.Prefix, p))
 	ifStmt = ifStmt.WithMarkers(v.visitMarkers(ifStmt.Markers, p))
 	ifStmt = ifStmt.WithCondition(visitAndCast[*java.ControlParentheses](v, ifStmt.Condition, p))
-	ifStmt = ifStmt.WithThen(visitAndCast[*java.Block](v, ifStmt.Then, p))
+	thenPart := ifStmt.ThenPart
+	thenPart.Element = v.self().Visit(thenPart.Element, p).(java.Statement)
+	thenPart.After = v.self().VisitSpace(thenPart.After, p)
+	ifStmt = ifStmt.WithThenPart(thenPart)
 	if ifStmt.ElsePart != nil {
-		ep := *ifStmt.ElsePart
-		ep.Element = v.self().Visit(ep.Element, p).(java.J)
-		ep.After = v.self().VisitSpace(ep.After, p)
-		ifStmt.ElsePart = &ep
+		ifStmt = ifStmt.WithElsePart(visitAndCast[*java.Else](v, ifStmt.ElsePart, p))
 	}
 	return ifStmt
 }
 
-// VisitElse handles the synthetic *java.Else wrapper that JavaSender produces
-// for RPC parity with Java's J.If.Else. The node never appears in a parsed
-// Go AST — language-level recipes go through VisitIf instead — so the default
-// implementation simply visits the body so traversal terminates correctly.
 func (v *GoVisitor) VisitElse(el *java.Else, p any) java.J {
 	el = el.WithPrefix(v.self().VisitSpace(el.Prefix, p))
 	el = el.WithMarkers(v.visitMarkers(el.Markers, p))
