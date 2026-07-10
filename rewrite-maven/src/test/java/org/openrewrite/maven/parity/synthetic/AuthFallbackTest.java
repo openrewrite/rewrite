@@ -92,11 +92,10 @@ class AuthFallbackTest {
             assertThat(resolution.failed()).isFalse();
             assertThat(resolution.errored()).isTrue();
             assertThat(resolution.errors()).isNotEmpty();
-            // 401 is a deterministic client error: pom GET, jar HEAD probe, then negatively cached
+            // 401 is a deterministic client error: one pom GET, then negatively cached (the engine
+            // reads the descriptor once and has no pom-less-jar HEAD probe)
             if (!SyntheticHarness.shadowMode()) {
-                assertThat(repo.requests()).containsExactly(
-                  "GET " + X_POM,
-                  "HEAD " + X_POM.replace(".pom", ".jar"));
+                assertThat(repo.requests()).containsExactly("GET " + X_POM);
             }
         }
     }
@@ -149,7 +148,7 @@ class AuthFallbackTest {
      * Unresolvable {@code ${...}} placeholder credentials still resolve anonymously — but on the
      * POM path the legacy engine first sends the literal placeholder as basic auth and only
      * recovers through the anonymous retry, unlike {@code MavenArtifactDownloader} (and Maven),
-     * which skip unresolved credentials up front. Ledger L-P0-007 pins the divergence.
+     * which skip unresolved credentials up front.
      */
     @Test
     void unresolvedPlaceholderCredentialsFallBackToAnonymous() {
@@ -159,9 +158,9 @@ class AuthFallbackTest {
               settingsWithServer("auth-repo", "${env.PARITY_NO_SUCH_USER}", "${env.PARITY_NO_SUCH_PASSWORD}"));
 
             assertThat(resolution.failed()).isFalse();
-            // L-P0-007: the placeholder leaks to the server before the anonymous retry succeeds. Legacy-scoped: under the
+            // The placeholder leaks to the server before the anonymous retry succeeds. Legacy-scoped: under the
             // shadow oracle the engine (Maven) skips unresolved credentials up front, so the two engines' request logs
-            // differ in shape and interleave — the L-P0-007 divergence itself is what flips at Phase 5.
+            // differ in shape and interleave — this divergence itself is what flips when the engine becomes the default.
             if (!SyntheticHarness.shadowMode()) {
                 assertThat(repo.artifactRequests()).containsExactly("GET " + X_POM, "GET " + X_POM);
                 assertThat(repo.recordedArtifacts().get(0).getHeader("Authorization"))

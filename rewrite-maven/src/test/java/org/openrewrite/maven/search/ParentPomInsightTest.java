@@ -119,6 +119,7 @@ class ParentPomInsightTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -138,6 +139,7 @@ class ParentPomInsightTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <!--~~>--><parent>
                     <groupId>org.springframework.boot</groupId>
@@ -232,6 +234,7 @@ class ParentPomInsightTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -251,6 +254,7 @@ class ParentPomInsightTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <!--~~>--><parent>
                     <groupId>org.springframework.boot</groupId>
@@ -343,6 +347,7 @@ class ParentPomInsightTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -362,6 +367,7 @@ class ParentPomInsightTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
 
                   <!--~~>--><parent>
                     <groupId>org.springframework.boot</groupId>
@@ -787,6 +793,7 @@ class ParentPomInsightTest implements RewriteTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
+              <packaging>pom</packaging>
               </project>
               """,
             SourceSpec::skip

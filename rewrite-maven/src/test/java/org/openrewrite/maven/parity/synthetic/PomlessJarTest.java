@@ -27,9 +27,9 @@ import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.rootPom;
 
 /**
  * A jar published without a pom: the legacy engine HEAD-probes the sibling jar after the pom
- * 404s and synthesizes a stub jar-packaging pom for it. Maven's missing-descriptor tolerance
- * ("The POM for ... is missing, no dependency information available", then proceed) is the
- * parity reference for Phase 3; effective behavior matches (a4 catalog #64).
+ * 404s and synthesizes a stub jar-packaging pom for it (a4 catalog #64). LEGACY-pinned: the
+ * engine deliberately fails a resolved-graph jar dependency whose pom is missing (matching
+ * real Maven), so the synthesis dies with the legacy engine.
  */
 class PomlessJarTest {
     private static final String G = "org.parity.synthetic";
@@ -42,8 +42,8 @@ class PomlessJarTest {
             // The jar exists (200 on HEAD, body stripped by MockMavenRepo); the pom does not
             repo.serve(JAR, request -> new MockResponse().setResponseCode(200));
 
-            SyntheticHarness.Session session = new SyntheticHarness.Session(
-              ctx -> ctx.setRepositories(List.of(repo.repo("mock"))));
+            SyntheticHarness.Session session = new SyntheticHarness.Session(SyntheticHarness.legacyPinned(
+              ctx -> ctx.setRepositories(List.of(repo.repo("mock")))));
             SyntheticHarness.Resolution resolution = session.resolve(rootPom(dependencies(G + ":nopom:1.0")));
 
             assertThat(resolution.failed()).isFalse();

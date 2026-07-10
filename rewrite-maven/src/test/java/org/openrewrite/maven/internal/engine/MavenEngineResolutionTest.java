@@ -80,20 +80,20 @@ class MavenEngineResolutionTest {
     @Test
     void legacyModeProducesLegacyPluginOrder() {
         ResolvedPom pom = resolve("plugins-executions", "legacy").getPom();
-        // L-P0-003: legacy re-appends the parent-merged enforcer to the end.
+        // The legacy resolver re-appends the parent-merged enforcer to the end.
         assertThat(pluginGas(pom)).containsExactly("org.parity.plugins:own-plugin", "org.apache.maven.plugins:maven-enforcer-plugin");
     }
 
     @Test
     void mavenModeProducesEnginePluginOrder() {
         ResolvedPom pom = resolve("plugins-executions", "maven").getPom();
-        // The engine yields Maven-correct inherited-first order (the L-P0-003 flip), proving MAVEN routing returns the engine pom.
+        // The engine yields Maven-correct inherited-first order, proving MAVEN routing returns the engine pom.
         assertThat(pluginGas(pom)).containsExactly("org.apache.maven.plugins:maven-enforcer-plugin", "org.parity.plugins:own-plugin");
     }
 
     @Test
     void shadowModeReturnsEngineResultAndMasksTheExpectedPluginFlip() {
-        // The only legacy-vs-engine $.pom diff on this fixture is the ledgered L-P0-002/003 plugin flip; masks absorb it,
+        // The only legacy-vs-engine $.pom diff on this fixture is the expected plugin-order flip; masks absorb it,
         // so shadow does not throw and returns the ENGINE plugin order (shadow never changes behavior relative to the
         // MAVEN default).
         ResolvedPom pom = resolve("plugins-executions", "shadow").getPom();
@@ -161,7 +161,7 @@ class MavenEngineResolutionTest {
     @Test
     void shadowDependencyModeReturnsEngineGraphWithoutThrowing() {
         // SHADOW routes both engines through resolveDependencies, diffs pom+scopes+errors, and (masks absorbing the
-        // ledgered flips) returns the engine graph. Reaching here without an AssertionError also proves the re-entrancy
+        // expected flips) returns the engine graph. Reaching here without an AssertionError also proves the re-entrancy
         // guard: the legacy pass calls pom.resolveDependencies(scope) per scope while the facade is dispatching, and
         // those nested calls run legacy rather than re-collecting/re-comparing.
         Map<Scope, List<String>> shadow = scopeGavs(resolve("scope-matrix", "shadow"));

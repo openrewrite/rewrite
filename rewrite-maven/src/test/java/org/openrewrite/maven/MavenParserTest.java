@@ -189,6 +189,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <properties>
                         <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
                   </properties>
@@ -226,29 +227,31 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     void invalidRange() {
-        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() ->
-          rewriteRun(
-            // Counter to what Maven does most of the time, the last range "wins" when the same dependency
-            // is defined twice with a range.
-            pomXml(
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
+        // The unsatisfiable range surfaces as a ParseExceptionResult marker instead of aborting the parse
+        rewriteRun(
+          spec -> spec.executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                  <dependencies>
-                    <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>[88.7,90.9)</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """
-            )
+                <dependencies>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>[88.7,90.9)</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pom ->
+              assertThat(pom.getMarkers().findFirst(ParseExceptionResult.class))
+                .hasValueSatisfying(per -> assertThat(per.getMessage()).contains("junit:junit").contains("[88.7,90.9)")))
           )
-        ).withMessage("Could not resolve version for [GroupArtifact(groupId=junit, artifactId=junit)] matching version requirements RangeSet={[88.7,90.9)}");
+        );
     }
 
     @Test
@@ -321,6 +324,7 @@ class MavenParserTest implements RewriteTest {
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-parent</artifactId>
                       <version>1</version>
+                      <packaging>pom</packaging>
                       <dependencies>
                         <dependency>
                           <groupId>junit</groupId>
@@ -780,7 +784,8 @@ class MavenParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/135")
     @Test
     void selfRecursiveParent() {
-        rewriteRun(
+        // Maven rejects a parent whose groupId:artifactId equals the project's
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -798,7 +803,7 @@ class MavenParserTest implements RewriteTest {
               </project>
               """
           )
-        );
+        )).withMessageContaining("'parent.artifactId' must be changed, the parent element cannot have the same groupId:artifactId as the project");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/135")
@@ -841,6 +846,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.foo</groupId>
                   <artifactId>parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -1194,6 +1200,7 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>parent</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
                     </project>
                 """,
               spec -> spec.path("parent/pom.xml")
@@ -3270,6 +3277,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>circular-example-parent</artifactId>
                   <version>0.0.1-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>circular-example-child</module>
                   </modules>
@@ -3379,7 +3387,8 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     void selfReferencingPropertyDoesNotStackOverflow() {
-        rewriteRun(
+        // Maven's interpolator fails fast on a recursive expression cycle
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -3393,12 +3402,13 @@ class MavenParserTest implements RewriteTest {
               </project>
               """
           )
-        );
+        )).withMessageContaining("Detected the following recursive expression cycle in 'revision'");
     }
 
     @Test
     void cyclicPropertyReferenceDoesNotStackOverflow() {
-        rewriteRun(
+        // Maven's interpolator fails fast on a recursive expression cycle
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           mavenProject("root",
             pomXml(
               """
@@ -3439,7 +3449,7 @@ class MavenParserTest implements RewriteTest {
               )
             )
           )
-        );
+        )).withMessageContaining("recursive expression cycle");
     }
 
     @Test
@@ -3622,6 +3632,7 @@ class MavenParserTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -3868,6 +3879,7 @@ class MavenParserTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>parent</artifactId>
                 <version>${revision}</version>
+                <packaging>pom</packaging>
               </project>
               """
           ),
@@ -3973,6 +3985,8 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     void invalidDirect() {
+        // Maven's model validator rejects the missing version at model build,
+        // instead of deferring to a download failure.
         assertThatThrownBy(() -> rewriteRun(
           pomXml(
             """
@@ -3989,9 +4003,8 @@ class MavenParserTest implements RewriteTest {
               </project>
               """
           )
-        )).isInstanceOf(AssertionError.class)
-          .cause()
-          .isInstanceOf(MavenDownloadingException.class);
+        )).isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("'dependencies.dependency.version' for org.jvnet.jax-ws-commons:jaxws-json:jar is missing");
     }
 
     @Test
@@ -4227,12 +4240,11 @@ class MavenParserTest implements RewriteTest {
               </project>
               """.formatted(firstVersion, firstScope, secondVersion, secondScope),
             spec -> spec.afterRecipe(pom -> {
+                // Maven collapses duplicate <dependencies> by g:a:classifier:type last-wins before
+                // collection, so only the last declaration (and its scope) exists.
                 MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                 assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.fromName(firstScope)))
-                  .hasSize(1)
-                  .extracting(ResolvedDependency::getGav)
-                  .extracting(ResolvedGroupArtifactVersion::getVersion)
-                  .containsExactly(firstVersion);
+                  .isEmpty();
                 assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.fromName(secondScope)))
                   .hasSize(1)
                   .extracting(ResolvedDependency::getGav)
@@ -4352,7 +4364,11 @@ class MavenParserTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {"latest", "release"})
     void latestOrReleaseVersionInDependencyManagement(String version) {
+        // Maven keeps a latest/release metaversion literal in the managed entry,
+        // so the import BOM is non-resolvable.
         rewriteRun(
+          spec -> spec.executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
           pomXml(
             //language=xml
             """
@@ -4379,7 +4395,12 @@ class MavenParserTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """.formatted(version)
+              """.formatted(version),
+            spec -> spec.afterRecipe(pom ->
+              assertThat(pom.getMarkers().findFirst(ParseExceptionResult.class))
+                .hasValueSatisfying(per -> assertThat(per.getMessage())
+                  .contains("Non-resolvable import POM")
+                  .contains("org.springframework.boot:spring-boot-dependencies:" + version)))
           )
         );
     }

@@ -23,9 +23,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -49,6 +51,7 @@ class ResolvedPomTest implements RewriteTest {
                 <groupId>org.example</groupId>
                 <artifactId>foo-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <properties>
                   <netty.version>4.1.101.Final</netty.version>
                   <netty-transport-native-epoll-classifier>linux-x86_64</netty-transport-native-epoll-classifier>
@@ -111,13 +114,16 @@ class ResolvedPomTest implements RewriteTest {
 
     @Test
     void projectVersion() {
-        rewriteRun(
+        // Maven's interpolator rejects ${project.version} used as the project's own version
+        // as a recursive expression cycle.
+        assertThatThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>3.17.0</version>
+                  <packaging>pom</packaging>
               </project>
               """
           ),
@@ -143,21 +149,16 @@ class ResolvedPomTest implements RewriteTest {
                         </dependency>
                     </dependencies>
                 </project>
-                """,
-              spec -> spec
-                .afterRecipe(doc -> {
-                    List<ResolvedDependency> deps = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                      .get(Scope.Compile);
-                    assertThat(deps).hasSize(1);
-                    assertThat(deps.getFirst().getVersion()).isEqualTo("3.17.0");
-                })
+                """
             )
           )
-        );
+        )).isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("Detected the following recursive expression cycle in 'project.version'");
     }
 
     @Test
     void dependencyWithCircularProjectVersionReference() {
+        // Maven's interpolator fails fast on the recursive expression cycle
         assertThatThrownBy(() -> rewriteRun(
             pomXml(
               """
@@ -177,9 +178,8 @@ class ResolvedPomTest implements RewriteTest {
             )
           )
         )
-          .cause()
-          .isInstanceOf(MavenDownloadingException.class)
-          .hasMessageContaining("org.apache.commons:commons-lang3:error.circular.project.version");
+          .isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("Detected the following recursive expression cycle in 'project.version'");
     }
 
     @Test
@@ -337,7 +337,8 @@ class ResolvedPomTest implements RewriteTest {
                     ),
                     new Plugin.Execution(
                       "grandfather-execution-id",
-                      List.of("enforce", "clean"),
+                      // Goals merge preserving declaration order: child (dominant) goals before the parent's
+                      List.of("clean", "enforce"),
                       "override-by-father",
                       null,
                       objectMapper.readTree(
@@ -405,6 +406,7 @@ class ResolvedPomTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>${revision}${sha1}${changelist}</version>
+                  <packaging>pom</packaging>
                   <properties>
                       <revision>1.2.3</revision>
                       <changelist>-SNAPSHOT</changelist>
@@ -438,6 +440,9 @@ class ResolvedPomTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
     @Nested
     class TolerateMissingPom {
+        // The engine fails a resolved-graph jar dependency whose pom is missing, matching real
+        // Maven; legacy synthesized a stub pom from the sibling jar. The failure surfaces as a
+        // ParseExceptionResult marker and the downloadError event still fires.
 
         @Language("xml")
         private static final String POM_WITH_DEPENDENCY = """
@@ -480,8 +485,13 @@ class ResolvedPomTest implements RewriteTest {
                 }
             });
             rewriteRun(
-              spec -> spec.executionContext(ctx),
-              pomXml(POM_WITH_DEPENDENCY)
+              spec -> spec.executionContext(ctx)
+                .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
+              pomXml(POM_WITH_DEPENDENCY,
+                spec -> spec.afterRecipe(doc ->
+                  assertThat(doc.getMarkers().findFirst(ParseExceptionResult.class))
+                    .hasValueSatisfying(per -> assertThat(per.getMessage())
+                      .contains("Unable to download POM: com.some:some-artifact:1"))))
             );
             assertThat(downloadErrorArgs).hasSize(1);
         }
@@ -506,8 +516,13 @@ class ResolvedPomTest implements RewriteTest {
                 }
             });
             rewriteRun(
-              spec -> spec.executionContext(ctx),
-              pomXml(POM_WITH_DEPENDENCY)
+              spec -> spec.executionContext(ctx)
+                .typeValidationOptions(TypeValidation.builder().dependencyModel(false).build()),
+              pomXml(POM_WITH_DEPENDENCY,
+                spec -> spec.afterRecipe(doc ->
+                  assertThat(doc.getMarkers().findFirst(ParseExceptionResult.class))
+                    .hasValueSatisfying(per -> assertThat(per.getMessage())
+                      .contains("Unable to download POM: com.some:some-artifact:1"))))
             );
             assertThat(downloadErrorArgs).hasSize(1);
         }
@@ -522,6 +537,8 @@ class ResolvedPomTest implements RewriteTest {
         void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository, "com.some", "some-artifact", "1");
+            // The engine fails a jar dependency whose pom is missing (matching real Maven), so publish one
+            createPomFile(localRepository, "com.some", "some-artifact", "1");
 
             MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(mavenLocal));
@@ -619,6 +636,8 @@ class ResolvedPomTest implements RewriteTest {
     void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws Exception {
         MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
         createJarFile(localRepository, "com.some", "some-artifact", "1");
+        // The engine fails a jar dependency whose pom is missing (matching real Maven), so publish one
+        createPomFile(localRepository, "com.some", "some-artifact", "1");
 
         MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
           .setRepositories(List.of(mavenLocal));
@@ -840,6 +859,22 @@ class ResolvedPomTest implements RewriteTest {
           groupId.replace('.', '/'), artifactId, version, artifactId, version));
         assertThat(localJar.getParent().toFile().mkdirs()).isTrue();
         Files.writeString(localJar, "some content not to be empty");
+    }
+
+    private static void createPomFile(Path localRepository, String groupId, String artifactId, String version) throws IOException {
+        Path localPom = localRepository.resolve("%s/%s/%s/%s-%s.pom".formatted(
+          groupId.replace('.', '/'), artifactId, version, artifactId, version));
+        Files.createDirectories(localPom.getParent());
+        Files.writeString(localPom,
+          //language=xml
+          """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>%s</groupId>
+                <artifactId>%s</artifactId>
+                <version>%s</version>
+            </project>
+            """.formatted(groupId, artifactId, version));
     }
 
     @Test

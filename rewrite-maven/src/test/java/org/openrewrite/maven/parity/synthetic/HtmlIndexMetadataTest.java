@@ -27,8 +27,11 @@ import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.rootPom;
 
 /**
  * Metadata derivation from a Nexus/Artifactory-style HTML index when {@code maven-metadata.xml}
- * 404s (a2 §1.3, a4 catalog #66). This AUGMENTS Maven — real Maven has no equivalent and its
- * keep/kill call is still open; these tests pin what exists either way. Ledger L-P0-006.
+ * 404s (a2 §1.3, a4 catalog #66). This AUGMENTS Maven — real Maven has no equivalent, and the
+ * behavior is deliberately kept — but the engine path has NO html-index derivation: the metadata
+ * 404 fails the range outright and the index is never scraped. That is a feature regression when
+ * the engine becomes the default, so these tests stay LEGACY-pinned to keep the kept behavior
+ * pinned until the engine implements it.
  */
 class HtmlIndexMetadataTest {
     private static final String G = "org.parity.synthetic";
@@ -59,7 +62,7 @@ class HtmlIndexMetadataTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom("<dependencies>" + rangeDependency("idx") + "</dependencies>"),
-              ctx -> ctx.setRepositories(List.of(repo.repo("nexus"))));
+              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("nexus")))));
 
             assertThat(resolution.failed()).isFalse();
             assertThat(resolution.snapshot().getJson().at("/scopes/Compile/0/gav").asText())
@@ -88,7 +91,7 @@ class HtmlIndexMetadataTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom("<dependencies>" + rangeDependency("idx1") + rangeDependency("idx2") + "</dependencies>"),
-              ctx -> ctx.setRepositories(List.of(repo.repo("nexus"))));
+              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("nexus")))));
 
             assertThat(resolution.failed()).isFalse();
             assertThat(resolution.errored()).isTrue();

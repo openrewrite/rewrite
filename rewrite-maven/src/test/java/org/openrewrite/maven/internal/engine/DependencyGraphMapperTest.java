@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit probes on {@link DependencyGraphMapper} output: the instance-identity contracts (§4.2 / a3 §2) and the
- * partial-failure aggregation shape (L-P0-004). The full fixture differential lives in
+ * partial-failure aggregation shape. The full fixture differential lives in
  * {@code org.openrewrite.maven.parity.EngineDependencyGraphComparisonTest}; this pins the invariants a snapshot diff
  * cannot see (object {@code ==} sharing) and the failure path a hermetic fixture cannot easily stage.
  */

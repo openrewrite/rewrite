@@ -438,6 +438,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                   <version>1.0.0</version>
                   <packaging>pom</packaging>
                   <properties>
+                    <source.encoding>UTF-8</source.encoding>
                     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
                     <maven.compiler.source>17</maven.compiler.source>
                   </properties>
@@ -458,7 +459,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                     </parent>
                     <artifactId>child</artifactId>
                     <properties>
-                      <project.build.sourceEncoding>${project.build.sourceEncoding}</project.build.sourceEncoding>
+                      <project.build.sourceEncoding>${source.encoding}</project.build.sourceEncoding>
                       <maven.compiler.source>17</maven.compiler.source>
                     </properties>
                   </project>
@@ -472,7 +473,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                     </parent>
                     <artifactId>child</artifactId>
                     <properties>
-                      <project.build.sourceEncoding>${project.build.sourceEncoding}</project.build.sourceEncoding>
+                      <project.build.sourceEncoding>${source.encoding}</project.build.sourceEncoding>
                     </properties>
                   </project>
                   """

@@ -137,6 +137,8 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
 
     @Test
     void fromExecutionContextSettings() {
+        // The settings-profile repository is part of the effective model's repositories,
+        // so it appears both there and via the recipe's settings stream
         rewriteRun(
           spec -> spec.executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
             .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo")),
@@ -148,7 +150,7 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, 2, """
+            spec -> spec.after(actual -> expectedWithUrls(actual, 3, """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -174,7 +176,7 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, 2, """
+            spec -> spec.after(actual -> expectedWithUrls(actual, 3, """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -193,9 +195,10 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
             .dataTable(EffectiveMavenRepositoriesTable.Row.class, rows -> {
-                assertThat(rows).hasSize(4);
+                // The settings-profile repository is also in the effective model's repositories
+                assertThat(rows).hasSize(6);
                 assertThat(rows).extracting(EffectiveMavenRepositoriesTable.Row::getPomPath)
-                  .containsExactly("pom.xml", "pom.xml", "module/pom.xml", "module/pom.xml");
+                  .containsExactly("pom.xml", "pom.xml", "pom.xml", "module/pom.xml", "module/pom.xml", "module/pom.xml");
                 assertThat(rows).extracting(EffectiveMavenRepositoriesTable.Row::getRepositoryUri)
                   .allSatisfy(uri -> assertThat(uri).startsWith("http"));
             })
@@ -206,6 +209,7 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>module</module>
                   </modules>

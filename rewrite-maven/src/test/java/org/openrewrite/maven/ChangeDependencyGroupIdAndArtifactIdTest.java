@@ -1139,6 +1139,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <properties>
                         <dep.version>3.1.1</dep.version>
                     </properties>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1161,6 +1162,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     <properties>
                         <dep.version>1.0.12</dep.version>
                     </properties>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1783,6 +1785,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -1801,6 +1804,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>child</artifactId>
                         <version>1</version>
+                        <packaging>pom</packaging>
                         <modules>
                             <module>subchild</module>
                         </modules>
@@ -1873,6 +1877,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -1987,6 +1992,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Test
     void changeGroupIdOnWildcardArtifacts() {
+        // Maven follows <relocation>: org.apache.commons:commons-io:1.3.2 relocates to commons-io:commons-io,
+        // so the resolved model already carries the target coordinate and the recipe finds nothing to change
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "org.apache.commons",
@@ -2008,21 +2015,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <groupId>org.apache.commons</groupId>
                           <artifactId>commons-io</artifactId>
                           <version>1.3.2</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>commons-io</groupId>
-                          <artifactId>commons-io</artifactId>
-                          <version>2.11.0</version>
                       </dependency>
                   </dependencies>
               </project>
@@ -2431,6 +2423,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <properties>
                     <version.swagger>1.5.16</version.swagger>
                   </properties>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>sub-project</module>
                   </modules>
@@ -2502,6 +2495,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <properties>
                     <version.swagger>1.5.16</version.swagger>
                   </properties>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>sub-project</module>
                   </modules>
@@ -2574,6 +2568,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <properties>
                     <version.swagger>1.5.16</version.swagger>
                   </properties>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>child-a</module>
                     <module>child-b</module>
@@ -2670,6 +2665,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <properties>
                     <version.swagger>1.5.16</version.swagger>
                   </properties>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>sub-project</module>
                   </modules>
@@ -3611,6 +3607,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>5.7.2</version>
+                  <packaging>pom</packaging>
               </project>
               """,
             SourceSpec::skip

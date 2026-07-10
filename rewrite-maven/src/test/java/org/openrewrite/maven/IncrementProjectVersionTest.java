@@ -120,6 +120,7 @@ class IncrementProjectVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
               </project>
               """,
             """
@@ -127,6 +128,7 @@ class IncrementProjectVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1.1.0</version>
+                  <packaging>pom</packaging>
               </project>
               """
           ),

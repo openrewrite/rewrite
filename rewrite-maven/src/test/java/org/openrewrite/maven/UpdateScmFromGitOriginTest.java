@@ -393,6 +393,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                       <module>core</module>
                       <module>api</module>
@@ -408,6 +409,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                       <module>core</module>
                       <module>api</module>

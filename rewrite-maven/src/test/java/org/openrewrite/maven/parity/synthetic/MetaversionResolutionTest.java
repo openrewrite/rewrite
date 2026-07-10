@@ -29,7 +29,7 @@ import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.dependenci
 import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.rootPom;
 
 /**
- * L-P3-E-004: a {@code RELEASE}/{@code LATEST} metaversion declared as a direct dependency's version resolves through
+ * A {@code RELEASE}/{@code LATEST} metaversion declared as a direct dependency's version resolves through
  * merged {@code maven-metadata.xml} before collection (the engine's {@code EngineDependencyCollector} seeds the concrete
  * version so the descriptor read no longer requests {@code artifact-LATEST.pom}). Pins the engine (MAVEN mode) resolving
  * {@code RELEASE} to {@code <release>} and {@code LATEST} to {@code <latest>}, hermetically.

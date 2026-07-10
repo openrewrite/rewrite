@@ -91,9 +91,12 @@ class FileRepoTest {
           </metadata>
           """);
 
+        // Legacy-pinned: legacy treats any file:// repo like a local repository and reads
+        // maven-metadata-local.xml (a2 §1.2); the engine reads the remote maven-metadata.xml name,
+        // as real Maven does for a file:// remote repository.
         SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
           rootPom(dependencies(G + ":rel:LATEST")),
-          ctx -> ctx.setRepositories(List.of(fileRepo("repo"))), tmp);
+          SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(fileRepo("repo")))), tmp);
 
         assertThat(resolution.failed()).isFalse();
         assertThat(resolution.marker().getDependencies().get(Scope.Compile).get(0).getGav().getVersion())
@@ -155,9 +158,11 @@ class FileRepoTest {
     void pomlessJarResolvesThroughSynthesizedPom() throws IOException {
         artifact("repo1", "nopom", "1.0", null, new byte[]{1});
 
+        // Legacy-pinned: pom-less-jar stub synthesis is legacy transport; the engine deliberately
+        // fails a jar dependency whose pom is missing (matching real Maven).
         SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
           rootPom(dependencies(G + ":nopom:1.0")),
-          ctx -> ctx.setRepositories(List.of(fileRepo("repo1"))), tmp);
+          SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(fileRepo("repo1")))), tmp);
 
         assertThat(resolution.failed()).isFalse();
         var node = resolution.snapshot().getJson().at("/scopes/Compile/0");

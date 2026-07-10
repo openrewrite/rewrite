@@ -33,20 +33,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The B2 acceptance gate: for every {@code parity/fixtures/} set, resolve the POM section with the LEGACY engine
  * (via {@link ParityHarness}) and with B1 + the B2 mappers (via {@link EngineFixtureHarness}), snapshot both through the
  * same {@link ResolutionSnapshot} projection, and diff the {@code $.pom} subtree only (scopes stay legacy-only until
- * Phase 3). The bar is ZERO UNEXPLAINED diffs: every surviving diff must match a declared per-fixture expectation that
- * cites a ledger row.
+ * Phase 3). The bar is ZERO UNEXPLAINED diffs: every surviving diff must match a declared per-fixture expectation.
  */
 class EngineResolvedPomComparisonTest {
 
     /**
-     * Per-fixture expected {@code $.pom} diff path-prefixes, each citing its ledger row. Anything not covered here is an
-     * UNEXPLAINED diff and fails the gate.
+     * Per-fixture expected {@code $.pom} diff path-prefixes, each with a short label for its cause. Anything not covered
+     * here is an UNEXPLAINED diff and fails the gate.
      */
     private static final Map<String, List<ExpectedDiff>> EXPECTED = Map.of(
             "plugins-executions", List.of(
-                    // L-P0-002 (execution goal order via HashSet) + L-P0-003 (parent-merged plugin moved to end): the
-                    // whole effective plugin list re-orders and the enforcer `shared` goals re-order under Maven's merge.
-                    new ExpectedDiff("$.pom.plugins", "L-P0-002/L-P0-003")));
+                    // Legacy loses execution goal order through a HashSet and moves the parent-merged plugin to the end:
+                    // the whole effective plugin list re-orders and the enforcer `shared` goals re-order under Maven's merge.
+                    new ExpectedDiff("$.pom.plugins", "plugin-merge-order")));
 
     static List<String> fixtures() {
         return ParityHarness.fixtureNames();
@@ -86,7 +85,7 @@ class EngineResolvedPomComparisonTest {
                 .as("Unexplained $.pom diffs for fixture '%s' (legacy=left, engine=right):%n%s", fixture, render(unexplained))
                 .isEmpty();
 
-        // A declared expectation must correspond to a real flip, otherwise the ledger citation is stale.
+        // A declared expectation must correspond to a real flip, otherwise the expectation is stale.
         if (!expected.isEmpty()) {
             assertThat(explained)
                     .as("Fixture '%s' declares expected flips but produced none — expectation is stale", fixture)
@@ -105,11 +104,11 @@ class EngineResolvedPomComparisonTest {
 
     private static class ExpectedDiff {
         private final String pathPrefix;
-        private final String ledgerId;
+        private final String label;
 
-        ExpectedDiff(String pathPrefix, String ledgerId) {
+        ExpectedDiff(String pathPrefix, String label) {
             this.pathPrefix = pathPrefix;
-            this.ledgerId = ledgerId;
+            this.label = label;
         }
 
         String getPathPrefix() {

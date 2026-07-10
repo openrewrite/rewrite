@@ -32,7 +32,12 @@ import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.rootPom;
 /**
  * Dated-snapshot resolution from {@code maven-metadata.xml}: classifier-aware
  * {@code <snapshotVersions>} selection, the {@code <snapshot>} timestamp/buildNumber fallback,
- * context-pinned snapshot versions, and per-repository snapshot policy (a2 §1.4).
+ * context-pinned snapshot versions, and per-repository snapshot policy (a2 §1.4). The
+ * dated-projection tests are LEGACY-pinned: the engine's {@code DependencyGraphMapper} threads
+ * the base version as {@code datedSnapshotVersion}, so the timestamped form is a legacy
+ * observable. Policy skipping holds on the engine and is asserted
+ * engine-side; the engine's pinned-snapshot short-circuit is pinned by
+ * {@code EngineDependencyCollectorTest}.
  */
 class SnapshotResolutionTest {
     private static final String G = "org.parity.synthetic";
@@ -81,7 +86,7 @@ class SnapshotResolutionTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom(dependencies(G + ":snap:1.0-SNAPSHOT")),
-              ctx -> ctx.setRepositories(List.of(repo.repo("snapshots"))));
+              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("snapshots")))));
 
             ResolvedGroupArtifactVersion gav = single(resolution).getGav();
             assertThat(gav.getVersion()).isEqualTo("1.0-SNAPSHOT");
@@ -105,7 +110,7 @@ class SnapshotResolutionTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom(dependencies(G + ":snap:1.0-SNAPSHOT:tests")),
-              ctx -> ctx.setRepositories(List.of(repo.repo("snapshots"))));
+              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("snapshots")))));
 
             ResolvedDependency dependency = single(resolution);
             assertThat(dependency.getClassifier()).isEqualTo("tests");
@@ -136,7 +141,7 @@ class SnapshotResolutionTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom(dependencies(G + ":snap:1.0-SNAPSHOT")),
-              ctx -> ctx.setRepositories(List.of(repo.repo("snapshots"))));
+              SyntheticHarness.legacyPinned(ctx -> ctx.setRepositories(List.of(repo.repo("snapshots")))));
 
             assertThat(single(resolution).getGav().getDatedSnapshotVersion()).isEqualTo("1.0-20260101.010101-3");
         }
@@ -149,11 +154,11 @@ class SnapshotResolutionTest {
 
             SyntheticHarness.Resolution resolution = SyntheticHarness.resolve(
               rootPom(dependencies(G + ":snap:1.0-SNAPSHOT")),
-              ctx -> {
+              SyntheticHarness.legacyPinned(ctx -> {
                   ctx.setRepositories(List.of(repo.repo("snapshots")));
                   ctx.setPinnedSnapshotVersions(List.of(new ResolvedGroupArtifactVersion(
                     null, G, "snap", "1.0-SNAPSHOT", "1.0-20260201.000000-9")));
-              });
+              }));
 
             assertThat(single(resolution).getGav().getDatedSnapshotVersion()).isEqualTo("1.0-20260201.000000-9");
             // The metadata is never requested (pinned) in either mode; the exact single-request log is legacy-scoped.
@@ -179,7 +184,10 @@ class SnapshotResolutionTest {
 
             assertThat(resolution.failed()).isFalse();
             assertThat(disabled.requests()).isEmpty();
-            assertThat(single(resolution).getGav().getDatedSnapshotVersion()).isEqualTo("1.0-20260101.010101-3");
+            // The enabled repository resolved the snapshot; the dated projection itself is pinned
+            // legacy-side above (the engine threads the base version)
+            assertThat(enabled.requests()).contains("GET " + METADATA_PATH);
+            assertThat(single(resolution).getGav().getVersion()).isEqualTo("1.0-SNAPSHOT");
         }
     }
 }

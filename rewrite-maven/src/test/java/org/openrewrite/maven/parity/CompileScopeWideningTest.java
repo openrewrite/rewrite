@@ -29,7 +29,7 @@ import org.openrewrite.maven.tree.Scope;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Pins the compile-scope widening fix (L-P3-C-004): a coordinate declared {@code runtime} on its nearest edge but
+ * Pins the compile-scope widening fix: a coordinate declared {@code runtime} on its nearest edge but
  * {@code compile} via another path must land in the compile classpath, because Maven selects a coordinate's effective
  * scope as the widest across every path to its winning version. {@code io.grpc:grpc-core:1.60.1} declares
  * {@code error_prone_annotations:2.20.0} at {@code runtime} directly (nearest, depth 1) while {@code grpc-api} declares

@@ -195,6 +195,7 @@ class FindDependencyTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>sample-module</module>
                 </modules>

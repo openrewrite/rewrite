@@ -19,12 +19,15 @@ import okhttp3.mockwebserver.MockResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.parity.synthetic.MockMavenRepo.pomPath;
@@ -33,9 +36,12 @@ import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.dependenci
 import static org.openrewrite.maven.parity.synthetic.SyntheticHarness.rootPom;
 
 /**
- * Failure-caching semantics of the legacy downloader: deterministic 4xx negatively cached in the
- * pom cache, retryable statuses (408/425/429, 5xx) never cached, and dead endpoints remembered
- * per run in the context's unreachable-endpoint set (a2 §1.8).
+ * Failure-caching semantics: deterministic 4xx negatively cached in the pom cache, retryable
+ * statuses (408/425/429, 5xx) never cached. These hold identically on the engine path
+ * ({@code CacheBridge}'s tri-state pom-bytes region + {@code HttpSenderTransporter.classify}),
+ * with a single descriptor read instead of legacy's per-scope passes and no pom-less-jar HEAD
+ * probe. Dead-endpoint bookkeeping in the context's unreachable-endpoint set is legacy-scoped
+ * (a2 §1.8); the engine keeps its own session-scoped memory.
  */
 class NegativeCachingTest {
     private static final String G = "org.parity.synthetic";
@@ -44,27 +50,30 @@ class NegativeCachingTest {
     @Test
     void deterministicNotFoundIsNegativelyCached() {
         try (MockMavenRepo repo = new MockMavenRepo()) {
-            SyntheticHarness.Session session = new SyntheticHarness.Session(
-              ctx -> ctx.setRepositories(List.of(repo.repo("mock"))));
+            // The engine memoizes a whole resolution per context, so cross-resolution cache semantics
+            // are observed with a fresh context sharing the pom cache — the recipe-loop-adjacent shape.
+            InMemoryMavenPomCache cache = new InMemoryMavenPomCache();
+            Consumer<MavenExecutionContextView> customize = ctx -> {
+                ctx.setRepositories(List.of(repo.repo("mock")));
+                ctx.setPomCache(cache);
+            };
             String pom = rootPom(dependencies(G + ":missing:1.0"));
 
-            SyntheticHarness.Resolution first = session.resolve(pom);
-            // L-P0-004 fix: the marker survives with resolvable scopes; the failure is surfaced as an error
+            SyntheticHarness.Resolution first = new SyntheticHarness.Session(customize).resolve(pom);
+            // Partial-failure contract: the marker survives with resolvable scopes; the failure is surfaced as an error
             assertThat(first.failed()).isFalse();
             assertThat(first.errored()).isTrue();
-            // One pom GET plus the pom-less-jar HEAD probe; the other three scopes already hit the
-            // negative cache within the first resolution
+            // One pom GET for the whole resolution: the engine reads the descriptor once and the
+            // deterministic 404 is negatively cached; no pom-less-jar HEAD probe on the engine path
             if (!SyntheticHarness.shadowMode()) {
-                assertThat(repo.requests()).containsExactly(
-                  "GET " + MISSING_POM,
-                  "HEAD " + MISSING_POM.replace(".pom", ".jar"));
+                assertThat(repo.requests()).containsExactly("GET " + MISSING_POM);
             }
 
-            SyntheticHarness.Resolution second = session.resolve(pom);
+            SyntheticHarness.Resolution second = new SyntheticHarness.Session(customize).resolve(pom);
             assertThat(second.failed()).isFalse();
             if (!SyntheticHarness.shadowMode()) {
-                assertThat(repo.requests()).hasSize(2); // zero new requests
-                assertThat(second.errors()).hasSize(2); // the cached failure is still surfaced
+                assertThat(repo.requests()).hasSize(1); // zero new requests
+                assertThat(second.errors()).hasSize(1); // the cached failure is still surfaced
             }
         }
     }
@@ -74,22 +83,25 @@ class NegativeCachingTest {
     void retryableStatusesAreNotCached(int status) {
         try (MockMavenRepo repo = new MockMavenRepo()) {
             repo.serve(MISSING_POM, request -> new MockResponse().setResponseCode(status));
-            SyntheticHarness.Session session = new SyntheticHarness.Session(
-              ctx -> ctx.setRepositories(List.of(repo.repo("mock"))));
+            InMemoryMavenPomCache cache = new InMemoryMavenPomCache();
+            Consumer<MavenExecutionContextView> customize = ctx -> {
+                ctx.setRepositories(List.of(repo.repo("mock")));
+                ctx.setPomCache(cache);
+            };
             String pom = rootPom(dependencies(G + ":missing:1.0"));
 
-            SyntheticHarness.Resolution first = session.resolve(pom);
+            SyntheticHarness.Resolution first = new SyntheticHarness.Session(customize).resolve(pom);
             assertThat(first.failed()).isFalse();
             assertThat(first.errored()).isTrue();
-            // Nothing cached: every scope of every resolution re-requests
             if (!SyntheticHarness.shadowMode()) {
-                assertThat(repo.requests()).containsExactly(
-                  "GET " + MISSING_POM, "GET " + MISSING_POM, "GET " + MISSING_POM, "GET " + MISSING_POM);
+                assertThat(repo.requests()).containsExactly("GET " + MISSING_POM);
             }
 
-            session.resolve(pom);
+            // Nothing cached: the transfer error is never negatively cached, so a fresh context
+            // sharing the pom cache re-requests
+            new SyntheticHarness.Session(customize).resolve(pom);
             if (!SyntheticHarness.shadowMode()) {
-                assertThat(repo.requests()).hasSize(8);
+                assertThat(repo.requests()).hasSize(2);
             }
         }
     }
@@ -107,8 +119,11 @@ class NegativeCachingTest {
             live.serve(pomPath(G, "a", "1.0", "1.0"), pomXml(G, "a", "1.0"));
             live.serve(pomPath(G, "b", "1.0", "1.0"), pomXml(G, "b", "1.0"));
 
-            SyntheticHarness.Session session = new SyntheticHarness.Session(
-              ctx -> ctx.setRepositories(List.of(deadOne, deadTwo, live.repo("live"))));
+            // Legacy-pinned: the ctx unreachable-endpoint set and repositoryAccessFailed events are legacy
+            // downloader observables; the engine's dead-endpoint memory is session-scoped inside
+            // HttpSenderTransporter and deliberately not surfaced on the context.
+            SyntheticHarness.Session session = new SyntheticHarness.Session(SyntheticHarness.legacyPinned(
+              ctx -> ctx.setRepositories(List.of(deadOne, deadTwo, live.repo("live")))));
             SyntheticHarness.Resolution resolution = session.resolve(
               rootPom(dependencies(G + ":a:1.0", G + ":b:1.0")));
 

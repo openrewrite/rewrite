@@ -18,6 +18,8 @@ package org.openrewrite.maven.parity.synthetic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.Parser;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -220,16 +222,36 @@ class MirrorMatrixTest {
                 """.formatted(EXTERNAL_URL) +
                 dependencies(G + ":rel:1.0")));
 
-            // L-P0-004 fix: the marker survives the snapshot dependency failure; the error is surfaced
+            // Partial-failure contract: the marker survives the snapshot dependency failure; the error is surfaced
             assertThat(resolution.failed()).isFalse();
             assertThat(resolution.errored()).isTrue();
-            assertThat(resolution.errors()).isNotEmpty();
+            // The failure names the snapshot coordinate in the surfaced error; the legacy downloadError
+            // listener event is deliberately not part of the engine path's event contract
+            assertThat(resolution.errors())
+              .anyMatch(t -> mentions(t, G + ":snap:1.0-SNAPSHOT"));
             assertThat(mirrorRepo.artifactRequests())
               .contains("GET " + pomPath(G, "rel", "1.0", "1.0"))
               .noneMatch(r -> r.contains("SNAPSHOT"));
-            assertThat(session.listener.getEvents())
-              .anyMatch(e -> "downloadError".equals(e.getType()) && e.getKey().startsWith(G + ":snap:1.0-SNAPSHOT"));
         }
+    }
+
+    private static boolean mentions(Throwable t, String coordinate) {
+        for (Throwable x = t; x != null; x = x.getCause()) {
+            if (x.getMessage() != null && x.getMessage().contains(coordinate)) {
+                return true;
+            }
+            if (x instanceof MavenDownloadingExceptions) {
+                for (MavenDownloadingException e : ((MavenDownloadingExceptions) x).getExceptions()) {
+                    if (mentions(e, coordinate)) {
+                        return true;
+                    }
+                }
+            }
+            if (x.getCause() == x) {
+                break;
+            }
+        }
+        return false;
     }
 
     @Test

@@ -93,9 +93,10 @@ class FindRepositoryOrderTest implements RewriteTest {
                 </repositories>
               </project>
               """,
+            // The settings-profile repository precedes the pom-declared one in the effective model's repositories
             """
-              <!--~~(https://myrepo.maven.com/repo
-              https://repo.spring.io/milestone)~~>--><project>
+              <!--~~(https://repo.spring.io/milestone
+              https://myrepo.maven.com/repo)~~>--><project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>

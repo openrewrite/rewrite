@@ -105,6 +105,8 @@ class RemoveDependencyTest implements RewriteTest {
 
     @Test
     void shouldRemoveScopedDependency() {
+        // Maven collapses the duplicate g:a declarations to the last (test scope),
+        // so no compile-scoped junit-jupiter exists to remove
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency("org.junit.jupiter", "junit-jupiter", "compile")),
           pomXml(
@@ -128,36 +130,6 @@ class RemoveDependencyTest implements RewriteTest {
                           <groupId>org.junit.jupiter</groupId>
                           <artifactId>junit-jupiter</artifactId>
                       </dependency>
-                      <dependency>
-                          <groupId>org.junit.jupiter</groupId>
-                          <artifactId>junit-jupiter</artifactId>
-                          <scope>test</scope>
-                      </dependency>
-                      <dependency>
-                          <groupId>org.junit.jupiter</groupId>
-                          <artifactId>junit-jupiter-api</artifactId>
-                          <version>5.6.3</version>
-                          <scope>test</scope>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                         <dependency>
-                              <groupId>org.junit.jupiter</groupId>
-                              <artifactId>junit-jupiter</artifactId>
-                              <version>5.7.1</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
                       <dependency>
                           <groupId>org.junit.jupiter</groupId>
                           <artifactId>junit-jupiter</artifactId>

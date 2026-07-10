@@ -34,30 +34,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link ParityHarness}) and with the collect + {@code DependencyGraphMapper} path (via {@link EngineFixtureHarness}),
  * snapshot both through the same {@link ResolutionSnapshot} projection, and diff the {@code $.scopes} subtree (per-scope
  * ordered lists, nested-graph shape, depth, requested threading, licenses, effectiveExclusions, datedSnapshotVersion).
- * The bar is ZERO UNEXPLAINED diffs: every surviving diff must match a declared per-fixture expectation citing a ledger
- * row.
+ * The bar is ZERO UNEXPLAINED diffs: every surviving diff must match a declared per-fixture expectation.
  */
 class EngineDependencyGraphComparisonTest {
 
-    /** Per-fixture expected {@code $.scopes} diff path-prefixes, each citing its ledger row. */
+    /** Per-fixture expected {@code $.scopes} diff path-prefixes, each with a short label for its cause. */
     private static final Map<String, List<ExpectedDiff>> EXPECTED = Map.of(
             "classifiers", List.of(
-                    // L-P0-001: the engine is Maven-correct and resolves BOTH classifier variants (conflict key is
+                    // The engine is Maven-correct and resolves BOTH classifier variants (conflict key is
                     // g:a:classifier:type); legacy dedups directly-declared deps by g:a only (last declaration wins), so
                     // the no-classifier `multi:1.0` shadows out and only `multi:1.1:tests` survives. Every scope list
                     // therefore gains an entry under the engine.
-                    new ExpectedDiff("$.scopes", "L-P0-001")),
+                    new ExpectedDiff("$.scopes", "classifier-conflict-key")),
             "profile-activation", List.of(
-                    // L-P2-B2-002: active-profile dependencies are ordered by profile DECLARATION order under Maven
-                    // (jdk-any before explicit), whereas legacy reverses profiles into precedence order (a1 §1.3) and so
+                    // Active-profile dependencies are ordered by profile DECLARATION order under Maven
+                    // (jdk-any before explicit), whereas legacy reverses profiles into precedence order and so
                     // contributes explicit-dep before jdk-dep. Pure ordering flip across all four scope lists.
-                    new ExpectedDiff("$.scopes", "L-P2-B2-002")),
+                    new ExpectedDiff("$.scopes", "profile-declaration-order")),
             "relocation", List.of(
-                    // L-P4-B-001: `oldg:1.0` declares a <distributionManagement><relocation> to `newg`. Maven (and the
+                    // `oldg:1.0` declares a <distributionManagement><relocation> to `newg`. Maven (and the
                     // engine's real maven-resolver descriptor read) follows it, resolving `newg:1.0`; legacy never reads
                     // <relocation>, so it keeps `oldg:1.0`. Engine is Maven-correct, legacy is the outlier (this is the
-                    // real cause of the census "org.apache.commons:commons-io vs commons-io:commons-io" family). Flip P5.
-                    new ExpectedDiff("$.scopes", "L-P4-B-001")));
+                    // real cause of the "org.apache.commons:commons-io vs commons-io:commons-io" divergence family).
+                    new ExpectedDiff("$.scopes", "relocation-following")));
 
     static List<String> fixtures() {
         return ParityHarness.fixtureNames();
@@ -115,11 +114,11 @@ class EngineDependencyGraphComparisonTest {
 
     private static class ExpectedDiff {
         private final String pathPrefix;
-        private final String ledgerId;
+        private final String label;
 
-        ExpectedDiff(String pathPrefix, String ledgerId) {
+        ExpectedDiff(String pathPrefix, String label) {
             this.pathPrefix = pathPrefix;
-            this.ledgerId = ledgerId;
+            this.label = label;
         }
 
         String getPathPrefix() {

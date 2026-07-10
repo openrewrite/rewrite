@@ -23,6 +23,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.ResolutionEngineSelector;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 
@@ -87,6 +88,9 @@ public class ParityHarness {
         ctx.setAddCentralRepository(false);
         ctx.setAddLocalRepository(false);
         ctx.setResolutionListener(listener);
+        // This harness is the LEGACY side of the dual-engine comparisons (and the legacy reference for the
+        // identity/determinism pins); the ambient default flipped to MAVEN at Phase 5, so pin explicitly.
+        ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, "legacy");
 
         MavenParser parser = MavenParser.builder()
                 .activeProfiles(ACTIVE_PROFILES.getOrDefault(fixture, List.of()).toArray(new String[0]))

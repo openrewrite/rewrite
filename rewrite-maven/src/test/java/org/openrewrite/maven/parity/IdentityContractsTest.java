@@ -18,10 +18,19 @@ package org.openrewrite.maven.parity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
+import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +38,8 @@ import java.util.Objects;
 import java.util.Set;
 
 import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -67,10 +78,10 @@ class IdentityContractsTest {
     }
 
     /**
-     * Ledger L-P0-001: the legacy engine deduplicates direct dependencies by groupId:artifactId
-     * only ("last declaration wins"), so a direct dependency differing only by classifier is
-     * shadowed and unresolvable by reference. Maven keys conflicts on g:a:classifier:type and
-     * resolves both. Pins today's behavior so the Phase 3 alignment is a reviewed change.
+     * The legacy reference engine (which {@link ParityHarness} pins) deduplicates direct
+     * dependencies by groupId:artifactId only ("last declaration wins"), so a direct dependency
+     * differing only by classifier is shadowed and unresolvable by reference.
+     * {@link #classifierVariantsBothResolveOnMavenEngine} pins the Maven-engine counterpart.
      */
     @Test
     void classifierShadowedByGaDeduplication() {
@@ -88,6 +99,48 @@ class IdentityContractsTest {
         assertThat(resolved.getVersion()).isEqualTo("1.1");
     }
 
+    /**
+     * Maven keys direct-dependency conflicts on g:a:classifier:type, so two declarations
+     * differing only by classifier both resolve on the (default) Maven engine.
+     */
+    @Test
+    void classifierVariantsBothResolveOnMavenEngine() {
+        MavenResolutionResult mrr = resolveDefaultEngine("classifiers");
+        List<Dependency> requested = mrr.getPom().getRequestedDependencies();
+        assertThat(requested).hasSize(2);
+
+        Dependency plain = requested.stream().filter(d -> d.getClassifier() == null).findFirst().orElseThrow();
+        Dependency tests = requested.stream().filter(d -> "tests".equals(d.getClassifier())).findFirst().orElseThrow();
+
+        ResolvedDependency resolvedPlain = mrr.getResolvedDependency(plain);
+        assertThat(resolvedPlain).isNotNull();
+        assertThat(resolvedPlain.getClassifier()).isNull();
+        assertThat(resolvedPlain.getVersion()).isEqualTo("1.0");
+        ResolvedDependency resolvedTests = mrr.getResolvedDependency(tests);
+        assertThat(resolvedTests).isNotNull();
+        assertThat(resolvedTests.getClassifier()).isEqualTo("tests");
+        assertThat(resolvedTests.getVersion()).isEqualTo("1.1");
+    }
+
+    /**
+     * Maven follows {@code <distributionManagement><relocation>}, so on the (default) Maven
+     * engine the declaration on the relocated coordinate resolves the relocation TARGET's g:a
+     * and the original declaration has no resolved node by reference.
+     */
+    @Test
+    void relocatedCoordinateResolvesTargetOnMavenEngine() {
+        MavenResolutionResult mrr = resolveDefaultEngine("relocation");
+        List<Dependency> requested = mrr.getPom().getRequestedDependencies();
+        assertThat(requested).hasSize(1);
+        assertThat(requested.getFirst().getArtifactId()).isEqualTo("oldg");
+
+        assertThat(mrr.getResolvedDependency(requested.getFirst())).isNull();
+        assertThat(mrr.findDependencies("org.parity", "newg", Scope.Compile))
+          .singleElement()
+          .satisfies(d -> assertThat(d.getVersion()).isEqualTo("1.0"));
+    }
+
+    // Legacy's dedup key is groupId:artifactId only; the harness pins the legacy reference engine
     private static boolean isShadowedByGaDeduplication(Dependency dependency, List<Dependency> requested) {
         for (int i = requested.size() - 1; i >= 0; i--) {
             Dependency other = requested.get(i);
@@ -97,6 +150,36 @@ class IdentityContractsTest {
             }
         }
         return false;
+    }
+
+    // Mirrors ParityHarness.resolve but resolves through the ambient default (Maven) engine
+    private static MavenResolutionResult resolveDefaultEngine(String fixture) {
+        Path fixtureDir;
+        try {
+            fixtureDir = Paths.get(requireNonNull(IdentityContractsTest.class.getResource("/parity/fixtures/" + fixture)).toURI());
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException(e);
+        }
+        Path repoDir = fixtureDir.resolve("repo");
+        MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        }));
+        ctx.setPomCache(new InMemoryMavenPomCache());
+        ctx.setRepositories(singletonList(MavenRepository.builder()
+          .id("fixture")
+          .uri(repoDir.toUri().toString())
+          .knownToExist(true)
+          .build()));
+        ctx.setAddCentralRepository(false);
+        ctx.setAddLocalRepository(false);
+        SourceFile doc = MavenParser.builder()
+          .property("parity.repo.url", repoDir.toUri().toString())
+          .build()
+          .parseInputs(singletonList(Parser.Input.fromFile(fixtureDir.resolve("pom.xml"))), fixtureDir, ctx)
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("Fixture " + fixture + " did not parse"));
+        return doc.getMarkers().findFirst(MavenResolutionResult.class)
+          .orElseThrow(() -> new IllegalStateException("Fixture " + fixture + " resolved without a MavenResolutionResult marker"));
     }
 
     @Test

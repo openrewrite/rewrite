@@ -176,6 +176,7 @@ class AddManagedDependencyTest implements RewriteTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>project</artifactId>
               <version>1</version>
+              <packaging>pom</packaging>
               <modules>
                 <module>core</module>
                 <module>service</module>
@@ -187,6 +188,7 @@ class AddManagedDependencyTest implements RewriteTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>project</artifactId>
               <version>1</version>
+              <packaging>pom</packaging>
               <modules>
                 <module>core</module>
                 <module>service</module>

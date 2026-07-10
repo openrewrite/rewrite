@@ -16,9 +16,11 @@
 package org.openrewrite.maven.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class NoSystemScopeDependenciesTest implements RewriteTest {
@@ -30,9 +32,11 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     }
 
 
+    // Maven's model validator rejects a system-scoped dependency whose <systemPath> is absent
+    // or not absolute, so these poms fail at model build before the recipe can run.
     @Test
     void removesSystemScopeAndSystemPath() {
-        rewriteRun(
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -49,28 +53,14 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """,
-            """
-              <project>
-                <groupId>test</groupId>
-                <artifactId>test</artifactId>
-                <version>1.0-SNAPSHOT</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                    <version>29.0-jre</version>
-                  </dependency>
-                </dependencies>
-              </project>
               """
           )
-        );
+        )).withMessageContaining("'dependencies.dependency.systemPath' for com.google.guava:guava:jar must specify an absolute path");
     }
 
     @Test
     void removesSystemScopeWithoutSystemPath() {
-        rewriteRun(
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -86,28 +76,14 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """,
-            """
-              <project>
-                <groupId>test</groupId>
-                <artifactId>test</artifactId>
-                <version>1.0-SNAPSHOT</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                    <version>29.0-jre</version>
-                  </dependency>
-                </dependencies>
-              </project>
               """
           )
-        );
+        )).withMessageContaining("'dependencies.dependency.systemPath' for com.google.guava:guava:jar is missing");
     }
 
     @Test
     void removesSystemScopeInDependencyManagement() {
-        rewriteRun(
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -126,30 +102,14 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
                   </dependencies>
                 </dependencyManagement>
               </project>
-              """,
-            """
-              <project>
-                <groupId>test</groupId>
-                <artifactId>test</artifactId>
-                <version>1.0-SNAPSHOT</version>
-                <dependencyManagement>
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>29.0-jre</version>
-                    </dependency>
-                  </dependencies>
-                </dependencyManagement>
-              </project>
               """
           )
-        );
+        )).withMessageContaining("'dependencyManagement.dependencies.dependency.systemPath' for com.google.guava:guava:jar must specify an absolute path");
     }
 
     @Test
     void removesSystemScopeWhenVersionIsProperty() {
-        rewriteRun(
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -169,31 +129,14 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """,
-            """
-              <project>
-                <groupId>test</groupId>
-                <artifactId>test</artifactId>
-                <version>1.0-SNAPSHOT</version>
-                <properties>
-                  <guava.version>29.0-jre</guava.version>
-                </properties>
-                <dependencies>
-                  <dependency>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                    <version>${guava.version}</version>
-                  </dependency>
-                </dependencies>
-              </project>
               """
           )
-        );
+        )).withMessageContaining("'dependencies.dependency.systemPath' for com.google.guava:guava:jar must specify an absolute path");
     }
 
     @Test
     void doesNotRemoveSystemScopeWhenNotInRepo() {
-        rewriteRun(
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() -> rewriteRun(
           pomXml(
             """
               <project>
@@ -212,7 +155,7 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
               </project>
               """
           )
-        );
+        )).withMessageContaining("'dependencies.dependency.systemPath' for com.example.local:proprietary-lib:jar must specify an absolute path");
     }
 
     @Test

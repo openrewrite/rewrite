@@ -47,7 +47,7 @@ import static java.util.Objects.requireNonNull;
  * {@link ParityHarness}'s counterpart for synthetic (MockWebServer / file://) repositories:
  * the standard MavenParser path with central and local repositories disabled and all errors and
  * events captured. Unlike the fixture harness, a resolution failure is representable: dependency
- * download failures keep the complete model with resolvable scopes populated (ledger L-P0-004)
+ * download failures keep the complete model with resolvable scopes populated
  * and surface via {@link Resolution#errored()}; only effective-pom failures discard the marker.
  * A {@link Session} reuses one context so caching behavior across resolutions is observable.
  */
@@ -55,6 +55,18 @@ class SyntheticHarness {
 
     static Resolution resolve(@Language("xml") String pomXml, Consumer<MavenExecutionContextView> customize, Path... normalizerRoots) {
         return new Session(customize).resolve(pomXml, normalizerRoots);
+    }
+
+    /**
+     * Pins the LEGACY engine for a test that validates legacy-only transport mechanics (pom-less jar synthesis,
+     * HTML-index derivation, dated-snapshot projection, dead-endpoint bookkeeping). Explain the reason at the use
+     * site; these tests document legacy transport until the legacy engine's deletion.
+     */
+    static Consumer<MavenExecutionContextView> legacyPinned(Consumer<MavenExecutionContextView> customize) {
+        return ctx -> {
+            ctx.putMessage(ResolutionEngineSelector.ENGINE_KEY, "legacy");
+            customize.accept(ctx);
+        };
     }
 
     /**
@@ -126,8 +138,8 @@ class SyntheticHarness {
             // This suite validates the LEGACY downloader's transport semantics (negative caching, snapshot
             // timestamps, mirrors, HTML-index derivation, pom-less jar synthesis) against single-engine stateful
             // mocks. Both engines share that same downloader for byte fetch, so under the dual-engine SHADOW oracle
-            // the only divergences are engine-side projection differences ledgered elsewhere (L-P0-005 datedSnapshot,
-            // L-P0-006 html-index, L-P3-C-005 message shape, ctx-injected repo universe) — not new parity bugs the
+            // the only divergences are known engine-side projection differences (datedSnapshot threading,
+            // html-index derivation, error-message shape, ctx-injected repo universe) — not new parity bugs the
             // oracle should compare. The transport suite therefore pins legacy in every mode; per-engine parity is
             // exercised by the hermetic parity fixtures and the census. A test wanting the engine (e.g. a MAVEN-mode
             // pin) overrides this via customize, which runs last.

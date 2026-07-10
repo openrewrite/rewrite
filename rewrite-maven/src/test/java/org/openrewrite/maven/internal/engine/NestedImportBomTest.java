@@ -43,7 +43,7 @@ import static java.util.Collections.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * L-P2-E-003 regression: a BOM that imports a NESTED BOM whose version is a property (e.g. spring-boot-dependencies
+ * Regression: a BOM that imports a NESTED BOM whose version is a property (e.g. spring-boot-dependencies
  * importing {@code infinispan-bom:${infinispan.version}}) must resolve the nested import to the version the importing BOM
  * pins — not an older one whose managed set leaks in. Minimal, hermetic stand-in for the spring-boot-dependencies:3.2.4
  * shadow failures.
@@ -101,7 +101,7 @@ class NestedImportBomTest {
         }
     }
 
-    // L-P2-E-003 (root cause): a transitively imported BOM carries a <profile> activated by a property-value NEGATION
+    // Root cause of the above: a transitively imported BOM carries a <profile> activated by a property-value NEGATION
     // (`release-mode != downstream`, active when the property is unset). Maven activates it and includes its managed
     // entries; the engine must too. (Legacy's env-var-based activation drops them — the parity flip, masked by
     // `dm-superset:$.pom.dependencyManagement`.) This is the minimal stand-in for infinispan-bom's `community` profile

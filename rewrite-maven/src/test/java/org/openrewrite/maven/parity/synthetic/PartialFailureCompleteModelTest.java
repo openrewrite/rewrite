@@ -23,7 +23,7 @@ import org.openrewrite.maven.tree.Scope;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Ledger L-P0-004 (jetty-server-11.0.19 corpus shape): a download failure in one scope must not
+ * Corpus shape observed on jetty-server-11.0.19: a download failure in one scope must not
  * discard the model. The complete model is the contract — the marker stays present with every
  * resolvable scope populated, and the failing scope's error is surfaced.
  */

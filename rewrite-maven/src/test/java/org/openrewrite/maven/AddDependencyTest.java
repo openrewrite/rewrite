@@ -25,9 +25,11 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -721,6 +723,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -896,6 +899,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -1208,6 +1212,7 @@ class AddDependencyTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>root</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>project1</module>
                         <module>project2</module>
@@ -1284,6 +1289,7 @@ class AddDependencyTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>root</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>project1</module>
                         <module>project2</module>
@@ -1295,6 +1301,7 @@ class AddDependencyTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>root</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>project1</module>
                         <module>project2</module>
@@ -1534,6 +1541,7 @@ class AddDependencyTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1636,6 +1644,7 @@ class AddDependencyTest implements RewriteTest {
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
                     <version>1</version>
+                    <packaging>pom</packaging>
                     <modules>
                         <module>child</module>
                     </modules>
@@ -1751,6 +1760,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-aggregate</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>project-parent</module>
                     <module>project-child</module>
@@ -1766,6 +1776,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
@@ -1778,6 +1789,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
@@ -1837,6 +1849,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-aggregate</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>my-app-parent</module>
                     <module>my-app-child</module>
@@ -1848,6 +1861,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-aggregate</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                     <module>my-app-parent</module>
                     <module>my-app-child</module>
@@ -1922,44 +1936,32 @@ class AddDependencyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/6426")
     @Test
     void handlesSystemScopeToAllowableScopeChange() {
-        rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "runtime")),
-          mavenProject("project",
-            //language=xml
-            pomXml(
-              """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>28.0-jre</version>
-                            <scope>system</scope>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """,
-              """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>29.0-jre</version>
-                            <scope>runtime</scope>
-                        </dependency>
-                    </dependencies>
-                </project>
+        // Maven rejects a system-scoped dependency without a <systemPath> at model building; the old resolver deferred the failure
+        assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() ->
+          rewriteRun(
+            spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "runtime")),
+            mavenProject("project",
+              //language=xml
+              pomXml(
                 """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>28.0-jre</version>
+                              <scope>system</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
             )
           )
-        );
+        ).withMessage("'dependencies.dependency.systemPath' for com.google.guava:guava:jar is missing.");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/6426")
@@ -2162,6 +2164,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void doesNotClobberManagedLatestWithExplicitVersion() {
+        // Maven keeps a managed `latest` literal in the effective model, so the recipe replaces it
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
           mavenProject("project",
@@ -2178,6 +2181,28 @@ class AddDependencyTest implements RewriteTest {
                                 <groupId>com.google.guava</groupId>
                                 <artifactId>guava</artifactId>
                                 <version>latest</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>29.0-jre</version>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
@@ -2273,6 +2298,7 @@ class AddDependencyTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>

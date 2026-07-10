@@ -373,6 +373,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -392,6 +393,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -499,6 +501,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -610,6 +613,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <modules>
                     <module>module1</module>
@@ -695,6 +699,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <modules>
                     <module>module1</module>
@@ -1654,6 +1659,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -1673,6 +1679,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -2132,6 +2139,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -2150,6 +2158,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -2245,6 +2254,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>root</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -2263,6 +2273,7 @@ class ChangeParentPomTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>root</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -2287,6 +2298,7 @@ class ChangeParentPomTest implements RewriteTest {
                       <version>1.0.0</version>
                     </parent>
                     <artifactId>intermediate</artifactId>
+                    <packaging>pom</packaging>
 
                     <modules>
                       <module>leaf</module>
@@ -2302,6 +2314,7 @@ class ChangeParentPomTest implements RewriteTest {
                       <version>1.0.0</version>
                     </parent>
                     <artifactId>intermediate</artifactId>
+                    <packaging>pom</packaging>
 
                     <modules>
                       <module>leaf</module>

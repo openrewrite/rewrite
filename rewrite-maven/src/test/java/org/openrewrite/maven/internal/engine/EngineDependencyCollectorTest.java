@@ -243,7 +243,7 @@ class EngineDependencyCollectorTest {
         }
     }
 
-    // (i) A jar-typed transitive whose POM 404s fails at any depth (legacy + real Maven both fail it — L-P3-D-003);
+    // (i) A jar-typed transitive whose POM 404s fails at any depth (legacy + real Maven both fail it);
     // the collect still completes over the partial graph so the resolvable scopes are projected.
     @Test
     void missingJarTransitiveFails(@TempDir Path tmp) throws Exception {

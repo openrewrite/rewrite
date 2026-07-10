@@ -186,6 +186,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -268,6 +269,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void doesNotClobberManagedLatestWithSpecificVersion() {
+        // Maven keeps a managed `latest` literal in the effective model, so the recipe replaces it
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null, null, null)),
           pomXml(
@@ -282,6 +284,28 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                               <groupId>com.google.guava</groupId>
                               <artifactId>guava</artifactId>
                               <version>latest</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -926,6 +950,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <properties>
                       <guava.version>25.0-jre</guava.version>
                   </properties>
@@ -945,6 +970,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <properties>
                       <guava.version>28.0-jre</guava.version>
                   </properties>
@@ -1054,6 +1080,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <properties>
                     <guava.version>13.0</guava.version>
                     <junit.version>4.13.2</junit.version>
@@ -1065,6 +1092,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <properties>
                     <guava.version>14.0</guava.version>
                     <junit.version>4.13.2</junit.version>
@@ -1338,6 +1366,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
               </project>
               """
           ),
@@ -1405,6 +1434,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <dependencies>
                       <dependency>
                           <groupId>org.flywaydb</groupId>
@@ -1423,6 +1453,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <properties>
                       <flyway.version>10.15.0</flyway.version>
                   </properties>
@@ -1475,6 +1506,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
               </project>
               """
           ),
@@ -2838,6 +2870,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                <groupId>com.mycompany.app</groupId>
                <artifactId>parent</artifactId>
                <version>1</version>
+               <packaging>pom</packaging>
                <dependencyManagement>
                 <dependencies>
               	  <dependency>
@@ -2854,6 +2887,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                <groupId>com.mycompany.app</groupId>
                <artifactId>parent</artifactId>
                <version>1</version>
+               <packaging>pom</packaging>
                <dependencyManagement>
                 <dependencies>
               	  <dependency>
@@ -2960,6 +2994,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>13.0</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>

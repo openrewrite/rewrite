@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -175,23 +177,14 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                    <groupId>com.bad</groupId>
-                    <artifactId>bad-artifact</artifactId>
-                    <version>1</version>
-                  </dependency>
-                </dependencies>
-              </project>
-              """,
-            spec -> spec.beforeRecipe(maven -> {
+            // The failure text includes the machine-specific local repository, so match on the stable parts
+            spec -> spec.after(actual -> {
+                assertThat(actual)
+                  .contains("doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:")
+                  .contains("doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:")
+                  .contains("https://repo.maven.apache.org/maven2: not found");
+                return actual;
+            }).beforeRecipe(maven -> {
                 // make the local pom bad before running the recipe
                 Files.writeString(localPom,
                   //language=xml
@@ -240,6 +233,30 @@ class MavenDependencyFailuresTest implements RewriteTest {
                     <artifactId>guava</artifactId>
                     <version>doesnotexist</version>
                   </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec
+              .afterRecipe(after -> {
+                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
+            })
+          )
+        );
+    }
+
+    // Unresolvable ${...} coordinates are rejected by Maven's model validator at model build
+    // (invalid artifactId pattern / missing version) rather than deferred to download.
+    @Test
+    void unresolvablePlaceholderCoordinatesRejectedAtModelBuild() {
+        assertThatThrownBy(() -> rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
                   <dependency>
                     <groupId>com.google.another</groupId>
                     <artifactId>${doesnotexist}</artifactId>
@@ -251,14 +268,11 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """,
-            spec -> spec
-              .afterRecipe(after -> {
-                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
-            })
+              """
           )
-        );
+        )).isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("'dependencies.dependency.version' for com.google.another:${doesnotexist}:jar is missing")
+          .hasMessageContaining("does not match a valid id pattern");
     }
 
     @Test
@@ -377,9 +391,13 @@ class MavenDependencyFailuresTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(after -> {
-                // tgz dependencies that can't be downloaded should NOT cause a parse failure
+                // All declared types resolve, so the unresolvable tgz poms surface as a
+                // ParseExceptionResult while the complete model (marker) is retained.
                 Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                assertThat(maybeParseException).isEmpty();
+                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage())
+                  .contains("Unable to download POM: com.example.mongo.osx:mongodb-osx-ssl-x86_64:3.6.23")
+                  .contains("Unable to download POM: com.example.mongo.linux:mongodb-linux-x86_64:3.6.23"));
+                assertThat(after.getMarkers().findFirst(MavenResolutionResult.class)).isPresent();
             })
           )
         );

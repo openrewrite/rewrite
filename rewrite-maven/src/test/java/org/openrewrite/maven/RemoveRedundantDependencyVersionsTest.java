@@ -98,6 +98,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -165,6 +166,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -230,6 +232,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -296,6 +299,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -363,6 +367,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -427,6 +432,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -485,6 +491,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>myApiApp</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
               </project>
               """
           ),
@@ -525,6 +532,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>myApiApp</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -573,6 +581,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>com.mycompany</groupId>
                   <artifactId>myApiApp</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -629,6 +638,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -654,6 +664,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <version>1.0-SNAPSHOT</version>
                         </parent>
                         <artifactId>child</artifactId>
+                        <packaging>pom</packaging>
                         <modules>
                             <module>child-2</module>
                         </modules>
@@ -725,6 +736,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -750,6 +762,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <version>1.0-SNAPSHOT</version>
                         </parent>
                         <artifactId>child</artifactId>
+                        <packaging>pom</packaging>
                         <modules>
                             <module>child-2</module>
                         </modules>
@@ -812,6 +825,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -837,6 +851,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <version>1.0-SNAPSHOT</version>
                         </parent>
                         <artifactId>child</artifactId>
+                        <packaging>pom</packaging>
                         <modules>
                             <module>child-module-2</module>
                         </modules>
@@ -886,6 +901,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -911,6 +927,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <version>1.0-SNAPSHOT</version>
                         </parent>
                         <artifactId>child</artifactId>
+                        <packaging>pom</packaging>
                         <modules>
                             <module>child-2</module>
                         </modules>
@@ -1237,6 +1254,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-parent</artifactId>
@@ -1318,6 +1336,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-parent</artifactId>
@@ -1401,6 +1420,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child-with-pluginManagement</module>
                       <module>child-with-plugin-execution</module>
@@ -2115,6 +2135,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>

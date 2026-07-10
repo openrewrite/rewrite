@@ -50,7 +50,7 @@ class EngineEffectivePomProjectionTest implements RewriteTest {
                 .parser(MavenParser.builder().skipDependencyResolution(true));
     }
 
-    // L-P2-D-007: a ${...} gav is interpolated from the merged properties, mirroring legacy's projected gav.
+    // A ${...} gav is interpolated from the merged properties, mirroring legacy's projected gav.
     @Test
     void ciFriendlyGavInterpolated() {
         rewriteRun(
@@ -74,7 +74,7 @@ class EngineEffectivePomProjectionTest implements RewriteTest {
         );
     }
 
-    // L-P2-D-008: a parser/config-injected property overrides a POM-declared property of the same name.
+    // A parser/config-injected property overrides a POM-declared property of the same name.
     @Test
     void builderPropertyOverridesPomProperty() {
         rewriteRun(
@@ -102,7 +102,7 @@ class EngineEffectivePomProjectionTest implements RewriteTest {
         );
     }
 
-    // L-P2-D-006: dependencyManagement collapses to one entry per g:a:classifier:type (first-wins); Maven keeps all raw.
+    // dependencyManagement collapses to one entry per g:a:classifier:type (first-wins); Maven keeps all raw.
     @Test
     void dependencyManagementDedupedByGroupArtifactClassifierType() {
         rewriteRun(
