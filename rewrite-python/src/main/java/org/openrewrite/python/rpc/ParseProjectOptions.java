@@ -27,7 +27,7 @@ import java.util.List;
  * <p>
  * Bundles the optional, independent parsing inputs into one value so the API doesn't grow a long
  * tail of positional parameters (and adjacent same-typed arguments that are easy to transpose). Build
- * with {@link #builder()}; every field is optional and defaults to {@code null}.
+ * with {@code builder()}; every field is optional and defaults to {@code null}.
  */
 @Value
 @Builder
