@@ -18,6 +18,7 @@ import * as path from "node:path";
 import * as readline from "node:readline";
 import {ChildProcessWithoutNullStreams, spawn} from "node:child_process";
 import * as rpc from "vscode-jsonrpc/node";
+import {chunkedJsonDecoder} from "./message-decoder";
 import {RewriteRpc} from "./rewrite-rpc";
 import {RecipeMarketplace} from "../marketplace";
 
@@ -104,7 +105,9 @@ export class JavaRpcTestServer {
         });
 
         const connection = rpc.createMessageConnection(
-            new rpc.StreamMessageReader(child.stdout),
+            // Trees and recipe descriptors cross this connection too, so it needs the same headroom
+            // as the server's: the default decoder caps an inbound message at V8's ~512 MB string limit.
+            new rpc.StreamMessageReader(child.stdout, {contentTypeDecoder: chunkedJsonDecoder}),
             new rpc.StreamMessageWriter(child.stdin),
             opts.logger,
         );
