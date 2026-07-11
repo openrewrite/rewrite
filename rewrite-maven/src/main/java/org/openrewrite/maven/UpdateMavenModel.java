@@ -191,7 +191,11 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         for (MavenResolutionResult module : result.getModules()) {
             Path modulePath = module.getPom().getRequested().getSourcePath();
             if (modulePath != null) {
-                map.put(modulePath, module);
+                // Don't clobber a fresher model recorded by storeSelfResult: when a child module's
+                // dependency resolution failed transiently, the best-effort re-resolution above returns the
+                // child's *stale* model here, but storeSelfResult already captured the child's updated POM
+                // (with the parent's new dependency management) during recursion. Prefer that one.
+                map.putIfAbsent(modulePath, module);
             }
             storeModuleResults(ctx, module);
         }
