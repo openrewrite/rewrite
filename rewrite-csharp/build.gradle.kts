@@ -145,9 +145,11 @@ val csharpTest by tasks.registering(Exec::class) {
         // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
         // TargetDir, so pin the absolute path and pass --results-directory to match.
         junitXmlFile.parentFile.mkdirs()
+        // -PverboseTests restores the per-passing-test console output
+        val dotnetVerbosity = if (project.hasProperty("verboseTests")) "normal" else "minimal"
         commandLine(
             findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
-            "--no-build", "--verbosity", "normal",
+            "--no-build", "--verbosity", dotnetVerbosity,
             "--results-directory", junitXmlFile.parentFile.absolutePath,
             "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
         )
@@ -232,10 +234,14 @@ tasks.withType<Test> {
     }
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
-    // Show test names as they run
     testLogging {
-        events("started", "passed", "failed", "skipped")
-        showStandardStreams = true
+        // -PverboseTests shows every test plus its stdout/stderr (for diagnosing RPC hangs)
+        if (project.hasProperty("verboseTests")) {
+            events("started", "passed", "failed", "skipped")
+            showStandardStreams = true
+        } else {
+            events("failed", "skipped")
+        }
     }
 }
 
