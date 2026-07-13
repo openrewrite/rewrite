@@ -176,8 +176,13 @@ val pytestTest by tasks.registering(Exec::class) {
     workingDir = pythonDir
     // Use relative path for python executable to avoid absolute paths in cache key
     val relativePythonExe = if (isWindows) ".venv/Scripts/python.exe" else ".venv/bin/python"
-    commandLine(relativePythonExe, "-m", "pytest", "tests/", "-v",
+    val pytestArgs = mutableListOf(relativePythonExe, "-m", "pytest", "tests/",
         "--junitxml=build/test-results/pytest/junit.xml")
+    // -PverboseTests restores per-test output
+    if (project.hasProperty("verboseTests")) {
+        pytestArgs.add("-v")
+    }
+    commandLine(pytestArgs)
 
     inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -206,10 +211,14 @@ tasks.withType<Test> {
     maxParallelForks = 1
     // Add timeout to identify hanging tests - tests that hang will fail with timeout
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
-    // Show test names as they run
     testLogging {
-        events("started", "passed", "failed", "skipped")
-        showStandardStreams = true
+        // -PverboseTests shows every test plus its stdout/stderr (for diagnosing RPC hangs)
+        if (project.hasProperty("verboseTests")) {
+            events("started", "passed", "failed", "skipped")
+            showStandardStreams = true
+        } else {
+            events("failed", "skipped")
+        }
     }
 }
 

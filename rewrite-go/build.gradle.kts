@@ -247,9 +247,11 @@ val goTest = tasks.register<Exec>("goTest") {
     description = "Run Go tests"
 
     workingDir = projectDir
+    // -PverboseTests restores the per-test `standard-verbose` output
+    val gotestFormat = if (project.hasProperty("verboseTests")) "standard-verbose" else "pkgname"
     commandLine("go", "run", "gotest.tools/gotestsum@latest",
         "--junitfile", junitXmlFile.relativeTo(projectDir).path,
-        "--format", "standard-verbose",
+        "--format", gotestFormat,
         "--", "-count=1", "./test/...")
 
     dependsOn(generateTestClasspath)
