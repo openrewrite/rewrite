@@ -45,28 +45,8 @@ public class ExtractVersionsAsProperties extends Recipe {
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Map<String, String> existingProps = loadExistingProperties(document.getRoot());
-                Map<String, String> groupSharedVersion = GroupVersionAnalyzer.analyze(document.getRoot(), existingProps);
-                Map<String, String> groupExistingProperty =
-                    GroupVersionAnalyzer.existingSharedProperties(document.getRoot(), groupSharedVersion, existingProps);
-                propertyResolver = new PropertyResolver(groupSharedVersion, groupExistingProperty, existingProps);
+                propertyResolver = new PropertyResolver(document.getRoot());
                 return super.visitDocument(document, ctx);
-            }
-
-            private Map<String, String> loadExistingProperties(Xml.Tag root) {
-                return root.getChild("properties")
-                    .map(this::collectPropertiesFrom)
-                    .orElseGet(LinkedHashMap::new);
-            }
-
-            private Map<String, String> collectPropertiesFrom(Xml.Tag propsTag) {
-                return propsTag.getChildren().stream()
-                    .filter(child -> child.getValue().isPresent())
-                    .collect(toMap(
-                        Xml.Tag::getName,
-                        child -> child.getValue().get(),
-                        (a, b) -> a,
-                        LinkedHashMap::new));
             }
 
             @Override
@@ -100,11 +80,27 @@ public class ExtractVersionsAsProperties extends Recipe {
         private final Map<String, String> groupSharedVersion;
         private final Map<String, String> groupExistingProperty;
 
-        PropertyResolver(Map<String, String> groupSharedVersion, Map<String, String> groupExistingProperty,
-                         Map<String, String> existingProps) {
-            this.groupSharedVersion = groupSharedVersion;
-            this.groupExistingProperty = groupExistingProperty;
+        PropertyResolver(Xml.Tag root) {
+            Map<String, String> existingProps = loadExistingProperties(root);
+            this.groupSharedVersion = GroupVersionAnalyzer.analyze(root, existingProps);
+            this.groupExistingProperty = GroupVersionAnalyzer.existingSharedProperties(root, groupSharedVersion, existingProps);
             this.propertyKeyToVersion.putAll(existingProps);
+        }
+
+        private static Map<String, String> loadExistingProperties(Xml.Tag root) {
+            return root.getChild("properties")
+                .map(PropertyResolver::collectPropertiesFrom)
+                .orElseGet(LinkedHashMap::new);
+        }
+
+        private static Map<String, String> collectPropertiesFrom(Xml.Tag propsTag) {
+            return propsTag.getChildren().stream()
+                .filter(child -> child.getValue().isPresent())
+                .collect(toMap(
+                    Xml.Tag::getName,
+                    child -> child.getValue().get(),
+                    (a, b) -> a,
+                    LinkedHashMap::new));
         }
 
         static boolean isPropertyRef(String version) {
