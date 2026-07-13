@@ -99,7 +99,14 @@ public class XRange extends LatestRelease {
     }
 
     private static String normalizeWildcard(String part) {
-        return "*".equals(part) || "x".equals(part) || "X".equals(part) || "+".equals(part) ? "*" : part;
+        return isWildcard(part) ? "*" : part;
+    }
+
+    /**
+     * @return whether {@code segment} is an X-range wildcard: {@code *}, {@code x}, {@code X}, or {@code +}.
+     */
+    static boolean isWildcard(String segment) {
+        return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
     }
 
     @Override

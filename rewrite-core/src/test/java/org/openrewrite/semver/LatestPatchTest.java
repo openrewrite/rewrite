@@ -48,6 +48,31 @@ class LatestPatchTest {
     }
 
     @Test
+    void staysWithinPatchRangeWhenMinorIsAbsentOrNonNumeric() {
+        // Bare major.
+        assertThat(latestPatch.isValid("1", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1", "1.1.0")).isFalse();
+        assertThat(latestPatch.isValid("1", "2.0.0")).isFalse();
+        assertThat(latestPatch.upgrade("1", List.of("1.0.5", "1.1.0", "2.0.0"))).contains("1.0.5");
+
+        // Qualifier in the minor position.
+        assertThat(latestPatch.isValid("1.Final", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1.Final", "1.9.9")).isFalse();
+        assertThat(latestPatch.isValid("1.Final", "2.0.0")).isFalse();
+        assertThat(latestPatch.upgrade("1.Final", List.of("1.0.5", "1.9.9", "2.0.0"))).contains("1.0.5");
+    }
+
+    @Test
+    void xRangeWildcardMinorAllowsAnyMinorWithinTheMajor() {
+        for (String current : List.of("2.x", "2.X", "2.+", "2.*")) {
+            assertThat(latestPatch.isValid(current, "2.1.0")).as(current).isTrue();
+            assertThat(latestPatch.isValid(current, "2.9.9")).as(current).isTrue();
+            assertThat(latestPatch.isValid(current, "3.0.0")).as(current).isFalse();
+            assertThat(latestPatch.upgrade(current, List.of("2.1.0", "2.9.9", "3.0.0"))).contains("2.9.9");
+        }
+    }
+
+    @Test
     void upgrade() {
         var upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.0"));
         assertThat(upgrade).isEmpty();

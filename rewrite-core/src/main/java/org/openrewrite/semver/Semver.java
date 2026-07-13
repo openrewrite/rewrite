@@ -132,27 +132,28 @@ public class Semver {
     }
 
     public static String majorVersion(String version) {
-        Scanner scanner = new Scanner(version);
-        scanner.useDelimiter("[.\\-$]");
-        if (scanner.hasNext()) {
-            return scanner.next();
-        }
-        return version;
+        String major = versionSegment(version, 0);
+        return major == null ? version : major;
     }
 
     public static String minorVersion(String version) {
+        String minor = versionSegment(version, 1);
+        return StringUtils.isNumeric(minor) ? minor : version;
+    }
+
+    /**
+     * @return the raw version segment at {@code index} (0 = major, 1 = minor, ...), or {@code null} if absent.
+     */
+    static @Nullable String versionSegment(String version, int index) {
         Scanner scanner = new Scanner(version);
         scanner.useDelimiter("[.\\-$]");
-        if (scanner.hasNext()) {
+        for (int i = 0; i < index; i++) {
+            if (!scanner.hasNext()) {
+                return null;
+            }
             scanner.next();
         }
-        if (scanner.hasNext()) {
-            String minor = scanner.next();
-            if (StringUtils.isNumeric(minor)) {
-                return minor;
-            }
-        }
-        return version;
+        return scanner.hasNext() ? scanner.next() : null;
     }
 
     public static @Nullable String max(@Nullable String version1, @Nullable String version2) {
