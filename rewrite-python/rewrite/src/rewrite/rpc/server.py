@@ -1720,19 +1720,13 @@ def _collect_search_result_ids(tree) -> set:
     if tree is None:
         return ids
 
-    def _walk(node):
-        if hasattr(node, 'markers') and node.markers is not None:
-            for m in node.markers.markers:
-                if isinstance(m, SearchResult):
-                    ids.add(str(m.id))
-
-    # Use the visitor framework to walk all nodes
-    from rewrite.visitor import TreeVisitor
-    class _Collector(TreeVisitor):
-        def pre_visit(self, tree, p):
-            _walk(tree)
-            return tree
-    _Collector().visit(tree, None)
+    from rewrite.python.visitor import PythonVisitor
+    class _Collector(PythonVisitor):
+        def visit_marker(self, marker, p):
+            if isinstance(marker, SearchResult):
+                p.add(str(marker.id))
+            return marker
+    _Collector().visit(tree, ids)
     return ids
 
 
