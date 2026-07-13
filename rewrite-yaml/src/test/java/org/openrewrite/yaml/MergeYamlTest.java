@@ -3991,9 +3991,9 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    void overwriteFoldedStripBlockScalarPreservesEnvelope() {
+    void overwritePlainOverBlockFoldedAdoptsPlainFormat() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml("$", "key: replaced\n", false, null, null, null, null, null)),
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced", false, null, null, null, null, null)),
           yaml(
             """
               key: >-
@@ -4002,8 +4002,7 @@ class MergeYamlTest implements RewriteTest {
               after: tail
               """,
             """
-              key: >-
-                replaced
+              key: replaced
               after: tail
               """
           )
@@ -4011,9 +4010,9 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    void overwriteLiteralKeepBlockScalarPreservesEnvelope() {
+    void overwritePlainOverBlockLiteralAdoptsPlainFormat() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml("$", "key: replaced\n", false, null, null, null, null, null)),
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced", false, null, null, null, null, null)),
           yaml(
             """
               key: |+
@@ -4023,9 +4022,46 @@ class MergeYamlTest implements RewriteTest {
               after: tail
               """,
             """
-              key: |+
-                replaced
+              key: replaced
+              after: tail
+              """
+          )
+        );
+    }
 
+    @Test
+    void overwriteBlockOverPlainAdoptsIncomingBlockFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |\n  line one\n  line two\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverBlockSameStyleKeepsExistingEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: >-\n  replaced\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
               after: tail
               """
           )

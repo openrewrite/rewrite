@@ -120,6 +120,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         if (existing.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
             Yaml.Mapping mapping = mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
 
+            java.util.Map<java.util.UUID, BoundaryRepair> repairs = getCursor().pollMessage(SIBLING_BOUNDARY_REPAIR);
+            if (repairs != null) {
+                mapping = applySiblingBoundaryRepair(mapping, repairs);
+            }
+
             if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                 List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) getCursor().getValue()).getEntries();
                 return mapping.withEntries(mapLast(mapping.getEntries(), it ->
@@ -129,6 +134,31 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return mapping;
         }
         return super.visitMapping(existingMapping, p);
+    }
+
+    // When mergeScalar swaps between block and plain styles, the sibling-boundary linebreak moves
+    // from the block scalar's trailing content to the next entry's prefix (or vice versa). Apply
+    // that shift here where we have entry-neighbour context.
+    private Yaml.Mapping applySiblingBoundaryRepair(Yaml.Mapping mapping, java.util.Map<java.util.UUID, BoundaryRepair> repairs) {
+        List<Yaml.Mapping.Entry> entries = mapping.getEntries();
+        List<Yaml.Mapping.Entry> patched = new ArrayList<>(entries);
+        String lineBreak = linebreak();
+        for (int i = 0; i < patched.size() - 1; i++) {
+            BoundaryRepair repair = repairs.get(patched.get(i).getId());
+            if (repair == null) {
+                continue;
+            }
+            Yaml.Mapping.Entry next = patched.get(i + 1);
+            if (repair == BoundaryRepair.BLOCK_TO_PLAIN) {
+                if (!next.getPrefix().startsWith("\n") && !next.getPrefix().startsWith("\r")) {
+                    patched.set(i + 1, next.withPrefix(lineBreak + next.getPrefix()));
+                }
+            }
+            // PLAIN_TO_BLOCK: the next entry's prefix already carries the sibling linebreak and
+            // the block scalar's own value may or may not end with one; leave the next entry's
+            // prefix alone rather than risk gluing siblings together.
+        }
+        return mapping.withEntries(patched);
     }
 
     private static boolean keyMatches(Yaml.Mapping.@Nullable Entry e1, Yaml.Mapping.@Nullable Entry e2) {
@@ -390,14 +420,57 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
         BlockScalar.Matcher matcher = new BlockScalar.Matcher();
-        BlockScalar existing = matcher.get(new Cursor(null, y1)).orElse(null);
-        String s1 = existing != null ? existing.getBody() : y1.getValue();
-        String s2 = matcher.get(new Cursor(null, y2)).map(BlockScalar::getBody).orElseGet(y2::getValue);
-        if (s1.equals(s2) || acceptTheirs) {
+        BlockScalar existingBs = matcher.get(new Cursor(null, y1)).orElse(null);
+        BlockScalar incomingBs = matcher.get(new Cursor(null, y2)).orElse(null);
+        String s1 = existingBs != null ? existingBs.getBody() : y1.getValue();
+        String s2 = incomingBs != null ? incomingBs.getBody() : y2.getValue();
+        if (s1.equals(s2) && y1.getStyle() == y2.getStyle() || acceptTheirs) {
             return y1;
         }
-        return existing != null ? existing.withBody(s2) : y1.withValue(s2);
+        // Adopt the incoming scalar's format: the incoming snippet's style wins.
+        if (incomingBs != null) {
+            // Result is a block scalar. If existing was also a block scalar with the same
+            // header/style, preserve its envelope (chomp indicator, indent, trailing whitespace
+            // bounding the next sibling) and swap only the body.
+            if (existingBs != null && y1.getStyle() == y2.getStyle()) {
+                return existingBs.withBody(s2);
+            }
+            // Existing was plain (or a differently-styled block). Preserve y1's identity (id,
+            // markers, prefix) but adopt y2's style and value verbatim so the block envelope is
+            // whatever the incoming snippet supplied.
+            recordBoundaryRepair(BoundaryRepair.PLAIN_TO_BLOCK);
+            return y1.withStyle(y2.getStyle()).withValue(y2.getValue());
+        }
+        // Result is a plain (or quoted) scalar.
+        if (existingBs != null) {
+            // Existing block scalar's trailing content held the sibling-separator linebreak; the
+            // enclosing mapping needs to add a leading linebreak to the next entry's prefix so the
+            // switched-to-plain value does not glue onto the following sibling.
+            recordBoundaryRepair(BoundaryRepair.BLOCK_TO_PLAIN);
+        }
+        return y1.withStyle(y2.getStyle()).withValue(y2.getValue());
     }
+
+    private enum BoundaryRepair { BLOCK_TO_PLAIN, PLAIN_TO_BLOCK }
+
+    private void recordBoundaryRepair(BoundaryRepair repair) {
+        Cursor entryCursor = getCursor().dropParentUntil(v -> v == ROOT_VALUE || v instanceof Yaml.Mapping.Entry);
+        if (!(entryCursor.getValue() instanceof Yaml.Mapping.Entry)) {
+            return;
+        }
+        Cursor mappingCursor = entryCursor.dropParentUntil(v -> v == ROOT_VALUE || v instanceof Yaml.Mapping);
+        if (!(mappingCursor.getValue() instanceof Yaml.Mapping)) {
+            return;
+        }
+        java.util.Map<java.util.UUID, BoundaryRepair> repairs = mappingCursor.getMessage(SIBLING_BOUNDARY_REPAIR);
+        if (repairs == null) {
+            repairs = new java.util.HashMap<>();
+            mappingCursor.putMessage(SIBLING_BOUNDARY_REPAIR, repairs);
+        }
+        repairs.put(((Yaml.Mapping.Entry) entryCursor.getValue()).getId(), repair);
+    }
+
+    private static final String SIBLING_BOUNDARY_REPAIR = "org.openrewrite.yaml.MergeYamlVisitor.siblingBoundaryRepair";
 
     /**
      * Specialized concatAll function which takes the `insertPlace` property into account.
