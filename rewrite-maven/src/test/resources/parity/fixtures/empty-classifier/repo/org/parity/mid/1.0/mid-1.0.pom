@@ -1,0 +1,14 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>mid</artifactId>
+    <version>1.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>leaf</artifactId>
+            <version>1.0</version>
+            <classifier></classifier>
+        </dependency>
+    </dependencies>
+</project>

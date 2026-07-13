@@ -73,6 +73,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <properties>
                   <key>value</key>
                 </properties>
@@ -106,6 +107,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-child</module>
                 </modules>
@@ -116,6 +118,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-child</module>
                 </modules>
@@ -166,6 +169,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-child</module>
                 </modules>
@@ -179,6 +183,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-child</module>
                 </modules>
@@ -229,6 +234,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-child</module>
                 </modules>
@@ -239,6 +245,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-child</module>
                 </modules>
@@ -288,6 +295,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-app</module>
                 </modules>
@@ -298,6 +306,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <modules>
                   <module>my-app</module>
                 </modules>
@@ -351,6 +360,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <properties>
                   <key>v</key>
                 </properties>

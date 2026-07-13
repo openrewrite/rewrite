@@ -166,6 +166,35 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
+    public @Nullable Optional<byte[]> getPomBytes(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
+        try {
+            byte[] bytes = cache.get(pomBytesKey(gav));
+            return bytes == null ? null : Optional.of(bytes);
+        } catch (RocksDBException e) {
+            throw new MavenDownloadingException("Failed to read POM bytes from RocksDB cache", e,
+                    new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
+        }
+    }
+
+    @Override
+    public void putPomBytes(ResolvedGroupArtifactVersion gav, byte @Nullable [] bytes) {
+        if (bytes == null) {
+            // Negatives are never persisted, matching putPom's stance.
+            return;
+        }
+        try {
+            cache.put(pomBytesKey(gav), bytes);
+        } catch (RocksDBException e) {
+            throw new IllegalStateException("Failed to save POM bytes into RocksDB cache", e);
+        }
+    }
+
+    // Prefixed so bytes never collide with the parsed-Pom region, which keys on the bare gav.
+    private static byte[] pomBytesKey(ResolvedGroupArtifactVersion gav) {
+        return serialize(("pomBytes:" + gav).getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Override
     public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         return null;
     }

@@ -1,0 +1,180 @@
+# Phase-0 parity corpus manifest (PHASE-0-SPEC.md section 3).
+#
+# Committed: this manifest only. Materialized state (.corpus/: poms, reactor clones, HTTP store,
+# ground truth, snapshots) is cached, never committed; CI caches key on the hash of this file.
+# Entry kinds: pom (single Central artifact) | reactor (git clone at pinned tag).
+# groundTruth flavors: dependency-tree (mvn dependency:tree -Dverbose), effective-pom
+# (mvn help:effective-pom). For pom entries the tree is captured through a generated consumer
+# stub declaring the GAV as sole dependency; effective-pom runs against the artifact's own pom.
+# deferred: true = not exercisable against Central (SNAPSHOTs) — slice-C synthetic corpus.
+# fetchOnly: true = materialized but excluded from record/ground-truth/resolution in phase 0.
+
+entries:
+  # --- Single-pom Central entries, chosen for feature coverage ---
+  - name: spring-boot-starter-web-3.2.0
+    kind: pom
+    source:
+      gav: org.springframework.boot:spring-boot-starter-web:3.2.0
+    groundTruth: [dependency-tree, effective-pom]
+    notes: classic starter graph; deep parent chain into spring-boot-dependencies BOM
+
+  - name: guava-33.0.0-jre
+    kind: pom
+    source:
+      gav: com.google.guava:guava:33.0.0-jre
+    groundTruth: [dependency-tree, effective-pom]
+    notes: small graph; guava-parent chain; failureaccess/listenablefuture sentinel versions
+
+  - name: quarkus-bom-3.6.0
+    kind: pom
+    source:
+      gav: io.quarkus:quarkus-bom:3.6.0
+    groundTruth: [dependency-tree, effective-pom]
+    notes: packaging pom; very large dependencyManagement; BOM importer coverage
+
+  - name: jackson-databind-2.16.1
+    kind: pom
+    source:
+      gav: com.fasterxml.jackson.core:jackson-databind:2.16.1
+    groundTruth: [dependency-tree, effective-pom]
+    notes: jackson-bom parent structure; property indirection
+
+  - name: junit-jupiter-5.10.1
+    kind: pom
+    source:
+      gav: org.junit.jupiter:junit-jupiter:5.10.1
+    groundTruth: [dependency-tree, effective-pom]
+    notes: junit-bom managed versions
+
+  - name: hibernate-core-6.4.1.Final
+    kind: pom
+    source:
+      gav: org.hibernate.orm:hibernate-core:6.4.1.Final
+    groundTruth: [dependency-tree, effective-pom]
+    notes: optional-heavy; deep graph; jakarta stack
+
+  - name: netty-handler-4.1.104.Final
+    kind: pom
+    source:
+      gav: io.netty:netty-handler:4.1.104.Final
+    groundTruth: [dependency-tree, effective-pom]
+    notes: sibling-module dependencies managed by netty-parent
+
+  - name: log4j-core-2.22.1
+    kind: pom
+    source:
+      gav: org.apache.logging.log4j:log4j-core:2.22.1
+    groundTruth: [dependency-tree, effective-pom]
+    notes: parent + BOM structure; optional annotations processor deps
+
+  - name: spring-cloud-dependencies-2023.0.0
+    kind: pom
+    source:
+      gav: org.springframework.cloud:spring-cloud-dependencies:2023.0.0
+    groundTruth: [dependency-tree, effective-pom]
+    notes: packaging pom; BOM-of-BOMs multi-level import chain
+
+  - name: awssdk-s3-2.22.0
+    kind: pom
+    source:
+      gav: software.amazon.awssdk:s3:2.22.0
+    groundTruth: [dependency-tree, effective-pom]
+    notes: wide and deep graph; large managed-dependency chain
+
+  - name: opentelemetry-sdk-1.34.1
+    kind: pom
+    source:
+      gav: io.opentelemetry:opentelemetry-sdk:1.34.1
+    groundTruth: [dependency-tree, effective-pom]
+    notes: BOM + sibling artifacts
+
+  - name: kotlin-stdlib-1.9.22
+    kind: pom
+    source:
+      gav: org.jetbrains.kotlin:kotlin-stdlib:1.9.22
+    groundTruth: [dependency-tree, effective-pom]
+    notes: Gradle-module-metadata adjacency; pom path must ignore .module variant data
+
+  - name: scala-library-2.13.12
+    kind: pom
+    source:
+      gav: org.scala-lang:scala-library:2.13.12
+    groundTruth: [dependency-tree, effective-pom]
+    notes: minimal graph baseline
+
+  - name: grpc-core-1.60.1
+    kind: pom
+    source:
+      gav: io.grpc:grpc-core:1.60.1
+    groundTruth: [dependency-tree, effective-pom]
+    notes: real version-range user; grpc pins sibling versions with [x.y.z] ranges
+
+  - name: spark-core-2.13-3.5.0
+    kind: pom
+    source:
+      gav: org.apache.spark:spark-core_2.13:3.5.0
+    groundTruth: [dependency-tree, effective-pom]
+    notes: very wide+deep graph; exclusion-heavy
+
+  - name: hadoop-client-3.3.6
+    kind: pom
+    source:
+      gav: org.apache.hadoop:hadoop-client:3.3.6
+    groundTruth: [dependency-tree, effective-pom]
+    notes: classic exclusion-heavy dependency set
+
+  - name: spring-boot-dependencies-3.2.0
+    kind: pom
+    source:
+      gav: org.springframework.boot:spring-boot-dependencies:3.2.0
+    groundTruth: [dependency-tree, effective-pom]
+    notes: packaging pom; property-indirection-heavy dependencyManagement
+
+  - name: jetty-server-11.0.19
+    kind: pom
+    source:
+      gav: org.eclipse.jetty:jetty-server:11.0.19
+    groundTruth: [dependency-tree, effective-pom]
+    notes: deep jetty-project parent chain; moderate graph
+
+  # --- SNAPSHOT coverage: deferred; Maven Central hosts no snapshots ---
+  - name: snapshot-consumer-deferred
+    kind: pom
+    source:
+      gav: org.openrewrite.parity:snapshot-consumer:1.0-SNAPSHOT
+    groundTruth: []
+    deferred: true
+    notes: >-
+      Pinned + dated SNAPSHOT resolution and metadata selection cannot be exercised against
+      Central; deferred to the slice-C synthetic corpus (MockWebServer).
+
+  # --- Real reactors ---
+  - name: apache-maven-3.9.16
+    kind: reactor
+    source:
+      git:
+        url: https://github.com/apache/maven.git
+        tag: maven-3.9.16
+    groundTruth: [dependency-tree, effective-pom]
+    notes: canonical multi-module reactor; also the benchmark subject from the spike
+
+  - name: apache-dubbo-3.2.10
+    kind: reactor
+    source:
+      git:
+        url: https://github.com/apache/dubbo.git
+        tag: dubbo-3.2.10
+    groundTruth: [dependency-tree, effective-pom]
+    notes: ${revision} CI-friendly-versions reactor; large module count
+
+  - name: apache-camel-4.4.0
+    kind: reactor
+    source:
+      git:
+        url: https://github.com/apache/camel.git
+        tag: camel-4.4.0
+    groundTruth: []
+    fetchOnly: true
+    notes: >-
+      Large-reactor benchmark subject (ModelCache clone-scaling question). Fetch-only in
+      phase 0; ground truth and resolution deliberately skipped for time.

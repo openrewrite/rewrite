@@ -89,6 +89,19 @@ public class MavenPomDownloader {
     private boolean addCentralRepository;
     private boolean addLocalRepository;
 
+    // Additive internal accessors for the resolution engine (org.openrewrite.maven.internal.engine).
+    public Map<Path, Pom> getProjectPoms() {
+        return projectPoms;
+    }
+
+    public @Nullable MavenSettings getMavenSettings() {
+        return mavenSettings;
+    }
+
+    public @Nullable List<String> getActiveProfiles() {
+        return activeProfiles;
+    }
+
     /**
      * @param projectPoms    Other POMs in this project.
      * @param ctx            The execution context, which potentially contain Maven settings customization

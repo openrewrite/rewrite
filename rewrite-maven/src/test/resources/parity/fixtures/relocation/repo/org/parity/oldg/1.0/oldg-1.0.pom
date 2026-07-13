@@ -1,0 +1,12 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>oldg</artifactId>
+    <version>1.0</version>
+    <distributionManagement>
+        <relocation>
+            <groupId>org.parity</groupId>
+            <artifactId>newg</artifactId>
+        </relocation>
+    </distributionManagement>
+</project>

@@ -1,0 +1,18 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>a</artifactId>
+    <version>1.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>c</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>d</artifactId>
+            <version>1.0</version>
+        </dependency>
+    </dependencies>
+</project>

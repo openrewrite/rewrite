@@ -129,9 +129,9 @@ class OrderPomElementsTest implements RewriteTest {
             """
               <project>
                   <parent>
-                      <groupId>jpl</groupId>
-                      <artifactId>jpl</artifactId>
-                      <version>7.4.0</version>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>
                   </parent>
                   <!-- modelVersion1 -->
 
@@ -180,9 +180,9 @@ class OrderPomElementsTest implements RewriteTest {
                   <!-- modelVersion2 -->
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>jpl</groupId>
-                      <artifactId>jpl</artifactId>
-                      <version>7.4.0</version>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>
                   </parent>
                   <groupId>my.org.project</groupId>
                   <artifactId>my-project</artifactId>
@@ -232,9 +232,9 @@ class OrderPomElementsTest implements RewriteTest {
             """
               <project>
                   <parent>
-                      <groupId>jpl</groupId>
-                      <artifactId>jpl</artifactId>
-                      <version>7.4.0</version>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>
                   </parent>
 
                   <!-- model version comment -->
@@ -288,9 +288,9 @@ class OrderPomElementsTest implements RewriteTest {
                   <modelVersion>4.0.0</modelVersion>
 
                   <parent>
-                      <groupId>jpl</groupId>
-                      <artifactId>jpl</artifactId>
-                      <version>7.4.0</version>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.0</version>
                   </parent>
 
                   <groupId>my.org.project</groupId>

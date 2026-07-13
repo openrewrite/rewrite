@@ -1,0 +1,480 @@
+{
+  "@c" : "org.openrewrite.maven.tree.MavenResolutionResult",
+  "@ref" : 1,
+  "id" : "f19486b8-6261-4ea8-be4b-b08f47c85b87",
+  "pom" : {
+    "@ref" : 2,
+    "requested" : {
+      "sourcePath" : "file:///parity/project/pom.xml",
+      "repository" : null,
+      "parent" : null,
+      "gav" : {
+        "@ref" : 3,
+        "repository" : null,
+        "groupId" : "org.parity",
+        "artifactId" : "bom-import-app",
+        "version" : "1",
+        "datedSnapshotVersion" : null
+      },
+      "obsoletePomVersion" : null,
+      "name" : null,
+      "prerequisites" : null,
+      "packaging" : null,
+      "properties" : {
+        "parity.repo.url" : "file:///parity/fixture/repo/"
+      },
+      "dependencyManagement" : [ {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Imported",
+        "@ref" : 4,
+        "gav" : {
+          "@ref" : 5,
+          "groupId" : "org.parity",
+          "artifactId" : "bom",
+          "version" : "1.0"
+        }
+      }, {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Defined",
+        "@ref" : 6,
+        "gav" : {
+          "@ref" : 7,
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : "1.5"
+        },
+        "scope" : null,
+        "type" : null,
+        "classifier" : null,
+        "exclusions" : null
+      } ],
+      "dependencies" : [ {
+        "gav" : {
+          "@ref" : 8,
+          "groupId" : "org.parity",
+          "artifactId" : "managed-a",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      }, {
+        "gav" : {
+          "@ref" : 9,
+          "groupId" : "org.parity",
+          "artifactId" : "defined-c",
+          "version" : null
+        },
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      } ],
+      "repositories" : [ ],
+      "pluginRepositories" : [ ],
+      "licenses" : [ ],
+      "profiles" : [ ],
+      "plugins" : [ ],
+      "pluginManagement" : [ ],
+      "subprojects" : [ ]
+    },
+    "activeProfiles" : [ ],
+    "properties" : {
+      "parity.repo.url" : "file:///parity/fixture/repo/"
+    },
+    "dependencyManagement" : [ {
+      "gav" : 7,
+      "scope" : null,
+      "type" : null,
+      "classifier" : null,
+      "exclusions" : null,
+      "requested" : 6,
+      "requestedBom" : null,
+      "bomGav" : null
+    }, {
+      "gav" : {
+        "@ref" : 10,
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0"
+      },
+      "scope" : null,
+      "type" : null,
+      "classifier" : null,
+      "exclusions" : null,
+      "requested" : {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Defined",
+        "@ref" : 11,
+        "gav" : 10,
+        "scope" : null,
+        "type" : null,
+        "classifier" : null,
+        "exclusions" : null
+      },
+      "requestedBom" : 4,
+      "bomGav" : {
+        "@ref" : 12,
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "bom",
+        "version" : "1.0",
+        "datedSnapshotVersion" : "1.0"
+      }
+    }, {
+      "gav" : {
+        "@ref" : 13,
+        "groupId" : "org.parity",
+        "artifactId" : "managed-b",
+        "version" : "2.0"
+      },
+      "scope" : null,
+      "type" : null,
+      "classifier" : null,
+      "exclusions" : null,
+      "requested" : {
+        "@c" : "org.openrewrite.maven.tree.ManagedDependency$Defined",
+        "@ref" : 14,
+        "gav" : 13,
+        "scope" : null,
+        "type" : null,
+        "classifier" : null,
+        "exclusions" : null
+      },
+      "requestedBom" : 4,
+      "bomGav" : 12
+    } ],
+    "dependencyManagementSorted" : true,
+    "initialRepositories" : [ ],
+    "repositories" : [ ],
+    "pluginRepositories" : [ ],
+    "requestedDependencies" : [ {
+      "gav" : 8,
+      "classifier" : null,
+      "type" : null,
+      "scope" : null,
+      "exclusions" : null,
+      "optional" : null,
+      "attributes" : { }
+    }, {
+      "gav" : 9,
+      "classifier" : null,
+      "type" : null,
+      "scope" : null,
+      "exclusions" : null,
+      "optional" : null,
+      "attributes" : { }
+    } ],
+    "plugins" : [ ],
+    "pluginManagement" : [ ],
+    "subprojects" : [ ]
+  },
+  "modules" : [ ],
+  "parent" : null,
+  "dependencies" : {
+    "Compile" : [ {
+      "@ref" : 15,
+      "repository" : {
+        "@ref" : 16,
+        "id" : "fixture",
+        "uri" : "file:///parity/fixture/repo/",
+        "releases" : null,
+        "snapshots" : null,
+        "timeout" : null,
+        "knownToExist" : true,
+        "deriveMetadataIfMissing" : null
+      },
+      "gav" : {
+        "@ref" : 17,
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "managed-a",
+        "version" : "2.0",
+        "datedSnapshotVersion" : "2.0"
+      },
+      "requested" : {
+        "gav" : 8,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ {
+        "@ref" : 18,
+        "repository" : {
+          "@ref" : 19,
+          "id" : "fixture",
+          "uri" : "file:///parity/fixture/repo/",
+          "releases" : null,
+          "snapshots" : null,
+          "timeout" : null,
+          "knownToExist" : true,
+          "deriveMetadataIfMissing" : null
+        },
+        "gav" : {
+          "@ref" : 20,
+          "repository" : "file:///parity/fixture/repo/",
+          "groupId" : "org.parity",
+          "artifactId" : "managed-b",
+          "version" : "2.0",
+          "datedSnapshotVersion" : "2.0"
+        },
+        "requested" : {
+          "gav" : {
+            "@ref" : 21,
+            "groupId" : "org.parity",
+            "artifactId" : "managed-b",
+            "version" : "2.0"
+          },
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null,
+          "attributes" : { }
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 22,
+      "repository" : {
+        "@ref" : 23,
+        "id" : "fixture",
+        "uri" : "file:///parity/fixture/repo/",
+        "releases" : null,
+        "snapshots" : null,
+        "timeout" : null,
+        "knownToExist" : true,
+        "deriveMetadataIfMissing" : null
+      },
+      "gav" : {
+        "@ref" : 24,
+        "repository" : "file:///parity/fixture/repo/",
+        "groupId" : "org.parity",
+        "artifactId" : "defined-c",
+        "version" : "1.5",
+        "datedSnapshotVersion" : "1.5"
+      },
+      "requested" : {
+        "gav" : 9,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 18 ],
+    "Runtime" : [ {
+      "@ref" : 25,
+      "repository" : 16,
+      "gav" : 17,
+      "requested" : {
+        "gav" : 8,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ {
+        "@ref" : 26,
+        "repository" : 19,
+        "gav" : 20,
+        "requested" : {
+          "gav" : 21,
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null,
+          "attributes" : { }
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 27,
+      "repository" : 23,
+      "gav" : 24,
+      "requested" : {
+        "gav" : 9,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 26 ],
+    "Test" : [ {
+      "@ref" : 28,
+      "repository" : 16,
+      "gav" : 17,
+      "requested" : {
+        "gav" : 8,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ {
+        "@ref" : 29,
+        "repository" : 19,
+        "gav" : 20,
+        "requested" : {
+          "gav" : 21,
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null,
+          "attributes" : { }
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 30,
+      "repository" : 23,
+      "gav" : 24,
+      "requested" : {
+        "gav" : 9,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 29 ],
+    "Provided" : [ {
+      "@ref" : 31,
+      "repository" : 16,
+      "gav" : 17,
+      "requested" : {
+        "gav" : 8,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ {
+        "@ref" : 32,
+        "repository" : 19,
+        "gav" : 20,
+        "requested" : {
+          "gav" : 21,
+          "classifier" : null,
+          "type" : null,
+          "scope" : null,
+          "exclusions" : null,
+          "optional" : null,
+          "attributes" : { }
+        },
+        "dependencies" : [ ],
+        "licenses" : [ ],
+        "type" : null,
+        "classifier" : null,
+        "optional" : false,
+        "depth" : 1,
+        "effectiveExclusions" : [ ]
+      } ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, {
+      "@ref" : 33,
+      "repository" : 23,
+      "gav" : 24,
+      "requested" : {
+        "gav" : 9,
+        "classifier" : null,
+        "type" : null,
+        "scope" : null,
+        "exclusions" : null,
+        "optional" : null,
+        "attributes" : { }
+      },
+      "dependencies" : [ ],
+      "licenses" : [ ],
+      "type" : null,
+      "classifier" : null,
+      "optional" : false,
+      "depth" : 0,
+      "effectiveExclusions" : [ ]
+    }, 32 ]
+  },
+  "mavenSettings" : null,
+  "activeProfiles" : [ ],
+  "userProperties" : {
+    "parity.repo.url" : "file:///parity/fixture/repo/"
+  }
+}

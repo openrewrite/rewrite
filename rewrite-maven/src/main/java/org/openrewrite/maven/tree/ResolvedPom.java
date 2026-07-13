@@ -32,6 +32,7 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.engine.MavenEngineResolution;
 import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
@@ -198,20 +199,23 @@ public class ResolvedPom {
             return this;
         }
 
-        ResolvedPom resolved = new ResolvedPom(
-                requested,
-                activeProfiles,
-                emptyMap(),
-                emptyList(),
-                true,
-                initialRepositories,
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                emptyList()
-        ).resolver(ctx, downloader).resolve();
+        // The effective-pom chokepoint for both Pom.resolve (initial parse) and UpdateMavenModel (re-resolution):
+        // the engine selector routes it legacy/maven/shadow. Dependency resolution stays legacy in every mode.
+        ResolvedPom resolved = MavenEngineResolution.effectivePom(requested, activeProfiles, downloader, ctx, () ->
+                new ResolvedPom(
+                        requested,
+                        activeProfiles,
+                        emptyMap(),
+                        emptyList(),
+                        true,
+                        initialRepositories,
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList()
+                ).resolver(ctx, downloader).resolve());
 
         if (!getVersion().equals(resolved.getVersion())) {
             return resolved;
@@ -996,12 +1000,15 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx);
+        // Route the single-scope projection through the engine facade (MAVEN maps just this scope from one verbose
+        // collect; LEGACY/SHADOW run the legacy pass, whose nested BOM/parent Pom.resolve calls stay legacy).
+        return MavenEngineResolution.dependencyGraphScope(this, scope, downloader, ctx,
+                () -> MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx)));
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return doResolveDependencies(scope, requirements, true, downloader, ctx);
+        return MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, requirements, true, downloader, ctx));
     }
 
     /**
@@ -1011,7 +1018,7 @@ public class ResolvedPom {
      * transitive POM downloads.
      */
     public List<ResolvedDependency> resolveDirectDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx);
+        return MavenEngineResolution.withoutEngine(() -> doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx));
     }
 
     private List<ResolvedDependency> doResolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,

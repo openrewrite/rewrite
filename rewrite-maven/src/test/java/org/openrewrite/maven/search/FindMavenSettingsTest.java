@@ -73,6 +73,7 @@ class FindMavenSettingsTest implements RewriteTest {
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>module</module>
                   </modules>
@@ -106,6 +107,7 @@ class FindMavenSettingsTest implements RewriteTest {
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
               </project>
               """,
             spec -> spec.path("pom.xml")

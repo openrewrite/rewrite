@@ -1,0 +1,54 @@
+{
+  "benchmark": "integrated-perf-gate",
+  "date": "2026-07-09",
+  "design": "DESIGN.md §6 — gate is the ratio vs legacy on identical inputs; integrated engine pays adapter cost inside (here beyond) the raw-pipeline headroom",
+  "supersedes": "spike/benchmark split-JVM OLD/NEW harness (predated integration, measured the raw unadapted pipeline)",
+  "harness": "maven-resolution-plan/phase0-tools IntegratedBenchmark: MavenParser end-to-end, one JVM, ctx engine=legacy vs engine=maven over an identical reactor input set; warm iterations zero-download (RecordingHttpSender record-once/replay).",
+  "environment": {
+    "cpu": "Apple Mac16,7",
+    "jdk": "Temurin 17.0.6",
+    "rewriteVersion": "8.87.0-SNAPSHOT (worktree, incl. slice-C dedup + metadata routing)",
+    "engineStack": "maven-resolver 2.0.20 + maven-model-builder 3.9.16 (shaded)",
+    "kernMaxfilesperproc": 92160,
+    "note": "camel rows run at -Xmx768m (see fdLeak); maven-15 at -Xmx2g. Ratio within each tier is same-heap for both engines and therefore fair; maven camel absolute numbers are a GC-pressured upper bound."
+  },
+  "protocol": {
+    "warmups": 2,
+    "iters": 5,
+    "warm": "fresh MavenPomCache per iteration, zero network (replay); median of iters",
+    "loop": "warm-cache re-resolution: one shared warm MavenPomCache, re-resolve the full reactor repeatedly (UpdateMavenModel steady state); median per iteration",
+    "loopNote": "deviates from the baseline's per-leaf loop — a standalone leaf cannot resolve its reactor parent from the remote store; re-resolving the full reactor under a warm shared cache is the closest self-consistent analogue. Both engines use the identical shared-cache protocol, so the ratio holds."
+  },
+  "fdLeak": {
+    "finding": "maven mode accumulates OS file descriptors within a single large-reactor parse (GC-reclaimable FileInputStream handles from materialized-pom / model-source reads outpace GC), exhausting the 92160 per-process cap at ~47 BOM-heavy camel modules.",
+    "evidence": "camel-40/47/50 crash with 'Too many open files' at -Xmx2g (both --daemon and --no-daemon, shell ulimit 1048576); the same tiers complete at -Xmx768m because frequent GC reclaims the FileInputStream FDs before the cap. maven-15 (shallow deps) stays under the cap at 2g.",
+    "classification": "flip-blocker — an FD-lifecycle fix in the descriptor/model file-handle path is required before maven mode can resolve a BOM-heavy reactor at production heap sizes.",
+    "notFixed": "measurement slice; no speculative engine change made (DESIGN discipline)."
+  },
+  "tiers": [
+    {
+      "corpus": "apache-maven-3.9.16", "tier": "full", "modules": 15, "heap": "2g",
+      "legacy": {"warmMedianMs": 149.0, "warmMsPerModule": 9.9, "loopMedianMs": 102.0, "loopMsPerModule": 6.8, "peakHeapMb": 164, "warm": [161,152,149,143,149]},
+      "maven":  {"warmMedianMs": 690.0, "warmMsPerModule": 46.0, "loopMedianMs": 196.0, "loopMsPerModule": 13.1, "peakHeapMb": 1021, "warm": [690,674,717,692,665]},
+      "warmRatioLegacyOverMaven": 0.22, "mavenSlowerWarm": 4.63, "loopRatioLegacyOverMaven": 0.52, "mavenSlowerLoop": 1.92
+    },
+    {
+      "corpus": "apache-camel-4.4.0", "tier": "50", "modules": 50, "heap": "768m",
+      "legacy": {"warmMedianMs": 1951.0, "warmMsPerModule": 39.0, "loopMedianMs": 1006.0, "loopMsPerModule": 20.1, "peakHeapMb": 564, "warm": [2059,1922,1879,1951,1993]},
+      "maven":  {"warmMedianMs": 4408.0, "warmMsPerModule": 88.2, "loopMedianMs": 2403.5, "loopMsPerModule": 48.1, "peakHeapMb": 515, "warm": [4372,4408,4438,4450,4130]},
+      "warmRatioLegacyOverMaven": 0.44, "mavenSlowerWarm": 2.26, "loopRatioLegacyOverMaven": 0.42, "mavenSlowerLoop": 2.39
+    },
+    {
+      "corpus": "apache-camel-4.4.0", "tier": "150", "modules": 150, "heap": "768m",
+      "legacy": {"warmMedianMs": 2766.0, "warmMsPerModule": 18.4, "loopMedianMs": 1749.0, "loopMsPerModule": 11.7, "peakHeapMb": 562, "warm": [2708,4166,2840,2766,2762]},
+      "maven":  {"warmMedianMs": 7274.0, "warmMsPerModule": 48.5, "loopMedianMs": 4122.0, "loopMsPerModule": 27.5, "peakHeapMb": 580, "warm": [8516,7537,7274,6839,6662]},
+      "warmRatioLegacyOverMaven": 0.38, "mavenSlowerWarm": 2.63, "loopRatioLegacyOverMaven": 0.42, "mavenSlowerLoop": 2.36
+    },
+    {
+      "corpus": "apache-camel-4.4.0", "tier": "400", "modules": 400, "heap": "768m",
+      "legacy": {"warmMedianMs": 4647.0, "warmMsPerModule": 11.6, "loopMedianMs": 3415.0, "loopMsPerModule": 8.5, "peakHeapMb": 594, "warm": [5022,4652,4647,4639,4534]},
+      "maven":  {"warmMedianMs": 16872.0, "warmMsPerModule": 42.2, "loopMedianMs": 12819.0, "loopMsPerModule": 32.0, "peakHeapMb": 669, "warm": [16659,16872,16652,16892,20514]},
+      "warmRatioLegacyOverMaven": 0.28, "mavenSlowerWarm": 3.63, "loopRatioLegacyOverMaven": 0.27, "mavenSlowerLoop": 3.75
+    }
+  ]
+}

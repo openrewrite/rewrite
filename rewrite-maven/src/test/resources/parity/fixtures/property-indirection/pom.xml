@@ -1,0 +1,19 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.parity</groupId>
+        <artifactId>prop-parent</artifactId>
+        <version>1</version>
+    </parent>
+    <artifactId>property-indirection-app</artifactId>
+    <properties>
+        <dep.version>${dep.version.actual}</dep.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>p</artifactId>
+            <version>${dep.version}</version>
+        </dependency>
+    </dependencies>
+</project>

@@ -91,6 +91,11 @@ java {
 }
 
 tasks.withType<Test>().configureEach {
+    // Forward the dev/CI resolution-engine selector to the forked test JVM (Gradle does not by default), so
+    // `-Dorg.openrewrite.maven.resolution.engine=legacy ./gradlew :rewrite-gradle:test` reaches ResolutionEngineSelector.
+    System.getProperty("org.openrewrite.maven.resolution.engine")?.let {
+        systemProperty("org.openrewrite.maven.resolution.engine", it)
+    }
     dependsOn(pluginLocalTestClasspath)
     val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {

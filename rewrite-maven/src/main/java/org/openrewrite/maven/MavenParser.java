@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
+import org.openrewrite.maven.internal.engine.PomXmlRegistry;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
@@ -30,6 +31,7 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
@@ -89,6 +91,8 @@ public class MavenParser implements Parser {
 
                     projectPoms.put(xml, pom);
                     projectPomsByPath.put(pomPath, pom);
+                    // XML-first: the engine reads this pom from its printed document bytes (DESIGN §0).
+                    PomXmlRegistry.put(ctx, pom, xml.printAll().getBytes(StandardCharsets.UTF_8));
                 } else {
                     parsed.add(sourceFile);
                 }
@@ -99,6 +103,7 @@ public class MavenParser implements Parser {
         }
 
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
+        PomXmlRegistry.setInjectedProperties(ctx, properties);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
@@ -122,15 +127,20 @@ public class MavenParser implements Parser {
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
+                Xml.Document doc = docToPom.getKey();
+                if (e.getPartialResult() != null) {
+                    // Keep the complete model with every resolvable scope populated; the failure is surfaced below
+                    doc = doc.withMarkers(doc.getMarkers().compute(e.getPartialResult(), (old, n) -> n));
+                }
                 if (e.getExceptions().size() == 1) {
                     // If there is only a single MavenDownloadingException, report just that as no additional debugging value is gleaned from its wrapper
                     MavenDownloadingException e2 = e.getExceptions().get(0);
-                    String message = e2.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
-                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e2, message))));
+                    String message = e2.warn(doc).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(doc.withMarkers(doc.getMarkers().add(ParseExceptionResult.build(this, e2, message))));
                     ctx.getOnError().accept(e2);
                 } else {
-                    String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
-                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
+                    String message = e.warn(doc).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(doc.withMarkers(doc.getMarkers().add(ParseExceptionResult.build(this, e, message))));
                     ctx.getOnError().accept(e);
                 }
             } catch (MavenDownloadingException e) {

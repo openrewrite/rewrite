@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -37,6 +38,19 @@ public class MavenDownloadingExceptions extends Exception {
      * dependency management dependencies.
      */
     private final List<MavenDownloadingException> exceptions = new ArrayList<>();
+
+    /**
+     * When dependency resolution computed some scopes before failing, the resolution result
+     * with the resolvable scopes populated, so consumers can retain the complete model
+     * alongside the failure.
+     */
+    @Nullable
+    private MavenResolutionResult partialResult;
+
+    public MavenDownloadingExceptions setPartialResult(@Nullable MavenResolutionResult partialResult) {
+        this.partialResult = partialResult;
+        return this;
+    }
 
     public static MavenDownloadingExceptions append(@Nullable MavenDownloadingExceptions current,
                                                     MavenDownloadingException exception) {

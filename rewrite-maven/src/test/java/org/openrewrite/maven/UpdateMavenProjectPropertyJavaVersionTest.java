@@ -133,6 +133,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <groupId>com.example</groupId>
                       <artifactId>example-parent</artifactId>
                       <version>1.0.0</version>
+                      <packaging>pom</packaging>
                       <modelVersion>4.0</modelVersion>
                       <properties>
                           <java.version>11</java.version>
@@ -151,6 +152,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <groupId>com.example</groupId>
                     <artifactId>example-parent</artifactId>
                     <version>1.0.0</version>
+                    <packaging>pom</packaging>
                     <modelVersion>4.0</modelVersion>
                     <properties>
                         <java.version>17</java.version>
@@ -197,6 +199,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>example-parent</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <modelVersion>4.0</modelVersion>
                   <build>
                       <plugins>
@@ -263,6 +266,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>example-parent</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <modelVersion>4.0</modelVersion>
                   <build>
                       <plugins>
@@ -286,6 +290,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>example-parent</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <modelVersion>4.0</modelVersion>
                   <build>
                       <plugins>

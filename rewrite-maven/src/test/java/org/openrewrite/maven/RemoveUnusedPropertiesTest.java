@@ -339,6 +339,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <modules>
                     <module>module1</module>
@@ -691,6 +692,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <modules>
                     <module>module1</module>
@@ -770,6 +772,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
 
                   <modules>
                     <module>module1</module>

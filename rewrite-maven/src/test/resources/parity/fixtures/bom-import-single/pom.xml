@@ -1,0 +1,32 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>bom-import-app</artifactId>
+    <version>1</version>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.parity</groupId>
+                <artifactId>bom</artifactId>
+                <version>1.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.parity</groupId>
+                <artifactId>defined-c</artifactId>
+                <version>1.5</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>managed-a</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>defined-c</artifactId>
+        </dependency>
+    </dependencies>
+</project>

@@ -421,6 +421,7 @@ class AddPluginTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <build>
                   <plugins>
                   </plugins>
@@ -432,6 +433,7 @@ class AddPluginTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <build>
                   <plugins>
                     <plugin>
@@ -476,6 +478,7 @@ class AddPluginTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
@@ -492,6 +495,7 @@ class AddPluginTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
+                <packaging>pom</packaging>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>

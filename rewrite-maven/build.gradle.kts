@@ -27,6 +27,14 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
+    // The shaded Maven-resolver/model-builder engine. Consume its `shadowRuntimeElements` variant (the fat jar,
+    // `bundling=shadowed`) rather than the plain project() dependency: a plain project() resolves the engine's
+    // classes-directory secondary variant, which holds only the engine's own classes (referencing the UN-relocated
+    // org.eclipse.aether.* stack) and none of the relocated org.openrewrite.maven.engine.shaded.* types the adapters
+    // compile against. shadowRuntimeElements is jar-only (no classes-directory secondary variant), so the relocated
+    // stack lands on both the compile and runtime classpaths.
+    implementation(project(path = ":rewrite-maven-engine", configuration = "shadowRuntimeElements"))
+
     compileOnly("org.rocksdb:rocksdbjni:10.2.1")
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))
@@ -69,6 +77,11 @@ tasks.register<JavaExec>("generateAntlrSources") {
 
 tasks.withType<Test>().configureEach {
     jvmArgs("-Djava.util.logging.config.file=${file("src/test/resources/logging.properties").absolutePath}")
+    // Forward the dev/CI resolution-engine selector to the forked test JVM (Gradle does not by default), so
+    // `-Dorg.openrewrite.maven.resolution.engine=shadow ./gradlew :rewrite-maven:test` reaches ResolutionEngineSelector.
+    System.getProperty("org.openrewrite.maven.resolution.engine")?.let {
+        systemProperty("org.openrewrite.maven.resolution.engine", it)
+    }
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -87,6 +100,8 @@ tasks.withType<Javadoc>().configureEach {
 
 configure<LicenseExtension> {
     excludePatterns.add("**/unresolvable.txt")
+    // Parity fixtures and serialized-LST payloads are verbatim test data; a header breaks them
+    excludePatterns.add("**/parity/**")
 }
 
 tasks.register<JavaExec>("generateRecipeMarketplace") {

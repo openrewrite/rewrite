@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
@@ -310,6 +311,9 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                         }
                     } catch (MavenDownloadingException e) {
                         acc.scannerException = e;
+                    } catch (MavenParsingException e) {
+                        // The new parent may no longer manage versions this pom relies on, which fails model
+                        // validation here but is repaired by the visitor's managed-version retention after editing.
                     }
                 }
                 return document;

@@ -19,14 +19,19 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.engine.PomXmlRegistry;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.emptyList;
@@ -138,12 +143,38 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(emptyList());
         }
 
+        // Re-read each profile's <properties> from the document so a recipe that edits a profile property (e.g.
+        // ChangePropertyValue in a <profile>) doesn't leave the re-resolved model's profile properties stale.
+        List<Xml.Tag> profileTags = document.getRoot().getChild("profiles")
+                .map(ps -> ps.getChildren("profile")).orElse(emptyList());
+        if (!requested.getProfiles().isEmpty() && !profileTags.isEmpty()) {
+            requested = requested.withProfiles(ListUtils.map(requested.getProfiles(), profile -> {
+                for (Xml.Tag profileTag : profileTags) {
+                    if (Objects.equals(profileTag.getChildValue("id").orElse(null), profile.getId())) {
+                        Map<String, String> profileProperties = new LinkedHashMap<>();
+                        profileTag.getChild("properties").ifPresent(pt -> {
+                            for (Xml.Tag propertyTag : pt.getChildren()) {
+                                profileProperties.put(propertyTag.getName(), propertyTag.getValue().orElse(""));
+                            }
+                        });
+                        return profile.withProperties(profileProperties);
+                    }
+                }
+                return profile;
+            }));
+        }
+
         try {
             Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
             Path sourcePath = requested.getSourcePath();
             if (sourcePath != null) {
                 projectPoms.put(sourcePath, requested);
             }
+            // XML-first re-resolution: feed the engine the mutated document's current bytes and bump the reactor epoch
+            // so any GAV-keyed engine cache re-reads them (DESIGN §5.5). Inert unless the maven/shadow engine is active.
+            PomXmlRegistry.put(ctx, requested, document.printAll().getBytes(StandardCharsets.UTF_8));
+            PomXmlRegistry.setInjectedProperties(ctx, resolutionResult.getUserProperties());
+            PomXmlRegistry.bumpEpoch(ctx);
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     projectPoms);
             markDirtyForAmbiguityRecipes(ctx, document, updated);
@@ -151,6 +182,11 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
+        } catch (MavenParsingException e) {
+            // A recipe's intermediate edit can leave the document transiently invalid under Maven's model
+            // validation (e.g. a managed version renamed before its dependency); keep the previous resolution
+            // and let the update after the completing edit re-resolve.
+            return document;
         }
     }
 
@@ -207,7 +243,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
                             return updateResult(ctx, module, projectPoms);
-                        } catch (MavenDownloadingExceptions e) {
+                        } catch (MavenDownloadingExceptions | MavenParsingException e) {
                             return module;
                         }
                     }))

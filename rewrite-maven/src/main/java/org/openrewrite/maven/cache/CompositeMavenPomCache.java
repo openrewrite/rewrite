@@ -87,6 +87,25 @@ public class CompositeMavenPomCache implements MavenPomCache {
     }
 
     @Override
+    public @Nullable Optional<byte[]> getPomBytes(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
+        Optional<byte[]> l1b = l1.getPomBytes(gav);
+        if (l1b != null) {
+            return l1b;
+        }
+        Optional<byte[]> l2b = l2.getPomBytes(gav);
+        if (l2b != null && l2b.isPresent()) {
+            l1.putPomBytes(gav, l2b.get());
+        }
+        return l2b;
+    }
+
+    @Override
+    public void putPomBytes(ResolvedGroupArtifactVersion gav, byte @Nullable [] bytes) {
+        l1.putPomBytes(gav, bytes);
+        l2.putPomBytes(gav, bytes);
+    }
+
+    @Override
     public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         Optional<MavenRepository> l1r = l1.getNormalizedRepository(repository);
         if(l1r != null) {

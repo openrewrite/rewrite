@@ -1,0 +1,13 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.parity</groupId>
+    <artifactId>managed-a</artifactId>
+    <version>2.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.parity</groupId>
+            <artifactId>managed-b</artifactId>
+            <version>2.0</version>
+        </dependency>
+    </dependencies>
+</project>

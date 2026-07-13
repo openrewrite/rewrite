@@ -88,6 +88,7 @@ class ManageDependenciesTest implements RewriteTest {
               <groupId>com.othercompany.app</groupId>
               <artifactId>my-parent-app</artifactId>
               <version>1</version>
+              <packaging>pom</packaging>
               <dependencyManagement>
                   <dependencies>
                       <dependency>
@@ -202,6 +203,7 @@ class ManageDependenciesTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>project</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>core</module>
                       <module>api</module>
@@ -214,6 +216,7 @@ class ManageDependenciesTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>project</artifactId>
                   <version>1</version>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>core</module>
                       <module>api</module>
@@ -243,6 +246,7 @@ class ManageDependenciesTest implements RewriteTest {
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>api</artifactId>
                         <version>1</version>
+                        <packaging>pom</packaging>
                     </project>
                 """
             )
@@ -316,6 +320,7 @@ class ManageDependenciesTest implements RewriteTest {
                   <groupId>com.managed.test</groupId>
                   <artifactId>a</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <parent>
                       <groupId>com.fasterxml.jackson</groupId>
                       <artifactId>jackson-parent</artifactId>
@@ -329,6 +334,7 @@ class ManageDependenciesTest implements RewriteTest {
                   <groupId>com.managed.test</groupId>
                   <artifactId>a</artifactId>
                   <version>1.0.0</version>
+                  <packaging>pom</packaging>
                   <parent>
                       <groupId>com.fasterxml.jackson</groupId>
                       <artifactId>jackson-parent</artifactId>
