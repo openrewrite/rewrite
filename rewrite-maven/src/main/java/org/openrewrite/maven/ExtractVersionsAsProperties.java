@@ -82,25 +82,25 @@ public class ExtractVersionsAsProperties extends Recipe {
 
         PropertyResolver(Xml.Tag root) {
             Map<String, String> existingProps = loadExistingProperties(root);
-            this.groupSharedVersion = GroupVersionAnalyzer.analyze(root, existingProps);
-            this.groupExistingProperty = GroupVersionAnalyzer.existingSharedProperties(root, groupSharedVersion, existingProps);
+            this.groupSharedVersion = analyze(root, existingProps);
+            this.groupExistingProperty = existingSharedProperties(root, groupSharedVersion, existingProps);
             this.propertyKeyToVersion.putAll(existingProps);
         }
 
         private static Map<String, String> loadExistingProperties(Xml.Tag root) {
             return root.getChild("properties")
-                .map(PropertyResolver::collectPropertiesFrom)
-                .orElseGet(LinkedHashMap::new);
+                    .map(PropertyResolver::collectPropertiesFrom)
+                    .orElseGet(LinkedHashMap::new);
         }
 
         private static Map<String, String> collectPropertiesFrom(Xml.Tag propsTag) {
             return propsTag.getChildren().stream()
-                .filter(child -> child.getValue().isPresent())
-                .collect(toMap(
-                    Xml.Tag::getName,
-                    child -> child.getValue().get(),
-                    (a, b) -> a,
-                    LinkedHashMap::new));
+                    .filter(child -> child.getValue().isPresent())
+                    .collect(toMap(
+                            Xml.Tag::getName,
+                            child -> child.getValue().get(),
+                            (a, b) -> a,
+                            LinkedHashMap::new));
         }
 
         static boolean isPropertyRef(String version) {
@@ -121,8 +121,8 @@ public class ExtractVersionsAsProperties extends Recipe {
                 }
             }
             String baseKey = groupId != null && groupSharedVersion.containsKey(groupId)
-                ? groupId + ".version"
-                : artifactId + ".version";
+                    ? groupId + ".version"
+                    : artifactId + ".version";
             String key = baseKey;
             int suffix = 1;
             while (propertyKeyToVersion.containsKey(key) && !propertyKeyToVersion.get(key).equals(version)) {
@@ -131,54 +131,52 @@ public class ExtractVersionsAsProperties extends Recipe {
             propertyKeyToVersion.put(key, version);
             return key;
         }
-    }
 
-    private static class GroupVersionAnalyzer {
         // Returns groupId → version for groups where every dep with a resolvable version shares the same version.
         static Map<String, String> analyze(Xml.Tag root, Map<String, String> existingProps) {
             return allDescendants(root)
-                .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
-                .filter(tag -> tag.getChildValue("groupId").isPresent())
-                .collect(groupingBy(
-                    tag -> tag.getChildValue("groupId").get(),
-                    toList()))
-                .entrySet().stream()
-                .flatMap(groupEntry -> toSharedVersionEntry(groupEntry, existingProps))
-                .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
+                    .filter(tag -> tag.getChildValue("groupId").isPresent())
+                    .collect(groupingBy(
+                            tag -> tag.getChildValue("groupId").get(),
+                            toList()))
+                    .entrySet().stream()
+                    .flatMap(groupEntry -> toSharedVersionEntry(groupEntry, existingProps))
+                    .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
 
         // For each shared-version group, the existing local property already referenced by one of its members,
         // so a newly-extracted sibling can reuse that name instead of minting a new group-standard one.
         static Map<String, String> existingSharedProperties(
-            Xml.Tag root, Map<String, String> groupSharedVersion, Map<String, String> existingProps) {
+                Xml.Tag root, Map<String, String> groupSharedVersion, Map<String, String> existingProps) {
             Map<String, String> result = new LinkedHashMap<>();
             allDescendants(root)
-                .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
-                .forEach(tag -> {
-                    String groupId = tag.getChildValue("groupId").orElse(null);
-                    if (groupId == null || result.containsKey(groupId) || !groupSharedVersion.containsKey(groupId)) {
-                        return;
-                    }
-                    String version = tag.getChild("version").flatMap(Xml.Tag::getValue).orElse(null);
-                    if (version == null || !PropertyResolver.isPropertyRef(version)) {
-                        return;
-                    }
-                    List<String> placeholders = ResolvedPom.placeholderHelper.getPlaceholders(version);
-                    if (placeholders.size() == 1 && groupSharedVersion.get(groupId).equals(existingProps.get(placeholders.get(0)))) {
-                        result.put(groupId, placeholders.get(0));
-                    }
-                });
+                    .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
+                    .forEach(tag -> {
+                        String groupId = tag.getChildValue("groupId").orElse(null);
+                        if (groupId == null || result.containsKey(groupId) || !groupSharedVersion.containsKey(groupId)) {
+                            return;
+                        }
+                        String version = tag.getChild("version").flatMap(Xml.Tag::getValue).orElse(null);
+                        if (version == null || !PropertyResolver.isPropertyRef(version)) {
+                            return;
+                        }
+                        List<String> placeholders = ResolvedPom.placeholderHelper.getPlaceholders(version);
+                        if (placeholders.size() == 1 && groupSharedVersion.get(groupId).equals(existingProps.get(placeholders.get(0)))) {
+                            result.put(groupId, placeholders.get(0));
+                        }
+                    });
             return result;
         }
 
         private static Stream<Map.Entry<String, String>> toSharedVersionEntry(
-            Map.Entry<String, List<Xml.Tag>> groupEntry, Map<String, String> existingProps) {
+                Map.Entry<String, List<Xml.Tag>> groupEntry, Map<String, String> existingProps) {
             List<String> resolvedVersions = groupEntry.getValue().stream()
-                .map(tag -> tag.getChild("version").flatMap(Xml.Tag::getValue).orElse(null))
-                .filter(Objects::nonNull)
-                .map(v -> PropertyResolver.resolveToLiteral(v, existingProps))
-                .filter(Objects::nonNull)
-                .collect(toList());
+                    .map(tag -> tag.getChild("version").flatMap(Xml.Tag::getValue).orElse(null))
+                    .filter(Objects::nonNull)
+                    .map(v -> PropertyResolver.resolveToLiteral(v, existingProps))
+                    .filter(Objects::nonNull)
+                    .collect(toList());
             if (resolvedVersions.size() > 1 && new HashSet<>(resolvedVersions).size() == 1) {
                 return Stream.of(new AbstractMap.SimpleEntry<>(groupEntry.getKey(), resolvedVersions.get(0)));
             }
