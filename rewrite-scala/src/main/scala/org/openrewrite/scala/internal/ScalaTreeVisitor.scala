@@ -6359,7 +6359,6 @@ class ScalaTreeVisitor(
                 if (commaIdx >= 0) {
                   trailingCommaFound = true
                   cursor = cursor + commaIdx + 1
-                  val afterCursor = cursor
                   Space.format(s.substring(commaIdx + 1, closeIdx))
                 } else {
                   Space.format(s.substring(0, closeIdx))
@@ -9813,13 +9812,14 @@ class ScalaTreeVisitor(
       if (funcEnd >= cursor && funcEnd <= source.length) cursor = funcEnd
     }
 
-    for (i <- func.args.indices) {
-      val param = func.args(i)
+    val effectiveArgs = stripTrailingCommaArtifact(func.args)
+    for (i <- effectiveArgs.indices) {
+      val param = effectiveArgs(i)
 
       // For parameters after the first, we need to handle the comma and space
       if (i > 0) {
         // Look for comma between previous and current parameter
-        val prevParam = func.args(i - 1)
+        val prevParam = effectiveArgs(i - 1)
         val prevEnd = prevParam.span.end - offsetAdjustment
         val currentStart = param.span.start - offsetAdjustment
 
@@ -9841,7 +9841,8 @@ class ScalaTreeVisitor(
 
       // Extract space after the parameter (before comma or closing paren)
       var afterSpace = Space.EMPTY
-      if (i < func.args.length - 1) {
+      var trailingCommaFound = false
+      if (i < effectiveArgs.length - 1) {
         // Not the last parameter, space before comma
         val currentEnd = param.span.end - offsetAdjustment
         if (currentEnd >= cursor) {
@@ -9856,7 +9857,8 @@ class ScalaTreeVisitor(
           }
         }
       } else {
-        // Last parameter — when parenthesized, capture whitespace before `)`.
+        // Last parameter — when parenthesized, capture whitespace before `)`,
+        // handling a possible trailing comma.
         val paramEnd = param.span.end - offsetAdjustment
         if (paramEnd >= cursor) {
           cursor = paramEnd
@@ -9864,13 +9866,20 @@ class ScalaTreeVisitor(
         if (hasParentheses) {
           val closeParen = positionOfNext(")", cursor)
           if (closeParen >= cursor && closeParen < source.length) {
+            val between = source.substring(cursor, closeParen)
+            val commaIdx = positionOfNextIn(between, ",", 0)
+            if (commaIdx >= 0) {
+              trailingCommaFound = true
+              cursor = cursor + commaIdx + 1
+            }
             afterSpace = ScalaSpace.format(source, cursor, closeParen)
             cursor = closeParen
           }
         }
       }
 
-      params.add(JRightPadded.build(paramTree).withAfter(afterSpace))
+      val paramMarkers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+      params.add(new JRightPadded(paramTree, afterSpace, paramMarkers))
     }
     
     // Update parameters with the actual params

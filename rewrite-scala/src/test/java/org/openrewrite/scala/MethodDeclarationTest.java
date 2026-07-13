@@ -981,4 +981,62 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingCommaInParameters() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(
+                x: Int,
+                y: Int,
+              ): Int = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInParametersSingleLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Int,): Int = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInTypeParameters() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo[
+                A,
+                B,
+              ](x: A): A = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInTypeParametersSingleLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo[A,](x: A): A = x
+            }
+            """
+          )
+        );
+    }
 }

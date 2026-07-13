@@ -572,6 +572,31 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void classWithTrailingCommaInTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[
+                    A,
+                    B,
+                ](x: A)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaInTypeParametersSingleLine() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[A,](x: A)
+                """
+            )
+        );
+    }
+
+    @Test
     void colonBodyWithTrailingCommentAfterColon() {
         rewriteRun(
             scala(
