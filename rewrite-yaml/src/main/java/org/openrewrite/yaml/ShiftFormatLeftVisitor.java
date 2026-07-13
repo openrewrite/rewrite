@@ -64,9 +64,7 @@ public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
         return s;
     }
 
-    // The body region of a block scalar carries its own indent inside Yaml.Scalar.value; each body
-    // line and the trailing whitespace bounding the next sibling must be dedented in step with the
-    // surrounding mapping entries' prefixes.
+    // A block scalar's body indent lives inside Yaml.Scalar.value and must dedent in step with the surrounding entry prefixes.
     private String shiftBlockBody(String body) {
         return String.join("\n", ListUtils.map(Arrays.asList(body.split("\\n", -1)), (index, s) -> {
             int nonWs = StringUtils.indexOfNonWhitespace(s);
