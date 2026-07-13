@@ -1915,7 +1915,7 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	prefix := ctx.prefix(lit.Pos())
 	ctx.skip(len(lit.Value))
 
-	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: lit.Value, Source: lit.Value}
+	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
 
 	// Type attribution for literal
 	if tv, ok := ctx.typeInfo.Types[lit]; ok {
@@ -1923,6 +1923,24 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	}
 
 	return l
+}
+
+func decodeBasicLitValue(lit *ast.BasicLit) any {
+	switch lit.Kind {
+	case token.STRING, token.CHAR:
+		if unquoted, err := strconv.Unquote(lit.Value); err == nil {
+			return unquoted
+		}
+	case token.INT:
+		if i, err := strconv.ParseInt(lit.Value, 0, 64); err == nil {
+			return i
+		}
+	case token.FLOAT:
+		if f, err := strconv.ParseFloat(lit.Value, 64); err == nil {
+			return f
+		}
+	}
+	return lit.Value
 }
 
 // hoistLeftPrefix detaches the leading whitespace from a node's first child
