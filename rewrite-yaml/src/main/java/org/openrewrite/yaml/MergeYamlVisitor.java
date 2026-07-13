@@ -23,12 +23,16 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.yaml.MergeYaml.InsertMode;
+import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -119,6 +123,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         if (existing.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
             Yaml.Mapping mapping = mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
 
+            Map<UUID, BoundaryRepair> repairs = getCursor().pollMessage(SIBLING_BOUNDARY_REPAIR);
+            if (repairs != null) {
+                mapping = applySiblingBoundaryRepair(mapping, repairs);
+            }
+
             if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                 List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) getCursor().getValue()).getEntries();
                 return mapping.withEntries(mapLast(mapping.getEntries(), it ->
@@ -128,6 +137,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return mapping;
         }
         return super.visitMapping(existingMapping, p);
+    }
+
+    private Yaml.Mapping applySiblingBoundaryRepair(Yaml.Mapping mapping, Map<UUID, BoundaryRepair> repairs) {
+        List<Yaml.Mapping.Entry> patched = new ArrayList<>(mapping.getEntries());
+        String lineBreak = linebreak();
+        for (int i = 0; i < patched.size() - 1; i++) {
+            if (repairs.get(patched.get(i).getId()) == BoundaryRepair.BLOCK_TO_PLAIN) {
+                Yaml.Mapping.Entry next = patched.get(i + 1);
+                if (!next.getPrefix().startsWith("\n") && !next.getPrefix().startsWith("\r")) {
+                    patched.set(i + 1, next.withPrefix(lineBreak + next.getPrefix()));
+                }
+            }
+        }
+        return mapping.withEntries(patched);
     }
 
     private static boolean keyMatches(Yaml.Mapping.@Nullable Entry e1, Yaml.Mapping.@Nullable Entry e2) {
@@ -388,10 +411,48 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
-        String s1 = y1.getValue();
-        String s2 = y2.getValue();
-        return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
+        BlockScalar.Matcher matcher = new BlockScalar.Matcher();
+        BlockScalar existingBs = matcher.get(new Cursor(null, y1)).orElse(null);
+        BlockScalar incomingBs = matcher.get(new Cursor(null, y2)).orElse(null);
+        String s1 = existingBs != null ? existingBs.getBody() : y1.getValue();
+        String s2 = incomingBs != null ? incomingBs.getBody() : y2.getValue();
+        if (s1.equals(s2) && y1.getStyle() == y2.getStyle() || acceptTheirs) {
+            return y1;
+        }
+        // Adopt the incoming scalar's format.
+        if (incomingBs != null) {
+            if (existingBs != null && y1.getStyle() == y2.getStyle()) {
+                return existingBs.withBody(s2);
+            }
+            recordBoundaryRepair(BoundaryRepair.PLAIN_TO_BLOCK);
+            return y1.withStyle(y2.getStyle()).withValue(y2.getValue());
+        }
+        if (existingBs != null) {
+            recordBoundaryRepair(BoundaryRepair.BLOCK_TO_PLAIN);
+        }
+        return y1.withStyle(y2.getStyle()).withValue(y2.getValue());
     }
+
+    private enum BoundaryRepair { BLOCK_TO_PLAIN, PLAIN_TO_BLOCK }
+
+    private void recordBoundaryRepair(BoundaryRepair repair) {
+        Cursor entryCursor = getCursor().dropParentUntil(v -> v == ROOT_VALUE || v instanceof Yaml.Mapping.Entry);
+        if (!(entryCursor.getValue() instanceof Yaml.Mapping.Entry)) {
+            return;
+        }
+        Cursor mappingCursor = entryCursor.dropParentUntil(v -> v == ROOT_VALUE || v instanceof Yaml.Mapping);
+        if (!(mappingCursor.getValue() instanceof Yaml.Mapping)) {
+            return;
+        }
+        Map<UUID, BoundaryRepair> repairs = mappingCursor.getMessage(SIBLING_BOUNDARY_REPAIR);
+        if (repairs == null) {
+            repairs = new HashMap<>();
+            mappingCursor.putMessage(SIBLING_BOUNDARY_REPAIR, repairs);
+        }
+        repairs.put(((Yaml.Mapping.Entry) entryCursor.getValue()).getId(), repair);
+    }
+
+    private static final String SIBLING_BOUNDARY_REPAIR = "org.openrewrite.yaml.MergeYamlVisitor.siblingBoundaryRepair";
 
     /**
      * Specialized concatAll function which takes the `insertPlace` property into account.
