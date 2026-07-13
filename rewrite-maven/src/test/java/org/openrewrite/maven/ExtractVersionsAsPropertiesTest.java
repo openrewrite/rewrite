@@ -167,7 +167,7 @@ class ExtractVersionsAsPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void renamesNonStandardPropertyToStandardGroupNameWhenOtherDepHasLiteralVersion() {
+    void reusesExistingGroupPropertyWhenOtherDepHasLiteralVersion() {
         rewriteRun(
           pomXml(
             """
@@ -198,18 +198,18 @@ class ExtractVersionsAsPropertiesTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1.0.0</version>
                 <properties>
-                  <org.springframework.version>5.3.0</org.springframework.version>
+                  <spring.version>5.3.0</spring.version>
                 </properties>
                 <dependencies>
                   <dependency>
                     <groupId>org.springframework</groupId>
                     <artifactId>spring-core</artifactId>
-                    <version>${org.springframework.version}</version>
+                    <version>${spring.version}</version>
                   </dependency>
                   <dependency>
                     <groupId>org.springframework</groupId>
                     <artifactId>spring-context</artifactId>
-                    <version>${org.springframework.version}</version>
+                    <version>${spring.version}</version>
                   </dependency>
                 </dependencies>
               </project>
@@ -776,7 +776,7 @@ class ExtractVersionsAsPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void doesNotRenameInheritedSpringBootPropertyToGroupStandardName() {
+    void doesNotTouchDependenciesSharingAnInheritedProperty() {
         rewriteRun(
           pomXml(
             """
