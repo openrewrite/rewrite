@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -118,7 +119,7 @@ public class ExtractVersionsAsProperties extends Recipe {
             return version;
         }
 
-        String resolvePropertyKey(String groupId, String artifactId, String version) {
+        String resolvePropertyKey(@Nullable String groupId, String artifactId, String version) {
             if (groupId != null) {
                 String existingKey = groupExistingProperty.get(groupId);
                 if (existingKey != null && version.equals(propertyKeyToVersion.get(existingKey))) {
