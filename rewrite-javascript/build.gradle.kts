@@ -142,6 +142,11 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
+    // -PverboseTests switches vitest to its full per-test reporter (see vitest.config.mts)
+    if (project.hasProperty("verboseTests")) {
+        environment.put("VERBOSE_TESTS", "1")
+    }
+
     args = listOf("run", "ci:test")
 }
 

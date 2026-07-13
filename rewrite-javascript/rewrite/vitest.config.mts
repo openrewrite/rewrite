@@ -10,8 +10,9 @@ export default defineConfig({
         testTimeout: 60_000,
         include: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],
         exclude: ['**/node_modules/**', '**/dist/**'],
+        // VERBOSE_TESTS (Gradle: -PverboseTests) restores the full per-test reporter
         reporters: [
-            'default',
+            process.env.VERBOSE_TESTS ? 'default' : 'dot',
             ['junit', {
                 outputFile: './build/test-results/vitest/junit.xml',
                 classname: '{classname}',
