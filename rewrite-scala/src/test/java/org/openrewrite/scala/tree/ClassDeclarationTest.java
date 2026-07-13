@@ -572,6 +572,17 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void classWithTrailingCommaAndWhitespaceBeforeComma() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int ,)
+                """
+            )
+        );
+    }
+
+    @Test
     void classWithTrailingCommaInTypeParameters() {
         rewriteRun(
             scala(

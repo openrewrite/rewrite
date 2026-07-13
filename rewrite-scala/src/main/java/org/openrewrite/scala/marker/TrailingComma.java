@@ -15,6 +15,10 @@
  */
 package org.openrewrite.scala.marker;
 
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.Tree;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -23,21 +27,18 @@ import java.util.UUID;
  * Marks a constructor parameter (or other comma-separated element) that was
  * followed by a trailing comma in the source. The printer emits a {@code ,}
  * after the marked element even though it is the last in its list.
+ * <p>
+ * {@code prefix} holds the whitespace between the element and the trailing
+ * comma (e.g. the space in {@code (x: Int ,)}); the whitespace after the comma
+ * is stored in the element's own right-padding.
  */
+@Value
+@With
 public class TrailingComma implements Marker {
-    private final UUID id;
+    UUID id;
+    Space prefix;
 
-    public TrailingComma(UUID id) {
-        this.id = id;
-    }
-
-    @Override
-    public UUID getId() {
-        return id;
-    }
-
-    @Override
-    public TrailingComma withId(UUID id) {
-        return new TrailingComma(id);
+    public static TrailingComma create(Space prefix) {
+        return new TrailingComma(Tree.randomId(), prefix);
     }
 }

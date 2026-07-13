@@ -5042,7 +5042,7 @@ class ScalaTreeVisitor(
         effectiveTypeParams.zipWithIndex.foreach { case (tparam, idx) =>
           val jTypeParam = visitTypeParameter(tparam)
           val isLast = idx == effectiveTypeParams.size - 1
-          var trailingCommaFound = false
+          var trailingCommaPrefix: Space = null
 
           val afterParam: Space = if (!isLast && cursor < source.length) {
             val commaPos = positionOfNext(",", cursor)
@@ -5057,7 +5057,7 @@ class ScalaTreeVisitor(
               val betweenStr = source.substring(cursor, closePos)
               val commaIdx = positionOfNextIn(betweenStr, ",", 0)
               if (commaIdx >= 0) {
-                trailingCommaFound = true
+                trailingCommaPrefix = Space.format(betweenStr.substring(0, commaIdx))
                 cursor = cursor + commaIdx + 1
                 ScalaSpace.format(source, cursor, closePos)
               } else {
@@ -5066,7 +5066,7 @@ class ScalaTreeVisitor(
             } else Space.EMPTY
           } else Space.EMPTY
 
-          val markers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+          val markers = if (trailingCommaPrefix != null) Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix)) else Markers.EMPTY
           jTypeParams.add(new JRightPadded(jTypeParam, afterParam, markers))
         }
         
@@ -5108,11 +5108,7 @@ class ScalaTreeVisitor(
     }
 
     val primaryConstructor: JContainer[Statement] = if (ctorParenPos >= 0) {
-      val rawParams = firstValueParamList.getOrElse(Nil)
-      val params = if (rawParams.nonEmpty) {
-        val lastName = rawParams.last.name.toString
-        if (lastName.isEmpty || lastName.startsWith("<")) rawParams.init else rawParams
-      } else rawParams
+      val params = stripTrailingCommaArtifact(firstValueParamList.getOrElse(Nil))
       val parenSpace = ScalaSpace.format(source, cursor, ctorParenPos)
       cursor = ctorParenPos + 1
 
@@ -5123,7 +5119,7 @@ class ScalaTreeVisitor(
         val paramEnd = if (vd.span.exists) Math.max(0, vd.span.end - offsetAdjustment) else cursor
         cursor = Math.max(cursor, paramEnd)
 
-        var trailingCommaFound = false
+        var trailingCommaPrefix: Space = null
         val afterParam: Space = if (!isLast) {
           val nextParamStart = if (params(idx + 1).span.exists) Math.max(0, params(idx + 1).span.start - offsetAdjustment) else cursor
           if (cursor < nextParamStart && nextParamStart <= source.length) {
@@ -5145,7 +5141,7 @@ class ScalaTreeVisitor(
               val between = remaining.substring(0, closeParen)
               val commaIdx = positionOfNextIn(between, ",", 0)
               if (commaIdx >= 0) {
-                trailingCommaFound = true
+                trailingCommaPrefix = Space.format(between.substring(0, commaIdx))
                 cursor = cursor + commaIdx + 1
                 Space.format(between.substring(commaIdx + 1))
               } else {
@@ -5154,8 +5150,8 @@ class ScalaTreeVisitor(
             } else Space.EMPTY
           } else Space.EMPTY
         }
-        val paramMarkers = if (trailingCommaFound) {
-          Markers.EMPTY.add(new TrailingComma(Tree.randomId()))
+        val paramMarkers = if (trailingCommaPrefix != null) {
+          Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix))
         } else {
           Markers.EMPTY
         }
@@ -6341,7 +6337,7 @@ class ScalaTreeVisitor(
         effectiveTypeParams.zipWithIndex.foreach { case (tp, idx) =>
           val jtp = visitTypeParameter(tp)
           val isLast = idx == effectiveTypeParams.size - 1
-          var trailingCommaFound = false
+          var trailingCommaPrefix: Space = null
           val afterParam = if (cursor < source.length) {
             if (!isLast) {
               val s = source.substring(cursor, Math.min(cursor + 200, source.length))
@@ -6357,7 +6353,7 @@ class ScalaTreeVisitor(
                 val betweenStr = s.substring(0, closeIdx)
                 val commaIdx = positionOfNextIn(betweenStr, ",", 0)
                 if (commaIdx >= 0) {
-                  trailingCommaFound = true
+                  trailingCommaPrefix = Space.format(betweenStr.substring(0, commaIdx))
                   cursor = cursor + commaIdx + 1
                   Space.format(s.substring(commaIdx + 1, closeIdx))
                 } else {
@@ -6366,7 +6362,7 @@ class ScalaTreeVisitor(
               } else Space.EMPTY
             }
           } else Space.EMPTY
-          val markers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+          val markers = if (trailingCommaPrefix != null) Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix)) else Markers.EMPTY
           jTypeParams.add(new JRightPadded(jtp, afterParam, markers))
         }
 
@@ -6391,7 +6387,7 @@ class ScalaTreeVisitor(
       params.zipWithIndex.foreach { case (vd, idx) =>
         val param = visitMethodParameter(vd)
         val isLast = idx == params.size - 1
-        var trailingCommaFound = false
+        var trailingCommaPrefix: Space = null
         val afterParam = if (!isLast) {
           val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
           cursor = Math.max(cursor, paramEnd)
@@ -6415,7 +6411,7 @@ class ScalaTreeVisitor(
               val betweenStr = remaining.substring(0, closeParen)
               val commaIdx = positionOfNextIn(betweenStr, ",", 0)
               if (commaIdx >= 0) {
-                trailingCommaFound = true
+                trailingCommaPrefix = Space.format(betweenStr.substring(0, commaIdx))
                 cursor = lookupStart + commaIdx + 1
                 Space.format(betweenStr.substring(commaIdx + 1))
               } else {
@@ -6424,7 +6420,7 @@ class ScalaTreeVisitor(
             } else Space.EMPTY
           } else Space.EMPTY
         }
-        val markers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+        val markers = if (trailingCommaPrefix != null) Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix)) else Markers.EMPTY
         jParams.add(new JRightPadded(param.asInstanceOf[J], afterParam, markers))
       }
 
@@ -6477,7 +6473,7 @@ class ScalaTreeVisitor(
         effectiveFirstList.zipWithIndex.foreach { case (vd, idx) =>
           val param = visitMethodParameter(vd)
           val isLast = idx == effectiveFirstList.size - 1
-          var trailingCommaFound = false
+          var trailingCommaPrefix: Space = null
           val afterParam = if (!isLast) {
             val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
             cursor = Math.max(cursor, paramEnd)
@@ -6501,7 +6497,7 @@ class ScalaTreeVisitor(
                 val betweenStr = remaining.substring(0, closeParen)
                 val commaIdx = positionOfNextIn(betweenStr, ",", 0)
                 if (commaIdx >= 0) {
-                  trailingCommaFound = true
+                  trailingCommaPrefix = Space.format(betweenStr.substring(0, commaIdx))
                   cursor = lookupStart + commaIdx + 1
                   Space.format(betweenStr.substring(commaIdx + 1))
                 } else {
@@ -6510,7 +6506,7 @@ class ScalaTreeVisitor(
               } else Space.EMPTY
             } else Space.EMPTY
           }
-          val markers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+          val markers = if (trailingCommaPrefix != null) Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix)) else Markers.EMPTY
           jParams.add(new JRightPadded(param.asInstanceOf[Statement], afterParam, markers))
         }
         val lastParamEnd = if (effectiveFirstList.nonEmpty) Math.max(0, effectiveFirstList.last.span.end - offsetAdjustment) else cursor
@@ -7969,7 +7965,7 @@ class ScalaTreeVisitor(
       effectiveTypeParams.zipWithIndex.foreach { case (tp, idx) =>
         val jtp = visitTypeParameter(tp)
         val isLast = idx == effectiveTypeParams.size - 1
-        var trailingCommaFound = false
+        var trailingCommaPrefix: Space = null
         val afterParam = if (cursor < source.length) {
           if (!isLast) {
             val s = source.substring(cursor, Math.min(cursor + 200, source.length))
@@ -7985,7 +7981,7 @@ class ScalaTreeVisitor(
               val betweenStr = s.substring(0, closeIdx)
               val commaIdx = positionOfNextIn(betweenStr, ",", 0)
               if (commaIdx >= 0) {
-                trailingCommaFound = true
+                trailingCommaPrefix = Space.format(betweenStr.substring(0, commaIdx))
                 cursor = cursor + commaIdx + 1
                 Space.format(s.substring(commaIdx + 1, closeIdx))
               } else {
@@ -7994,7 +7990,7 @@ class ScalaTreeVisitor(
             } else Space.EMPTY
           }
         } else Space.EMPTY
-        val markers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+        val markers = if (trailingCommaPrefix != null) Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix)) else Markers.EMPTY
         jTypeParams.add(new JRightPadded(jtp, afterParam, markers))
       }
 
@@ -9841,7 +9837,7 @@ class ScalaTreeVisitor(
 
       // Extract space after the parameter (before comma or closing paren)
       var afterSpace = Space.EMPTY
-      var trailingCommaFound = false
+      var trailingCommaPrefix: Space = null
       if (i < effectiveArgs.length - 1) {
         // Not the last parameter, space before comma
         val currentEnd = param.span.end - offsetAdjustment
@@ -9869,7 +9865,7 @@ class ScalaTreeVisitor(
             val between = source.substring(cursor, closeParen)
             val commaIdx = positionOfNextIn(between, ",", 0)
             if (commaIdx >= 0) {
-              trailingCommaFound = true
+              trailingCommaPrefix = Space.format(between.substring(0, commaIdx))
               cursor = cursor + commaIdx + 1
             }
             afterSpace = ScalaSpace.format(source, cursor, closeParen)
@@ -9878,7 +9874,7 @@ class ScalaTreeVisitor(
         }
       }
 
-      val paramMarkers = if (trailingCommaFound) Markers.EMPTY.add(new TrailingComma(Tree.randomId())) else Markers.EMPTY
+      val paramMarkers = if (trailingCommaPrefix != null) Markers.EMPTY.add(TrailingComma.create(trailingCommaPrefix)) else Markers.EMPTY
       params.add(new JRightPadded(paramTree, afterSpace, paramMarkers))
     }
     

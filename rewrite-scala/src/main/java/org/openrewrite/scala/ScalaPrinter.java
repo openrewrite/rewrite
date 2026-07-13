@@ -89,7 +89,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             JRightPadded<? extends J> node = nodes.get(i);
             visit(node.getElement(), p);
             boolean isLast = i == nodes.size() - 1;
-            if (isLast && node.getMarkers().findFirst(TrailingComma.class).isPresent()) {
+            Optional<TrailingComma> trailingComma = isLast ? node.getMarkers().findFirst(TrailingComma.class) : Optional.empty();
+            if (trailingComma.isPresent()) {
+                visitSpace(trailingComma.get().getPrefix(), location.getAfterLocation(), p);
                 p.append(suffixBetween);
                 visitSpace(node.getAfter(), location.getAfterLocation(), p);
                 visitMarkers(node.getMarkers(), p);
@@ -110,7 +112,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
      * that don't go through {@link #visitRightPadded}.
      */
     private void visitListElementSuffix(JRightPadded<? extends J> node, boolean isLast, Space.Location afterLocation, PrintOutputCapture<P> p) {
-        if (isLast && node.getMarkers().findFirst(TrailingComma.class).isPresent()) {
+        Optional<TrailingComma> trailingComma = isLast ? node.getMarkers().findFirst(TrailingComma.class) : Optional.empty();
+        if (trailingComma.isPresent()) {
+            visitSpace(trailingComma.get().getPrefix(), afterLocation, p);
             p.append(',');
             visitSpace(node.getAfter(), afterLocation, p);
         } else {
