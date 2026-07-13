@@ -15,7 +15,6 @@
  */
 package org.openrewrite.scala.internal
 
-import scala.util.boundary
 import dotty.tools.dotc.ast.{Trees, untpd, tpd}
 import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
@@ -8339,15 +8338,17 @@ class ScalaTreeVisitor(
     case other => List(other)
   }
 
-  private def visitIntersectionInfixType(infix: untpd.InfixOp): TypeTree = boundary {
+  private def visitIntersectionInfixType(infix: untpd.InfixOp): TypeTree = {
     val prefix = extractPrefix(infix.span)
     val parts = flattenTypeInfix(infix, "&")
     val elements = new util.ArrayList[JRightPadded[TypeTree]](parts.size)
-    for (i <- parts.indices) {
+    var i = 0
+    while (i < parts.size) {
       val tt = visitTypeTree(parts(i))
-      if (tt == null) boundary.break(ident(extractSource(infix.span), prefix))
+      if (tt == null) return ident(extractSource(infix.span), prefix)
       val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("&")
       elements.add(new JRightPadded[TypeTree](tt, afterSpace, Markers.EMPTY))
+      i += 1
     }
     updateCursor(infix.span.end)
     new J.IntersectionType(
@@ -8358,15 +8359,17 @@ class ScalaTreeVisitor(
     )
   }
 
-  private def visitUnionInfixType(infix: untpd.InfixOp): TypeTree = boundary {
+  private def visitUnionInfixType(infix: untpd.InfixOp): TypeTree = {
     val prefix = extractPrefix(infix.span)
     val parts = flattenTypeInfix(infix, "|")
     val elements = new util.ArrayList[JRightPadded[Expression]](parts.size)
-    for (i <- parts.indices) {
+    var i = 0
+    while (i < parts.size) {
       val operand = visitUnionOperand(parts(i))
-      if (operand == null) boundary.break(ident(extractSource(infix.span), prefix))
+      if (operand == null) return ident(extractSource(infix.span), prefix)
       val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("|")
       elements.add(new JRightPadded[Expression](operand, afterSpace, Markers.EMPTY))
+      i += 1
     }
     updateCursor(infix.span.end)
     S.UnionType.build(
