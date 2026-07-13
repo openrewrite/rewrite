@@ -4049,6 +4049,63 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void overwriteBlockStripOverPlainNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |-\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockClipOverPlainNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverPlainAsLastEntryNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "last: |-\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              before: head
+              last: value
+              """,
+            """
+              before: head
+              last: |-
+                line one
+                line two
+              """
+          )
+        );
+    }
+
+    @Test
     void overwriteBlockOverBlockSameStyleKeepsExistingEnvelope() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml("$", "key: >-\n  replaced\n", false, null, null, null, null, null)),
