@@ -80,11 +80,7 @@ def maybe_add_import(visitor: PythonVisitor, options: AddImportOptions) -> None:
         # Add: from typing import *
         maybe_add_import(visitor, AddImportOptions(module='typing', name='*'))
     """
-    # Names from the ``builtins`` module (e.g. ``list``, ``dict``, ``set``) are
-    # always available without an import, so ``from builtins import list`` is
-    # redundant and flagged by linters. Skip adding such imports unless an
-    # explicit alias makes the import meaningful (e.g. ``from builtins import
-    # list as _list``).
+    # builtins are always available; only import them under an explicit alias
     if options.module == 'builtins' and options.alias is None:
         return
 

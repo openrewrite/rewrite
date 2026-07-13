@@ -495,8 +495,6 @@ class TestChangeImport:
                 x: List[str] = []
                 y: Dict[str, int] = {}
                 """,
-                # 'List' dropped from the typing import and references renamed to
-                # 'list'; no 'from builtins import list' line is introduced.
                 """
                 from typing import Dict
 
