@@ -2965,7 +2965,6 @@ class ScalaTreeVisitor(
           Collections.singletonList(implicitModifier),
           null,
           null,
-          Collections.emptyList(),
           Collections.singletonList(JRightPadded.build(variable))
         )
       }
@@ -3024,7 +3023,6 @@ class ScalaTreeVisitor(
         modifiers,
         typeExpr,
         if (beforeColon != Space.EMPTY) beforeColon else null,
-        Collections.emptyList(),
         Collections.singletonList(JRightPadded.build(variable))
       )
     }
@@ -3453,7 +3451,6 @@ class ScalaTreeVisitor(
       modifiers,
       typeExpression,
       varargs, // Space before colon (repurposed from Java varargs)
-      Collections.emptyList(),
       Collections.singletonList(declarator)
     )
   }
@@ -5658,7 +5655,8 @@ class ScalaTreeVisitor(
             new JRightPadded(expr, exprAfterSpace, Markers.EMPTY),
             clazz,
             null, // pattern (not used in Scala)
-            null  // type
+            null, // type
+            null  // modifier
           )
         }
 
@@ -6781,7 +6779,6 @@ class ScalaTreeVisitor(
       paramModifiers,
       typeExpr,
       if (beforeColon != Space.EMPTY) beforeColon else null,
-      Collections.emptyList(),
       Collections.singletonList(JRightPadded.build(variable))
     )
   }
@@ -6940,7 +6937,6 @@ class ScalaTreeVisitor(
       paramModifiers,
       typeExpr,
       if (beforeColon != Space.EMPTY) beforeColon else null,
-      Collections.emptyList(),
       Collections.singletonList(JRightPadded.build(variable))
     )
   }
@@ -8066,7 +8062,7 @@ class ScalaTreeVisitor(
       val varargs: Space = if (beforeColon != Space.EMPTY) beforeColon else null
       new J.VariableDeclarations(Tree.randomId(), Space.EMPTY, markers,
         new util.ArrayList[J.Annotation](), modifiers, typeExpr, varargs,
-        Collections.emptyList(), Collections.singletonList(JRightPadded.build(namedVariable)))
+        Collections.singletonList(JRightPadded.build(namedVariable)))
     }
   }
 
@@ -8346,11 +8342,13 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(infix.span)
     val parts = flattenTypeInfix(infix, "&")
     val elements = new util.ArrayList[JRightPadded[TypeTree]](parts.size)
-    for (i <- parts.indices) {
+    var i = 0
+    while (i < parts.size) {
       val tt = visitTypeTree(parts(i))
       if (tt == null) return ident(extractSource(infix.span), prefix)
       val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("&")
       elements.add(new JRightPadded[TypeTree](tt, afterSpace, Markers.EMPTY))
+      i += 1
     }
     updateCursor(infix.span.end)
     new J.IntersectionType(
@@ -8365,11 +8363,13 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(infix.span)
     val parts = flattenTypeInfix(infix, "|")
     val elements = new util.ArrayList[JRightPadded[Expression]](parts.size)
-    for (i <- parts.indices) {
+    var i = 0
+    while (i < parts.size) {
       val operand = visitUnionOperand(parts(i))
       if (operand == null) return ident(extractSource(infix.span), prefix)
       val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("|")
       elements.add(new JRightPadded[Expression](operand, afterSpace, Markers.EMPTY))
+      i += 1
     }
     updateCursor(infix.span.end)
     S.UnionType.build(
@@ -9141,7 +9141,7 @@ class ScalaTreeVisitor(
       // Check if it starts with + or - (after stripping whitespace)
       if (stripped.startsWith("+") || stripped.startsWith("-")) {
         val variance = stripped.charAt(0)
-        nameStr = variance + tparam.name.toString
+        nameStr = variance.toString + tparam.name.toString
         cursor = adjustedStart + (paramSource.length - stripped.length) + 1
       }
       // Check for higher-kinded type params like F[_] or F[_, _]
