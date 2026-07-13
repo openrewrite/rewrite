@@ -595,9 +595,6 @@ class ExtractVersionsAsPropertiesTest implements RewriteTest {
 
     @Test
     void isNoOpForDepAlreadyUsingPropertyWithIndirectValue() {
-        // lib.version's value is itself a property ref; the recipe's resolveVersion() only goes one
-        // level deep, returning the intermediate ref rather than the final literal. The dep already
-        // uses a property placeholder so the recipe must leave it alone regardless.
         rewriteRun(
           pomXml(
             """

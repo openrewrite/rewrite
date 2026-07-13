@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -111,12 +112,9 @@ public class ExtractVersionsAsProperties extends Recipe {
             return trimmedVersion.startsWith("${") && trimmedVersion.endsWith("}");
         }
 
-        static String resolveToLiteral(String version, Map<String, String> existingProps) {
-            if (isPropertyRef(version)) {
-                String trimmedVersion = version.trim();
-                return existingProps.get(trimmedVersion.substring(2, trimmedVersion.length() - 1));
-            }
-            return version;
+        static @Nullable String resolveToLiteral(String version, Map<String, String> existingProps) {
+            String resolved = ResolvedPom.placeholderHelper.replacePlaceholders(version, existingProps::get);
+            return ResolvedPom.placeholderHelper.hasPlaceholders(resolved) ? null : resolved;
         }
 
         String resolvePropertyKey(@Nullable String groupId, String artifactId, String version) {
@@ -169,10 +167,9 @@ public class ExtractVersionsAsProperties extends Recipe {
                     if (version == null || !PropertyResolver.isPropertyRef(version)) {
                         return;
                     }
-                    String trimmed = version.trim();
-                    String propRef = trimmed.substring(2, trimmed.length() - 1);
-                    if (groupSharedVersion.get(groupId).equals(existingProps.get(propRef))) {
-                        result.put(groupId, propRef);
+                    List<String> placeholders = ResolvedPom.placeholderHelper.getPlaceholders(version);
+                    if (placeholders.size() == 1 && groupSharedVersion.get(groupId).equals(existingProps.get(placeholders.get(0)))) {
+                        result.put(groupId, placeholders.get(0));
                     }
                 });
             return result;
