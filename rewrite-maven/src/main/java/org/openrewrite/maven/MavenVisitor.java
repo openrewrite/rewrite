@@ -169,9 +169,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
-        if (!isTag("dependency") ||
-                !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
-                        !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+        if (!isPluginDependencyTag()) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
