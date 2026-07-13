@@ -153,6 +153,39 @@ class GolangRecipeIntegTest implements RewriteTest {
         );
     }
 
+    @Test
+    void renameInsideMultiAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          go(
+            """
+              package main
+
+              func f() {
+              \tvar x, y int
+              \tx, y = y, x
+              }
+              """,
+            """
+              package main
+
+              func f() {
+              \tvar flag, y int
+              \tflag, y = y, flag
+              }
+              """
+          )
+        );
+    }
+
     /**
      * Grouped {@code var ( ... )} / {@code const ( ... )} blocks survive a
      * full Java RPC round-trip with no changes (idempotent print).

@@ -55,19 +55,7 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
 
     private <T extends Statement> java.util.List<JRightPadded<T>> visitStatements(
             java.util.List<JRightPadded<T>> statements, P p) {
-        java.util.List<JRightPadded<T>> s = statements;
-        for (int i = 0; i < s.size(); i++) {
-            JRightPadded<T> rp = s.get(i);
-            @SuppressWarnings("unchecked")
-            T elem = (T) visitAndCast(rp.getElement(), p);
-            if (elem != rp.getElement()) {
-                if (s == statements) {
-                    s = new java.util.ArrayList<>(statements);
-                }
-                s.set(i, rp.withElement(elem));
-            }
-        }
-        return s;
+        return ListUtils.map(statements, rp -> visitRightPadded(rp, JRightPadded.Location.LANGUAGE_EXTENSION, p));
     }
 
     public J visitGoStatement(Go.GoStatement goStmt, P p) {
@@ -254,6 +242,9 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         if (t.getTypeParameters() != null) {
             t = t.withTypeParameters((J.TypeParameters) visitAndCast(t.getTypeParameters(), p));
         }
+        if (t.getPadding().getAssign() != null) {
+            t = t.getPadding().withAssign(visitLeftPadded(t.getPadding().getAssign(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
         if (t.getDefinition() != null) {
             t = t.withDefinition((Expression) visitAndCast(t.getDefinition(), p));
         }
@@ -276,6 +267,11 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         Go.MultiAssignment m = multiAssignment;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(),
+                el -> visitRightPadded(el, JRightPadded.Location.LANGUAGE_EXTENSION, p)));
+        m = m.getPadding().withOperator(visitLeftPadded(m.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        m = m.getPadding().withValues(ListUtils.map(m.getPadding().getValues(),
+                el -> visitRightPadded(el, JRightPadded.Location.LANGUAGE_EXTENSION, p)));
         return m;
     }
 
