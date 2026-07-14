@@ -871,6 +871,8 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		before = s.localObjects[id]
 	}
 
+	strIntern := make(map[string]string)
+
 	fetchBatch := func() []rpc.RpcObjectData {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
@@ -898,22 +900,11 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			s.logger.Printf("No result data in bidirectional response")
 			return nil
 		}
-		var respResult any
-		if err := json.Unmarshal(resultData, &respResult); err != nil {
+
+		batch, err := rpc.DecodeBatch(resultData, strIntern)
+		if err != nil {
 			s.logger.Printf("Error parsing response result: %v", err)
 			return nil
-		}
-
-		batchData, ok := respResult.([]any)
-		if !ok || len(batchData) == 0 {
-			return nil
-		}
-
-		batch := make([]rpc.RpcObjectData, 0, len(batchData))
-		for _, item := range batchData {
-			if m, ok := item.(map[string]any); ok {
-				batch = append(batch, rpc.ParseObjectData(m))
-			}
 		}
 		return batch
 	}
