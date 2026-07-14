@@ -28,7 +28,6 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
 import static java.util.Collections.singletonList;
@@ -40,7 +39,7 @@ import static org.openrewrite.Tree.randomId;
  * along with matching capabilities that handle environment variables.
  */
 @RequiredArgsConstructor
-public class DockerFrom implements Trait<Docker.From>, DockerImageReference<Docker.From> {
+public class DockerFrom implements DockerImageReference<Docker.From> {
 
     @Getter
     private final Cursor cursor;

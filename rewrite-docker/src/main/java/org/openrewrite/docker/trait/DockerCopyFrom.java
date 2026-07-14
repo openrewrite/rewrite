@@ -28,7 +28,6 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
 import java.util.HashSet;
@@ -48,7 +47,7 @@ import static org.openrewrite.Tree.randomId;
  * disambiguate.
  */
 @RequiredArgsConstructor
-public class DockerCopyFrom implements Trait<Docker.Instruction>, DockerImageReference<Docker.Instruction> {
+public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> {
 
     @Getter
     private final Cursor cursor;
