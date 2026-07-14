@@ -31,12 +31,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     @Timeout(120)
     void warnsOnBothManifestAndLockWhenRegenerationFails() {
-        // Upgrading a dependency that cannot be resolved makes `uv lock` fail. The manifest is
-        // still bumped, but because the lock file cannot be regenerated the recipe attaches the
-        // same warning to BOTH pyproject.toml and the (otherwise untouched) uv.lock so a reviewer
-        // looking at the lock file sees why it did not change. The failure is deterministic whether
-        // or not uv is installed: an unresolvable dependency fails `uv lock`, and a missing uv
-        // reports "not installed".
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion(
             "nonexistent-openrewrite-lock-test-package", ">=2.0", null, null)),
