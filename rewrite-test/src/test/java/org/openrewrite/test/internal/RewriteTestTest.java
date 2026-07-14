@@ -99,6 +99,15 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void generatesFileWithInvalidPath() {
+        AssertionError e = assertThrows(AssertionError.class,
+          () -> rewriteRun(
+            spec -> spec.recipe(new GeneratesFileWithInvalidPath()),
+            text("hello")));
+        assertThat(e).hasStackTraceContaining("Recipe generated a source file with an invalid path");
+    }
+
+    @Test
     void cursorValidation() {
         assertThrows(AssertionError.class, () ->
           rewriteRun(
@@ -425,6 +434,34 @@ class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
         return List.of(PlainText.builder()
           .text("generated content")
           .sourcePath(Path.of("existing.txt"))
+          .build());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class GeneratesFileWithInvalidPath extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a file with an invalid path";
+
+    String description = "A recipe that generates a source file whose path points outside the source root, to show " +
+      "that the test framework helps protect against this mistake.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("outside")
+          .sourcePath(Path.of("../outside.txt"))
           .build());
     }
 }
