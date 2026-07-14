@@ -375,4 +375,17 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void trailingCommaInLambdaParams() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val f = (x: Int, y: Int,) => x + y
+                }
+                """
+            )
+        );
+    }
 }

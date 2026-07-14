@@ -41,6 +41,7 @@ import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
+import org.openrewrite.scala.marker.TrailingComma;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
@@ -81,7 +82,49 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             super.visitContainer(before, container, location, suffixBetween, after, p);
         }
     }
-    
+
+    @Override
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
+        for (int i = 0; i < nodes.size(); i++) {
+            JRightPadded<? extends J> node = nodes.get(i);
+            visit(node.getElement(), p);
+            boolean isLast = i == nodes.size() - 1;
+            Optional<TrailingComma> trailingComma = isLast ? node.getMarkers().findFirst(TrailingComma.class) : Optional.empty();
+            if (trailingComma.isPresent()) {
+                visitSpace(trailingComma.get().getPrefix(), location.getAfterLocation(), p);
+                p.append(suffixBetween);
+                visitSpace(node.getAfter(), location.getAfterLocation(), p);
+                visitMarkers(node.getMarkers(), p);
+            } else {
+                visitSpace(node.getAfter(), location.getAfterLocation(), p);
+                visitMarkers(node.getMarkers(), p);
+                if (!isLast) {
+                    p.append(suffixBetween);
+                }
+            }
+        }
+    }
+
+    /**
+     * Emit the separator following a comma-separated list element, honoring a
+     * {@link TrailingComma} marker on the last element so a source trailing comma
+     * round-trips. Used by the hand-written parameter/type-parameter print loops
+     * that don't go through {@link #visitRightPadded}.
+     */
+    private void visitListElementSuffix(JRightPadded<? extends J> node, boolean isLast, Space.Location afterLocation, PrintOutputCapture<P> p) {
+        Optional<TrailingComma> trailingComma = isLast ? node.getMarkers().findFirst(TrailingComma.class) : Optional.empty();
+        if (trailingComma.isPresent()) {
+            visitSpace(trailingComma.get().getPrefix(), afterLocation, p);
+            p.append(',');
+            visitSpace(node.getAfter(), afterLocation, p);
+        } else {
+            visitSpace(node.getAfter(), afterLocation, p);
+            if (!isLast) {
+                p.append(',');
+            }
+        }
+    }
+
     @Override
     public J visitTypeParameters(J.TypeParameters typeParams, PrintOutputCapture<P> p) {
         // Use Scala-style square brackets instead of angle brackets
@@ -470,10 +513,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             } else {
                 visit(element, p);
             }
-            visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
-            if (i < paramList.size() - 1) {
-                p.append(',');
-            }
+            visitListElementSuffix(param, i == paramList.size() - 1, JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
         }
         if (hasParens) {
             p.append(')');
@@ -631,10 +671,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             } else {
                 visit(elem, p);
             }
-            visitSpace(lp.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
-            if (j < lps.size() - 1) {
-                p.append(',');
-            }
+            visitListElementSuffix(lp, j == lps.size() - 1, JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
         }
         if (lambdaParams.isParenthesized()) {
             p.append(')');
@@ -973,10 +1010,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     } else {
                         visit(element, p);
                     }
-                    visitSpace(rp.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
-                    if (i < ctorElements.size() - 1) {
-                        p.append(',');
-                    }
+                    visitListElementSuffix(rp, i == ctorElements.size() - 1, Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
                 }
                 p.append(')');
                 // Re-emit any additional curried constructor param lists captured verbatim
@@ -1049,10 +1083,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             List<JRightPadded<J.TypeParameter>> elements = typeParams.getPadding().getElements();
             for (int i = 0; i < elements.size(); i++) {
                 visit(elements.get(i).getElement(), p);
-                visitSpace(elements.get(i).getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
-                if (i < elements.size() - 1) {
-                    p.append(',');
-                }
+                visitListElementSuffix(elements.get(i), i == elements.size() - 1, Space.Location.TYPE_PARAMETER_SUFFIX, p);
             }
             p.append(']');
         }
@@ -2069,10 +2100,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             } else {
                 visit(element, p);
             }
-            visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
-            if (i < paramList.size() - 1) {
-                p.append(',');
-            }
+            visitListElementSuffix(param, i == paramList.size() - 1, JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
         }
         p.append(')');
         visit(ext.getBody(), p);

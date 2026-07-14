@@ -523,6 +523,91 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void classWithTrailingCommaInParameters() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(
+                    val x: String,
+                    val y: Int,
+                )
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaSingleParameter() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(
+                    x: Int,
+                )
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaSingleLine() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int,)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithoutTrailingCommaDoesNotFail() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaAndWhitespaceBeforeComma() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x: Int ,)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaInTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[
+                    A,
+                    B,
+                ](x: A)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithTrailingCommaInTypeParametersSingleLine() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[A,](x: A)
+                """
+            )
+        );
+    }
+
+    @Test
     void colonBodyWithTrailingCommentAfterColon() {
         rewriteRun(
             scala(
