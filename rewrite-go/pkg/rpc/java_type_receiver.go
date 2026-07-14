@@ -145,6 +145,10 @@ func (r *JavaTypeReceiver) VisitArray(a *java.JavaTypeArray, p any) java.JavaTyp
 	q := p.(*ReceiveQueue)
 	a.ElemType = receiveAsType[java.JavaType](r, q, a.ElemType)
 	a.Annotations = receiveClassList(r, q, a.Annotations)
+	// Annotations sit outside TypeSignature, so only canonicalize the plain case.
+	if len(a.Annotations) == 0 {
+		return q.internType(a)
+	}
 	return a
 }
 
@@ -152,7 +156,7 @@ func (r *JavaTypeReceiver) VisitArray(a *java.JavaTypeArray, p any) java.JavaTyp
 func (r *JavaTypeReceiver) VisitPrimitive(pr *java.JavaTypePrimitive, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
 	pr.Keyword = receiveScalar[string](q, pr.Keyword)
-	return pr
+	return q.internType(pr)
 }
 
 // VisitMethod mirrors JavaTypeReceiver.visitMethod field order:
