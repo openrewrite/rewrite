@@ -170,13 +170,23 @@ class ChangeImport(Recipe):
                             if alias is not None:
                                 self.has_old_import = True
                                 self.old_alias = alias if alias != "" else None
-                        if old_name and not self.has_direct_module_import and stmt.from_ is None:
-                            for imp in stmt.names:
-                                name = get_qualid_name(imp.qualid)
-                                if name == old_module:
-                                    self.has_direct_module_import = True
-                                    self.module_alias = get_alias_name(imp)
-                                    break
+                        if old_name and not self.has_direct_module_import:
+                            if stmt.from_ is None:
+                                for imp in stmt.names:
+                                    name = get_qualid_name(imp.qualid)
+                                    if name == old_module:
+                                        self.has_direct_module_import = True
+                                        self.module_alias = get_alias_name(imp)
+                                        break
+                            else:
+                                # `from pkg import submod` exposes `pkg.submod` under the submodule name
+                                from_name = get_name_string(stmt.from_)
+                                for imp in stmt.names:
+                                    submod = get_qualid_name(imp.qualid)
+                                    if f"{from_name}.{submod}" == old_module:
+                                        self.has_direct_module_import = True
+                                        self.module_alias = get_alias_name(imp) or submod
+                                        break
 
                 if not self.has_old_import and not self.has_direct_module_import:
                     return cu
@@ -273,75 +283,85 @@ class ChangeImport(Recipe):
                     return method
                 if not old_name or not self.has_direct_module_import:
                     return method
-                # Only matches simple module.func() calls where the select is an
-                # Identifier. Nested attribute chains like pkg.module.func()
-                # (where select is a FieldAccess) are not currently handled.
-                if not isinstance(method.select, Identifier):
-                    return method
                 if not isinstance(method.name, Identifier):
-                    return method
-
-                select_name = method.select.simple_name
-                # For dotted modules without aliases (e.g. `import os.path`),
-                # `old_module` is a dotted string like "os.path" which will
-                # never match a simple Identifier name — but those cases are
-                # already excluded by the `isinstance(method.select, Identifier)`
-                # guard above (the select would be a FieldAccess instead).
-                expected_name = self.module_alias or old_module
-                if select_name != expected_name:
                     return method
                 if method.name.simple_name != old_name:
                     return method
-
-                self.rewrote_qualified_refs = True
-                new_select_name = new_alias or new_module
-                new_select = method.select.replace(_simple_name=new_select_name)
-                # Update type attribution on the select identifier
-                if method.select.type is not None:
-                    new_select = new_select.replace(_type=self._get_new_module_type())
-                padded_select = method.padding.select
-                if padded_select is None:
+                if not self._matches_module_ref(method.select):
                     return method
-                new_padded_select = padded_select.replace(_element=new_select)
-                result = method.padding.replace(_select=new_padded_select)
+
+                # Rewrite the select only when the module path changes; a plain
+                # leaf rename (e.g. avro.schema.Parse -> avro.schema.parse) keeps it.
+                select_changes = old_module != new_module or new_alias is not None
+                if select_changes and not isinstance(method.select, Identifier):
+                    return method
+
+                result = method
+                if select_changes:
+                    self.rewrote_qualified_refs = True
+                    new_select = method.select.replace(_simple_name=new_alias or new_module)
+                    if method.select.type is not None:
+                        new_select = new_select.replace(_type=self._get_new_module_type())
+                    padded_select = method.padding.select
+                    if padded_select is None:
+                        return method
+                    result = result.padding.replace(_select=padded_select.replace(_element=new_select))
                 if new_name and new_name != old_name:
                     result = result.replace(_name=result.name.replace(_simple_name=new_name))
-                # Update method_type declaring type and name
                 if result.method_type is not None:
-                    result = result.replace(_method_type=dc_replace(
-                        result.method_type,
-                        _declaring_type=self._get_new_module_type(),
-                        _name=new_name or old_name,
-                    ))
+                    if select_changes:
+                        result = result.replace(_method_type=dc_replace(
+                            result.method_type,
+                            _declaring_type=self._get_new_module_type(),
+                            _name=new_name or old_name,
+                        ))
+                    elif new_name and new_name != old_name:
+                        result = result.replace(_method_type=dc_replace(
+                            result.method_type,
+                            _name=new_name,
+                        ))
                 return result
 
             def visit_field_access(self, field_access: FieldAccess, p: ExecutionContext) -> J:
                 field_access = super().visit_field_access(field_access, p)  # ty: ignore[invalid-assignment]  # visitor covariance
-                if not old_name or not self.has_direct_module_import:
-                    return field_access
                 if not isinstance(field_access, FieldAccess):
                     return field_access
-                if not isinstance(field_access.target, Identifier):
-                    return field_access
-
-                existing_name = field_access.target.simple_name
-                expected_name = self.module_alias or old_module
-                if existing_name != expected_name:
+                if not old_name or not self.has_direct_module_import:
                     return field_access
                 if field_access.name.simple_name != old_name:
                     return field_access
+                if not self._matches_module_ref(field_access.target):
+                    return field_access
 
-                self.rewrote_qualified_refs = True
-                new_target_name = new_alias or new_module
-                new_target = field_access.target.replace(_simple_name=new_target_name)
-                # Update type attribution on the target identifier
-                if field_access.target.type is not None:
-                    new_target = new_target.replace(_type=self._get_new_module_type())
-                result = field_access.replace(_target=new_target)
+                select_changes = old_module != new_module or new_alias is not None
+                if select_changes and not isinstance(field_access.target, Identifier):
+                    return field_access
+
+                result = field_access
+                if select_changes:
+                    self.rewrote_qualified_refs = True
+                    new_target = field_access.target.replace(_simple_name=new_alias or new_module)
+                    if field_access.target.type is not None:
+                        new_target = new_target.replace(_type=self._get_new_module_type())
+                    result = result.replace(_target=new_target)
                 if new_name and new_name != old_name:
                     new_name_ident = result.name.replace(_simple_name=new_name)
                     result = result.padding.replace(_name=result.padding.name.replace(_element=new_name_ident))
                 return result
+
+            def _matches_module_ref(self, expr) -> bool:
+                """True if a method select or field-access target refers to the old module.
+
+                Matches an aliased/submodule reference by its bound name, a simple module
+                by its Identifier, or a dotted module (`avro.schema`) by its FieldAccess chain.
+                """
+                if self.module_alias is not None:
+                    return isinstance(expr, Identifier) and expr.simple_name == self.module_alias
+                if isinstance(expr, Identifier):
+                    return expr.simple_name == old_module
+                if isinstance(expr, FieldAccess):
+                    return get_name_string(expr) == old_module
+                return False
 
             def _get_new_module_type(self) -> JavaType.Class:
                 if self.new_module_type is None:

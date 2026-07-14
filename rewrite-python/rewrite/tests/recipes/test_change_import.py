@@ -504,6 +504,113 @@ class TestChangeImport:
             )
         )
 
+    def test_change_qualified_dotted_module_leaf_rename(self):
+        """import avro.schema / avro.schema.Parse(x) -> avro.schema.parse(x)"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='avro.schema',
+            old_name='Parse',
+            new_module='avro.schema',
+            new_name='parse',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import avro.schema
+                avro.schema.Parse(data)
+                """,
+                """
+                import avro.schema
+                avro.schema.parse(data)
+                """,
+            )
+        )
+
+    def test_change_qualified_dotted_module_alias_preserved(self):
+        """import avro.schema as s / s.Parse(x) -> s.parse(x) (alias preserved)"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='avro.schema',
+            old_name='Parse',
+            new_module='avro.schema',
+            new_name='parse',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import avro.schema as s
+                s.Parse(data)
+                """,
+                """
+                import avro.schema as s
+                s.parse(data)
+                """,
+            )
+        )
+
+    def test_change_qualified_from_submodule_leaf_rename(self):
+        """from avro import schema / schema.Parse(x) -> schema.parse(x)"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='avro.schema',
+            old_name='Parse',
+            new_module='avro.schema',
+            new_name='parse',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from avro import schema
+                schema.Parse(data)
+                """,
+                """
+                from avro import schema
+                schema.parse(data)
+                """,
+            )
+        )
+
+    def test_no_change_qualified_leaf_rename_on_different_module(self):
+        """A same-named function on a different module is left untouched."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='avro.schema',
+            old_name='Parse',
+            new_module='avro.schema',
+            new_name='parse',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import avro.schema
+                import json.schema
+
+                avro.schema.Parse(data)
+                json.schema.Parse(data)
+                """,
+                """
+                import avro.schema
+                import json.schema
+
+                avro.schema.parse(data)
+                json.schema.Parse(data)
+                """,
+            )
+        )
+
+    def test_no_change_qualified_leaf_rename_idempotent(self):
+        """Already-migrated qualified calls are left unchanged (idempotent)."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='avro.schema',
+            old_name='Parse',
+            new_module='avro.schema',
+            new_name='parse',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import avro.schema
+                avro.schema.parse(data)
+                """,
+            )
+        )
+
     def test_both_from_import_and_direct_import(self):
         """When a file has both 'from X import name' and 'import X', handle without duplicates."""
         spec = RecipeSpec(recipe=ChangeImport(
