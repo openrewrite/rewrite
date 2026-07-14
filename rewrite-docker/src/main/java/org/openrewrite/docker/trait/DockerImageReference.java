@@ -92,13 +92,13 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
      * Returns the instruction with its image reference replaced by {@code reference}
      * (e.g. {@code "nginx:1.25"}).
      */
-    Docker.Instruction withImageReference(String reference);
+    T withImageReference(String reference);
 
     /**
      * Returns the instruction with the tag of its image reference replaced by {@code tag},
      * preserving the image name and any digest.
      */
-    Docker.Instruction withTag(String tag);
+    T withTag(String tag);
 
     /**
      * Reasons why an image may be considered unpinned.
