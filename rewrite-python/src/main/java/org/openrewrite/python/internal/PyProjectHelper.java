@@ -23,6 +23,7 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.PipfileParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.table.PythonLockFileRegenerationResults;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
@@ -33,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -311,6 +313,53 @@ public class PyProjectHelper {
             return null;
         }
         return regen.regenerate(depsFile.printAll(), capturedLockContent);
+    }
+
+    /**
+     * Classify a lock-file regeneration outcome for the
+     * {@link PythonLockFileRegenerationResults} data table.
+     *
+     * @param originalLock the lock content captured before the edit, or {@code null}
+     * @param regen        the regeneration result, or {@code null} when regeneration
+     *                     was not attempted (no lock captured or no adapter)
+     */
+    public static PythonLockFileRegenerationResults.Status regenerationStatus(
+            @Nullable String originalLock, LockFileRegeneration.@Nullable Result regen) {
+        if (regen == null) {
+            return PythonLockFileRegenerationResults.Status.NO_LOCK_PRESENT;
+        }
+        if (!regen.isSuccess()) {
+            return regen.getReason() == LockFileRegeneration.Result.Reason.TOOL_NOT_INSTALLED ?
+                    PythonLockFileRegenerationResults.Status.TOOL_NOT_INSTALLED :
+                    PythonLockFileRegenerationResults.Status.FAILED;
+        }
+        return Objects.equals(originalLock, regen.getLockFileContent()) ?
+                PythonLockFileRegenerationResults.Status.UNCHANGED :
+                PythonLockFileRegenerationResults.Status.REGENERATED;
+    }
+
+    /**
+     * Build a {@link PythonLockFileRegenerationResults.Row} for a touched manifest.
+     * The package manager and lock file name are derived from the manifest's
+     * {@link PythonResolutionResult} marker; they are {@code null} when the manifest
+     * has no marker or uses a package manager without a regeneration adapter.
+     *
+     * @param manifest     the edited manifest source file (carries the marker and path)
+     * @param originalLock the lock content captured before the edit, or {@code null}
+     * @param regen        the regeneration result, or {@code null}
+     */
+    public static PythonLockFileRegenerationResults.Row regenerationRow(
+            SourceFile manifest, @Nullable String originalLock, LockFileRegeneration.@Nullable Result regen) {
+        PythonResolutionResult marker = manifest.getMarkers()
+                .findFirst(PythonResolutionResult.class).orElse(null);
+        LockFileRegeneration regeneration = marker == null ? null :
+                LockFileRegeneration.forPackageManager(marker.getPackageManager());
+        return new PythonLockFileRegenerationResults.Row(
+                manifest.getSourcePath().toString(),
+                regeneration == null ? null : regeneration.getLockFileName(),
+                regeneration == null ? null : regeneration.getPackageManagerName(),
+                regenerationStatus(originalLock, regen),
+                regen == null ? null : regen.getErrorMessage());
     }
 
     /**

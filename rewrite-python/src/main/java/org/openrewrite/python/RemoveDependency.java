@@ -23,6 +23,7 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.table.PythonLockFileRegenerationResults;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
@@ -42,6 +43,8 @@ import java.util.function.Function;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulator> {
+
+    transient PythonLockFileRegenerationResults regenResults = new PythonLockFileRegenerationResults(this);
 
     @Option(displayName = "Package name",
             description = "The PyPI package name to remove.",
@@ -101,6 +104,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         @Nullable String capturedLockContent;
         @Nullable SourceFile modifiedDepsFile;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean regenRowInserted;
     }
 
     @Override
@@ -177,6 +181,11 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
+                        }
+                        if (!ps.regenRowInserted) {
+                            ps.regenRowInserted = true;
+                            regenResults.insertRow(ctx, PyProjectHelper.regenerationRow(
+                                    ps.modifiedDepsFile, ps.capturedLockContent, ps.regenResult));
                         }
                         PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
                         return out;
