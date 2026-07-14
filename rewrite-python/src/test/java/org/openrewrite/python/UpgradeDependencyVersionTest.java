@@ -16,14 +16,54 @@
 package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
+
+    @Test
+    @Timeout(120)
+    void warnsOnBothManifestAndLockWhenRegenerationFails() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion(
+            "nonexistent-openrewrite-lock-test-package", ">=2.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "nonexistent-openrewrite-lock-test-package>=1.0",
+              ]
+
+              [tool.uv]
+              """,
+            s -> s.after(actual -> {
+                assertThat(actual).contains("nonexistent-openrewrite-lock-test-package>=2.0");
+                return actual;
+            }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                    .as("manifest should carry the lock-regeneration-failure warning")
+                    .isPresent())
+          ),
+          uvLock(
+            """
+              version = 1
+              requires-python = ">=3.9"
+              """,
+            s -> s.after(actual -> actual)
+                    .afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                            .as("lock file should carry the lock-regeneration-failure warning")
+                            .isPresent())
+          )
+        );
+    }
 
     @Test
     void changeVersionWithResolvedProject(@TempDir Path tempDir) {

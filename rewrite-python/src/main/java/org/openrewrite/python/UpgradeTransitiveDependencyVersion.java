@@ -199,13 +199,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }
                     }
                 }
-                if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
-                    String lockContent = lockPs.regenResult.getLockFileContent();
-                    if (tree instanceof Toml.Document) {
-                        return PyProjectHelper.reparseToml((Toml.Document) tree, lockContent);
-                    }
-                    if (tree instanceof Json.Document) {
-                        return PyProjectHelper.reparseJson((Json.Document) tree, lockContent);
+                if (lockPs.regenResult != null) {
+                    if (lockPs.regenResult.isSuccess()) {
+                        String lockContent = lockPs.regenResult.getLockFileContent();
+                        if (tree instanceof Toml.Document) {
+                            return PyProjectHelper.reparseToml((Toml.Document) tree, lockContent);
+                        }
+                        if (tree instanceof Json.Document) {
+                            return PyProjectHelper.reparseJson((Json.Document) tree, lockContent);
+                        }
+                    } else {
+                        return Markup.warn(sourceFile, new RuntimeException(
+                                "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
                     }
                 }
                 return tree;
