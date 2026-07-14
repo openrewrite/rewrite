@@ -93,7 +93,9 @@ class PythonLockFileRegenerationResultsTest implements RewriteTest {
                   "develop": {}
               }
               """,
+            // The lock cannot be regenerated, so the recipe attaches the same warning to it.
             spec -> spec.path("Pipfile.lock")
+              .after(actual -> assertThat(actual).contains("lock regeneration failed: pipenv is not installed").actual())
           )
         );
     }
