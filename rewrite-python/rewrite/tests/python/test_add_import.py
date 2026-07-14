@@ -292,3 +292,41 @@ class TestMaybeAddImport:
                 """,
             )
         )
+
+    def test_skips_builtins_import(self):
+        """Names from the 'builtins' module are always available, so no import
+        is added (e.g. 'from builtins import list' is redundant)."""
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('builtins', 'list')))
+        spec.rewrite_run(
+            python(
+                """
+                x: list = []
+                """,
+            )
+        )
+
+    def test_skips_builtins_direct_import(self):
+        """A direct 'import builtins' is likewise not added."""
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('builtins')))
+        spec.rewrite_run(
+            python(
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_adds_aliased_builtins_import(self):
+        """An explicit alias makes a builtins import meaningful, so it is added."""
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('builtins', 'list', '_list')))
+        spec.rewrite_run(
+            python(
+                """
+                x = 1
+                """,
+                """
+                from builtins import list as _list
+                x = 1
+                """,
+            )
+        )

@@ -478,6 +478,32 @@ class TestChangeImport:
             )
         )
 
+    def test_pep585_typing_to_builtin_adds_no_builtins_import(self):
+        """PEP 585: 'from typing import List' -> 'list[...]' must NOT add
+        'from builtins import list' (builtins are always available)."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='List',
+            new_module='builtins',
+            new_name='list',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List, Dict
+
+                x: List[str] = []
+                y: Dict[str, int] = {}
+                """,
+                """
+                from typing import Dict
+
+                x: list[str] = []
+                y: Dict[str, int] = {}
+                """,
+            )
+        )
+
     def test_both_from_import_and_direct_import(self):
         """When a file has both 'from X import name' and 'import X', handle without duplicates."""
         spec = RecipeSpec(recipe=ChangeImport(

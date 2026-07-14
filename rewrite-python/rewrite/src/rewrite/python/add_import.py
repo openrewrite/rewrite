@@ -80,6 +80,10 @@ def maybe_add_import(visitor: PythonVisitor, options: AddImportOptions) -> None:
         # Add: from typing import *
         maybe_add_import(visitor, AddImportOptions(module='typing', name='*'))
     """
+    # builtins are always available; only import them under an explicit alias
+    if options.module == 'builtins' and options.alias is None:
+        return
+
     # Check for duplicate registrations
     if visitor._after_visit is None:
         visitor._after_visit = []
