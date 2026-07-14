@@ -232,7 +232,7 @@ func newServer(cfg serverConfig) *server {
 		} else {
 			s.metricsFile = f
 			s.metricsWriter = csv.NewWriter(f)
-			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error"}); err != nil {
+			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes"}); err != nil {
 				logger.Printf("metrics-csv: cannot write header: %v", err)
 			}
 			s.metricsWriter.Flush()
@@ -271,11 +271,19 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 	if rpcErr != nil {
 		errMsg = rpcErr.Message
 	}
+	// Mirror the JS server's process.memoryUsage() self-report: HeapAlloc is
+	// the live-heap analog of Node's heapUsed, Sys the OS-footprint analog of
+	// heapTotal. Read only when metrics are enabled — ReadMemStats stops the
+	// world, so the default (metrics-disabled) path returns above untouched.
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
 	row := []string{
 		time.Now().UTC().Format(time.RFC3339Nano),
 		method,
 		strconv.FormatInt(duration.Milliseconds(), 10),
 		errMsg,
+		strconv.FormatUint(mem.HeapAlloc, 10),
+		strconv.FormatUint(mem.Sys, 10),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
 		s.logger.Printf("metrics-csv: write row failed: %v", err)

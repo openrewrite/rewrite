@@ -70,7 +70,7 @@ func TestMetricsCSVHeaderWritten(t *testing.T) {
 	s.closeMetrics()
 
 	header, rows := readMetricsCSV(t, csvPath)
-	want := []string{"timestamp", "method", "duration_ms", "error"}
+	want := []string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes"}
 	if len(header) != len(want) {
 		t.Fatalf("header columns: want %v, got %v", want, header)
 	}
@@ -100,8 +100,8 @@ func TestMetricsCSVRowPerRequest(t *testing.T) {
 		t.Fatalf("rows: want %d, got %d (%v)", len(calls), len(rows), rows)
 	}
 	for i, row := range rows {
-		if len(row) != 4 {
-			t.Errorf("row[%d] columns: want 4, got %d (%v)", i, len(row), row)
+		if len(row) != 6 {
+			t.Errorf("row[%d] columns: want 6, got %d (%v)", i, len(row), row)
 			continue
 		}
 		if row[1] != calls[i] {
@@ -117,6 +117,12 @@ func TestMetricsCSVRowPerRequest(t *testing.T) {
 		}
 		if _, err := time.Parse(time.RFC3339Nano, row[0]); err != nil {
 			t.Errorf("row[%d].timestamp: not RFC3339Nano: %q (%v)", i, row[0], err)
+		}
+		if used, err := strconv.ParseUint(row[4], 10, 64); err != nil || used == 0 {
+			t.Errorf("row[%d].memory_used_bytes: want positive uint, got %q (%v)", i, row[4], err)
+		}
+		if max, err := strconv.ParseUint(row[5], 10, 64); err != nil || max == 0 {
+			t.Errorf("row[%d].memory_max_bytes: want positive uint, got %q (%v)", i, row[5], err)
 		}
 	}
 }
@@ -176,8 +182,8 @@ func TestMetricsCSVConcurrentLoad(t *testing.T) {
 	// produce malformed rows; we re-validate here in case ReadAll silently
 	// padded.
 	for i, row := range rows {
-		if len(row) != 4 {
-			t.Fatalf("row[%d] columns: want 4, got %d (%v)", i, len(row), row)
+		if len(row) != 6 {
+			t.Fatalf("row[%d] columns: want 6, got %d (%v)", i, len(row), row)
 		}
 		if row[1] != "GetLanguages" {
 			t.Errorf("row[%d].method: want GetLanguages, got %q", i, row[1])
