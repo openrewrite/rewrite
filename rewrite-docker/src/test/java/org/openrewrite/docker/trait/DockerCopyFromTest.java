@@ -289,4 +289,74 @@ class DockerCopyFromTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void registryPortIsNotMisSplitIntoTag() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.isStageReference()).isFalse();
+                assertThat(image.getImageName()).isEqualTo("registry.example.com:5000/app");
+                assertThat(image.getTag()).isNull();
+                assertThat(image.isUnpinned()).isTrue();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              COPY --from=registry.example.com:5000/app /out /app
+              """,
+            """
+              FROM alpine
+              ~~>COPY --from=registry.example.com:5000/app /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void registryPortWithTag() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).isEqualTo("registry.example.com:5000/app");
+                assertThat(image.getTag()).isEqualTo("1.2");
+                assertThat(image.getDigest()).isNull();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              COPY --from=registry.example.com:5000/app:1.2 /out /app
+              """,
+            """
+              FROM alpine
+              ~~>COPY --from=registry.example.com:5000/app:1.2 /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void envVarOnlyReferenceIsConsideredPinned() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.isStageReference()).isFalse();
+                assertThat(image.isUnpinned()).isFalse();
+                assertThat(image.getUnpinnedReason()).isNull();
+                // A pin recipe must leave the unresolved variable untouched
+                return image.isUnpinned() ? image.withTag("3.19") : image.getTree();
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              COPY --from=${BUILDER_IMAGE} /out /app
+              """
+          )
+        );
+    }
 }

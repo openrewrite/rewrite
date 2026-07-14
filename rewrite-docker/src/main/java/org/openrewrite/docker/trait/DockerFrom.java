@@ -142,8 +142,12 @@ public class DockerFrom implements Trait<Docker.From>, DockerImageReference<Dock
         if (from.getDigest() != null) {
             return null;
         }
-        // No tag means implicit "latest"
+        // No tag means implicit "latest", unless the name is an unresolved environment
+        // variable, in which case we can't classify it and conservatively treat it as pinned
         if (from.getTag() == null) {
+            if (new Matcher().hasEnvironmentVariables(from.getImageName())) {
+                return null;
+            }
             return UnpinnedReason.IMPLICIT_LATEST;
         }
         // Explicit "latest" tag is unpinned (if it's a literal, not env var)
@@ -226,13 +230,15 @@ public class DockerFrom implements Trait<Docker.From>, DockerImageReference<Dock
     /**
      * Returns the FROM instruction with its image reference replaced by {@code reference}
      * (e.g. {@code "nginx:1.25"}), decomposing it into the structured image name, tag, and
-     * digest while preserving the original prefix and quote style.
+     * digest while preserving the original prefix.
      */
     @Override
     public Docker.From withImageReference(String reference) {
         Docker.From from = getTree();
+        // Pass an unquoted literal so split() decomposes name/tag/digest; a quote style would
+        // short-circuit that and keep the whole reference as a single image name.
         Docker.@Nullable Argument[] parts = ImageReferences.split(
-                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, getQuoteStyle())),
+                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)),
                 from.getImageName().getPrefix());
         return from.withImageName(parts[0]).withTag(parts[1]).withDigest(parts[2]);
     }

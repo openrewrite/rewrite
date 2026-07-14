@@ -53,6 +53,10 @@ public class DockerCopyFrom implements Trait<Docker.Instruction>, DockerImageRef
     @Getter
     private final Cursor cursor;
 
+    private @Nullable Boolean stageReference;
+    private boolean componentsComputed;
+    private Docker.@Nullable Argument @Nullable [] componentsValue;
+
     private @Nullable List<Docker.Flag> flags() {
         Docker.Instruction instruction = getTree();
         if (instruction instanceof Docker.Copy) {
@@ -78,6 +82,14 @@ public class DockerCopyFrom implements Trait<Docker.Instruction>, DockerImageRef
     }
 
     private Docker.@Nullable Argument @Nullable [] components() {
+        if (!componentsComputed) {
+            componentsValue = computeComponents();
+            componentsComputed = true;
+        }
+        return componentsValue;
+    }
+
+    private Docker.@Nullable Argument @Nullable [] computeComponents() {
         if (isStageReference()) {
             return null;
         }
@@ -101,6 +113,13 @@ public class DockerCopyFrom implements Trait<Docker.Instruction>, DockerImageRef
      * numeric index) rather than an external image.
      */
     public boolean isStageReference() {
+        if (stageReference == null) {
+            stageReference = computeStageReference();
+        }
+        return stageReference;
+    }
+
+    private boolean computeStageReference() {
         Docker.Argument arg = fromArgument();
         if (arg == null) {
             return false;
@@ -201,6 +220,11 @@ public class DockerCopyFrom implements Trait<Docker.Instruction>, DockerImageRef
             return null;
         }
         if (components[1] == null) {
+            // A reference whose name is an unresolved environment variable can't be classified;
+            // conservatively treat it as pinned rather than assuming an implicit "latest".
+            if (new Matcher().hasEnvironmentVariables(components[0])) {
+                return null;
+            }
             return UnpinnedReason.IMPLICIT_LATEST;
         }
         String tag = new Matcher().extractText(components[1]);

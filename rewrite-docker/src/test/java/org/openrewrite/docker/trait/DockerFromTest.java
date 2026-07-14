@@ -604,4 +604,72 @@ class DockerFromTest implements RewriteTest {
             );
         }
     }
+
+    @Nested
+    class RegistryAndVariables implements RewriteTest {
+
+        @Test
+        void registryPortIsNotMisSplitIntoTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getImageName()).isEqualTo("registry.example.com:5000/app");
+                    assertThat(image.getTag()).isNull();
+                    assertThat(image.isUnpinned()).isTrue();
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM registry.example.com:5000/app
+                  """,
+                """
+                  ~~>FROM registry.example.com:5000/app
+                  """
+              )
+            );
+        }
+
+        @Test
+        void registryPortWithTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getImageName()).isEqualTo("registry.example.com:5000/app");
+                    assertThat(image.getTag()).isEqualTo("1.2");
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM registry.example.com:5000/app:1.2
+                  """,
+                """
+                  ~~>FROM registry.example.com:5000/app:1.2
+                  """
+              )
+            );
+        }
+
+        @Test
+        void envVarOnlyImageIsConsideredPinned() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.isUnpinned()).isFalse();
+                    assertThat(image.getUnpinnedReason()).isNull();
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM ${BASE_IMAGE}
+                  """,
+                """
+                  ~~>FROM ${BASE_IMAGE}
+                  """
+              )
+            );
+        }
+    }
 }

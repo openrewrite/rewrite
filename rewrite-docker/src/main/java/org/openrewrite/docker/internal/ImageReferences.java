@@ -57,14 +57,14 @@ public final class ImageReferences {
                 String text = ((Docker.Literal) content).getText();
 
                 int atIndex = text.indexOf('@');
-                int colonIndex = text.indexOf(':');
+                int colonIndex = tagColonIndex(text);
 
                 if (atIndex >= 0 && !foundAt) {
                     foundAt = true;
                     String beforeAt = text.substring(0, atIndex);
                     String digestPart = text.substring(atIndex + 1);
 
-                    int colonInBeforeAt = beforeAt.indexOf(':');
+                    int colonInBeforeAt = tagColonIndex(beforeAt);
                     if (colonInBeforeAt >= 0 && !foundColon) {
                         foundColon = true;
                         String imagePart = beforeAt.substring(0, colonInBeforeAt);
@@ -126,5 +126,14 @@ public final class ImageReferences {
                 new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
 
         return new Docker.@Nullable Argument[]{imageName, tag, digest};
+    }
+
+    /**
+     * Returns the index of the {@code :} that separates the tag, or -1 if there is none. Only a
+     * colon after the last {@code /} can be a tag separator; an earlier colon is a registry port
+     * (e.g. {@code registry.example.com:5000/app}), which is part of the image name.
+     */
+    private static int tagColonIndex(String text) {
+        return text.indexOf(':', text.lastIndexOf('/') + 1);
     }
 }
