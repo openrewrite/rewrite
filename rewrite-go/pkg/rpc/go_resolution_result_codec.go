@@ -22,6 +22,25 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
+type GoResolutionInternPool struct {
+	byIdent map[uuid.UUID]golang.GoResolutionResult
+}
+
+func NewGoResolutionInternPool() *GoResolutionInternPool {
+	return &GoResolutionInternPool{byIdent: make(map[uuid.UUID]golang.GoResolutionResult)}
+}
+
+func (p *GoResolutionInternPool) intern(r golang.GoResolutionResult) golang.GoResolutionResult {
+	if p == nil || r.Ident == uuid.Nil {
+		return r
+	}
+	if c, ok := p.byIdent[r.Ident]; ok {
+		return c
+	}
+	p.byIdent[r.Ident] = r
+	return r
+}
+
 // sendGoResolutionResult mirrors Java's
 // org.openrewrite.golang.marker.GoResolutionResult#rpcSend.
 //
@@ -163,7 +182,7 @@ func receiveGoResolutionResult(before golang.GoResolutionResult, q *ReceiveQueue
 	before.Retracts = recvRetracts(q, before.Retracts)
 	before.ResolvedDependencies = recvResolvedDeps(q, before.ResolvedDependencies)
 	before.PackageModules = recvPackageModules(q, before.PackageModules)
-	return before
+	return q.goResolutionIntern.intern(before)
 }
 
 func recvRequires(q *ReceiveQueue, before []golang.GoRequire) []golang.GoRequire {
