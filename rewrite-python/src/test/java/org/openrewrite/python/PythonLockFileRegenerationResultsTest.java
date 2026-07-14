@@ -83,10 +83,7 @@ class PythonLockFileRegenerationResultsTest implements RewriteTest {
               """,
             // The manifest change lands; the Markup.warn about the failed regeneration
             // is appended by the recipe, so accept whatever is rendered.
-            spec -> spec.after(actual -> {
-                assertThat(actual).contains("flask = \">=2.0\"");
-                return actual;
-            })
+            spec -> spec.after(actual -> assertThat(actual).contains("flask = \">=2.0\"").actual())
           ),
           json(
             """
@@ -148,10 +145,7 @@ class PythonLockFileRegenerationResultsTest implements RewriteTest {
               requires-python = ">=3.8"
               """,
             // uv rewrites the lock with resolved packages; accept whatever it produces.
-            spec -> spec.noTrim().after(actual -> {
-                assertThat(actual).contains("certifi");
-                return actual;
-            })
+            spec -> spec.noTrim().after(actual -> assertThat(actual).contains("certifi").actual())
           )
         );
     }
