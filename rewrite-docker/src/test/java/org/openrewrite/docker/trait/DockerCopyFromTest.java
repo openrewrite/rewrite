@@ -179,7 +179,7 @@ class DockerCopyFromTest implements RewriteTest {
                 assertThat(image.getTag()).isNull();
                 assertThat(image.isUnpinned()).isTrue();
                 assertThat(image.getUnpinnedReason())
-                  .isEqualTo(DockerCopyFrom.UnpinnedReason.IMPLICIT_LATEST);
+                  .isEqualTo(DockerImageReference.UnpinnedReason.IMPLICIT_LATEST);
                 return SearchResult.found(image.getTree());
             })
           )),

@@ -528,4 +528,80 @@ class DockerFromTest implements RewriteTest {
             );
         }
     }
+
+    @Nested
+    class Mutation implements RewriteTest {
+
+        @Test
+        void withTagUpgradesTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").tag("20.04").asVisitor((image, ctx) ->
+                  image.withTag("22.04"))
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withTagPreservesDigest() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("nginx").tag("1.20").asVisitor((image, ctx) ->
+                  image.withTag("1.25"))
+              )),
+              docker(
+                """
+                  FROM nginx:1.20@sha256:abc123
+                  """,
+                """
+                  FROM nginx:1.25@sha256:abc123
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withImageReferenceReplacesWholeReference() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").asVisitor((image, ctx) ->
+                  image.withImageReference("alpine:3.19"))
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM alpine:3.19
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withImageReferenceCanRemoveTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").tag("20.04").asVisitor((image, ctx) ->
+                  image.withImageReference("ubuntu"))
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu
+                  """
+              )
+            );
+        }
+    }
 }

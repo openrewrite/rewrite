@@ -48,7 +48,7 @@ import static org.openrewrite.Tree.randomId;
  * disambiguate.
  */
 @RequiredArgsConstructor
-public class DockerCopyFrom implements Trait<Docker.Instruction> {
+public class DockerCopyFrom implements Trait<Docker.Instruction>, DockerImageReference<Docker.Instruction> {
 
     @Getter
     private final Cursor cursor;
@@ -145,6 +145,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
      * Returns the image name (without tag or digest), or null if this is a stage reference
      * or there is no {@code --from} flag.
      */
+    @Override
     public @Nullable String getImageName() {
         Docker.@Nullable Argument[] components = components();
         return components == null ? null : new Matcher().extractTextWithVariables(components[0]);
@@ -153,6 +154,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
     /**
      * Returns the tag, or null if no tag is specified or this is a stage reference.
      */
+    @Override
     public @Nullable String getTag() {
         Docker.@Nullable Argument[] components = components();
         return components == null ? null : new Matcher().extractTextWithVariables(components[1]);
@@ -161,6 +163,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
     /**
      * Returns the digest, or null if no digest is specified or this is a stage reference.
      */
+    @Override
     public @Nullable String getDigest() {
         Docker.@Nullable Argument[] components = components();
         return components == null ? null : new Matcher().extractTextWithVariables(components[2]);
@@ -169,6 +172,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
     /**
      * Returns true if the referenced external image is pinned by digest.
      */
+    @Override
     public boolean isDigestPinned() {
         Docker.@Nullable Argument[] components = components();
         return components != null && components[2] != null;
@@ -178,22 +182,16 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
      * Returns true if the referenced external image is unpinned (no tag or an explicit
      * "latest" tag). Stage references and digest-pinned images are considered pinned.
      */
+    @Override
     public boolean isUnpinned() {
         return getUnpinnedReason() != null;
-    }
-
-    /**
-     * Reasons why an image may be considered unpinned.
-     */
-    public enum UnpinnedReason {
-        IMPLICIT_LATEST,
-        EXPLICIT_LATEST
     }
 
     /**
      * Returns the reason the referenced external image is unpinned, or null if it's pinned
      * or this is a stage reference.
      */
+    @Override
     public @Nullable UnpinnedReason getUnpinnedReason() {
         Docker.@Nullable Argument[] components = components();
         if (components == null) {
@@ -216,6 +214,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
      * Returns the instruction with its {@code --from} value replaced by {@code reference}
      * (e.g. {@code "nginx:1.25"}), or unchanged if there is no {@code --from} flag.
      */
+    @Override
     public Docker.Instruction withImageReference(String reference) {
         Docker.Argument arg = fromArgument();
         if (arg == null) {
@@ -239,6 +238,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
      * Returns the instruction with the tag of its external image reference replaced by
      * {@code tag}, preserving the image name and any digest. Unchanged for stage references.
      */
+    @Override
     public Docker.Instruction withTag(String tag) {
         String name = getImageName();
         if (name == null) {
@@ -251,6 +251,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
     /**
      * Checks if the image name matches the given glob pattern; always false for stage references.
      */
+    @Override
     public boolean imageNameMatches(String pattern) {
         Docker.@Nullable Argument[] components = components();
         if (components == null) {
@@ -264,6 +265,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
     /**
      * Checks if the tag matches the given glob pattern; false for stage references or when absent.
      */
+    @Override
     public boolean tagMatches(String pattern) {
         Docker.@Nullable Argument[] components = components();
         if (components == null || components[1] == null) {
@@ -277,6 +279,7 @@ public class DockerCopyFrom implements Trait<Docker.Instruction> {
     /**
      * Checks if the digest matches the given glob pattern; false for stage references or when absent.
      */
+    @Override
     public boolean digestMatches(String pattern) {
         Docker.@Nullable Argument[] components = components();
         if (components == null || components[2] == null) {

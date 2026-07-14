@@ -23,10 +23,16 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
+
+import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
 
 /**
  * A trait representing a Docker base image from a FROM instruction.
@@ -34,7 +40,7 @@ import org.openrewrite.trait.VisitFunction2;
  * along with matching capabilities that handle environment variables.
  */
 @RequiredArgsConstructor
-public class DockerFrom implements Trait<Docker.From> {
+public class DockerFrom implements Trait<Docker.From>, DockerImageReference<Docker.From> {
 
     @Getter
     private final Cursor cursor;
@@ -45,6 +51,7 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return The image name, or null if it contains unresolvable variables
      */
+    @Override
     public @Nullable String getImageName() {
         return new Matcher().extractTextWithVariables(getTree().getImageName());
     }
@@ -55,6 +62,7 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return The tag, or null
      */
+    @Override
     public @Nullable String getTag() {
         return new Matcher().extractTextWithVariables(getTree().getTag());
     }
@@ -65,6 +73,7 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return The digest, or null
      */
+    @Override
     public @Nullable String getDigest() {
         return new Matcher().extractTextWithVariables(getTree().getDigest());
     }
@@ -114,22 +123,9 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return true if the image is unpinned
      */
+    @Override
     public boolean isUnpinned() {
         return getUnpinnedReason() != null;
-    }
-
-    /**
-     * Reasons why an image may be considered unpinned.
-     */
-    public enum UnpinnedReason {
-        /**
-         * No tag specified, which defaults to "latest".
-         */
-        IMPLICIT_LATEST,
-        /**
-         * Explicit "latest" tag specified.
-         */
-        EXPLICIT_LATEST
     }
 
     /**
@@ -139,6 +135,7 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return The reason for being unpinned, or null if pinned
      */
+    @Override
     public @Nullable UnpinnedReason getUnpinnedReason() {
         Docker.From from = getTree();
         // Images with digest are pinned
@@ -165,6 +162,7 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return true if a digest is present
      */
+    @Override
     public boolean isDigestPinned() {
         return getTree().getDigest() != null;
     }
@@ -184,6 +182,7 @@ public class DockerFrom implements Trait<Docker.From> {
      * @param pattern The glob pattern to match against
      * @return true if the image name matches
      */
+    @Override
     public boolean imageNameMatches(String pattern) {
         Matcher m = new Matcher();
         String text = m.extractTextForMatching(getTree().getImageName());
@@ -196,6 +195,7 @@ public class DockerFrom implements Trait<Docker.From> {
      * @param pattern The glob pattern to match against
      * @return true if the tag matches, false if no tag or doesn't match
      */
+    @Override
     public boolean tagMatches(String pattern) {
         Docker.Argument tag = getTree().getTag();
         if (tag == null) {
@@ -212,6 +212,7 @@ public class DockerFrom implements Trait<Docker.From> {
      * @param pattern The glob pattern to match against
      * @return true if the digest matches, false if no digest or doesn't match
      */
+    @Override
     public boolean digestMatches(String pattern) {
         Docker.Argument digest = getTree().getDigest();
         if (digest == null) {
@@ -220,6 +221,30 @@ public class DockerFrom implements Trait<Docker.From> {
         Matcher m = new Matcher();
         String text = m.extractTextForMatching(digest);
         return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(digest));
+    }
+
+    /**
+     * Returns the FROM instruction with its image reference replaced by {@code reference}
+     * (e.g. {@code "nginx:1.25"}), decomposing it into the structured image name, tag, and
+     * digest while preserving the original prefix and quote style.
+     */
+    @Override
+    public Docker.From withImageReference(String reference) {
+        Docker.From from = getTree();
+        Docker.@Nullable Argument[] parts = ImageReferences.split(
+                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, getQuoteStyle())),
+                from.getImageName().getPrefix());
+        return from.withImageName(parts[0]).withTag(parts[1]).withDigest(parts[2]);
+    }
+
+    /**
+     * Returns the FROM instruction with the tag of its image reference replaced by {@code tag},
+     * preserving the image name and any digest.
+     */
+    @Override
+    public Docker.From withTag(String tag) {
+        return getTree().withTag(new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tag, getQuoteStyle()))));
     }
 
     /**
