@@ -20,9 +20,24 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.PathUtils.isValidSourcePath;
 import static org.openrewrite.PathUtils.matchesGlob;
 
 class PathUtilsTest {
+
+    @Test
+    void sourcePathValidation() {
+        // valid: relative and already normalized
+        assertThat(isValidSourcePath(path("foo.txt"))).isTrue();
+        assertThat(isValidSourcePath(path("foo/bar/baz.txt"))).isTrue();
+
+        assertThat(isValidSourcePath(path("").toAbsolutePath().resolve("foo.txt"))).isFalse(); // absolute
+        assertThat(isValidSourcePath(path(""))).isFalse(); // empty
+        assertThat(isValidSourcePath(path("../foo.txt"))).isFalse(); // outside the source root
+        assertThat(isValidSourcePath(path("foo/../../bar.txt"))).isFalse(); // outside the source root
+        assertThat(isValidSourcePath(path("foo/../bar.txt"))).isFalse(); // not normalized
+        assertThat(isValidSourcePath(path("foo/./bar.txt"))).isFalse(); // not normalized
+    }
     @Test
     void globMatching() {
         // exact matches
