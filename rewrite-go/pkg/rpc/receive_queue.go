@@ -76,6 +76,13 @@ func (q *ReceiveQueue) Take() RpcObjectData {
 	return msg
 }
 
+func (q *ReceiveQueue) peek() RpcObjectData {
+	if len(q.batch) == 0 {
+		q.batch = q.pull()
+	}
+	return q.batch[0]
+}
+
 // Receive reads the next value from the queue.
 // If onChange is non-nil, it's called for ADD/CHANGE states to deserialize nested fields.
 func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
@@ -230,6 +237,11 @@ func convertTo[T any](v any) T {
 }
 
 func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
+	return receiveTypedList(q, before, onChange, func(v any) any { return v })
+}
+
+// receiveTypedList is the generic, allocation-lean counterpart to ReceiveList.
+func receiveTypedList[T any](q *ReceiveQueue, before []T, onChange func(any) any, coerce func(any) T) []T {
 	msg := q.Take()
 
 	switch msg.State {
@@ -238,10 +250,9 @@ func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 	case Delete:
 		return nil
 	case Add:
-		before = []any{}
+		before = []T{}
 		fallthrough
 	case Change:
-		// Next message contains positions
 		posMsg := q.Take()
 		if posMsg.State != Change {
 			panic(fmt.Sprintf("expected CHANGE with positions, got %v (value=%v, valueType=%v)", posMsg.State, posMsg.Value, posMsg.ValueType))
@@ -250,23 +261,59 @@ func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 		if !ok {
 			panic(fmt.Sprintf("expected []any positions, got %T", posMsg.Value))
 		}
-		after := make([]any, len(positionsRaw))
+		after := make([]T, len(positionsRaw))
 		for i, posRaw := range positionsRaw {
 			pos := toInt(posRaw)
+			hasBefore := pos >= 0 && before != nil && pos < len(before)
+			// Unchanged elements — the common case, since a recipe touches few nodes —
+			// are copied across in their static type T. Routing them through Receive
+			// would box before[pos] into `any` (a heap allocation per element for the
+			// non-pointer struct types these lists hold) only to hand the same value back.
+			if hasBefore && q.peek().State == NoChange {
+				q.Take()
+				after[i] = before[pos]
+				continue
+			}
 			var beforeItem any
-			if pos >= 0 && before != nil && pos < len(before) {
+			if hasBefore {
 				beforeItem = before[pos]
 			}
-			after[i] = q.Receive(beforeItem, onChange)
+			after[i] = coerce(q.Receive(beforeItem, onChange))
 		}
 		return after
 	case EndOfObject:
-		// Sentinel from multi-batch GetObject; push back and return before unchanged
 		q.batch = append([]RpcObjectData{msg}, q.batch...)
 		return before
 	default:
 		panic(fmt.Sprintf("unsupported state for list: %v", msg.State))
 	}
+}
+
+// receiveTypedListNonNil is receiveTypedList for fields (e.g. leadingAnnotations) that drop
+// elements onChange narrowed to the zero T. It never mutates before: compaction only ever
+// rebuilds a freshly allocated ADD/CHANGE slice, and the NO_CHANGE slice — which holds no
+// dropped elements — is returned as is.
+func receiveTypedListNonNil[T any](q *ReceiveQueue, before []T, onChange func(any) any, coerce func(any) T, isNil func(T) bool) []T {
+	after := receiveTypedList(q, before, onChange, coerce)
+	if after == nil {
+		return nil
+	}
+	kept := 0
+	for _, e := range after {
+		if !isNil(e) {
+			kept++
+		}
+	}
+	if kept == len(after) {
+		return after
+	}
+	out := make([]T, 0, kept)
+	for _, e := range after {
+		if !isNil(e) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func toInt(v any) int {
