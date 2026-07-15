@@ -79,6 +79,8 @@ type server struct {
 	remoteRefs    map[int]any
 	batchSize     int
 
+	inProgressGetObjects map[string]*getObjectTransfer
+
 	// Separate state for reverse GetObject (Java→Go) to avoid conflating
 	// with forward direction state
 	reverseRemoteObjects map[string]any
@@ -207,6 +209,7 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               make(map[uintptr]int),
 		remoteRefs:              make(map[int]any),
+		inProgressGetObjects:    make(map[string]*getObjectTransfer),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
@@ -752,42 +755,115 @@ type getObjectRequest struct {
 	SourceFileType string `json:"sourceFileType"`
 }
 
+type getObjectBatch struct {
+	data []rpc.RpcObjectData
+	err  error
+}
+
+type getObjectTransfer struct {
+	after      any
+	batches    chan getObjectBatch
+	cancel     chan struct{}
+	cancelOnce sync.Once
+}
+
+type getObjectTransferCanceled struct{}
+
+func (t *getObjectTransfer) stop() {
+	t.cancelOnce.Do(func() {
+		close(t.cancel)
+	})
+}
+
+func (s *server) startGetObjectTransfer(id string, after, before any) *getObjectTransfer {
+	t := &getObjectTransfer{
+		after:   after,
+		batches: make(chan getObjectBatch, 1),
+		cancel:  make(chan struct{}),
+	}
+
+	// Use a fresh ref map for each complete GetObject exchange to avoid ref ID
+	// collisions between the reverse direction (Java→Go) and forward
+	// direction (Go→Java). It must span every batch in this transfer.
+	localRefs := make(map[uintptr]int)
+	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
+		select {
+		case t.batches <- getObjectBatch{data: batch}:
+		case <-t.cancel:
+			panic(getObjectTransferCanceled{})
+		}
+	}, localRefs)
+
+	go func() {
+		defer close(t.batches)
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				if _, canceled := recovered.(getObjectTransferCanceled); canceled {
+					return
+				}
+
+				buf := make([]byte, 4096)
+				n := runtime.Stack(buf, false)
+				s.logger.Printf("PANIC producing GetObject %s: %v\n%s", id, recovered, buf[:n])
+				err := fmt.Errorf("GetObject traversal failed: %v", recovered)
+				select {
+				case t.batches <- getObjectBatch{err: err}:
+				case <-t.cancel:
+				}
+			}
+		}()
+
+		sender := rpc.NewGoSender()
+		q.Send(after, before, func(v any) {
+			if tree, ok := v.(java.Tree); ok {
+				sender.Visit(tree, q)
+			}
+		})
+		q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
+		q.Flush()
+	}()
+
+	return t
+}
+
 func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	var req getObjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
 	}
 
-	obj := s.localObjects[req.ID]
-	if obj == nil {
-		return []rpc.RpcObjectData{
-			{State: rpc.Delete},
-			{State: rpc.EndOfObject},
-		}, nil
+	t := s.inProgressGetObjects[req.ID]
+	if t == nil {
+		obj := s.localObjects[req.ID]
+		if obj == nil {
+			return []rpc.RpcObjectData{
+				{State: rpc.Delete},
+				{State: rpc.EndOfObject},
+			}, nil
+		}
+
+		t = s.startGetObjectTransfer(req.ID, obj, s.remoteObjects[req.ID])
+		s.inProgressGetObjects[req.ID] = t
 	}
 
-	before := s.remoteObjects[req.ID]
-	// Use a fresh ref map for each GetObject to avoid ref ID collisions
-	// between the reverse direction (Java→Go) and forward direction (Go→Java).
-	localRefs := make(map[uintptr]int)
+	batch, ok := <-t.batches
+	if !ok {
+		delete(s.inProgressGetObjects, req.ID)
+		delete(s.remoteObjects, req.ID)
+		return nil, &rpcError{Code: -32603, Message: "GetObject traversal ended without END_OF_OBJECT"}
+	}
+	if batch.err != nil {
+		delete(s.inProgressGetObjects, req.ID)
+		delete(s.remoteObjects, req.ID)
+		return nil, &rpcError{Code: -32603, Message: batch.err.Error()}
+	}
 
-	var result []rpc.RpcObjectData
-	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
-		result = append(result, batch...)
-	}, localRefs)
+	if len(batch.data) > 0 && batch.data[len(batch.data)-1].State == rpc.EndOfObject {
+		delete(s.inProgressGetObjects, req.ID)
+		s.remoteObjects[req.ID] = t.after
+	}
 
-	sender := rpc.NewGoSender()
-	q.Send(obj, before, func(v any) {
-		if t, ok := v.(java.Tree); ok {
-			sender.Visit(t, q)
-		}
-	})
-	q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
-	q.Flush()
-
-	s.remoteObjects[req.ID] = obj
-
-	return result, nil
+	return batch.data, nil
 }
 
 type printRequest struct {
@@ -1043,6 +1119,10 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 }
 
 func (s *server) handleReset() bool {
+	for _, transfer := range s.inProgressGetObjects {
+		transfer.stop()
+	}
+	s.inProgressGetObjects = make(map[string]*getObjectTransfer)
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
 	s.localRefs = make(map[uintptr]int)
