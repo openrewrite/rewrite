@@ -84,8 +84,7 @@ type server struct {
 	reverseRemoteObjects map[string]any
 	reverseRemoteRefs    map[int]any
 
-	reverseTypePool    map[string]java.JavaType
-	goResolutionIntern *rpc.GoResolutionInternPool
+	reverseTypePool map[string]java.JavaType
 
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
@@ -211,7 +210,6 @@ func newServer(cfg serverConfig) *server {
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
-		goResolutionIntern:      rpc.NewGoResolutionInternPool(),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
@@ -910,7 +908,6 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	}
 
 	q := rpc.NewReceiveQueue(s.reverseRemoteRefs, fetchBatch).WithTypePool(s.reverseTypePool)
-	q.SetGoResolutionIntern(s.goResolutionIntern)
 
 	receiver := rpc.NewGoReceiver()
 
@@ -1053,7 +1050,6 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.reverseTypePool = make(map[string]java.JavaType)
-	s.goResolutionIntern = rpc.NewGoResolutionInternPool()
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
@@ -2135,8 +2131,9 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	// non-fatal — the affected files just lose module context and fall
 	// back to stdlib-only attribution.
 	type modCtx struct {
-		dir string // absolute directory containing go.mod
-		mrr *golang.GoResolutionResult
+		dir       string // absolute directory containing go.mod
+		mrr       *golang.GoResolutionResult
+		goProject golang.GoProject // lightweight per-CU marker; one shared instance per module
 	}
 	mods := make(map[string]*modCtx, len(disc.goMods))
 	for _, modPath := range disc.goMods {
@@ -2165,7 +2162,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
 			mrr.PackageModules = pkgs
 		}
-		mods[filepath.Dir(modPath)] = &modCtx{dir: filepath.Dir(modPath), mrr: mrr}
+		mods[filepath.Dir(modPath)] = &modCtx{
+			dir:       filepath.Dir(modPath),
+			mrr:       mrr,
+			goProject: golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+		}
 	}
 
 	// closestModule walks up `dir` looking for the deepest known go.mod
@@ -2336,7 +2337,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if o.modCtx != nil {
-			cu.Markers = java.AddMarker(cu.Markers, *o.modCtx.mrr)
+			// Attach only the lightweight GoProject (module path) per CU; the
+			// full GoResolutionResult stays on the go.mod/go.sum, looked up by
+			// sibling path — mirroring MavenResolutionResult on pom.xml and
+			// NodeResolutionResult on package.json.
+			cu.Markers = java.AddMarker(cu.Markers, o.modCtx.goProject)
 		}
 		id := cu.ID.String()
 		s.localObjects[id] = cu
@@ -2371,7 +2376,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr)
+			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
 		}
 		id := gm.Ident.String()
 		s.localObjects[id] = gm
@@ -2401,7 +2406,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr)
+			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr, m.goProject)
 		}
 		id := gs.Ident.String()
 		s.localObjects[id] = gs

@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.golang.marker.GoProject;
 import org.openrewrite.golang.marker.GoResolutionResult;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.golang.tree.GoMod;
@@ -42,10 +43,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * inference (item 8 of the rewrite-go parity plan).
  * <p>
  * Each .go file in the discovered project tree must resolve against its
- * closest-ancestor go.mod, not the project root's. The owning
- * {@link GoResolutionResult} marker is attached to each compilation unit
- * so Java-side recipes can read module dependencies without re-parsing
- * go.mod themselves.
+ * closest-ancestor go.mod, not the project root's. The lightweight
+ * {@link org.openrewrite.golang.marker.GoProject} marker (carrying the
+ * module path) is attached to each compilation unit; the full
+ * {@link GoResolutionResult} stays on the sibling go.mod/go.sum, mirroring
+ * MavenResolutionResult on pom.xml and NodeResolutionResult on package.json.
  */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class ParseProjectModuleContextTest {
@@ -71,7 +73,7 @@ class ParseProjectModuleContextTest {
     }
 
     @Test
-    void singleModuleAttachesResolutionResult() throws Exception {
+    void singleModuleAttachesProjectMarkerToCompilationUnits() throws Exception {
         // Single root go.mod + two .go files in different packages.
         write(projectDir.resolve("go.mod"), """
                 module example.com/foo
@@ -94,7 +96,9 @@ class ParseProjectModuleContextTest {
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
         List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
 
-        // Both .go files should be parsed and carry the same GoResolutionResult.
+        // Both .go files carry the lightweight GoProject marker (module path);
+        // the heavy GoResolutionResult stays on the sibling go.mod, mirroring
+        // MavenResolutionResult on pom.xml / NodeResolutionResult on package.json.
         List<Go.CompilationUnit> cus = sources.stream()
                 .filter(s -> s instanceof Go.CompilationUnit)
                 .map(s -> (Go.CompilationUnit) s)
@@ -102,13 +106,12 @@ class ParseProjectModuleContextTest {
         assertThat(cus).as("expected 2 .go compilation units").hasSize(2);
 
         for (Go.CompilationUnit cu : cus) {
-            GoResolutionResult mrr = cu.getMarkers().findFirst(GoResolutionResult.class).orElseThrow(
-                    () -> new AssertionError("missing GoResolutionResult on " + cu.getSourcePath()));
-            assertThat(mrr.getModulePath()).isEqualTo("example.com/foo");
-            assertThat(mrr.getGoVersion()).isEqualTo("1.22");
-            assertThat(mrr.getRequires())
-                    .extracting(GoResolutionResult.Require::getModulePath)
-                    .contains("github.com/google/uuid");
+            GoProject project = cu.getMarkers().findFirst(GoProject.class).orElseThrow(
+                    () -> new AssertionError("missing GoProject on " + cu.getSourcePath()));
+            assertThat(project.getModulePath()).isEqualTo("example.com/foo");
+            assertThat(cu.getMarkers().findFirst(GoResolutionResult.class))
+                    .as("GoResolutionResult must not ride on each compilation unit")
+                    .isEmpty();
         }
     }
 
@@ -180,9 +183,9 @@ class ParseProjectModuleContextTest {
         Go.CompilationUnit rootCu = findBySuffix(sources, "main.go");
         Go.CompilationUnit nestedCu = findBySuffix(sources, "nested/lib.go");
 
-        assertThat(rootCu.getMarkers().findFirst(GoResolutionResult.class).orElseThrow().getModulePath())
+        assertThat(rootCu.getMarkers().findFirst(GoProject.class).orElseThrow().getModulePath())
                 .isEqualTo("example.com/root");
-        assertThat(nestedCu.getMarkers().findFirst(GoResolutionResult.class).orElseThrow().getModulePath())
+        assertThat(nestedCu.getMarkers().findFirst(GoProject.class).orElseThrow().getModulePath())
                 .isEqualTo("example.com/nested");
     }
 
@@ -201,6 +204,7 @@ class ParseProjectModuleContextTest {
 
         Go.CompilationUnit cu = findBySuffix(sources, "main.go");
         assertThat(cu.getMarkers().findFirst(GoResolutionResult.class)).isEmpty();
+        assertThat(cu.getMarkers().findFirst(GoProject.class)).isEmpty();
     }
 
     private static Go.CompilationUnit findBySuffix(List<SourceFile> sources, String suffix) {

@@ -74,56 +74,33 @@ type project struct {
 }
 
 func (p project) Expand() []SourceSpec {
-	marker := golang.NewGoProject(p.name)
 	var out []SourceSpec
 	for _, s := range p.inner {
-		for _, ss := range s.Expand() {
-			ss.Markers = append(append([]java.Marker{}, ss.Markers...), marker)
-			out = append(out, ss)
-		}
+		out = append(out, s.Expand()...)
 	}
 	mergeGoSumIntoGoMod(out)
-	propagateModuleResolution(out)
+	// GoProject rides on every source (like JavaProject on the Java side)
+	// and carries the module path so recipes can classify imports without
+	// reading the sibling go.mod. The full GoResolutionResult stays on the
+	// go.mod/go.sum only, just as MavenResolutionResult lives on pom.xml.
+	marker := golang.NewGoProject(p.name, projectModulePath(out))
+	for i := range out {
+		out[i].Markers = append(append([]java.Marker{}, out[i].Markers...), marker)
+	}
 	return out
 }
 
-// propagateModuleResolution copies the go.mod's GoResolutionResult
-// marker onto every sibling .go SourceSpec in the project. Recipes
-// that need module context per file (e.g. RenamePackage's
-// fileBelongsTo check) can then read it directly off the
-// CompilationUnit's Markers without re-walking the project. Java does
-// the equivalent at parse time by attaching the parsed-go.mod marker
-// to each CU.
-func propagateModuleResolution(specs []SourceSpec) {
-	var mrr *golang.GoResolutionResult
+// projectModulePath returns the module path from the project's go.mod
+// GoResolutionResult marker, or "" if the project has no parseable go.mod.
+func projectModulePath(specs []SourceSpec) string {
 	for i := range specs {
 		if specs[i].Path == "go.mod" {
-			if found := FindGoResolutionResult(specs[i]); found != nil && found.ModulePath != "" {
-				mrr = found
-				break
+			if found := FindGoResolutionResult(specs[i]); found != nil {
+				return found.ModulePath
 			}
 		}
 	}
-	if mrr == nil {
-		return
-	}
-	for i := range specs {
-		if !strings.HasSuffix(specs[i].Path, ".go") {
-			continue
-		}
-		// Skip if already present (e.g. caller pre-attached one).
-		alreadyHas := false
-		for _, m := range specs[i].Markers {
-			if _, ok := m.(golang.GoResolutionResult); ok {
-				alreadyHas = true
-				break
-			}
-		}
-		if alreadyHas {
-			continue
-		}
-		specs[i].Markers = append(append([]java.Marker{}, specs[i].Markers...), *mrr)
-	}
+	return ""
 }
 
 // mergeGoSumIntoGoMod finds a sibling go.sum spec inside the same expanded

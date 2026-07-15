@@ -52,124 +52,9 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	return receiveMarkersCodec(recvQ, java.Markers{})
 }
 
-func roundTripMarkersInterned(t *testing.T, before java.Markers, pool *GoResolutionInternPool) java.Markers {
-	t.Helper()
-	var messages []RpcObjectData
-	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
-		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
-	SendMarkersCodec(before, sendQ)
-	sendQ.Flush()
-
-	delivered := false
-	recvQ := NewReceiveQueue(make(map[int]any), func() []RpcObjectData {
-		if delivered {
-			return nil
-		}
-		delivered = true
-		return messages
-	})
-	recvQ.SetGoResolutionIntern(pool)
-	return receiveMarkersCodec(recvQ, java.Markers{})
-}
-
-func sampleResolutionResult(id uuid.UUID, modulePath string) golang.GoResolutionResult {
-	return golang.GoResolutionResult{
-		Ident:      id,
-		ModulePath: modulePath,
-		GoVersion:  "1.22",
-		Path:       "/tmp/go.mod",
-		Requires: []golang.GoRequire{
-			{ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
-		},
-		ResolvedDependencies: []golang.GoResolvedDependency{
-			{ModulePath: "github.com/google/uuid", Version: "v1.6.0", ModuleHash: "h1:abc="},
-		},
-		PackageModules: []golang.GoPackageModule{
-			{ImportPath: "github.com/google/uuid", ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
-		},
-	}
-}
-
-func TestGoResolutionResultInterningSharesBackingSlices(t *testing.T) {
-	// given
-	id := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	mrr := sampleResolutionResult(id, "example.com/foo")
-	pool := NewGoResolutionInternPool()
-
-	// when
-	after1 := roundTripMarkersInterned(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}, pool)
-	after2 := roundTripMarkersInterned(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}, pool)
-	got1 := after1.Entries[0].(golang.GoResolutionResult)
-	got2 := after2.Entries[0].(golang.GoResolutionResult)
-
-	// then
-	if !reflect.DeepEqual(mrr, got1) {
-		t.Fatalf("round-trip mismatch\nbefore: %+v\nafter:  %+v", mrr, got1)
-	}
-	if &got1.ResolvedDependencies[0] != &got2.ResolvedDependencies[0] {
-		t.Errorf("ResolvedDependencies not interned: distinct backing arrays")
-	}
-	if &got1.Requires[0] != &got2.Requires[0] {
-		t.Errorf("Requires not interned: distinct backing arrays")
-	}
-	if &got1.PackageModules[0] != &got2.PackageModules[0] {
-		t.Errorf("PackageModules not interned: distinct backing arrays")
-	}
-}
-
-func TestGoResolutionResultInterningKeepsDistinctModulesSeparate(t *testing.T) {
-	// given
-	pool := NewGoResolutionInternPool()
-	a := sampleResolutionResult(uuid.MustParse("11111111-1111-1111-1111-111111111111"), "example.com/a")
-	b := sampleResolutionResult(uuid.MustParse("22222222-2222-2222-2222-222222222222"), "example.com/b")
-
-	// when
-	gotA := roundTripMarkersInterned(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{a}}, pool).Entries[0].(golang.GoResolutionResult)
-	gotB := roundTripMarkersInterned(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{b}}, pool).Entries[0].(golang.GoResolutionResult)
-
-	// then
-	if gotA.ModulePath != "example.com/a" || gotB.ModulePath != "example.com/b" {
-		t.Errorf("distinct modules collapsed: %q / %q", gotA.ModulePath, gotB.ModulePath)
-	}
-	if &gotA.ResolvedDependencies[0] == &gotB.ResolvedDependencies[0] {
-		t.Errorf("distinct modules unexpectedly share a backing array")
-	}
-}
-
-func TestGoResolutionResultInterningPassesThroughNilIdent(t *testing.T) {
-	// given
-	pool := NewGoResolutionInternPool()
-	mrr := sampleResolutionResult(uuid.Nil, "example.com/foo")
-
-	// when
-	got1 := roundTripMarkersInterned(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}, pool).Entries[0].(golang.GoResolutionResult)
-	got2 := roundTripMarkersInterned(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}, pool).Entries[0].(golang.GoResolutionResult)
-
-	// then
-	if &got1.ResolvedDependencies[0] == &got2.ResolvedDependencies[0] {
-		t.Errorf("nil-Ident results must not be interned")
-	}
-}
-
-func TestGoResolutionResultInterningDisabledByDefault(t *testing.T) {
-	// given
-	id := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	mrr := sampleResolutionResult(id, "example.com/foo")
-
-	// when
-	got1 := roundTripMarkers(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}).Entries[0].(golang.GoResolutionResult)
-	got2 := roundTripMarkers(t, java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}).Entries[0].(golang.GoResolutionResult)
-
-	// then
-	if &got1.ResolvedDependencies[0] == &got2.ResolvedDependencies[0] {
-		t.Errorf("expected independent backing arrays without an intern pool")
-	}
-}
-
 func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	gp := golang.GoProject{Ident: id, ProjectName: "example/foo"}
+	gp := golang.GoProject{Ident: id, ProjectName: "example/foo", ModulePath: "example.com/foo"}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{gp}}
 
 	after := roundTripMarkers(t, before)
@@ -185,6 +70,9 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	}
 	if got.ProjectName != "example/foo" {
 		t.Errorf("ProjectName: want %q, got %q", "example/foo", got.ProjectName)
+	}
+	if got.ModulePath != "example.com/foo" {
+		t.Errorf("ModulePath: want %q, got %q", "example.com/foo", got.ModulePath)
 	}
 }
 

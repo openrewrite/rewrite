@@ -130,7 +130,7 @@ public final class Assertions {
      * child source.
      */
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
-        return sourceSpec.markers(new GoProject(Tree.randomId(), projectName));
+        return sourceSpec.markers(new GoProject(Tree.randomId(), projectName, null));
     }
 
     /**

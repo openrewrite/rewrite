@@ -535,8 +535,11 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	return out
 }
 
-// FindModulePath extracts the GoResolutionResult marker's ModulePath
-// from the cu (or its sibling go.mod, if attached). Returns "" when no
+// FindModulePath extracts the module import path from the cu's GoProject
+// marker. The full GoResolutionResult (dependency graph) lives on the
+// sibling go.mod, not on each compilation unit; GoProject carries just the
+// module path recipes need to classify imports — analogous to
+// JavaProject.Publication carrying GAV per source. Returns "" when no
 // marker is present (which is fine — IsLocal handles empty modulePath
 // by reporting false uniformly).
 func FindModulePath(cu *golang.CompilationUnit) string {
@@ -544,14 +547,12 @@ func FindModulePath(cu *golang.CompilationUnit) string {
 		return ""
 	}
 	for _, m := range cu.Markers.Entries {
-		if mrr, ok := m.(golang.GoResolutionResult); ok {
-			return mrr.ModulePath
+		if gp, ok := m.(golang.GoProject); ok && gp.ModulePath != "" {
+			return gp.ModulePath
 		}
 	}
 	return ""
 }
 
-// _ golang.GoResolutionResult is referenced via FindModulePath; this
-// silences the unused-import linter when callers don't pull in the tree
-// package explicitly.
+// _ keeps the uuid import referenced regardless of build tags.
 var _ = uuid.UUID{}

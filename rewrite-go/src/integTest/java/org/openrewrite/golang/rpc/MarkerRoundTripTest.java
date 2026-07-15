@@ -82,7 +82,7 @@ class MarkerRoundTripTest {
         SourceFile cu = GolangParser.builder().build()
                 .parse(source).findFirst().orElseThrow();
 
-        GoProject marker = new GoProject(UUID.randomUUID(), "example/foo");
+        GoProject marker = new GoProject(UUID.randomUUID(), "example/foo", "example.com/foo");
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
 
         // Force the marker through Go's receive codec.
@@ -176,7 +176,7 @@ class MarkerRoundTripTest {
                 .parse(source).findFirst().orElseThrow();
 
         Markers markers = cu.getMarkers()
-                .addIfAbsent(new GoProject(UUID.randomUUID(), "example/foo"))
+                .addIfAbsent(new GoProject(UUID.randomUUID(), "example/foo", "example.com/foo"))
                 .addIfAbsent(new GoResolutionResult(
                         UUID.randomUUID(),
                         "example.com/foo",
@@ -212,7 +212,7 @@ class MarkerRoundTripTest {
         UUID projectId = UUID.randomUUID();
         UUID gomodId = UUID.randomUUID();
         cu = cu.withMarkers(cu.getMarkers()
-                .addIfAbsent(new GoProject(projectId, "example/foo"))
+                .addIfAbsent(new GoProject(projectId, "example/foo", "example.com/foo"))
                 .addIfAbsent(new GoResolutionResult(
                         gomodId, "example.com/foo", "1.22", null, "go.mod",
                         Collections.singletonList(
@@ -238,6 +238,7 @@ class MarkerRoundTripTest {
                 () -> new AssertionError("GoProject marker missing from round-trip result"));
         assertThat(project.getId()).isEqualTo(projectId);
         assertThat(project.getProjectName()).isEqualTo("example/foo");
+        assertThat(project.getModulePath()).isEqualTo("example.com/foo");
 
         GoResolutionResult mrr = resultMarkers.findFirst(GoResolutionResult.class).orElseThrow(
                 () -> new AssertionError("GoResolutionResult marker missing from round-trip result"));
