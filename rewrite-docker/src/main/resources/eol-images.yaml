@@ -44,6 +44,11 @@
   eolDate: "2024-08-14"
   suggestedReplacement: trixie (13)
 
+- imageName: debian
+  tagPatterns: [bookworm, "bookworm-*", "12", "12.*"]
+  eolDate: "2026-07-11"
+  suggestedReplacement: trixie (13)
+
 - imageName: ubuntu
   tagPatterns: ["12.04", "12.04.*"]
   eolDate: "2017-04-28"
