@@ -46,6 +46,23 @@ class FindKeyTest implements RewriteTest {
     }
 
     @Test
+    void findKeyInInlineTable() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey(
+            "testcontainers-mongo.name"
+          )),
+          toml(
+            """
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb" }
+              """,
+            """
+              testcontainers-mongo = { group = "org.testcontainers", ~~>name = "mongodb" }
+              """
+          )
+        );
+    }
+
+    @Test
     void findMultipleMatchingKeys() {
         rewriteRun(
           spec -> spec.recipe(new FindKey(

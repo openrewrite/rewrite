@@ -16,7 +16,12 @@
 
 package rpc
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+)
 
 type State int
 
@@ -72,29 +77,39 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 }
 
 type wireObjectData struct {
-	State     string          `json:"state"`
-	ValueType *string         `json:"valueType"`
-	Value     json.RawMessage `json:"value"`
-	Ref       *int            `json:"ref"`
+	State     string  `json:"state"`
+	ValueType *string `json:"valueType"`
+	Value     any     `json:"value"`
+	Ref       *int    `json:"ref"`
 }
 
 func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
-	var wire []wireObjectData
-	if err := json.Unmarshal(data, &wire); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	open, err := dec.Token()
+	if err != nil {
+		if err == io.EOF {
+			return nil, nil
+		}
 		return nil, err
 	}
-	batch := make([]RpcObjectData, len(wire))
-	for i := range wire {
-		w := &wire[i]
-		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
-		if len(w.Value) > 0 {
-			var v any
-			if err := json.Unmarshal(w.Value, &v); err != nil {
-				return nil, err
-			}
-			d.Value = internValue(v, intern)
+	if open == nil {
+		return nil, nil
+	}
+	if d, ok := open.(json.Delim); !ok || d != '[' {
+		return nil, fmt.Errorf("expected JSON array, got %v", open)
+	}
+	batch := make([]RpcObjectData, 0, len(data)/40+1)
+	var w wireObjectData
+	for dec.More() {
+		w = wireObjectData{}
+		if err := dec.Decode(&w); err != nil {
+			return nil, err
 		}
-		batch[i] = d
+		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
+		if w.Value != nil {
+			d.Value = internValue(w.Value, intern)
+		}
+		batch = append(batch, d)
 	}
 	return batch, nil
 }
