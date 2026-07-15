@@ -169,7 +169,7 @@ func TestGoResolutionResultInterningDisabledByDefault(t *testing.T) {
 
 func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	gp := golang.GoProject{Ident: id, ProjectName: "example/foo"}
+	gp := golang.GoProject{Ident: id, ProjectName: "example/foo", ModulePath: "example.com/foo"}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{gp}}
 
 	after := roundTripMarkers(t, before)
@@ -185,6 +185,9 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	}
 	if got.ProjectName != "example/foo" {
 		t.Errorf("ProjectName: want %q, got %q", "example/foo", got.ProjectName)
+	}
+	if got.ModulePath != "example.com/foo" {
+		t.Errorf("ModulePath: want %q, got %q", "example.com/foo", got.ModulePath)
 	}
 }
 

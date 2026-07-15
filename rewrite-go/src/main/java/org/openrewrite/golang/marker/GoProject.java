@@ -18,6 +18,7 @@ package org.openrewrite.golang.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -42,16 +43,28 @@ public class GoProject implements Marker, RpcCodec<GoProject> {
 
     String projectName;
 
+    /**
+     * The module's import path from its {@code go.mod} {@code module} directive
+     * (e.g. {@code github.com/foo/bar}). Carried per compilation unit so recipes
+     * can form import paths without re-reading the sibling go.mod — analogous to
+     * {@code JavaProject.Publication} carrying GAV coordinates per source. The
+     * full dependency graph stays on {@link GoResolutionResult}, attached to the
+     * go.mod/go.sum only.
+     */
+    @Nullable String modulePath;
+
     @Override
     public void rpcSend(GoProject after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
         q.getAndSend(after, GoProject::getProjectName);
+        q.getAndSend(after, GoProject::getModulePath);
     }
 
     @Override
     public GoProject rpcReceive(GoProject before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withProjectName(q.receive(before.getProjectName()));
+                .withProjectName(q.receive(before.getProjectName()))
+                .withModulePath(q.receive(before.getModulePath()));
     }
 }

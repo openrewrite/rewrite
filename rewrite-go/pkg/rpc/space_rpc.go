@@ -203,9 +203,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// Semicolon.rpcSend sends: id (UUID string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.Semicolon).Ident.String() }, nil)
 	case golang.GoProject:
-		// GoProject.rpcSend sends: id (UUID string), projectName (string)
+		// GoProject.rpcSend sends: id (UUID string), projectName (string), modulePath (string, nullable)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GoProject).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GoProject).ProjectName }, nil)
+		q.GetAndSend(m, func(x any) any { return emptyAsNil(x.(golang.GoProject).ModulePath) }, nil)
 	case golang.GoResolutionResult:
 		// Field order mirrors Java's GoResolutionResult#rpcSend exactly;
 		// see go_resolution_result_codec.go for the per-field commentary.
@@ -473,6 +474,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			m.ProjectName = receiveScalar[string](q, m.ProjectName)
+			m.ModulePath = receiveNullableString(q, m.ModulePath)
 			return m
 		case golang.GoResolutionResult:
 			return receiveGoResolutionResult(m, q)

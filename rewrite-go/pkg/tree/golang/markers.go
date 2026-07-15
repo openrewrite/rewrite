@@ -24,6 +24,7 @@ import "github.com/google/uuid"
 type GoProject struct {
 	Ident       uuid.UUID
 	ProjectName string
+	ModulePath  string
 }
 
 func (m GoProject) ID() uuid.UUID { return m.Ident }
@@ -46,6 +47,6 @@ func NewSemicolon() Semicolon {
 	return Semicolon{Ident: uuid.New()}
 }
 
-func NewGoProject(projectName string) GoProject {
-	return GoProject{Ident: uuid.New(), ProjectName: projectName}
+func NewGoProject(projectName, modulePath string) GoProject {
+	return GoProject{Ident: uuid.New(), ProjectName: projectName, ModulePath: modulePath}
 }
