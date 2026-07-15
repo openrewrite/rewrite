@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.tree.TomlKey;
 import org.openrewrite.toml.tree.TomlRightPadded;
 import org.openrewrite.toml.tree.TomlValue;
 
@@ -64,6 +65,13 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         return i.withMarkers(visitMarkers(i.getMarkers(), p));
     }
 
+    public Toml visitDottedKey(Toml.DottedKey dottedKey, P p) {
+        Toml.DottedKey d = dottedKey;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d.getPadding().withNames(ListUtils.map(d.getPadding().getNames(), n -> visitRightPadded(n, p)));
+    }
+
     public Toml visitKeyValue(Toml.KeyValue keyValue, P p) {
         Toml.KeyValue kv = keyValue;
         kv = kv.withPrefix(visitSpace(kv.getPrefix(), p));
@@ -86,6 +94,10 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         Toml.Table t = table;
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        TomlRightPadded<TomlKey> name = t.getPadding().getName();
+        if (name != null) {
+            t = t.getPadding().withName(visitRightPadded(name, p));
+        }
         return t.withValues(ListUtils.map(t.getValues(), v -> visit(v, p)));
     }
 

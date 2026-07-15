@@ -40,6 +40,11 @@ public class TomlIsoVisitor<P> extends TomlVisitor<P> {
     }
 
     @Override
+    public Toml.DottedKey visitDottedKey(Toml.DottedKey dottedKey, P p) {
+        return (Toml.DottedKey) super.visitDottedKey(dottedKey, p);
+    }
+
+    @Override
     public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, P p) {
         return (Toml.KeyValue) super.visitKeyValue(keyValue, p);
     }

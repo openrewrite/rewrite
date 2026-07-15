@@ -128,8 +128,11 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     @Override
-    public Toml.Identifier visitKey(TomlParser.KeyContext ctx) {
-        return (Toml.Identifier) super.visitKey(ctx);
+    public TomlKey visitKey(TomlParser.KeyContext ctx) {
+        if (ctx.simpleKey() != null) {
+            return visitSimpleKey(ctx.simpleKey());
+        }
+        return visitDottedKey(ctx.dottedKey());
     }
 
     @Override
@@ -147,22 +150,16 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     @Override
-    public Toml.Identifier visitDottedKey(TomlParser.DottedKeyContext ctx) {
+    public Toml.DottedKey visitDottedKey(TomlParser.DottedKeyContext ctx) {
         Space prefix = prefix(ctx);
-        StringBuilder text = new StringBuilder();
-        StringBuilder key = new StringBuilder();
-        for (ParseTree child : ctx.children) {
-            Space space = sourceBefore(child.getText());
-            text.append(space.getWhitespace()).append(child.getText());
-            key.append(child.getText());
+        List<TomlParser.SimpleKeyContext> simpleKeys = ctx.simpleKey();
+        List<TomlRightPadded<Toml.Identifier>> segments = new ArrayList<>(simpleKeys.size());
+        for (int i = 0; i < simpleKeys.size(); i++) {
+            Toml.Identifier segment = visitSimpleKey(simpleKeys.get(i));
+            Space after = i < simpleKeys.size() - 1 ? sourceBefore(".") : Space.EMPTY;
+            segments.add(TomlRightPadded.build(segment).withAfter(after));
         }
-        return new Toml.Identifier(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                text.toString(),
-                key.toString()
-        );
+        return new Toml.DottedKey(randomId(), prefix, Markers.EMPTY, segments);
     }
 
     /**
@@ -192,7 +189,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                TomlRightPadded.build((TomlKey) visitKey(c.key())).withAfter(sourceBefore("=")),
+                TomlRightPadded.build(visitKey(c.key())).withAfter(sourceBefore("=")),
                 visitValue(c.value())
             ));
     }
@@ -413,8 +410,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     public Toml visitStandardTable(TomlParser.StandardTableContext ctx) {
         return convert(ctx, (c, prefix) -> {
             sourceBefore("[");
-            Toml.Identifier tableName = visitKey(c.key());
-            TomlRightPadded<Toml.Identifier> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]"));
+            TomlKey tableName = visitKey(c.key());
+            TomlRightPadded<TomlKey> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]"));
 
             List<TomlParser.KeyValueContext> values = c.keyValue();
             List<TomlRightPadded<Toml>> elements = new ArrayList<>();
@@ -436,8 +433,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     public Toml visitArrayTable(TomlParser.ArrayTableContext ctx) {
         return convert(ctx, (c, prefix) -> {
             sourceBefore("[[");
-            Toml.Identifier tableName = visitKey(c.key());
-            TomlRightPadded<Toml.Identifier> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]]"));
+            TomlKey tableName = visitKey(c.key());
+            TomlRightPadded<TomlKey> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]]"));
 
             List<TomlParser.KeyValueContext> values = c.keyValue();
             List<TomlRightPadded<Toml>> elements = new ArrayList<>();

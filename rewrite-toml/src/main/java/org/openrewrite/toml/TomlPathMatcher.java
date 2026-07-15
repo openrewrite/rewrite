@@ -18,7 +18,6 @@ package org.openrewrite.toml;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlKey;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -95,29 +94,20 @@ public class TomlPathMatcher {
 
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                TomlKey key = kv.getKey();
-                if (key instanceof Toml.Identifier) {
-                    String keyName = ((Toml.Identifier) key).getName();
-                    Cursor parent = current.getParent();
-                    while (parent != null) {
-                        Object parentValue = parent.getValue();
-                        if (parentValue instanceof Toml.Table) {
-                            Toml.Table table = (Toml.Table) parentValue;
-                            if (table.getName() != null) {
-                                String tableName = table.getName().getName();
-                                // Split dotted names: [tool.poetry]
-                                String[] parts = tableName.split("\\.");
-                                for (int i = parts.length - 1; i >= 0; i--) {
-                                    path.add(0, parts[i].trim());
-                                }
-                            }
-                            break;
+                Cursor parent = current.getParent();
+                while (parent != null) {
+                    Object parentValue = parent.getValue();
+                    if (parentValue instanceof Toml.Table) {
+                        Toml.Table table = (Toml.Table) parentValue;
+                        if (table.getName() != null) {
+                            path.addAll(table.getName().getPath());
                         }
-                        parent = parent.getParent();
+                        break;
                     }
-                    path.add(keyName);
-                    return path;
+                    parent = parent.getParent();
                 }
+                path.addAll(kv.getKey().getPath());
+                return path;
             }
 
             current = current.getParent();

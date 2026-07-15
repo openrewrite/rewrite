@@ -67,6 +67,14 @@ public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Toml visitDottedKey(Toml.DottedKey dottedKey, PrintOutputCapture<P> p) {
+        beforeSyntax(dottedKey, p);
+        visitRightPadded(dottedKey.getPadding().getNames(), ".", p);
+        afterSyntax(dottedKey, p);
+        return dottedKey;
+    }
+
+    @Override
     public Toml visitKeyValue(Toml.KeyValue keyValue, PrintOutputCapture<P> p) {
         beforeSyntax(keyValue, p);
         visitRightPadded(keyValue.getPadding().getKey(), p);

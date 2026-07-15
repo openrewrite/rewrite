@@ -199,6 +199,81 @@ public interface Toml extends Tree {
         }
     }
 
+    /**
+     * A dotted key such as {@code physical.color} or {@code site."google.com"}.
+     * Each segment is a {@link Identifier}; the dots between them are emitted
+     * by the printer and not stored in the AST. {@code TomlRightPadded.after} on
+     * each segment captures whitespace before the following dot (empty for the
+     * last segment).
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DottedKey implements TomlKey {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        List<TomlRightPadded<Identifier>> names;
+
+        public List<Identifier> getNames() {
+            return TomlRightPadded.getElements(names);
+        }
+
+        public DottedKey withNames(List<Identifier> names) {
+            return getPadding().withNames(TomlRightPadded.withElements(this.names, names));
+        }
+
+        @Override
+        public <P> Toml acceptToml(TomlVisitor<P> v, P p) {
+            return v.visitDottedKey(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "DottedKey{prefix=" + prefix + ", path=" + getPath() + "}";
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DottedKey t;
+
+            public List<TomlRightPadded<Identifier>> getNames() {
+                return t.names;
+            }
+
+            public DottedKey withNames(List<TomlRightPadded<Identifier>> names) {
+                return t.names == names ? t : new DottedKey(t.id, t.prefix, t.markers, names);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -315,13 +390,13 @@ public interface Toml extends Tree {
         Markers markers;
 
         @Nullable
-        TomlRightPadded<Toml.Identifier> name;
+        TomlRightPadded<TomlKey> name;
 
-        public Toml.@Nullable Identifier getName() {
+        public @Nullable TomlKey getName() {
             return name != null ? name.getElement() : null;
         }
 
-        public Table withName(Toml.@Nullable Identifier name) {
+        public Table withName(@Nullable TomlKey name) {
             return getPadding().withName(TomlRightPadded.withElement(this.name, name));
         }
 
@@ -367,11 +442,11 @@ public interface Toml extends Tree {
                 return t.values == values ? t : new Table(t.id, t.prefix, t.markers, t.name, values);
             }
 
-            public @Nullable TomlRightPadded<Toml.Identifier> getName() {
+            public @Nullable TomlRightPadded<TomlKey> getName() {
                 return t.name;
             }
 
-            public Table withName(@Nullable TomlRightPadded<Identifier> name) {
+            public Table withName(@Nullable TomlRightPadded<TomlKey> name) {
                 return t.name == name ? t : new Table(t.id, t.prefix, t.markers, name, t.values);
             }
         }
