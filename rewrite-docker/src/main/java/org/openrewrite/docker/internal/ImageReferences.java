@@ -128,11 +128,6 @@ public final class ImageReferences {
         return new Docker.@Nullable Argument[]{imageName, tag, digest};
     }
 
-    /**
-     * Returns the index of the {@code :} that separates the tag, or -1 if there is none. Only a
-     * colon after the last {@code /} can be a tag separator; an earlier colon is a registry port
-     * (e.g. {@code registry.example.com:5000/app}), which is part of the image name.
-     */
     private static int tagColonIndex(String text) {
         return text.indexOf(':', text.lastIndexOf('/') + 1);
     }
