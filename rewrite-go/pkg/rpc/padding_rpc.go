@@ -327,6 +327,17 @@ func coerceToStatementRP(rp any) java.RightPadded[java.Statement] {
 	panic(fmt.Sprintf("coerceToStatementRP: element does not implement java.Statement (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
 }
 
+// coerceAnnotation narrows a received leadingAnnotations element to *java.Annotation,
+// mapping a nil element to nil so receiveTypedListNonNil can drop it.
+func coerceAnnotation(v any) *java.Annotation {
+	if v == nil {
+		return nil
+	}
+	return v.(*java.Annotation)
+}
+
+func annotationIsNil(a *java.Annotation) bool { return a == nil }
+
 // coerceLeftPaddedIdent converts a LeftPadded of any variant to LeftPadded[*Identifier].
 // Java may send the value generic-parameterized on Expression even though the element
 // is an *Identifier; this helper bridges that asymmetry.
