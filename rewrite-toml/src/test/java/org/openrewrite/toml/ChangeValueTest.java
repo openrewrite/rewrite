@@ -69,6 +69,59 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
+    void changeValueInInlineTable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue(
+            "testcontainers-mongo.name",
+            "\"testcontainers-mongodb\""
+          )),
+          toml(
+            """
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb" }
+              """,
+            """
+              testcontainers-mongo = { group = "org.testcontainers", name = "testcontainers-mongodb" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeValueInInlineTableInsideSection() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue(
+            "deps.mongo.name",
+            "\"testcontainers-mongodb\""
+          )),
+          toml(
+            """
+              [deps]
+              mongo = { group = "org.testcontainers", name = "mongodb" }
+              """,
+            """
+              [deps]
+              mongo = { group = "org.testcontainers", name = "testcontainers-mongodb" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotChangeInlineTableMemberWithBareKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue(
+            "name",
+            "\"testcontainers-mongodb\""
+          )),
+          toml(
+            """
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb" }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeBooleanValue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
