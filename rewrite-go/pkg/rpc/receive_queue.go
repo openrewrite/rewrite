@@ -30,6 +30,33 @@ type ReceiveQueue struct {
 	batch []RpcObjectData
 	refs  map[int]any
 	pull  func() []RpcObjectData
+
+	typePool           map[string]java.JavaType
+	goResolutionIntern *GoResolutionInternPool
+}
+
+func (q *ReceiveQueue) WithTypePool(pool map[string]java.JavaType) *ReceiveQueue {
+	q.typePool = pool
+	return q
+}
+
+func (q *ReceiveQueue) internType(t java.JavaType) java.JavaType {
+	if q.typePool == nil {
+		return t
+	}
+	sig := java.TypeSignature(t)
+	if sig == "" {
+		return t
+	}
+	if c, ok := q.typePool[sig]; ok {
+		return c
+	}
+	q.typePool[sig] = t
+	return t
+}
+
+func (q *ReceiveQueue) SetGoResolutionIntern(pool *GoResolutionInternPool) {
+	q.goResolutionIntern = pool
 }
 
 func NewReceiveQueue(refs map[int]any, pull func() []RpcObjectData) *ReceiveQueue {

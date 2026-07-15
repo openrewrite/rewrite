@@ -71,20 +71,62 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func ParseObjectData(m map[string]any) RpcObjectData {
-	d := RpcObjectData{}
-	if s, ok := m["state"].(string); ok {
-		d.State = parseState(s)
+type wireObjectData struct {
+	State     string          `json:"state"`
+	ValueType *string         `json:"valueType"`
+	Value     json.RawMessage `json:"value"`
+	Ref       *int            `json:"ref"`
+}
+
+func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
+	var wire []wireObjectData
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return nil, err
 	}
-	if vt, ok := m["valueType"].(string); ok {
-		d.ValueType = &vt
+	batch := make([]RpcObjectData, len(wire))
+	for i := range wire {
+		w := &wire[i]
+		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
+		if len(w.Value) > 0 {
+			var v any
+			if err := json.Unmarshal(w.Value, &v); err != nil {
+				return nil, err
+			}
+			d.Value = internValue(v, intern)
+		}
+		batch[i] = d
 	}
-	d.Value = m["value"]
-	if ref, ok := m["ref"]; ok && ref != nil {
-		r := int(ref.(float64))
-		d.Ref = &r
+	return batch, nil
+}
+
+func internValue(v any, tbl map[string]string) any {
+	switch x := v.(type) {
+	case string:
+		return internString(x, tbl)
+	case []any:
+		for i := range x {
+			x[i] = internValue(x[i], tbl)
+		}
+		return x
+	case map[string]any:
+		for k, val := range x {
+			x[k] = internValue(val, tbl)
+		}
+		return x
+	default:
+		return v
 	}
-	return d
+}
+
+func internString(s string, tbl map[string]string) string {
+	if s == "" || tbl == nil {
+		return s
+	}
+	if c, ok := tbl[s]; ok {
+		return c
+	}
+	tbl[s] = s
+	return s
 }
 
 func parseState(s string) State {

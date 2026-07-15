@@ -253,6 +253,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         Set<Path> seenInThisBatch = new HashSet<>();
                         generated.removeIf(source -> {
                             Path sourcePath = source.getSourcePath();
+                            if (!PathUtils.isValidSourcePath(sourcePath)) {
+                                sourceSet.onGenerateInvalidPath(sourcePath);
+                                handleError(recipe, source, null, new IllegalStateException(
+                                        "Recipe " + recipe.getName() + " generated a source file with an invalid path: " + sourcePath));
+                                return true;
+                            }
                             if (sourceSet.getBefore(sourcePath) != null) {
                                 sourceSet.onGenerateCollision(sourcePath, true);
                                 return true;

@@ -1433,6 +1433,88 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void doesNotSendCredentialsWhenRepositoryServesAnonymously() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> authorizationHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        authorizationHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Mirror Apache Maven: a repository that serves anonymously must never be sent credentials
+                assertThat(authorizationHeaders).containsOnlyNulls();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void authenticatesPreemptivelyAfterCredentialsRequired() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestAuthHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestAuthHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        }
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            return new MockResponse().setResponseCode(401).setBody("");
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion("fred", "fred", "1.0.0"), null, null, repositories));
+                assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion("fred", "other", "1.0.0"), null, null, repositories));
+
+                // Only the first body GET probes anonymously; once the host is known to require credentials, later
+                // GETs authenticate preemptively instead of paying another anonymous 401 round-trip.
+                assertThat(getRequestAuthHeaders.stream().filter(Objects::isNull).count()).isEqualTo(1);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");

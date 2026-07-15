@@ -84,6 +84,9 @@ type server struct {
 	reverseRemoteObjects map[string]any
 	reverseRemoteRefs    map[int]any
 
+	reverseTypePool    map[string]java.JavaType
+	goResolutionIntern *rpc.GoResolutionInternPool
+
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
 
@@ -207,6 +210,8 @@ func newServer(cfg serverConfig) *server {
 		remoteRefs:              make(map[int]any),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
+		reverseTypePool:         make(map[string]java.JavaType),
+		goResolutionIntern:      rpc.NewGoResolutionInternPool(),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
@@ -232,7 +237,7 @@ func newServer(cfg serverConfig) *server {
 		} else {
 			s.metricsFile = f
 			s.metricsWriter = csv.NewWriter(f)
-			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error"}); err != nil {
+			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes"}); err != nil {
 				logger.Printf("metrics-csv: cannot write header: %v", err)
 			}
 			s.metricsWriter.Flush()
@@ -271,11 +276,19 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 	if rpcErr != nil {
 		errMsg = rpcErr.Message
 	}
+	// Mirror the JS server's process.memoryUsage() self-report: HeapAlloc is
+	// the live-heap analog of Node's heapUsed, Sys the OS-footprint analog of
+	// heapTotal. Read only when metrics are enabled — ReadMemStats stops the
+	// world, so the default (metrics-disabled) path returns above untouched.
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
 	row := []string{
 		time.Now().UTC().Format(time.RFC3339Nano),
 		method,
 		strconv.FormatInt(duration.Milliseconds(), 10),
 		errMsg,
+		strconv.FormatUint(mem.HeapAlloc, 10),
+		strconv.FormatUint(mem.Sys, 10),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
 		s.logger.Printf("metrics-csv: write row failed: %v", err)
@@ -858,6 +871,8 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		before = s.localObjects[id]
 	}
 
+	strIntern := make(map[string]string)
+
 	fetchBatch := func() []rpc.RpcObjectData {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
@@ -885,27 +900,17 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			s.logger.Printf("No result data in bidirectional response")
 			return nil
 		}
-		var respResult any
-		if err := json.Unmarshal(resultData, &respResult); err != nil {
+
+		batch, err := rpc.DecodeBatch(resultData, strIntern)
+		if err != nil {
 			s.logger.Printf("Error parsing response result: %v", err)
 			return nil
-		}
-
-		batchData, ok := respResult.([]any)
-		if !ok || len(batchData) == 0 {
-			return nil
-		}
-
-		batch := make([]rpc.RpcObjectData, 0, len(batchData))
-		for _, item := range batchData {
-			if m, ok := item.(map[string]any); ok {
-				batch = append(batch, rpc.ParseObjectData(m))
-			}
 		}
 		return batch
 	}
 
-	q := rpc.NewReceiveQueue(s.reverseRemoteRefs, fetchBatch)
+	q := rpc.NewReceiveQueue(s.reverseRemoteRefs, fetchBatch).WithTypePool(s.reverseTypePool)
+	q.SetGoResolutionIntern(s.goResolutionIntern)
 
 	receiver := rpc.NewGoReceiver()
 
@@ -1047,6 +1052,8 @@ func (s *server) handleReset() bool {
 	s.remoteRefs = make(map[int]any)
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
+	s.reverseTypePool = make(map[string]java.JavaType)
+	s.goResolutionIntern = rpc.NewGoResolutionInternPool()
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
