@@ -42,6 +42,9 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.toml.TomlIsoVisitor;
+import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.TomlTableValue;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -173,6 +176,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
         Set<GroupArtifact> failedResolutions = new HashSet<>();
+        @Nullable
+        GradleProject gradleProject;
     }
 
     @Override
@@ -199,6 +204,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (gradleProject == null) {
                         return (J) tree;
                     }
+                    acc.gradleProject = gradleProject;
                 }
                 return super.visit(tree, ctx);
             }
@@ -483,9 +489,133 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         });
 
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+        TreeVisitor<?, ExecutionContext> tomlVisitor = new TomlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
+                Toml.Table libraries = findTable(document);
+                Toml.Document updated = updateVersionReferences(document, libraries, ctx);
+                return super.visitDocument(updated, ctx);
+            }
+
+            @Override
+            public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
+                Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
+                if (!(kv.getValue() instanceof Toml.Table)) {
+                    return kv;
+                }
+
+                Toml.Table library = (Toml.Table) kv.getValue();
+                if (!matchesGroupAndName(library)) {
+                    return kv;
+                }
+
+                String replacementGroupId = StringUtils.isBlank(newGroupId) ? oldGroupId : newGroupId;
+                String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? oldArtifactId : newArtifactId;
+                String selectedVersion = null;
+                if (!StringUtils.isBlank(newVersion)) {
+                    try {
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, acc.gradleProject, null)
+                                .select(new GroupArtifact(
+                                        replacementGroupId,
+                                        replacementArtifactId
+                                ), null, newVersion, versionPattern, ctx);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(kv);
+                    }
+                }
+                String replacementVersion = selectedVersion;
+                library = TomlTableValue.withString(library, "group", replacementGroupId);
+                library = TomlTableValue.withString(library, "name", replacementArtifactId);
+                if (replacementVersion != null && TomlTableValue.has(library, "version")) {
+                    library = TomlTableValue.withString(library, "version", replacementVersion);
+                } else if (replacementVersion != null && Boolean.TRUE.equals(overrideManagedVersion) &&
+                           !TomlTableValue.has(library, "version.ref")) {
+                    library = TomlTableValue.withStringOrAdd(library, "version", replacementVersion);
+                }
+                return kv.withValue(library);
+            }
+
+            private boolean matchesGroupAndName(Toml.Table library) {
+                return Objects.equals(oldGroupId, TomlTableValue.getString(library, "group")) &&
+                       Objects.equals(oldArtifactId, TomlTableValue.getString(library, "name"));
+            }
+
+            private Toml.Document updateVersionReferences(Toml.Document document, Toml.@Nullable Table libraries, ExecutionContext ctx) {
+                if (libraries == null || StringUtils.isBlank(newVersion)) {
+                    return document;
+                }
+                return document.withValues(ListUtils.map(document.getValues(), value -> {
+                    if (value instanceof Toml.Table) {
+                        Toml.Table table = (Toml.Table) value;
+                        if (table.getName() != null && "versions".equals(table.getName().getName())) {
+                            return updateVersionTable(table, libraries, ctx);
+                        }
+                    }
+                    return value;
+                }));
+            }
+
+            private Toml.Table updateVersionTable(Toml.Table versions, Toml.Table libraries, ExecutionContext ctx) {
+                return versions.withValues(ListUtils.map(versions.getValues(), value -> {
+                    if (!(value instanceof Toml.KeyValue) ||
+                        !(((Toml.KeyValue) value).getKey() instanceof Toml.Identifier) ||
+                        !(((Toml.KeyValue) value).getValue() instanceof Toml.Literal)) {
+                        return value;
+                    }
+                    Toml.KeyValue version = (Toml.KeyValue) value;
+                    String versionName = ((Toml.Identifier) version.getKey()).getName();
+                    if (!isReferencedByMatchingLibrary(libraries, versionName)) {
+                        return version;
+                    }
+                    try {
+                        String selectedVersion = new DependencyVersionSelector(metadataFailures, acc.gradleProject, null)
+                                .select(new GroupArtifact(
+                                        StringUtils.isBlank(newGroupId) ? oldGroupId : newGroupId,
+                                        StringUtils.isBlank(newArtifactId) ? oldArtifactId : newArtifactId
+                                ), null, newVersion, versionPattern, ctx);
+                        if (selectedVersion != null) {
+                            Toml.Literal literal = (Toml.Literal) version.getValue();
+                            return version.withValue(literal.withSource("\"" + selectedVersion + "\"").withValue(selectedVersion));
+                        }
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(version);
+                    }
+                    return version;
+                }));
+            }
+
+            private boolean isReferencedByMatchingLibrary(Toml.Table libraries, String versionName) {
+                for (Toml value : libraries.getValues()) {
+                    if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getValue() instanceof Toml.Table)) {
+                        continue;
+                    }
+                    Toml.Table library = (Toml.Table) ((Toml.KeyValue) value).getValue();
+                    if (matchesGroupAndName(library) &&
+                        Objects.equals(versionName, TomlTableValue.getString(library, "version.ref"))) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private Toml.@Nullable Table findTable(Toml.Document document) {
+                for (Toml value : document.getValues()) {
+                    if (value instanceof Toml.Table) {
+                        Toml.Table table = (Toml.Table) value;
+                        if (table.getName() != null && "libraries".equals(table.getName().getName())) {
+                            return table;
+                        }
+                    }
+                }
+                return null;
+            }
+        };
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                if (sourceFile instanceof Toml) {
+                    return sourceFile.getSourcePath().endsWith("libs.versions.toml");
+                }
                 if (sourceFile instanceof Properties.File) {
                     return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                 }
@@ -495,6 +625,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Toml) {
+                    return tomlVisitor.visit(tree, ctx);
+                }
                 if (tree instanceof Properties.File) {
                     Properties.File propsFile = (Properties.File) tree;
                     if (propsFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && !acc.versionVariableUpdates.isEmpty()) {
