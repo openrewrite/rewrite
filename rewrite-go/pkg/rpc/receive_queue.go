@@ -31,8 +31,7 @@ type ReceiveQueue struct {
 	refs  map[int]any
 	pull  func() []RpcObjectData
 
-	typePool           map[string]java.JavaType
-	goResolutionIntern *GoResolutionInternPool
+	typePool map[string]java.JavaType
 }
 
 func (q *ReceiveQueue) WithTypePool(pool map[string]java.JavaType) *ReceiveQueue {
@@ -53,10 +52,6 @@ func (q *ReceiveQueue) internType(t java.JavaType) java.JavaType {
 	}
 	q.typePool[sig] = t
 	return t
-}
-
-func (q *ReceiveQueue) SetGoResolutionIntern(pool *GoResolutionInternPool) {
-	q.goResolutionIntern = pool
 }
 
 func NewReceiveQueue(refs map[int]any, pull func() []RpcObjectData) *ReceiveQueue {

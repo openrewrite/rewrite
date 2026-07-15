@@ -84,8 +84,7 @@ type server struct {
 	reverseRemoteObjects map[string]any
 	reverseRemoteRefs    map[int]any
 
-	reverseTypePool    map[string]java.JavaType
-	goResolutionIntern *rpc.GoResolutionInternPool
+	reverseTypePool map[string]java.JavaType
 
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
@@ -211,7 +210,6 @@ func newServer(cfg serverConfig) *server {
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
-		goResolutionIntern:      rpc.NewGoResolutionInternPool(),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
@@ -910,7 +908,6 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	}
 
 	q := rpc.NewReceiveQueue(s.reverseRemoteRefs, fetchBatch).WithTypePool(s.reverseTypePool)
-	q.SetGoResolutionIntern(s.goResolutionIntern)
 
 	receiver := rpc.NewGoReceiver()
 
@@ -1053,7 +1050,6 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.reverseTypePool = make(map[string]java.JavaType)
-	s.goResolutionIntern = rpc.NewGoResolutionInternPool()
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
