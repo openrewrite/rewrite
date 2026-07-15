@@ -104,7 +104,7 @@ class DockerImageReferenceTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerImageReference.Matcher().imageName("nginx").asVisitor((ref, ctx) ->
-              "1.27".equals(ref.getTag()) ? ref.getTree() : ref.withImageReference("nginx:1.27"))
+              "1.27".equals(ref.getTag().orElse(null)) ? ref.getTree() : ref.withImageReference("nginx:1.27"))
           )),
           docker(
             """

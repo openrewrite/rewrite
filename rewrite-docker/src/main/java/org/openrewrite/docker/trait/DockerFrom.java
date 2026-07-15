@@ -30,6 +30,8 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.VisitFunction2;
 
+import java.util.Optional;
+
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -48,33 +50,33 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
      * Returns the image name (without tag or digest).
      * Environment variables are preserved in their original form.
      *
-     * @return The image name, or null if it contains unresolvable variables
+     * @return The image name
      */
     @Override
-    public @Nullable String getImageName() {
-        return new Matcher().extractTextWithVariables(getTree().getImageName());
+    public Optional<String> getImageName() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(getTree().getImageName()));
     }
 
     /**
-     * Returns the tag, or null if no tag is specified.
+     * Returns the tag, or empty if no tag is specified.
      * Environment variables are preserved in their original form.
      *
-     * @return The tag, or null
+     * @return The tag, or empty
      */
     @Override
-    public @Nullable String getTag() {
-        return new Matcher().extractTextWithVariables(getTree().getTag());
+    public Optional<String> getTag() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(getTree().getTag()));
     }
 
     /**
-     * Returns the digest, or null if no digest is specified.
+     * Returns the digest, or empty if no digest is specified.
      * Environment variables are preserved in their original form.
      *
-     * @return The digest, or null
+     * @return The digest, or empty
      */
     @Override
-    public @Nullable String getDigest() {
-        return new Matcher().extractTextWithVariables(getTree().getDigest());
+    public Optional<String> getDigest() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(getTree().getDigest()));
     }
 
     /**
@@ -124,38 +126,38 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
      */
     @Override
     public boolean isUnpinned() {
-        return getUnpinnedReason() != null;
+        return getUnpinnedReason().isPresent();
     }
 
     /**
-     * Returns the reason this image is unpinned, or null if it's pinned.
+     * Returns the reason this image is unpinned, or empty if it's pinned.
      * Images with a digest are considered pinned. Images with environment variables
      * in the tag are conservatively considered pinned (we can't determine the value).
      *
-     * @return The reason for being unpinned, or null if pinned
+     * @return The reason for being unpinned, or empty if pinned
      */
     @Override
-    public @Nullable UnpinnedReason getUnpinnedReason() {
+    public Optional<UnpinnedReason> getUnpinnedReason() {
         Docker.From from = getTree();
         // Images with digest are pinned
         if (from.getDigest() != null) {
-            return null;
+            return Optional.empty();
         }
         // No tag means implicit "latest", unless the name is an unresolved environment
         // variable, in which case we can't classify it and conservatively treat it as pinned
         if (from.getTag() == null) {
             if (new Matcher().hasEnvironmentVariables(from.getImageName())) {
-                return null;
+                return Optional.empty();
             }
-            return UnpinnedReason.IMPLICIT_LATEST;
+            return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
         }
         // Explicit "latest" tag is unpinned (if it's a literal, not env var)
         String tag = new Matcher().extractText(from.getTag());
         if ("latest".equals(tag)) {
-            return UnpinnedReason.EXPLICIT_LATEST;
+            return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
         }
         // Has a specific tag (or env var tag) - considered pinned
-        return null;
+        return Optional.empty();
     }
 
     /**

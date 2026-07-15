@@ -25,6 +25,8 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
+import java.util.Optional;
+
 /**
  * A trait representing an image reference anywhere in a Dockerfile: the base image of a
  * {@code FROM} instruction (see {@link DockerFrom}) or the image carried by the {@code --from}
@@ -43,20 +45,20 @@ import org.openrewrite.trait.VisitFunction2;
 public interface DockerImageReference<T extends Docker.Instruction> extends Trait<T> {
 
     /**
-     * Returns the image name (without tag or digest), or null if the reference does not
+     * Returns the image name (without tag or digest), or empty if the reference does not
      * resolve to an external image (e.g. a build-stage reference).
      */
-    @Nullable String getImageName();
+    Optional<String> getImageName();
 
     /**
-     * Returns the tag, or null if no tag is specified.
+     * Returns the tag, or empty if no tag is specified.
      */
-    @Nullable String getTag();
+    Optional<String> getTag();
 
     /**
-     * Returns the digest, or null if no digest is specified.
+     * Returns the digest, or empty if no digest is specified.
      */
-    @Nullable String getDigest();
+    Optional<String> getDigest();
 
     /**
      * Returns true if the referenced image is pinned by digest.
@@ -69,9 +71,9 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
     boolean isUnpinned();
 
     /**
-     * Returns the reason the referenced image is unpinned, or null if it is pinned.
+     * Returns the reason the referenced image is unpinned, or empty if it is pinned.
      */
-    @Nullable UnpinnedReason getUnpinnedReason();
+    Optional<UnpinnedReason> getUnpinnedReason();
 
     /**
      * Checks if the image name matches the given glob pattern.

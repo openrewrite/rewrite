@@ -50,12 +50,10 @@ public class FindUnpinnedBaseImages extends Recipe {
                 .excludeScratch()
                 .onlyUnpinned()
                 .asVisitor(image -> {
-                    // Get the reason for being unpinned
-                    DockerImageReference.UnpinnedReason reason = image.getUnpinnedReason();
-
-                    String message = reason == DockerImageReference.UnpinnedReason.IMPLICIT_LATEST ?
-                            "Uses implicit 'latest' tag" :
-                            "Uses 'latest' tag";
+                    String message = image.getUnpinnedReason()
+                            .filter(reason -> reason == DockerImageReference.UnpinnedReason.IMPLICIT_LATEST)
+                            .map(reason -> "Uses implicit 'latest' tag")
+                            .orElse("Uses 'latest' tag");
                     return SearchResult.found(image.getTree(), message);
                 });
     }

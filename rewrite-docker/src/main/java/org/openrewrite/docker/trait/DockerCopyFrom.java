@@ -32,6 +32,7 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.util.Collections.singletonList;
@@ -101,10 +102,10 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
 
     /**
      * Returns the raw {@code --from} value with environment variable references preserved,
-     * or null if there is no {@code --from} flag.
+     * or empty if there is no {@code --from} flag.
      */
-    public @Nullable String getFromValue() {
-        return new Matcher().extractTextWithVariables(fromArgument());
+    public Optional<String> getFromValue() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(fromArgument()));
     }
 
     /**
@@ -160,31 +161,31 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
     }
 
     /**
-     * Returns the image name (without tag or digest), or null if this is a stage reference
+     * Returns the image name (without tag or digest), or empty if this is a stage reference
      * or there is no {@code --from} flag.
      */
     @Override
-    public @Nullable String getImageName() {
+    public Optional<String> getImageName() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : new Matcher().extractTextWithVariables(components[0]);
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[0]));
     }
 
     /**
-     * Returns the tag, or null if no tag is specified or this is a stage reference.
+     * Returns the tag, or empty if no tag is specified or this is a stage reference.
      */
     @Override
-    public @Nullable String getTag() {
+    public Optional<String> getTag() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : new Matcher().extractTextWithVariables(components[1]);
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[1]));
     }
 
     /**
-     * Returns the digest, or null if no digest is specified or this is a stage reference.
+     * Returns the digest, or empty if no digest is specified or this is a stage reference.
      */
     @Override
-    public @Nullable String getDigest() {
+    public Optional<String> getDigest() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : new Matcher().extractTextWithVariables(components[2]);
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[2]));
     }
 
     /**
@@ -202,35 +203,35 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      */
     @Override
     public boolean isUnpinned() {
-        return getUnpinnedReason() != null;
+        return getUnpinnedReason().isPresent();
     }
 
     /**
-     * Returns the reason the referenced external image is unpinned, or null if it's pinned
+     * Returns the reason the referenced external image is unpinned, or empty if it's pinned
      * or this is a stage reference.
      */
     @Override
-    public @Nullable UnpinnedReason getUnpinnedReason() {
+    public Optional<UnpinnedReason> getUnpinnedReason() {
         Docker.@Nullable Argument[] components = components();
         if (components == null) {
-            return null;
+            return Optional.empty();
         }
         if (components[2] != null) {
-            return null;
+            return Optional.empty();
         }
         if (components[1] == null) {
             // A reference whose name is an unresolved environment variable can't be classified;
             // conservatively treat it as pinned rather than assuming an implicit "latest".
             if (new Matcher().hasEnvironmentVariables(components[0])) {
-                return null;
+                return Optional.empty();
             }
-            return UnpinnedReason.IMPLICIT_LATEST;
+            return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
         }
         String tag = new Matcher().extractText(components[1]);
         if ("latest".equals(tag)) {
-            return UnpinnedReason.EXPLICIT_LATEST;
+            return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
         }
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -263,12 +264,12 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      */
     @Override
     public Docker.Instruction withTag(String tag) {
-        String name = getImageName();
-        if (name == null) {
+        Optional<String> name = getImageName();
+        if (!name.isPresent()) {
             return getTree();
         }
-        String digest = getDigest();
-        return withImageReference(name + ":" + tag + (digest != null ? "@" + digest : ""));
+        String suffix = getDigest().map(d -> "@" + d).orElse("");
+        return withImageReference(name.get() + ":" + tag + suffix);
     }
 
     /**

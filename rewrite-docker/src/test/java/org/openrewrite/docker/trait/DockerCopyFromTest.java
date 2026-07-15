@@ -94,9 +94,9 @@ class DockerCopyFromTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().imageName("nginx").asVisitor((image, ctx) -> {
                 assertThat(image.isStageReference()).isFalse();
-                assertThat(image.getImageName()).isEqualTo("nginx");
-                assertThat(image.getTag()).isEqualTo("latest");
-                assertThat(image.getDigest()).isNull();
+                assertThat(image.getImageName()).contains("nginx");
+                assertThat(image.getTag()).contains("latest");
+                assertThat(image.getDigest()).isEmpty();
                 assertThat(image.isUnpinned()).isTrue();
                 return SearchResult.found(image.getTree());
             })
@@ -119,10 +119,10 @@ class DockerCopyFromTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
-                assertThat(image.getFromValue()).isEqualTo("builder");
+                assertThat(image.getFromValue()).contains("builder");
                 assertThat(image.isStageReference()).isTrue();
-                assertThat(image.getImageName()).isNull();
-                assertThat(image.getTag()).isNull();
+                assertThat(image.getImageName()).isEmpty();
+                assertThat(image.getTag()).isEmpty();
                 assertThat(image.isUnpinned()).isFalse();
                 return SearchResult.found(image.getTree());
             })
@@ -150,7 +150,7 @@ class DockerCopyFromTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
                 assertThat(image.isStageReference()).isTrue();
-                assertThat(image.getImageName()).isNull();
+                assertThat(image.getImageName()).isEmpty();
                 return SearchResult.found(image.getTree());
             })
           )),
@@ -175,11 +175,11 @@ class DockerCopyFromTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
                 assertThat(image.isStageReference()).isFalse();
-                assertThat(image.getImageName()).isEqualTo("nginx");
-                assertThat(image.getTag()).isNull();
+                assertThat(image.getImageName()).contains("nginx");
+                assertThat(image.getTag()).isEmpty();
                 assertThat(image.isUnpinned()).isTrue();
                 assertThat(image.getUnpinnedReason())
-                  .isEqualTo(DockerImageReference.UnpinnedReason.IMPLICIT_LATEST);
+                  .contains(DockerImageReference.UnpinnedReason.IMPLICIT_LATEST);
                 return SearchResult.found(image.getTree());
             })
           )),
@@ -201,9 +201,9 @@ class DockerCopyFromTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
-                assertThat(image.getImageName()).isEqualTo("alpine");
-                assertThat(image.getTag()).isNull();
-                assertThat(image.getDigest()).isEqualTo("sha256:abc123");
+                assertThat(image.getImageName()).contains("alpine");
+                assertThat(image.getTag()).isEmpty();
+                assertThat(image.getDigest()).contains("sha256:abc123");
                 assertThat(image.isDigestPinned()).isTrue();
                 assertThat(image.isUnpinned()).isFalse();
                 return SearchResult.found(image.getTree());
@@ -227,7 +227,7 @@ class DockerCopyFromTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().imageName("nginx").asVisitor((image, ctx) -> {
-                assertThat(image.getFromValue()).isEqualTo("${IMG}");
+                assertThat(image.getFromValue()).contains("${IMG}");
                 assertThat(image.isStageReference()).isFalse();
                 return SearchResult.found(image.getTree());
             })
@@ -251,7 +251,7 @@ class DockerCopyFromTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().excludeStageReferences().asVisitor((image, ctx) -> {
                 assertThat(image.isStageReference()).isFalse();
-                assertThat(image.getImageName()).isEqualTo("nginx");
+                assertThat(image.getImageName()).contains("nginx");
                 return SearchResult.found(image.getTree());
             })
           )),
@@ -296,8 +296,8 @@ class DockerCopyFromTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
                 assertThat(image.isStageReference()).isFalse();
-                assertThat(image.getImageName()).isEqualTo("registry.example.com:5000/app");
-                assertThat(image.getTag()).isNull();
+                assertThat(image.getImageName()).contains("registry.example.com:5000/app");
+                assertThat(image.getTag()).isEmpty();
                 assertThat(image.isUnpinned()).isTrue();
                 return SearchResult.found(image.getTree());
             })
@@ -320,9 +320,9 @@ class DockerCopyFromTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
-                assertThat(image.getImageName()).isEqualTo("registry.example.com:5000/app");
-                assertThat(image.getTag()).isEqualTo("1.2");
-                assertThat(image.getDigest()).isNull();
+                assertThat(image.getImageName()).contains("registry.example.com:5000/app");
+                assertThat(image.getTag()).contains("1.2");
+                assertThat(image.getDigest()).isEmpty();
                 return SearchResult.found(image.getTree());
             })
           )),
@@ -346,7 +346,7 @@ class DockerCopyFromTest implements RewriteTest {
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
                 assertThat(image.isStageReference()).isFalse();
                 assertThat(image.isUnpinned()).isFalse();
-                assertThat(image.getUnpinnedReason()).isNull();
+                assertThat(image.getUnpinnedReason()).isEmpty();
                 // A pin recipe must leave the unresolved variable untouched
                 return image.isUnpinned() ? image.withTag("3.19") : image.getTree();
             })
