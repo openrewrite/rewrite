@@ -20,7 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.csharp.tree.CsDocComment;
-import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
@@ -891,15 +890,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                     .withComments(q.receiveList(space.getComments(), c -> {
                         if (c instanceof CsDocComment.DocComment) {
                             return (Comment) new CsDocCommentReceiver(delegate).visit((CsDocComment.DocComment) c, q);
-                        }
-                        if (c instanceof CsDocCommentRawComment) {
-                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
-                            q.receive(dc.isMultiline()); // consume; always true
-                            return new CsDocCommentRawComment(
-                                    q.receive(dc.getText()),
-                                    q.receive(dc.getSuffix()),
-                                    q.receive(dc.getMarkers())
-                            );
                         }
                         if (c instanceof TextComment) {
                             TextComment tc = (TextComment) c;
