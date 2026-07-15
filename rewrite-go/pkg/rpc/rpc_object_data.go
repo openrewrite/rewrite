@@ -72,10 +72,10 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 }
 
 type wireObjectData struct {
-	State     string          `json:"state"`
-	ValueType *string         `json:"valueType"`
-	Value     json.RawMessage `json:"value"`
-	Ref       *int            `json:"ref"`
+	State     string  `json:"state"`
+	ValueType *string `json:"valueType"`
+	Value     any     `json:"value"`
+	Ref       *int    `json:"ref"`
 }
 
 func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
@@ -87,12 +87,8 @@ func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error)
 	for i := range wire {
 		w := &wire[i]
 		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
-		if len(w.Value) > 0 {
-			var v any
-			if err := json.Unmarshal(w.Value, &v); err != nil {
-				return nil, err
-			}
-			d.Value = internValue(v, intern)
+		if w.Value != nil {
+			d.Value = internValue(w.Value, intern)
 		}
 		batch[i] = d
 	}
