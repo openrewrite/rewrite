@@ -32,9 +32,9 @@ class DockerFromTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerFrom.Matcher().imageName("ubuntu").asVisitor((image, ctx) -> {
-                assertThat(image.getImageName()).isEqualTo("ubuntu");
-                assertThat(image.getTag()).isEqualTo("20.04");
-                assertThat(image.getDigest()).isNull();
+                assertThat(image.getImageName()).contains("ubuntu");
+                assertThat(image.getTag()).contains("20.04");
+                assertThat(image.getDigest()).isEmpty();
                 assertThat(image.getPlatform()).isNull();
                 assertThat(image.getStageName()).isNull();
                 assertThat(image.isScratch()).isFalse();
@@ -63,9 +63,9 @@ class DockerFromTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
                 new DockerFrom.Matcher().asVisitor((image, ctx) -> {
-                    assertThat(image.getImageName()).isEqualTo("my.registry.com/library/ubuntu");
-                    assertThat(image.getTag()).isEqualTo("22.04");
-                    assertThat(image.getDigest()).isNull();
+                    assertThat(image.getImageName()).contains("my.registry.com/library/ubuntu");
+                    assertThat(image.getTag()).contains("22.04");
+                    assertThat(image.getDigest()).isEmpty();
                     assertThat(image.getPlatform()).isEqualTo("linux/amd64");
                     assertThat(image.getStageName()).isEqualTo("builder");
                     return SearchResult.found(image.getTree());
@@ -89,9 +89,9 @@ class DockerFromTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
                 new DockerFrom.Matcher().asVisitor((image, ctx) -> {
-                    assertThat(image.getImageName()).isEqualTo("ubuntu");
-                    assertThat(image.getTag()).isNull();
-                    assertThat(image.getDigest()).isEqualTo("sha256:abc123def456");
+                    assertThat(image.getImageName()).contains("ubuntu");
+                    assertThat(image.getTag()).isEmpty();
+                    assertThat(image.getDigest()).contains("sha256:abc123def456");
                     assertThat(image.isUnpinned()).isFalse();
                     return SearchResult.found(image.getTree());
                 })
@@ -112,9 +112,9 @@ class DockerFromTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
                 new DockerFrom.Matcher().asVisitor((image, ctx) -> {
-                    assertThat(image.getImageName()).isEqualTo("ubuntu");
-                    assertThat(image.getTag()).isEqualTo("20.04");
-                    assertThat(image.getDigest()).isEqualTo("sha256:abc123");
+                    assertThat(image.getImageName()).contains("ubuntu");
+                    assertThat(image.getTag()).contains("20.04");
+                    assertThat(image.getDigest()).contains("sha256:abc123");
                     return SearchResult.found(image.getTree());
                 })
               )),
@@ -282,7 +282,7 @@ class DockerFromTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
                 new DockerFrom.Matcher().asVisitor((image, ctx) -> {
-                    assertThat(image.getTag()).isEqualTo("$TAG");
+                    assertThat(image.getTag()).contains("$TAG");
                     return SearchResult.found(image.getTree());
                 })
               )),
@@ -523,6 +523,150 @@ class DockerFromTest implements RewriteTest {
                 """
                   ~~>FROM ubuntu@sha256:abc123
                   FROM alpine:latest
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class Mutation implements RewriteTest {
+
+        @Test
+        void withTagUpgradesTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").tag("20.04").asVisitor((image, ctx) ->
+                  image.withTag("22.04"))
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withTagPreservesDigest() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("nginx").tag("1.20").asVisitor((image, ctx) ->
+                  image.withTag("1.25"))
+              )),
+              docker(
+                """
+                  FROM nginx:1.20@sha256:abc123
+                  """,
+                """
+                  FROM nginx:1.25@sha256:abc123
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withImageReferenceReplacesWholeReference() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").asVisitor((image, ctx) ->
+                  image.withImageReference("alpine:3.19"))
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM alpine:3.19
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withImageReferenceCanRemoveTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").tag("20.04").asVisitor((image, ctx) ->
+                  image.withImageReference("ubuntu"))
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class RegistryAndVariables implements RewriteTest {
+
+        @Test
+        void registryPortIsNotMisSplitIntoTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getImageName()).contains("registry.example.com:5000/app");
+                    assertThat(image.getTag()).isEmpty();
+                    assertThat(image.isUnpinned()).isTrue();
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM registry.example.com:5000/app
+                  """,
+                """
+                  ~~>FROM registry.example.com:5000/app
+                  """
+              )
+            );
+        }
+
+        @Test
+        void registryPortWithTag() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getImageName()).contains("registry.example.com:5000/app");
+                    assertThat(image.getTag()).contains("1.2");
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM registry.example.com:5000/app:1.2
+                  """,
+                """
+                  ~~>FROM registry.example.com:5000/app:1.2
+                  """
+              )
+            );
+        }
+
+        @Test
+        void envVarOnlyImageIsConsideredPinned() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.isUnpinned()).isFalse();
+                    assertThat(image.getUnpinnedReason()).isEmpty();
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM ${BASE_IMAGE}
+                  """,
+                """
+                  ~~>FROM ${BASE_IMAGE}
                   """
               )
             );
