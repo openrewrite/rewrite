@@ -293,6 +293,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           ),
           buildGradle(
             """
+              plugins {
+                  id 'java'
+              }
+
               dependencies {
                   implementation(libs.guava)
               }
