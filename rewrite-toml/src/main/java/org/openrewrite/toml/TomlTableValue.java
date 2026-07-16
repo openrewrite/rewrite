@@ -78,7 +78,9 @@ public final class TomlTableValue {
                 return element;
             }
             Toml.Literal literal = (Toml.Literal) keyValue.getValue();
-            return keyValue.withValue(literal.withSource("\"" + value + "\"").withValue(value));
+            String source = literal.getSource();
+            String quote = source.isEmpty() ? "\"" : source.substring(0, 1);
+            return keyValue.withValue(literal.withSource(quote + value + quote).withValue(value));
         }));
     }
 
