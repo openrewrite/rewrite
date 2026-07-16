@@ -34,7 +34,7 @@ func TestCommentSendsTextCommentValueType(t *testing.T) {
 	var messages []rpc.RpcObjectData
 	q := rpc.NewSendQueue(1000, func(batch []rpc.RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, rpc.NewReferenceMap())
 	rpc.NewGoSender().Visit(cu, q)
 	q.Flush()
 

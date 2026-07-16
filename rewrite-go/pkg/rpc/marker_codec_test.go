@@ -34,7 +34,7 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, NewReferenceMap())
 	SendMarkersCodec(before, sendQ)
 	sendQ.Flush()
 

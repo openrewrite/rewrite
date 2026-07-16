@@ -74,9 +74,8 @@ type rpcError struct {
 
 type server struct {
 	localObjects  map[string]any
-	remoteObjects map[string]any // forward direction: tracks what Java has from Go
-	localRefs     map[uintptr]int
-	remoteRefs    map[int]any
+	remoteObjects map[string]any    // forward direction: tracks what Java has from Go
+	localRefs     *rpc.ReferenceMap // forward direction: tracks references sent to Java
 	batchSize     int
 
 	inProgressGetObjects map[string]*getObjectTransfer
@@ -207,8 +206,7 @@ func newServer(cfg serverConfig) *server {
 	s := &server{
 		localObjects:            make(map[string]any),
 		remoteObjects:           make(map[string]any),
-		localRefs:               make(map[uintptr]int),
-		remoteRefs:              make(map[int]any),
+		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
@@ -765,6 +763,7 @@ type getObjectTransfer struct {
 	batches    chan getObjectBatch
 	cancel     chan struct{}
 	cancelOnce sync.Once
+	sendQueue  *rpc.SendQueue
 }
 
 type getObjectTransferCanceled struct{}
@@ -782,22 +781,24 @@ func (s *server) startGetObjectTransfer(id string, after, before any) *getObject
 		cancel:  make(chan struct{}),
 	}
 
-	// Use a fresh ref map for each complete GetObject exchange to avoid ref ID
-	// collisions between the reverse direction (Java→Go) and forward
-	// direction (Go→Java). It must span every batch in this transfer.
-	localRefs := make(map[uintptr]int)
+	// Reference IDs are scoped to the Go→Java direction and persist until
+	// Reset, matching the lifetime of Java's receive table. GetObject exchanges
+	// are serialized so a ref cannot be reused before its defining page arrives.
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		select {
 		case t.batches <- getObjectBatch{data: batch}:
 		case <-t.cancel:
 			panic(getObjectTransferCanceled{})
 		}
-	}, localRefs)
+	}, s.localRefs)
+	t.sendQueue = q
 
 	go func() {
 		defer close(t.batches)
 		defer func() {
 			if recovered := recover(); recovered != nil {
+				q.DiscardNewReferences()
+
 				if _, canceled := recovered.(getObjectTransferCanceled); canceled {
 					return
 				}
@@ -831,9 +832,16 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
 	}
-
 	t := s.inProgressGetObjects[req.ID]
 	if t == nil {
+		for activeID := range s.inProgressGetObjects {
+			return nil, &rpcError{
+				Code: -32603,
+				Message: fmt.Sprintf("GetObject %s is still in progress; cannot start %s",
+					activeID, req.ID),
+			}
+		}
+
 		obj := s.localObjects[req.ID]
 		if obj == nil {
 			return []rpc.RpcObjectData{
@@ -848,11 +856,13 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 
 	batch, ok := <-t.batches
 	if !ok {
+		t.sendQueue.DiscardNewReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: "GetObject traversal ended without END_OF_OBJECT"}
 	}
 	if batch.err != nil {
+		t.sendQueue.DiscardNewReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: batch.err.Error()}
@@ -1125,8 +1135,7 @@ func (s *server) handleReset() bool {
 	s.inProgressGetObjects = make(map[string]*getObjectTransfer)
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
-	s.localRefs = make(map[uintptr]int)
-	s.remoteRefs = make(map[int]any)
+	s.localRefs = rpc.NewReferenceMap()
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.reverseTypePool = make(map[string]java.JavaType)

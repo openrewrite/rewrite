@@ -33,7 +33,7 @@ func rpcRoundTrip(t *testing.T, cu *golang.CompilationUnit) *golang.CompilationU
 	var messages []rpc.RpcObjectData
 	sendQ := rpc.NewSendQueue(1000, func(batch []rpc.RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, rpc.NewReferenceMap())
 	rpc.NewGoSender().Visit(cu, sendQ)
 	sendQ.Flush()
 

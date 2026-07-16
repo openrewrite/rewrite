@@ -16,10 +16,71 @@
 
 package rpc
 
-import "reflect"
+import (
+	"reflect"
+	"sync"
+)
 
 type Reference struct {
 	Value any
+}
+
+// ReferenceMap retains referenced objects for as long as their wire IDs are
+// valid. Keeping the objects themselves as keys prevents a collected object's
+// address from being reused for a different object while the remote side still
+// has the old ID in its receive table.
+type ReferenceMap struct {
+	mu     sync.Mutex
+	refs   map[any]int
+	nextID int
+}
+
+func NewReferenceMap() *ReferenceMap {
+	return &ReferenceMap{
+		refs:   make(map[any]int),
+		nextID: 1,
+	}
+}
+
+func (m *ReferenceMap) GetOrCreate(obj any) (int, bool) {
+	assertReferenceIdentity(obj)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ref, ok := m.refs[obj]; ok {
+		return ref, true
+	}
+	ref := m.nextID
+	m.nextID++
+	m.refs[obj] = ref
+	return ref, false
+}
+
+func (m *ReferenceMap) Len() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.refs)
+}
+
+func (m *ReferenceMap) deleteIfMatches(obj any, ref int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if current, ok := m.refs[obj]; ok && current == ref {
+		delete(m.refs, obj)
+	}
+}
+
+func isReferenceIdentity(v any) bool {
+	if v == nil {
+		return false
+	}
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Ptr && !rv.IsNil()
+}
+
+func assertReferenceIdentity(v any) {
+	if !isReferenceIdentity(v) {
+		panic("references require a non-nil pointer identity")
+	}
 }
 
 // Returns nil if the value is nil (including typed nil pointers/interfaces).
