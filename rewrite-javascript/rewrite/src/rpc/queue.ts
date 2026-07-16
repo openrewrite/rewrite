@@ -225,7 +225,7 @@ export class RpcSendQueue {
         let ref: number | undefined;
         if (isRef(after)) {
             ref = this.refs.get(after);
-            if (ref) {
+            if (ref !== undefined) {
                 this.put({
                     state: RpcObjectState.ADD,
                     ref
