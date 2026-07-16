@@ -170,7 +170,7 @@ func TestHandleGetObjectReusesReferencesAcrossTransfers(t *testing.T) {
 	t.Fatal("second transfer did not reuse the shared type by reference")
 }
 
-func TestHandleGetObjectPublishesReferencesAfterFinalBatch(t *testing.T) {
+func TestHandleGetObjectRejectsInterleavedTransfers(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.batchSize = 1
 	sharedType := &java.JavaTypeClass{
@@ -185,20 +185,9 @@ func TestHandleGetObjectPublishesReferencesAfterFinalBatch(t *testing.T) {
 	if firstBatch[len(firstBatch)-1].State == rpc.EndOfObject {
 		t.Fatal("first transfer unexpectedly completed in one batch")
 	}
-	if got := s.localRefs.Len(); got != 0 {
-		t.Fatalf("references published before final batch = %d, want 0", got)
-	}
 
-	second := getCompleteObjectForTest(t, s, "second")
-	fullDefinition := false
-	for _, data := range second {
-		if data.State == rpc.Add && data.Ref != nil && data.ValueType != nil {
-			fullDefinition = true
-			break
-		}
-	}
-	if !fullDefinition {
-		t.Fatal("interleaved transfer referenced an object that was not committed yet")
+	if _, rpcErr := s.handleGetObject(getObjectParams(t, "second")); rpcErr == nil {
+		t.Fatal("interleaved transfer was not rejected")
 	}
 
 	for {
@@ -207,15 +196,10 @@ func TestHandleGetObjectPublishesReferencesAfterFinalBatch(t *testing.T) {
 			break
 		}
 	}
-
-	s.localObjects["third"] = &java.Identifier{Name: "third", Type: sharedType}
-	third := getCompleteObjectForTest(t, s, "third")
-	for _, data := range third {
-		if data.State == rpc.Add && data.Ref != nil && data.ValueType == nil && data.Value == nil {
-			return
-		}
+	if len(s.inProgressGetObjects) != 0 {
+		t.Fatalf("in-progress GetObjects after completion = %d, want 0", len(s.inProgressGetObjects))
 	}
-	t.Fatal("completed transfers did not publish their shared reference")
+	getCompleteObjectForTest(t, s, "second")
 }
 
 func TestResetCancelsInProgressGetObject(t *testing.T) {

@@ -26,20 +26,42 @@ var defaultSender = NewGoSender()
 
 // It tracks refs for deduplication and maintains a "before" state for delta encoding.
 type SendQueue struct {
-	batchSize int
-	batch     []RpcObjectData
-	drain     func([]RpcObjectData)
-	refs      ReferenceStore
-	before    any
+	batchSize     int
+	batch         []RpcObjectData
+	drain         func([]RpcObjectData)
+	refs          *ReferenceMap
+	allocatedRefs []referenceAllocation
+	before        any
 }
 
-func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs ReferenceStore) *SendQueue {
+type referenceAllocation struct {
+	obj any
+	ref int
+}
+
+func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs *ReferenceMap) *SendQueue {
 	return &SendQueue{
 		batchSize: batchSize,
 		batch:     make([]RpcObjectData, 0, batchSize),
 		drain:     drain,
 		refs:      refs,
 	}
+}
+
+// RollbackReferences removes references first allocated by this queue. IDs
+// remain monotonic because the receiver may already have seen definitions from
+// an earlier page of a failed transfer.
+func (q *SendQueue) RollbackReferences() {
+	for _, allocation := range q.allocatedRefs {
+		q.refs.deleteIfMatches(allocation.obj, allocation.ref)
+	}
+	q.allocatedRefs = nil
+}
+
+// CommitReferences releases the queue's temporary rollback log. The strong
+// keys remain in the session-wide ReferenceMap until Reset.
+func (q *SendQueue) CommitReferences() {
+	q.allocatedRefs = nil
 }
 
 func (q *SendQueue) Put(data RpcObjectData) {
@@ -187,6 +209,7 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 			q.Put(RpcObjectData{State: Add, Ref: &r})
 			return
 		}
+		q.allocatedRefs = append(q.allocatedRefs, referenceAllocation{obj: afterVal, ref: r})
 		ref = &r
 	}
 

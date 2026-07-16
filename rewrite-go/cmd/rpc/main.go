@@ -763,7 +763,7 @@ type getObjectTransfer struct {
 	batches    chan getObjectBatch
 	cancel     chan struct{}
 	cancelOnce sync.Once
-	refs       *rpc.ReferenceTransaction
+	sendQueue  *rpc.SendQueue
 }
 
 type getObjectTransferCanceled struct{}
@@ -775,30 +775,29 @@ func (t *getObjectTransfer) stop() {
 }
 
 func (s *server) startGetObjectTransfer(id string, after, before any) *getObjectTransfer {
-	localRefs := s.localRefs.Begin()
 	t := &getObjectTransfer{
 		after:   after,
 		batches: make(chan getObjectBatch, 1),
 		cancel:  make(chan struct{}),
-		refs:    localRefs,
 	}
 
 	// Reference IDs are scoped to the Go→Java direction and persist until
-	// Reset, matching the lifetime of Java's receive table. Allocations remain
-	// private to this transfer until its final page is delivered.
+	// Reset, matching the lifetime of Java's receive table. GetObject exchanges
+	// are serialized so a ref cannot be reused before its defining page arrives.
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		select {
 		case t.batches <- getObjectBatch{data: batch}:
 		case <-t.cancel:
 			panic(getObjectTransferCanceled{})
 		}
-	}, localRefs)
+	}, s.localRefs)
+	t.sendQueue = q
 
 	go func() {
 		defer close(t.batches)
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				localRefs.Rollback()
+				q.RollbackReferences()
 
 				if _, canceled := recovered.(getObjectTransferCanceled); canceled {
 					return
@@ -833,9 +832,16 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
 	}
-
 	t := s.inProgressGetObjects[req.ID]
 	if t == nil {
+		for activeID := range s.inProgressGetObjects {
+			return nil, &rpcError{
+				Code: -32603,
+				Message: fmt.Sprintf("GetObject %s is still in progress; cannot start %s",
+					activeID, req.ID),
+			}
+		}
+
 		obj := s.localObjects[req.ID]
 		if obj == nil {
 			return []rpc.RpcObjectData{
@@ -850,20 +856,20 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 
 	batch, ok := <-t.batches
 	if !ok {
-		t.refs.Rollback()
+		t.sendQueue.RollbackReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: "GetObject traversal ended without END_OF_OBJECT"}
 	}
 	if batch.err != nil {
-		t.refs.Rollback()
+		t.sendQueue.RollbackReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: batch.err.Error()}
 	}
 
 	if len(batch.data) > 0 && batch.data[len(batch.data)-1].State == rpc.EndOfObject {
-		t.refs.Commit()
+		t.sendQueue.CommitReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		s.remoteObjects[req.ID] = t.after
 	}

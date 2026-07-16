@@ -18,60 +18,43 @@ package rpc
 
 import "testing"
 
-func TestReferenceTransactionsPublishOnlyOnCommit(t *testing.T) {
-	type object struct{}
-	shared := &object{}
+func TestReferenceMapReusesStrongIdentity(t *testing.T) {
+	type object struct{ value int }
+	shared := &object{value: 1}
 	refs := NewReferenceMap()
 
-	first := refs.Begin()
-	firstID, existed := first.GetOrCreate(shared)
+	firstID, existed := refs.GetOrCreate(shared)
 	if existed || firstID != 1 {
 		t.Fatalf("first allocation = (%d, %v), want (1, false)", firstID, existed)
 	}
-	if got := refs.Len(); got != 0 {
-		t.Fatalf("published refs before commit = %d, want 0", got)
-	}
-
-	second := refs.Begin()
-	secondID, existed := second.GetOrCreate(shared)
-	if existed || secondID != 2 {
-		t.Fatalf("isolated allocation = (%d, %v), want (2, false)", secondID, existed)
-	}
-	second.Commit()
-
 	if got := refs.Len(); got != 1 {
-		t.Fatalf("published refs after commit = %d, want 1", got)
+		t.Fatalf("reference count = %d, want 1", got)
 	}
-	if id, ok := refs.GetOrCreate(shared); !ok || id != secondID {
-		t.Fatalf("committed allocation = (%d, %v), want (%d, true)", id, ok, secondID)
-	}
-
-	// A later commit for the same sender object must not replace the ID that
-	// was published first.
-	first.Commit()
-	if id, ok := refs.GetOrCreate(shared); !ok || id != secondID {
-		t.Fatalf("allocation after competing commit = (%d, %v), want (%d, true)", id, ok, secondID)
+	if id, ok := refs.GetOrCreate(shared); !ok || id != firstID {
+		t.Fatalf("reused allocation = (%d, %v), want (%d, true)", id, ok, firstID)
 	}
 }
 
-func TestReferenceTransactionRollbackDoesNotReuseIDs(t *testing.T) {
+func TestSendQueueRollbackDoesNotReuseReferenceIDs(t *testing.T) {
 	type object struct{ value int }
 	refs := NewReferenceMap()
 
-	rolledBack := refs.Begin()
-	rolledBackID, existed := rolledBack.GetOrCreate(&object{value: 1})
-	if existed {
-		t.Fatal("new transaction unexpectedly reused a reference")
+	firstQueue := NewSendQueue(10, func([]RpcObjectData) {}, refs)
+	firstQueue.add(AsRef(&object{value: 1}), nil)
+	rolledBackID := *firstQueue.batch[0].Ref
+	firstQueue.RollbackReferences()
+	if got := refs.Len(); got != 0 {
+		t.Fatalf("reference count after rollback = %d, want 0", got)
 	}
-	rolledBack.Rollback()
 
-	committed := refs.Begin()
-	committedID, existed := committed.GetOrCreate(&object{value: 2})
-	if existed {
-		t.Fatal("new object unexpectedly reused a reference")
-	}
+	secondQueue := NewSendQueue(10, func([]RpcObjectData) {}, refs)
+	secondQueue.add(AsRef(&object{value: 2}), nil)
+	committedID := *secondQueue.batch[0].Ref
 	if committedID <= rolledBackID {
 		t.Fatalf("reference ID after rollback = %d, want greater than %d", committedID, rolledBackID)
 	}
-	committed.Commit()
+	secondQueue.CommitReferences()
+	if got := refs.Len(); got != 1 {
+		t.Fatalf("reference count after commit = %d, want 1", got)
+	}
 }
