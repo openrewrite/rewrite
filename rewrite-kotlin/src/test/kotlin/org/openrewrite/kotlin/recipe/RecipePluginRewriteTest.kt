@@ -671,6 +671,35 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `multi-param selector rewrite attaches method type — sumBy to sumOf`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseSumOf = recipe(
+                    displayName = "Use sumOf",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<Int>, selector: (Int) -> Int -> xs.sumBy(selector) } to { xs, selector -> xs.sumOf(selector) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseSumOf",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun total(xs: List<Int>): Int = xs.sumBy { it * 2 }
+                """,
+                """
+                fun total(xs: List<Int>): Int = xs.sumOf { it * 2 }
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `bare single-call rewrite preserves dot-on-its-own-line layout`() {
         // Same fix, different rewrite path: `methodInvocationRewrite` (the
         // non-chain bare path) also runs the template through

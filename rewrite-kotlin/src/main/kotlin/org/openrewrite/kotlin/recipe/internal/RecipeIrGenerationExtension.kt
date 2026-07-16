@@ -66,7 +66,10 @@ import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
+import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeArgument
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.addChild
@@ -81,6 +84,7 @@ import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.types.Variance
 import java.io.File
 
 /**
@@ -1620,9 +1624,29 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // templated call's method type. Only remap reference FQNs (those with a
         // dot); leave primitives (`int`) and non-builtins alone. KotlinTemplate
         // keeps the Kotlin spelling, which is what it resolves against.
-        if (!javaTemplate) return fqn
-        val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
-        return if (mapped != null && mapped.contains('.')) mapped else fqn
+        if (javaTemplate) {
+            val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
+            return if (mapped != null && mapped.contains('.')) mapped else fqn
+        }
+        // KotlinTemplate path: spell out concrete type arguments so callees whose
+        // overload resolution depends on a generic argument still attribute a
+        // JavaType.Method — e.g. `Iterable<T>.sumOf` dispatches on the selector's
+        // return type, so a raw `kotlin.Function1` leaves the call unresolved.
+        // A non-concrete argument falls back to the raw spelling (prior behavior).
+        val args = (type as? IrSimpleType)?.arguments
+        if (args.isNullOrEmpty()) return fqn
+        val rendered = args.map { renderTypeArgument(it) ?: return fqn }
+        return "$fqn<${rendered.joinToString(", ")}>"
+    }
+
+    private fun renderTypeArgument(arg: IrTypeArgument): String? {
+        if (arg !is IrTypeProjection) return null
+        val inner = renderPlaceholderType(arg.type, javaTemplate = false) ?: return null
+        return when (arg.variance) {
+            Variance.OUT_VARIANCE -> "? extends $inner"
+            Variance.IN_VARIANCE -> "? super $inner"
+            else -> inner
+        }
     }
 
     private fun renderPlaceholder(typeFqn: String?): String =
