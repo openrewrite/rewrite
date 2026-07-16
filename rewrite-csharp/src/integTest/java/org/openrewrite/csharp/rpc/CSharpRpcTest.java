@@ -61,6 +61,29 @@ class CSharpRpcTest implements RewriteTest {
     }
 
     @Test
+    void parseXmlDocComments() {
+        // Structured /// documentation comments are parsed on the C# side, decomposed over RPC
+        // as a CsDocComment tree, and must print back byte-identically on the Java side.
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                /// <summary>
+                /// Adds <paramref name="a"/> to <c>b</c>.
+                /// </summary>
+                /// <param name="a">first</param>
+                /// <returns>the <see cref="int"/> sum</returns>
+                public class Calculator
+                {
+                    /// <summary>Adds two numbers.</summary>
+                    public int Add(int a, int b) => a + b;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
     void parseClassWithProperties() {
         rewriteRun(csharp(
           """

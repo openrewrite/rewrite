@@ -110,6 +110,24 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(CsUnary),
             "org.openrewrite.csharp.tree.Cs$Unary");
 
+        // Structured XML doc-comment tree — nested C# types map to the Java CsDocComment model.
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.DocComment),
+            "org.openrewrite.csharp.tree.CsDocComment$DocComment");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlElement),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlElement");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlEmptyElement),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlEmptyElement");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlText),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlText");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlAttribute");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlCrefAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlCrefAttribute");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlNameAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlNameAttribute");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.LineBreak),
+            "org.openrewrite.csharp.tree.CsDocComment$LineBreak");
+
         // Types in nagoya's Rewrite.Java namespace that don't follow nesting conventions
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable");

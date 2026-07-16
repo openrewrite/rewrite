@@ -443,7 +443,6 @@ public class RpcReceiveQueue
         {
             "org.openrewrite.java.tree.Space" => typeof(Space),
             "org.openrewrite.java.tree.TextComment" => typeof(TextComment),
-            "org.openrewrite.csharp.tree.CsDocCommentRawComment" => typeof(XmlDocComment),
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
@@ -462,25 +461,23 @@ public class RpcReceiveQueue
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>
                 typeof(NamedVariable),
 
-            // Structured XML doc-comment tree (Java-only model). The C# side has no
-            // equivalent, so these map to sentinel shells that CsDocCommentReceiver drains
-            // and re-flattens into a raw XmlDocComment.
+            // Structured XML doc-comment tree, mirrored node-for-node on the C# side.
             "org.openrewrite.csharp.tree.CsDocComment$DocComment" =>
-                typeof(OpenRewrite.CSharp.Rpc.StructuredDocComment),
+                typeof(OpenRewrite.CSharp.CsDocComment.DocComment),
             "org.openrewrite.csharp.tree.CsDocComment$XmlElement" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlElement),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlElement),
             "org.openrewrite.csharp.tree.CsDocComment$XmlEmptyElement" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlEmptyElement),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlEmptyElement),
             "org.openrewrite.csharp.tree.CsDocComment$XmlText" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlText),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlText),
             "org.openrewrite.csharp.tree.CsDocComment$XmlAttribute" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlAttribute),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlAttribute),
             "org.openrewrite.csharp.tree.CsDocComment$XmlCrefAttribute" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlCrefAttribute),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlCrefAttribute),
             "org.openrewrite.csharp.tree.CsDocComment$XmlNameAttribute" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlNameAttribute),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlNameAttribute),
             "org.openrewrite.csharp.tree.CsDocComment$LineBreak" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocLineBreak),
+                typeof(OpenRewrite.CSharp.CsDocComment.LineBreak),
 
             // Marker type overrides
             "org.openrewrite.java.marker.Semicolon" =>
