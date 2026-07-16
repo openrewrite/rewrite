@@ -18,6 +18,19 @@ describe("RPC queues", () => {
         expect(refs.has(ref2)).toBeTruthy();
     })
 
+    test("reuses reference ID zero", async () => {
+        const value = asRef({kind: Json.Kind.Space, comments: [], whitespace: "\n"});
+        const queue = new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false);
+
+        await queue.generate(value, undefined);
+        const batch = await queue.generate(value, undefined);
+
+        expect(batch).toEqual([
+            {state: RpcObjectState.ADD, ref: 0},
+            {state: RpcObjectState.END_OF_OBJECT},
+        ]);
+    });
+
     test("changePropertyType", async () => {
         // Test changing a property from one type to another type
         // This simulates a recipe that changes the type of an object assigned to a property
