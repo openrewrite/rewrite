@@ -35,14 +35,14 @@ func TestReferenceMapReusesStrongIdentity(t *testing.T) {
 	}
 }
 
-func TestSendQueueRollbackDoesNotReuseReferenceIDs(t *testing.T) {
+func TestSendQueueDiscardDoesNotReuseReferenceIDs(t *testing.T) {
 	type object struct{ value int }
 	refs := NewReferenceMap()
 
 	firstQueue := NewSendQueue(10, func([]RpcObjectData) {}, refs)
 	firstQueue.add(AsRef(&object{value: 1}), nil)
 	rolledBackID := *firstQueue.batch[0].Ref
-	firstQueue.RollbackReferences()
+	firstQueue.DiscardNewReferences()
 	if got := refs.Len(); got != 0 {
 		t.Fatalf("reference count after rollback = %d, want 0", got)
 	}
@@ -53,7 +53,6 @@ func TestSendQueueRollbackDoesNotReuseReferenceIDs(t *testing.T) {
 	if committedID <= rolledBackID {
 		t.Fatalf("reference ID after rollback = %d, want greater than %d", committedID, rolledBackID)
 	}
-	secondQueue.CommitReferences()
 	if got := refs.Len(); got != 1 {
 		t.Fatalf("reference count after commit = %d, want 1", got)
 	}

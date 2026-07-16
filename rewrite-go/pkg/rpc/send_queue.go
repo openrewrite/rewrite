@@ -48,19 +48,13 @@ func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs *ReferenceMap
 	}
 }
 
-// RollbackReferences removes references first allocated by this queue. IDs
+// DiscardNewReferences removes references first allocated by this queue. IDs
 // remain monotonic because the receiver may already have seen definitions from
 // an earlier page of a failed transfer.
-func (q *SendQueue) RollbackReferences() {
+func (q *SendQueue) DiscardNewReferences() {
 	for _, allocation := range q.allocatedRefs {
 		q.refs.deleteIfMatches(allocation.obj, allocation.ref)
 	}
-	q.allocatedRefs = nil
-}
-
-// CommitReferences releases the queue's temporary rollback log. The strong
-// keys remain in the session-wide ReferenceMap until Reset.
-func (q *SendQueue) CommitReferences() {
 	q.allocatedRefs = nil
 }
 

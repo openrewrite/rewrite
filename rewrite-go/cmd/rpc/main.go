@@ -797,7 +797,7 @@ func (s *server) startGetObjectTransfer(id string, after, before any) *getObject
 		defer close(t.batches)
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				q.RollbackReferences()
+				q.DiscardNewReferences()
 
 				if _, canceled := recovered.(getObjectTransferCanceled); canceled {
 					return
@@ -856,20 +856,19 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 
 	batch, ok := <-t.batches
 	if !ok {
-		t.sendQueue.RollbackReferences()
+		t.sendQueue.DiscardNewReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: "GetObject traversal ended without END_OF_OBJECT"}
 	}
 	if batch.err != nil {
-		t.sendQueue.RollbackReferences()
+		t.sendQueue.DiscardNewReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: batch.err.Error()}
 	}
 
 	if len(batch.data) > 0 && batch.data[len(batch.data)-1].State == rpc.EndOfObject {
-		t.sendQueue.CommitReferences()
 		delete(s.inProgressGetObjects, req.ID)
 		s.remoteObjects[req.ID] = t.after
 	}
