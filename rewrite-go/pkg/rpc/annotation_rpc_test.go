@@ -35,7 +35,7 @@ func roundTripNode(t *testing.T, before java.Tree, seed java.Tree) any {
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, NewReferenceMap())
 	NewGoSender().Visit(before, sendQ)
 	sendQ.Flush()
 

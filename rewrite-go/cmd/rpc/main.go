@@ -74,8 +74,8 @@ type rpcError struct {
 
 type server struct {
 	localObjects  map[string]any
-	remoteObjects map[string]any  // forward direction: tracks what Java has from Go
-	localRefs     map[uintptr]int // forward direction: tracks references sent to Java
+	remoteObjects map[string]any    // forward direction: tracks what Java has from Go
+	localRefs     *rpc.ReferenceMap // forward direction: tracks references sent to Java
 	batchSize     int
 
 	inProgressGetObjects map[string]*getObjectTransfer
@@ -206,7 +206,7 @@ func newServer(cfg serverConfig) *server {
 	s := &server{
 		localObjects:            make(map[string]any),
 		remoteObjects:           make(map[string]any),
-		localRefs:               make(map[uintptr]int),
+		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
@@ -763,6 +763,7 @@ type getObjectTransfer struct {
 	batches    chan getObjectBatch
 	cancel     chan struct{}
 	cancelOnce sync.Once
+	refs       *rpc.ReferenceTransaction
 }
 
 type getObjectTransferCanceled struct{}
@@ -774,17 +775,17 @@ func (t *getObjectTransfer) stop() {
 }
 
 func (s *server) startGetObjectTransfer(id string, after, before any) *getObjectTransfer {
+	localRefs := s.localRefs.Begin()
 	t := &getObjectTransfer{
 		after:   after,
 		batches: make(chan getObjectBatch, 1),
 		cancel:  make(chan struct{}),
+		refs:    localRefs,
 	}
 
 	// Reference IDs are scoped to the Go→Java direction and persist until
-	// Reset, matching the lifetime of Java's receive table. Keep the map for
-	// the complete transfer so references remain valid across page boundaries.
-	localRefs := s.localRefs
-	savedRefCount := len(localRefs)
+	// Reset, matching the lifetime of Java's receive table. Allocations remain
+	// private to this transfer until its final page is delivered.
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		select {
 		case t.batches <- getObjectBatch{data: batch}:
@@ -797,13 +798,7 @@ func (s *server) startGetObjectTransfer(id string, after, before any) *getObject
 		defer close(t.batches)
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				// The receiver cannot have completed this transfer, so references
-				// first introduced by it must not be reused by later transfers.
-				for ptr, ref := range localRefs {
-					if ref > savedRefCount {
-						delete(localRefs, ptr)
-					}
-				}
+				localRefs.Rollback()
 
 				if _, canceled := recovered.(getObjectTransferCanceled); canceled {
 					return
@@ -855,17 +850,20 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 
 	batch, ok := <-t.batches
 	if !ok {
+		t.refs.Rollback()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: "GetObject traversal ended without END_OF_OBJECT"}
 	}
 	if batch.err != nil {
+		t.refs.Rollback()
 		delete(s.inProgressGetObjects, req.ID)
 		delete(s.remoteObjects, req.ID)
 		return nil, &rpcError{Code: -32603, Message: batch.err.Error()}
 	}
 
 	if len(batch.data) > 0 && batch.data[len(batch.data)-1].State == rpc.EndOfObject {
+		t.refs.Commit()
 		delete(s.inProgressGetObjects, req.ID)
 		s.remoteObjects[req.ID] = t.after
 	}
@@ -1132,7 +1130,7 @@ func (s *server) handleReset() bool {
 	s.inProgressGetObjects = make(map[string]*getObjectTransfer)
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
-	s.localRefs = make(map[uintptr]int)
+	s.localRefs = rpc.NewReferenceMap()
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.reverseTypePool = make(map[string]java.JavaType)

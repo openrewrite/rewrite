@@ -152,13 +152,13 @@ func TestHandleGetObjectReusesReferencesAcrossTransfers(t *testing.T) {
 	s.localObjects["second"] = &java.Identifier{Name: "second", Type: sharedType}
 
 	getCompleteObjectForTest(t, s, "first")
-	refsAfterFirst := len(s.localRefs)
+	refsAfterFirst := s.localRefs.Len()
 	if refsAfterFirst == 0 {
 		t.Fatal("first transfer did not retain any references")
 	}
 
 	second := getCompleteObjectForTest(t, s, "second")
-	if got := len(s.localRefs); got != refsAfterFirst {
+	if got := s.localRefs.Len(); got != refsAfterFirst {
 		t.Fatalf("references after second transfer = %d, want %d", got, refsAfterFirst)
 	}
 
@@ -168,6 +168,54 @@ func TestHandleGetObjectReusesReferencesAcrossTransfers(t *testing.T) {
 		}
 	}
 	t.Fatal("second transfer did not reuse the shared type by reference")
+}
+
+func TestHandleGetObjectPublishesReferencesAfterFinalBatch(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.batchSize = 1
+	sharedType := &java.JavaTypeClass{
+		Kind:               "Class",
+		FullyQualifiedName: "example.Shared",
+	}
+	s.localObjects["first"] = &java.Identifier{Name: "first", Type: sharedType}
+	s.localObjects["second"] = &java.Identifier{Name: "second", Type: sharedType}
+
+	firstParams := getObjectParams(t, "first")
+	firstBatch := getObjectBatchForTest(t, s, firstParams)
+	if firstBatch[len(firstBatch)-1].State == rpc.EndOfObject {
+		t.Fatal("first transfer unexpectedly completed in one batch")
+	}
+	if got := s.localRefs.Len(); got != 0 {
+		t.Fatalf("references published before final batch = %d, want 0", got)
+	}
+
+	second := getCompleteObjectForTest(t, s, "second")
+	fullDefinition := false
+	for _, data := range second {
+		if data.State == rpc.Add && data.Ref != nil && data.ValueType != nil {
+			fullDefinition = true
+			break
+		}
+	}
+	if !fullDefinition {
+		t.Fatal("interleaved transfer referenced an object that was not committed yet")
+	}
+
+	for {
+		batch := getObjectBatchForTest(t, s, firstParams)
+		if batch[len(batch)-1].State == rpc.EndOfObject {
+			break
+		}
+	}
+
+	s.localObjects["third"] = &java.Identifier{Name: "third", Type: sharedType}
+	third := getCompleteObjectForTest(t, s, "third")
+	for _, data := range third {
+		if data.State == rpc.Add && data.Ref != nil && data.ValueType == nil && data.Value == nil {
+			return
+		}
+	}
+	t.Fatal("completed transfers did not publish their shared reference")
 }
 
 func TestResetCancelsInProgressGetObject(t *testing.T) {

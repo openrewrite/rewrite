@@ -29,11 +29,11 @@ type SendQueue struct {
 	batchSize int
 	batch     []RpcObjectData
 	drain     func([]RpcObjectData)
-	refs      map[uintptr]int // pointer identity -> ref number
+	refs      ReferenceStore
 	before    any
 }
 
-func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs map[uintptr]int) *SendQueue {
+func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs ReferenceStore) *SendQueue {
 	return &SendQueue{
 		batchSize: batchSize,
 		batch:     make([]RpcObjectData, 0, batchSize),
@@ -180,18 +180,14 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 	}
 
 	var ref *int
-	if IsRef(after) {
-		ptr := ptrKey(afterVal)
-		if ptr != 0 { // Only track refs for pointer types (value types all return 0)
-			if existingRef, ok := q.refs[ptr]; ok {
-				// Already sent - emit pure ref
-				q.Put(RpcObjectData{State: Add, Ref: &existingRef})
-				return
-			}
-			r := len(q.refs) + 1
-			q.refs[ptr] = r
-			ref = &r
+	if IsRef(after) && isReferenceIdentity(afterVal) {
+		r, existed := q.refs.GetOrCreate(afterVal)
+		if existed {
+			// Already sent - emit pure ref
+			q.Put(RpcObjectData{State: Add, Ref: &r})
+			return
 		}
+		ref = &r
 	}
 
 	vt := getValueType(afterVal)
@@ -230,18 +226,6 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 			defaultSender.Visit(t, q)
 		}
 	}
-}
-
-func ptrKey(v any) uintptr {
-	if v == nil {
-		return 0
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
-		return rv.Pointer()
-	}
-	// For non-pointer types, we can't track by identity
-	return 0
 }
 
 func sameIdentity(a, b any) bool {
