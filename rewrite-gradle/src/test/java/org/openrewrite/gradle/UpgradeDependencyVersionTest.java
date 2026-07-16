@@ -51,6 +51,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -58,6 +59,99 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
           .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
+    }
+
+    @Test
+    void upgradesVersionCatalogStringLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = "com.google.guava:guava:29.0-jre"
+              """,
+            """
+              [libraries]
+              guava = "com.google.guava:guava:30.1.1-jre"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogInlineLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = "29.0-jre" }
+              """,
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = "30.1.1-jre" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample

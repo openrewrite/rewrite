@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.trait.GradlePlugin;
@@ -42,6 +43,9 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.toml.TomlIsoVisitor;
+import org.openrewrite.toml.TomlTableValue;
+import org.openrewrite.toml.tree.Toml;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -204,6 +208,108 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
+        TomlIsoVisitor<ExecutionContext> tomlVisitor = new TomlIsoVisitor<ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof Toml.Document &&
+                        sourceFile.getSourcePath().endsWith(VersionCatalogToml.FILE_NAME);
+            }
+
+            @Override
+            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
+                Toml.Table plugins = VersionCatalogToml.findTable(document, "plugins");
+                Toml.Table versions = VersionCatalogToml.findTable(document, "versions");
+                if (plugins == null) {
+                    return document;
+                }
+                Map<String, String> references = new HashMap<>();
+                for (Toml value : plugins.getValues()) {
+                    if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getValue() instanceof Toml.Table) {
+                        Toml.Table plugin = (Toml.Table) ((Toml.KeyValue) value).getValue();
+                        String ref = TomlTableValue.getString(plugin, "version.ref");
+                        String id = TomlTableValue.getString(plugin, "id");
+                        if (ref != null && id != null && StringUtils.matchesGlob(id, pluginIdPattern)) {
+                            String selected = select(VersionCatalogToml.getVersion(versions, ref), id, ctx);
+                            if (selected != null) {
+                                references.put(ref, selected);
+                            }
+                        }
+                    }
+                }
+                Toml.Document updated = document.withValues(ListUtils.map(document.getValues(), value -> {
+                    if (!(value instanceof Toml.Table)) {
+                        return value;
+                    }
+                    Toml.Table table = (Toml.Table) value;
+                    if (table.getName() != null && "plugins".equals(table.getName().getName())) {
+                        return updatePlugins(table, ctx);
+                    }
+                    if (table.getName() != null && "versions".equals(table.getName().getName())) {
+                        return updateVersions(table, references);
+                    }
+                    return table;
+                }));
+                return super.visitDocument(updated, ctx);
+            }
+
+            private Toml.Table updatePlugins(Toml.Table plugins, ExecutionContext ctx) {
+                return plugins.withValues(ListUtils.map(plugins.getValues(), value -> {
+                    if (!(value instanceof Toml.KeyValue)) {
+                        return value;
+                    }
+                    Toml.KeyValue plugin = (Toml.KeyValue) value;
+                    if (plugin.getValue() instanceof Toml.Literal && ((Toml.Literal) plugin.getValue()).getValue() instanceof String) {
+                        Toml.Literal literal = (Toml.Literal) plugin.getValue();
+                        String[] parts = ((String) literal.getValue()).split(":", 2);
+                        if (parts.length == 2 && StringUtils.matchesGlob(parts[0], pluginIdPattern)) {
+                            String selected = select(parts[1], parts[0], ctx);
+                            if (selected != null) {
+                                return plugin.withValue(literal.withSource(VersionCatalogToml.quoted(literal, parts[0] + ":" + selected))
+                                        .withValue(parts[0] + ":" + selected));
+                            }
+                        }
+                    } else if (plugin.getValue() instanceof Toml.Table) {
+                        Toml.Table inline = (Toml.Table) plugin.getValue();
+                        String id = TomlTableValue.getString(inline, "id");
+                        if (id != null && StringUtils.matchesGlob(id, pluginIdPattern) && TomlTableValue.has(inline, "version")) {
+                            String selected = select(TomlTableValue.getString(inline, "version"), id, ctx);
+                            if (selected != null) {
+                                return plugin.withValue(TomlTableValue.withString(inline, "version", selected));
+                            }
+                        }
+                    }
+                    return plugin;
+                }));
+            }
+
+            private Toml.Table updateVersions(Toml.Table versions, Map<String, String> references) {
+                return versions.withValues(ListUtils.map(versions.getValues(), value -> {
+                    if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getKey() instanceof Toml.Identifier) ||
+                            !(((Toml.KeyValue) value).getValue() instanceof Toml.Literal)) {
+                        return value;
+                    }
+                    String selected = references.get(((Toml.Identifier) ((Toml.KeyValue) value).getKey()).getName());
+                    if (selected == null) {
+                        return value;
+                    }
+                    Toml.Literal literal = (Toml.Literal) ((Toml.KeyValue) value).getValue();
+                    return ((Toml.KeyValue) value).withValue(literal.withSource(VersionCatalogToml.quoted(literal, selected)).withValue(selected));
+                }));
+            }
+
+            private @Nullable String select(@Nullable String current, String id, ExecutionContext ctx) {
+                if (current == null) {
+                    return null;
+                }
+                try {
+                    return new DependencyVersionSelector(metadataFailures, null, null)
+                            .select(new GroupArtifactVersion(id, id + ".gradle.plugin", current), "classpath", newVersion, versionPattern, ctx);
+                } catch (MavenDownloadingException e) {
+                    return null;
+                }
+            }
+
+        };
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -340,7 +446,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 return visited;
             }
         };
-        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
+        return Preconditions.or(
+                propertiesVisitor,
+                tomlVisitor,
+                Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor)
+        );
     }
 
     private @Nullable String literalValue(Expression expr) {
