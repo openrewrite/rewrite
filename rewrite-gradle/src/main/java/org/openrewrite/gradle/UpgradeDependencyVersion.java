@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -124,8 +125,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static final MethodMatcher PROPERTY_METHOD = new MethodMatcher("* property(String)");
     private static final MethodMatcher FIND_PROPERTY_METHOD = new MethodMatcher("* findProperty(String)");
 
-    @Value
+    @Getter
     public static class DependencyVersionState {
+        @Nullable
+        GradleProject gradleProject;
         Map<String, Map<GroupArtifact, Set<String>>> variableNames = new HashMap<>();
         Map<String, Map<GroupArtifact, Set<String>>> versionPropNameToGA = new HashMap<>();
 
@@ -169,6 +172,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (gradleProject != null && ":".equals(gradleProject.getPath())) {
+                        acc.gradleProject = gradleProject;
+                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -320,7 +326,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateVersionCatalog updateVersionCatalog = new UpdateVersionCatalog();
+            private final UpdateVersionCatalog updateVersionCatalog = new UpdateVersionCatalog(acc);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
@@ -396,7 +402,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     private class UpdateVersionCatalog extends TomlIsoVisitor<ExecutionContext> {
+        private final DependencyVersionState acc;
         private final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+
+        private UpdateVersionCatalog(DependencyVersionState acc) {
+            this.acc = acc;
+        }
 
         @Override
         public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
@@ -412,7 +423,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     Toml.Table library = (Toml.Table) ((Toml.KeyValue) value).getValue();
                     String versionRef = TomlTableValue.getString(library, "version.ref");
                     if (versionRef != null && matches(library)) {
-                        referencedVersions.put(versionRef, selectVersion(VersionCatalogToml.getVersion(versions, versionRef), ctx));
+                        try {
+                            referencedVersions.put(versionRef, selectVersion(VersionCatalogToml.getVersion(versions, versionRef), ctx));
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(document);
+                        }
                     }
                 }
             }
@@ -443,19 +458,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (literal.getValue() instanceof String) {
                         Dependency dependency = DependencyNotation.parse((String) literal.getValue());
                         if (dependency != null && dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
-                            String selected = selectVersion(dependency.getVersion(), ctx);
-                            if (selected != null) {
-                                String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(selected)));
-                                return library.withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
+                            try {
+                                String selected = selectVersion(dependency.getVersion(), ctx);
+                                if (selected != null) {
+                                    String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(selected)));
+                                    return library.withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
+                                }
+                            } catch (MavenDownloadingException e) {
+                                return e.warn(library);
                             }
                         }
                     }
                 } else if (library.getValue() instanceof Toml.Table) {
                     Toml.Table inline = (Toml.Table) library.getValue();
                     if (matches(inline) && TomlTableValue.has(inline, "version")) {
-                        String selected = selectVersion(TomlTableValue.getString(inline, "version"), ctx);
-                        if (selected != null) {
-                            return library.withValue(TomlTableValue.withString(inline, "version", selected));
+                        try {
+                            String selected = selectVersion(TomlTableValue.getString(inline, "version"), ctx);
+                            if (selected != null) {
+                                return library.withValue(TomlTableValue.withString(inline, "version", selected));
+                            }
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(library);
                         }
                     }
                 }
@@ -483,16 +506,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return dependencyMatcher.matches(TomlTableValue.getString(library, "group"), TomlTableValue.getString(library, "name"));
         }
 
-        private @Nullable String selectVersion(@Nullable String currentVersion, ExecutionContext ctx) {
+        private @Nullable String selectVersion(@Nullable String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
             if (currentVersion == null) {
                 return null;
             }
-            try {
-                return new DependencyVersionSelector(metadataFailures, null, null)
-                        .select(new GroupArtifactVersion(groupId, artifactId, currentVersion), null, newVersion, versionPattern, ctx);
-            } catch (MavenDownloadingException e) {
-                return null;
-            }
+            return new DependencyVersionSelector(metadataFailures, acc.gradleProject, null)
+                    .select(new GroupArtifactVersion(groupId, artifactId, currentVersion), null, newVersion, versionPattern, ctx);
         }
 
     }

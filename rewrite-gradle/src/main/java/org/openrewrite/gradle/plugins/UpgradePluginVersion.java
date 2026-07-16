@@ -103,6 +103,10 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     }
 
     public static class DependencyVersionState {
+        @Nullable
+        GradleProject gradleProject;
+        @Nullable
+        GradleSettings gradleSettings;
         Map<String, String> versionPropNameToPluginId = new HashMap<>();
         Map<String, @Nullable String> pluginIdToNewVersion = new HashMap<>();
     }
@@ -129,6 +133,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
+                    if (gradleProject != null && ":".equals(gradleProject.getPath())) {
+                        acc.gradleProject = gradleProject;
+                    }
+                    if (gradleSettings != null) {
+                        acc.gradleSettings = gradleSettings;
+                    }
                     localVariableValues.clear();
                 }
                 return super.visit(tree, ctx);
@@ -229,9 +239,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         String ref = TomlTableValue.getString(plugin, "version.ref");
                         String id = TomlTableValue.getString(plugin, "id");
                         if (ref != null && id != null && StringUtils.matchesGlob(id, pluginIdPattern)) {
-                            String selected = select(VersionCatalogToml.getVersion(versions, ref), id, ctx);
-                            if (selected != null) {
-                                references.put(ref, selected);
+                            try {
+                                String selected = select(VersionCatalogToml.getVersion(versions, ref), id, ctx);
+                                if (selected != null) {
+                                    references.put(ref, selected);
+                                }
+                            } catch (MavenDownloadingException e) {
+                                return e.warn(document);
                             }
                         }
                     }
@@ -262,19 +276,27 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         Toml.Literal literal = (Toml.Literal) plugin.getValue();
                         String[] parts = ((String) literal.getValue()).split(":", 2);
                         if (parts.length == 2 && StringUtils.matchesGlob(parts[0], pluginIdPattern)) {
-                            String selected = select(parts[1], parts[0], ctx);
-                            if (selected != null) {
-                                return plugin.withValue(literal.withSource(VersionCatalogToml.quoted(literal, parts[0] + ":" + selected))
-                                        .withValue(parts[0] + ":" + selected));
+                            try {
+                                String selected = select(parts[1], parts[0], ctx);
+                                if (selected != null) {
+                                    return plugin.withValue(literal.withSource(VersionCatalogToml.quoted(literal, parts[0] + ":" + selected))
+                                            .withValue(parts[0] + ":" + selected));
+                                }
+                            } catch (MavenDownloadingException e) {
+                                return e.warn(plugin);
                             }
                         }
                     } else if (plugin.getValue() instanceof Toml.Table) {
                         Toml.Table inline = (Toml.Table) plugin.getValue();
                         String id = TomlTableValue.getString(inline, "id");
                         if (id != null && StringUtils.matchesGlob(id, pluginIdPattern) && TomlTableValue.has(inline, "version")) {
-                            String selected = select(TomlTableValue.getString(inline, "version"), id, ctx);
-                            if (selected != null) {
-                                return plugin.withValue(TomlTableValue.withString(inline, "version", selected));
+                            try {
+                                String selected = select(TomlTableValue.getString(inline, "version"), id, ctx);
+                                if (selected != null) {
+                                    return plugin.withValue(TomlTableValue.withString(inline, "version", selected));
+                                }
+                            } catch (MavenDownloadingException e) {
+                                return e.warn(plugin);
                             }
                         }
                     }
@@ -297,16 +319,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 }));
             }
 
-            private @Nullable String select(@Nullable String current, String id, ExecutionContext ctx) {
+            private @Nullable String select(@Nullable String current, String id, ExecutionContext ctx) throws MavenDownloadingException {
                 if (current == null) {
                     return null;
                 }
-                try {
-                    return new DependencyVersionSelector(metadataFailures, null, null)
-                            .select(new GroupArtifactVersion(id, id + ".gradle.plugin", current), "classpath", newVersion, versionPattern, ctx);
-                } catch (MavenDownloadingException e) {
-                    return null;
-                }
+                return new DependencyVersionSelector(metadataFailures, acc.gradleProject, acc.gradleSettings)
+                        .select(new GroupArtifactVersion(id, id + ".gradle.plugin", current), "classpath", newVersion, versionPattern, ctx);
             }
 
         };

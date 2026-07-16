@@ -154,6 +154,36 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradesVersionCatalogLibraryWithRangeSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre")),
+          toml(
+            """
+              [libraries]
+              guava = "com.google.guava:guava:29.0-jre"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+                .after(actual -> assertThat(actual).containsPattern("com.google.guava:guava:30\\.\\d+\\.\\d+-jre").actual())
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void guavaCompileOnly() {

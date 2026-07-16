@@ -119,6 +119,28 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradesVersionCatalogPluginWithRangeSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.40.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+                .after(actual -> assertThat(actual).containsPattern("org.openrewrite.rewrite:5\\.40\\.\\d+").actual())
+          ),
+          buildGradle(
+            """
+              plugins {
+                  alias(libs.plugins.openrewrite)
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample("Upgrading a build plugin")
     @Test
     void upgradePlugin() {
