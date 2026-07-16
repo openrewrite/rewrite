@@ -72,20 +72,22 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
         }
         Map<String, String> references = new HashMap<>();
         for (Toml value : plugins.getValues()) {
-            if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getValue() instanceof Toml.Table) {
-                Toml.Table plugin = (Toml.Table) ((Toml.KeyValue) value).getValue();
-                String ref = TomlTableValue.getString(plugin, "version.ref");
-                String id = TomlTableValue.getString(plugin, "id");
-                if (ref != null && id != null && StringUtils.matchesGlob(id, pluginIdPattern)) {
-                    try {
-                        String selected = select(VersionCatalogToml.getVersion(versions, ref), id, ctx);
-                        if (selected != null) {
-                            references.put(ref, selected);
-                        }
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(document);
-                    }
+            if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getValue() instanceof Toml.Table)) {
+                continue;
+            }
+            Toml.Table plugin = (Toml.Table) ((Toml.KeyValue) value).getValue();
+            String ref = TomlTableValue.getString(plugin, "version.ref");
+            String id = TomlTableValue.getString(plugin, "id");
+            if (ref == null || id == null || !StringUtils.matchesGlob(id, pluginIdPattern)) {
+                continue;
+            }
+            try {
+                String selected = select(VersionCatalogToml.getVersion(versions, ref), id, ctx);
+                if (selected != null) {
+                    references.put(ref, selected);
                 }
+            } catch (MavenDownloadingException e) {
+                return e.warn(document);
             }
         }
         Toml.Document updated = document.withValues(ListUtils.map(document.getValues(), value -> {
@@ -99,7 +101,7 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
             if (table.getName() != null && "versions".equals(table.getName().getName())) {
                 return updateVersions(table, references);
             }
-            return table;
+            return value;
         }));
         return super.visitDocument(updated, ctx);
     }
@@ -110,32 +112,37 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
                 return value;
             }
             Toml.KeyValue plugin = (Toml.KeyValue) value;
-            if (plugin.getValue() instanceof Toml.Literal && ((Toml.Literal) plugin.getValue()).getValue() instanceof String) {
+            if (plugin.getValue() instanceof Toml.Literal) {
                 Toml.Literal literal = (Toml.Literal) plugin.getValue();
+                if (!(literal.getValue() instanceof String)) {
+                    return plugin;
+                }
                 String[] parts = ((String) literal.getValue()).split(":", 2);
-                if (parts.length == 2 && StringUtils.matchesGlob(parts[0], pluginIdPattern)) {
-                    try {
-                        String selected = select(parts[1], parts[0], ctx);
-                        if (selected != null) {
-                            return plugin.withValue(literal.withSource(VersionCatalogToml.quoted(literal, parts[0] + ":" + selected))
-                                    .withValue(parts[0] + ":" + selected));
-                        }
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(plugin);
+                if (parts.length != 2 || !StringUtils.matchesGlob(parts[0], pluginIdPattern)) {
+                    return plugin;
+                }
+                try {
+                    String selected = select(parts[1], parts[0], ctx);
+                    if (selected != null) {
+                        return plugin.withValue(literal.withSource(VersionCatalogToml.quoted(literal, parts[0] + ":" + selected))
+                                .withValue(parts[0] + ":" + selected));
                     }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(plugin);
                 }
             } else if (plugin.getValue() instanceof Toml.Table) {
                 Toml.Table inline = (Toml.Table) plugin.getValue();
                 String id = TomlTableValue.getString(inline, "id");
-                if (id != null && StringUtils.matchesGlob(id, pluginIdPattern) && TomlTableValue.has(inline, "version")) {
-                    try {
-                        String selected = select(TomlTableValue.getString(inline, "version"), id, ctx);
-                        if (selected != null) {
-                            return plugin.withValue(TomlTableValue.withString(inline, "version", selected));
-                        }
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(plugin);
+                if (id == null || !StringUtils.matchesGlob(id, pluginIdPattern) || !TomlTableValue.has(inline, "version")) {
+                    return plugin;
+                }
+                try {
+                    String selected = select(TomlTableValue.getString(inline, "version"), id, ctx);
+                    if (selected != null) {
+                        return plugin.withValue(TomlTableValue.withString(inline, "version", selected));
                     }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(plugin);
                 }
             }
             return plugin;

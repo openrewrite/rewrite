@@ -68,28 +68,31 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
 
         Map<String, String> referencedVersions = new HashMap<>();
         for (Toml value : libraries.getValues()) {
-            if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getValue() instanceof Toml.Table) {
-                Toml.Table library = (Toml.Table) ((Toml.KeyValue) value).getValue();
-                String versionRef = TomlTableValue.getString(library, "version.ref");
-                if (versionRef != null && matches(library)) {
-                    try {
-                        referencedVersions.put(versionRef, selectVersion(VersionCatalogToml.getVersion(versions, versionRef), ctx));
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(document);
-                    }
-                }
+            if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getValue() instanceof Toml.Table)) {
+                continue;
+            }
+            Toml.Table library = (Toml.Table) ((Toml.KeyValue) value).getValue();
+            String versionRef = TomlTableValue.getString(library, "version.ref");
+            if (versionRef == null || !matches(library)) {
+                continue;
+            }
+            try {
+                referencedVersions.put(versionRef, selectVersion(VersionCatalogToml.getVersion(versions, versionRef), ctx));
+            } catch (MavenDownloadingException e) {
+                return e.warn(document);
             }
         }
 
         Toml.Document updated = document.withValues(ListUtils.map(document.getValues(), value -> {
-            if (value instanceof Toml.Table) {
-                Toml.Table table = (Toml.Table) value;
-                if (table.getName() != null && "libraries".equals(table.getName().getName())) {
-                    return updateLibraries(table, ctx);
-                }
-                if (table.getName() != null && "versions".equals(table.getName().getName())) {
-                    return updateVersions(table, referencedVersions);
-                }
+            if (!(value instanceof Toml.Table)) {
+                return value;
+            }
+            Toml.Table table = (Toml.Table) value;
+            if (table.getName() != null && "libraries".equals(table.getName().getName())) {
+                return updateLibraries(table, ctx);
+            }
+            if (table.getName() != null && "versions".equals(table.getName().getName())) {
+                return updateVersions(table, referencedVersions);
             }
             return value;
         }));
@@ -104,31 +107,34 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
             Toml.KeyValue library = (Toml.KeyValue) value;
             if (library.getValue() instanceof Toml.Literal) {
                 Toml.Literal literal = (Toml.Literal) library.getValue();
-                if (literal.getValue() instanceof String) {
-                    Dependency dependency = DependencyNotation.parse((String) literal.getValue());
-                    if (dependency != null && dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
-                        try {
-                            String selected = selectVersion(dependency.getVersion(), ctx);
-                            if (selected != null) {
-                                String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(selected)));
-                                return library.withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
-                            }
-                        } catch (MavenDownloadingException e) {
-                            return e.warn(library);
-                        }
+                if (!(literal.getValue() instanceof String)) {
+                    return library;
+                }
+                Dependency dependency = DependencyNotation.parse((String) literal.getValue());
+                if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    return library;
+                }
+                try {
+                    String selected = selectVersion(dependency.getVersion(), ctx);
+                    if (selected != null) {
+                        String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(selected)));
+                        return library.withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
                     }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(library);
                 }
             } else if (library.getValue() instanceof Toml.Table) {
                 Toml.Table inline = (Toml.Table) library.getValue();
-                if (matches(inline) && TomlTableValue.has(inline, "version")) {
-                    try {
-                        String selected = selectVersion(TomlTableValue.getString(inline, "version"), ctx);
-                        if (selected != null) {
-                            return library.withValue(TomlTableValue.withString(inline, "version", selected));
-                        }
-                    } catch (MavenDownloadingException e) {
-                        return e.warn(library);
+                if (!matches(inline) || !TomlTableValue.has(inline, "version")) {
+                    return library;
+                }
+                try {
+                    String selected = selectVersion(TomlTableValue.getString(inline, "version"), ctx);
+                    if (selected != null) {
+                        return library.withValue(TomlTableValue.withString(inline, "version", selected));
                     }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(library);
                 }
             }
             return library;

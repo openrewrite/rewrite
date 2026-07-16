@@ -94,11 +94,12 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
         }
         library = TomlTableValue.withString(library, "group", replacementGroupId);
         library = TomlTableValue.withString(library, "name", replacementArtifactId);
-        if (selectedVersion != null && TomlTableValue.has(library, "version")) {
-            library = TomlTableValue.withString(library, "version", selectedVersion);
-        } else if (selectedVersion != null && Boolean.TRUE.equals(overrideManagedVersion) &&
-                !TomlTableValue.has(library, "version.ref")) {
-            library = TomlTableValue.withStringOrAdd(library, "version", selectedVersion);
+        if (selectedVersion != null) {
+            if (TomlTableValue.has(library, "version")) {
+                library = TomlTableValue.withString(library, "version", selectedVersion);
+            } else if (Boolean.TRUE.equals(overrideManagedVersion) && !TomlTableValue.has(library, "version.ref")) {
+                library = TomlTableValue.withStringOrAdd(library, "version", selectedVersion);
+            }
         }
         return kv.withValue(library);
     }
