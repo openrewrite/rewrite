@@ -50,8 +50,6 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
-import org.openrewrite.toml.TomlIsoVisitor;
-import org.openrewrite.toml.TomlTableValue;
 import org.openrewrite.toml.tree.Toml;
 
 import java.util.*;
@@ -326,7 +324,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateVersionCatalog updateVersionCatalog = new UpdateVersionCatalog(acc);
+            private final UpgradeDependencyVersionCatalog updateVersionCatalog = new UpgradeDependencyVersionCatalog(groupId, artifactId, newVersion, versionPattern, metadataFailures, acc.gradleProject);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
@@ -399,121 +397,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
         };
-    }
-
-    private class UpdateVersionCatalog extends TomlIsoVisitor<ExecutionContext> {
-        private final DependencyVersionState acc;
-        private final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
-
-        private UpdateVersionCatalog(DependencyVersionState acc) {
-            this.acc = acc;
-        }
-
-        @Override
-        public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-            Toml.Table libraries = VersionCatalogToml.findTable(document, "libraries");
-            Toml.Table versions = VersionCatalogToml.findTable(document, "versions");
-            if (libraries == null) {
-                return document;
-            }
-
-            Map<String, String> referencedVersions = new HashMap<>();
-            for (Toml value : libraries.getValues()) {
-                if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getValue() instanceof Toml.Table) {
-                    Toml.Table library = (Toml.Table) ((Toml.KeyValue) value).getValue();
-                    String versionRef = TomlTableValue.getString(library, "version.ref");
-                    if (versionRef != null && matches(library)) {
-                        try {
-                            referencedVersions.put(versionRef, selectVersion(VersionCatalogToml.getVersion(versions, versionRef), ctx));
-                        } catch (MavenDownloadingException e) {
-                            return e.warn(document);
-                        }
-                    }
-                }
-            }
-
-            Toml.Document updated = document.withValues(ListUtils.map(document.getValues(), value -> {
-                if (value instanceof Toml.Table) {
-                    Toml.Table table = (Toml.Table) value;
-                    if (table.getName() != null && "libraries".equals(table.getName().getName())) {
-                        return updateLibraries(table, ctx);
-                    }
-                    if (table.getName() != null && "versions".equals(table.getName().getName())) {
-                        return updateVersions(table, referencedVersions);
-                    }
-                }
-                return value;
-            }));
-            return super.visitDocument(updated, ctx);
-        }
-
-        private Toml.Table updateLibraries(Toml.Table libraries, ExecutionContext ctx) {
-            return libraries.withValues(ListUtils.map(libraries.getValues(), value -> {
-                if (!(value instanceof Toml.KeyValue)) {
-                    return value;
-                }
-                Toml.KeyValue library = (Toml.KeyValue) value;
-                if (library.getValue() instanceof Toml.Literal) {
-                    Toml.Literal literal = (Toml.Literal) library.getValue();
-                    if (literal.getValue() instanceof String) {
-                        Dependency dependency = DependencyNotation.parse((String) literal.getValue());
-                        if (dependency != null && dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
-                            try {
-                                String selected = selectVersion(dependency.getVersion(), ctx);
-                                if (selected != null) {
-                                    String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(selected)));
-                                    return library.withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
-                                }
-                            } catch (MavenDownloadingException e) {
-                                return e.warn(library);
-                            }
-                        }
-                    }
-                } else if (library.getValue() instanceof Toml.Table) {
-                    Toml.Table inline = (Toml.Table) library.getValue();
-                    if (matches(inline) && TomlTableValue.has(inline, "version")) {
-                        try {
-                            String selected = selectVersion(TomlTableValue.getString(inline, "version"), ctx);
-                            if (selected != null) {
-                                return library.withValue(TomlTableValue.withString(inline, "version", selected));
-                            }
-                        } catch (MavenDownloadingException e) {
-                            return e.warn(library);
-                        }
-                    }
-                }
-                return library;
-            }));
-        }
-
-        private Toml.Table updateVersions(Toml.Table versions, Map<String, String> referencedVersions) {
-            return versions.withValues(ListUtils.map(versions.getValues(), value -> {
-                if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getKey() instanceof Toml.Identifier) ||
-                        !(((Toml.KeyValue) value).getValue() instanceof Toml.Literal)) {
-                    return value;
-                }
-                String key = ((Toml.Identifier) ((Toml.KeyValue) value).getKey()).getName();
-                String selected = referencedVersions.get(key);
-                if (selected == null) {
-                    return value;
-                }
-                Toml.Literal literal = (Toml.Literal) ((Toml.KeyValue) value).getValue();
-                return ((Toml.KeyValue) value).withValue(literal.withSource(VersionCatalogToml.quoted(literal, selected)).withValue(selected));
-            }));
-        }
-
-        private boolean matches(Toml.Table library) {
-            return dependencyMatcher.matches(TomlTableValue.getString(library, "group"), TomlTableValue.getString(library, "name"));
-        }
-
-        private @Nullable String selectVersion(@Nullable String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
-            if (currentVersion == null) {
-                return null;
-            }
-            return new DependencyVersionSelector(metadataFailures, acc.gradleProject, null)
-                    .select(new GroupArtifactVersion(groupId, artifactId, currentVersion), null, newVersion, versionPattern, ctx);
-        }
-
     }
 
     @RequiredArgsConstructor
