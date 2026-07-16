@@ -129,7 +129,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
-                    if (gradleProject != null && ":".equals(gradleProject.getPath())) {
+                    if (gradleProject != null && gradleProject.isRootProject()) {
                         acc.gradleProject = gradleProject;
                     }
                     if (gradleSettings != null) {

@@ -170,7 +170,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
-                    if (gradleProject != null && ":".equals(gradleProject.getPath())) {
+                    if (gradleProject != null && gradleProject.isRootProject()) {
                         acc.gradleProject = gradleProject;
                     }
                 }
@@ -956,7 +956,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if (StringUtils.isBlank(project.getGroup())) {
             return project.getName();
         }
-        if (":".equals(project.getPath())) {
+        if (project.isRootProject()) {
             return project.getGroup();
         }
         return project.getGroup() + project.getPath().replace(":", ".");
