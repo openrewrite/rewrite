@@ -74,9 +74,8 @@ type rpcError struct {
 
 type server struct {
 	localObjects  map[string]any
-	remoteObjects map[string]any // forward direction: tracks what Java has from Go
-	localRefs     map[uintptr]int
-	remoteRefs    map[int]any
+	remoteObjects map[string]any  // forward direction: tracks what Java has from Go
+	localRefs     map[uintptr]int // forward direction: tracks references sent to Java
 	batchSize     int
 
 	inProgressGetObjects map[string]*getObjectTransfer
@@ -208,7 +207,6 @@ func newServer(cfg serverConfig) *server {
 		localObjects:            make(map[string]any),
 		remoteObjects:           make(map[string]any),
 		localRefs:               make(map[uintptr]int),
-		remoteRefs:              make(map[int]any),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
@@ -782,10 +780,11 @@ func (s *server) startGetObjectTransfer(id string, after, before any) *getObject
 		cancel:  make(chan struct{}),
 	}
 
-	// Use a fresh ref map for each complete GetObject exchange to avoid ref ID
-	// collisions between the reverse direction (Java→Go) and forward
-	// direction (Go→Java). It must span every batch in this transfer.
-	localRefs := make(map[uintptr]int)
+	// Reference IDs are scoped to the Go→Java direction and persist until
+	// Reset, matching the lifetime of Java's receive table. Keep the map for
+	// the complete transfer so references remain valid across page boundaries.
+	localRefs := s.localRefs
+	savedRefCount := len(localRefs)
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		select {
 		case t.batches <- getObjectBatch{data: batch}:
@@ -798,6 +797,14 @@ func (s *server) startGetObjectTransfer(id string, after, before any) *getObject
 		defer close(t.batches)
 		defer func() {
 			if recovered := recover(); recovered != nil {
+				// The receiver cannot have completed this transfer, so references
+				// first introduced by it must not be reused by later transfers.
+				for ptr, ref := range localRefs {
+					if ref > savedRefCount {
+						delete(localRefs, ptr)
+					}
+				}
+
 				if _, canceled := recovered.(getObjectTransferCanceled); canceled {
 					return
 				}
@@ -1126,7 +1133,6 @@ func (s *server) handleReset() bool {
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
 	s.localRefs = make(map[uintptr]int)
-	s.remoteRefs = make(map[int]any)
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.reverseTypePool = make(map[string]java.JavaType)

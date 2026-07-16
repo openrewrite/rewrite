@@ -44,6 +44,19 @@ func getObjectBatchForTest(t *testing.T, s *server, params json.RawMessage) []rp
 	return result.([]rpc.RpcObjectData)
 }
 
+func getCompleteObjectForTest(t *testing.T, s *server, id string) []rpc.RpcObjectData {
+	t.Helper()
+	params := getObjectParams(t, id)
+	var result []rpc.RpcObjectData
+	for {
+		batch := getObjectBatchForTest(t, s, params)
+		result = append(result, batch...)
+		if len(batch) > 0 && batch[len(batch)-1].State == rpc.EndOfObject {
+			return result
+		}
+	}
+}
+
 func getObjectTreeForTest(t *testing.T) java.Tree {
 	t.Helper()
 	cu, err := goparser.NewGoParser().Parse("main.go", "package main\n")
@@ -127,6 +140,34 @@ func TestHandleGetObjectBatchesAreConsumedByReceiveQueue(t *testing.T) {
 	if pulls < 2 {
 		t.Fatalf("GetObject pulls = %d, want a multi-batch transfer", pulls)
 	}
+}
+
+func TestHandleGetObjectReusesReferencesAcrossTransfers(t *testing.T) {
+	s, _ := newTestServer(t)
+	sharedType := &java.JavaTypeClass{
+		Kind:               "Class",
+		FullyQualifiedName: "example.Shared",
+	}
+	s.localObjects["first"] = &java.Identifier{Name: "first", Type: sharedType}
+	s.localObjects["second"] = &java.Identifier{Name: "second", Type: sharedType}
+
+	getCompleteObjectForTest(t, s, "first")
+	refsAfterFirst := len(s.localRefs)
+	if refsAfterFirst == 0 {
+		t.Fatal("first transfer did not retain any references")
+	}
+
+	second := getCompleteObjectForTest(t, s, "second")
+	if got := len(s.localRefs); got != refsAfterFirst {
+		t.Fatalf("references after second transfer = %d, want %d", got, refsAfterFirst)
+	}
+
+	for _, data := range second {
+		if data.State == rpc.Add && data.Ref != nil && data.ValueType == nil && data.Value == nil {
+			return
+		}
+	}
+	t.Fatal("second transfer did not reuse the shared type by reference")
 }
 
 func TestResetCancelsInProgressGetObject(t *testing.T) {
