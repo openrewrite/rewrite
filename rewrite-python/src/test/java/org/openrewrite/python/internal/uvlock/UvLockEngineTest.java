@@ -196,6 +196,12 @@ class UvLockEngineTest {
       "p-editable-root/pyproject.toml, p-editable-root/uv.lock",
       "o-old-uv/proj-0.7.0/pyproject.toml, o-old-uv/proj-0.7.0/uv.lock.as-0.7.0",
       "s-remove-last-dep/pyproject.toml, s-remove-last-dep/uv.lock.after",
+      // directory-sourced deps and the top-level conflicts/supported-markers/required-markers
+      // header keys all pass through an unrelated rebuild verbatim
+      "v-directory/pyproject.toml, v-directory/uv.lock",
+      "w-conflicts/pyproject.toml, w-conflicts/uv.lock",
+      "w2-conflicts-groups/pyproject.toml, w2-conflicts-groups/uv.lock",
+      "x-supported-required-markers/pyproject.toml, x-supported-required-markers/uv.lock",
     })
     void noOpRebuildIsByteIdentical(String pyprojectPath, String lockPath) {
         ExecutionContext plain = new InMemoryExecutionContext(t -> {
@@ -320,6 +326,27 @@ class UvLockEngineTest {
           ctx);
         assertThat(result.getErrorMessage()).isNull();
         assertThat(result.getLockFileContent()).isEqualTo(resource("u-git-source/uv.lock"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void removingDirectorySourcedDependencyIsUnsupported() {
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "dirdep"
+            version = "0.1.0"
+            requires-python = ">=3.9"
+            dependencies = []
+
+            [tool.uv.sources]
+            foo = { path = "libs/foo" }
+            """,
+          resource("v-directory/uv.lock"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("foo");
         assertThat(http.requests).isEmpty();
     }
 

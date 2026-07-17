@@ -29,6 +29,14 @@ import static org.openrewrite.python.Assertions.*;
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
+    void invalidNewVersionIsRejected() {
+        // a fat-fingered trailing quote must fail validation, not corrupt the manifest
+        assertThat(new UpgradeDependencyVersion("six", "==1.17.0\"", null, null).validate().isValid()).isFalse();
+        assertThat(new UpgradeDependencyVersion("six", "==1.17.0", null, null).validate().isValid()).isTrue();
+        assertThat(new UpgradeDependencyVersion("six", "1.17.0", null, null).validate().isValid()).isTrue();
+    }
+
+    @Test
     @Timeout(120)
     void warnsOnBothManifestAndLockWhenRegenerationFails() {
         rewriteRun(

@@ -83,7 +83,12 @@ final class UvLockFixtures {
       "s-remove-last-dep/uv.lock.after",
       "s-remove-last-dep/uv.lock.before",
       "t-url-source/uv.lock",
-      "u-git-source/uv.lock"
+      "u-git-source/uv.lock",
+      "v-directory/uv.lock",
+      "w-conflicts/uv.lock",
+      "w2-conflicts-groups/uv.lock",
+      "x-supported-required-markers/uv.lock",
+      "y-editable-marker/uv.lock"
     };
 
     private UvLockFixtures() {

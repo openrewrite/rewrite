@@ -23,6 +23,7 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.python.trait.PythonDependencyFile;
@@ -76,6 +77,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
             v = v.and(Validated.required("groupName", groupName));
         }
+        v = v.and(Validated.test("newVersion",
+                "must be a PEP 440 version or version specifier", newVersion,
+                nv -> nv != null && !nv.trim().isEmpty() &&
+                        PythonVersionSpecifierSet.parse(PyProjectHelper.normalizeVersionConstraint(nv)) != null));
         return v;
     }
 

@@ -615,7 +615,7 @@ public final class UvLockEngine {
             String specifier = normalizeSpecifier(decl);
             String index = pins == null ? null : declaredIndexUrl(pins.get(0), decl.canonicalName);
             String marker = resolveMetadataMarker(decl);
-            return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null);
+            return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null);
         }
 
         private @Nullable String normalizeSpecifier(Declared decl) {
@@ -803,6 +803,10 @@ public final class UvLockEngine {
                     throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, newReq.getName(),
                             "Re-targeting between registry and editable sources is not supported");
                 }
+                if (!Objects.equals(oldReq.getDirectory(), newReq.getDirectory())) {
+                    throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, newReq.getName(),
+                            "Re-targeting between registry and directory sources is not supported");
+                }
                 Change change = changes.get(newReq.getName());
                 if (change == null) {
                     change = new Change(newReq.getName());
@@ -843,7 +847,7 @@ public final class UvLockEngine {
             for (UvLockRequirement req : reqs) {
                 rendered.add(req.getName() + "|" + req.getExtras() + "|" + req.getEditable() + "|" +
                         req.getMarker() + "|" + req.getSpecifier() + "|" + req.getIndex() + "|" +
-                        req.getUrl() + "|" + req.getGit());
+                        req.getUrl() + "|" + req.getGit() + "|" + req.getDirectory());
             }
             return rendered;
         }

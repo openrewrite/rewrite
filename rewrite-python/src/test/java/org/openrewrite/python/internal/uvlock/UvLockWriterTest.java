@@ -35,7 +35,7 @@ class UvLockWriterTest {
     }
 
     private String write(UvLockPackage pkg) {
-        return UvLockWriter.write(new UvLock(1, 3, ">=3.12", null, null, null, singletonList(pkg)));
+        return UvLockWriter.write(new UvLock(1, 3, ">=3.12", null, null, null, null, null, null, singletonList(pkg)));
     }
 
     @Test
@@ -51,7 +51,7 @@ class UvLockWriterTest {
     void revisionlessStyleOmitsUploadTime() {
         UvLockPackage pkg = minimalPackage().withSdist(
           UvLockArtifact.remote("https://example.com/six.tar.gz", "sha256:abc", 34031L, null));
-        String written = UvLockWriter.write(new UvLock(1, null, ">=3.12", null, null, null, singletonList(pkg)));
+        String written = UvLockWriter.write(new UvLock(1, null, ">=3.12", null, null, null, null, null, null, singletonList(pkg)));
         assertThat(written)
           .doesNotContain("revision")
           .doesNotContain("upload-time")

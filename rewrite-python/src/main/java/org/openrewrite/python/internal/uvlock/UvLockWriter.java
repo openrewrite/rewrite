@@ -67,7 +67,47 @@ public final class UvLockWriter {
         if (lock.getResolutionMarkers() != null) {
             b.append("\nresolution-markers = ").append(multilineStringArray(lock.getResolutionMarkers()));
         }
+        if (lock.getSupportedMarkers() != null) {
+            b.append("\nsupported-markers = ").append(multilineStringArray(lock.getSupportedMarkers()));
+        }
+        if (lock.getRequiredMarkers() != null) {
+            b.append("\nrequired-markers = ").append(multilineStringArray(lock.getRequiredMarkers()));
+        }
+        if (lock.getConflicts() != null) {
+            b.append("\nconflicts = ").append(conflictsArray(lock.getConflicts()));
+        }
         return b.toString();
+    }
+
+    /**
+     * uv emits {@code conflicts} as an array of arrays of inline tables: each set is a multiline
+     * bracket run, and the sets are joined by {@code ], [} so the outer brackets abut
+     * ({@code [[ … ], [ … ]]}).
+     */
+    private static String conflictsArray(List<List<UvLockConflictItem>> conflicts) {
+        StringBuilder b = new StringBuilder("[");
+        for (int i = 0; i < conflicts.size(); i++) {
+            if (i > 0) {
+                b.append(", ");
+            }
+            b.append('[');
+            for (UvLockConflictItem item : conflicts.get(i)) {
+                b.append("\n    ").append(conflictItem(item)).append(',');
+            }
+            b.append("\n]");
+        }
+        return b.append(']').toString();
+    }
+
+    private static String conflictItem(UvLockConflictItem item) {
+        StringBuilder b = new StringBuilder("{ package = ").append(string(item.getPackageName()));
+        if (item.getExtra() != null) {
+            b.append(", extra = ").append(string(item.getExtra()));
+        }
+        if (item.getGroup() != null) {
+            b.append(", group = ").append(string(item.getGroup()));
+        }
+        return b.append(" }").toString();
     }
 
     private static String optionsBlock(UvLockOptions options) {
@@ -192,18 +232,21 @@ public final class UvLockWriter {
         if (req.getExtras() != null) {
             b.append(", extras = ").append(inlineStringArray(req.getExtras()));
         }
-        if (req.getEditable() != null) {
-            b.append(", editable = ").append(string(req.getEditable()));
-        }
         if (req.getMarker() != null) {
             b.append(", marker = ").append(string(req.getMarker()));
         }
-        // url/git are the requirement's direct source; uv emits them after marker, in place of specifier
+        // editable/url/git/directory are the requirement's direct source; uv emits them after marker, in place of specifier
+        if (req.getEditable() != null) {
+            b.append(", editable = ").append(string(req.getEditable()));
+        }
         if (req.getUrl() != null) {
             b.append(", url = ").append(string(req.getUrl()));
         }
         if (req.getGit() != null) {
             b.append(", git = ").append(string(req.getGit()));
+        }
+        if (req.getDirectory() != null) {
+            b.append(", directory = ").append(string(req.getDirectory()));
         }
         if (req.getSpecifier() != null) {
             b.append(", specifier = ").append(string(req.getSpecifier()));

@@ -62,4 +62,11 @@ public class UvLockRequirement {
      */
     @Nullable
     String git;
+
+    /**
+     * Local directory source of the requirement (a {@code [tool.uv.sources]} path pointing at a
+     * directory); uv emits it after {@code marker}, in place of {@code specifier}.
+     */
+    @Nullable
+    String directory;
 }
