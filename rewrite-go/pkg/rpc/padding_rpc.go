@@ -19,6 +19,7 @@ package rpc
 import (
 	"fmt"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -368,6 +369,12 @@ func leftPaddedBefore(lp any) any {
 		return v.Before
 	case java.LeftPadded[java.UnaryOperator]:
 		return v.Before
+	case java.LeftPadded[golang.BinaryOperator]:
+		return v.Before
+	case java.LeftPadded[golang.AssignmentOperator]:
+		return v.Before
+	case java.LeftPadded[golang.UnaryOperator]:
+		return v.Before
 	case java.LeftPadded[java.Space]:
 		return v.Before
 	case java.LeftPadded[string]:
@@ -393,6 +400,12 @@ func leftPaddedElement(lp any) any {
 		return v.Element
 	case java.LeftPadded[java.UnaryOperator]:
 		return v.Element
+	case java.LeftPadded[golang.BinaryOperator]:
+		return v.Element
+	case java.LeftPadded[golang.AssignmentOperator]:
+		return v.Element
+	case java.LeftPadded[golang.UnaryOperator]:
+		return v.Element
 	case java.LeftPadded[java.Space]:
 		return v.Element
 	case java.LeftPadded[string]:
@@ -417,6 +430,12 @@ func leftPaddedMarkers(lp any) any {
 	case java.LeftPadded[java.AssignmentOperator]:
 		return v.Markers
 	case java.LeftPadded[java.UnaryOperator]:
+		return v.Markers
+	case java.LeftPadded[golang.BinaryOperator]:
+		return v.Markers
+	case java.LeftPadded[golang.AssignmentOperator]:
+		return v.Markers
+	case java.LeftPadded[golang.UnaryOperator]:
 		return v.Markers
 	case java.LeftPadded[java.Space]:
 		return v.Markers
