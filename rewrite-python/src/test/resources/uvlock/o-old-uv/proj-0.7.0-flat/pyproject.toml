@@ -1,0 +1,14 @@
+[project]
+name = "fixture-o-flat"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "six>=1.16",
+    "iniconfig>=2.0",
+]
+
+[[tool.uv.index]]
+name = "local"
+url = "assets/shared"
+format = "flat"
+default = true

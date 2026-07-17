@@ -261,13 +261,21 @@ public class PyProjectHelper {
             PythonDependencyFile trait,
             Function<PythonDependencyFile, PythonDependencyFile> editFn,
             @Nullable String capturedLockContent) {
+        return editAndRegenerate(trait, editFn, capturedLockContent, new InMemoryExecutionContext());
+    }
+
+    public static EditAndRegenerateResult editAndRegenerate(
+            PythonDependencyFile trait,
+            Function<PythonDependencyFile, PythonDependencyFile> editFn,
+            @Nullable String capturedLockContent,
+            ExecutionContext ctx) {
         PythonDependencyFile updated = editFn.apply(trait);
         if (updated.getTree() == trait.getTree()) {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile modified = refreshMarker((SourceFile) updated.getTree());
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(modified, capturedLockContent);
+                : regenerateLockContent(modified, capturedLockContent, ctx);
         if (regen != null && regen.isSuccess() && regen.getLockFileContent() != null) {
             modified = applyResolvedDependencies(modified, regen.getLockFileContent());
         }
@@ -301,6 +309,11 @@ public class PyProjectHelper {
      */
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile depsFile, @Nullable String capturedLockContent) {
+        return regenerateLockContent(depsFile, capturedLockContent, new InMemoryExecutionContext());
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile depsFile, @Nullable String capturedLockContent, ExecutionContext ctx) {
         PythonResolutionResult marker = depsFile.getMarkers()
                 .findFirst(PythonResolutionResult.class).orElse(null);
         if (marker == null) {
@@ -310,7 +323,7 @@ public class PyProjectHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(depsFile.printAll(), capturedLockContent);
+        return regen.regenerate(depsFile.printAll(), capturedLockContent, ctx);
     }
 
     /**

@@ -17,31 +17,27 @@ package org.openrewrite.python.internal;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.python.internal.pipfilelock.PipenvLockEngine;
+import org.openrewrite.python.internal.uvlock.UvLockEngine;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
+import org.openrewrite.python.table.PythonLockRegenerationFailures;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /**
- * Regenerates a lock file by running {@code <packageManager> lock} in a temporary
- * directory seeded with the dependencies file (and optionally an existing lock).
- * Pre-configured instances are provided for {@code uv} ({@link #UV}) and
- * {@code pipenv} ({@link #PIPENV}).
+ * Regenerates a lock file from an edited dependencies file. Both {@code uv}
+ * ({@link #UV}) and {@code pipenv} ({@link #PIPENV}) projects regenerate their lock
+ * natively, without executing the package manager: the existing lock is surgically
+ * updated by consulting the project's package index over the network.
  */
-public final class LockFileRegeneration {
+public abstract class LockFileRegeneration {
 
-    public static final LockFileRegeneration UV = new LockFileRegeneration(
-            PackageManagerExecutor.UV, "pyproject.toml", "uv.lock");
+    public static final LockFileRegeneration UV = new NativeUv();
 
-    public static final LockFileRegeneration PIPENV = new LockFileRegeneration(
-            PackageManagerExecutor.PIPENV, "Pipfile", "Pipfile.lock");
+    public static final LockFileRegeneration PIPENV = new NativePipenv();
 
     public static @Nullable LockFileRegeneration forPackageManager(@Nullable PackageManager pm) {
         if (pm == null) {
@@ -57,119 +53,115 @@ public final class LockFileRegeneration {
         }
     }
 
+    public enum Reason {
+        INDEX_UNREACHABLE,
+        AUTH_FAILED,
+        PACKAGE_NOT_FOUND,
+        DYNAMIC_SDIST_METADATA,
+        PIN_EXCLUDED_BY_PYTHON,
+        UNSUPPORTED_ENTRY_TYPE,
+        RESOLUTION_REQUIRED,
+        RESOLUTION_CONFLICT,
+        HASH_UNAVAILABLE,
+        MALFORMED_MANIFEST,
+        MALFORMED_LOCK
+    }
+
+    @Value
+    public static class Failure {
+        Reason reason;
+        @Nullable String packageName;
+        @Nullable String indexUrl;
+        String detail;
+    }
+
     @Value
     public static class Result {
         boolean success;
         @Nullable String lockFileContent;
         @Nullable String errorMessage;
+        @Nullable Failure failure;
+
+        /**
+         * Notes accompanying a successful regeneration, e.g. orphaned transitive
+         * entries retained after a removal.
+         */
+        @Nullable String detail;
 
         public static Result success(String lockFileContent) {
-            return new Result(true, lockFileContent, null);
+            return new Result(true, lockFileContent, null, null, null);
+        }
+
+        public static Result success(String lockFileContent, @Nullable String detail) {
+            return new Result(true, lockFileContent, null, null, detail);
         }
 
         public static Result failure(String errorMessage) {
-            return new Result(false, null, errorMessage);
+            return new Result(false, null, errorMessage, null, null);
+        }
+
+        public static Result failure(Failure failure) {
+            StringBuilder message = new StringBuilder(failure.getReason().toString());
+            if (failure.getPackageName() != null) {
+                message.append(" [").append(failure.getPackageName()).append(']');
+            }
+            message.append(": ").append(failure.getDetail());
+            return new Result(false, null, message.toString(), failure, null);
         }
     }
 
-    private final PackageManagerExecutor executor;
-    private final String dependenciesFile;
-    private final String lockFile;
-
-    private LockFileRegeneration(PackageManagerExecutor executor, String dependenciesFile, String lockFile) {
-        this.executor = executor;
-        this.dependenciesFile = dependenciesFile;
-        this.lockFile = lockFile;
+    /**
+     * Insert a data table row describing a failed regeneration, mapping the
+     * structured {@link Failure} when present and falling back to the plain
+     * error message (and the recipe's target package) otherwise.
+     */
+    public static void insertFailureRow(ExecutionContext ctx, PythonLockRegenerationFailures table,
+                                        Path depsPath, Result result, @Nullable String fallbackPackageName) {
+        Failure failure = result.getFailure();
+        table.insertRow(ctx, new PythonLockRegenerationFailures.Row(
+                depsPath.toString(),
+                failure != null && failure.getPackageName() != null ? failure.getPackageName() : fallbackPackageName,
+                failure != null ? failure.getReason().toString() : null,
+                failure != null ? failure.getDetail() : String.valueOf(result.getErrorMessage())));
     }
 
-    public Result regenerate(String dependenciesContent) {
-        return regenerate(dependenciesContent, null, Collections.emptyMap());
-    }
-
-    public Result regenerate(String dependenciesContent, @Nullable String existingLockContent) {
-        return regenerate(dependenciesContent, existingLockContent, Collections.emptyMap());
+    public final Result regenerate(String dependenciesContent, @Nullable String existingLockContent, ExecutionContext ctx) {
+        return regenerate(dependenciesContent, existingLockContent, Collections.emptyMap(), ctx);
     }
 
     /**
      * Regenerate the lock file from the given dependencies content.
-     * When an existing lock file is provided it is seeded into the working
-     * directory so the package manager performs a minimal update rather than
-     * re-resolving every dependency from scratch.
+     * When an existing lock file is provided a minimal update is performed
+     * rather than re-resolving every dependency from scratch.
      *
      * @param dependenciesContent the dependencies-file content to lock
      * @param existingLockContent the current lock file content, or {@code null}
-     * @param environment         additional environment variables (e.g., SSL_CERT_FILE)
-     * @return a result containing the new lock file content, or an error message
+     * @param environment         ignored; retained for API compatibility with the
+     *                            former shell-out implementation. Environment-style
+     *                            proxy/index configuration has no effect on the
+     *                            native engines; use {@code ctx} instead
+     * @param ctx                 supplies the HTTP transport (proxy included) via
+     *                            {@link org.openrewrite.HttpSenderExecutionContextView}
+     *                            and host-configured package indexes/credentials via
+     *                            {@link org.openrewrite.python.PythonExecutionContextView}
+     * @return a result containing the new lock file content, or a failure
      */
-    public Result regenerate(String dependenciesContent, @Nullable String existingLockContent, Map<String, String> environment) {
-        String executablePath = executor.find();
-        if (executablePath == null) {
-            return Result.failure(executor.getName() + " is not installed. Install it with: pip install " + executor.getName());
-        }
+    public abstract Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
+                                      Map<String, String> environment, ExecutionContext ctx);
 
-        Path tempDir = null;
-        try {
-            tempDir = Files.createTempDirectory("openrewrite-packagemanager-lock-");
-
-            Files.write(tempDir.resolve(dependenciesFile),
-                    dependenciesContent.getBytes(StandardCharsets.UTF_8));
-
-            if (existingLockContent != null) {
-                Files.write(tempDir.resolve(lockFile),
-                        existingLockContent.getBytes(StandardCharsets.UTF_8));
-            }
-
-            PackageManagerExecutor.RunResult runResult = executor.run(tempDir, executablePath,
-                    mergeEnv(environment), "lock");
-            if (!runResult.isSuccess()) {
-                return Result.failure(executor.getName() + " lock failed (exit code " + runResult.getExitCode() + "): " + runResult.getStderr());
-            }
-
-            Path lockPath = tempDir.resolve(lockFile);
-            if (!Files.exists(lockPath)) {
-                return Result.failure(executor.getName() + " lock did not produce a " + lockFile + " file");
-            }
-
-            String lockContent = new String(Files.readAllBytes(lockPath), StandardCharsets.UTF_8);
-            return Result.success(lockContent);
-
-        } catch (IOException e) {
-            return Result.failure("IO error during " + executor.getName() + " lock: " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Result.failure(executor.getName() + " lock was interrupted");
-        } finally {
-            if (tempDir != null) {
-                cleanupDirectory(tempDir);
-            }
+    private static final class NativePipenv extends LockFileRegeneration {
+        @Override
+        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
+                                 Map<String, String> environment, ExecutionContext ctx) {
+            return PipenvLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
         }
     }
 
-    private Map<String, String> mergeEnv(Map<String, String> environment) {
-        Map<String, String> defaults = executor.getEnvDefaults();
-        if (defaults.isEmpty()) {
-            return environment;
-        }
-        Map<String, String> merged = new LinkedHashMap<>(defaults);
-        merged.putAll(environment);
-        return merged;
-    }
-
-    private static void cleanupDirectory(Path dir) {
-        if (!Files.exists(dir)) {
-            return;
-        }
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            // Ignore
-                        }
-                    });
-        } catch (IOException e) {
-            // Ignore cleanup errors
+    private static final class NativeUv extends LockFileRegeneration {
+        @Override
+        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
+                                 Map<String, String> environment, ExecutionContext ctx) {
+            return UvLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
         }
     }
 }

@@ -19,12 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PythonDependencyParser;
 import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.internal.UvLockParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
@@ -79,28 +77,7 @@ public class PyProjectTomlParser implements Parser {
         if (!resolvedDeps.isEmpty()) {
             return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
         }
-
-        // No uv.lock found — check if another package manager owns this project
-        if (UvLockParser.hasAlternativeLockFile(pyprojectDir, relativeTo)) {
-            return marker;
-        }
-        PackageManager pm = marker.getPackageManager();
-        if (pm == PackageManager.Poetry || pm == PackageManager.Pdm) {
-            return marker;
-        }
-
-        // Fall back to running uv lock
-        LockFileRegeneration.Result result = LockFileRegeneration.UV.regenerate(doc.printAll());
-        if (!result.isSuccess() || result.getLockFileContent() == null) {
-            return marker;
-        }
-
-        resolvedDeps = UvLockParser.parse(result.getLockFileContent());
-        if (resolvedDeps.isEmpty()) {
-            return marker;
-        }
-
-        return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
+        return marker;
     }
 
     @Override

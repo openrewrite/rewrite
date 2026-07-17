@@ -1,0 +1,23 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_requirements.py (EQUAL_DEPENDENCIES, EQUIVALENT_DEPENDENCIES, DIFFERENT_DEPENDENCIES)
+# Retrieved: 2026-07-16
+# kind<TAB>requirement1<TAB>requirement2.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+EQUAL	packaging>20.1	packaging>20.1
+EQUAL	requests[security, tests]>=2.8.1,==2.8.*;python_version<"2.7"	requests [security,tests] >= 2.8.1, == 2.8.* ; python_version < "2.7"
+EQUAL	importlib-metadata; python_version<"3.8"	importlib-metadata; python_version<'3.8'
+EQUAL	appdirs>=1.4.4,<2; os_name=="posix" and extra=="testing"	appdirs>=1.4.4,<2; os_name == 'posix' and extra == 'testing'
+EQUIVALENT	scikit-learn==1.0.1	scikit_learn==1.0.1
+EQUIVALENT	foo==1.0.0	foo==1.0.0.0
+EQUIVALENT	foo>=1.0	foo>=1.0.0
+EQUIVALENT	foo[a]==1.0.0; python_version>="3.8"	foo[a]==1.0.0.0; python_version>="3.8"
+EQUIVALENT	urllib3[secure]	urllib3[SECURE]
+EQUIVALENT	fishtank[all-blue]	fishtank[all_blue]
+EQUIVALENT	fishtank[all-blue]	fishtank[all---blue]
+EQUIVALENT	fishtank[crazy-bunches]	fishtank[cRazy_BUnches]
+DIFFERENT	package_one	package_two
+DIFFERENT	packaging>20.1	packaging>=20.1
+DIFFERENT	packaging>20.1	packaging>21.1
+DIFFERENT	packaging>20.1	package>20.1
+DIFFERENT	requests[security,tests]>=2.8.1,==2.8.*;python_version<"2.7"	requests [security,tests] >= 2.8.1 ; python_version < "2.7"
+DIFFERENT	importlib-metadata; python_version<"3.8"	importlib-metadata; python_version<'3.7'
+DIFFERENT	appdirs>=1.4.4,<2; os_name=="posix" and extra=="testing"	appdirs>=1.4.4,<2; os_name == 'posix' and extra == 'docs'
