@@ -1628,11 +1628,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
             return if (mapped != null && mapped.contains('.')) mapped else fqn
         }
-        // KotlinTemplate path: spell out concrete type arguments so callees whose
-        // overload resolution depends on a generic argument still attribute a
-        // JavaType.Method — e.g. `Iterable<T>.sumOf` dispatches on the selector's
-        // return type, so a raw `kotlin.Function1` leaves the call unresolved.
-        // A non-concrete argument falls back to the raw spelling (prior behavior).
+        // KotlinTemplate path: spell out concrete type arguments so overloads that
+        // dispatch on a generic argument resolve (e.g. `Iterable<T>.sumOf` on the
+        // selector's return type). Non-concrete arguments fall back to raw.
         val args = (type as? IrSimpleType)?.arguments
         if (args.isNullOrEmpty()) return fqn
         val rendered = args.map { renderTypeArgument(it) ?: return fqn }
