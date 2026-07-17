@@ -36,13 +36,12 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.toml.tree.Toml;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -167,7 +166,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     private boolean isGlobPattern() {
         return oldGroupId.contains("*") || oldGroupId.contains("?") ||
-               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+                oldArtifactId.contains("*") || oldArtifactId.contains("?");
     }
 
     public static class Accumulator {
@@ -298,7 +297,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()){
+                if (!maybeGp.isPresent()) {
                     return sourceFile;
                 }
                 for (GradleDependencyConfiguration c : maybeGp.get().getConfigurations()) {
@@ -501,8 +500,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                if (sourceFile instanceof Toml) {
-                    return sourceFile.getSourcePath().endsWith("libs.versions.toml");
+                if (tomlVisitor.isAcceptable(sourceFile, ctx)) {
+                    return true;
                 }
                 if (sourceFile instanceof Properties.File) {
                     return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
@@ -513,7 +512,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof Toml) {
+                if (tree instanceof SourceFile && tomlVisitor.isAcceptable((SourceFile) tree, ctx)) {
                     return tomlVisitor.visit(tree, ctx);
                 }
                 if (tree instanceof Properties.File) {

@@ -16,7 +16,10 @@
 package org.openrewrite.gradle.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.toml.tree.Toml;
+
+import java.util.Map;
 
 /**
  * Structural operations shared by Gradle version-catalog TOML visitors.
@@ -56,5 +59,28 @@ public final class VersionCatalogToml {
         String source = literal.getSource();
         String quote = source.isEmpty() ? "\"" : source.substring(0, 1);
         return quote + value + quote;
+    }
+
+    public static Toml.KeyValue updateReferencedVersion(
+            Toml.KeyValue keyValue, Cursor cursor, Map<String, String> referencedVersions) {
+        if (referencedVersions.isEmpty()) {
+            return keyValue;
+        }
+        Cursor parent = cursor.getParent();
+        if (parent == null || !(parent.getValue() instanceof Toml.Table)) {
+            return keyValue;
+        }
+        Toml.Table parentTable = (Toml.Table) parent.getValue();
+        if (parentTable.getName() == null || !"versions".equals(parentTable.getName().getName()) ||
+                !(keyValue.getKey() instanceof Toml.Identifier) ||
+                !(keyValue.getValue() instanceof Toml.Literal)) {
+            return keyValue;
+        }
+        String selected = referencedVersions.get(((Toml.Identifier) keyValue.getKey()).getName());
+        if (selected == null) {
+            return keyValue;
+        }
+        Toml.Literal literal = (Toml.Literal) keyValue.getValue();
+        return keyValue.withValue(literal.withSource(quoted(literal, selected)).withValue(selected));
     }
 }

@@ -22,7 +22,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.AddDependencyVisitor;
-import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.ExtraProperty;
@@ -50,7 +49,6 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
-import org.openrewrite.toml.tree.Toml;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -329,7 +327,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
                 return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) ||
-                        (sf instanceof Toml.Document && sf.getSourcePath().endsWith(VersionCatalogToml.FILE_NAME));
+                        updateVersionCatalog.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -342,7 +340,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
                         t = updateGradle.visitNonNull(t, ctx);
-                    } else if (t instanceof Toml.Document) {
+                    } else if (updateVersionCatalog.isAcceptable(sf, ctx)) {
                         t = updateVersionCatalog.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
@@ -754,12 +752,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     .artifactId(artifactId)
                     .get(getCursor())
                     .orElse(null);
-            if (bomEntry != null) {
-                // Only update literal versions; property-based versions are handled by UpdateProperties/UpdateVariable
-                if (bomEntry.getVersionVariable() == null) {
-                    m = updateBomEntry(bomEntry, ctx);
-                }
+            if (bomEntry != null && bomEntry.getVersionVariable() == null) {
+                m = updateBomEntry(bomEntry, ctx);
             }
+
 
             if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
                 // rare case that gradle versions are set via settings.gradle ext block (only possible for Groovy DSL)
