@@ -29,6 +29,11 @@ public class CoreMetadata {
     String metadataVersion;
     String name;
     String version;
+
+    /** The {@code Summary} header (one-line description), or {@code null} when absent. */
+    @Nullable
+    String summary;
+
     List<String> requiresDist;
 
     @Nullable

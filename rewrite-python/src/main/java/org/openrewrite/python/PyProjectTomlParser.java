@@ -20,6 +20,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PythonDependencyParser;
+import org.openrewrite.python.internal.PdmLockParser;
+import org.openrewrite.python.internal.PoetryLockParser;
 import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.internal.UvLockParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
@@ -73,9 +75,18 @@ public class PyProjectTomlParser implements Parser {
             return marker;
         }
 
-        List<ResolvedDependency> resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
+        PythonResolutionResult.PackageManager pm = marker.getPackageManager();
+        List<ResolvedDependency> resolvedDeps;
+        if (pm == PythonResolutionResult.PackageManager.Poetry) {
+            resolvedDeps = PoetryLockParser.findAndParse(pyprojectDir, relativeTo);
+        } else if (pm == PythonResolutionResult.PackageManager.Pdm) {
+            resolvedDeps = PdmLockParser.findAndParse(pyprojectDir, relativeTo);
+        } else {
+            resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
+            pm = PythonResolutionResult.PackageManager.Uv;
+        }
         if (!resolvedDeps.isEmpty()) {
-            return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
+            return PythonResolutionLinker.applyPyproject(marker, resolvedDeps, pm);
         }
         return marker;
     }
