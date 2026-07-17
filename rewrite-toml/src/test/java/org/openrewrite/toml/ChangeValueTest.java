@@ -21,6 +21,9 @@ import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
+import org.openrewrite.toml.tree.Toml;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class ChangeValueTest implements RewriteTest {
@@ -203,7 +206,11 @@ class ChangeValueTest implements RewriteTest {
               description = \"""A multi-line
               description\"""
               name = "project"
-              """
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Toml.Literal literal = (Toml.Literal) ((Toml.KeyValue) doc.getValues().getFirst()).getValue();
+                assertThat(literal.getValue()).isEqualTo("A multi-line\ndescription");
+            })
           )
         );
     }
@@ -219,14 +226,14 @@ class ChangeValueTest implements RewriteTest {
             """
               [package]
               version = "1.0.0"
-
+              
               [dependencies]
               version = "should-not-change"
               """,
             """
               [package]
               version = "2.0.0"
-
+              
               [dependencies]
               version = "should-not-change"
               """

@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.toml.Assertions.toml;
 
 class TomlParserTest implements RewriteTest {
@@ -451,6 +452,30 @@ class TomlParserTest implements RewriteTest {
               # Another inline table with trailing comma
               person = { name = "John", age = 30, }
               """
+          )
+        );
+    }
+
+    @Test
+    void multiLineStringValueStrippedCorrectly() {
+        rewriteRun(
+          toml(
+            """
+              basic = \"""hello\"""
+              literal = '''world'''
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getValues())
+                  .extracting(Toml.KeyValue.class::cast)
+                  .extracting(
+                    keyValue -> ((Toml.Identifier) keyValue.getKey()).getName(),
+                    keyValue -> ((Toml.Literal) keyValue.getValue()).getValue()
+                  )
+                  .containsExactly(
+                    tuple("basic", "hello"),
+                    tuple("literal", "world")
+                  );
+            })
           )
         );
     }
