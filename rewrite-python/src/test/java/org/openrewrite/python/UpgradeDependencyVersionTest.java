@@ -29,6 +29,40 @@ import static org.openrewrite.python.Assertions.*;
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
+    void upgradesDevPackagesDependencyByDefault() {
+        // pytube shape: coverage declared only in [dev-packages]; the default (null) scope must find it
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("coverage", "==6.5.0", null, null)),
+          pipfile(
+            """
+              [[source]]
+              url = "https://pypi.org/simple"
+              verify_ssl = true
+              name = "pypi"
+
+              [packages]
+
+              [dev-packages]
+              coverage = "*"
+              flake8 = "*"
+              """,
+            """
+              [[source]]
+              url = "https://pypi.org/simple"
+              verify_ssl = true
+              name = "pypi"
+
+              [packages]
+
+              [dev-packages]
+              coverage = "==6.5.0"
+              flake8 = "*"
+              """
+          )
+        );
+    }
+
+    @Test
     void invalidNewVersionIsRejected() {
         // a fat-fingered trailing quote must fail validation, not corrupt the manifest
         assertThat(new UpgradeDependencyVersion("six", "==1.17.0\"", null, null).validate().isValid()).isFalse();

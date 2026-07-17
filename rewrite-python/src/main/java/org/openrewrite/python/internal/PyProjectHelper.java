@@ -435,7 +435,10 @@ public class PyProjectHelper {
             String packageName,
             @Nullable String scope,
             @Nullable String groupName) {
-        if (scope == null || "project.dependencies".equals(scope)) {
+        if (scope == null) {
+            // default: all scopes, matching the null-scope edit paths (Pipfile dev-packages, pyproject groups)
+            return marker.findDependencyInAnyScope(packageName);
+        } else if ("project.dependencies".equals(scope)) {
             return marker.findDependency(packageName);
         } else if ("build-system.requires".equals(scope)) {
             return findInList(marker.getBuildRequires(), packageName);
