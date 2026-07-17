@@ -79,6 +79,9 @@ class PipfileParserTest {
         assertThat(marker).isNotNull();
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Pipenv);
 
+        assertThat(marker.getSourceIndexes()).containsExactly(
+                new PythonResolutionResult.SourceIndex("pypi", "https://pypi.org/simple", true));
+
         assertThat(marker.getResolvedDependencies()).hasSize(3);
         assertThat(marker.getResolvedDependency("requests")).isNotNull();
         assertThat(marker.getResolvedDependency("requests").getVersion()).isEqualTo("2.31.0");
@@ -102,8 +105,8 @@ class PipfileParserTest {
 
     @Test
     void parsesWithoutLockFile(@TempDir Path tempDir) throws Exception {
-        // Without a Pipfile.lock and without pipenv on PATH the marker should still
-        // be produced — just without resolved dependencies.
+        // Without a Pipfile.lock the marker is still produced, just without
+        // resolved dependencies; parsing never regenerates a missing lock.
         String pipfile = """
           [packages]
           requests = ">=2.28.0"
@@ -124,6 +127,8 @@ class PipfileParserTest {
         assertThat(marker).isNotNull();
         assertThat(marker.getDependencies()).hasSize(1);
         assertThat(marker.getDependencies().get(0).getName()).isEqualTo("requests");
-        // resolvedDependencies may be empty when neither Pipfile.lock nor pipenv is available.
+        assertThat(marker.getResolvedDependencies()).isEmpty();
+        // No [[source]] blocks means no source indexes on the marker.
+        assertThat(marker.getSourceIndexes()).isNull();
     }
 }

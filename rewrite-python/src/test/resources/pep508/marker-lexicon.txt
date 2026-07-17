@@ -1,0 +1,43 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_markers.py (VARIABLES/PEP_345_VARIABLES/SETUPTOOLS_VARIABLES/OPERATORS/VALUES)
+# Retrieved: 2026-07-16
+# Sections of variables, operators and values; every product "<var> <op> '<value>'" and "'<value>' <op> <var>" must parse.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+[variables]
+extra
+implementation_name
+implementation_version
+os_name
+platform_machine
+platform_release
+platform_system
+platform_version
+python_full_version
+python_version
+platform_python_implementation
+sys_platform
+[pep345-variables]
+os.name
+sys.platform
+platform.version
+platform.machine
+platform.python_implementation
+[setuptools-variables]
+python_implementation
+[operators]
+===
+==
+>=
+<=
+!=
+~=
+>
+<
+in
+not in
+[values]
+1.0
+5.6a0
+dog
+freebsd
+literally any string can go here
+things @#4 dsfd (((

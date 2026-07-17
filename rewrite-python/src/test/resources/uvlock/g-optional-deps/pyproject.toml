@@ -1,0 +1,15 @@
+[project]
+name = "fixture-g"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "six>=1.16",
+]
+
+[project.optional-dependencies]
+cli = [
+    "click>=8.1",
+]
+yaml = [
+    "pyyaml>=6.0",
+]

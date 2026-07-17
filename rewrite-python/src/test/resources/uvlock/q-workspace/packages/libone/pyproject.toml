@@ -1,0 +1,11 @@
+[project]
+name = "libone"
+version = "0.2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "iniconfig>=2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
