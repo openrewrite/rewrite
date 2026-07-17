@@ -2760,7 +2760,8 @@ public class GroovyParserVisitor {
                             }
                             ClosureExpression cl = (ClosureExpression) arg;
                             ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                            for (Parameter p : cl.getParameters()) {
+                            Parameter[] clParameters = cl.getParameters();
+                            for (Parameter p : clParameters == null ? Parameter.EMPTY_ARRAY : clParameters) {
                                 if (p.isDynamicTyped()) {
                                     p.setType(actualParamTypeRaw);
                                     p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
@@ -2849,7 +2850,8 @@ public class GroovyParserVisitor {
                         }
                         ClosureExpression cl = (ClosureExpression) arg;
                         ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                        for (Parameter p : cl.getParameters()) {
+                        Parameter[] clParameters = cl.getParameters();
+                        for (Parameter p : clParameters == null ? Parameter.EMPTY_ARRAY : clParameters) {
                             if (p.isDynamicTyped()) {
                                 p.setType(actualParamTypeRaw);
                                 p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
