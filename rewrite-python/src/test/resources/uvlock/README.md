@@ -20,6 +20,27 @@ checked-in pyproject is the edited, dependency-less state); `h3-requires-python-
 manifest declaring `requires-python = "<3.15,>=3.10"` — uv sorts the clauses ascending by version
 (`">=3.10, <3.15"`); `g3-multi-extras` locks `requests[use_chardet_on_py3,socks]` — requires-dist
 records extras in declaration order while dependency edges record them sorted.
+`t-url-source` locks a `[tool.uv.sources]` direct-URL dependency (`six` from an sdist URL on
+files.pythonhosted.org) — the package `source = { url = … }` with a hash-only `sdist` and a
+`requires-dist` `url` key (FORMAT.md §5/§7/§8); `u-git-source` locks a `git` source
+(`six` from `github.com/benjaminp/six?tag=1.17.0`) — package `source = { git = …#<commit> }` and a
+`requires-dist` `git` key without the commit.
+
+Follow-up constructs (same uv 0.10.11, generated **offline** against local path sub-packages so no
+network was touched): `v-directory` locks a `[tool.uv.sources]` local-directory dependency
+(`foo = { path = "libs/foo" }` pointing at a directory) — package `source = { directory = "libs/foo" }`
+and a `requires-dist` `directory` key (FORMAT.md §5/§7). `w-conflicts` locks a single conflicting-extra
+set (`[tool.uv] conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]`) — the top-level
+`conflicts = [[ … ]]` header key (FORMAT.md §9) plus `directory` sources.
+`w2-conflicts-groups` locks two conflict sets, one over extras and one over
+`[dependency-groups]`, exercising the multi-set `[[ … ], [ … ]]` shape and the `group` key.
+`x-supported-required-markers` locks `[tool.uv] environments`/`required-environments`, producing the
+`supported-markers` and `required-markers` header arrays (FORMAT.md §2). These four match, byte for
+byte, the same constructs found in the wild in real committed locks: `conflicts`/`required-markers`
+in CorentinJ/Real-Time-Voice-Cloning@890f3a03187195b9829db2079b75c2ba2ab0405c,
+`supported-markers` in spotDL/spotify-downloader@4aab5fdc5ad949abbb9974d8ad14c66675192c31, and
+`directory` sources in LizardByte/Sunshine@9d2409f71b60f1812f482e6dd807dc52e2f72fe7.
+
 `o-old-uv/proj-0.5.0/uv.lock.engine-edited` is the one ENGINE-DEFINED expectation in the corpus
 (real uv cannot produce it: it would rewrite the whole file at revision 3): the surgical
 six==1.16.0 pin-down of `uv.lock.as-0.5.0` in the file's own revisionless style, derived from the

@@ -44,6 +44,27 @@ public class UvLock {
     @Nullable
     List<String> resolutionMarkers;
 
+    /**
+     * The forks the resolution supports (from {@code [tool.uv] environments}); same shape as
+     * {@code resolutionMarkers}, emitted just after it.
+     */
+    @Nullable
+    List<String> supportedMarkers;
+
+    /**
+     * The forks a resolution must cover (from {@code [tool.uv] required-environments}); emitted
+     * after {@code supportedMarkers}.
+     */
+    @Nullable
+    List<String> requiredMarkers;
+
+    /**
+     * Mutually-exclusive extra/group sets (from {@code [tool.uv] conflicts}); an array of arrays
+     * of inline tables, emitted as the last header key before {@code [options]}.
+     */
+    @Nullable
+    List<List<UvLockConflictItem>> conflicts;
+
     @Nullable
     UvLockOptions options;
 

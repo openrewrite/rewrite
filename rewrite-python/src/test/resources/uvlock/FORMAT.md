@@ -37,6 +37,9 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 resolution-markers = [ ... ]        # only when the resolution forked
+supported-markers = [ ... ]         # only with [tool.uv] environments set
+required-markers = [ ... ]          # only with [tool.uv] required-environments set
+conflicts = [[ ... ]]               # only with [tool.uv] conflicts declared (§9)
 ```
 
 then, separated by blank lines, optional top-level tables in this order:
@@ -60,6 +63,12 @@ Rules:
   with parentheses and `or`-chains:
   `"(python_full_version < '3.10.2' and platform_machine != 'aarch64') or platform_machine == 'aarch64' or sys_platform == 'win32'"`
   (`n2-inline-width/uv.lock:4-7`, `e2-true-fork/uv.lock:4-7`).
+- `supported-markers` / `required-markers`: same multiline-string-array shape as `resolution-markers`,
+  emitted **immediately after** it in that order (`supported-markers` then `required-markers`).
+  `supported-markers` comes from `[tool.uv] environments`, `required-markers` from
+  `required-environments` (`x-supported-required-markers/uv.lock`, both present; real-world:
+  `supported-markers` alone in spotDL/spotify-downloader, `required-markers` alone in
+  CorentinJ/Real-Time-Voice-Cloning).
 
 ## 3. Package ordering
 
@@ -102,6 +111,20 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
 - Root project without `[build-system]`: `source = { virtual = "." }` (`a-multi-package/uv.lock`).
 - Root/workspace member with `[build-system]`: `source = { editable = "." }`
   (`p-editable-root/uv.lock`) or `{ editable = "packages/libone" }` (`q-workspace/uv.lock`).
+- Direct URL (`[tool.uv.sources]` `url = …`): `source = { url = "https://…/six-1.17.0.tar.gz" }` — the
+  download URL recorded **verbatim** (`t-url-source/uv.lock`). The artifact is not repeated on the
+  URL: an sdist-URL package carries a **hash-only** `sdist = { hash = "sha256:…" }` (§8); a
+  wheel-URL package carries the wheel with its own `url` + `hash` in `wheels`.
+- Git (`[tool.uv.sources]` `git = …`): `source = { git = "https://…/six?tag=1.17.0#<40-hex-commit>" }`
+  — the requested ref query (`?tag=`/`?rev=`/`?branch=`) is kept and the **resolved commit is appended
+  as `#<sha>`** (`u-git-source/uv.lock`). Git packages carry no `sdist`/`wheels`.
+- Local directory (`[tool.uv.sources]` `path = …` pointing at a **directory**, not a file):
+  `source = { directory = "libs/foo" }` — the relative path recorded **verbatim** (`v-directory/uv.lock`;
+  real-world: LizardByte/Sunshine, e.g. `{ directory = "third-party/glad" }`). Distinct from `path`,
+  which uv uses when the `[tool.uv.sources]` path points at a wheel/sdist **file** (the `path`
+  key appears on flat-index artifacts, §8). Directory packages carry no `sdist`/`wheels`.
+- Single string value throughout: the source table always has **exactly one key** whose value is a
+  string; `url`/`git`/`directory` fit the same `{ key = "value" }` shape as `registry`/`editable`.
 
 ## 6. `dependencies` arrays (resolved graph edges)
 
@@ -126,12 +149,22 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
 - `requires-dist`: **inline single-bracket array when it has exactly 1 element, multiline when ≥2**.
   The rule is element count, not line width — a 200-char single entry stays inline
   (`n2-inline-width/uv.lock`, `c-sdist-only/uv.lock:14`).
-- Entries sorted by name. Inline-table key order: `name`, `extras`, `editable`, `marker`,
-  `specifier`, `index`:
+- Entries sorted by name. Inline-table key order: `name`, `extras`, `marker`,
+  `editable`/`url`/`git`/`directory`, `specifier`, `index` — the direct-source keys
+  `editable`/`url`/`git`/`directory` all sit **after `marker`** and stand in for `specifier`
+  (a direct-source requirement has no version specifier). editable+marker together:
+  `{ name = "foo", marker = "sys_platform == 'darwin'", editable = "libs/foo" }` (`y-editable-marker/uv.lock`):
   - `{ name = "requests", extras = ["socks"], specifier = ">=2.31" }` (`d-extras/uv.lock:84`)
   - `{ name = "importlib-metadata", marker = "python_full_version < '3.11'", specifier = ">=6.0" }` (`e-markers-forks/uv.lock:27`)
   - `{ name = "six", specifier = ">=1.16", index = "https://test.pypi.org/simple/" }` (`k-multi-index/uv.lock`)
   - `{ name = "libone", editable = "packages/libone" }` (`q-workspace/uv.lock`)
+  - `{ name = "six", url = "https://…/six-1.17.0.tar.gz" }` (`t-url-source/uv.lock`) — the URL is the
+    download URL **without** the package source's `#<commit>`; extras/marker still precede it, e.g.
+    probed `{ name = "six", extras = ["all"], marker = "python_full_version >= '3.10'", url = "…" }`
+  - `{ name = "six", git = "https://github.com/benjaminp/six?tag=1.17.0" }` (`u-git-source/uv.lock`) —
+    the git URL **without** the resolved `#<commit>` that the package source carries
+  - `{ name = "foo", directory = "libs/foo" }` (`v-directory/uv.lock`); with a marker:
+    `{ name = "bar", marker = "extra == 'cuda'", directory = "libs/bar" }` (`w-conflicts/uv.lock`)
 - Keys are omitted when absent (no `specifier` key for unconstrained deps, `e-markers-forks/uv.lock:26`).
 - The `extras` key keeps **declaration order** (canonicalized, not sorted):
   `requests[use_chardet_on_py3,socks]` → `extras = ["use-chardet-on-py3", "socks"]`
@@ -160,6 +193,8 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
 
 - `sdist` inline-table key order: `url`, `hash`, `size`, `upload-time`
   (`a-multi-package/uv.lock:9`). `hash = "sha256:<hex>"`.
+- Direct-URL sdist packages carry a **hash-only** `sdist = { hash = "sha256:<hex>" }` — no `url`
+  (it is the package `source`, §5), no `size`, no `upload-time` (`t-url-source/uv.lock`).
 - `wheels`: **always multiline** (one wheel per line), even for a single wheel. Same key order per
   wheel: `url`, `hash`, `size`, `upload-time`.
 - `upload-time` format: RFC3339 UTC with `Z`, fractional seconds **truncated to milliseconds,
@@ -193,6 +228,24 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
 A fork can be triggered by a marker split alone (no duplicate versions): `n2-inline-width/uv.lock`
 has top-level `resolution-markers` but a single `charset-normalizer` entry with no per-package
 markers.
+
+**`conflicts`** (top-level header key, from `[tool.uv] conflicts`): an **array of arrays** of inline
+tables, each `{ package = "…", extra = "…" }` or `{ package = "…", group = "…" }` (package plus
+exactly one of `extra`/`group`), declaring a mutually-exclusive set. Each set is a multiline bracket
+run (one item per 4-space-indented line, trailing comma) and the outer brackets abut so a single set
+reads `conflicts = [[ … ]]`; multiple sets are joined by `], [`:
+```toml
+conflicts = [[
+    { package = "confproj", extra = "cpu" },
+    { package = "confproj", extra = "cuda" },
+], [
+    { package = "confproj", group = "g1" },
+    { package = "confproj", group = "g2" },
+]]
+```
+Single-set (`w-conflicts/uv.lock`; real-world CorentinJ/Real-Time-Voice-Cloning, plotly/plotly.py),
+two-set with a `group` set (`w2-conflicts-groups/uv.lock`). It is the **last header key**, before the
+blank line that precedes `[options]`/`[manifest]`/`[[package]]`.
 
 ## 10. Cross-version drift (scenario o)
 

@@ -491,6 +491,10 @@ class PipenvLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_CONFLICT);
         assertThat(result.getFailure().getPackageName()).isEqualTo("requests");
         assertThat(result.getFailure().getIndexUrl()).isEqualTo(server.url("/simple").toString());
+        // the version is simply not at the index (e.g. a lagging mirror), not a python exclusion
+        assertThat(result.getFailure().getDetail())
+                .contains("No version matching ==9.9.9 is available")
+                .contains("may lag PyPI");
     }
 
     @Test
@@ -719,6 +723,10 @@ class PipenvLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_MANIFEST);
+        // the underlying TOML parse error is appended for diagnosability, not swallowed
+        assertThat(result.getFailure().getDetail())
+          .contains("could not be parsed as TOML:")
+          .contains("Syntax error");
     }
 
     @Test

@@ -42,6 +42,9 @@ public final class UvLockReader {
         Integer revision = null;
         String requiresPython = null;
         List<String> resolutionMarkers = null;
+        List<String> supportedMarkers = null;
+        List<String> requiredMarkers = null;
+        List<List<UvLockConflictItem>> conflicts = null;
         for (Map.Entry<String, Object> e : header.entrySet()) {
             String key = e.getKey();
             if ("version".equals(key)) {
@@ -52,6 +55,12 @@ public final class UvLockReader {
                 requiresPython = stringValue(key, e.getValue());
             } else if ("resolution-markers".equals(key)) {
                 resolutionMarkers = stringList(key, e.getValue());
+            } else if ("supported-markers".equals(key)) {
+                supportedMarkers = stringList(key, e.getValue());
+            } else if ("required-markers".equals(key)) {
+                requiredMarkers = stringList(key, e.getValue());
+            } else if ("conflicts".equals(key)) {
+                conflicts = toConflicts(e.getValue());
             } else {
                 throw new UvLockFormatException("Unrecognized top-level key: " + key);
             }
@@ -106,7 +115,42 @@ public final class UvLockReader {
         for (RawPackage raw : rawPackages) {
             packages.add(toPackage(raw));
         }
-        return new UvLock(version, revision, requiresPython, resolutionMarkers, options, manifest, packages);
+        return new UvLock(version, revision, requiresPython, resolutionMarkers, supportedMarkers,
+                requiredMarkers, conflicts, options, manifest, packages);
+    }
+
+    private static List<List<UvLockConflictItem>> toConflicts(Object v) {
+        List<List<UvLockConflictItem>> sets = new ArrayList<>();
+        for (Object set : listValue("conflicts", v)) {
+            List<UvLockConflictItem> items = new ArrayList<>();
+            for (Object item : listValue("conflicts", set)) {
+                items.add(toConflictItem(tableValue("conflicts", item)));
+            }
+            sets.add(items);
+        }
+        return sets;
+    }
+
+    private static UvLockConflictItem toConflictItem(Map<String, Object> table) {
+        String packageName = null;
+        String extra = null;
+        String group = null;
+        for (Map.Entry<String, Object> e : table.entrySet()) {
+            String key = e.getKey();
+            if ("package".equals(key)) {
+                packageName = stringValue(key, e.getValue());
+            } else if ("extra".equals(key)) {
+                extra = stringValue(key, e.getValue());
+            } else if ("group".equals(key)) {
+                group = stringValue(key, e.getValue());
+            } else {
+                throw new UvLockFormatException("Unrecognized conflicts key: " + key);
+            }
+        }
+        if (packageName == null || (extra == null) == (group == null)) {
+            throw new UvLockFormatException("Conflict entry needs package and exactly one of extra/group");
+        }
+        return new UvLockConflictItem(packageName, extra, group);
     }
 
     private static final class RawPackage {
@@ -520,8 +564,9 @@ public final class UvLockReader {
                 throw new UvLockFormatException("Unrecognized artifact key: " + key);
             }
         }
-        if (url == null && path == null) {
-            throw new UvLockFormatException("Artifact entry has neither url nor path");
+        // url-sourced packages record a hash-only sdist (the download URL lives on the package source)
+        if (url == null && path == null && hash == null) {
+            throw new UvLockFormatException("Artifact entry has neither url, path, nor hash");
         }
         return new UvLockArtifact(url, path, hash, size, uploadTime);
     }
@@ -541,6 +586,9 @@ public final class UvLockReader {
         String marker = null;
         String specifier = null;
         String index = null;
+        String url = null;
+        String git = null;
+        String directory = null;
         for (Map.Entry<String, Object> e : table.entrySet()) {
             String key = e.getKey();
             Object v = e.getValue();
@@ -556,6 +604,12 @@ public final class UvLockReader {
                 specifier = stringValue(key, v);
             } else if ("index".equals(key)) {
                 index = stringValue(key, v);
+            } else if ("url".equals(key)) {
+                url = stringValue(key, v);
+            } else if ("git".equals(key)) {
+                git = stringValue(key, v);
+            } else if ("directory".equals(key)) {
+                directory = stringValue(key, v);
             } else {
                 throw new UvLockFormatException("Unrecognized requirement key: " + key);
             }
@@ -563,7 +617,7 @@ public final class UvLockReader {
         if (name == null) {
             throw new UvLockFormatException("Requirement entry is missing name");
         }
-        return new UvLockRequirement(name, extras, editable, marker, specifier, index);
+        return new UvLockRequirement(name, extras, editable, marker, specifier, index, url, git, directory);
     }
 
     // ---- typed accessors over the generic parse ----
