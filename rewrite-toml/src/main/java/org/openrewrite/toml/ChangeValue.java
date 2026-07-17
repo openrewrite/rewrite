@@ -96,19 +96,8 @@ public class ChangeValue extends Recipe {
                     );
                 }
 
-                if (value.startsWith("\"\"\"") && value.endsWith("\"\"\"")) {
-                    String unquoted = value.substring(3, value.length() - 3);
-                    return new Toml.Literal(
-                            Tree.randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            TomlType.Primitive.String,
-                            value,
-                            unquoted
-                    );
-                }
-
-                if (value.startsWith("'''") && value.endsWith("'''")) {
+                if ((value.startsWith("\"\"\"") && value.endsWith("\"\"\"")) ||
+                    (value.startsWith("'''") && value.endsWith("'''"))) {
                     String unquoted = value.substring(3, value.length() - 3);
                     return new Toml.Literal(
                             Tree.randomId(),
