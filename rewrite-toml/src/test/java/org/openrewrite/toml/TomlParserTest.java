@@ -16,6 +16,8 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
@@ -451,6 +453,26 @@ class TomlParserTest implements RewriteTest {
               # Another inline table with trailing comma
               person = { name = "John", age = 30, }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "\"hello\"",
+      "'hello'",
+      "\"\"\"hello\"\"\"",
+      "'''hello'''"
+    })
+    void stringValueStrippedForAnyQuoteStyle(String quoted) {
+        rewriteRun(
+          toml(
+            "greeting = " + quoted,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getValues())
+                .extracting(Toml.KeyValue.class::cast)
+                .extracting(keyValue -> ((Toml.Literal) keyValue.getValue()).getValue())
+                .containsExactly("hello"))
           )
         );
     }
