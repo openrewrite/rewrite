@@ -1630,7 +1630,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
         // KotlinTemplate path: spell out concrete type arguments so overloads that
         // dispatch on a generic argument resolve (e.g. `Iterable<T>.sumOf` on the
-        // selector's return type). Non-concrete arguments fall back to raw.
+        // selector's return type). Anything but an invariant, concrete argument
+        // (star projection, use-site variance, type parameter) falls back to raw.
         val args = (type as? IrSimpleType)?.arguments
         if (args.isNullOrEmpty()) return fqn
         val rendered = args.map { renderTypeArgument(it) ?: return fqn }
@@ -1638,13 +1639,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     private fun renderTypeArgument(arg: IrTypeArgument): String? {
-        if (arg !is IrTypeProjection) return null
-        val inner = renderPlaceholderType(arg.type, javaTemplate = false) ?: return null
-        return when (arg.variance) {
-            Variance.OUT_VARIANCE -> "? extends $inner"
-            Variance.IN_VARIANCE -> "? super $inner"
-            else -> inner
-        }
+        if (arg !is IrTypeProjection || arg.variance != Variance.INVARIANT) return null
+        return renderPlaceholderType(arg.type, javaTemplate = false)
     }
 
     private fun renderPlaceholder(typeFqn: String?): String =

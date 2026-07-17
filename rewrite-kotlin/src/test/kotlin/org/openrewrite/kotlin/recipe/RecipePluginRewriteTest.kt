@@ -700,6 +700,69 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `nested generic type argument in selector attaches method type`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFlatMap = recipe(
+                    displayName = "Use flatMap",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<Int>, f: (Int) -> List<Int> -> xs.map(f).flatten() } to { xs, f -> xs.flatMap(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFlatMap",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun expand(xs: List<Int>): List<Int> = xs.map { listOf(it) }.flatten()
+                """,
+                """
+                fun expand(xs: List<Int>): List<Int> = xs.flatMap { listOf(it) }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `use-site variance argument degrades gracefully to raw`() {
+        // Use-site variance can't be rendered concretely, so the type falls back
+        // to raw: the rewrite still applies but the method type is absent.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseToMutableList = recipe(
+                    displayName = "Use toMutableList",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<out Number> -> xs.toList() } to { xs -> xs.toMutableList() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseToMutableList",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build())
+            },
+            kotlin(
+                """
+                fun copy(xs: List<Int>): List<Int> = xs.toList()
+                """,
+                """
+                fun copy(xs: List<Int>): List<Int> = xs.toMutableList()
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `bare single-call rewrite preserves dot-on-its-own-line layout`() {
         // Same fix, different rewrite path: `methodInvocationRewrite` (the
         // non-chain bare path) also runs the template through
