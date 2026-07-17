@@ -665,9 +665,7 @@ public final class PipenvLockEngine {
             PythonVersion selected = selectVersion(byVersion, constraint);
             if (selected == null) {
                 return new Failure(Reason.RESOLUTION_CONFLICT, pkg, index.getUrl(),
-                        "No non-yanked version satisfying " + entry.constraint +
-                                (lockPython != null ? " for python " + lockPython : "") +
-                                " found at " + index.getUrl());
+                        explainNoVersion(byVersion, constraint, entry.constraint, index.getUrl()));
             }
             List<PackageFile> files = byVersion.get(selected);
 
@@ -1137,6 +1135,35 @@ public final class PipenvLockEngine {
                 }
             }
             return best;
+        }
+
+        /**
+         * Explain why {@link #selectVersion} found nothing, distinguishing "the index
+         * has no version matching the constraint" (a lagging mirror is the usual cause)
+         * from a genuine requires-python exclusion or an all-yanked release.
+         */
+        private String explainNoVersion(Map<PythonVersion, List<PackageFile>> byVersion,
+                                        PythonVersionSpecifierSet constraint, String constraintText, String indexUrl) {
+            List<PythonVersion> matching = new ArrayList<>();
+            for (PythonVersion version : byVersion.keySet()) {
+                if (constraint.contains(version)) {
+                    matching.add(version);
+                }
+            }
+            if (matching.isEmpty()) {
+                return "No version matching " + constraintText + " is available at " + indexUrl +
+                        " (the index may lag PyPI or not mirror this release)";
+            }
+            if (lockPython != null) {
+                for (PythonVersion version : matching) {
+                    if (!versionAdmitsPython(byVersion.get(version), lockPython)) {
+                        return constraintText + " matches " + version + " at " + indexUrl +
+                                ", but its requires-python excludes python " + lockPython;
+                    }
+                }
+            }
+            return "All versions matching " + constraintText + " at " + indexUrl +
+                    " are yanked or have no installable distribution";
         }
 
         /**

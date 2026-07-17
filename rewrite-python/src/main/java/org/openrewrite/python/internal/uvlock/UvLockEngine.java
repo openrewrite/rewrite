@@ -1335,9 +1335,7 @@ public final class UvLockEngine {
             if (selected == null) {
                 throw new EngineFailure(new Failure(Reason.RESOLUTION_CONFLICT, change.canonicalName,
                         listing.index.getIndex().getUrl(),
-                        "No non-yanked version satisfying the declared constraints" +
-                                (range.lower != null ? " for python " + range.lower : "") +
-                                " found at " + listing.index.getIndex().getUrl()));
+                        explainNoVersion(byVersion, change, listing.index.getIndex().getUrl())));
             }
             List<PackageFile> files = byVersion.get(selected);
             CoreMetadata metadata = fetchMetadata(change.canonicalName, listing.index, files);
@@ -1524,6 +1522,34 @@ public final class UvLockEngine {
                 }
             }
             return best;
+        }
+
+        /**
+         * Explain why {@link #selectVersion} found nothing, distinguishing "the index
+         * has no version matching the constraints" (a lagging mirror is the usual cause)
+         * from a genuine requires-python exclusion or an all-yanked release.
+         */
+        private String explainNoVersion(Map<PythonVersion, List<PackageFile>> byVersion, Change change, String indexUrl) {
+            List<PythonVersion> matching = new ArrayList<>();
+            for (PythonVersion version : byVersion.keySet()) {
+                if (satisfiesAll(change.constraints, version)) {
+                    matching.add(version);
+                }
+            }
+            if (matching.isEmpty()) {
+                return "No version matching the declared constraints is available at " + indexUrl +
+                        " (the index may lag PyPI or not mirror this release)";
+            }
+            if (range.lower != null) {
+                for (PythonVersion version : matching) {
+                    if (!versionAdmitsPython(byVersion.get(version))) {
+                        return "The declared constraints match " + version + " at " + indexUrl +
+                                ", but its requires-python excludes python " + range.lower;
+                    }
+                }
+            }
+            return "All versions matching the declared constraints at " + indexUrl +
+                    " are yanked or have no installable distribution";
         }
 
         /**

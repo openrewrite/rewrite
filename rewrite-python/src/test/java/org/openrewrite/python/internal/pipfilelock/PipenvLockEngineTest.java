@@ -491,6 +491,10 @@ class PipenvLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_CONFLICT);
         assertThat(result.getFailure().getPackageName()).isEqualTo("requests");
         assertThat(result.getFailure().getIndexUrl()).isEqualTo(server.url("/simple").toString());
+        // the version is simply not at the index (e.g. a lagging mirror), not a python exclusion
+        assertThat(result.getFailure().getDetail())
+                .contains("No version matching ==9.9.9 is available")
+                .contains("may lag PyPI");
     }
 
     @Test
