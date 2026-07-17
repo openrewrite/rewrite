@@ -196,7 +196,24 @@ public class PyProjectHelper {
                 if (resolved.isEmpty()) {
                     return depsFile;
                 }
-                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved);
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Uv);
+                break;
+            case Poetry:
+                resolved = PoetryLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Poetry);
+                break;
+            case Pdm:
+                resolved = PdmLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Pdm);
                 break;
             case Pipenv:
                 resolved = PipfileLockParser.parse(regeneratedLockContent);

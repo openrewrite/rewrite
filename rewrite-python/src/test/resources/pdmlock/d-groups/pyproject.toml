@@ -1,0 +1,15 @@
+[project]
+name = "d-groups"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["six==1.16.0"]
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+test = ["iniconfig==2.0.0"]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

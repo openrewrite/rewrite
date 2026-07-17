@@ -18,7 +18,9 @@ package org.openrewrite.python.internal;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.python.internal.pdmlock.PdmLockEngine;
 import org.openrewrite.python.internal.pipfilelock.PipenvLockEngine;
+import org.openrewrite.python.internal.poetrylock.PoetryLockEngine;
 import org.openrewrite.python.internal.uvlock.UvLockEngine;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
@@ -39,6 +41,10 @@ public abstract class LockFileRegeneration {
 
     public static final LockFileRegeneration PIPENV = new NativePipenv();
 
+    public static final LockFileRegeneration POETRY = new NativePoetry();
+
+    public static final LockFileRegeneration PDM = new NativePdm();
+
     public static @Nullable LockFileRegeneration forPackageManager(@Nullable PackageManager pm) {
         if (pm == null) {
             return null;
@@ -48,6 +54,10 @@ public abstract class LockFileRegeneration {
                 return UV;
             case Pipenv:
                 return PIPENV;
+            case Poetry:
+                return POETRY;
+            case Pdm:
+                return PDM;
             default:
                 return null;
         }
@@ -162,6 +172,22 @@ public abstract class LockFileRegeneration {
         public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
                                  Map<String, String> environment, ExecutionContext ctx) {
             return UvLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
+        }
+    }
+
+    private static final class NativePoetry extends LockFileRegeneration {
+        @Override
+        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
+                                 Map<String, String> environment, ExecutionContext ctx) {
+            return PoetryLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
+        }
+    }
+
+    private static final class NativePdm extends LockFileRegeneration {
+        @Override
+        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
+                                 Map<String, String> environment, ExecutionContext ctx) {
+            return PdmLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
         }
     }
 }

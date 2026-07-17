@@ -35,6 +35,7 @@ public class MetadataParser {
         String metadataVersion = "";
         String name = "";
         String version = "";
+        String summary = null;
         String requiresPython = null;
         List<String> requiresDist = new ArrayList<>();
         List<String> providesExtra = new ArrayList<>();
@@ -52,6 +53,9 @@ public class MetadataParser {
                     break;
                 case "version":
                     version = value;
+                    break;
+                case "summary":
+                    summary = value;
                     break;
                 case "requires-dist":
                     requiresDist.add(value);
@@ -71,7 +75,7 @@ public class MetadataParser {
                     break;
             }
         }
-        return new CoreMetadata(metadataVersion, name, version, requiresDist, requiresPython, providesExtra, dynamic);
+        return new CoreMetadata(metadataVersion, name, version, summary, requiresDist, requiresPython, providesExtra, dynamic);
     }
 
     private static List<String[]> headers(String content) {
