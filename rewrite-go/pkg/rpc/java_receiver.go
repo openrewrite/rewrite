@@ -551,7 +551,11 @@ func (r *JavaReceiver) VisitCase(cs *java.Case, p any) java.J {
 	q.Receive(nil, nil) // type enum
 	cs.Expressions = receiveContainer[java.Expression](r, q, cs.Expressions)
 	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	if result := q.Receive(nil, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
+	var stmtsBefore any
+	if cs.Body != nil {
+		stmtsBefore = java.Container[java.Statement]{Elements: cs.Body}
+	}
+	if result := q.Receive(stmtsBefore, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		cont := result.(java.Container[java.Statement])
 		cs.Body = cont.Elements
 	}
