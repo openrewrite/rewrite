@@ -198,6 +198,13 @@ public final class UvLockWriter {
         if (req.getMarker() != null) {
             b.append(", marker = ").append(string(req.getMarker()));
         }
+        // url/git are the requirement's direct source; uv emits them after marker, in place of specifier
+        if (req.getUrl() != null) {
+            b.append(", url = ").append(string(req.getUrl()));
+        }
+        if (req.getGit() != null) {
+            b.append(", git = ").append(string(req.getGit()));
+        }
         if (req.getSpecifier() != null) {
             b.append(", specifier = ").append(string(req.getSpecifier()));
         }

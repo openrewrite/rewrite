@@ -48,4 +48,18 @@ public class UvLockRequirement {
 
     @Nullable
     String index;
+
+    /**
+     * Direct-URL source of the requirement (mutually exclusive with {@code specifier}); the
+     * download URL without the resolved commit that the package {@code source} carries.
+     */
+    @Nullable
+    String url;
+
+    /**
+     * Git source of the requirement, e.g. {@code "https://host/repo?tag=1.2.3"}; the resolved
+     * commit lives only on the package {@code source}, not here.
+     */
+    @Nullable
+    String git;
 }

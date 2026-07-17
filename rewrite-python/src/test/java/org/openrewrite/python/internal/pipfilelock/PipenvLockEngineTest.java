@@ -719,6 +719,10 @@ class PipenvLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_MANIFEST);
+        // the underlying TOML parse error is appended for diagnosability, not swallowed
+        assertThat(result.getFailure().getDetail())
+          .contains("could not be parsed as TOML:")
+          .contains("Syntax error");
     }
 
     @Test

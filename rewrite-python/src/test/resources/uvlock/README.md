@@ -20,6 +20,12 @@ checked-in pyproject is the edited, dependency-less state); `h3-requires-python-
 manifest declaring `requires-python = "<3.15,>=3.10"` — uv sorts the clauses ascending by version
 (`">=3.10, <3.15"`); `g3-multi-extras` locks `requests[use_chardet_on_py3,socks]` — requires-dist
 records extras in declaration order while dependency edges record them sorted.
+`t-url-source` locks a `[tool.uv.sources]` direct-URL dependency (`six` from an sdist URL on
+files.pythonhosted.org) — the package `source = { url = … }` with a hash-only `sdist` and a
+`requires-dist` `url` key (FORMAT.md §5/§7/§8); `u-git-source` locks a `git` source
+(`six` from `github.com/benjaminp/six?tag=1.17.0`) — package `source = { git = …#<commit> }` and a
+`requires-dist` `git` key without the commit.
+
 `o-old-uv/proj-0.5.0/uv.lock.engine-edited` is the one ENGINE-DEFINED expectation in the corpus
 (real uv cannot produce it: it would rewrite the whole file at revision 3): the surgical
 six==1.16.0 pin-down of `uv.lock.as-0.5.0` in the file's own revisionless style, derived from the

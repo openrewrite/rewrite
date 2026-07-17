@@ -520,8 +520,9 @@ public final class UvLockReader {
                 throw new UvLockFormatException("Unrecognized artifact key: " + key);
             }
         }
-        if (url == null && path == null) {
-            throw new UvLockFormatException("Artifact entry has neither url nor path");
+        // url-sourced packages record a hash-only sdist (the download URL lives on the package source)
+        if (url == null && path == null && hash == null) {
+            throw new UvLockFormatException("Artifact entry has neither url, path, nor hash");
         }
         return new UvLockArtifact(url, path, hash, size, uploadTime);
     }
@@ -541,6 +542,8 @@ public final class UvLockReader {
         String marker = null;
         String specifier = null;
         String index = null;
+        String url = null;
+        String git = null;
         for (Map.Entry<String, Object> e : table.entrySet()) {
             String key = e.getKey();
             Object v = e.getValue();
@@ -556,6 +559,10 @@ public final class UvLockReader {
                 specifier = stringValue(key, v);
             } else if ("index".equals(key)) {
                 index = stringValue(key, v);
+            } else if ("url".equals(key)) {
+                url = stringValue(key, v);
+            } else if ("git".equals(key)) {
+                git = stringValue(key, v);
             } else {
                 throw new UvLockFormatException("Unrecognized requirement key: " + key);
             }
@@ -563,7 +570,7 @@ public final class UvLockReader {
         if (name == null) {
             throw new UvLockFormatException("Requirement entry is missing name");
         }
-        return new UvLockRequirement(name, extras, editable, marker, specifier, index);
+        return new UvLockRequirement(name, extras, editable, marker, specifier, index, url, git);
     }
 
     // ---- typed accessors over the generic parse ----

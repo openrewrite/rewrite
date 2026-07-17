@@ -97,10 +97,14 @@ public final class PipenvLockEngine {
                     "Existing Pipfile.lock could not be parsed: " + e.getMessage()));
         }
 
-        Toml.Document pipfile = parsePipfile(pipfileContent);
+        String[] parseError = new String[1];
+        Toml.Document pipfile = parsePipfile(pipfileContent, parseError);
         if (pipfile == null) {
-            return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null,
-                    "Edited Pipfile could not be parsed as TOML"));
+            String detail = "Edited Pipfile could not be parsed as TOML";
+            if (parseError[0] != null && !parseError[0].isEmpty()) {
+                detail += ": " + parseError[0];
+            }
+            return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null, detail));
         }
 
         try {
@@ -110,14 +114,22 @@ public final class PipenvLockEngine {
         }
     }
 
-    private static Toml.@Nullable Document parsePipfile(String pipfileContent) {
+    private static Toml.@Nullable Document parsePipfile(String pipfileContent, String[] parseError) {
         // ANTLR error recovery can still yield a Document for broken TOML; treat any syntax error as malformed
-        boolean[] failed = new boolean[1];
+        Throwable[] firstError = new Throwable[1];
         SourceFile parsed = new TomlParser()
-                .parse(new InMemoryExecutionContext(t -> failed[0] = true), pipfileContent)
+                .parse(new InMemoryExecutionContext(t -> {
+                    if (firstError[0] == null) {
+                        firstError[0] = t;
+                    }
+                }), pipfileContent)
                 .findFirst()
                 .orElse(null);
-        return !failed[0] && parsed instanceof Toml.Document ? (Toml.Document) parsed : null;
+        if (firstError[0] != null) {
+            parseError[0] = firstError[0].getMessage();
+            return null;
+        }
+        return parsed instanceof Toml.Document ? (Toml.Document) parsed : null;
     }
 
     private static Failure indexFailure(@Nullable String packageName, PythonIndexException e) {

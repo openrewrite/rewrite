@@ -102,6 +102,15 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
 - Root project without `[build-system]`: `source = { virtual = "." }` (`a-multi-package/uv.lock`).
 - Root/workspace member with `[build-system]`: `source = { editable = "." }`
   (`p-editable-root/uv.lock`) or `{ editable = "packages/libone" }` (`q-workspace/uv.lock`).
+- Direct URL (`[tool.uv.sources]` `url = …`): `source = { url = "https://…/six-1.17.0.tar.gz" }` — the
+  download URL recorded **verbatim** (`t-url-source/uv.lock`). The artifact is not repeated on the
+  URL: an sdist-URL package carries a **hash-only** `sdist = { hash = "sha256:…" }` (§8); a
+  wheel-URL package carries the wheel with its own `url` + `hash` in `wheels`.
+- Git (`[tool.uv.sources]` `git = …`): `source = { git = "https://…/six?tag=1.17.0#<40-hex-commit>" }`
+  — the requested ref query (`?tag=`/`?rev=`/`?branch=`) is kept and the **resolved commit is appended
+  as `#<sha>`** (`u-git-source/uv.lock`). Git packages carry no `sdist`/`wheels`.
+- Single string value throughout: the source table always has **exactly one key** whose value is a
+  string; `url`/`git` fit the same `{ key = "value" }` shape as `registry`/`editable`.
 
 ## 6. `dependencies` arrays (resolved graph edges)
 
@@ -127,11 +136,17 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
   The rule is element count, not line width — a 200-char single entry stays inline
   (`n2-inline-width/uv.lock`, `c-sdist-only/uv.lock:14`).
 - Entries sorted by name. Inline-table key order: `name`, `extras`, `editable`, `marker`,
-  `specifier`, `index`:
+  `url`/`git`, `specifier`, `index` — the direct-source keys `url`/`git` sit **after `marker`**
+  and stand in for `specifier` (a direct-URL/git requirement has no version specifier):
   - `{ name = "requests", extras = ["socks"], specifier = ">=2.31" }` (`d-extras/uv.lock:84`)
   - `{ name = "importlib-metadata", marker = "python_full_version < '3.11'", specifier = ">=6.0" }` (`e-markers-forks/uv.lock:27`)
   - `{ name = "six", specifier = ">=1.16", index = "https://test.pypi.org/simple/" }` (`k-multi-index/uv.lock`)
   - `{ name = "libone", editable = "packages/libone" }` (`q-workspace/uv.lock`)
+  - `{ name = "six", url = "https://…/six-1.17.0.tar.gz" }` (`t-url-source/uv.lock`) — the URL is the
+    download URL **without** the package source's `#<commit>`; extras/marker still precede it, e.g.
+    probed `{ name = "six", extras = ["all"], marker = "python_full_version >= '3.10'", url = "…" }`
+  - `{ name = "six", git = "https://github.com/benjaminp/six?tag=1.17.0" }` (`u-git-source/uv.lock`) —
+    the git URL **without** the resolved `#<commit>` that the package source carries
 - Keys are omitted when absent (no `specifier` key for unconstrained deps, `e-markers-forks/uv.lock:26`).
 - The `extras` key keeps **declaration order** (canonicalized, not sorted):
   `requests[use_chardet_on_py3,socks]` → `extras = ["use-chardet-on-py3", "socks"]`
@@ -160,6 +175,8 @@ uv omits `[package.metadata]` entirely — the root entry ends at `source`
 
 - `sdist` inline-table key order: `url`, `hash`, `size`, `upload-time`
   (`a-multi-package/uv.lock:9`). `hash = "sha256:<hex>"`.
+- Direct-URL sdist packages carry a **hash-only** `sdist = { hash = "sha256:<hex>" }` — no `url`
+  (it is the package `source`, §5), no `size`, no `upload-time` (`t-url-source/uv.lock`).
 - `wheels`: **always multiline** (one wheel per line), even for a single wheel. Same key order per
   wheel: `url`, `hash`, `size`, `upload-time`.
 - `upload-time` format: RFC3339 UTC with `Z`, fractional seconds **truncated to milliseconds,

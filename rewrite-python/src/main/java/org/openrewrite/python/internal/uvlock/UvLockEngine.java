@@ -116,10 +116,14 @@ public final class UvLockEngine {
             return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, null,
                     "Existing uv.lock could not be parsed: " + e.getMessage()));
         }
-        Toml.Document pyproject = parseToml(pyprojectContent);
+        String[] parseError = new String[1];
+        Toml.Document pyproject = parseToml(pyprojectContent, parseError);
         if (pyproject == null) {
-            return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null,
-                    "Edited pyproject.toml could not be parsed as TOML"));
+            String detail = "Edited pyproject.toml could not be parsed as TOML";
+            if (parseError[0] != null && !parseError[0].isEmpty()) {
+                detail += ": " + parseError[0];
+            }
+            return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null, detail));
         }
         try {
             return new Run(pyproject, lock, ctx).regenerate();
@@ -131,13 +135,21 @@ public final class UvLockEngine {
         }
     }
 
-    private static Toml.@Nullable Document parseToml(String content) {
-        boolean[] failed = new boolean[1];
+    private static Toml.@Nullable Document parseToml(String content, String[] parseError) {
+        Throwable[] firstError = new Throwable[1];
         SourceFile parsed = new TomlParser()
-                .parse(new InMemoryExecutionContext(t -> failed[0] = true), content)
+                .parse(new InMemoryExecutionContext(t -> {
+                    if (firstError[0] == null) {
+                        firstError[0] = t;
+                    }
+                }), content)
                 .findFirst()
                 .orElse(null);
-        return !failed[0] && parsed instanceof Toml.Document ? (Toml.Document) parsed : null;
+        if (firstError[0] != null) {
+            parseError[0] = firstError[0].getMessage();
+            return null;
+        }
+        return parsed instanceof Toml.Document ? (Toml.Document) parsed : null;
     }
 
     private static Failure indexFailure(@Nullable String packageName, PythonIndexException e) {
@@ -603,7 +615,7 @@ public final class UvLockEngine {
             String specifier = normalizeSpecifier(decl);
             String index = pins == null ? null : declaredIndexUrl(pins.get(0), decl.canonicalName);
             String marker = resolveMetadataMarker(decl);
-            return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index);
+            return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null);
         }
 
         private @Nullable String normalizeSpecifier(Declared decl) {
@@ -830,7 +842,8 @@ public final class UvLockEngine {
             List<String> rendered = new ArrayList<>(reqs.size());
             for (UvLockRequirement req : reqs) {
                 rendered.add(req.getName() + "|" + req.getExtras() + "|" + req.getEditable() + "|" +
-                        req.getMarker() + "|" + req.getSpecifier() + "|" + req.getIndex());
+                        req.getMarker() + "|" + req.getSpecifier() + "|" + req.getIndex() + "|" +
+                        req.getUrl() + "|" + req.getGit());
             }
             return rendered;
         }
@@ -974,7 +987,8 @@ public final class UvLockEngine {
                             "requires-python changes on a forked lock are not supported by the native engine");
                 }
                 UvLockPackage.UvLockPackageBuilder builder = pkg.toBuilder();
-                if (pkg.getWheels() != null) {
+                // url/git-pinned artifacts are chosen explicitly, not by Python tag; never filter them
+                if (pkg.getSource().getType() == UvLockSource.Type.REGISTRY && pkg.getWheels() != null) {
                     List<UvLockArtifact> kept = new ArrayList<>();
                     for (UvLockArtifact wheel : pkg.getWheels()) {
                         String filename = wheelFilename(wheel);

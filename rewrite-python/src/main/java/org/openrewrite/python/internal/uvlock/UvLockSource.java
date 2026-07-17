@@ -20,7 +20,9 @@ import lombok.With;
 
 /**
  * A package {@code source} inline table, e.g. {@code { registry = "https://pypi.org/simple" }}.
- * The value (URL or path) is recorded verbatim, including trailing-slash presence.
+ * The value (URL or path) is recorded verbatim, including trailing-slash presence. For {@code git}
+ * the value carries the resolved commit as a {@code #<sha>} suffix; for {@code url} it is the
+ * direct download URL of the pinned sdist/wheel.
  */
 @Value
 @With
@@ -31,7 +33,8 @@ public class UvLockSource {
         VIRTUAL("virtual"),
         EDITABLE("editable"),
         PATH("path"),
-        GIT("git");
+        GIT("git"),
+        URL("url");
 
         private final String key;
 

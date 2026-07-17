@@ -81,7 +81,9 @@ final class UvLockFixtures {
       "r-removal/uv.lock",
       "r-removal/uv.lock.before",
       "s-remove-last-dep/uv.lock.after",
-      "s-remove-last-dep/uv.lock.before"
+      "s-remove-last-dep/uv.lock.before",
+      "t-url-source/uv.lock",
+      "u-git-source/uv.lock"
     };
 
     private UvLockFixtures() {

@@ -379,4 +379,84 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noChangeWhenVersionAlreadyTargetDespiteSpacing() {
+        // Whitespace-only difference must not produce an edit.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "calibre"
+              dependencies = [
+                  "six == 1.17.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void spacePaddedRequirementRewritesCleanly() {
+        // kovidgoyal/calibre shape: "six == 1.17.0" (spaces around ==) — only the
+        // version token changes; the original spacing is preserved.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.1", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "calibre"
+              dependencies = [
+                  "six == 1.17.0",
+                  "lxml == 6.1.1",
+              ]
+              """,
+            """
+              [project]
+              name = "calibre"
+              dependencies = [
+                  "six == 1.17.1",
+                  "lxml == 6.1.1",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void starConstraintPipfileRewritesCleanly() {
+        // postmanlabs/httpbin shape: six = "*" alongside git inline-table entries
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null)),
+          pipfile(
+            """
+              [[source]]
+              url = "https://pypi.python.org/simple"
+              verify_ssl = true
+
+              [packages]
+              Flask = "*"
+              six = "*"
+              pyyaml = {git = "https://github.com/yaml/pyyaml.git"}
+
+              [dev-packages]
+              rope = "*"
+              """,
+            """
+              [[source]]
+              url = "https://pypi.python.org/simple"
+              verify_ssl = true
+
+              [packages]
+              Flask = "*"
+              six = "==1.17.0"
+              pyyaml = {git = "https://github.com/yaml/pyyaml.git"}
+
+              [dev-packages]
+              rope = "*"
+              """
+          )
+        );
+    }
 }
