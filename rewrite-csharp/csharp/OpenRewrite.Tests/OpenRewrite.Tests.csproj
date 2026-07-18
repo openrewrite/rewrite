@@ -16,6 +16,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <!-- Keep MSBuild assemblies out of the output so MSBuildLocator can load the SDK's copies
+         for in-process restore-graph evaluation (NuGetResolver). A stale app-base copy of
+         Microsoft.Build.Framework causes MissingMethodException at MSBuild load time. -->
+    <PackageReference Include="Microsoft.Build" Version="18.8.2" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.8.2" ExcludeAssets="runtime" />
     <!-- Test-only: fixtures build throwaway git repos with LibGit2Sharp. The production
          tool resolves git through the host `git` CLI (see GitCli) and ships no native libs. -->
     <PackageReference Include="LibGit2Sharp" Version="0.31.0" />

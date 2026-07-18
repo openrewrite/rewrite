@@ -52,7 +52,9 @@ public class DotNetBuildContext
 
     private static readonly HashSet<string> BuildFileNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "nuget.config"
+        "nuget.config",
+        // Needed so legacy projects can be reattested (synthesized restore graph) after edits.
+        "packages.config"
     };
 
     /// <summary>

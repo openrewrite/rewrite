@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-using System.Diagnostics;
-using System.Text.Json;
 using System.Xml.Linq;
+using NuGet.ProjectModel;
+using OpenRewrite.CSharp.NuGet;
 using OpenRewrite.Xml;
 using Serilog;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -27,21 +27,21 @@ namespace OpenRewrite.CSharp;
 ///     Creates and regenerates MSBuildProject markers.
 ///     Only the Sdk attribute is read from the csproj XML itself; all other
 ///     metadata (target frameworks, package references, resolved packages,
-///     project references) comes from project.assets.json produced by dotnet restore.
+///     project references) comes from the in-memory NuGet <see cref="LockFile" />
+///     produced by <see cref="NuGetResolver" /> (in-process PackageSpec/RestoreRunner
+///     restore — no <c>dotnet restore</c> child process, no <c>project.assets.json</c> read).
+///     Legacy <c>packages.config</c> projects get the same full attestation via a
+///     PackageSpec synthesized from their packages.config entries.
 ///     After a recipe modifies a .csproj file, this helper regenerates the
-///     marker by running `dotnet restore` and re-reading project.assets.json.
-///     Uses <see cref="DotNetBuildContext" /> to materialize the full repository
-///     build context (other .csproj files, Directory.Build.props/.targets,
-///     nuget.config, etc.) before running restore, so that project references
-///     and MSBuild imports resolve correctly.
+///     marker by re-running the in-process restore against the materialized
+///     <see cref="DotNetBuildContext" /> (other .csproj files,
+///     Directory.Build.props/.targets, nuget.config, packages.config, etc.).
 /// </summary>
 public static class MSBuildProjectHelper
 {
-    private static readonly TimeSpan RestoreTimeout = TimeSpan.FromMinutes(5);
-
     // Keyed off ExecutionContext: the set of .csproj source paths that have been
     // structurally modified during this run and whose MSBuildProject marker is
-    // therefore stale until the next dotnet restore. Mutating visitors add to
+    // therefore stale until the next restore. Mutating visitors add to
     // this set; RegenerateMarkerVisitor consumes from it so files no one touched
     // skip the (expensive) restore.
     private const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
@@ -96,84 +96,240 @@ public static class MSBuildProjectHelper
 
     /// <summary>
     ///     Creates an MSBuildProject marker. Only the Sdk attribute is read from the XML document.
-    ///     All dependency and framework metadata comes from project.assets.json.
+    ///     All dependency and framework metadata comes from an in-process NuGet restore of the
+    ///     project on disk under <paramref name="rootDir"/> (PackageReference projects via
+    ///     restore-graph generation; packages.config projects via a synthesized PackageSpec).
     /// </summary>
     /// <param name="doc">The parsed XML document (only Sdk attribute is read).</param>
-    /// <param name="rootDir">Root directory for resolving project.assets.json and nuget.config.</param>
+    /// <param name="rootDir">Root directory the document's SourcePath is relative to.</param>
     public static MSBuildProject? CreateMarker(Document doc, string? rootDir = null)
     {
-        var root = doc.Root;
-        var sdk = root.GetAttributeValue("Sdk");
+        var sdk = doc.Root.GetAttributeValue("Sdk");
 
         if (rootDir == null)
             return new MSBuildProject(Guid.NewGuid(), sdk);
 
-        var projectDir = Path.GetDirectoryName(Path.Combine(rootDir, doc.SourcePath));
-        if (projectDir == null)
-            return new MSBuildProject(Guid.NewGuid(), sdk);
-
-        var assetsPath = Path.Combine(projectDir, "obj", "project.assets.json");
-        if (!File.Exists(assetsPath))
+        var projectPath = Path.GetFullPath(Path.Combine(rootDir, doc.SourcePath));
+        if (!File.Exists(projectPath))
             return new MSBuildProject(Guid.NewGuid(), sdk);
 
         try
         {
-            return CreateFromAssetsJson(sdk, assetsPath, projectDir);
+            var lockFile = NuGetResolver
+                .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
+                .GetAwaiter().GetResult();
+            if (lockFile == null)
+                return new MSBuildProject(Guid.NewGuid(), sdk);
+
+            var projectDir = Path.GetDirectoryName(projectPath)!;
+            return CreateFromLockFile(sdk, lockFile, projectDir,
+                includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir));
         }
         catch (Exception ex)
         {
-            Log.Debug("Failed to read project.assets.json at {Path}: {Error}", assetsPath, ex.Message);
+            Log.Debug("Failed to resolve lock file for {Path}: {Error}", projectPath, ex.Message);
             return new MSBuildProject(Guid.NewGuid(), sdk);
         }
     }
 
-    private static MSBuildProject CreateFromAssetsJson(string? sdk, string assetsPath, string projectDir)
+    /// <summary>
+    ///     Creates an MSBuildProject marker from a pre-resolved <see cref="LockFile"/>
+    ///     (e.g. the one produced during solution restore), avoiding a second restore.
+    /// </summary>
+    public static MSBuildProject CreateMarker(Document doc, LockFile lockFile, string projectDir)
     {
-        var json = File.ReadAllText(assetsPath);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        var sdk = doc.Root.GetAttributeValue("Sdk");
+        return CreateFromLockFile(sdk, lockFile, projectDir,
+            includeDeclaredPackageReferences: !HasPackagesConfigSibling(projectDir));
+    }
 
-        // Read declared dependencies per TFM from project.frameworks
-        var declaredDeps = ReadDeclaredDependencies(root);
+    /// <summary>
+    ///     True when the project directory contains a packages.config. Such projects declare
+    ///     dependencies in packages.config, not as csproj <c>&lt;PackageReference&gt;</c> items —
+    ///     the marker's PackageReferences list must stay 1:1 with actual csproj items (recipes
+    ///     use it for idempotency checks), so it is left empty and the direct dependencies are
+    ///     represented as depth-0 entries in the resolved graph instead.
+    /// </summary>
+    private static bool HasPackagesConfigSibling(string projectDir)
+    {
+        try
+        {
+            return File.Exists(Path.Combine(projectDir, "packages.config"));
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
-        // Read resolved packages from targets
-        var resolvedByTfm = ReadResolvedPackages(root);
+    /// <summary>
+    ///     Builds the marker from the in-memory NuGet lock file: declared package references
+    ///     (from the restore's PackageSpec), the fully-linked resolved package graph with
+    ///     per-package asset information, and project references.
+    /// </summary>
+    public static MSBuildProject CreateFromLockFile(string? sdk, LockFile lockFile, string projectDir,
+        bool includeDeclaredPackageReferences = true)
+    {
+        var spec = lockFile.PackageSpec;
 
-        // Read project references from libraries (type=project)
-        var projectRefs = ReadProjectReferences(root, projectDir);
-
-        // Build per-TFM metadata
-        var tfmList = new List<TargetFramework>();
-        // Use targets keys as the authoritative list of TFMs
-        if (root.TryGetProperty("targets", out var targets))
-            foreach (var target in targets.EnumerateObject())
+        // Declared dependencies per TFM alias (framework-specific + project-level)
+        var declaredByTfm = new Dictionary<string, List<PackageReference>>(StringComparer.OrdinalIgnoreCase);
+        if (spec != null)
+        {
+            foreach (var tfi in spec.TargetFrameworks)
             {
-                var tfm = NormalizeTfm(target.Name);
-                declaredDeps.TryGetValue(tfm, out var pkgRefs);
-                resolvedByTfm.TryGetValue(tfm, out var resolved);
+                var tfm = ShortTfm(tfi.FrameworkName, tfi.TargetAlias);
+                var refs = new List<PackageReference>();
+                foreach (var dep in tfi.Dependencies)
+                    refs.Add(new PackageReference(dep.Name, dep.LibraryRange?.VersionRange?.MinVersion?.ToNormalizedString()));
+                declaredByTfm[tfm] = refs;
+            }
+        }
 
-                // Cross-reference declared package refs with resolved versions
-                if (pkgRefs != null && resolved != null)
+        // Per-package file lists (analyzers, scripts, transforms, legacy content)
+        var libraryFiles = new Dictionary<string, IList<string>>(StringComparer.OrdinalIgnoreCase);
+        var projectLibraries = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var library in lockFile.Libraries)
+        {
+            var key = library.Name + "/" + library.Version;
+            if (string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase))
+                projectLibraries[key] = library.MSBuildProject;
+            else if (library.Files != null)
+                libraryFiles[key] = library.Files;
+        }
+
+        var projectRefs = new List<ProjectReference>();
+        foreach (var msbuildProject in projectLibraries.Values)
+        {
+            if (msbuildProject == null)
+                continue;
+            try
+            {
+                var absolutePath = Path.GetFullPath(Path.Combine(projectDir, msbuildProject));
+                projectRefs.Add(new ProjectReference(Path.GetRelativePath(projectDir, absolutePath)));
+            }
+            catch
+            {
+                projectRefs.Add(new ProjectReference(msbuildProject));
+            }
+        }
+
+        var tfmList = new List<TargetFramework>();
+        foreach (var target in lockFile.Targets)
+        {
+            // RID-specific targets duplicate the RID-less graph; the marker captures the
+            // RID-agnostic view.
+            if (!string.IsNullOrEmpty(target.RuntimeIdentifier))
+                continue;
+
+            var tfm = ShortTfm(target.TargetFramework, null);
+            declaredByTfm.TryGetValue(tfm, out var declared);
+            declared ??= declaredByTfm.Values.FirstOrDefault() ?? new List<PackageReference>();
+
+            // First pass: create one node per resolved library with its asset data.
+            var nodes = new Dictionary<string, ResolvedPackage>(StringComparer.OrdinalIgnoreCase);
+            var dependencyNames = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var library in target.Libraries)
+            {
+                if (library.Name == null || library.Version == null)
+                    continue;
+                var isProject = string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase);
+                var fileKey = library.Name + "/" + library.Version;
+                libraryFiles.TryGetValue(fileKey, out var files);
+
+                var analyzers = new List<string>();
+                var hasInstallScripts = false;
+                var hasXdt = false;
+                var hasLegacyContent = false;
+                if (files != null)
                 {
-                    var resolvedLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var rp in resolved)
-                        resolvedLookup[rp.Name] = rp.ResolvedVersion;
-
-                    pkgRefs = pkgRefs.Select(pr =>
+                    foreach (var file in files)
                     {
-                        resolvedLookup.TryGetValue(pr.Include, out var resolvedVersion);
-                        return pr.WithResolvedVersion(resolvedVersion);
-                    }).ToList();
+                        var normalized = file.Replace('\\', '/');
+                        if (normalized.StartsWith("analyzers/", StringComparison.OrdinalIgnoreCase) &&
+                            normalized.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                            analyzers.Add(normalized);
+                        else if (normalized.StartsWith("tools/", StringComparison.OrdinalIgnoreCase) &&
+                                 (normalized.EndsWith("install.ps1", StringComparison.OrdinalIgnoreCase) ||
+                                  normalized.EndsWith("init.ps1", StringComparison.OrdinalIgnoreCase)))
+                            hasInstallScripts = true;
+                        else if (normalized.EndsWith(".xdt", StringComparison.OrdinalIgnoreCase) ||
+                                 normalized.EndsWith(".transform", StringComparison.OrdinalIgnoreCase))
+                            hasXdt = true;
+                        else if (normalized.StartsWith("content/", StringComparison.OrdinalIgnoreCase))
+                            hasLegacyContent = true;
+                    }
                 }
 
-                tfmList.Add(new TargetFramework(
-                    tfm,
-                    pkgRefs ?? [],
-                    resolved ?? [],
-                    projectRefs));
+                var node = new ResolvedPackage(
+                    library.Name,
+                    library.Version.ToNormalizedString(),
+                    dependencies: new List<ResolvedPackage>(),
+                    depth: int.MaxValue,
+                    type: isProject ? "project" : "package",
+                    compileAssemblies: RealItems(library.CompileTimeAssemblies?.Select(i => i.Path)),
+                    runtimeAssemblies: RealItems(library.RuntimeAssemblies?.Select(i => i.Path)),
+                    frameworkAssemblies: library.FrameworkAssemblies?.ToList() ?? [],
+                    buildFiles: RealItems(library.Build?.Select(i => i.Path)),
+                    buildMultiTargetingFiles: RealItems(library.BuildMultiTargeting?.Select(i => i.Path)),
+                    contentFiles: RealItems(library.ContentFiles?.Select(i => i.Path)),
+                    runtimeTargets: RealItems(library.RuntimeTargets?.Select(i => i.Path)),
+                    resourceAssemblies: RealItems(library.ResourceAssemblies?.Select(i => i.Path)),
+                    analyzerAssemblies: analyzers,
+                    hasInstallScripts: hasInstallScripts,
+                    hasXdtTransforms: hasXdt,
+                    hasLegacyContentFolder: hasLegacyContent);
+                nodes[library.Name] = node;
+                dependencyNames[library.Name] =
+                    library.Dependencies?.Select(d => d.Id).ToList() ?? new List<string>();
             }
 
-        // Read package sources from nuget.config files walking up the directory tree
+            // Second pass: link dependency edges to the actual resolved nodes (shared instances)
+            // and compute depth as the shortest distance from a directly-declared dependency
+            // (direct = 0). Nodes unreachable from declared roots (e.g. the roots themselves in
+            // pathological graphs) keep the maximum observed depth.
+            foreach (var (name, deps) in dependencyNames)
+            {
+                var list = (List<ResolvedPackage>)nodes[name].Dependencies;
+                foreach (var depName in deps)
+                {
+                    if (nodes.TryGetValue(depName, out var depNode))
+                        list.Add(depNode);
+                }
+            }
+
+            var depths = ComputeDepths(declared.Select(d => d.Include), nodes, dependencyNames);
+            var resolved = new List<ResolvedPackage>();
+            foreach (var (name, node) in nodes)
+                resolved.Add(node.WithDepth(depths.TryGetValue(name, out var d) ? d : 0));
+            // Re-link after WithDepth created copies: rebuild edges against the final instances.
+            var finalNodes = resolved.ToDictionary(n => n.Name, n => n, StringComparer.OrdinalIgnoreCase);
+            foreach (var node in resolved)
+            {
+                var list = (List<ResolvedPackage>)node.Dependencies;
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (finalNodes.TryGetValue(list[i].Name, out var final))
+                        list[i] = final;
+                }
+            }
+
+            // Cross-reference declared refs with resolved versions. For packages.config
+            // projects the declared entries come from packages.config, not csproj
+            // <PackageReference> items — they stay out of PackageReferences (kept 1:1 with
+            // csproj items) and are represented as depth-0 nodes in the resolved graph.
+            var resolvedLookup = finalNodes;
+            var packageRefs = includeDeclaredPackageReferences
+                ? declared
+                    .Select(pr => resolvedLookup.TryGetValue(pr.Include, out var node)
+                        ? pr.WithResolvedVersion(node.ResolvedVersion)
+                        : pr)
+                    .ToList()
+                : new List<PackageReference>();
+
+            tfmList.Add(new TargetFramework(tfm, packageRefs, resolved, projectRefs));
+        }
+
         var packageSources = ReadPackageSourcesFromTree(projectDir);
 
         return new MSBuildProject(
@@ -184,157 +340,62 @@ public static class MSBuildProjectHelper
             tfmList);
     }
 
-    private static Dictionary<string, IList<PackageReference>> ReadDeclaredDependencies(JsonElement root)
+    /// <summary>Strips the special <c>_._</c> placeholder entries from an asset list.</summary>
+    private static IList<string> RealItems(IEnumerable<string?>? paths)
     {
-        var result = new Dictionary<string, IList<PackageReference>>();
-
-        if (!root.TryGetProperty("project", out var project) ||
-            !project.TryGetProperty("frameworks", out var frameworks))
-            return result;
-
-        foreach (var fw in frameworks.EnumerateObject())
-        {
-            var tfm = fw.Name;
-            var pkgRefs = new List<PackageReference>();
-
-            if (fw.Value.TryGetProperty("dependencies", out var deps))
-                foreach (var dep in deps.EnumerateObject())
-                {
-                    // Skip project references — they have "target": "Project"
-                    if (dep.Value.TryGetProperty("target", out var targetProp) &&
-                        targetProp.GetString() == "Project")
-                        continue;
-
-                    string? requestedVersion = null;
-                    if (dep.Value.TryGetProperty("version", out var versionProp)) requestedVersion = ParseVersionRange(versionProp.GetString());
-
-                    pkgRefs.Add(new PackageReference(dep.Name, requestedVersion));
-                }
-
-            result[tfm] = pkgRefs;
-        }
-
-        return result;
+        if (paths == null)
+            return [];
+        return paths
+            .Where(p => p != null && !Path.GetFileName(p).Equals("_._", StringComparison.Ordinal))
+            .Select(p => p!.Replace('\\', '/'))
+            .ToList();
     }
 
     /// <summary>
-    ///     Parses NuGet version range notation to extract the minimum version.
-    ///     "[4.13.1, )" → "4.13.1", "[1.0.0]" → "1.0.0"
+    /// BFS from the directly-declared dependencies (depth 0) across the dependency edges.
     /// </summary>
-    private static string? ParseVersionRange(string? versionRange)
+    private static Dictionary<string, int> ComputeDepths(
+        IEnumerable<string> roots,
+        Dictionary<string, ResolvedPackage> nodes,
+        Dictionary<string, List<string>> edges)
     {
-        if (string.IsNullOrEmpty(versionRange))
-            return null;
-
-        var trimmed = versionRange.TrimStart('[', '(');
-        var commaIdx = trimmed.IndexOf(',');
-        if (commaIdx >= 0)
-            trimmed = trimmed[..commaIdx];
-        trimmed = trimmed.TrimEnd(']', ')').Trim();
-        return trimmed.Length > 0 ? trimmed : null;
-    }
-
-    private static Dictionary<string, IList<ResolvedPackage>> ReadResolvedPackages(JsonElement root)
-    {
-        var result = new Dictionary<string, IList<ResolvedPackage>>();
-
-        if (!root.TryGetProperty("targets", out var targets))
-            return result;
-
-        // Build a set of project-type libraries to exclude from resolved packages
-        var projectLibraries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (root.TryGetProperty("libraries", out var libraries))
-            foreach (var lib in libraries.EnumerateObject())
-                if (lib.Value.TryGetProperty("type", out var typeProp) &&
-                    typeProp.GetString() == "project")
-                    projectLibraries.Add(lib.Name);
-
-        foreach (var target in targets.EnumerateObject())
+        var depths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var queue = new Queue<(string Name, int Depth)>();
+        foreach (var root in roots)
         {
-            var normalizedTfm = NormalizeTfm(target.Name);
-            var packages = new List<ResolvedPackage>();
-
-            foreach (var pkg in target.Value.EnumerateObject())
-            {
-                // Skip project references in the targets list
-                if (projectLibraries.Contains(pkg.Name))
-                    continue;
-
-                var parts = pkg.Name.Split('/');
-                if (parts.Length == 2)
-                {
-                    var deps = new List<ResolvedPackage>();
-                    if (pkg.Value.TryGetProperty("dependencies", out var depsElement))
-                        foreach (var dep in depsElement.EnumerateObject())
-                            deps.Add(new ResolvedPackage(dep.Name, dep.Value.GetString() ?? ""));
-
-                    packages.Add(new ResolvedPackage(parts[0], parts[1], deps));
-                }
-            }
-
-            result[normalizedTfm] = packages;
+            if (nodes.ContainsKey(root) && depths.TryAdd(root, 0))
+                queue.Enqueue((root, 0));
         }
 
-        return result;
-    }
-
-    private static List<ProjectReference> ReadProjectReferences(JsonElement root, string projectDir)
-    {
-        var projectRefs = new List<ProjectReference>();
-
-        if (!root.TryGetProperty("libraries", out var libraries))
-            return projectRefs;
-
-        foreach (var lib in libraries.EnumerateObject())
+        while (queue.Count > 0)
         {
-            if (!lib.Value.TryGetProperty("type", out var typeProp) ||
-                typeProp.GetString() != "project")
+            var (name, depth) = queue.Dequeue();
+            if (!edges.TryGetValue(name, out var deps))
                 continue;
-
-            // msbuildProject contains the relative path from the assets.json location
-            if (lib.Value.TryGetProperty("msbuildProject", out var msbuildProjectProp))
+            foreach (var dep in deps)
             {
-                var relativePath = msbuildProjectProp.GetString();
-                if (relativePath != null)
-                {
-                    // msbuildProject path is relative to the project directory
-                    // Normalize it to a clean relative path
-                    var absolutePath = Path.GetFullPath(Path.Combine(projectDir, relativePath));
-                    var normalizedRelative = Path.GetRelativePath(projectDir, absolutePath);
-                    projectRefs.Add(new ProjectReference(normalizedRelative));
-                }
+                if (nodes.ContainsKey(dep) && depths.TryAdd(dep, depth + 1))
+                    queue.Enqueue((dep, depth + 1));
             }
         }
 
-        return projectRefs;
+        return depths;
     }
 
-    private static string NormalizeTfm(string tfm)
+    private static string ShortTfm(global::NuGet.Frameworks.NuGetFramework? framework, string? alias)
     {
-        if (tfm.StartsWith(".NETCoreApp,Version=v"))
+        if (!string.IsNullOrEmpty(alias))
+            return alias;
+        if (framework == null)
+            return "";
+        try
         {
-            var version = tfm[".NETCoreApp,Version=v".Length..];
-            // .NET Core 1.x/2.x/3.x ship as "netcoreappN.M" in project.frameworks;
-            // .NET 5+ unified to "netN.M". Match the short-form on each side so
-            // declared deps cross-reference the resolved target correctly.
-            if (version.Length > 0 && (version[0] is '1' or '2' or '3'))
-                return "netcoreapp" + version;
-            return "net" + version;
+            return framework.GetShortFolderName();
         }
-
-        if (tfm.StartsWith(".NETStandard,Version=v"))
+        catch
         {
-            var version = tfm[".NETStandard,Version=v".Length..];
-            return "netstandard" + version;
+            return framework.ToString();
         }
-
-        if (tfm.StartsWith(".NETFramework,Version=v"))
-        {
-            var version = tfm[".NETFramework,Version=v".Length..].Replace(".", "");
-            return "net" + version;
-        }
-
-        return tfm;
     }
 
     /// <summary>
@@ -436,10 +497,9 @@ public static class MSBuildProjectHelper
     ///     Regenerates the MSBuildProject marker on a .csproj document after mutation.
     ///     1. Writes all captured build files from DotNetBuildContext to a temp directory
     ///     2. Writes the modified .csproj (overwriting the scanned version if present)
-    ///     3. Runs `dotnet restore` to resolve dependencies
-    ///     4. Reads back project.assets.json
-    ///     5. Rebuilds the MSBuildProject marker from updated XML + fresh assets
-    ///     6. Replaces the old marker on the document
+    ///     3. Runs the in-process NuGet restore to resolve dependencies
+    ///     4. Rebuilds the MSBuildProject marker from updated XML + the in-memory LockFile
+    ///     5. Replaces the old marker on the document
     /// </summary>
     public static Document RegenerateAndRefreshMarker(Document updated, ExecutionContext ctx)
     {
@@ -467,16 +527,7 @@ public static class MSBuildProjectHelper
                 Directory.CreateDirectory(csprojDir);
             File.WriteAllText(csprojPath, content);
 
-            // Run dotnet restore
-            var restoreResult = RunDotnetRestore(csprojPath);
-            if (!restoreResult.Success)
-            {
-                Log.Debug("MSBuildProjectHelper: dotnet restore failed for {Path}: {Error}",
-                    updated.SourcePath, restoreResult.Error);
-                return RefreshMarkerFromXmlOnly(updated, existingMarker);
-            }
-
-            // Rebuild marker from XML + project.assets.json
+            // In-process restore + marker rebuild from the in-memory lock file
             var newMarker = CreateMarker(updated, tempDir);
             if (newMarker != null)
             {
@@ -524,7 +575,7 @@ public static class MSBuildProjectHelper
             if (document.Markers.FindFirst<MSBuildProject>() == null)
                 return document;
             // Gate on the stale flag so files no mutating recipe touched don't
-            // trigger dotnet restore. Consuming clears the flag so a second
+            // trigger a restore. Consuming clears the flag so a second
             // reattestation pass (e.g., immediate + trailing
             // EnsureCsprojAttestation) doesn't run restore twice.
             if (!TryConsumeStaleAttestation(ctx, document.SourcePath))
@@ -546,140 +597,75 @@ public static class MSBuildProjectHelper
         return updated;
     }
 
-    private record RestoreResult(bool Success, string? Error);
-
-    private static RestoreResult RunDotnetRestore(string csprojPath)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("dotnet")
-            {
-                WorkingDirectory = Path.GetDirectoryName(csprojPath) ?? ".",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("restore");
-            psi.ArgumentList.Add(csprojPath);
-            psi.ArgumentList.Add("/p:NuGetAudit=false");
-            psi.ArgumentList.Add("/p:RestoreIgnoreFailedSources=true");
-            psi.ArgumentList.Add("--ignore-failed-sources");
-            psi.Environment["NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT"] = "1";
-            psi.Environment["NUGET_ENHANCED_NETWORK_RETRY_DELAY_MILLISECONDS"] = "100";
-
-            using var process = Process.Start(psi);
-            if (process == null)
-                return new RestoreResult(false, "Failed to start dotnet restore");
-
-            var stderrTask = process.StandardError.ReadToEndAsync();
-            var stdout = process.StandardOutput.ReadToEnd();
-            var stderr = stderrTask.GetAwaiter().GetResult();
-            process.WaitForExit((int)RestoreTimeout.TotalMilliseconds);
-
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(true);
-                }
-                catch
-                {
-                }
-
-                return new RestoreResult(false, "dotnet restore timed out");
-            }
-
-            return process.ExitCode == 0
-                ? new RestoreResult(true, null)
-                : new RestoreResult(false, $"Exit code {process.ExitCode}: {stderr}");
-        }
-        catch (Exception ex)
-        {
-            return new RestoreResult(false, ex.Message);
-        }
-    }
-
     #endregion
 
     #region Direct version resolution
 
     /// <summary>
-    ///     Returns the resolved concrete version of a direct package dependency from
-    ///     <c>obj/project.assets.json</c>. Used by callers (such as the InstallRecipes
-    ///     RPC handler) that need the concrete SemVer that NuGet selected after a
-    ///     restore, rather than the version constraint authored in the csproj —
+    ///     Returns the resolved concrete version of a direct package dependency by running the
+    ///     in-process restore for the project in <paramref name="projectDir"/>. Used by callers
+    ///     (such as the InstallRecipes RPC handler) that need the concrete SemVer that NuGet
+    ///     selected, rather than the version constraint authored in the csproj —
     ///     <c>dotnet add package &lt;pkg&gt; --version *</c> preserves the wildcard
-    ///     verbatim in the csproj, so the resolved version must be read from the
-    ///     NuGet restore output.
+    ///     verbatim in the csproj, so the resolved version must come from restore output.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when <c>obj/project.assets.json</c> is missing (restore did not
-    ///     complete), when the package is not a direct dependency under any TFM, or
-    ///     when no matching resolved entry exists in the assets file's libraries.
+    ///     Thrown when the restore produced no lock file, when the package is not a direct
+    ///     dependency under any TFM, or when no matching resolved entry exists.
     /// </exception>
     public static string GetResolvedPackageVersion(string projectDir, string packageName)
     {
-        var assetsPath = Path.Combine(projectDir, "obj", "project.assets.json");
-        if (!File.Exists(assetsPath))
+        var projectPath = Directory.EnumerateFiles(projectDir, "*.csproj").FirstOrDefault()
+                          ?? throw new InvalidOperationException($"No .csproj found in {projectDir}");
+
+        var lockFile = NuGetResolver
+            .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        if (lockFile == null)
         {
             throw new InvalidOperationException(
-                $"project.assets.json not found at {assetsPath}; restore did not complete");
+                $"Restore produced no lock file for {projectPath}; restore did not complete");
         }
 
-        using var doc = JsonDocument.Parse(File.ReadAllText(assetsPath));
-        var root = doc.RootElement;
+        return GetResolvedPackageVersion(lockFile, packageName, projectPath);
+    }
 
-        if (!IsDirectDependency(root, packageName))
+    /// <summary>
+    ///     Lock-file-level lookup behind <see cref="GetResolvedPackageVersion(string,string)"/>,
+    ///     usable directly when the restore result is already in hand.
+    /// </summary>
+    public static string GetResolvedPackageVersion(LockFile lockFile, string packageName,
+        string projectDescription = "project")
+    {
+        if (!IsDirectDependency(lockFile, packageName))
         {
             throw new InvalidOperationException(
-                $"{packageName} is not a direct dependency in {assetsPath}");
+                $"{packageName} is not a direct dependency of {projectDescription}");
         }
 
-        // Read from targets — NuGet's per-TFM resolution map — rather than libraries,
-        // which is a flat package graph including PackageDownload assets that don't
-        // resolve to a single version. Matches what ReadResolvedPackages does above.
-        if (root.TryGetProperty("targets", out var targets))
+        foreach (var target in lockFile.Targets)
+        foreach (var library in target.Libraries)
         {
-            foreach (var tfm in targets.EnumerateObject())
-            foreach (var entry in tfm.Value.EnumerateObject())
+            if (string.Equals(library.Type, "package", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(library.Name, packageName, StringComparison.OrdinalIgnoreCase) &&
+                library.Version != null)
             {
-                if (!entry.Value.TryGetProperty("type", out var typeProp) ||
-                    typeProp.GetString() != "package")
-                    continue;
-
-                var slash = entry.Name.IndexOf('/');
-                if (slash > 0 &&
-                    string.Equals(entry.Name[..slash], packageName, StringComparison.OrdinalIgnoreCase))
-                {
-                    var version = entry.Name[(slash + 1)..];
-                    if (!string.IsNullOrEmpty(version))
-                        return version;
-                }
+                return library.Version.ToNormalizedString();
             }
         }
 
         throw new InvalidOperationException(
-            $"Could not find resolved version for {packageName} in {assetsPath}");
+            $"Could not find resolved version for {packageName} in restore result of {projectDescription}");
     }
 
-    private static bool IsDirectDependency(JsonElement root, string packageName)
+    private static bool IsDirectDependency(LockFile lockFile, string packageName)
     {
-        if (!root.TryGetProperty("project", out var project) ||
-            !project.TryGetProperty("frameworks", out var frameworks))
+        var spec = lockFile.PackageSpec;
+        if (spec == null)
             return false;
 
-        foreach (var fw in frameworks.EnumerateObject())
-        {
-            if (!fw.Value.TryGetProperty("dependencies", out var deps))
-                continue;
-
-            foreach (var dep in deps.EnumerateObject())
-                if (string.Equals(dep.Name, packageName, StringComparison.OrdinalIgnoreCase))
-                    return true;
-        }
-
-        return false;
+        return spec.TargetFrameworks.Any(tfi =>
+            tfi.Dependencies.Any(d => string.Equals(d.Name, packageName, StringComparison.OrdinalIgnoreCase)));
     }
 
     #endregion

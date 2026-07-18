@@ -28,4 +28,12 @@
     <ProjectReference Include="$(OpenRewriteSdkSourcePath)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Keep MSBuild assemblies out of the output so MSBuildLocator can load the SDK's copies
+         for in-process restore-graph evaluation (NuGetResolver). A stale app-base copy of
+         Microsoft.Build.Framework causes MissingMethodException at MSBuild load time. -->
+    <PackageReference Include="Microsoft.Build" Version="18.8.2" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.8.2" ExcludeAssets="runtime" />
+  </ItemGroup>
+
 </Project>
