@@ -312,8 +312,9 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void markerRefreshedAndFailureSurfacedWhenAdditionNeedsResolution() {
-        // The native uv engine cannot add a package without delta resolution; the edit
-        // still lands, the marker reflects it, and the failure is surfaced on both files.
+        // Resolving into a lock restricted to a subset of environments ([tool.uv] environments,
+        // recorded as supported-markers) needs marker-space resolution the native engine defers;
+        // the edit still lands, the marker reflects it, and the failure is surfaced on both files.
         rewriteRun(
           spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
           pyproject(
@@ -348,13 +349,19 @@ class AddDependencyTest implements RewriteTest {
               version = 1
               revision = 3
               requires-python = ">=3.12"
+              resolution-markers = [
+                  "sys_platform == 'linux'",
+              ]
+              supported-markers = [
+                  "sys_platform == 'linux'",
+              ]
 
               [[package]]
               name = "myapp"
               version = "1.0.0"
               source = { virtual = "." }
               dependencies = [
-                  { name = "requests" },
+                  { name = "requests", marker = "sys_platform == 'linux'" },
               ]
 
               [package.metadata]
