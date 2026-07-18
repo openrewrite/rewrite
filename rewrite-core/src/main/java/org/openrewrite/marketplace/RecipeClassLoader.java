@@ -92,6 +92,8 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.ParseErrorVisitor",
             "org.openrewrite.PrintOutputCapture",
             "org.openrewrite.ipc.http.HttpSender",
+            "org.openrewrite.golang.GoModVisitor",
+            "org.openrewrite.golang.GoSumVisitor",
             "org.openrewrite.gradle.attributes.Category",
             "org.openrewrite.gradle.attributes.ProjectAttribute",
             "org.openrewrite.java.JavadocVisitor",
