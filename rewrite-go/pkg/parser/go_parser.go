@@ -1927,9 +1927,20 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 func decodeBasicLitValue(lit *ast.BasicLit) any {
 	switch lit.Kind {
-	case token.STRING, token.CHAR:
+	case token.STRING:
 		if unquoted, err := strconv.Unquote(lit.Value); err == nil {
 			return unquoted
+		}
+	case token.CHAR:
+		// A Go rune literal ('x') is an integer constant equal to its Unicode
+		// code point, and go/types resolves it to byte or int as readily as
+		// rune. Store the numeric code point, never the character string: the
+		// JVM LST deserializer is type-directed and coerces an integer-typed
+		// J.Literal via <Type>.valueOf(value.toString())
+		if unquoted, err := strconv.Unquote(lit.Value); err == nil {
+			if rs := []rune(unquoted); len(rs) == 1 {
+				return int64(rs[0])
+			}
 		}
 	case token.INT:
 		if i, err := strconv.ParseInt(lit.Value, 0, 64); err == nil {
