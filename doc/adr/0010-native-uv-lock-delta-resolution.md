@@ -156,8 +156,21 @@ marker-space resolution, by drawing the line at fork *structure changes*:
 
 This keeps the accuracy contract intact — the engine never invents a fork it did not resolve
 — while covering the common case where a newly pulled transitive has one universal version.
-Native `requires-python` bumps on forked locks (`applyPythonBump`'s current blanket bail)
-remain a separate effort; they are not a delta-resolution problem.
+
+### `requires-python` bumps that collapse a fork
+
+Raising the `requires-python` floor past every fork boundary — the common "drop the oldest
+Python" bump — is a *mechanical* transformation of the existing lock, not a re-resolution: uv
+minimizes forks, so once only one environment survives the higher floor, each fork-duplicated
+package keeps exactly the version already locked for that environment. `applyPythonBump` now
+supports this on forked locks. It confirms the top-level `resolution-markers` collapse to a
+single always-true branch (every other branch is always-false under the new range), then drops
+the eliminated fork entries, strips the surviving entry's `resolution-markers`, reverts its
+now-redundant fork-disambiguated edges (dropping `version` / `source`), filters wheels, prunes
+edges whose Python markers no longer fire, and sweeps newly-unreachable transitives. It fails
+loud when the bump leaves *more than one* branch (the lock stays forked — marker-space
+resolution) or when the lock is environment-restricted. Verified byte-identical to real uv
+(`soupsieve` 2.7/2.8.4 collapse; `importlib-resources` three-way collapse dropping `zipp`).
 
 ### Markered direct adds
 
@@ -247,5 +260,5 @@ fraction becomes resolved in-recipe instead of in CI.
   majority of cases, so the residual defer-to-CI cases must be genuinely residual — which is
   why T1 and T2 are both built and why the resolver must work inside forked locks. The
   remaining fail-loud surface (backtracking, new fork-duplications, workspace locks,
-  `requires-python` bumps on forked locks) is the explicit boundary of this ADR; each is a
-  named, separately-scoped follow-on rather than an open-ended gap.
+  `requires-python` bumps that leave the lock forked) is the explicit boundary of this ADR; each
+  is a named, separately-scoped follow-on rather than an open-ended gap.

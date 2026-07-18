@@ -166,6 +166,40 @@ class UvLockEngineTest {
         assertThat(http.requests).containsExactly("https://pypi.org/simple/attrs/");
     }
 
+    /**
+     * A bump lifting the floor past a fork boundary collapses the lock to one environment: the
+     * eliminated branch (soupsieve 2.7 for python &lt; 3.9) drops, the survivor (2.8.4) loses its
+     * resolution-markers, the root's two fork-disambiguated edges revert to one plain edge, and the
+     * top-level resolution-markers are removed -- byte-identical to real uv.
+     */
+    @Test
+    void requiresPythonBumpCollapsingForkMatchesRealUvByteForByte() {
+        http.route("https://pypi.org/simple/soupsieve/", resource("http/soupsieve-listing-json"));
+        Result result = UvLockEngine.regenerate(
+          resource("h4-fork-collapse/pyproject.toml"),
+          resource("h4-fork-collapse/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("h4-fork-collapse/uv.lock.after"));
+        assertThat(http.requests).containsExactly("https://pypi.org/simple/soupsieve/");
+    }
+
+    /**
+     * A bump that lifts the floor but still leaves more than one fork branch keeps the lock forked
+     * (importlib-resources stays split at 3.10 after &gt;=3.8 -&gt; &gt;=3.9); collapsing it needs
+     * marker-space resolution, so the engine fails loud before any network fetch.
+     */
+    @Test
+    void requiresPythonBumpLeavingForkRequiresResolution() {
+        Result result = UvLockEngine.regenerate(
+          resource("h5-fork-partial/pyproject.toml"),
+          resource("h5-fork-partial/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(http.requests).isEmpty();
+    }
+
     @Test
     void constraintRelaxationKeepsLockedVersion() {
         // i2 scenario: ==1.16.0 -> >=1.16 keeps 1.16.0, only the requires-dist line changes

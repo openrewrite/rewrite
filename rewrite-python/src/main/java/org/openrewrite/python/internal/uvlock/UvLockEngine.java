@@ -221,6 +221,9 @@ public final class UvLockEngine {
         private int rootIndex;
         private UvLockMetadata oldMetadata;
         private PyRange range;
+        // set when a requires-python bump collapsed a forked lock to a single environment, so the
+        // top-level resolution-markers are dropped
+        private boolean collapsedForks;
         // greedy-forward cascade state (ADR 0010 T1): packages a moved requirement forces to move,
         // and a metadata cache so gathering a target's constraints re-reads each dependent once
         private final Deque<String> cascadeQueue = new ArrayDeque<>();
@@ -302,6 +305,9 @@ public final class UvLockEngine {
             boolean structural = false;
             if (pythonChanged && lowerBoundIncreased()) {
                 applyPythonBump();
+                if (collapsedForks) {
+                    updated = updated.withResolutionMarkers(null);
+                }
                 structural = true;
             }
             Set<String> rewritten = new HashSet<>();
@@ -602,42 +608,97 @@ public final class UvLockEngine {
         /**
          * Empirical bump behavior (BEHAVIOR.md §3): filter wheel arrays down by the new
          * lower bound, prune edges whose markers can no longer fire, and drop always-true
-         * marker clauses; declared metadata stays untouched.
+         * marker clauses; declared metadata stays untouched. On a forked lock, only a bump
+         * that lifts the floor past every fork boundary -- collapsing it to one environment --
+         * is supported: the eliminated fork branches drop, the surviving entry loses its
+         * resolution-markers, and its edges revert from fork-disambiguated to plain.
          */
         private void applyPythonBump() {
             if (lock.getResolutionMarkers() != null) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "requires-python changes on a forked lock are not supported by the native engine");
+                if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "requires-python changes on a lock with restricted environments are not supported");
+                }
+                if (!collapsesToSingleEnvironment()) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "requires-python changes that leave the lock forked are not supported by the native engine");
+                }
+                collapsedForks = true;
             }
-            for (int i = 0; i < packages.size(); i++) {
-                UvLockPackage pkg = packages.get(i);
-                if (pkg.getResolutionMarkers() != null || isDuplicated(pkg.getName())) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
-                            "requires-python changes on a forked lock are not supported by the native engine");
+            List<UvLockPackage> kept = new ArrayList<>();
+            for (UvLockPackage pkg : packages) {
+                if (pkg.getResolutionMarkers() != null && allBranchesEliminated(pkg.getResolutionMarkers())) {
+                    continue; // this fork branch's Python range is gone under the higher floor
                 }
                 UvLockPackage.UvLockPackageBuilder builder = pkg.toBuilder();
+                if (pkg.getResolutionMarkers() != null) {
+                    builder.resolutionMarkers(null); // collapsed to a single environment
+                }
                 // url/git-pinned artifacts are chosen explicitly, not by Python tag; never filter them
                 if (pkg.getSource().getType() == UvLockSource.Type.REGISTRY && pkg.getWheels() != null) {
-                    List<UvLockArtifact> kept = new ArrayList<>();
+                    List<UvLockArtifact> keptWheels = new ArrayList<>();
                     for (UvLockArtifact wheel : pkg.getWheels()) {
                         String filename = wheelFilename(wheel);
                         if (filename == null || wheelAdmittedByLowerBound(filename)) {
-                            kept.add(wheel);
+                            keptWheels.add(wheel);
                         }
                     }
-                    if (kept.isEmpty() && pkg.getSdist() == null) {
+                    if (keptWheels.isEmpty() && pkg.getSdist() == null) {
                         throw new EngineFailure(new Failure(Reason.PIN_EXCLUDED_BY_PYTHON, pkg.getName(), null,
                                 pkg.getName() + "==" + pkg.getVersion() + " has no sdist and no wheel compatible " +
                                         "with requires-python " + range.describe() +
                                         "; no installable distribution would remain"));
                     }
-                    builder.wheels(kept.isEmpty() ? null : kept);
+                    builder.wheels(keptWheels.isEmpty() ? null : keptWheels);
                 }
                 builder.dependencies(pruneEdges(pkg.getName(), pkg.getDependencies()));
                 builder.optionalDependencies(pruneEdgeGroups(pkg.getName(), pkg.getOptionalDependencies()));
                 builder.devDependencies(pruneEdgeGroups(pkg.getName(), pkg.getDevDependencies()));
-                packages.set(i, builder.build());
+                kept.add(builder.build());
             }
+            packages = kept;
+            rootIndex = findRoot();
+        }
+
+        /**
+         * A forked lock collapses to a single environment when, under the new range, exactly one
+         * top-level resolution-marker branch is always true and every other is always false. A branch
+         * that still straddles the range (or one this engine cannot evaluate) means the lock stays
+         * forked, which is out of scope.
+         */
+        private boolean collapsesToSingleEnvironment() {
+            int survivors = 0;
+            for (String marker : lock.getResolutionMarkers()) {
+                Boolean truth = branchTruth(marker);
+                if (Boolean.TRUE.equals(truth)) {
+                    survivors++;
+                } else if (truth == null) {
+                    return false;
+                }
+            }
+            return survivors == 1;
+        }
+
+        private boolean allBranchesEliminated(List<String> markers) {
+            for (String marker : markers) {
+                if (!Boolean.FALSE.equals(branchTruth(marker))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** True/false when a resolution-marker branch is always/never in the new range; null when it straddles. */
+        private @Nullable Boolean branchTruth(String marker) {
+            List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(marker);
+            if (clauses == null) {
+                return null;
+            }
+            String simplified = UvLockMarkers.simplifyClauses(range, clauses);
+            if (UvLockMarkers.DROP_EDGE.equals(simplified)) {
+                return Boolean.FALSE;
+            }
+            return simplified == null ? Boolean.TRUE : null;
         }
 
         private @Nullable Map<String, List<UvLockDependency>> pruneEdgeGroups(
@@ -662,7 +723,7 @@ public final class UvLockEngine {
             List<UvLockDependency> kept = new ArrayList<>();
             for (UvLockDependency edge : edges) {
                 if (edge.getMarker() == null) {
-                    kept.add(edge);
+                    kept.add(deforked(edge));
                     continue;
                 }
                 List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(edge.getMarker());
@@ -675,9 +736,21 @@ public final class UvLockEngine {
                 if (UvLockMarkers.DROP_EDGE.equals(simplified)) {
                     continue;
                 }
-                kept.add(Objects.equals(simplified, edge.getMarker()) ? edge : edge.withMarker(simplified));
+                kept.add(Objects.equals(simplified, edge.getMarker()) && !collapsedForks ? edge :
+                        new UvLockDependency(edge.getName(), null, null, edge.getExtra(), simplified));
             }
             return kept.isEmpty() ? null : kept;
+        }
+
+        /**
+         * A collapsed fork de-duplicates every package, so an edge that carried a {@code version}
+         * / {@code source} to disambiguate fork copies reverts to the plain form.
+         */
+        private UvLockDependency deforked(UvLockDependency edge) {
+            if (!collapsedForks || (edge.getVersion() == null && edge.getSource() == null)) {
+                return edge;
+            }
+            return new UvLockDependency(edge.getName(), null, null, edge.getExtra(), edge.getMarker());
         }
 
         /**
@@ -1575,16 +1648,6 @@ public final class UvLockEngine {
                 lists.addAll(pkg.getDevDependencies().values());
             }
             return lists;
-        }
-
-        private boolean isDuplicated(String name) {
-            int count = 0;
-            for (UvLockPackage pkg : packages) {
-                if (pkg.getName().equals(name)) {
-                    count++;
-                }
-            }
-            return count > 1;
         }
 
         // ---- python-bump pin validation ----
