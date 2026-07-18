@@ -45,7 +45,6 @@ import org.openrewrite.python.internal.pep508.Marker;
 import org.openrewrite.python.internal.pep508.Pep508Requirement;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -100,7 +99,7 @@ public final class UvLockEngine {
      * Visible for tests: truth of a simple marker clause over a requires-python interval.
      */
     static @Nullable Boolean clauseTruth(String requiresPython, String var, String op, String value) {
-        return Run.clauseTruth(Run.parseRange(requiresPython), var, op, value);
+        return UvLockMarkers.clauseTruth(PyRange.parse(requiresPython), var, op, value);
     }
 
     public static Result regenerate(String pyprojectContent, @Nullable String oldLockContent, ExecutionContext ctx) {
@@ -171,23 +170,6 @@ public final class UvLockEngine {
      * A declared dependency from the edited pyproject, tagged with the metadata section
      * it records into: requires-dist (optionally under an extra) or a dev group.
      */
-    private static final class Declared {
-        final String canonicalName;
-        final Pep508Requirement requirement;
-        final @Nullable String rawMarker;
-        final @Nullable String extraGroup;
-        final @Nullable String devGroup;
-
-        Declared(Pep508Requirement requirement, @Nullable String rawMarker,
-                 @Nullable String extraGroup, @Nullable String devGroup) {
-            this.canonicalName = requirement.getCanonicalName();
-            this.requirement = requirement;
-            this.rawMarker = rawMarker;
-            this.extraGroup = extraGroup;
-            this.devGroup = devGroup;
-        }
-    }
-
     private static final class Change {
         final String canonicalName;
         final List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
@@ -211,36 +193,21 @@ public final class UvLockEngine {
         }
     }
 
-    /**
-     * The lock's requires-python interval; upper is null when unbounded.
-     */
-    private static final class PyRange {
-        @Nullable PythonVersion lower;
-        boolean lowerExclusive;
-        @Nullable PythonVersion upper;
-        boolean upperInclusive;
-    }
+    /** A directly-declared dependency the manifest adds; gets a new [[package]] entry and a root edge. */
+    private static final class Addition {
+        final String canonicalName;
+        final @Nullable String devGroup;
+        /** uv's recorded marker form for the root edge, or null for an unconditional add. */
+        final @Nullable String marker;
 
-    private static final class EngineFailure extends RuntimeException {
-        final Failure failure;
-
-        EngineFailure(Failure failure) {
-            super(failure.getDetail());
-            this.failure = failure;
-        }
-
-        EngineFailure(Reason reason, @Nullable String packageName, String detail) {
-            this(new Failure(reason, packageName, null, detail));
+        Addition(String canonicalName, @Nullable String devGroup, @Nullable String marker) {
+            this.canonicalName = canonicalName;
+            this.devGroup = devGroup;
+            this.marker = marker;
         }
     }
 
     private static final class Run {
-        private static final Pattern SIMPLE_CLAUSE = Pattern.compile(
-                "\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(===|==|!=|<=|>=|<|>|~=|not\\s+in|in)\\s*(['\"])([^'\"]*)\\3\\s*");
-        private static final Pattern EXTRA_CLAUSE = Pattern.compile("extra == '([^']+)'");
-        private static final Set<String> VERSION_VARS = new HashSet<>(Arrays.asList(
-                "python_version", "python_full_version"));
-
         private final Toml.Document pyproject;
         private final UvLock lock;
         private final HttpSender http;
@@ -254,6 +221,19 @@ public final class UvLockEngine {
         private int rootIndex;
         private UvLockMetadata oldMetadata;
         private PyRange range;
+        // greedy-forward cascade state (ADR 0010 T1): packages a moved requirement forces to move,
+        // and a metadata cache so gathering a target's constraints re-reads each dependent once
+        private final Deque<String> cascadeQueue = new ArrayDeque<>();
+        private final Map<String, CoreMetadata> metadataCache = new HashMap<>();
+        // T2 add state: directly-declared additions from the manifest, and transitive packages
+        // their closures pull in (not yet in the lock)
+        private final List<Addition> additions = new ArrayList<>();
+        private final Deque<String> additionQueue = new ArrayDeque<>();
+        // packages resolved under a markered direct add: the whole closure inherits the root
+        // marker, so a marker-gated transitive edge would need root/edge marker intersection
+        // (fail loud). Unconditional transitive edges keep the closure identical to an
+        // unmarkered add, which is byte-identical to uv (verified: python-dateutil -> six).
+        private final Set<String> markeredAddClosure = new HashSet<>();
 
         Run(Toml.Document pyproject, UvLock lock, ExecutionContext ctx) {
             this.pyproject = pyproject;
@@ -263,7 +243,7 @@ public final class UvLockEngine {
             this.flatClient = new FlatIndexClient(http);
             this.indexes = UvIndexDiscovery.discover(ctx, pyproject, null, Environment.SYSTEM);
             this.indexPins = UvIndexDiscovery.sourceIndexPins(pyproject);
-            this.nonRegistrySources = readNonRegistrySources();
+            this.nonRegistrySources = UvLockMetadataBuilder.readNonRegistrySources(pyproject);
         }
 
         Result regenerate() {
@@ -285,29 +265,27 @@ public final class UvLockEngine {
             oldMetadata = root.getMetadata() != null ? root.getMetadata() :
                     UvLockMetadata.builder().build();
 
-            Toml.Table project = findTable("project");
+            Toml.Table project = UvLockToml.findTable(pyproject, "project");
             if (project == null) {
                 throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
                         "pyproject.toml has no [project] table");
             }
-            String projectName = literalString(project, "name");
+            String projectName = UvLockToml.literalString(project, "name");
             if (projectName == null ||
                     !Pep508Requirement.canonicalize(projectName).equals(Pep508Requirement.canonicalize(root.getName()))) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, projectName,
                         "The [project] name does not match the lock's root package " + root.getName());
             }
 
-            String newRequiresPython = normalizeRequiresPython(literalString(project, "requires-python"));
+            String newRequiresPython = normalizeRequiresPython(UvLockToml.literalString(project, "requires-python"));
             boolean pythonChanged = !newRequiresPython.equals(lock.getRequiresPython());
-            range = parseRange(newRequiresPython);
+            range = PyRange.parse(newRequiresPython);
             if (pythonChanged) {
-                checkPythonBounds(parseRange(lock.getRequiresPython() != null ? lock.getRequiresPython() : ""));
+                checkPythonBounds(PyRange.parse(lock.getRequiresPython() != null ? lock.getRequiresPython() : ""));
             }
 
-            List<Declared> declared = readDeclarations(project);
-            List<String> providesExtras = readProvidesExtras();
-
-            UvLockMetadata newMetadata = buildMetadata(declared, providesExtras);
+            UvLockMetadata newMetadata = new UvLockMetadataBuilder(
+                    pyproject, oldMetadata, indexes, indexPins, nonRegistrySources).build(project);
             boolean metadataEmpty = newMetadata.getRequiresDist() == null &&
                     newMetadata.getProvidesExtras() == null && newMetadata.getRequiresDev() == null;
             packages.set(rootIndex, root.toBuilder()
@@ -327,9 +305,44 @@ public final class UvLockEngine {
                 structural = true;
             }
             Set<String> rewritten = new HashSet<>();
+            Set<String> resolved = new HashSet<>();
             for (Change change : changes) {
+                resolved.add(change.canonicalName);
                 if (applyChange(change)) {
                     rewritten.add(change.canonicalName);
+                    structural = true;
+                }
+            }
+            for (Addition addition : additions) {
+                resolved.add(addition.canonicalName);
+                resolveAddition(addition.canonicalName, addition);
+                rewritten.add(addition.canonicalName);
+                structural = true;
+            }
+            // drain cascades and transitive additions the closures pull in (ADR 0010 T1+T2)
+            while (!cascadeQueue.isEmpty() || !additionQueue.isEmpty()) {
+                if (!cascadeQueue.isEmpty()) {
+                    String target = cascadeQueue.poll();
+                    if (!resolved.add(target)) {
+                        verifyCascadeSatisfied(target);
+                        continue;
+                    }
+                    Change cascade = new Change(target);
+                    cascade.constraints.addAll(gatherConstraints(target));
+                    List<String> pins = indexPins.get(target);
+                    cascade.pinnedIndexName = pins != null ? pins.get(0) : null;
+                    if (applyChange(cascade)) {
+                        rewritten.add(target);
+                        structural = true;
+                    }
+                } else {
+                    String target = additionQueue.poll();
+                    if (!resolved.add(target)) {
+                        verifyCascadeSatisfied(target);
+                        continue;
+                    }
+                    resolveAddition(target, null);
+                    rewritten.add(target);
                     structural = true;
                 }
             }
@@ -370,7 +383,7 @@ public final class UvLockEngine {
         }
 
         private String projectVersion(Toml.Table project, String oldVersion) {
-            String version = literalString(project, "version");
+            String version = UvLockToml.literalString(project, "version");
             if (version == null) {
                 return oldVersion;
             }
@@ -380,341 +393,6 @@ public final class UvLockEngine {
                         "The [project] version is not a valid PEP 440 version: " + version);
             }
             return parsed.toString();
-        }
-
-        private List<Declared> readDeclarations(Toml.Table project) {
-            List<Declared> declared = new ArrayList<>();
-            for (String spec : stringArray(project, "dependencies")) {
-                declared.add(toDeclared(spec, null, null));
-            }
-            Toml.Table optional = findTable("project.optional-dependencies");
-            if (optional != null) {
-                for (Toml value : optional.getValues()) {
-                    if (!(value instanceof Toml.KeyValue)) {
-                        continue;
-                    }
-                    Toml.KeyValue kv = (Toml.KeyValue) value;
-                    String extra = keyName(kv);
-                    if (extra == null || !(kv.getValue() instanceof Toml.Array)) {
-                        throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
-                                "Unreadable [project.optional-dependencies] entry");
-                    }
-                    for (String spec : stringArrayValues((Toml.Array) kv.getValue(), "optional-dependencies")) {
-                        declared.add(toDeclared(spec, Pep508Requirement.canonicalize(extra), null));
-                    }
-                }
-            }
-            Toml.Table groups = findTable("dependency-groups");
-            if (groups != null) {
-                for (Toml value : groups.getValues()) {
-                    if (!(value instanceof Toml.KeyValue)) {
-                        continue;
-                    }
-                    Toml.KeyValue kv = (Toml.KeyValue) value;
-                    String group = keyName(kv);
-                    if (group == null || !(kv.getValue() instanceof Toml.Array)) {
-                        throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
-                                "Unreadable [dependency-groups] entry");
-                    }
-                    for (String spec : stringArrayValues((Toml.Array) kv.getValue(), "dependency-groups")) {
-                        declared.add(toDeclared(spec, null, group));
-                    }
-                }
-            }
-            return declared;
-        }
-
-        private Declared toDeclared(String spec, @Nullable String extraGroup, @Nullable String devGroup) {
-            Pep508Requirement requirement = Pep508Requirement.parse(spec);
-            if (requirement == null) {
-                throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
-                        "Unparseable dependency declaration: " + spec);
-            }
-            if (requirement.getUrl() != null) {
-                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, requirement.getCanonicalName(),
-                        "Direct URL dependencies are not supported by the native engine: " + spec);
-            }
-            int semi = spec.indexOf(';');
-            String rawMarker = requirement.getMarker() != null && semi >= 0 ?
-                    spec.substring(semi + 1).trim() : null;
-            return new Declared(requirement, rawMarker, extraGroup, devGroup);
-        }
-
-        private List<String> readProvidesExtras() {
-            Toml.Table optional = findTable("project.optional-dependencies");
-            if (optional == null) {
-                return emptyList();
-            }
-            List<String> extras = new ArrayList<>();
-            for (Toml value : optional.getValues()) {
-                if (value instanceof Toml.KeyValue) {
-                    String extra = keyName((Toml.KeyValue) value);
-                    if (extra != null) {
-                        extras.add(Pep508Requirement.canonicalize(extra));
-                    }
-                }
-            }
-            return extras;
-        }
-
-        /**
-         * Package names whose {@code [tool.uv.sources]} entry pins something other than a
-         * named index (git/path/workspace/editable).
-         */
-        private Set<String> readNonRegistrySources() {
-            Set<String> nonRegistry = new HashSet<>();
-            for (TomlValue value : pyproject.getValues()) {
-                if (!(value instanceof Toml.Table)) {
-                    continue;
-                }
-                Toml.Table table = (Toml.Table) value;
-                String name = tableName(table);
-                if ("tool.uv.sources".equals(name)) {
-                    for (Toml sourceValue : table.getValues()) {
-                        if (!(sourceValue instanceof Toml.KeyValue)) {
-                            continue;
-                        }
-                        Toml.KeyValue kv = (Toml.KeyValue) sourceValue;
-                        String pkg = keyName(kv);
-                        if (pkg != null && !hasIndexKey(kv.getValue())) {
-                            nonRegistry.add(Pep508Requirement.canonicalize(pkg));
-                        }
-                    }
-                } else if (name != null && name.startsWith("tool.uv.sources.")) {
-                    String pkg = name.substring("tool.uv.sources.".length());
-                    if (literalString(table, "index") == null) {
-                        nonRegistry.add(Pep508Requirement.canonicalize(unquote(pkg)));
-                    }
-                }
-            }
-            return nonRegistry;
-        }
-
-        private static boolean hasIndexKey(Toml value) {
-            if (value instanceof Toml.Table) {
-                return literalString((Toml.Table) value, "index") != null;
-            }
-            if (value instanceof Toml.Array) {
-                for (Toml element : ((Toml.Array) value).getValues()) {
-                    if (!(element instanceof Toml.Table) ||
-                            literalString((Toml.Table) element, "index") == null) {
-                        return false;
-                    }
-                }
-                return !((Toml.Array) value).getValues().isEmpty();
-            }
-            return false;
-        }
-
-        // ---- metadata rebuild ----
-
-        private UvLockMetadata buildMetadata(List<Declared> declared, List<String> providesExtras) {
-            List<UvLockRequirement> requiresDist = new ArrayList<>();
-            Map<String, List<UvLockRequirement>> requiresDev = new TreeMap<>();
-            for (Declared decl : declared) {
-                UvLockRequirement requirement = buildRequirement(decl);
-                if (decl.devGroup != null) {
-                    List<UvLockRequirement> group = requiresDev.computeIfAbsent(decl.devGroup,
-                            k -> new ArrayList<>());
-                    group.add(requirement);
-                } else {
-                    requiresDist.add(requirement);
-                }
-            }
-            // Declared dev groups record into requires-dev even when empty
-            Toml.Table groups = findTable("dependency-groups");
-            if (groups != null) {
-                for (Toml value : groups.getValues()) {
-                    if (value instanceof Toml.KeyValue) {
-                        String group = keyName((Toml.KeyValue) value);
-                        if (group != null && !requiresDev.containsKey(group)) {
-                            requiresDev.put(group, new ArrayList<>());
-                        }
-                    }
-                }
-            }
-            requiresDist.sort(Comparator.comparing(UvLockRequirement::getName));
-            for (List<UvLockRequirement> group : requiresDev.values()) {
-                group.sort(Comparator.comparing(UvLockRequirement::getName));
-            }
-            stabilizeDuplicates(requiresDist, oldMetadata.getRequiresDist());
-            for (Map.Entry<String, List<UvLockRequirement>> group : requiresDev.entrySet()) {
-                stabilizeDuplicates(group.getValue(), oldMetadata.getRequiresDev() != null ?
-                        oldMetadata.getRequiresDev().get(group.getKey()) : null);
-            }
-            return new UvLockMetadata(
-                    requiresDist.isEmpty() ? null : requiresDist,
-                    providesExtras.isEmpty() ? null : providesExtras,
-                    requiresDev.isEmpty() ? null : new LinkedHashMap<>(requiresDev));
-        }
-
-        /**
-         * uv's tie-break for same-name (marker-differentiated) entries is not declaration
-         * order; when a run of duplicates matches the old recording as a multiset, keep the
-         * old order so an untouched forked declaration round-trips byte-identically.
-         */
-        private static void stabilizeDuplicates(List<UvLockRequirement> entries,
-                                                @Nullable List<UvLockRequirement> oldSection) {
-            if (oldSection == null) {
-                return;
-            }
-            int i = 0;
-            while (i < entries.size()) {
-                int end = i + 1;
-                while (end < entries.size() && entries.get(end).getName().equals(entries.get(i).getName())) {
-                    end++;
-                }
-                if (end - i > 1) {
-                    List<UvLockRequirement> oldRun = new ArrayList<>();
-                    for (UvLockRequirement old : oldSection) {
-                        if (old.getName().equals(entries.get(i).getName())) {
-                            oldRun.add(old);
-                        }
-                    }
-                    List<String> newRendered = rendered(entries.subList(i, end));
-                    List<String> oldRendered = rendered(oldRun);
-                    List<String> newSorted = new ArrayList<>(newRendered);
-                    List<String> oldSorted = new ArrayList<>(oldRendered);
-                    Collections.sort(newSorted);
-                    Collections.sort(oldSorted);
-                    if (newSorted.equals(oldSorted)) {
-                        for (int j = 0; j < oldRun.size(); j++) {
-                            entries.set(i + j, oldRun.get(j));
-                        }
-                    }
-                }
-                i = end;
-            }
-        }
-
-        private UvLockRequirement buildRequirement(Declared decl) {
-            if (nonRegistrySources.contains(decl.canonicalName)) {
-                UvLockRequirement old = findOldRequirement(decl);
-                if (old == null) {
-                    throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, decl.canonicalName,
-                            "Adding a git/path/editable dependency is not supported by the native engine");
-                }
-                return old;
-            }
-            List<String> pins = indexPins.get(decl.canonicalName);
-            if (pins != null && new HashSet<>(pins).size() > 1) {
-                UvLockRequirement old = findOldRequirement(decl);
-                if (old != null) {
-                    return old;
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, decl.canonicalName,
-                        "Marker-gated multi-index pins are not supported by the native engine");
-            }
-            List<String> extras = null;
-            if (!decl.requirement.getExtras().isEmpty()) {
-                extras = new ArrayList<>();
-                for (String extra : decl.requirement.getExtras()) {
-                    extras.add(Pep508Requirement.canonicalize(extra));
-                }
-            }
-            String specifier = normalizeSpecifier(decl);
-            String index = pins == null ? null : declaredIndexUrl(pins.get(0), decl.canonicalName);
-            String marker = resolveMetadataMarker(decl);
-            return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null);
-        }
-
-        private @Nullable String normalizeSpecifier(Declared decl) {
-            PythonVersionSpecifierSet specifiers = decl.requirement.getSpecifiers();
-            if (specifiers == null || specifiers.isMatchAll()) {
-                return null;
-            }
-            StringBuilder joined = new StringBuilder();
-            for (PythonVersionSpecifier spec : specifiers.getSpecifiers()) {
-                if (joined.length() > 0) {
-                    joined.append(',');
-                }
-                joined.append(spec.getOperator()).append(spec.getVersion());
-            }
-            try {
-                return UvLockNormalization.normalizeRequiresDistSpecifier(joined.toString());
-            } catch (IllegalArgumentException e) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, decl.canonicalName,
-                        "Cannot normalize version specifier " + joined + ": " + e.getMessage());
-            }
-        }
-
-        private String declaredIndexUrl(String indexName, String pkg) {
-            for (UvIndex index : indexes) {
-                if (index.isNamed() && indexName.equals(index.getIndex().getName())) {
-                    return index.getIndex().getUrl();
-                }
-            }
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                    "Index " + indexName + " pinned via [tool.uv.sources] is not declared in configuration");
-        }
-
-        /**
-         * uv's recorded marker form for a declaration. When the declared marker is outside
-         * the normalization subset the empirical catalog covers, fall back to the old
-         * recorded form when it is provably the same declaration; otherwise fail.
-         */
-        private @Nullable String resolveMetadataMarker(Declared decl) {
-            String extraClause = decl.extraGroup != null ? "extra == '" + decl.extraGroup + "'" : null;
-            if (decl.rawMarker == null) {
-                return extraClause;
-            }
-            String normalized = recordMarker(decl.rawMarker, extraClause);
-            if (normalized != null) {
-                return normalized;
-            }
-            UvLockRequirement old = findOldRequirement(decl);
-            if (old != null && old.getMarker() != null && markersLooselyEqual(decl, old.getMarker())) {
-                return old.getMarker();
-            }
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, decl.canonicalName,
-                    "Cannot reproduce uv's recorded form of marker \"" + decl.rawMarker + "\"; " +
-                            "marker normalization outside the verified subset requires resolution");
-        }
-
-        /**
-         * Whether the declared marker (plus any extra gate) is semantically the marker uv
-         * recorded, modulo spacing/quoting, so the recorded form can be copied verbatim.
-         */
-        private boolean markersLooselyEqual(Declared decl, String recorded) {
-            String declaredText = decl.extraGroup != null ?
-                    "(" + decl.rawMarker + ") and extra == '" + decl.extraGroup + "'" : decl.rawMarker;
-            Marker declaredMarker = Marker.parse(declaredText);
-            Marker recordedMarker = Marker.parse(recorded);
-            return declaredMarker != null && declaredMarker.equals(recordedMarker);
-        }
-
-        private @Nullable UvLockRequirement findOldRequirement(Declared decl) {
-            List<UvLockRequirement> section = decl.devGroup != null ?
-                    (oldMetadata.getRequiresDev() != null ? oldMetadata.getRequiresDev().get(decl.devGroup) : null) :
-                    oldMetadata.getRequiresDist();
-            if (section == null) {
-                return null;
-            }
-            for (UvLockRequirement req : section) {
-                if (req.getName().equals(decl.canonicalName) &&
-                        Objects.equals(decl.extraGroup, extraGroupOf(req))) {
-                    return req;
-                }
-            }
-            return null;
-        }
-
-        /**
-         * Sentinel group for markers gating on more than one extra, which cannot be
-         * attributed to a single optional-dependencies group.
-         */
-        private static final String MULTI_EXTRA = "\0multi-extra";
-
-        private static @Nullable String extraGroupOf(UvLockRequirement req) {
-            if (req.getMarker() == null) {
-                return null;
-            }
-            Matcher m = EXTRA_CLAUSE.matcher(req.getMarker());
-            if (!m.find()) {
-                return null;
-            }
-            String first = m.group(1);
-            return m.find() ? MULTI_EXTRA : first;
         }
 
         // ---- diffing ----
@@ -773,14 +451,30 @@ public final class UvLockEngine {
                         throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, added.getName(),
                                 "Git/path/editable dependency entries are not supported by the native engine");
                     }
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, added.getName(),
-                            "Package is not in the existing lock; adding a package requires delta " +
-                                    "resolution, which the native engine does not yet support");
-                }
-                if (rendered(oldReqs).equals(rendered(newReqs))) {
+                    // T2 add (ADR 0010): resolve the new package and its closure. Extras, pinned
+                    // indexes, and optional-dependency groups on the added declaration are deferred
+                    // to a later increment.
+                    if (newReqs.size() > 1 || added.getIndex() != null ||
+                            (added.getExtras() != null && !added.getExtras().isEmpty()) || UvLockRequirements.extraGroupOf(added) != null) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, added.getName(),
+                                "Adding a dependency with extras or a pinned index is not yet " +
+                                        "supported by the native engine");
+                    }
+                    // A python-version-gated add introduces a new fork boundary uv records as
+                    // lock-level resolution-markers even when the package resolves to one version;
+                    // that is marker-space resolution, so fail loud (added.getMarker() is uv's form).
+                    if (added.getMarker() != null && UvLockMarkers.referencesPythonVersion(added.getMarker())) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, added.getName(),
+                                "Adding a dependency gated on the Python version alters the lock's fork " +
+                                        "structure, which the native engine does not support");
+                    }
+                    additions.add(new Addition(added.getName(), devGroup, added.getMarker()));
                     continue;
                 }
-                if (e.getKey().endsWith(MULTI_EXTRA)) {
+                if (UvLockRequirements.rendered(oldReqs).equals(UvLockRequirements.rendered(newReqs))) {
+                    continue;
+                }
+                if (e.getKey().endsWith(UvLockRequirements.MULTI_EXTRA)) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newReqs.get(0).getName(),
                             "Editing a declaration whose marker gates on multiple extras is not supported");
                 }
@@ -820,8 +514,8 @@ public final class UvLockEngine {
             }
             for (List<UvLockRequirement> removed : oldByKey.values()) {
                 for (UvLockRequirement req : removed) {
-                    String extraGroup = devGroup == null ? extraGroupOf(req) : null;
-                    if (MULTI_EXTRA.equals(extraGroup)) {
+                    String extraGroup = devGroup == null ? UvLockRequirements.extraGroupOf(req) : null;
+                    if (UvLockRequirements.MULTI_EXTRA.equals(extraGroup)) {
                         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.getName(),
                                 "Removing a declaration whose marker gates on multiple extras is not supported");
                     }
@@ -834,22 +528,12 @@ public final class UvLockEngine {
             Map<String, List<UvLockRequirement>> byKey = new LinkedHashMap<>();
             if (section != null) {
                 for (UvLockRequirement req : section) {
-                    String key = req.getName() + '\0' + extraGroupOf(req);
+                    String key = req.getName() + '\0' + UvLockRequirements.extraGroupOf(req);
                     List<UvLockRequirement> reqs = byKey.computeIfAbsent(key, k -> new ArrayList<>());
                     reqs.add(req);
                 }
             }
             return byKey;
-        }
-
-        private static List<String> rendered(List<UvLockRequirement> reqs) {
-            List<String> rendered = new ArrayList<>(reqs.size());
-            for (UvLockRequirement req : reqs) {
-                rendered.add(req.getName() + "|" + req.getExtras() + "|" + req.getEditable() + "|" +
-                        req.getMarker() + "|" + req.getSpecifier() + "|" + req.getIndex() + "|" +
-                        req.getUrl() + "|" + req.getGit() + "|" + req.getDirectory());
-            }
-            return rendered;
         }
 
         // ---- requires-python ----
@@ -892,65 +576,6 @@ public final class UvLockEngine {
             return b.toString();
         }
 
-        private static PyRange parseRange(String requiresPython) {
-            PyRange range = new PyRange();
-            PythonVersionSpecifierSet set = PythonVersionSpecifierSet.parse(requiresPython);
-            if (set == null) {
-                return range;
-            }
-            for (PythonVersionSpecifier spec : set.getSpecifiers()) {
-                String op = spec.getOperator();
-                String version = spec.getVersion();
-                boolean wildcard = version.endsWith(".*");
-                PythonVersion v = PythonVersion.parse(wildcard ? version.substring(0, version.length() - 2) : version);
-                if (v == null) {
-                    continue;
-                }
-                if (">=".equals(op) || ">".equals(op)) {
-                    if (range.lower == null || v.compareTo(range.lower) > 0) {
-                        range.lower = v;
-                        range.lowerExclusive = ">".equals(op);
-                    }
-                } else if ("<".equals(op) || "<=".equals(op)) {
-                    if (range.upper == null || v.compareTo(range.upper) < 0) {
-                        range.upper = v;
-                        range.upperInclusive = "<=".equals(op);
-                    }
-                } else if ("~=".equals(op) || ("==".equals(op) && wildcard)) {
-                    if (range.lower == null || v.compareTo(range.lower) > 0) {
-                        range.lower = v;
-                        range.lowerExclusive = false;
-                    }
-                    PythonVersion next = bumpTrailingRelease(v);
-                    if (next != null && (range.upper == null || next.compareTo(range.upper) < 0)) {
-                        range.upper = next;
-                        range.upperInclusive = false;
-                    }
-                } else if ("==".equals(op)) {
-                    range.lower = v;
-                    range.lowerExclusive = false;
-                    range.upper = v;
-                    range.upperInclusive = true;
-                }
-            }
-            return range;
-        }
-
-        private static @Nullable PythonVersion bumpTrailingRelease(PythonVersion v) {
-            long[] release = v.getRelease();
-            if (release.length < 2) {
-                return null;
-            }
-            StringBuilder b = new StringBuilder();
-            for (int i = 0; i < release.length - 1; i++) {
-                if (i > 0) {
-                    b.append('.');
-                }
-                b.append(i == release.length - 2 ? release[i] + 1 : release[i]);
-            }
-            return PythonVersion.parse(b.toString());
-        }
-
         private void checkPythonBounds(PyRange oldRange) {
             if (oldRange.lower != null && (range.lower == null || range.lower.compareTo(oldRange.lower) < 0)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
@@ -967,7 +592,7 @@ public final class UvLockEngine {
         }
 
         private boolean lowerBoundIncreased() {
-            PyRange oldRange = parseRange(lock.getRequiresPython() != null ? lock.getRequiresPython() : "");
+            PyRange oldRange = PyRange.parse(lock.getRequiresPython() != null ? lock.getRequiresPython() : "");
             if (range.lower == null) {
                 return false;
             }
@@ -1003,7 +628,7 @@ public final class UvLockEngine {
                     if (kept.isEmpty() && pkg.getSdist() == null) {
                         throw new EngineFailure(new Failure(Reason.PIN_EXCLUDED_BY_PYTHON, pkg.getName(), null,
                                 pkg.getName() + "==" + pkg.getVersion() + " has no sdist and no wheel compatible " +
-                                        "with requires-python " + rangeDescription() +
+                                        "with requires-python " + range.describe() +
                                         "; no installable distribution would remain"));
                     }
                     builder.wheels(kept.isEmpty() ? null : kept);
@@ -1040,178 +665,19 @@ public final class UvLockEngine {
                     kept.add(edge);
                     continue;
                 }
-                List<String[]> clauses = parseSimpleAndChain(edge.getMarker());
+                List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(edge.getMarker());
                 if (clauses == null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                             "Cannot re-evaluate dependency marker \"" + edge.getMarker() +
                                     "\" under the new requires-python");
                 }
-                String simplified = simplifyClauses(clauses);
-                if (DROP_EDGE.equals(simplified)) {
+                String simplified = UvLockMarkers.simplifyClauses(range, clauses);
+                if (UvLockMarkers.DROP_EDGE.equals(simplified)) {
                     continue;
                 }
                 kept.add(Objects.equals(simplified, edge.getMarker()) ? edge : edge.withMarker(simplified));
             }
             return kept.isEmpty() ? null : kept;
-        }
-
-        private static final String DROP_EDGE = "\0drop";
-
-        /**
-         * Drops always-true clauses and signals edge removal on any always-false clause;
-         * null result means the whole marker became vacuous.
-         */
-        private @Nullable String simplifyClauses(List<String[]> clauses) {
-            List<String> kept = new ArrayList<>();
-            for (String[] clause : clauses) {
-                Boolean truth = clauseTruth(clause);
-                if (Boolean.FALSE.equals(truth)) {
-                    return DROP_EDGE;
-                }
-                if (truth == null) {
-                    kept.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");
-                }
-            }
-            return kept.isEmpty() ? null : String.join(" and ", kept);
-        }
-
-        private @Nullable Boolean clauseTruth(String[] clause) {
-            return clauseTruth(range, clause[0], clause[1], clause[2]);
-        }
-
-        /**
-         * Truth of a simple marker clause over every Python in the lock's requires-python
-         * range; null when it varies or cannot be decided. Deliberately still null:
-         * non-version variables, unparseable values, python_version compared at micro
-         * precision, wildcards under ordering operators, and ~= of a single-component
-         * version. Pre-release Pythons at interval boundaries are outside the model,
-         * matching the release-ordering treatment of the inequality operators.
-         */
-        static @Nullable Boolean clauseTruth(PyRange range, String var, String op, String value) {
-            if (!VERSION_VARS.contains(var)) {
-                return null;
-            }
-            boolean wildcard = value.endsWith(".*");
-            if (wildcard && !"==".equals(op) && !"!=".equals(op)) {
-                return null;
-            }
-            PythonVersion v = PythonVersion.parse(wildcard ? value.substring(0, value.length() - 2) : value);
-            if (v == null) {
-                return null;
-            }
-            // python_version truncates to major.minor; micro-precision comparisons diverge
-            if ("python_version".equals(var) && v.getRelease().length > 2) {
-                return null;
-            }
-            PythonVersion lower = range.lower;
-            PythonVersion upper = range.upper;
-            switch (op) {
-                case ">=":
-                    if (lower != null && lower.compareTo(v) >= 0) {
-                        return true;
-                    }
-                    if (upper != null && (range.upperInclusive ? upper.compareTo(v) < 0 : upper.compareTo(v) <= 0)) {
-                        return false;
-                    }
-                    return null;
-                case ">":
-                    if (lower != null && (range.lowerExclusive ? lower.compareTo(v) >= 0 : lower.compareTo(v) > 0)) {
-                        return true;
-                    }
-                    if (upper != null && upper.compareTo(v) <= 0) {
-                        return false;
-                    }
-                    return null;
-                case "<":
-                    if (upper != null && (range.upperInclusive ? upper.compareTo(v) < 0 : upper.compareTo(v) <= 0)) {
-                        return true;
-                    }
-                    if (lower != null && lower.compareTo(v) >= 0) {
-                        return false;
-                    }
-                    return null;
-                case "<=":
-                    if (upper != null && upper.compareTo(v) <= 0) {
-                        return true;
-                    }
-                    if (lower != null && (range.lowerExclusive ? lower.compareTo(v) >= 0 : lower.compareTo(v) > 0)) {
-                        return false;
-                    }
-                    return null;
-                case "==":
-                    return equalityTruth(range, var, v, wildcard);
-                case "!=": {
-                    Boolean eq = equalityTruth(range, var, v, wildcard);
-                    return eq == null ? null : !eq;
-                }
-                case "~=": {
-                    // ~=X.Y[.Z] is >=X.Y[.Z], <X.(Y+1) / <X.Y.(Z+1)-family upper
-                    if (v.getRelease().length < 2) {
-                        return null;
-                    }
-                    PythonVersion next = bumpTrailingRelease(v);
-                    return next == null ? null : intervalTruth(range, v, next);
-                }
-                default:
-                    return null;
-            }
-        }
-
-        /**
-         * ==/!= truth: a wildcard, or python_version's truncated equality, covers the
-         * half-open interval [v, next); exact python_full_version equality is a single
-         * point, decidable only when v lies outside the range or the range is that point.
-         */
-        private static @Nullable Boolean equalityTruth(PyRange range, String var, PythonVersion v, boolean wildcard) {
-            if (wildcard || "python_version".equals(var)) {
-                PythonVersion next = bumpLastComponent(v, wildcard ? v.getRelease().length : 2);
-                return next == null ? null : intervalTruth(range, v, next);
-            }
-            if (range.lower != null && range.upper != null &&
-                    range.lower.compareTo(v) == 0 && range.upper.compareTo(v) == 0 &&
-                    !range.lowerExclusive && range.upperInclusive) {
-                return true;
-            }
-            if ((range.lower != null && (range.lowerExclusive ? range.lower.compareTo(v) >= 0 : range.lower.compareTo(v) > 0)) ||
-                    (range.upper != null && (range.upperInclusive ? range.upper.compareTo(v) < 0 : range.upper.compareTo(v) <= 0))) {
-                return false;
-            }
-            return null;
-        }
-
-        /**
-         * Truth of "python in [lo, hi)" over the whole range: true when the range is
-         * contained, false when disjoint, null when it straddles a boundary.
-         */
-        private static @Nullable Boolean intervalTruth(PyRange range, PythonVersion lo, PythonVersion hi) {
-            if (range.lower != null && range.lower.compareTo(lo) >= 0 &&
-                    range.upper != null &&
-                    (range.upperInclusive ? range.upper.compareTo(hi) < 0 : range.upper.compareTo(hi) <= 0)) {
-                return true;
-            }
-            if (range.lower != null && range.lower.compareTo(hi) >= 0) {
-                return false;
-            }
-            if (range.upper != null && (range.upperInclusive ? range.upper.compareTo(lo) < 0 : range.upper.compareTo(lo) <= 0)) {
-                return false;
-            }
-            return null;
-        }
-
-        private static @Nullable PythonVersion bumpLastComponent(PythonVersion v, int components) {
-            if (components < 1) {
-                return null;
-            }
-            long[] release = v.getRelease();
-            StringBuilder b = new StringBuilder();
-            for (int i = 0; i < components; i++) {
-                if (i > 0) {
-                    b.append('.');
-                }
-                long part = i < release.length ? release[i] : 0;
-                b.append(i == components - 1 ? part + 1 : part);
-            }
-            return PythonVersion.parse(b.toString());
         }
 
         /**
@@ -1319,6 +785,18 @@ public final class UvLockEngine {
             if (!change.indexChanged && satisfiesAll(change.constraints, pinned)) {
                 return false; // locked-version preference: only the requires-dist line changes
             }
+            packages.set(index, resolveEntry(change, pinned, pkg));
+            return true;
+        }
+
+        /**
+         * Resolves {@code change.canonicalName} against its index over the change's constraints
+         * and returns a fully built registry entry (version, source, edges, artifacts).
+         * {@code base} supplies fields to preserve for a rewrite; a fresh add passes a name-only
+         * package with {@code pinned == null}. Cascades and additions the closure needs are queued
+         * as a side effect of {@link #buildEdges}.
+         */
+        private UvLockPackage resolveEntry(Change change, @Nullable PythonVersion pinned, UvLockPackage base) {
             if (lock.getOptions() != null && lock.getOptions().getExcludeNewer() != null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, change.canonicalName,
                         "Version selection under [options] exclude-newer is not supported");
@@ -1337,9 +815,15 @@ public final class UvLockEngine {
                         listing.index.getIndex().getUrl(),
                         explainNoVersion(byVersion, change, listing.index.getIndex().getUrl())));
             }
+            if (wouldFork(byVersion, change, selected)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, change.canonicalName,
+                        "Resolving " + change.canonicalName + " would fork it across the requires-python range " +
+                                "(uv locks multiple versions gated by python markers); marker-space resolution " +
+                                "is not supported by the native engine");
+            }
             List<PackageFile> files = byVersion.get(selected);
             CoreMetadata metadata = fetchMetadata(change.canonicalName, listing.index, files);
-            List<UvLockDependency> edges = buildEdges(change.canonicalName, metadata, pkg);
+            List<UvLockDependency> edges = buildEdges(change.canonicalName, metadata, base);
 
             PackageFile sdistFile = null;
             List<PackageFile> wheelFiles = new ArrayList<>();
@@ -1363,22 +847,171 @@ public final class UvLockEngine {
             for (PackageFile wheel : wheelFiles) {
                 wheels.add(toArtifact(change.canonicalName, listing.index, wheel));
             }
-            packages.set(index, pkg.toBuilder()
+            return base.toBuilder()
                     .version(selected.toString())
                     .source(UvLockSource.registry(listing.index.getIndex().getUrl()))
                     .dependencies(edges.isEmpty() ? null : edges)
                     .sdist(sdistFile != null ? toArtifact(change.canonicalName, listing.index, sdistFile) : null)
                     .wheels(wheels.isEmpty() ? null : wheels)
-                    .build());
-            return true;
+                    .build();
+        }
+
+        /**
+         * Resolves an added package (direct or transitive) as a fresh registry entry and inserts
+         * it in uv's alphabetical package order. Direct manifest additions additionally get a root
+         * dependency edge.
+         */
+        private void resolveAddition(String name, @Nullable Addition direct) {
+            if (direct != null && direct.marker != null) {
+                markeredAddClosure.add(name);
+            }
+            Change select = new Change(name);
+            select.constraints.addAll(gatherConstraints(name));
+            List<String> pins = indexPins.get(name);
+            select.pinnedIndexName = pins != null ? pins.get(0) : null;
+            UvLockPackage created = resolveEntry(select, null, UvLockPackage.builder().name(name).build());
+            insertSorted(created);
+            if (direct != null) {
+                addRootEdge(direct);
+            }
+        }
+
+        private void insertSorted(UvLockPackage pkg) {
+            int pos = 0;
+            while (pos < packages.size() && packages.get(pos).getName().compareTo(pkg.getName()) < 0) {
+                pos++;
+            }
+            packages.add(pos, pkg);
+            rootIndex = findRoot();
+        }
+
+        private void addRootEdge(Addition addition) {
+            UvLockPackage root = packages.get(rootIndex);
+            UvLockPackage.UvLockPackageBuilder builder = root.toBuilder();
+            UvLockDependency edge = new UvLockDependency(addition.canonicalName, null, null, null, addition.marker);
+            if (addition.devGroup != null) {
+                Map<String, List<UvLockDependency>> groups = root.getDevDependencies() != null ?
+                        new LinkedHashMap<>(root.getDevDependencies()) : new LinkedHashMap<>();
+                groups.put(addition.devGroup, addEdgeSorted(groups.get(addition.devGroup), edge));
+                builder.devDependencies(groups);
+            } else {
+                builder.dependencies(addEdgeSorted(root.getDependencies(), edge));
+            }
+            packages.set(rootIndex, builder.build());
+        }
+
+        private static List<UvLockDependency> addEdgeSorted(@Nullable List<UvLockDependency> edges, UvLockDependency edge) {
+            List<UvLockDependency> updated = edges != null ? new ArrayList<>(edges) : new ArrayList<>();
+            int pos = 0;
+            while (pos < updated.size() && updated.get(pos).getName().compareTo(edge.getName()) < 0) {
+                pos++;
+            }
+            updated.add(pos, edge);
+            return updated;
+        }
+
+        /**
+         * Every constraint on {@code target} across the whole lock: each registry dependent's
+         * recorded requirement (from its metadata) plus any direct declaration on the root.
+         * uv keeps a package at the highest version satisfying <em>all</em> of these, so
+         * gathering them completely is what makes a cascade choice reproduce uv's.
+         */
+        private List<PythonVersionSpecifierSet> gatherConstraints(String target) {
+            List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+            for (UvLockPackage q : packages) {
+                if (q.getSource().getType() != UvLockSource.Type.REGISTRY || !dependsOn(q, target)) {
+                    continue;
+                }
+                CoreMetadata meta = metadataFor(q);
+                if (meta == null) {
+                    continue;
+                }
+                for (String raw : meta.getRequiresDist()) {
+                    Pep508Requirement req = Pep508Requirement.parse(raw);
+                    if (req == null || !req.getCanonicalName().equals(target)) {
+                        continue;
+                    }
+                    PythonVersionSpecifierSet specs = req.getSpecifiers();
+                    if (specs != null && !specs.isMatchAll()) {
+                        constraints.add(specs);
+                    }
+                }
+            }
+            UvLockMetadata rootMeta = packages.get(rootIndex).getMetadata();
+            if (rootMeta != null && rootMeta.getRequiresDist() != null) {
+                for (UvLockRequirement req : rootMeta.getRequiresDist()) {
+                    if (req.getName().equals(target) && req.getSpecifier() != null) {
+                        PythonVersionSpecifierSet specs = PythonVersionSpecifierSet.parse(req.getSpecifier());
+                        if (specs != null) {
+                            constraints.add(specs);
+                        }
+                    }
+                }
+            }
+            return constraints;
+        }
+
+        private static boolean dependsOn(UvLockPackage pkg, String target) {
+            for (List<UvLockDependency> edges : allEdgeLists(pkg)) {
+                for (UvLockDependency edge : edges) {
+                    if (edge.getName().equals(target)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private @Nullable CoreMetadata metadataFor(UvLockPackage pkg) {
+            String key = pkg.getName() + '@' + pkg.getVersion();
+            if (metadataCache.containsKey(key)) {
+                return metadataCache.get(key);
+            }
+            CoreMetadata meta = null;
+            PythonVersion version = PythonVersion.parse(pkg.getVersion());
+            if (version != null) {
+                List<String> pins = indexPins.get(pkg.getName());
+                Listing listing = fetchListing(pkg.getName(), pins != null ? pins.get(0) : null);
+                if (!listing.index.isFlat()) {
+                    List<PackageFile> files = groupByVersion(listing.listing, pkg.getName()).get(version);
+                    if (files != null && !files.isEmpty()) {
+                        meta = fetchMetadata(pkg.getName(), listing.index, files);
+                    }
+                }
+            }
+            metadataCache.put(key, meta);
+            return meta;
+        }
+
+        /**
+         * A cascade rediscovered an already-settled package: safe only if its settled version
+         * still satisfies the now-complete constraint set. Otherwise uv would backtrack, which
+         * the greedy engine does not.
+         */
+        private void verifyCascadeSatisfied(String target) {
+            int index = findSinglePackage(target);
+            if (index < 0) {
+                return;
+            }
+            PythonVersion version = PythonVersion.parse(packages.get(index).getVersion());
+            if (version == null) {
+                return;
+            }
+            for (PythonVersionSpecifierSet constraint : gatherConstraints(target)) {
+                if (!constraint.contains(version, true)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, target,
+                            "Updating " + target + " to satisfy a new requirement would require revising an " +
+                                    "already-updated package (backtracking), which the native engine does not support");
+                }
+            }
         }
 
         private void checkNoUvResolutionOverrides(String pkg) {
-            Toml.Table uvTable = findTable("tool.uv");
+            Toml.Table uvTable = UvLockToml.findTable(pyproject, "tool.uv");
             if (uvTable != null) {
                 for (Toml value : uvTable.getValues()) {
                     if (value instanceof Toml.KeyValue) {
-                        String key = keyName((Toml.KeyValue) value);
+                        String key = UvLockToml.keyName((Toml.KeyValue) value);
                         if ("constraint-dependencies".equals(key) || "override-dependencies".equals(key)) {
                             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                                     "Version selection under [tool.uv] " + key + " is not supported");
@@ -1525,6 +1158,59 @@ public final class UvLockEngine {
         }
 
         /**
+         * uv forks a package -- locking multiple versions gated by python markers -- when a
+         * version newer than the one admissible at the requires-python floor is itself
+         * admissible for a higher part of the range. The greedy engine locks a single version,
+         * so this must be detected and failed loud rather than emit a lock uv would disagree with.
+         */
+        private boolean wouldFork(Map<PythonVersion, List<PackageFile>> byVersion, Change change, PythonVersion selected) {
+            if (range.lower == null) {
+                return false;
+            }
+            for (Map.Entry<PythonVersion, List<PackageFile>> candidate : byVersion.entrySet()) {
+                PythonVersion version = candidate.getKey();
+                if (version.compareTo(selected) <= 0) {
+                    continue;
+                }
+                boolean satisfies = true;
+                for (PythonVersionSpecifierSet constraint : change.constraints) {
+                    if (!constraint.contains(version)) {
+                        satisfies = false;
+                        break;
+                    }
+                }
+                if (!satisfies || !installable(candidate.getValue())) {
+                    continue;
+                }
+                // selectVersion skipped this newer version because its requires-python floor
+                // excludes the lock's floor; if that floor still lands inside the range, uv would
+                // lock it for the upper sub-range and fork
+                for (PackageFile file : candidate.getValue()) {
+                    String requires = file.getRequiresPython();
+                    if (requires == null) {
+                        continue;
+                    }
+                    PyRange fileRange = PyRange.parse(requires);
+                    if (fileRange.lower != null && fileRange.lower.compareTo(range.lower) > 0 &&
+                            range.withinUpperBound(fileRange.lower)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static boolean installable(List<PackageFile> files) {
+            for (PackageFile file : files) {
+                DistFilename dist = DistFilename.parse(file.getFilename());
+                if (!file.isYanked() && dist != null && dist.getType() != DistFilename.Type.OTHER) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
          * Explain why {@link #selectVersion} found nothing, distinguishing "the index
          * has no version matching the constraints" (a lagging mirror is the usual cause)
          * from a genuine requires-python exclusion or an all-yanked release.
@@ -1648,13 +1334,19 @@ public final class UvLockEngine {
                 int semi = raw.indexOf(';');
                 String rawMarker = requirement.getMarker() != null && semi >= 0 ?
                         raw.substring(semi + 1).trim() : null;
-                if (rawMarker != null && referencesExtraVariable(rawMarker)) {
+                if (rawMarker != null && UvLockMarkers.referencesExtraVariable(rawMarker)) {
                     checkExtraGatedRequirementDroppable(pkg, oldPkg, raw);
                     continue;
                 }
                 String marker = edgeMarker(pkg, requirement.getCanonicalName(), rawMarker, oldEdges);
-                if (DROP_EDGE.equals(marker)) {
+                if (UvLockMarkers.DROP_EDGE.equals(marker)) {
                     continue;
+                }
+                if (marker != null && markeredAddClosure.contains(pkg)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
+                            "Adding a conditional dependency whose closure has a marker-gated edge (" +
+                                    requirement.getCanonicalName() + ") requires marker-space resolution, " +
+                                    "which the native engine does not support");
                 }
                 String target = requirement.getCanonicalName();
                 if (!seen.add(target)) {
@@ -1663,17 +1355,26 @@ public final class UvLockEngine {
                 }
                 int targetIndex = findSinglePackage(target);
                 if (targetIndex < 0) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            "Requirement " + raw + " of the new version is not in the existing lock; " +
-                                    "delta resolution is not yet supported by the native engine");
+                    // T2 (ADR 0010): the requirement pulls in a package not yet in the lock; queue it
+                    // as a transitive addition and emit the version-agnostic edge
+                    if (!requirement.getExtras().isEmpty()) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
+                                "Adding transitive " + target + " with extras is not yet supported by the native engine");
+                    }
+                    additionQueue.add(target);
+                    if (markeredAddClosure.contains(pkg)) {
+                        markeredAddClosure.add(target);
+                    }
+                    edges.add(new UvLockDependency(target, null, null, null, marker));
+                    continue;
                 }
                 UvLockPackage locked = packages.get(targetIndex);
                 PythonVersion lockedVersion = PythonVersion.parse(locked.getVersion());
                 if (requirement.getSpecifiers() != null && (lockedVersion == null ||
                         !requirement.getSpecifiers().contains(lockedVersion, true))) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            "Requirement " + raw + " of the new version is not satisfied by the pinned " +
-                                    target + "==" + locked.getVersion() + "; delta resolution is not yet supported");
+                    // greedy-forward cascade (ADR 0010 T1): the new version needs a newer <target>
+                    // than the pin; queue it to move and still emit the version-agnostic edge
+                    cascadeQueue.add(target);
                 }
                 List<String> extra = null;
                 if (!requirement.getExtras().isEmpty()) {
@@ -1695,10 +1396,6 @@ public final class UvLockEngine {
             }
             edges.sort(Comparator.comparing(UvLockDependency::getName));
             return edges;
-        }
-
-        private static boolean referencesExtraVariable(String marker) {
-            return Pattern.compile("\\bextra\\b").matcher(marker).find();
         }
 
         /**
@@ -1728,10 +1425,10 @@ public final class UvLockEngine {
             if (rawMarker == null) {
                 return null;
             }
-            String normalized = recordMarker(rawMarker, null);
+            String normalized = UvLockMarkers.recordMarker(rawMarker, null);
             if (normalized != null) {
-                List<String[]> clauses = parseSimpleAndChain(normalized);
-                return clauses != null ? simplifyClauses(clauses) : normalized;
+                List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(normalized);
+                return clauses != null ? UvLockMarkers.simplifyClauses(range, clauses) : normalized;
             }
             for (UvLockDependency oldEdge : oldEdges) {
                 if (oldEdge.getName().equals(target) && oldEdge.getMarker() != null &&
@@ -1922,198 +1619,10 @@ public final class UvLockEngine {
                         violatingPackages.size() == 1 ? violatingPackages.get(0) : null,
                         null,
                         "Pinned versions incompatible with requires-python " + lock.getRequiresPython() +
-                                " -> " + rangeDescription() + ": " + String.join(", ", violations)));
+                                " -> " + range.describe() + ": " + String.join(", ", violations)));
             }
         }
 
-        private String rangeDescription() {
-            return range.lower != null ? ">=" + range.lower : "(unbounded)";
-        }
 
-        // ---- marker normalization (verified subset) ----
-
-        /**
-         * uv's recorded marker form for the cataloged subset: normalized spacing, single
-         * quotes, {@code python_version} to {@code python_full_version} for order-preserving
-         * comparisons, and and-chain clauses sorted by variable. Null when the marker is
-         * outside the subset.
-         */
-        private @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
-            List<String[]> clauses = parseSimpleAndChain(rawMarker);
-            if (clauses == null) {
-                return null;
-            }
-            List<String[]> mapped = new ArrayList<>();
-            for (String[] clause : clauses) {
-                String var = clause[0];
-                String op = clause[1];
-                String value = clause[2];
-                if (value.indexOf('\'') >= 0 || value.indexOf('"') >= 0) {
-                    return null;
-                }
-                if (VERSION_VARS.contains(var)) {
-                    // only >= and < survive the python_version -> python_full_version rename unchanged
-                    if (!">=".equals(op) && !"<".equals(op)) {
-                        return null;
-                    }
-                    mapped.add(new String[]{"python_full_version", op, value});
-                } else if ("==".equals(op) || "!=".equals(op)) {
-                    mapped.add(clause);
-                } else {
-                    return null;
-                }
-            }
-            if (extraClause != null) {
-                List<String[]> extra = parseSimpleAndChain(extraClause);
-                if (extra == null) {
-                    return null;
-                }
-                mapped.addAll(extra);
-            }
-            // stable sort: uv orders and-chains alphabetically by variable
-            mapped.sort(Comparator.comparing(a -> a[0]));
-            List<String> parts = new ArrayList<>(mapped.size());
-            for (String[] clause : mapped) {
-                parts.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");
-            }
-            return String.join(" and ", parts);
-        }
-
-        /**
-         * Splits a marker into simple {@code var op 'value'} clauses joined by {@code and};
-         * null for anything richer (or-chains, parentheses, reversed operands).
-         */
-        static @Nullable List<String[]> parseSimpleAndChain(String marker) {
-            List<String> parts = splitTopLevelAnd(marker);
-            if (parts == null) {
-                return null;
-            }
-            List<String[]> clauses = new ArrayList<>(parts.size());
-            for (String part : parts) {
-                Matcher m = SIMPLE_CLAUSE.matcher(part);
-                if (!m.matches()) {
-                    return null;
-                }
-                clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
-            }
-            return clauses;
-        }
-
-        private static @Nullable List<String> splitTopLevelAnd(String marker) {
-            if (marker.indexOf('(') >= 0 || marker.indexOf(')') >= 0) {
-                return null;
-            }
-            List<String> parts = new ArrayList<>();
-            StringBuilder current = new StringBuilder();
-            char quote = 0;
-            String[] tokens = marker.split("(?<=\\s)|(?=\\s)");
-            // scan word tokens, honoring quoted strings, so "and"/"or" inside values are kept
-            int i = 0;
-            while (i < tokens.length) {
-                String token = tokens[i];
-                if (quote == 0 && ("and".equals(token))) {
-                    parts.add(current.toString());
-                    current.setLength(0);
-                    i++;
-                    continue;
-                }
-                if (quote == 0 && "or".equals(token)) {
-                    return null;
-                }
-                for (int c = 0; c < token.length(); c++) {
-                    char ch = token.charAt(c);
-                    if (quote == 0 && (ch == '\'' || ch == '"')) {
-                        quote = ch;
-                    } else if (quote == ch) {
-                        quote = 0;
-                    }
-                }
-                current.append(token);
-                i++;
-            }
-            parts.add(current.toString());
-            return parts;
-        }
-
-        // ---- TOML helpers ----
-
-        private Toml.@Nullable Table findTable(String name) {
-            for (TomlValue value : pyproject.getValues()) {
-                if (value instanceof Toml.Table) {
-                    Toml.Table table = (Toml.Table) value;
-                    if (name.equals(tableName(table))) {
-                        return table;
-                    }
-                }
-            }
-            return null;
-        }
-
-        private static @Nullable String tableName(Toml.Table table) {
-            Toml.Identifier name = table.getName();
-            return name != null ? name.getName() : null;
-        }
-
-        private static @Nullable String keyName(Toml.KeyValue kv) {
-            if (kv.getKey() instanceof Toml.Identifier) {
-                return unquote(((Toml.Identifier) kv.getKey()).getName());
-            }
-            return null;
-        }
-
-        private static String unquote(String s) {
-            if (s.length() >= 2 && (s.charAt(0) == '"' || s.charAt(0) == '\'') &&
-                    s.charAt(s.length() - 1) == s.charAt(0)) {
-                return s.substring(1, s.length() - 1);
-            }
-            return s;
-        }
-
-        private static @Nullable String literalString(Toml.Table table, String key) {
-            for (Toml value : table.getValues()) {
-                if (value instanceof Toml.KeyValue) {
-                    Toml.KeyValue kv = (Toml.KeyValue) value;
-                    if (key.equals(keyName(kv)) && kv.getValue() instanceof Toml.Literal) {
-                        Object v = ((Toml.Literal) kv.getValue()).getValue();
-                        if (v instanceof String) {
-                            return (String) v;
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-
-        private List<String> stringArray(Toml.Table table, String key) {
-            for (Toml value : table.getValues()) {
-                if (value instanceof Toml.KeyValue) {
-                    Toml.KeyValue kv = (Toml.KeyValue) value;
-                    if (key.equals(keyName(kv))) {
-                        if (!(kv.getValue() instanceof Toml.Array)) {
-                            throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
-                                    "Expected an array for " + key);
-                        }
-                        return stringArrayValues((Toml.Array) kv.getValue(), key);
-                    }
-                }
-            }
-            return emptyList();
-        }
-
-        private List<String> stringArrayValues(Toml.Array array, String context) {
-            List<String> strings = new ArrayList<>();
-            for (Toml element : array.getValues()) {
-                if (element instanceof Toml.Empty) {
-                    continue; // trailing comma
-                }
-                Object v = element instanceof Toml.Literal ? ((Toml.Literal) element).getValue() : null;
-                if (!(v instanceof String)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                            "Non-string entry in " + context + " (e.g. include-group) is not supported");
-                }
-                strings.add((String) v);
-            }
-            return strings;
-        }
     }
 }

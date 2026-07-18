@@ -261,7 +261,8 @@ class UvLockEngineTest {
     }
 
     @Test
-    void additionRequiresResolution() {
+    void markeredAdditionRequiresResolution() {
+        // plain adds now resolve (T2); a marker/extra on the added declaration is still deferred
         Result result = UvLockEngine.regenerate(
           """
             [project]
@@ -270,8 +271,7 @@ class UvLockEngineTest {
             requires-python = ">=3.12"
             dependencies = [
                 "six==1.17.0",
-                "iniconfig>=2.0",
-                "attrs>=23.0",
+                "attrs>=23.0; python_version < '3.13'",
             ]
             """,
           resource("i-minimal-update/uv.lock.v2"),

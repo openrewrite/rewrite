@@ -88,6 +88,13 @@ final class UvLockFixtures {
       "w-conflicts/uv.lock",
       "w2-conflicts-groups/uv.lock",
       "x-supported-required-markers/uv.lock",
+      "x1-cascade-boto3/uv.lock.before",
+      "x1-cascade-boto3/uv.lock.after",
+      "x2-add-leaf/uv.lock.after",
+      "x3-add-closure/uv.lock.after",
+      "off4-add-markered/uv.lock.after",
+      "off5-add-markered-closure/uv.lock.after",
+      "off7-add-markered-platform/uv.lock.after",
       "y-editable-marker/uv.lock"
     };
 
