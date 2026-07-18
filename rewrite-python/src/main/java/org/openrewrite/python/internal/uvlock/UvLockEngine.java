@@ -802,6 +802,13 @@ public final class UvLockEngine {
                         "Version selection under [options] exclude-newer is not supported");
             }
             checkNoUvResolutionOverrides(change.canonicalName);
+            if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
+                // uv resolves a restricted-environments lock per environment, dropping edges gated on
+                // an unsupported platform; the engine's requires-python-only simplification can't.
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, change.canonicalName,
+                        "Resolving " + change.canonicalName + " in a lock with restricted environments " +
+                                "([tool.uv] environments / required-environments) is not supported by the native engine");
+            }
 
             Listing listing = fetchListing(change.canonicalName, change.pinnedIndexName);
             if (listing.index.isFlat()) {
@@ -1012,7 +1019,8 @@ public final class UvLockEngine {
                 for (Toml value : uvTable.getValues()) {
                     if (value instanceof Toml.KeyValue) {
                         String key = UvLockToml.keyName((Toml.KeyValue) value);
-                        if ("constraint-dependencies".equals(key) || "override-dependencies".equals(key)) {
+                        if ("constraint-dependencies".equals(key) || "override-dependencies".equals(key) ||
+                                "environments".equals(key) || "required-environments".equals(key)) {
                             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                                     "Version selection under [tool.uv] " + key + " is not supported");
                         }

@@ -221,12 +221,28 @@ fraction becomes resolved in-recipe instead of in CI.
   PubGrub with lock preferences). A future pipenv/poetry/pdm resolver would reproduce *its*
   tool's non-backtracking behavior, seeded and gated the same way, but is not literally the
   same code.
-- **Known residual — platform forks.** Fork-induction detection covers `requires-python`-driven
-  forks (the common case: a newer release drops an old Python). A package that forks by *platform*
-  marker (a different version locked per `sys_platform`) is not yet detected and could be
-  mis-resolved silently. The conservative fix — fail loud whenever the lock's marker space is
-  non-trivial and a resolved package varies across it — is deferred; until then this is the one
-  narrow gap in the otherwise-by-construction accuracy guarantee.
+- **Platform forks are handled, not residual.** A ground-truth investigation against real
+  `uv lock` 0.10.11 (local-index scenarios exercising `sys_platform`-partitioned constraints, wheel
+  availability, and `tool.uv.environments`) established that uv *fork-duplicates a package to
+  multiple versions if and only if no single version satisfies the union of its constraints*. When a
+  single version does satisfy the union, uv locks that one version — the highest satisfying the
+  union — even across an existing fork and even under restricted environments; it does not maximize
+  each fork independently, and it does not fork on wheel-platform availability (a version with only
+  a linux wheel is locked as-is, not backfilled per platform). This is exactly what the engine's
+  `gatherConstraints` (union) + `selectVersion` (highest satisfying) computes, so a `sys_platform`
+  fork is never mis-resolved silently: the engine reproduces uv's single-version choice byte-for-byte
+  when one exists, and otherwise fails loud — `selectVersion` returns null → `RESOLUTION_CONFLICT`
+  (mutually-exclusive constraints), `wouldFork` (a `requires-python`-driven fork), or
+  `findSinglePackage` throwing (an edit touching an already fork-duplicated package).
+- **The one residual that needed closing — restricted environments.** A lock restricted to a subset
+  of environments via `[tool.uv] environments` / `required-environments` (recorded as
+  `supported-markers` / `required-markers`) is resolved *per environment*: uv drops edges gated on an
+  unsupported platform (a linux-only lock omits a `sys_platform == 'win32'` transitive entirely) and
+  can fork-duplicate where a universal resolution would error. The engine simplifies markers only
+  against `requires-python`, so it would keep such edges and emit a wrong lock. Resolving into a lock
+  with `supported-markers` / `required-markers` (or under a manifest declaring those `[tool.uv]`
+  keys) now fails loud; restricted-environment locks are uncommon, so the coverage cost is small and
+  the accuracy guarantee is again by construction.
 - **Justified by the product need.** Customers need in-recipe lock updates for the vast
   majority of cases, so the residual defer-to-CI cases must be genuinely residual — which is
   why T1 and T2 are both built and why the resolver must work inside forked locks. The

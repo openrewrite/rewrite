@@ -155,6 +155,41 @@ class UvLockDeltaOfflineTest {
         assertThat(http.requests).isEmpty();
     }
 
+    /**
+     * A lock restricted to a subset of environments ({@code [tool.uv] environments}, recorded as
+     * {@code supported-markers}) is resolved per environment: uv drops edges gated on an unsupported
+     * platform (this base lock's linux-only supported-markers already dropped click's win32-only
+     * {@code colorama}). Resolving a new dependency into it needs marker-space resolution, so the
+     * engine fails loud before any network fetch -- even when the manifest itself does not repeat the
+     * {@code [tool.uv]} block (environments can come from {@code uv.toml} or the CLI).
+     */
+    @Test
+    void restrictedEnvironmentsLockFailsLoud() {
+        Result result = UvLockEngine.regenerate(
+          resource("off8-restricted-environments/pyproject.toml"),
+          resource("off8-restricted-environments/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(http.requests).isEmpty();
+    }
+
+    /**
+     * A manifest declaring {@code [tool.uv] environments} restricts resolution to those environments;
+     * the engine rejects any resolution under it (here an unforked base lock, so the manifest is the
+     * only signal) rather than resolve universally and emit a lock uv would not.
+     */
+    @Test
+    void manifestEnvironmentsFailsLoud() {
+        Result result = UvLockEngine.regenerate(
+          resource("off9-manifest-environments/pyproject.toml"),
+          resource("off1-add-leaf/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(http.requests).isEmpty();
+    }
+
     private void assertScenario(String scenario) {
         Result result = UvLockEngine.regenerate(
           resource(scenario + "/pyproject.toml"),
