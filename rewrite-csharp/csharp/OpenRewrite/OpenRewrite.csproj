@@ -31,20 +31,29 @@
 
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="NuGet.Frameworks" Version="6.12.4" />
-    <PackageReference Include="NuGet.Versioning" Version="6.12.4" />
+    <PackageReference Include="NuGet.Frameworks" Version="7.6.0" />
+    <PackageReference Include="NuGet.Versioning" Version="7.6.0" />
+    <!-- In-process NuGet restore (PackageSpec/DependencyGraphSpec -> RestoreRunner -> LockFile).
+         Commands transitively supplies ProjectModel, Protocol, Packaging, Configuration, Common. -->
+    <PackageReference Include="NuGet.Commands" Version="7.6.0" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.3.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.3.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+    <!-- Compile-time only: at runtime MSBuildLocator redirects these to the located SDK's MSBuild.
+         PrivateAssets=all keeps the runtime assets from flowing to consuming projects too — a
+         stale Microsoft.Build*.dll in any consumer's output directory would break the SDK
+         assembly redirection (MissingMethodException/FileLoadException at MSBuild load time). -->
+    <PackageReference Include="Microsoft.Build" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.8.2" ExcludeAssets="runtime" PrivateAssets="all" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="StreamJsonRpc" Version="2.25.29" />
     <!-- xunit (assertion/fixture API only) is consumed by the public Test/ helpers (RewriteTest, RpcFixture, ...). -->
     <!-- The runner packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio) live in the sibling OpenRewrite.Tests project. -->
     <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.3" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.4" PrivateAssets="none" />
   </ItemGroup>
 
   <ItemGroup>

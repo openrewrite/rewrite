@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using Serilog;
@@ -21,10 +20,11 @@ using Serilog;
 namespace OpenRewrite.Xml;
 
 /// <summary>
-/// Parses .csproj files as XML and attaches an MSBuildProject marker with
-/// project metadata extracted from project.assets.json produced by dotnet restore.
-/// Writes files to a temp directory and runs dotnet restore to generate
-/// project.assets.json for accurate metadata.
+/// Parses .csproj files as XML and attaches an MSBuildProject marker with project metadata
+/// from an in-process NuGet restore (PackageSpec/RestoreRunner → in-memory LockFile).
+/// Files are written to a temp directory so MSBuild imports (Directory.Build.props,
+/// .targets, packages.config, nuget.config) resolve correctly during restore-graph
+/// generation — but no child process is spawned and no project.assets.json is read.
 /// </summary>
 public class CsprojParser
 {
@@ -38,8 +38,6 @@ public class CsprojParser
         "csproj", "vbproj", "fsproj"
     };
 
-    private static readonly TimeSpan RestoreTimeout = TimeSpan.FromMinutes(2);
-
     private readonly XmlParser _xmlParser = new();
 
     /// <summary>
@@ -52,9 +50,10 @@ public class CsprojParser
     }
 
     /// <summary>
-    /// Parses multiple csproj/props/targets files together. Writes all files to a shared
-    /// temp directory and runs dotnet restore so that MSBuild imports (Directory.Build.props,
-    /// .targets, etc.) resolve correctly. Returns parsed Documents in the same order as input.
+    /// Parses multiple csproj/props/targets (and supporting packages.config/nuget.config) files
+    /// together. Writes all files to a shared temp directory so MSBuild imports resolve, then
+    /// resolves each project's dependency graph in-process. Returns parsed Documents in the
+    /// same order as input. Only project files (csproj/vbproj/fsproj) receive a marker.
     /// </summary>
     public IList<Document> ParseAll(IList<(string sourceStr, string sourcePath)> files)
     {
@@ -76,21 +75,25 @@ public class CsprojParser
                 File.WriteAllText(filePath, sourceStr);
             }
 
-            // Run dotnet restore on each restorable project file
-            foreach (var (_, sourcePath) in files)
-            {
-                if (IsProjectFile(sourcePath))
-                    RunDotnetRestore(Path.Combine(tempDir, sourcePath));
-            }
-
-            // Parse each file — CreateMarker reads project.assets.json from tempDir
+            // Parse each file — project files get a marker from the in-process restore
             var results = new List<Document>(files.Count);
             foreach (var (sourceStr, sourcePath) in files)
             {
                 var doc = _xmlParser.Parse(sourceStr, sourcePath);
-                var marker = MSBuildProjectHelper.CreateMarker(doc, tempDir);
-                if (marker != null)
-                    doc = doc.WithMarkers(doc.Markers.Add(marker));
+                if (IsProjectFile(sourcePath))
+                {
+                    var marker = MSBuildProjectHelper.CreateMarker(doc, tempDir);
+                    if (marker != null)
+                        doc = doc.WithMarkers(doc.Markers.Add(marker));
+                }
+                else if (Accept(sourcePath))
+                {
+                    // props/targets carry a basic marker (no restore attempt) — recipes use
+                    // marker presence as the "this is an MSBuild build file" gate.
+                    var marker = MSBuildProjectHelper.CreateMarker(doc);
+                    if (marker != null)
+                        doc = doc.WithMarkers(doc.Markers.Add(marker));
+                }
                 results.Add(doc);
             }
 
@@ -104,9 +107,12 @@ public class CsprojParser
             foreach (var (sourceStr, sourcePath) in files)
             {
                 var doc = _xmlParser.Parse(sourceStr, sourcePath);
-                var marker = MSBuildProjectHelper.CreateMarker(doc);
-                if (marker != null)
-                    doc = doc.WithMarkers(doc.Markers.Add(marker));
+                if (Accept(sourcePath))
+                {
+                    var marker = MSBuildProjectHelper.CreateMarker(doc);
+                    if (marker != null)
+                        doc = doc.WithMarkers(doc.Markers.Add(marker));
+                }
                 results.Add(doc);
             }
             return results;
@@ -132,8 +138,8 @@ public class CsprojParser
     }
 
     /// <summary>
-    /// Returns true for actual project files (.csproj/.vbproj/.fsproj) that support dotnet restore,
-    /// as opposed to .props/.targets files which cannot be restored independently.
+    /// Returns true for actual project files (.csproj/.vbproj/.fsproj) that participate in
+    /// restore, as opposed to .props/.targets files which cannot be restored independently.
     /// </summary>
     private static bool IsProjectFile(string path)
     {
@@ -143,47 +149,5 @@ public class CsprojParser
             return ProjectExtensions.Contains(path[(dot + 1)..]);
         }
         return false;
-    }
-
-    private static bool RunDotnetRestore(string csprojPath)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("dotnet")
-            {
-                WorkingDirectory = Path.GetDirectoryName(csprojPath) ?? ".",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("restore");
-            psi.ArgumentList.Add(csprojPath);
-            psi.ArgumentList.Add("/p:NuGetAudit=false");
-            psi.ArgumentList.Add("/p:RestoreIgnoreFailedSources=true");
-            psi.ArgumentList.Add("--ignore-failed-sources");
-            psi.Environment["NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT"] = "1";
-            psi.Environment["NUGET_ENHANCED_NETWORK_RETRY_DELAY_MILLISECONDS"] = "100";
-
-            using var process = Process.Start(psi);
-            if (process == null) return false;
-
-            process.StandardOutput.ReadToEnd();
-            process.StandardError.ReadToEnd();
-            process.WaitForExit((int)RestoreTimeout.TotalMilliseconds);
-
-            if (!process.HasExited)
-            {
-                try { process.Kill(true); } catch { }
-                return false;
-            }
-
-            return process.ExitCode == 0;
-        }
-        catch (Exception ex)
-        {
-            Log.Debug("CsprojParser: dotnet restore failed: {Error}", ex.Message);
-            return false;
-        }
     }
 }

@@ -212,8 +212,11 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
     }
 
     /**
-     * A resolved NuGet package from the transitive dependency tree.
-     * Built from project.assets.json after dotnet restore.
+     * A resolved package (or referenced project) from the restore dependency graph, carrying
+     * the full per-target-framework asset information from the NuGet {@code LockFile}
+     * (produced by an in-process {@code PackageSpec}/{@code RestoreRunner} restore).
+     * Asset lists hold package-relative paths with {@code _._} placeholder entries stripped,
+     * so an empty list means "the package provides no assets of that kind".
      */
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
@@ -230,6 +233,81 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
 
         int depth;
 
+        /**
+         * Library type from the lock file: "package" or "project".
+         */
+        @Builder.Default
+        String type = "package";
+
+        /**
+         * Compile-time assemblies (lib/ref), lock file {@code compile} section.
+         */
+        @Builder.Default
+        List<String> compileAssemblies = emptyList();
+
+        /**
+         * Runtime assemblies, lock file {@code runtime} section.
+         */
+        @Builder.Default
+        List<String> runtimeAssemblies = emptyList();
+
+        /**
+         * .NET Framework in-box assembly names, lock file {@code frameworkAssemblies} section.
+         */
+        @Builder.Default
+        List<String> frameworkAssemblies = emptyList();
+
+        /**
+         * MSBuild props/targets imports, lock file {@code build} section.
+         */
+        @Builder.Default
+        List<String> buildFiles = emptyList();
+
+        /**
+         * MSBuild imports for the outer multi-targeting build, lock file {@code buildMultiTargeting} section.
+         */
+        @Builder.Default
+        List<String> buildMultiTargetingFiles = emptyList();
+
+        /**
+         * PackageReference-style shared content, lock file {@code contentFiles} section.
+         */
+        @Builder.Default
+        List<String> contentFiles = emptyList();
+
+        /**
+         * RID-specific assets, lock file {@code runtimeTargets} section.
+         */
+        @Builder.Default
+        List<String> runtimeTargets = emptyList();
+
+        /**
+         * Satellite resource assemblies, lock file {@code resource} section.
+         */
+        @Builder.Default
+        List<String> resourceAssemblies = emptyList();
+
+        /**
+         * Roslyn analyzer assemblies, derived from the package file list (analyzers/**.dll).
+         */
+        @Builder.Default
+        List<String> analyzerAssemblies = emptyList();
+
+        /**
+         * Package ships install.ps1/uninstall.ps1/init.ps1 (not executed under PackageReference).
+         */
+        boolean hasInstallScripts;
+
+        /**
+         * Package ships XDT/.transform config transforms (not applied under PackageReference).
+         */
+        boolean hasXdtTransforms;
+
+        /**
+         * Package ships a legacy content/ folder (ignored under PackageReference).
+         */
+        boolean hasLegacyContentFolder;
+
         @Override
         public void rpcSend(ResolvedPackage after, RpcSendQueue q) {
             q.getAndSend(after, ResolvedPackage::getName);
@@ -238,6 +316,28 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
                     dep -> dep.getName() + "@" + dep.getResolvedVersion(),
                     dep -> dep.rpcSend(dep, q));
             q.getAndSend(after, ResolvedPackage::getDepth);
+            q.getAndSend(after, ResolvedPackage::getType);
+            sendStringList(q, after, ResolvedPackage::getCompileAssemblies);
+            sendStringList(q, after, ResolvedPackage::getRuntimeAssemblies);
+            sendStringList(q, after, ResolvedPackage::getFrameworkAssemblies);
+            sendStringList(q, after, ResolvedPackage::getBuildFiles);
+            sendStringList(q, after, ResolvedPackage::getBuildMultiTargetingFiles);
+            sendStringList(q, after, ResolvedPackage::getContentFiles);
+            sendStringList(q, after, ResolvedPackage::getRuntimeTargets);
+            sendStringList(q, after, ResolvedPackage::getResourceAssemblies);
+            sendStringList(q, after, ResolvedPackage::getAnalyzerAssemblies);
+            q.getAndSend(after, ResolvedPackage::isHasInstallScripts);
+            q.getAndSend(after, ResolvedPackage::isHasXdtTransforms);
+            q.getAndSend(after, ResolvedPackage::isHasLegacyContentFolder);
+        }
+
+        private static void sendStringList(RpcSendQueue q, ResolvedPackage after,
+                                           java.util.function.Function<ResolvedPackage, List<String>> selector) {
+            q.getAndSendList(after, selector, s -> s, s -> q.getAndSend(s, x -> x));
+        }
+
+        private static List<String> receiveStringList(RpcReceiveQueue q, List<String> before) {
+            return q.receiveList(before, s -> q.<String, String>receiveAndGet(s, x -> x));
         }
 
         @Override
@@ -247,7 +347,20 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
                     .withResolvedVersion(q.receive(before.resolvedVersion))
                     .withDependencies(q.receiveList(before.dependencies,
                             dep -> dep.rpcReceive(dep, q)))
-                    .withDepth(q.receive(before.depth));
+                    .withDepth(q.receive(before.depth))
+                    .withType(q.receive(before.type))
+                    .withCompileAssemblies(receiveStringList(q, before.compileAssemblies))
+                    .withRuntimeAssemblies(receiveStringList(q, before.runtimeAssemblies))
+                    .withFrameworkAssemblies(receiveStringList(q, before.frameworkAssemblies))
+                    .withBuildFiles(receiveStringList(q, before.buildFiles))
+                    .withBuildMultiTargetingFiles(receiveStringList(q, before.buildMultiTargetingFiles))
+                    .withContentFiles(receiveStringList(q, before.contentFiles))
+                    .withRuntimeTargets(receiveStringList(q, before.runtimeTargets))
+                    .withResourceAssemblies(receiveStringList(q, before.resourceAssemblies))
+                    .withAnalyzerAssemblies(receiveStringList(q, before.analyzerAssemblies))
+                    .withHasInstallScripts(q.receive(before.hasInstallScripts))
+                    .withHasXdtTransforms(q.receive(before.hasXdtTransforms))
+                    .withHasLegacyContentFolder(q.receive(before.hasLegacyContentFolder));
         }
     }
 

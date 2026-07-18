@@ -262,7 +262,18 @@ public abstract class RewriteTest
 
     private static readonly CsprojParser CsprojParserInstance = new();
 
-    private static bool IsCsprojPath(string path) => CsprojParserInstance.Accept(path);
+    private static bool IsCsprojPath(string path)
+    {
+        // packages.config / nuget.config ride along into the shared temp directory so the
+        // in-process restore sees them (legacy attestation, package sources) during ParseAll.
+        var fileName = Path.GetFileName(path);
+        if (fileName.Equals("packages.config", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("nuget.config", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return CsprojParserInstance.Accept(path);
+    }
 
     private static Dictionary<string, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs)
     {

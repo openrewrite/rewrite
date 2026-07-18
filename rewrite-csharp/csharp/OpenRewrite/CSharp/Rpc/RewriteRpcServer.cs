@@ -304,16 +304,19 @@ public class RewriteRpcServer
                 });
             }
 
-            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker
-            // Files are already on disk and restore happened during solution loading,
-            // so we parse XML directly and create the marker from project.assets.json.
+            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
+            // The in-process restore during solution loading produced the in-memory LockFile
+            // for each project; fall back to a fresh in-process resolve when absent.
             try
             {
                 var content = ReadFilePreservingBom(project.FilePath!);
                 var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
                 var xmlParser = new OpenRewrite.Xml.XmlParser();
                 var csprojDoc = xmlParser.Parse(content, relativePath);
-                var marker = MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                var projectFullPath = Path.GetFullPath(project.FilePath!);
+                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
+                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
+                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
                 if (marker != null)
                     csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
                 _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
