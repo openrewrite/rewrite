@@ -300,7 +300,7 @@ class PythonTypeMapping:
         if cache_key in self._lookup_cache:
             return self._lookup_cache[cache_key]
 
-        start = self._pos_to_byte_offset(node.lineno, node.col_offset)  # ty: ignore[unresolved-attribute]  # AST nodes with lineno always have col_offset
+        start = self._decorated_start(node)
         end = self._pos_to_byte_offset(end_lineno, end_col_offset) if end_lineno is not None else None
 
         result = None
@@ -321,6 +321,25 @@ class PythonTypeMapping:
 
         self._lookup_cache[cache_key] = result
         return result
+
+    def _decorated_start(self, node: ast.AST) -> int:
+        """Return the byte offset ty uses as this node's start.
+
+        CPython's ``ast`` places a decorated class/function's ``lineno``/
+        ``col_offset`` at the ``class``/``def`` keyword, but ruff (which ty is
+        built on) starts the statement's range at the first decorator's ``@``.
+        Realign to that ``@`` so the ``(start, end)`` lookup hits; otherwise
+        every decorated class or function (e.g. ``@dataclass``) resolves to no
+        type.
+        """
+        decorators = getattr(node, 'decorator_list', None)
+        if decorators:
+            first = decorators[0]
+            line = self._source_lines[first.lineno - 1] if first.lineno <= len(self._source_lines) else ""
+            at_col = line.rfind('@', 0, first.col_offset)
+            if at_col != -1:
+                return self._pos_to_byte_offset(first.lineno, at_col)
+        return self._pos_to_byte_offset(node.lineno, node.col_offset)  # ty: ignore[unresolved-attribute]  # AST nodes with lineno always have col_offset
 
     def _resolve_type(self, type_id: int) -> Optional[JavaType]:
         """Resolve a type ID to a JavaType, maximizing object reuse.
