@@ -22,6 +22,7 @@ Bidirectional RPC:
 
 import argparse
 import ast
+import csv
 import json
 import logging
 import os
@@ -32,9 +33,15 @@ import time
 import traceback
 import threading
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Set
 from uuid import uuid4
+
+try:
+    import resource
+except ImportError:  # not available on Windows
+    resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName
 
@@ -59,6 +66,14 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
+# Per-source-file remote_refs high-water, captured before a file is first visited so
+# handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
+_ref_checkpoints: Dict[str, int] = {}
+
+# Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
+_metrics_file = None
+_metrics_writer = None
+_metrics_lock = threading.Lock()
 
 # Request ID counter for outgoing requests
 _request_id_counter = 0
@@ -673,8 +688,26 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
+    _ref_checkpoints.clear()
 
     logger.info("Reset: cleared all cached state")
+    return True
+
+
+def handle_evict(params: dict) -> bool:
+    """Handle an Evict RPC notification - drop one source file's tree and roll back the
+    refs it introduced, bounding memory to roughly one source file at a time. Recipe,
+    accumulator, and execution-context state (keyed separately) is left intact.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    local_objects.pop(obj_id, None)
+    remote_objects.pop(obj_id, None)
+    checkpoint = _ref_checkpoints.pop(obj_id, None)
+    if checkpoint is not None:
+        for ref_id in [k for k in remote_refs if k > checkpoint]:
+            del remote_refs[ref_id]
     return True
 
 
@@ -1580,6 +1613,9 @@ def handle_visit(params: dict) -> dict:
 
     _install_data_table_store(ctx)
 
+    # Snapshot the remote_refs high-water for this file before fetching its tree (first visit wins).
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1653,6 +1689,9 @@ def handle_batch_visit(params: dict) -> dict:
             local_objects[p_id] = ctx
 
     _install_data_table_store(ctx)
+
+    # Snapshot the remote_refs high-water for this file before fetching its tree.
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1872,6 +1911,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'Evict': handle_evict,
         'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
@@ -2083,6 +2123,73 @@ def _init_pyroscope() -> None:
     )
 
 
+_METRICS_HEADER = ['timestamp', 'method', 'duration_ms', 'error', 'memory_used_bytes',
+                   'memory_max_bytes', 'local_objects', 'remote_objects', 'refs']
+
+
+def _init_metrics_csv(path: str) -> None:
+    """Open the per-call metrics CSV and write its header. Best-effort: a failure here
+    disables metrics but never blocks the server."""
+    global _metrics_file, _metrics_writer
+    try:
+        _metrics_file = open(path, 'w', newline='')
+        _metrics_writer = csv.writer(_metrics_file)
+        _metrics_writer.writerow(_METRICS_HEADER)
+        _metrics_file.flush()
+    except OSError as e:
+        logger.warning(f"metrics-csv: cannot open {path!r}: {e} - metrics disabled")
+        _metrics_file = _metrics_writer = None
+
+
+def _rss_bytes():
+    """Best-effort (current, peak) RSS in bytes; blank without /proc or the resource module (Windows).
+    The RewriteRpcProcess RSS sampler is the source of truth; these columns just annotate each row."""
+    current = ''
+    peak = ''
+    try:
+        with open('/proc/self/statm') as f:
+            current = int(f.read().split()[1]) * os.sysconf('SC_PAGE_SIZE')
+    except (OSError, ValueError, IndexError):
+        pass
+    if resource is not None:
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # macOS reports ru_maxrss in bytes; Linux and most others in kilobytes.
+        peak = maxrss if sys.platform == 'darwin' else maxrss * 1024
+        if current == '':
+            current = peak
+    return current, peak
+
+
+def _record_metric(method: str, duration_ms: float, error: str) -> None:
+    """Append one row of timing + cache residency. refs counts remote_refs only: Python's send-side
+    refs live on a per-call RpcSendQueue, the only cross-call ref cache handle_evict rolls back."""
+    if _metrics_writer is None:
+        return
+    used, peak = _rss_bytes()
+    with _metrics_lock:
+        if _metrics_writer is None:
+            return
+        try:
+            _metrics_writer.writerow([
+                datetime.now(timezone.utc).isoformat(), method, f"{duration_ms:.0f}", error,
+                used, peak, len(local_objects), len(remote_objects), len(remote_refs)])
+            _metrics_file.flush()
+        except OSError as e:
+            logger.warning(f"metrics-csv: write failed: {e}")
+
+
+def _close_metrics() -> None:
+    global _metrics_file, _metrics_writer
+    with _metrics_lock:
+        if _metrics_file is not None:
+            try:
+                _metrics_file.flush()
+                _metrics_file.close()
+            except OSError:
+                pass
+        _metrics_file = _metrics_writer = None
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -2095,6 +2202,9 @@ def main():
     args = parser.parse_args()
 
     _init_pyroscope()
+
+    if args.metrics_csv:
+        _init_metrics_csv(args.metrics_csv)
 
     if args.recipe_install_dir:
         global _recipe_install_dir
@@ -2128,6 +2238,8 @@ def main():
                 logger.error("Missing 'method' in request")
                 continue
 
+            metric_start = time.monotonic()
+            metric_error = ''
             try:
                 result = handle_request(method, params)
                 response = {
@@ -2139,6 +2251,7 @@ def main():
                 logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
+                metric_error = str(e)
                 response = {
                     'jsonrpc': '2.0',
                     'id': request_id,
@@ -2148,11 +2261,15 @@ def main():
                         'data': tb_str
                     }
                 }
+            _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
 
             if args.trace_rpc_messages:
                 logger.debug(f"Sending: {json.dumps(response)}")
 
-            write_message(response)
+            # Notifications (no id, e.g. Evict) get no reply — a null-id response would
+            # fail every in-flight request on the Java reader.
+            if request_id is not None:
+                write_message(response)
 
         except Exception as e:
             logger.exception(f"Fatal error: {e}")
@@ -2160,6 +2277,7 @@ def main():
 
     # No ty-types cleanup needed here — clients are scoped per parse batch
 
+    _close_metrics()
     logger.info("Python RPC server shutting down...")
 
 

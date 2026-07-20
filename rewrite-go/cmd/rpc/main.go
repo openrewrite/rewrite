@@ -72,6 +72,13 @@ type rpcError struct {
 	Data    string `json:"data,omitempty"`
 }
 
+// evictCheckpoint is a peer's ref high-water before a file is visited: localRefsNext (send,
+// Go→Java) and reverseRemoteRefsMax (receive, Java→Go), so evict rolls back exactly its refs.
+type evictCheckpoint struct {
+	localRefsNext        int
+	reverseRemoteRefsMax int
+}
+
 type server struct {
 	localObjects  map[string]any
 	remoteObjects map[string]any    // forward direction: tracks what Java has from Go
@@ -86,6 +93,10 @@ type server struct {
 	reverseRemoteRefs    map[int]any
 
 	reverseTypePool map[string]java.JavaType
+
+	// Ref high-water marks captured before a source file is first visited, keyed by tree id,
+	// so handleEvict can roll back exactly the refs that file introduced (see handleEvict).
+	refCheckpoints map[string]evictCheckpoint
 
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
@@ -211,6 +222,7 @@ func newServer(cfg serverConfig) *server {
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
+		refCheckpoints:          make(map[string]evictCheckpoint),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
@@ -236,7 +248,7 @@ func newServer(cfg serverConfig) *server {
 		} else {
 			s.metricsFile = f
 			s.metricsWriter = csv.NewWriter(f)
-			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes"}); err != nil {
+			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes", "local_objects", "remote_objects", "refs"}); err != nil {
 				logger.Printf("metrics-csv: cannot write header: %v", err)
 			}
 			s.metricsWriter.Flush()
@@ -288,6 +300,9 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 		errMsg,
 		strconv.FormatUint(mem.HeapAlloc, 10),
 		strconv.FormatUint(mem.Sys, 10),
+		strconv.Itoa(len(s.localObjects)),
+		strconv.Itoa(len(s.remoteObjects)),
+		strconv.Itoa(s.localRefs.Len() + len(s.reverseRemoteRefs)),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
 		s.logger.Printf("metrics-csv: write row failed: %v", err)
@@ -349,6 +364,11 @@ func main() {
 		}
 
 		resp := s.safeHandleRequest(req)
+		// Notifications (no id, e.g. Evict) get no reply — a null-id response would fail
+		// every in-flight request on the Java reader.
+		if isNotification(req.ID) {
+			continue
+		}
 		if err := s.writeMessage(resp); err != nil {
 			s.logger.Printf("Error writing response: %v", err)
 			break
@@ -406,6 +426,12 @@ func (s *server) writeMessage(resp *jsonRPCResponse) error {
 // safeHandleRequest wraps handleRequest with panic recovery and per-RPC
 // metrics capture. The metric row is written exactly once per request,
 // after the response is determined (panic-recovered or not).
+// isNotification reports whether a request has no id (a JSON-RPC notification, e.g. Evict).
+func isNotification(id json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(id)
+	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null"))
+}
+
 func (s *server) safeHandleRequest(req *jsonRPCRequest) (resp *jsonRPCResponse) {
 	start := time.Now()
 	defer func() {
@@ -444,6 +470,8 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 		result, rpcErr = s.handleInstallRecipes(req.Params)
 	case "Reset":
 		result = s.handleReset()
+	case "Evict":
+		result = s.handleEvict(req.Params)
 	case "GetMarketplace":
 		result, rpcErr = s.handleGetMarketplace(req.Params)
 	case "PrepareRecipe":
@@ -1139,11 +1167,58 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.reverseTypePool = make(map[string]java.JavaType)
+	s.refCheckpoints = make(map[string]evictCheckpoint)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
+	s.refCheckpoints = make(map[string]evictCheckpoint)
+	return true
+}
+
+// captureRefCheckpoint records the ref high-water before a file is first visited (first visit
+// wins), keyed by tree id, so handleEvict rolls back exactly the refs that file introduced.
+func (s *server) captureRefCheckpoint(treeID string) {
+	if _, ok := s.refCheckpoints[treeID]; ok {
+		return
+	}
+	maxKey := -1
+	for k := range s.reverseRemoteRefs {
+		if k > maxKey {
+			maxKey = k
+		}
+	}
+	s.refCheckpoints[treeID] = evictCheckpoint{
+		localRefsNext:        s.localRefs.NextID(),
+		reverseRemoteRefsMax: maxKey,
+	}
+}
+
+// handleEvict drops one source file's tree and rolls back the refs it introduced. Recipe/
+// accumulator/context state (keyed separately) is preserved. Fire-and-forget, so it never errors.
+func (s *server) handleEvict(params json.RawMessage) bool {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(params, &req); err != nil || req.ID == "" {
+		return true
+	}
+	if t, ok := s.inProgressGetObjects[req.ID]; ok {
+		t.stop()
+		delete(s.inProgressGetObjects, req.ID)
+	}
+	delete(s.localObjects, req.ID)
+	delete(s.remoteObjects, req.ID)
+	if cp, ok := s.refCheckpoints[req.ID]; ok {
+		s.localRefs.RollbackTo(cp.localRefsNext)
+		for k := range s.reverseRemoteRefs {
+			if k > cp.reverseRemoteRefsMax {
+				delete(s.reverseRemoteRefs, k)
+			}
+		}
+		delete(s.refCheckpoints, req.ID)
+	}
 	return true
 }
 
@@ -1829,6 +1904,7 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Get the tree from Java via bidirectional RPC
+	s.captureRefCheckpoint(req.TreeID)
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
 	if treeObj == nil {
 		return &visitResponse{Modified: false}, nil
@@ -1995,6 +2071,7 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 
 	ctx := s.resolveExecutionContext(req.PID)
 
+	s.captureRefCheckpoint(req.TreeID)
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
 	current, _ := treeObj.(java.Tree)
 	if current == nil {

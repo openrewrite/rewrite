@@ -25,6 +25,7 @@ using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
 using Serilog;
 using StreamJsonRpc;
+using StreamJsonRpc.Protocol;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -83,6 +84,12 @@ public class RewriteRpcServer
     /// Refs received from the remote process (Java) for deduplication.
     /// </summary>
     private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
+
+    /// <summary>
+    /// Ref high-water per source file (send-side _localRefs count, receive-side max _remoteRefs
+    /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
 
     /// <summary>
     /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
@@ -1304,6 +1311,7 @@ public class RewriteRpcServer
         }
 
         // Fetch tree from the remote (Java) process
+        CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
 
         if (phase != "scan" && phase != "edit")
@@ -1358,6 +1366,7 @@ public class RewriteRpcServer
         }
 
         var sw = Stopwatch.StartNew();
+        CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var fetchMs = sw.ElapsedMilliseconds;
 
@@ -1486,6 +1495,7 @@ public class RewriteRpcServer
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
         string? recipeInstallDir = null,
+        string? metricsCsv = null,
         CancellationToken cancellationToken = default)
     {
         marketplace ??= new RecipeMarketplace();
@@ -1513,10 +1523,21 @@ public class RewriteRpcServer
             JsonSerializerOptions = RpcJson.Options,
         };
 
-        var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
-        using var jsonRpc = new StringErrorDataJsonRpc(handler);
-
         var server = new RewriteRpcServer(marketplace, recipeInstallDir);
+
+        // Wrap the handler so each dispatched request records timing + cache residency
+        // (local/remote/refs) — flat with per-file Evict, ramping without.
+        IJsonRpcMessageHandler handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
+        RpcMetricsWriter? metrics = null;
+        if (!string.IsNullOrEmpty(metricsCsv))
+        {
+            metrics = new RpcMetricsWriter(metricsCsv, () =>
+                (server._localObjects.Count, server._remoteObjects.Count,
+                    server._localRefs.Count + server._remoteRefs.Count));
+            handler = new MetricsMessageHandler(handler, metrics);
+        }
+
+        using var jsonRpc = new StringErrorDataJsonRpc(handler);
         server._jsonRpc = jsonRpc;
         _current = server;
         // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
@@ -1533,6 +1554,7 @@ public class RewriteRpcServer
         finally
         {
             _current = null;
+            metrics?.Dispose();
         }
     }
 
@@ -1643,9 +1665,62 @@ public class RewriteRpcServer
         _remoteObjects.Clear();
         _localRefs.Clear();
         _remoteRefs.Clear();
+        _refCheckpoints.Clear();
         _preparedRecipes.Clear();
         _recipeAccumulators.Clear();
         _executionContexts.Clear();
+    }
+
+    /// <summary>
+    /// Records the ref high-water before a source file is first visited (first visit wins), so
+    /// <see cref="Evict"/> can roll back exactly the refs that file introduced.
+    /// </summary>
+    private void CaptureRefCheckpoint(string treeId)
+    {
+        _refCheckpoints.GetOrAdd(treeId, _ =>
+        {
+            var remoteMax = -1;
+            foreach (var key in _remoteRefs.Keys)
+            {
+                if (key > remoteMax)
+                {
+                    remoteMax = key;
+                }
+            }
+            return (_localRefs.Count, remoteMax);
+        });
+    }
+
+    /// <summary>
+    /// Drops one source file's tree and rolls back the refs it introduced; recipe/accumulator/
+    /// context state (keyed separately) is preserved. Fire-and-forget, so it returns no response.
+    /// </summary>
+    [JsonRpcMethod("Evict", UseSingleObjectParameterDeserialization = true)]
+    public void Evict(EvictRequest request)
+    {
+        if (string.IsNullOrEmpty(request.Id))
+        {
+            return;
+        }
+        _localObjects.TryRemove(request.Id, out _);
+        _remoteObjects.TryRemove(request.Id, out _);
+        if (_refCheckpoints.TryRemove(request.Id, out var cp))
+        {
+            foreach (var kv in _localRefs)
+            {
+                if (kv.Value > cp.LocalRefs)
+                {
+                    _localRefs.TryRemove(kv.Key, out _);
+                }
+            }
+            foreach (var key in _remoteRefs.Keys)
+            {
+                if (key > cp.RemoteRefsMax)
+                {
+                    _remoteRefs.TryRemove(key, out _);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1721,6 +1796,126 @@ public class RewriteRpcServer
                 _ => new CSharpReceiver().Visit((J)before, q)!
             };
         }
+    }
+}
+
+/// <summary>
+/// Writes one CSV row per dispatched RPC call: timing, managed-heap memory, and object/ref cache
+/// residency. Same schema as the Go and Python servers. Thread-safe; rows are flushed eagerly.
+/// </summary>
+internal sealed class RpcMetricsWriter : IDisposable
+{
+    private const string Header =
+        "timestamp,method,duration_ms,error,memory_used_bytes,memory_max_bytes,local_objects,remote_objects,refs";
+
+    private readonly StreamWriter _writer;
+    private readonly Func<(int Local, int Remote, int Refs)> _cacheSizes;
+    private readonly object _lock = new();
+    private bool _disposed;
+
+    public RpcMetricsWriter(string path, Func<(int, int, int)> cacheSizes)
+    {
+        _cacheSizes = cacheSizes;
+        _writer = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read));
+        _writer.WriteLine(Header);
+        _writer.Flush();
+    }
+
+    public void Record(string method, double durationMs, string? error)
+    {
+        var (local, remote, refs) = _cacheSizes();
+        var used = GC.GetTotalMemory(false);
+        var max = GC.GetGCMemoryInfo().HeapSizeBytes;
+        var timestamp = DateTimeOffset.UtcNow.ToString("O");
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _writer.WriteLine(
+                $"{timestamp},{method},{durationMs:F0},{Escape(error)},{used},{max},{local},{remote},{refs}");
+            _writer.Flush();
+        }
+    }
+
+    // Quote per RFC 4180 only when the field contains a comma, quote, or newline (errors can).
+    private static string Escape(string? field)
+    {
+        if (string.IsNullOrEmpty(field))
+        {
+            return "";
+        }
+        if (field.IndexOfAny([',', '"', '\n', '\r']) < 0)
+        {
+            return field;
+        }
+        return $"\"{field.Replace("\"", "\"\"")}\"";
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            _writer.Dispose();
+        }
+    }
+}
+
+/// <summary>
+/// Wraps the message handler to record a metrics row when each inbound request's response is
+/// written. Notifications (Evict) get no response and aren't recorded; outbound requests are ignored.
+/// </summary>
+internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposable
+{
+    private readonly IJsonRpcMessageHandler _inner;
+    private readonly RpcMetricsWriter _metrics;
+    private readonly ConcurrentDictionary<RequestId, (string Method, long Start)> _inflight = new();
+
+    public MetricsMessageHandler(IJsonRpcMessageHandler inner, RpcMetricsWriter metrics)
+    {
+        _inner = inner;
+        _metrics = metrics;
+    }
+
+    public bool CanRead => _inner.CanRead;
+    public bool CanWrite => _inner.CanWrite;
+    public IJsonRpcMessageFormatter Formatter => _inner.Formatter;
+
+    public async ValueTask<JsonRpcMessage?> ReadAsync(CancellationToken cancellationToken)
+    {
+        var message = await _inner.ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (message is JsonRpcRequest { IsResponseExpected: true } request)
+        {
+            _inflight[request.RequestId] = (request.Method ?? "", Stopwatch.GetTimestamp());
+        }
+        return message;
+    }
+
+    public async ValueTask WriteAsync(JsonRpcMessage message, CancellationToken cancellationToken)
+    {
+        await _inner.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+        // Only responses to inbound requests carry an id we put in _inflight; outbound requests we
+        // send to Java are JsonRpcRequest and never match, so their ids can't collide here.
+        if (message is JsonRpcResult or JsonRpcError &&
+            message is IJsonRpcMessageWithId withId &&
+            _inflight.TryRemove(withId.RequestId, out var entry))
+        {
+            var durationMs = Stopwatch.GetElapsedTime(entry.Start).TotalMilliseconds;
+            var error = (message as JsonRpcError)?.Error?.Message;
+            _metrics.Record(entry.Method, durationMs, error);
+        }
+    }
+
+    public void Dispose()
+    {
+        (_inner as IDisposable)?.Dispose();
+        _metrics.Dispose();
     }
 }
 
@@ -1819,6 +2014,11 @@ public class PrintRequest
     public string? SourcePath { get; set; }
     public string? SourceFileType { get; set; }
     public string? MarkerPrinter { get; set; }
+}
+
+public class EvictRequest
+{
+    public string Id { get; set; } = "";
 }
 
 public class GetMarketplaceResponseRow

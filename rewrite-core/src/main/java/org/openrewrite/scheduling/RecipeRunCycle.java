@@ -124,6 +124,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (isScanningRequired()) {
             return sourceSetEditor.apply(sourceSet, sourceFile -> {
                 BatchState scanBatch = new BatchState();
+                Set<RewriteRpc> touched = newSetFromMap(new IdentityHashMap<>());
+                Map<RewriteRpc, int[]> refCheckpoints = new IdentityHashMap<>();
 
                 SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = leaf(recipeStack);
@@ -137,6 +139,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         // Check if this is a batchable RPC scanning recipe
                         RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
                         String scanVisitorName = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getScanVisitor() : null;
+
+                        if (scanVisitorName != null) {
+                            captureRpc(currentRpc, touched, refCheckpoints);
+                        }
 
                         if (currentRpc != null && scanVisitorName != null) {
                             // Flush if switching to a different RPC instance
@@ -198,6 +204,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     flushScanBatch(scanBatch, result);
                 }
 
+                evictSourceFile(sourceFile, touched, refCheckpoints);
                 return result;
             });
         }
@@ -220,6 +227,33 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
 
         batch.clear();
+    }
+
+    /**
+     * Record a peer this file touched, snapshotting its ref high-water on first sight so
+     * {@link #evictSourceFile} can roll back exactly the refs this file introduced.
+     */
+    private static void captureRpc(@Nullable RewriteRpc rpc, Set<RewriteRpc> touched,
+                                   Map<RewriteRpc, int[]> refCheckpoints) {
+        if (rpc != null && touched.add(rpc)) {
+            refCheckpoints.put(rpc, rpc.refCheckpoint());
+        }
+    }
+
+    /**
+     * Drop this source file's tree from every RPC peer that visited it, rolling each peer's
+     * ref maps back to the pre-file checkpoint. Bounds RPC-server memory to ~one file at a time.
+     */
+    private static void evictSourceFile(@Nullable SourceFile sourceFile, Set<RewriteRpc> touched,
+                                        Map<RewriteRpc, int[]> refCheckpoints) {
+        if (sourceFile == null || touched.isEmpty()) {
+            return;
+        }
+        String id = sourceFile.getId().toString();
+        for (RewriteRpc rpc : touched) {
+            int[] cp = refCheckpoints.get(rpc);
+            rpc.evict(id, cp[0], cp[1]);
+        }
     }
 
     public LSS generateSources(LSS sourceSet) {
@@ -320,6 +354,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     protected @Nullable SourceFile editSource(LSS sourceSet, SourceFile sourceFile) {
         recipeRunStats.recordSourceVisited(sourceFile);
         BatchState batch = new BatchState();
+        Set<RewriteRpc> touched = newSetFromMap(new IdentityHashMap<>());
+        Map<RewriteRpc, int[]> refCheckpoints = new IdentityHashMap<>();
 
         SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
             Recipe recipe = leaf(recipeStack);
@@ -328,6 +364,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
 
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
+            captureRpc(currentRpc, touched, refCheckpoints);
 
             // Flush batch if switching to a different RPC or non-RPC recipe
             if (batch.rpc != null && batch.rpc != currentRpc) {
@@ -450,6 +487,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             result = flushBatch(batch, result);
         }
 
+        // Recipe errors are handled inside the reduce, so this runs on every normal return.
+        evictSourceFile(sourceFile, touched, refCheckpoints);
         return result;
     }
 

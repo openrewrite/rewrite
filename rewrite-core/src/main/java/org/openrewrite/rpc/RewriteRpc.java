@@ -19,6 +19,7 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.JsonRpcSuccess;
+import io.moderne.jsonrpc.RawJson;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
@@ -248,6 +249,15 @@ public class RewriteRpc {
                 return true;
             }
         });
+        jsonRpc.rpc("Evict", new JsonRpcMethod<Evict>() {
+            @Override
+            protected Boolean handle(Evict request) {
+                // Inbound side has no per-file checkpoint, so refs are left for Reset.
+                remoteObjects.remove(request.getId());
+                localObjects.remove(request.getId());
+                return true;
+            }
+        });
 
         jsonRpc.bind();
     }
@@ -321,6 +331,40 @@ public class RewriteRpc {
         remoteRefs.clear();
         localRefs.clear();
         remoteLanguages = null;
+    }
+
+    /**
+     * Ref high-water marks (send-side count, receive-side max key) captured before a file is
+     * visited so {@link #evict} rolls back exactly that file's refs. Receive-side uses the max
+     * key, not the size, because remote ids may be zero-based.
+     */
+    public int[] refCheckpoint() {
+        int remoteRefsMax = -1;
+        for (Integer ref : remoteRefs.keySet()) {
+            if (ref > remoteRefsMax) {
+                remoteRefsMax = ref;
+            }
+        }
+        return new int[]{localRefs.size(), remoteRefsMax};
+    }
+
+    /**
+     * Drop a file's tree from both peers and roll their refs back to the pre-file checkpoint.
+     * Symmetric by design: dropping the send-side ref forces the next file to re-{@code ADD} the
+     * interned object instead of a {@code REF_USE} the rolled-back receiver would reject. Notified
+     * fire-and-forget — under source-outer iteration the file's transfer is already complete.
+     *
+     * @param localRefsCheckpoint  {@code refCheckpoint()[0]} captured before the file was visited
+     * @param remoteRefsCheckpoint {@code refCheckpoint()[1]} captured before the file was visited
+     */
+    public void evict(String id, int localRefsCheckpoint, int remoteRefsCheckpoint) {
+        jsonRpc.notify(new JsonRpcRequest(null, "Evict", RawJson.of(new Evict(id))));
+
+        remoteObjects.remove(id);
+        localObjects.remove(id);
+
+        localRefs.values().removeIf(ref -> ref > localRefsCheckpoint);
+        remoteRefs.keySet().removeIf(ref -> ref > remoteRefsCheckpoint);
     }
 
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
