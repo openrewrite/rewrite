@@ -354,8 +354,11 @@ public class ChangePropertyKey extends Recipe {
             if (start < 0 || start + keyParts.length > segments.length) {
                 return false;
             }
+            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.LOWER_CAMEL :
+                    NameCaseConvention.EXACT;
             for (int i = 0; i < keyParts.length; i++) {
-                if (!segments[start + i].equals(keyParts[i])) {
+                if (!convention.format(segments[start + i]).equals(convention.format(keyParts[i]))) {
                     return false;
                 }
             }

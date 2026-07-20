@@ -982,6 +982,42 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    void relocatesUnderExistingPrefixWithRelaxedBinding() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "managementServer.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+                    percentiles: [0.99, 0.9]
+              management-server:
+                prometheus:
+                  test: true
+              """,
+            """
+              project:
+                metrics:
+                  prometheus:
+                    percentiles: [0.99, 0.9]
+              management-server:
+                prometheus:
+                  test: true
+                  metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2881")
     @Test
     void embedIndentedPropertyIntoExisting() {
