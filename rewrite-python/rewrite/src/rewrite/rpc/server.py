@@ -59,6 +59,9 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
+# Per-source-file remote_refs high-water, captured before a file is first visited so
+# handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
+_ref_checkpoints: Dict[str, int] = {}
 
 # Request ID counter for outgoing requests
 _request_id_counter = 0
@@ -673,8 +676,26 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
+    _ref_checkpoints.clear()
 
     logger.info("Reset: cleared all cached state")
+    return True
+
+
+def handle_evict(params: dict) -> bool:
+    """Handle an Evict RPC notification - drop one source file's tree and roll back the
+    refs it introduced, bounding memory to roughly one source file at a time. Recipe,
+    accumulator, and execution-context state (keyed separately) is left intact.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    local_objects.pop(obj_id, None)
+    remote_objects.pop(obj_id, None)
+    checkpoint = _ref_checkpoints.pop(obj_id, None)
+    if checkpoint is not None:
+        for ref_id in [k for k in remote_refs if k > checkpoint]:
+            del remote_refs[ref_id]
     return True
 
 
@@ -1580,6 +1601,9 @@ def handle_visit(params: dict) -> dict:
 
     _install_data_table_store(ctx)
 
+    # Snapshot the remote_refs high-water for this file before fetching its tree (first visit wins).
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1653,6 +1677,9 @@ def handle_batch_visit(params: dict) -> dict:
             local_objects[p_id] = ctx
 
     _install_data_table_store(ctx)
+
+    # Snapshot the remote_refs high-water for this file before fetching its tree.
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1872,6 +1899,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'Evict': handle_evict,
         'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
@@ -2152,7 +2180,10 @@ def main():
             if args.trace_rpc_messages:
                 logger.debug(f"Sending: {json.dumps(response)}")
 
-            write_message(response)
+            # Notifications (no id, e.g. Evict) get no reply — a null-id response would
+            # fail every in-flight request on the Java reader.
+            if request_id is not None:
+                write_message(response)
 
         except Exception as e:
             logger.exception(f"Fatal error: {e}")
