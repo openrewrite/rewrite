@@ -220,7 +220,6 @@ public class SolutionParser
     public async Task<Solution> LoadAsync(string path, CancellationToken ct = default)
     {
         Log.Debug("LoadAsync: starting for {Path}", path);
-        MSBuildRegistration.Ensure();
 
         // Legacy non-SDK projects use packages.config: they need the solution-local packages/
         // folder materialized and get their attestation graph from a synthesized PackageSpec.

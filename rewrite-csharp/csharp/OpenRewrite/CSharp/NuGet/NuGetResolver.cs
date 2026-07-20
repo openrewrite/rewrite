@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.Build.Construction;
-using Microsoft.Build.Evaluation;
-using Microsoft.Build.Execution;
-using Microsoft.Build.Locator;
 using NuGet.Commands;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -35,30 +33,6 @@ using Serilog;
 using ILogger = NuGet.Common.ILogger;
 
 namespace OpenRewrite.CSharp.NuGet;
-
-/// <summary>
-/// Ensures MSBuildLocator registration happens exactly once per process, shared by
-/// <see cref="SolutionParser"/> (MSBuildWorkspace) and <see cref="NuGetResolver"/>
-/// (in-process restore-graph evaluation).
-/// </summary>
-internal static class MSBuildRegistration
-{
-    private static readonly object Lock = new();
-    private static bool _registered;
-
-    public static void Ensure()
-    {
-        lock (Lock)
-        {
-            if (!_registered)
-            {
-                if (!MSBuildLocator.IsRegistered)
-                    MSBuildLocator.RegisterDefaults();
-                _registered = true;
-            }
-        }
-    }
-}
 
 /// <summary>
 /// In-process NuGet engine replacing all child-process package operations
@@ -122,28 +96,6 @@ public static class NuGetResolver
         }
     }
 
-    /// <summary>MSBuild logger forwarding errors/warnings to Serilog at Debug level.</summary>
-    private sealed class SerilogMSBuildLogger : Microsoft.Build.Framework.ILogger
-    {
-        public Microsoft.Build.Framework.LoggerVerbosity Verbosity { get; set; } =
-            Microsoft.Build.Framework.LoggerVerbosity.Quiet;
-
-        public string? Parameters { get; set; }
-
-        public void Initialize(Microsoft.Build.Framework.IEventSource eventSource)
-        {
-            eventSource.ErrorRaised += (_, e) =>
-                Log.Debug("MSBuild error {Code} at {File}({Line}): {Message}",
-                    e.Code, e.File, e.LineNumber, e.Message);
-            eventSource.WarningRaised += (_, e) =>
-                Log.Debug("MSBuild warning {Code}: {Message}", e.Code, e.Message);
-        }
-
-        public void Shutdown()
-        {
-        }
-    }
-
     public static ILogger Logger => SerilogNuGetLogger.Instance;
 
     public static ISettings LoadSettings(string startDirectory) =>
@@ -160,8 +112,6 @@ public static class NuGetResolver
         string path,
         IDictionary<string, string>? extraGlobalProperties = null)
     {
-        MSBuildRegistration.Ensure();
-
         var projects = EnumerateProjects(path).ToList();
         if (projects.Count == 0)
         {
@@ -242,18 +192,21 @@ public static class NuGetResolver
         }
     }
 
-    // BuildManager.DefaultBuildManager.Build is not safe for concurrent invocations.
+    // Serialize graph generation: concurrent SDK msbuild processes contend on obj/ and
+    // the NuGet http cache without adding throughput for our one-at-a-time callers.
     private static readonly object BuildGate = new();
 
+    private static readonly TimeSpan GraphGenTimeout = TimeSpan.FromMinutes(5);
+
     /// <summary>
-    /// Runs the <c>GenerateRestoreGraphFile</c> target for a single project and loads the
-    /// resulting <see cref="DependencyGraphSpec"/>. The target executes in an out-of-process
-    /// MSBuild worker node (<see cref="BuildParameters.DisableInProcNode"/>) so the SDK's own
-    /// NuGet task assemblies never load into this process, where they would collide with the
-    /// NuGet client libraries used for the in-process restore. Only graph *evaluation* happens
-    /// in the worker; dependency resolution and downloads run in-process via
-    /// <see cref="RestoreRunner"/>. Returns null on evaluation/target failure
-    /// (e.g. a legacy project whose imports cannot be resolved).
+    /// Runs the <c>GenerateRestoreGraphFile</c> target for a single project via the .NET SDK's
+    /// own <c>dotnet msbuild</c> and loads the resulting <see cref="DependencyGraphSpec"/>.
+    /// Evaluation deliberately runs in the SDK's process, never ours: loading Microsoft.Build
+    /// into this process (MSBuildLocator-style) is fragile — any MSBuild assembly in the app
+    /// base defeats the redirection, and the SDK's restore tasks bind their own NuGet assembly
+    /// versions. Only *evaluation* happens in the child; dependency resolution and downloads
+    /// run in-process via <see cref="RestoreRunner"/>. Returns null on evaluation/target
+    /// failure (e.g. a legacy project whose imports cannot be resolved).
     /// </summary>
     private static DependencyGraphSpec? GenerateRestoreGraph(
         string projectPath,
@@ -272,7 +225,7 @@ public static class NuGetResolver
                 // NuGet.targets' internal default already discovers the closure per entry.
                 ["NuGetAudit"] = "false",
                 ["RestoreIgnoreFailedSources"] = "true",
-                ["RestoreAdditionalProjectSources"] = string.Join(";", AdditionalNuGetSources),
+                ["RestoreAdditionalProjectSources"] = string.Join("%3B", AdditionalNuGetSources),
                 // Avoid restore-time package imports polluting evaluation
                 ["ExcludeRestorePackageImports"] = "true",
             };
@@ -282,27 +235,46 @@ public static class NuGetResolver
                     globalProps[k] = v;
             }
 
+            var psi = new ProcessStartInfo("dotnet")
+            {
+                WorkingDirectory = Path.GetDirectoryName(projectPath) ?? ".",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            psi.ArgumentList.Add("msbuild");
+            psi.ArgumentList.Add(projectPath);
+            psi.ArgumentList.Add("-t:GenerateRestoreGraphFile");
+            psi.ArgumentList.Add("-nologo");
+            psi.ArgumentList.Add("-v:quiet");
+            psi.ArgumentList.Add("-nodeReuse:false");
+            foreach (var (k, v) in globalProps)
+                psi.ArgumentList.Add($"-p:{k}={v}");
+
             lock (BuildGate)
             {
-                using var projectCollection = new ProjectCollection(globalProps);
-                var parameters = new BuildParameters(projectCollection)
+                using var process = Process.Start(psi);
+                if (process == null)
                 {
-                    DisableInProcNode = true,
-                    EnableNodeReuse = false,
-                    MaxNodeCount = 1,
-                    Loggers = new Microsoft.Build.Framework.ILogger[] { new SerilogMSBuildLogger() },
-                };
-                var requestData = new BuildRequestData(
-                    projectPath,
-                    globalProps,
-                    null,
-                    new[] { "GenerateRestoreGraphFile" },
-                    null);
-                var result = BuildManager.DefaultBuildManager.Build(parameters, requestData);
-                if (result.OverallResult != BuildResultCode.Success || !File.Exists(outputPath))
+                    Log.Debug("NuGetResolver: failed to start dotnet msbuild for {Project}", projectPath);
+                    return null;
+                }
+
+                // Read both streams before waiting to avoid pipe-buffer deadlock.
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
+                if (!process.WaitForExit((int)GraphGenTimeout.TotalMilliseconds))
                 {
-                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile failed for {Project}: {Exception}",
-                        projectPath, result.Exception?.Message);
+                    try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile timed out for {Project}", projectPath);
+                    return null;
+                }
+
+                if (process.ExitCode != 0 || !File.Exists(outputPath))
+                {
+                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile failed for {Project} (exit {Exit}):\n{Out}\n{Err}",
+                        projectPath, process.ExitCode, stdoutTask.Result.Trim(), stderrTask.Result.Trim());
                     return null;
                 }
             }
