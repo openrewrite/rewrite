@@ -1481,6 +1481,94 @@ x = Multi()
             _cleanup_mapping(mapping, tmpdir, client)
 
 
+@requires_ty_types_cli
+class TestDecoratedDeclarationType:
+    """Regression tests for type attribution of *decorated* class/function declarations.
+
+    CPython's ``ast`` places a decorated class/function's ``lineno``/``col_offset``
+    at the ``class``/``def`` keyword, while ruff (ty's backend) starts the
+    statement's range at the first decorator's ``@``. The byte-offset lookup must
+    realign to the decorator, otherwise every decorated declaration resolves to no
+    type — which is what left ``J.ClassDeclaration.getType()`` null for Python
+    ``@dataclass`` classes (openrewrite/rewrite#8293).
+    """
+
+    def _class_type(self, source: str, class_name: str):
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            node = next(n for n in ast.walk(tree)
+                        if isinstance(n, ast.ClassDef) and n.name == class_name)
+            return mapping.type(node)
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_undecorated_class_declaration_has_type(self):
+        result = self._class_type('class Foo:\n    pass\n', 'Foo')
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name.endswith('Foo')
+
+    def test_dataclass_declaration_has_type(self):
+        source = '''from dataclasses import dataclass
+
+
+@dataclass
+class Foo:
+    x: int
+'''
+        result = self._class_type(source, 'Foo')
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name.endswith('Foo')
+
+    def test_custom_decorated_class_declaration_has_type(self):
+        source = '''def deco(c):
+    return c
+
+
+@deco
+class Foo:
+    pass
+'''
+        result = self._class_type(source, 'Foo')
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name.endswith('Foo')
+
+    def test_multiple_decorators_class_declaration_has_type(self):
+        source = '''def a(c):
+    return c
+
+
+def b(c):
+    return c
+
+
+@a
+@b
+class Foo:
+    pass
+'''
+        result = self._class_type(source, 'Foo')
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name.endswith('Foo')
+
+    def test_decorated_function_declaration_has_method_type(self):
+        source = '''import functools
+
+
+@functools.cache
+def f(x: int) -> int:
+    return x
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            node = next(n for n in ast.walk(tree)
+                        if isinstance(n, ast.FunctionDef) and n.name == 'f')
+            result = mapping.method_declaration_type(node)
+            assert result is not None
+            assert result._return_type == JavaType.Primitive.Int
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 class TestGenericTypeVariable:
     """Tests for typeVar → GenericTypeVariable conversion."""
 
