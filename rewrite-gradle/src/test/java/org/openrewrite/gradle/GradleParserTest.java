@@ -23,10 +23,14 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -567,6 +571,48 @@ class GradleParserTest implements RewriteTest {
         assertThat(optionalSourceFile).isPresent();
         SourceFile sourceFile = optionalSourceFile.get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    /**
+     * {@code org.openrewrite.gradle.Assertions#gradleParser} is a single {@code static final}
+     * {@link GradleParser.Builder} that every {@code gradle(...)} spec reuses, and {@code RewriteTest} clones
+     * it per test method to isolate state while JUnit Jupiter runs those methods concurrently. Cloning must
+     * therefore give every clone its own {@link JavaTypeCache}: the cache's backing
+     * {@link org.openrewrite.internal.AdaptiveRadixTree} is not thread-safe, so a shared cache written from
+     * multiple threads corrupts it and (with assertions enabled) trips
+     * {@code AdaptiveRadixTree$InternalNode.split}. {@link GroovyParser.Builder#clone()} and
+     * {@link KotlinParser.Builder#clone()} already clone their caches; {@link GradleParser.Builder} must
+     * propagate that to both sub-builders rather than inheriting a shallow {@link Object#clone()}.
+     */
+    @Issue("https://github.com/openrewrite/rewrite/pull/8301")
+    @Test
+    void cloneIsolatesGroovyAndKotlinTypeCaches() throws Exception {
+        GradleParser.Builder shared = GradleParser.builder()
+          .groovyParser(GroovyParser.builder())
+          .kotlinParser(KotlinParser.builder());
+
+        GradleParser.Builder cloneA = (GradleParser.Builder) shared.clone();
+        GradleParser.Builder cloneB = (GradleParser.Builder) shared.clone();
+
+        assertThat(cloneA.groovyParser)
+          .isNotSameAs(shared.groovyParser)
+          .isNotSameAs(cloneB.groovyParser);
+        assertThat(cloneA.kotlinParser)
+          .isNotSameAs(shared.kotlinParser)
+          .isNotSameAs(cloneB.kotlinParser);
+
+        assertThat(typeCacheOf(cloneA.groovyParser))
+          .isNotSameAs(typeCacheOf(shared.groovyParser))
+          .isNotSameAs(typeCacheOf(cloneB.groovyParser));
+        assertThat(typeCacheOf(cloneA.kotlinParser))
+          .isNotSameAs(typeCacheOf(shared.kotlinParser))
+          .isNotSameAs(typeCacheOf(cloneB.kotlinParser));
+    }
+
+    private static JavaTypeCache typeCacheOf(Object parserBuilder) throws Exception {
+        Field field = parserBuilder.getClass().getDeclaredField("typeCache");
+        field.setAccessible(true);
+        return (JavaTypeCache) field.get(parserBuilder);
     }
 
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
