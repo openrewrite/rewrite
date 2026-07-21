@@ -255,6 +255,52 @@ class PipenvLockEngineTest {
     }
 
     @Test
+    void bareVersionIsTreatedAsExactPin() {
+        stubRequestsBaseline();
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = "2.32.4"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.32.4\"");
+    }
+
+    @Test
+    void bareVersionMatchingExistingPinRegeneratesWithoutError() {
+        stubRequestsBaseline();
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = "2.31.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.31.0\"");
+    }
+
+    @Test
     void requiresBumpRevalidatesEveryPinAndRewritesMeta() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
