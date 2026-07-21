@@ -2715,12 +2715,12 @@ class TestClassObjectTypeAttribution:
         instance type); the fix must not regress that to instance assignability.
         """
         from rewrite.python.type_utils import is_assignable_to
-        source = (
-            "class M:\n"
-            "    @classmethod\n"
-            "    def make(cls):\n"
-            "        return cls\n"
-        )
+        source = textwrap.dedent('''\
+            class M:
+                @classmethod
+                def make(cls):
+                    return cls
+        ''')
         cu, tmpdir, client = _parse_with_types({'m.py': source}, 'm.py')
         try:
             cls_types = self._collect_ident_types(cu, 'cls')
