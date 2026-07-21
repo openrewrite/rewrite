@@ -90,10 +90,13 @@ class Facade:
         if bundle is None:
             raise ValueError(f"No child owns visitor '{visitor}'")
         result = self._children.request(bundle, "Visit", params)
-        # The child now holds the (possibly modified) tree in its local_objects, along with the
-        # RPC ref-state built up fetching inputs. A later Print/GetObject for this tree must run
-        # there — the facade's own ref-state is empty and cannot service get_object_from_java.
         tree_id = params.get("treeId")
+        # The edit lives in the child; the facade answers Java's later Print/GetObject from its own
+        # tree. Pull it back here or that answer is the unmodified input and the edit is lost --
+        # silently, since the run still succeeds and simply reports no changes. `batch_visit` does
+        # the same for each of its runs; a single-recipe run reaches this path instead.
+        if self._hub_pull is not None and tree_id is not None and result.get("modified"):
+            self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"))
         if tree_id is not None:
             self._bundle_by_tree[tree_id] = bundle
         self._active_bundle = bundle

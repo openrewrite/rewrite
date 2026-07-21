@@ -154,6 +154,9 @@ class _EditingChildren(_FakeChildren):
             vs = [v["visitor"] for v in params.get("visitors", [])]
             self.calls.append(("batch", bundle, vs))
             return {"results": [{"visitor": v, "modified": self._modified} for v in vs]}
+        if method == "Visit":
+            self.calls.append(("visit", bundle, params.get("visitor")))
+            return {"modified": self._modified}
         return super().request(bundle, method, params)
 
 
@@ -171,6 +174,35 @@ def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
         ("batch", "A", ["edit:a"]), ("batch", "B", ["edit:b"])]
     # each run's edit is pulled into the facade's tree in order, so B starts from A's result
     assert pulls == [("A", "T", "py"), ("B", "T", "py")]
+
+
+def test_single_visit_pulls_its_edit_into_the_hub():
+    """A single-recipe run reaches `visit`, not `batch_visit`, and must pull its edit back too.
+
+    The facade answers Java's later Print/GetObject from its own tree, so an edit left behind in
+    the child is lost -- silently, because the run still succeeds and reports no changes. Observed
+    end-to-end as a modifying recipe producing a diff inside a composite but "No changes" when run
+    on its own.
+    """
+    children = _EditingChildren()
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor["edit:a"] = "A"
+
+    f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
+
+    assert pulls == [("A", "T", "py")]
+
+
+def test_single_visit_does_not_pull_when_nothing_changed():
+    children = _EditingChildren(modified=False)
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor["edit:a"] = "A"
+
+    f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
+
+    assert pulls == []
 
 
 def test_single_bundle_batch_still_pulls_its_edit_into_the_hub():
