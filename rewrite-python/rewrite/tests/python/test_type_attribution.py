@@ -37,6 +37,7 @@ from rewrite.python.ty_client import TyTypesClient
 from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python.visitor import PythonVisitor
 from rewrite.java.tree import MethodInvocation, ClassDeclaration
+from rewrite.test import dedent
 
 
 def _ty_types_cli_available() -> bool:
@@ -354,10 +355,10 @@ class TestModuleFunctionDeclaringType:
 
     def test_os_getcwd_declaring_type_is_os(self):
         """import os; os.getcwd() → declaring type FQN should be 'os'."""
-        source = textwrap.dedent('''\
+        source = '''
             import os
             os.getcwd()
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -372,10 +373,10 @@ class TestModuleFunctionDeclaringType:
 
     def test_os_path_join_declaring_type(self):
         """import os; os.path.join() → declaring type FQN should contain 'os.path' or 'posixpath'."""
-        source = textwrap.dedent('''\
+        source = '''
             import os
             os.path.join("/tmp", "file.txt")
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -392,10 +393,10 @@ class TestModuleFunctionDeclaringType:
 
     def test_json_dumps_declaring_type(self):
         """import json; json.dumps() → declaring type FQN should be 'json'."""
-        source = textwrap.dedent('''\
+        source = '''
             import json
             json.dumps({"key": "value"})
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -630,7 +631,11 @@ def _make_mapping(source: str) -> tuple:
 
     Returns (mapping, tree, tmpdir_path) inside active context managers.
     Use with _with_mapping() instead for automatic cleanup.
+
+    ``source`` is dedented so callers can pass cleanly indented triple-quoted
+    strings; byte offsets used for type lookup are relative to the dedented text.
     """
+    source = dedent(source)
     tree = ast.parse(source)
     tmpdir = tempfile.mkdtemp()
     file_path = os.path.join(tmpdir, 'test.py')
@@ -823,14 +828,14 @@ class TestDeclaringTypeWithTyTypes:
 
     def test_user_defined_class_method(self):
         """Method call on a user-defined class instance."""
-        source = textwrap.dedent('''\
+        source = '''
             class Greeter:
                 def greet(self, name: str) -> str:
                     return "Hello, " + name
 
             g = Greeter()
             g.greet("World")
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[2].value  # g.greet("World")
@@ -844,14 +849,14 @@ class TestDeclaringTypeWithTyTypes:
 
     def test_user_defined_class_method_return_type(self):
         """Return type from a user-defined class method."""
-        source = textwrap.dedent('''\
+        source = '''
             class Greeter:
                 def greet(self, name: str) -> str:
                     return "Hello, " + name
 
             g = Greeter()
             g.greet("World")
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[2].value
@@ -863,10 +868,10 @@ class TestDeclaringTypeWithTyTypes:
 
     def test_stdlib_os_path_join(self):
         """os.path.join() resolves correctly."""
-        source = textwrap.dedent('''\
+        source = '''
             import os
             os.path.join("/tmp", "file.txt")
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -884,12 +889,12 @@ class TestUnionTypes:
 
     def test_optional_str_variable_method(self):
         """Calling a method on an Optional[str] variable that's been narrowed."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Optional
             x: Optional[str] = "hello"
             if x is not None:
                 x.upper()
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             # x.upper() is inside the if body
@@ -904,13 +909,13 @@ class TestUnionTypes:
 
     def test_union_return_type(self):
         """Function returning Optional[str] should have str or Unknown return type."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Optional
             def maybe_name() -> Optional[str]:
                 return "Alice"
 
             maybe_name()
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[2].value  # maybe_name()
@@ -1076,12 +1081,12 @@ class TestMethodSignatureDetails:
 
     def test_user_function_param_names(self):
         """Parameter names are resolved from a user-defined function."""
-        source = textwrap.dedent('''\
+        source = '''
             def add(a: int, b: int) -> int:
                 return a + b
 
             add(1, 2)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -1096,12 +1101,12 @@ class TestMethodSignatureDetails:
 
     def test_user_function_param_types(self):
         """Parameter types are resolved from a user-defined function."""
-        source = textwrap.dedent('''\
+        source = '''
             def add(a: int, b: int) -> int:
                 return a + b
 
             add(1, 2)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -1116,14 +1121,14 @@ class TestMethodSignatureDetails:
 
     def test_method_filters_self_param(self):
         """Method signature should not include 'self' in parameter names."""
-        source = textwrap.dedent('''\
+        source = '''
             class Calculator:
                 def add(self, a: int, b: int) -> int:
                     return a + b
 
             c = Calculator()
             c.add(1, 2)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[2].value  # c.add(1, 2)
@@ -1137,12 +1142,12 @@ class TestMethodSignatureDetails:
 
     def test_default_param_still_listed(self):
         """Parameters with defaults are still included."""
-        source = textwrap.dedent('''\
+        source = '''
             def greet(name: str, greeting: str = "Hello") -> str:
                 return f"{greeting}, {name}!"
 
             greet("World")
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -1328,7 +1333,7 @@ class TestParamSpecAndConcatenateIntegration:
     def test_callable_paramspec_collapses_in_invocation(self):
         """`cb()` where `cb: Callable[P, R]` yields a method type with a
         single collapsed `P` parameter rather than two variadic entries."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Callable, ParamSpec, TypeVar
             P = ParamSpec('P')
             R = TypeVar('R')
@@ -1337,7 +1342,7 @@ class TestParamSpecAndConcatenateIntegration:
                 return cb()
 
             run(lambda: 42)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             cb_call = tree.body[3].body[0].value  # cb() inside run
@@ -1353,7 +1358,7 @@ class TestParamSpecAndConcatenateIntegration:
     def test_concatenate_keeps_prefix_and_collapses_tail(self):
         """`cb(1)` where `cb: Callable[Concatenate[int, P], R]` yields a
         method type with the leading `int` plus a single collapsed `P`."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Callable, Concatenate, ParamSpec, TypeVar
             P = ParamSpec('P')
             R = TypeVar('R')
@@ -1362,7 +1367,7 @@ class TestParamSpecAndConcatenateIntegration:
                 return cb(1)
 
             run(lambda x: x)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             cb_call = tree.body[3].body[0].value  # cb(1) inside run
@@ -1380,12 +1385,12 @@ class TestParamSpecAndConcatenateIntegration:
     def test_plain_function_method_type_unchanged(self):
         """Regression: a function with no ParamSpec/Concatenate produces the
         same (name, type) pairs it did before the 0.0.31 field additions."""
-        source = textwrap.dedent('''\
+        source = '''
             def add(a: int, b: int) -> int:
                 return a + b
 
             add(1, 2)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[1].value
@@ -1404,7 +1409,7 @@ class TestClassKind:
 
     def test_enum_class_has_enum_kind(self):
         """A class inheriting from Enum should have Kind.Enum."""
-        source = textwrap.dedent('''\
+        source = '''
             from enum import Enum
 
             class Color(Enum):
@@ -1412,7 +1417,7 @@ class TestClassKind:
                 GREEN = 2
 
             x = Color.RED
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             # x = Color.RED — the type of x should be Color
@@ -1427,14 +1432,14 @@ class TestClassKind:
 
     def test_protocol_class_has_interface_kind(self):
         """A class inheriting from Protocol should have Kind.Interface."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Protocol
 
             class Greeter(Protocol):
                 def greet(self, name: str) -> str: ...
 
             x: Greeter
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             name_node = tree.body[2].target  # x
@@ -1448,12 +1453,12 @@ class TestClassKind:
 
     def test_regular_class_has_class_kind(self):
         """A regular class should have Kind.Class."""
-        source = textwrap.dedent('''\
+        source = '''
             class MyClass:
                 pass
 
             x = MyClass()
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             name_node = tree.body[1].targets[0]  # x
@@ -1467,7 +1472,7 @@ class TestClassKind:
 
     def test_multiple_supertypes_stored_as_interfaces(self):
         """Python multiple inheritance: first supertype → _supertype, rest → _interfaces."""
-        source = textwrap.dedent('''\
+        source = '''
             class Mixin:
                 def mix(self) -> str:
                     return 'mixed'
@@ -1480,7 +1485,7 @@ class TestClassKind:
                 pass
 
             x = Multi()
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             name_node = tree.body[3].targets[0]  # x
@@ -1530,20 +1535,20 @@ class TestDecoratedDeclarationType:
         assert result._fully_qualified_name.endswith('Foo')
 
     def test_dataclass_declaration_has_type(self):
-        source = textwrap.dedent('''\
+        source = '''
             from dataclasses import dataclass
 
 
             @dataclass
             class Foo:
                 x: int
-        ''')
+        '''
         result = self._class_type(source, 'Foo')
         assert isinstance(result, JavaType.Class)
         assert result._fully_qualified_name.endswith('Foo')
 
     def test_custom_decorated_class_declaration_has_type(self):
-        source = textwrap.dedent('''\
+        source = '''
             def deco(c):
                 return c
 
@@ -1551,13 +1556,13 @@ class TestDecoratedDeclarationType:
             @deco
             class Foo:
                 pass
-        ''')
+        '''
         result = self._class_type(source, 'Foo')
         assert isinstance(result, JavaType.Class)
         assert result._fully_qualified_name.endswith('Foo')
 
     def test_multiple_decorators_class_declaration_has_type(self):
-        source = textwrap.dedent('''\
+        source = '''
             def a(c):
                 return c
 
@@ -1570,20 +1575,20 @@ class TestDecoratedDeclarationType:
             @b
             class Foo:
                 pass
-        ''')
+        '''
         result = self._class_type(source, 'Foo')
         assert isinstance(result, JavaType.Class)
         assert result._fully_qualified_name.endswith('Foo')
 
     def test_decorated_function_declaration_has_method_type(self):
-        source = textwrap.dedent('''\
+        source = '''
             import functools
 
 
             @functools.cache
             def f(x: int) -> int:
                 return x
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             node = next(n for n in ast.walk(tree)
@@ -1732,10 +1737,10 @@ class TestImportedNameTypeAttribution:
 
     def test_typing_callable_has_fqn(self):
         """typing.Callable in a type annotation should resolve to typing.Callable, not Unknown."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Callable
             handler: Callable[[int], str] = lambda x: str(x)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             # handler: Callable[...] — the annotation target 'handler'
@@ -1757,10 +1762,10 @@ class TestImportedNameTypeAttribution:
 
     def test_typing_callable_qualified_has_fqn(self):
         """typing.Callable via qualified access should also resolve correctly."""
-        source = textwrap.dedent('''\
+        source = '''
             import typing
             handler: typing.Callable[[int], str] = lambda x: str(x)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             ann_node = tree.body[1]  # AnnAssign
@@ -2012,11 +2017,11 @@ class TestNewDescriptorsWithTyTypes:
 
     def test_callable_annotation_resolves(self):
         """A Callable[[int], str] annotation should resolve."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import Callable
             my_func: Callable[[int], str] = str
             my_func
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             name_node = tree.body[2].value  # bare 'my_func' expression
@@ -2031,14 +2036,14 @@ class TestNewDescriptorsWithTyTypes:
 
     def test_bound_method_has_classname_declaring_type(self):
         """Bound method on user class should produce declaring type from className."""
-        source = textwrap.dedent('''\
+        source = '''
             class Calculator:
                 def add(self, a: int, b: int) -> int:
                     return a + b
 
             c = Calculator()
             c.add(1, 2)
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             call = tree.body[2].value  # c.add(1, 2)
@@ -2052,11 +2057,11 @@ class TestNewDescriptorsWithTyTypes:
 
     def test_typevar_with_constraints_from_ty_types(self):
         """TypeVar with constraints should produce GenericTypeVariable with bounds."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import TypeVar
             T = TypeVar('T', int, str)
             x: T
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             # Look up the type of 'x' which should be T
@@ -2072,11 +2077,11 @@ class TestNewDescriptorsWithTyTypes:
 
     def test_type_alias_resolves_through_value(self):
         """A type alias should resolve through to its value type."""
-        source = textwrap.dedent('''\
+        source = '''
             type MyInt = int
             x: MyInt = 42
             x
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             name_node = tree.body[2].value  # bare 'x'
@@ -2092,10 +2097,10 @@ class TestNewDescriptorsWithTyTypes:
 
     def test_known_instance_typevar_resolves_to_class(self):
         """The TypeVar constructor name should resolve to a class, not Unknown."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing import TypeVar
             TypeVar
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             name_node = tree.body[1].value  # bare 'TypeVar'
@@ -2194,7 +2199,11 @@ def _parse_with_types(files: dict, main_filename: str = 'm.py'):
     Sibling modules in ``files`` are written into the same workspace so ty can
     resolve cross-module references. Returns ``(cu, tmpdir, client)``; the
     caller must call :func:`_cleanup_parse`.
+
+    Each source is dedented so callers can pass cleanly indented triple-quoted
+    strings; byte offsets used for type lookup are relative to the dedented text.
     """
+    files = {name: dedent(src) for name, src in files.items()}
     tmpdir = tempfile.mkdtemp()
     for name, src in files.items():
         with open(os.path.join(tmpdir, name), 'w') as f:
@@ -2251,7 +2260,7 @@ class TestMethodInvocationResultType:
     """
 
     def test_method_invocation_type_is_return_type(self):
-        src = textwrap.dedent('''\
+        src = '''
             class Widget:
                 pass
 
@@ -2259,7 +2268,7 @@ class TestMethodInvocationResultType:
                 return Widget()
 
             w = make_widget()
-        ''')
+        '''
         cu, tmpdir, client = _parse_with_types({'m.py': src})
         try:
             make = [c for c in _collect_method_invocations(cu)
@@ -2275,7 +2284,7 @@ class TestMethodInvocationResultType:
 
     def test_method_invocation_type_matches_method_return_type(self):
         """The derived ``type`` equals the underlying ``method_type.return_type``."""
-        src = textwrap.dedent('''\
+        src = '''
             class Widget:
                 pass
 
@@ -2283,7 +2292,7 @@ class TestMethodInvocationResultType:
                 return Widget()
 
             w = make_widget()
-        ''')
+        '''
         cu, tmpdir, client = _parse_with_types({'m.py': src})
         try:
             make = [c for c in _collect_method_invocations(cu)
@@ -2308,7 +2317,7 @@ class TestSupertypeChainResolution:
 
     def test_cross_module_supertype_chain(self):
         base = "class Base:\n    pass\n"
-        main = textwrap.dedent('''\
+        main = '''
             from basemod import Base
 
             class Mid(Base):
@@ -2316,7 +2325,7 @@ class TestSupertypeChainResolution:
 
             class Leaf(Mid):
                 pass
-        ''')
+        '''
         cu, tmpdir, client = _parse_with_types(
             {'basemod.py': base, 'm.py': main}, main_filename='m.py')
         try:
@@ -2384,13 +2393,13 @@ class TestMethodDeclarationResultType:
     (mirrors Java J.MethodDeclaration.getType() == methodType.returnType)."""
 
     def test_method_declaration_type_is_return_type(self):
-        src = textwrap.dedent('''\
+        src = '''
             class Widget:
                 pass
 
             def make_widget() -> Widget:
                 return Widget()
-        ''')
+        '''
         cu, tmpdir, client = _parse_with_types({'m.py': src})
         try:
             decls = []
@@ -2588,11 +2597,11 @@ class TestTypeFormIntegration:
 
     def test_type_form_value_resolves_to_class_object_over_argument(self):
         """Reading a `TypeForm[str]` value resolves to a class object wrapping `str`."""
-        source = textwrap.dedent('''\
+        source = '''
             from typing_extensions import TypeForm
             string_form: TypeForm[str] = str
             ref = string_form
-        ''')
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             ref = tree.body[2].value  # `string_form` on the RHS of `ref = string_form`
@@ -2683,7 +2692,7 @@ class TestClassObjectTypeAttribution:
         Requirement 2: the wrapped class stays usable — the declaring-type path
         attributes ``c.make()`` to a method declared on ``M``, not on ``type``.
         """
-        source = textwrap.dedent('''\
+        source = '''
             class M:
                 @classmethod
                 def make(cls) -> 'M':
@@ -2691,7 +2700,7 @@ class TestClassObjectTypeAttribution:
 
             def use(c: type[M]):
                 return c.make()
-        ''')
+        '''
         cu, tmpdir, client = _parse_with_types({'m.py': source}, 'm.py')
         try:
             calls = [mi for mi in _collect_method_invocations(cu)
@@ -2715,12 +2724,12 @@ class TestClassObjectTypeAttribution:
         instance type); the fix must not regress that to instance assignability.
         """
         from rewrite.python.type_utils import is_assignable_to
-        source = textwrap.dedent('''\
+        source = '''
             class M:
                 @classmethod
                 def make(cls):
                     return cls
-        ''')
+        '''
         cu, tmpdir, client = _parse_with_types({'m.py': source}, 'm.py')
         try:
             cls_types = self._collect_ident_types(cu, 'cls')
@@ -3123,7 +3132,7 @@ class TestClassMembers:
         return result._declaring_type, mapping, tmpdir, client
 
     def test_dataclass_members_populated(self):
-        src = textwrap.dedent('''\
+        src = '''
             from dataclasses import dataclass
 
 
@@ -3137,7 +3146,7 @@ class TestClassMembers:
                     return self.label
 
             Point(1).describe()
-        ''')
+        '''
         cls, mapping, tmpdir, client = self._class_type(src)
         try:
             members = cls._members
@@ -3165,7 +3174,7 @@ class TestClassMembers:
             _cleanup_mapping(mapping, tmpdir, client)
 
     def test_plain_class_members_populated(self):
-        src = textwrap.dedent('''\
+        src = '''
             class Config:
                 count: int = 0
                 name: str
@@ -3175,7 +3184,7 @@ class TestClassMembers:
                     return self.name
 
             Config().label()
-        ''')
+        '''
         cls, mapping, tmpdir, client = self._class_type(src)
         try:
             by_name = {v._name: v for v in (cls._members or [])}
@@ -3198,7 +3207,7 @@ class TestClassMembers:
         # A member whose declared type is the owning class must resolve without
         # infinitely recursing (the cycle guard already covers methods; members
         # must rely on the same mechanism).
-        src = textwrap.dedent('''\
+        src = '''
             class Node:
                 value: int
                 next: "Node" = None
@@ -3207,7 +3216,7 @@ class TestClassMembers:
                     return self.value
 
             Node().get()
-        ''')
+        '''
         cls, mapping, tmpdir, client = self._class_type(src)
         try:
             by_name = {v._name: v for v in (cls._members or [])}
@@ -3241,7 +3250,7 @@ class TestTypedDictMembers:
         return result, mapping, tmpdir, client
 
     def test_typed_dict_fields_are_members(self):
-        src = textwrap.dedent('''\
+        src = '''
             from typing import TypedDict
 
 
@@ -3251,7 +3260,7 @@ class TestTypedDictMembers:
 
             movie: Movie = {"name": "x", "year": 2020}
             movie
-        ''')
+        '''
         cls, mapping, tmpdir, client = self._value_type(src)
         try:
             assert isinstance(cls, JavaType.Class)
@@ -3272,7 +3281,7 @@ class TestTypedDictMembers:
         # field's typeId points back at the owning descriptor). Resolving the
         # member must lean on the shared `_resolve_type` cycle guard rather than
         # recursing forever.
-        src = textwrap.dedent('''\
+        src = '''
             from typing import TypedDict
 
 
@@ -3282,7 +3291,7 @@ class TestTypedDictMembers:
 
             t: Tree = {"label": "root", "child": {}}
             t
-        ''')
+        '''
         cls, mapping, tmpdir, client = self._value_type(src)
         try:
             assert isinstance(cls, JavaType.Class)
