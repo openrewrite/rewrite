@@ -27,6 +27,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -580,6 +582,52 @@ class GradleParserTest implements RewriteTest {
         assertThat(optionalSourceFile).isPresent();
         SourceFile sourceFile = optionalSourceFile.get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void settingsKtsTypeAttributionWithEmptyClasspath() {
+        var parser = new GradleParser(GradleParser.builder().settingsClasspath(Collections.emptyList()));
+        Stream<SourceFile> sourceFileStream = parser.parseInputs(
+                List.of(Parser.Input.fromString(Paths.get("settings.gradle.kts"),
+                        "pluginManagement {\n    repositories {\n        gradlePluginPortal()\n    }\n}\n")),
+                null, new InMemoryExecutionContext());
+        Optional<SourceFile> sf = sourceFileStream.findFirst();
+        assertThat(sf).isPresent();
+        new org.openrewrite.TreeVisitor<org.openrewrite.Tree, Integer>() {
+            @Override
+            public org.openrewrite.Tree visit(org.openrewrite.Tree tree, Integer p) {
+                if (tree instanceof J.MethodInvocation mi && "pluginManagement".equals(mi.getSimpleName())) {
+                    assertThat(mi.getMethodType()).isNotNull();
+                    assertThat(mi.getMethodType().getDeclaringType().getFullyQualifiedName())
+                            .as("pluginManagement() should resolve to Settings")
+                            .isEqualTo("org.gradle.api.initialization.Settings");
+                }
+                return super.visit(tree, p);
+            }
+        }.visit(sf.get(), 0);
+    }
+
+    @Test
+    void buildKtsTypeAttributionWithEmptyClasspath() {
+        var parser = new GradleParser(GradleParser.builder().buildscriptClasspath(Collections.emptyList()));
+        Stream<SourceFile> sourceFileStream = parser.parseInputs(
+                List.of(Parser.Input.fromString(Paths.get("build.gradle.kts"),
+                        "repositories {\n    mavenCentral()\n}\n")),
+                null, new InMemoryExecutionContext());
+        Optional<SourceFile> sf = sourceFileStream.findFirst();
+        assertThat(sf).isPresent();
+        new org.openrewrite.TreeVisitor<org.openrewrite.Tree, Integer>() {
+            @Override
+            public org.openrewrite.Tree visit(org.openrewrite.Tree tree, Integer p) {
+                if (tree instanceof J.MethodInvocation mi && "repositories".equals(mi.getSimpleName())) {
+                    assertThat(mi.getMethodType()).isNotNull();
+                    assertThat(mi.getMethodType().getDeclaringType().getFullyQualifiedName())
+                            .as("repositories() should resolve to Project")
+                            .isEqualTo("org.gradle.api.Project");
+                }
+                return super.visit(tree, p);
+            }
+        }.visit(sf.get(), 0);
     }
 
     /**
