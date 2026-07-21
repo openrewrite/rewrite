@@ -1352,10 +1352,17 @@ public final class PipenvLockEngine {
             return stringOrNull(lockEntry.get("index"));
         }
 
+        private static final List<String> VERSION_OPERATORS =
+                Arrays.asList("===", "==", "~=", "!=", "<=", ">=", "<", ">");
+
         private static @Nullable PythonVersionSpecifierSet parseConstraint(String constraint) {
             String trimmed = constraint.trim();
             if (trimmed.isEmpty() || "*".equals(trimmed)) {
                 return PythonVersionSpecifierSet.parse("");
+            }
+            // pipenv treats a bare version like "2.33.0" as an exact pin; normalize to "==2.33.0".
+            if (VERSION_OPERATORS.stream().noneMatch(trimmed::startsWith)) {
+                trimmed = "==" + trimmed;
             }
             return PythonVersionSpecifierSet.parse(trimmed);
         }
