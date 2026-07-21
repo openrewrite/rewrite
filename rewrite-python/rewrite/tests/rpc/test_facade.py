@@ -226,12 +226,48 @@ def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp
     acquired = []
     monkeypatch.setattr(server, "_hub_acquire", lambda oid, sft: acquired.append(oid))
     monkeypatch.setitem(server._hub_tree, "T1", object())
-    assert server.handle_request("Print", {"treeId": "T1"}) == "local-print"
+    assert server.handle_request("Print", {"treeId": "T1", "sourceFileType": "py"}) == "local-print"
     assert acquired == []
 
     # one it doesn't hold yet is acquired here, at the top level, then served locally
-    assert server.handle_request("Print", {"treeId": "other"}) == "local-print"
+    assert server.handle_request("Print", {"treeId": "other", "sourceFileType": "py"}) == "local-print"
     assert acquired == ["other"]
+
+
+def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path):
+    """Java fetches the execution context and cursors by id too, and those have no Python codec.
+
+    `GetObject.sourceFileType` is nullable and set only for trees, so it is what distinguishes
+    them. Acquiring a non-tree hands its property messages to a receiver that cannot consume
+    them, which desynchronizes the queue for every object that follows -- observed end-to-end as
+    "No RPC codec registered on the Python side for 'org.openrewrite.InMemoryExecutionContext'".
+    """
+    import rewrite.rpc.server as server
+
+    class _FakeFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def visit(self, params): ...
+        def batch_visit(self, params): ...
+        def generate(self, params): ...
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+    monkeypatch.setattr(server, "handle_get_object", lambda p: "local-get")
+
+    acquired = []
+    monkeypatch.setattr(server, "_hub_acquire", lambda oid, sft: acquired.append(oid))
+
+    # The execution context: fetched by id, no sourceFileType.
+    assert server.handle_request("GetObject", {"id": "ctx-1"}) == "local-get"
+    assert acquired == []
+
+    # A tree carries its type and is still acquired.
+    assert server.handle_request("GetObject", {"id": "tree-1", "sourceFileType": "py"}) == "local-get"
+    assert acquired == ["tree-1"]
 
 
 def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):

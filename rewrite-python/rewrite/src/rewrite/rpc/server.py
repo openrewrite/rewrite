@@ -2067,8 +2067,13 @@ def handle_request(method: str, params: dict) -> Any:
         # local handlers, which read local_objects.
         if method in ('Print', 'GetObject'):
             obj_id = params.get('treeId') or params.get('id')
-            if obj_id is not None and obj_id not in _hub_tree:
-                _hub_acquire(obj_id, params.get('sourceFileType'))
+            source_file_type = params.get('sourceFileType')
+            # Java fetches non-tree objects by id as well (the execution context, cursors).
+            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+            # that has no codec for them, desynchronizing the queue for every later object.
+            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
+                _hub_acquire(obj_id, source_file_type)
         # Parse / GetLanguages / build-time GetObject / etc. run locally on the facade.
 
     handlers = {
