@@ -715,10 +715,6 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             var suffix = q.Receive(c.Suffix);
             // C# Comment doesn't have Markers; consume and discard
             q.Receive<Markers>(Markers.Empty);
-            if (c is XmlDocComment)
-            {
-                return new XmlDocComment(text!, suffix!, multiline);
-            }
             return new TextComment(text!, suffix!, multiline);
         });
         var whitespace = q.Receive(space.Whitespace);

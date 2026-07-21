@@ -9579,8 +9579,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var space = Space.FormatWithComments(whitespace);
         if (space.Comments.Count == 0)
+        {
             _spaceCache[whitespace] = space;
-        return space;
+            return space;
+        }
+
+        // Structure any /// doc comments into the CsDocComment tree via Roslyn's XML parse.
+        return CsDocCommentParser.StructureDocComments(space);
     }
 
     /// <summary>

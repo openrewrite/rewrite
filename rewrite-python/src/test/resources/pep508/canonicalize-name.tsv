@@ -1,0 +1,21 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_utils.py (test_canonicalize_name, test_canonicalize_name_invalid)
+# Retrieved: 2026-07-16
+# name<TAB>PEP 503 canonical form.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+foo	foo
+Foo	foo
+fOo	foo
+foo.bar	foo-bar
+Foo.Bar	foo-bar
+Foo.....Bar	foo-bar
+foo_bar	foo-bar
+foo___bar	foo-bar
+foo-bar	foo-bar
+foo----bar	foo-bar
+_not_legal	-not-legal
+hi\n	hi\n
+\nhi	\nhi
+h\ni	h\ni
+hi\r	hi\r
+\rhi	\rhi
+h\ri	h\ri

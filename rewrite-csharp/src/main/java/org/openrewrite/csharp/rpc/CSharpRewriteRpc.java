@@ -204,6 +204,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Supplier<@Nullable Path> dotnetPathSupplier = () -> DEFAULT_DOTNET_PATH;
         private @Nullable Path csharpServerEntry;
         private @Nullable Path log;
+        private @Nullable Path metricsCsv;
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
@@ -268,6 +269,11 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         public Builder log(@Nullable Path log) {
             this.log = log;
+            return this;
+        }
+
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
             return this;
         }
 
@@ -360,6 +366,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                             dotnetPath.toString(),
                             serverEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                            metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                             traceRpcMessages ? "--trace-rpc-messages" : null,
                             recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                     );
@@ -485,6 +492,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     // ("Non-default ID required"). --no-build also implies --no-restore.
                     "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
@@ -513,6 +521,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );

@@ -23,6 +23,7 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
@@ -36,12 +37,14 @@ import java.util.function.Function;
 /**
  * Remove a dependency from a Python project. Supports {@code pyproject.toml}
  * (with scope and group targeting), {@code requirements.txt}, and {@code Pipfile}.
- * When the matching package manager is available on {@code PATH}, the lock file
- * (uv.lock for pyproject, Pipfile.lock for Pipfile) is regenerated to reflect the change.
+ * The lock file is regenerated to reflect the change: uv.lock by invoking {@code uv}
+ * when available, Pipfile.lock natively via the project's package index.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulator> {
+
+    transient PythonLockRegenerationFailures lockRegenerationFailures = new PythonLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "The PyPI package name to remove.",
@@ -85,9 +88,10 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     public String getDescription() {
         return "Remove a dependency from a Python project. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
-                "When the matching package manager (`uv` or `pipenv`) is available, " +
-                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated. " +
-                "Not safe to use as a precondition: invokes the package manager and " +
+                "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
+                "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
+                "package index over the network. " +
+                "Not safe to use as a precondition: invokes the package manager or the network and " +
                 "publishes per-project state shared with other dependency recipes.";
     }
 
@@ -101,6 +105,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         @Nullable String capturedLockContent;
         @Nullable SourceFile modifiedDepsFile;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override
@@ -123,6 +128,20 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 Path sourcePath = sourceFile.getSourcePath();
 
                 if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+                if (tree instanceof Toml.Document && sourcePath.endsWith("poetry.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+                if (tree instanceof Toml.Document && sourcePath.endsWith("pdm.lock")) {
                     Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
                     ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
                     ps.capturedLockContent = ((Toml.Document) tree).printAll();
@@ -170,11 +189,12 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (ps != null) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null && matchesRemoveDependency(trait)) {
-                        ensureComputed(ps, trait);
+                        ensureComputed(ps, trait, ctx);
                     }
                     if (ps.modifiedDepsFile != null) {
                         SourceFile out = ps.modifiedDepsFile;
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            recordFailure(ctx, ps, sourcePath);
                             out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
@@ -200,7 +220,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                         Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
                         PythonDependencyFile trait = matcher.get(synth).orElse(null);
                         if (trait != null && matchesRemoveDependency(trait)) {
-                            ensureComputed(lockPs, trait);
+                            ensureComputed(lockPs, trait, ctx);
                             if (lockPs.modifiedDepsFile != null) {
                                 PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
                             }
@@ -217,6 +237,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                             return PyProjectHelper.reparseJson((Json.Document) tree, lockContent);
                         }
                     } else {
+                        recordFailure(ctx, lockPs, depsPath);
                         return Markup.warn(sourceFile, new RuntimeException(
                                 "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
                     }
@@ -224,7 +245,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, PythonDependencyFile trait) {
+            private void ensureComputed(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
                 if (ps.modifiedDepsFile != null) {
                     return;
                 }
@@ -232,13 +253,21 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 Function<PythonDependencyFile, PythonDependencyFile> editFn =
                         t -> t.withRemovedDependencies(removals, scope, groupName);
                 PyProjectHelper.EditAndRegenerateResult r =
-                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent);
+                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
                     ps.modifiedDepsFile = r.getModifiedDepsFile();
                     ps.regenResult = r.getRegenResult();
                 }
             }
         };
+    }
+
+    private void recordFailure(ExecutionContext ctx, ProjectState ps, Path depsPath) {
+        if (ps.failureRecorded || ps.regenResult == null) {
+            return;
+        }
+        ps.failureRecorded = true;
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, depsPath, ps.regenResult, packageName);
     }
 
 }

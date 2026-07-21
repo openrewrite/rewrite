@@ -44,7 +44,7 @@ func roundTripNodeWithBefore(t *testing.T, after, before, seed java.Tree) any {
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, NewReferenceMap())
 	// Diff `after` against `before`; identical field pointers/values emit NO_CHANGE.
 	sendQ.before = before
 	NewGoSender().Visit(after, sendQ)

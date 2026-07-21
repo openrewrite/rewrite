@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * -------------------THIS FILE IS AUTO GENERATED--------------------------
- * Changes to this file may cause incorrect behavior and will be lost if
- * the code is regenerated.
-*/
-
 package org.openrewrite.csharp;
 
 import org.jspecify.annotations.Nullable;
@@ -54,11 +48,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
             return space;
         }
         return space.withComments(ListUtils.map(space.getComments(), comment -> {
-            if (comment instanceof CsDocCommentRawComment) {
-                // Convert raw doc comment from RPC into structured tree, then visit
-                CsDocComment.DocComment parsed = CsDocCommentParser.parse((CsDocCommentRawComment) comment);
-                return visitCsDocCommentComment(parsed, p);
-            } else if (comment instanceof CsDocComment.DocComment) {
+            if (comment instanceof CsDocComment.DocComment) {
                 return visitCsDocCommentComment((CsDocComment.DocComment) comment, p);
             }
             return comment;

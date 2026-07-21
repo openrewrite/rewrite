@@ -38,13 +38,14 @@ public final class PythonResolutionLinker {
     /**
      * Apply pyproject-shaped resolution: link dependencies, build-requires,
      * optional-dependencies, dependency-groups, constraint-dependencies, and
-     * override-dependencies. Sets the package manager to {@link PackageManager#Uv}
-     * since uv is the resolver this overlay covers.
+     * override-dependencies. Sets the package manager to {@code pm}, the resolver
+     * whose lock this overlay came from.
      */
     public static PythonResolutionResult applyPyproject(PythonResolutionResult marker,
-                                                        List<ResolvedDependency> resolvedDeps) {
+                                                        List<ResolvedDependency> resolvedDeps,
+                                                        PackageManager pm) {
         marker = marker.withResolvedDependencies(resolvedDeps);
-        marker = marker.withPackageManager(PackageManager.Uv);
+        marker = marker.withPackageManager(pm);
         marker = marker.withDependencies(link(marker.getDependencies(), resolvedDeps));
         marker = marker.withBuildRequires(link(marker.getBuildRequires(), resolvedDeps));
         marker = marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));

@@ -15,6 +15,7 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.internal.ListUtils.map;
 
@@ -92,34 +93,57 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
 
     /**
      * Rewrite a PEP 508 dependency spec with a new version constraint.
-     * Preserves extras and environment markers. The version is normalized
-     * via {@link PyProjectHelper#normalizeVersionConstraint(String)},
-     * so both {@code "2.31.0"} and {@code ">=2.31.0"} are accepted.
+     * Changes only the version token, preserving the requirement's original
+     * whitespace, extras, and environment marker; returns {@code spec} unchanged
+     * when the version is already the target (ignoring formatting), so no edit is
+     * made for a whitespace-only difference. The version is normalized via
+     * {@link PyProjectHelper#normalizeVersionConstraint(String)}, so both
+     * {@code "2.31.0"} and {@code ">=2.31.0"} are accepted.
      */
     static String rewritePep508Spec(String spec, String packageName, String newVersion) {
         int nameEnd = packageName.length();
-        StringBuilder sb = new StringBuilder(packageName);
 
-        // Preserve extras like [security]
+        // Skip extras like [security]
         if (nameEnd < spec.length() && spec.charAt(nameEnd) == '[') {
             int extrasEnd = spec.indexOf(']', nameEnd);
             if (extrasEnd >= 0) {
-                extrasEnd++;
-                sb.append(spec, nameEnd, extrasEnd);
-                nameEnd = extrasEnd;
+                nameEnd = extrasEnd + 1;
             }
         }
 
-        sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
-
-        // Preserve environment markers (everything after ';')
         int semiIdx = spec.indexOf(';', nameEnd);
-        if (semiIdx >= 0) {
-            sb.append(spec.substring(semiIdx));
+        int constraintEnd = semiIdx >= 0 ? semiIdx : spec.length();
+        String prefix = spec.substring(0, nameEnd);
+        String constraint = spec.substring(nameEnd, constraintEnd);
+        String marker = semiIdx >= 0 ? spec.substring(semiIdx) : "";
+        String newConstraint = PyProjectHelper.normalizeVersionConstraint(newVersion);
+
+        // No change when the version is already the target, ignoring whitespace.
+        if (constraint.replaceAll("\\s+", "").equals(newConstraint)) {
+            return spec;
         }
 
-        return sb.toString();
+        // Same operator, single clause: swap only the version, keeping all whitespace.
+        // java.util.regex.Matcher is qualified to avoid the trait's own nested Matcher.
+        java.util.regex.Matcher current = SINGLE_CLAUSE.matcher(constraint.trim());
+        java.util.regex.Matcher target = SINGLE_CLAUSE.matcher(newConstraint);
+        if (current.matches() && target.matches() && current.group(1).equals(target.group(1))) {
+            int versionStart = constraint.indexOf(current.group(1)) + current.group(1).length();
+            while (versionStart < constraint.length() && Character.isWhitespace(constraint.charAt(versionStart))) {
+                versionStart++;
+            }
+            return prefix + constraint.substring(0, versionStart) + target.group(2) + marker;
+        }
+
+        // Otherwise keep the leading whitespace before the constraint and emit the new one.
+        int lead = 0;
+        while (lead < constraint.length() && Character.isWhitespace(constraint.charAt(lead))) {
+            lead++;
+        }
+        return prefix + constraint.substring(0, lead) + newConstraint + marker;
     }
+
+    Pattern SINGLE_CLAUSE = Pattern.compile("(===|==|>=|<=|!=|~=|>|<)\\s*(\\S+)");
 
     /**
      * Look up a value in a map by normalizing the lookup key per PEP 503.

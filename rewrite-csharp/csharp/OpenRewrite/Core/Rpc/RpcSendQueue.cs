@@ -350,7 +350,6 @@ public class RpcSendQueue
                 "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",
-                "XmlDocComment" => "org.openrewrite.csharp.tree.CsDocCommentRawComment",
                 "Checksum" => "org.openrewrite.Checksum",
                 "FileAttributes" => "org.openrewrite.FileAttributes",
                 _ => null,

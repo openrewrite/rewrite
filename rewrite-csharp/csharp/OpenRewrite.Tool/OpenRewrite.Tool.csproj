@@ -20,8 +20,15 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <OpenRewriteSdkSourcePath Condition="'$(OpenRewriteSdkSourcePath)' == ''">../OpenRewrite/OpenRewrite.csproj</OpenRewriteSdkSourcePath>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="../OpenRewrite/OpenRewrite.csproj" />
+    <ProjectReference Include="$(OpenRewriteSdkSourcePath)" />
+  </ItemGroup>
+
+  <ItemGroup>
   </ItemGroup>
 
 </Project>

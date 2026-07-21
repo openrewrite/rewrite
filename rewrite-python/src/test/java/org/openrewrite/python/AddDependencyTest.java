@@ -17,12 +17,24 @@ package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
@@ -299,62 +311,115 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void markerResolvedDependenciesUpdatedAfterEdit(@TempDir Path tempDir) {
+    void markerRefreshedAndFailureSurfacedWhenAdditionNeedsResolution() {
+        // Resolving into a lock restricted to a subset of environments ([tool.uv] environments,
+        // recorded as supported-markers) needs marker-space resolution the native engine defers;
+        // the edit still lands, the marker reflects it, and the failure is surfaced on both files.
         rewriteRun(
           spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
-          uv(tempDir,
-            pyproject(
-              """
-                [project]
-                name = "myapp"
-                version = "1.0.0"
-                dependencies = [
-                    "requests>=2.28.0",
-                ]
-                """,
-              """
-                [project]
-                name = "myapp"
-                version = "1.0.0"
-                dependencies = [
-                    "requests>=2.28.0",
-                    "flask>=2.0",
-                ]
-                """,
-              s -> s.afterRecipe(doc -> {
-                  PythonResolutionResult marker = doc.getMarkers()
-                          .findFirst(PythonResolutionResult.class).orElseThrow();
-                  assertThat(marker.getResolvedDependencies())
-                          .extracting(d -> PythonResolutionResult.normalizeName(d.getName()))
-                          .as("regenerated uv.lock should contain flask among resolved dependencies")
-                          .contains("flask");
-                  assertThat(marker.getDependencies())
-                          .filteredOn(d -> "flask".equals(PythonResolutionResult.normalizeName(d.getName())))
-                          .singleElement()
-                          .satisfies(d -> assertThat(d.getResolved())
-                                  .as("declared `flask` dep should be linked to its resolved entry")
-                                  .isNotNull());
-              })
-            )
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              requires-python = ">=3.12"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.uv]
+              """,
+            s -> s.after(actual -> {
+                assertThat(actual).contains("flask>=2.0");
+                return actual;
+            }).afterRecipe(doc -> {
+                PythonResolutionResult marker = doc.getMarkers()
+                        .findFirst(PythonResolutionResult.class).orElseThrow();
+                assertThat(marker.getDependencies())
+                        .extracting(d -> PythonResolutionResult.normalizeName(d.getName()))
+                        .as("refreshed marker should declare the added dependency")
+                        .contains("flask");
+                assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                        .as("manifest should carry the lock-regeneration-failure warning")
+                        .isPresent();
+            })
+          ),
+          uvLock(
+            """
+              version = 1
+              revision = 3
+              requires-python = ">=3.12"
+              resolution-markers = [
+                  "sys_platform == 'linux'",
+              ]
+              supported-markers = [
+                  "sys_platform == 'linux'",
+              ]
+
+              [[package]]
+              name = "myapp"
+              version = "1.0.0"
+              source = { virtual = "." }
+              dependencies = [
+                  { name = "requests", marker = "sys_platform == 'linux'" },
+              ]
+
+              [package.metadata]
+              requires-dist = [{ name = "requests", specifier = ">=2.28.0" }]
+
+              [[package]]
+              name = "requests"
+              version = "2.32.4"
+              source = { registry = "https://pypi.org/simple" }
+              sdist = { url = "https://files.pythonhosted.org/packages/aa/requests-2.32.4.tar.gz", hash = "sha256:aaaa", size = 1, upload-time = "2024-01-01T00:00:00Z" }
+              wheels = [
+                  { url = "https://files.pythonhosted.org/packages/aa/requests-2.32.4-py3-none-any.whl", hash = "sha256:bbbb", size = 1, upload-time = "2024-01-01T00:00:00Z" },
+              ]
+              """,
+            s -> s.after(actual -> actual)
+                    .afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                            .as("lock file should carry the lock-regeneration-failure warning")
+                            .isPresent())
           )
         );
     }
 
     @Test
     void uvLockRegenerationWorks() {
-        String pyprojectWithFlask = """
-              [project]
-              name = "myapp"
-              version = "1.0.0"
-              dependencies = [
-                  "requests>=2.28.0",
-                  "flask>=2.0",
-              ]
-              """;
-        org.openrewrite.python.internal.LockFileRegeneration.Result result =
-                org.openrewrite.python.internal.LockFileRegeneration.UV.regenerate(pyprojectWithFlask);
-        assertThat(result.isSuccess()).as("uv lock should succeed: " + result.getErrorMessage()).isTrue();
-        assertThat(result.getLockFileContent()).contains("name = \"flask\"");
+        // Native minimal update of a recorded uv lock: bump the six pin from the fixtures.
+        Map<String, String> routes = Map.of(
+          "https://pypi.org/simple/six/", uvResource("http/six-listing-json"),
+          "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl.metadata",
+          uvResource("http/six-1.17.0-py2.py3-none-any.whl.metadata"));
+        HttpSender http = request -> {
+            String body = routes.get(request.getUrl().toString());
+            return new HttpSender.Response(body == null ? 404 : 200,
+              new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
+            });
+        };
+        ExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        });
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of(
+          new PythonPackageIndex("pypi", "https://pypi.org/simple", true, null, null, false)));
+
+        LockFileRegeneration.Result result =
+                LockFileRegeneration.UV.regenerate(
+                  uvResource("i-minimal-update/pyproject.toml"),
+                  uvResource("i-minimal-update/uv.lock.v1"),
+                  ctx);
+        assertThat(result.isSuccess()).as("native uv regeneration should succeed: " + result.getErrorMessage()).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(uvResource("i-minimal-update/uv.lock.v2"));
+    }
+
+    private static String uvResource(String name) {
+        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/uvlock/" + name)) {
+            assertThat(is).as(name).isNotNull();
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Test

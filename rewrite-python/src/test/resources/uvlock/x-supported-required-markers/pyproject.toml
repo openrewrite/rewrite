@@ -1,0 +1,12 @@
+[project]
+name = "envproj"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = ["foo"]
+
+[tool.uv.sources]
+foo = { path = "libs/foo" }
+
+[tool.uv]
+environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
+required-environments = ["sys_platform == 'darwin'"]

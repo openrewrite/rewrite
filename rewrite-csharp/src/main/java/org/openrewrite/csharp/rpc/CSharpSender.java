@@ -20,7 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.csharp.tree.CsDocComment;
-import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -879,8 +878,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                     c -> {
                         if (c instanceof TextComment) {
                             return ((TextComment) c).getText() + c.getSuffix();
-                        } else if (c instanceof CsDocCommentRawComment) {
-                            return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
                         } else if (c instanceof CsDocComment.DocComment) {
                             // A structured doc comment is a proper tree, so it is keyed by its id
                             // (like Javadoc.DocComment on the Java side) and decomposed over RPC.
@@ -891,20 +888,14 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                     c -> {
                         if (c instanceof CsDocComment.DocComment) {
                             new CsDocCommentSender(delegate).visit((CsDocComment.DocComment) c, q);
-                        } else {
-                            if (c instanceof TextComment) {
-                                TextComment tc = (TextComment) c;
-                                q.getAndSend(tc, TextComment::isMultiline);
-                                q.getAndSend(tc, TextComment::getText);
-                            } else if (c instanceof CsDocCommentRawComment) {
-                                CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
-                                q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
-                                q.getAndSend(dc, CsDocCommentRawComment::getText);
-                            } else {
-                                throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
-                            }
+                        } else if (c instanceof TextComment) {
+                            TextComment tc = (TextComment) c;
+                            q.getAndSend(tc, TextComment::isMultiline);
+                            q.getAndSend(tc, TextComment::getText);
                             q.getAndSend(c, Comment::getSuffix);
                             q.getAndSend(c, Comment::getMarkers);
+                        } else {
+                            throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                         }
                     });
             q.getAndSend(space, Space::getWhitespace);

@@ -78,14 +78,6 @@ public class UvLockParser {
     }
 
     /**
-     * Check whether a poetry.lock or pdm.lock file exists near the given directory.
-     */
-    public static boolean hasAlternativeLockFile(Path startDir, @Nullable Path boundary) {
-        return findLockFile(startDir, boundary, "poetry.lock") != null ||
-               findLockFile(startDir, boundary, "pdm.lock") != null;
-    }
-
-    /**
      * Parse uv.lock content into a list of resolved dependencies.
      */
     public static List<ResolvedDependency> parse(String content) {

@@ -1,0 +1,7 @@
+[project]
+name = "fixture-d"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests[socks]>=2.31",
+]

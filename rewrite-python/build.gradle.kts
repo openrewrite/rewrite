@@ -36,6 +36,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
 

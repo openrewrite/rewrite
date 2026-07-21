@@ -15,154 +15,27 @@
  */
 using System.Diagnostics;
 using System.Xml.Linq;
-using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using NuGet.ProjectModel;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.CSharp.NuGet;
 using Serilog;
 
 namespace OpenRewrite.CSharp;
 
 /// <summary>
-/// Serializes <c>dotnet restore</c> invocations so that only one runs at a time,
-/// preventing process explosions when multiple tests load solutions concurrently.
-/// Tracks which paths have already been restored to avoid redundant work.
+/// Serializes in-process NuGet restores so that only one runs at a time (multiple tests may
+/// load solutions concurrently) and caches which paths have already been restored.
+/// All package operations run through <see cref="NuGetResolver"/> — no <c>dotnet restore</c>
+/// or <c>nuget.exe</c> child processes.
 /// </summary>
-internal static class DotNetRestore
+internal static class SolutionRestore
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
-    private static readonly HashSet<string> Restored = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(10);
-
-    internal record RestoreResult(int ExitCode, string Stdout, string Stderr, TimeSpan Elapsed, bool TimedOut);
-
-    public static async Task<RestoreResult> RunAsync(string path, CancellationToken ct)
-    {
-        var key = Path.GetFullPath(path);
-
-        // Fast path: already restored in this process
-        lock (Restored)
-        {
-            if (Restored.Contains(key))
-            {
-                Log.Debug("dotnet restore: skipped (already restored) {Path}", path);
-                return new RestoreResult(0, "", "", TimeSpan.Zero, false);
-            }
-        }
-
-        Log.Debug("dotnet restore: waiting for gate {Path}", path);
-        await Gate.WaitAsync(ct);
-        try
-        {
-            // Double-check after acquiring the gate
-            lock (Restored)
-            {
-                if (Restored.Contains(key))
-                    return new RestoreResult(0, "", "", TimeSpan.Zero, false);
-            }
-
-            var result = await RunCoreAsync(path, ct);
-
-            if (result.ExitCode == 0 && !result.TimedOut)
-            {
-                lock (Restored)
-                {
-                    Restored.Add(key);
-                }
-            }
-
-            return result;
-        }
-        finally
-        {
-            Gate.Release();
-        }
-    }
-
-    /// <summary>
-    /// Replacement NuGet feeds for defunct dotnet.myget.org sources.
-    /// MyGet was shut down; packages migrated to Azure DevOps Artifacts (dnceng).
-    /// Semicolons are escaped as %3B because MSBuild /p: treats literal ';' as a property separator.
-    /// </summary>
-    private static readonly string AdditionalNuGetSources = string.Join("%3B",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/myget-legacy/nuget/v3/index.json");
-
-    private static async Task<RestoreResult> RunCoreAsync(string path, CancellationToken ct)
-    {
-        Log.Debug("dotnet restore: starting for {Path}", path);
-        var sw = Stopwatch.StartNew();
-        // Relax restore for LST parsing: disable NuGet vulnerability audit
-        // (NU1902/NU1903 would fail restore), ignore dead NuGet sources,
-        // and add replacement feeds for defunct MyGet sources.
-        var psi = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        psi.ArgumentList.Add("restore");
-        psi.ArgumentList.Add(path);
-        psi.ArgumentList.Add("/p:NuGetAudit=false");
-        psi.ArgumentList.Add("/p:RestoreIgnoreFailedSources=true");
-        psi.ArgumentList.Add($"/p:RestoreAdditionalProjectSources={AdditionalNuGetSources}");
-        psi.ArgumentList.Add("--ignore-failed-sources");
-        // Reduce NuGet retry attempts so dead feeds fail fast
-        psi.Environment["NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT"] = "1";
-        psi.Environment["NUGET_ENHANCED_NETWORK_RETRY_DELAY_MILLISECONDS"] = "100";
-
-        using var process = Process.Start(psi);
-        if (process == null)
-        {
-            Log.Debug("dotnet restore: process failed to start");
-            return new RestoreResult(-1, "", "Failed to start dotnet restore process", sw.Elapsed, false);
-        }
-
-        Log.Debug("dotnet restore: process started (PID {ProcessId})", process.Id);
-        using var restoreCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        restoreCts.CancelAfter(Timeout);
-
-        try
-        {
-            // Must read stdout/stderr before WaitForExitAsync to avoid deadlock
-            // when the pipe buffer fills up (e.g. many NETSDK1138 warnings for
-            // Windows-specific TFMs).
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(restoreCts.Token);
-            var stderrTask = process.StandardError.ReadToEndAsync(restoreCts.Token);
-            await Task.WhenAll(stdoutTask, stderrTask);
-            await process.WaitForExitAsync(restoreCts.Token);
-            sw.Stop();
-            Log.Debug("dotnet restore: completed (exit code {ExitCode})", process.ExitCode);
-            return new RestoreResult(process.ExitCode, stdoutTask.Result, stderrTask.Result, sw.Elapsed, false);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            // Restore timed out but overall operation is still running — kill and continue
-            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-            sw.Stop();
-            Log.Debug("dotnet restore: TIMED OUT after {Timeout}, killed process", Timeout);
-            return new RestoreResult(-1, "", "", sw.Elapsed, true);
-        }
-    }
-}
-
-/// <summary>
-/// Serializes <c>nuget restore</c> invocations (and the one-time restore of the .NET
-/// Framework build assets) so only one runs at a time, and caches which paths have
-/// already been restored. Unlike <see cref="DotNetRestore"/>, the standalone NuGet CLI
-/// can restore legacy <c>packages.config</c> (non-SDK-style) projects, which
-/// <c>dotnet restore</c> treats as a no-op. On non-Windows machines the NuGet CLI runs
-/// through <c>mono</c>.
-/// </summary>
-internal static class NuGetRestore
-{
-    private static readonly SemaphoreSlim Gate = new(1, 1);
-    private static readonly HashSet<string> Restored = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(10);
+    private static readonly Dictionary<string, IReadOnlyDictionary<string, LockFile>> Restored =
+        new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// .NET Framework build assets that are not present on non-Windows machines. They are
@@ -177,24 +50,32 @@ internal static class NuGetRestore
 
     private static NetFrameworkBuildAssets? _buildAssets;
 
-    internal record RestoreResult(int ExitCode, string Stdout, string Stderr, TimeSpan Elapsed, bool TimedOut);
-
     /// <summary>
     /// MSBuild property values pointing at restored .NET Framework build assets. A value is
     /// null when the corresponding package could not be restored.
     /// </summary>
     internal record NetFrameworkBuildAssets(string? VSToolsPath, string? TargetFrameworkRootPath);
 
-    public static async Task<RestoreResult> RunAsync(string path, CancellationToken ct)
+    /// <summary>
+    /// Restores a solution/project in-process: PackageReference projects via restore-graph
+    /// generation + RestoreRunner (committing assets/props/targets so MSBuildWorkspace can
+    /// compile), legacy packages.config projects via the solution-local packages folder plus a
+    /// synthesized attestation graph. Returns the in-memory LockFile per project path.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, LockFile>> RunAsync(
+        string path,
+        bool hasPackagesConfig,
+        IDictionary<string, string> msbuildProperties,
+        CancellationToken ct)
     {
-        var key = "restore:" + Path.GetFullPath(path);
+        var key = Path.GetFullPath(path);
 
         lock (Restored)
         {
-            if (Restored.Contains(key))
+            if (Restored.TryGetValue(key, out var cached))
             {
-                Log.Debug("nuget restore: skipped (already restored) {Path}", path);
-                return new RestoreResult(0, "", "", TimeSpan.Zero, false);
+                Log.Debug("restore: skipped (already restored) {Path}", path);
+                return cached;
             }
         }
 
@@ -203,29 +84,61 @@ internal static class NuGetRestore
         {
             lock (Restored)
             {
-                if (Restored.Contains(key))
-                    return new RestoreResult(0, "", "", TimeSpan.Zero, false);
+                if (Restored.TryGetValue(key, out var cached))
+                    return cached;
             }
 
-            var cli = FindNuGetCli();
-            if (cli == null)
-            {
-                return new RestoreResult(-1, "",
-                    "NuGet CLI not found on PATH (need `nuget` on macOS/Linux or `nuget.exe` on Windows)",
-                    TimeSpan.Zero, false);
-            }
+            var lockFiles = new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
+            var rootDir = Path.GetDirectoryName(key) ?? ".";
 
-            var args = new List<string>(cli.Value.PrefixArgs) { "restore", path, "-NonInteractive" };
-            var workingDir = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
-            Log.Debug("nuget restore: starting for {Path}", path);
-            var result = await RunProcessAsync(cli.Value.Exe, args, workingDir, ct);
-
-            if (result.ExitCode == 0 && !result.TimedOut)
+            if (hasPackagesConfig)
             {
-                lock (Restored)
+                // Materialize the solution-local packages/ folder for legacy HintPaths.
+                var packagesConfigs = Directory
+                    .EnumerateFiles(rootDir, "packages.config", SearchOption.AllDirectories)
+                    .ToList();
+                Log.Debug(">> packages.config restore ({Count} configs)", packagesConfigs.Count);
+                await NuGetResolver.InstallPackagesConfigPackagesAsync(rootDir, packagesConfigs, ct);
+                Log.Debug("<< packages.config restore");
+
+                // Synthesized attestation graph per legacy project.
+                foreach (var packagesConfig in packagesConfigs)
                 {
-                    Restored.Add(key);
+                    var projectDir = Path.GetDirectoryName(packagesConfig)!;
+                    foreach (var projectFile in Directory.EnumerateFiles(projectDir, "*.*proj"))
+                    {
+                        var lockFile = await NuGetResolver.RestorePackagesConfigGraphAsync(
+                            projectFile, packagesConfig, NuGetResolver.ReadLegacyFramework(projectFile), ct);
+                        if (lockFile != null)
+                            lockFiles[Path.GetFullPath(projectFile)] = lockFile;
+                    }
                 }
+            }
+
+            // In-process restore of PackageReference projects (replaces `dotnet restore`).
+            var sw = Stopwatch.StartNew();
+            Log.Debug(">> in-process restore ({FileName})", Path.GetFileName(path));
+            var dgSpec = NuGetResolver.CreateDependencyGraphSpec(key,
+                msbuildProperties.Count > 0 ? msbuildProperties : null);
+            if (dgSpec != null)
+            {
+                foreach (var (projectPath, lockFile) in await NuGetResolver.RestoreAsync(dgSpec, commit: true, ct))
+                    lockFiles.TryAdd(projectPath, lockFile);
+            }
+            else if (!hasPackagesConfig)
+            {
+                // Degrade rather than abort: MSBuildWorkspace may still evaluate the
+                // solution (packages already cached, or projects without dependencies),
+                // and markers fall back to SDK-only attestation.
+                Log.Warning("In-process restore could not produce a dependency graph for {Path}; " +
+                            "continuing with degraded dependency attestation", path);
+            }
+            Log.Debug("<< in-process restore ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
+
+            var result = (IReadOnlyDictionary<string, LockFile>)lockFiles;
+            lock (Restored)
+            {
+                Restored[key] = result;
             }
 
             return result;
@@ -238,8 +151,9 @@ internal static class NuGetRestore
 
     /// <summary>
     /// Restores the .NET Framework reference assemblies and web-application targets as NuGet
-    /// packages into a stable per-machine cache directory, so MSBuildWorkspace can evaluate
-    /// legacy projects on non-Windows machines. The result is cached for the process lifetime.
+    /// packages into a stable per-machine cache directory (flat, version-less layout), so
+    /// MSBuildWorkspace can evaluate legacy projects on non-Windows machines. The result is
+    /// cached for the process lifetime.
     /// </summary>
     public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(CancellationToken ct)
     {
@@ -252,28 +166,21 @@ internal static class NuGetRestore
             if (_buildAssets != null)
                 return _buildAssets;
 
-            // -ExcludeVersion keeps the installed folder names stable across versions.
             var cacheDir = Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
             var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
             var targetFrameworkRootPath = Path.Combine(cacheDir, ReferenceAssembliesPackage, "build");
 
-            var cli = FindNuGetCli();
-            if (cli == null)
-            {
-                Log.Debug("nuget install: NuGet CLI not found on PATH; skipping .NET Framework build assets");
-                _buildAssets = new NetFrameworkBuildAssets(null, null);
-                return _buildAssets;
-            }
-
             if (!Directory.Exists(vsToolsPath))
-                await NuGetInstallAsync(cli.Value, WebTargetsPackage, WebTargetsVersion, cacheDir, ct);
+                await NuGetResolver.InstallPackageAsync(
+                    WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);
             if (!Directory.Exists(targetFrameworkRootPath))
-                await NuGetInstallAsync(cli.Value, ReferenceAssembliesPackage, ReferenceAssembliesVersion, cacheDir, ct);
+                await NuGetResolver.InstallPackageAsync(
+                    ReferenceAssembliesPackage, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);
 
             _buildAssets = new NetFrameworkBuildAssets(
                 Directory.Exists(vsToolsPath) ? vsToolsPath : null,
                 Directory.Exists(targetFrameworkRootPath) ? targetFrameworkRootPath : null);
-            Log.Debug("nuget install: .NET Framework build assets — VSToolsPath={VSToolsPath}, TargetFrameworkRootPath={TargetFrameworkRootPath}",
+            Log.Debug("netfx build assets — VSToolsPath={VSToolsPath}, TargetFrameworkRootPath={TargetFrameworkRootPath}",
                 _buildAssets.VSToolsPath ?? "(missing)", _buildAssets.TargetFrameworkRootPath ?? "(missing)");
             return _buildAssets;
         }
@@ -281,111 +188,6 @@ internal static class NuGetRestore
         {
             Gate.Release();
         }
-    }
-
-    private static async Task NuGetInstallAsync((string Exe, string[] PrefixArgs) cli, string package,
-        string version, string outputDirectory, CancellationToken ct)
-    {
-        Directory.CreateDirectory(outputDirectory);
-        var args = new List<string>(cli.PrefixArgs)
-        {
-            "install", package,
-            "-Version", version,
-            "-OutputDirectory", outputDirectory,
-            "-ExcludeVersion",
-            "-NonInteractive"
-        };
-        Log.Debug("nuget install: {Package} {Version} -> {OutputDirectory}", package, version, outputDirectory);
-        var result = await RunProcessAsync(cli.Exe, args, outputDirectory, ct);
-        if (result.ExitCode != 0)
-        {
-            Log.Debug("nuget install: {Package} failed (exit code {ExitCode})\n{Stdout}\n{Stderr}",
-                package, result.ExitCode, result.Stdout, result.Stderr);
-        }
-    }
-
-    private static async Task<RestoreResult> RunProcessAsync(string exe, IReadOnlyList<string> args,
-        string workingDirectory, CancellationToken ct)
-    {
-        var sw = Stopwatch.StartNew();
-        var psi = new ProcessStartInfo(exe)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var a in args)
-            psi.ArgumentList.Add(a);
-
-        using var process = Process.Start(psi);
-        if (process == null)
-        {
-            sw.Stop();
-            return new RestoreResult(-1, "", $"Failed to start process: {exe}", sw.Elapsed, false);
-        }
-
-        using var procCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        procCts.CancelAfter(Timeout);
-        try
-        {
-            // Read stdout/stderr before WaitForExitAsync to avoid a pipe-buffer deadlock.
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(procCts.Token);
-            var stderrTask = process.StandardError.ReadToEndAsync(procCts.Token);
-            await Task.WhenAll(stdoutTask, stderrTask);
-            await process.WaitForExitAsync(procCts.Token);
-            sw.Stop();
-            return new RestoreResult(process.ExitCode, stdoutTask.Result, stderrTask.Result, sw.Elapsed, false);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-            sw.Stop();
-            return new RestoreResult(-1, "", "", sw.Elapsed, true);
-        }
-    }
-
-    /// <summary>
-    /// Resolves how to invoke the NuGet CLI: <c>nuget.exe</c> on Windows, <c>nuget</c> on
-    /// other platforms, falling back to <c>mono nuget.exe</c>. Returns null when no NuGet CLI
-    /// is found on the PATH.
-    /// </summary>
-    private static (string Exe, string[] PrefixArgs)? FindNuGetCli()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            var win = FindOnPath("nuget.exe") ?? FindOnPath("nuget");
-            return win == null ? null : (win, Array.Empty<string>());
-        }
-        var nuget = FindOnPath("nuget");
-        if (nuget != null)
-            return (nuget, Array.Empty<string>());
-        var nugetExe = FindOnPath("nuget.exe");
-        if (nugetExe != null)
-            return ("mono", new[] { nugetExe });
-        return null;
-    }
-
-    private static string? FindOnPath(string fileName)
-    {
-        var pathVar = Environment.GetEnvironmentVariable("PATH");
-        if (string.IsNullOrEmpty(pathVar))
-            return null;
-        foreach (var dir in pathVar.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            try
-            {
-                var candidate = Path.Combine(dir.Trim(), fileName);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-            catch
-            {
-                // Skip invalid PATH entries.
-            }
-        }
-        return null;
     }
 }
 
@@ -397,92 +199,50 @@ internal static class NuGetRestore
 /// </summary>
 public class SolutionParser
 {
-    private static bool _msbuildRegistered;
     private readonly CSharpParser _parser = new();
+
+    private IReadOnlyDictionary<string, LockFile> _restoredLockFiles =
+        new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// In-memory NuGet lock files (keyed by absolute project path) from the most recent
+    /// <see cref="LoadAsync"/>. Used for MSBuildProject marker attestation without reading
+    /// <c>project.assets.json</c> from disk.
+    /// </summary>
+    public IReadOnlyDictionary<string, LockFile> RestoredLockFiles => _restoredLockFiles;
 
     /// <summary>
     /// Load a solution or project via MSBuildWorkspace.
     /// Detects .sln/.slnx vs .csproj by extension and calls the appropriate method.
-    /// Runs dotnet restore first to ensure NuGet packages are resolved.
+    /// Runs the in-process NuGet restore first so packages are resolved and the standard
+    /// restore outputs exist for compilation.
     /// </summary>
     public async Task<Solution> LoadAsync(string path, CancellationToken ct = default)
     {
         Log.Debug("LoadAsync: starting for {Path}", path);
-        EnsureMSBuildRegistered();
 
-        // Legacy non-SDK projects use packages.config and must be restored with the
-        // standalone NuGet CLI; dotnet restore is a no-op for them. A solution can mix
-        // SDK-style and non-SDK projects, so when packages.config is present we run both.
+        // Legacy non-SDK projects use packages.config: they need the solution-local packages/
+        // folder materialized and get their attestation graph from a synthesized PackageSpec.
+        // A solution can mix SDK-style and non-SDK projects, so both paths may run.
         var hasPackagesConfig = HasPackagesConfig(path);
 
-        // Run dotnet restore to ensure NuGet packages are available for MSBuildWorkspace
-        Log.Debug(">> dotnet restore ({FileName})", Path.GetFileName(path));
-        var restoreResult = await DotNetRestore.RunAsync(path, ct);
-        Log.Debug("<< dotnet restore ({FileName}) ({Elapsed})", Path.GetFileName(path), restoreResult.Elapsed);
-
-        if (restoreResult.TimedOut)
-        {
-            throw new InvalidOperationException(
-                $"dotnet restore timed out after {restoreResult.Elapsed} for {path}");
-        }
-
-        if (restoreResult.ExitCode != 0)
-        {
-            var details = string.Join("\n",
-                new[] { restoreResult.Stdout, restoreResult.Stderr }
-                    .Where(s => !string.IsNullOrWhiteSpace(s)));
-            if (hasPackagesConfig)
-            {
-                // For packages.config projects the authoritative restore is the nuget
-                // restore below; a dotnet restore failure here is not fatal.
-                Log.Debug("dotnet restore failed (exit code {ExitCode}) for {Path}; continuing with nuget restore\n{Details}",
-                    restoreResult.ExitCode, path, details);
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    $"dotnet restore failed (exit code {restoreResult.ExitCode}) for {path}\n{details}");
-            }
-        }
-        else
-        {
-            Log.Debug("dotnet restore succeeded in {Elapsed}", restoreResult.Elapsed);
-        }
-
-        // MSBuild properties handed to MSBuildWorkspace. For packages.config projects these
-        // point MSBuild at the .NET Framework reference assemblies and web-application
-        // targets that are not present on non-Windows machines.
+        // MSBuild properties handed to MSBuildWorkspace (and restore-graph evaluation). For
+        // legacy (non-SDK) projects these point MSBuild at the .NET Framework reference
+        // assemblies and web-application targets that are not present on non-Windows machines.
+        // Gated on non-SDK project presence (not packages.config): a converted project that
+        // uses PackageReference in a classic csproj still needs them to evaluate/compile.
         var msbuildProperties = new Dictionary<string, string>();
 
-        if (hasPackagesConfig)
+        if (hasPackagesConfig || HasNonSdkProject(path))
         {
-            Log.Debug(">> nuget restore ({FileName})", Path.GetFileName(path));
-            var nugetResult = await NuGetRestore.RunAsync(path, ct);
-            Log.Debug("<< nuget restore ({FileName}) ({Elapsed})", Path.GetFileName(path), nugetResult.Elapsed);
-
-            if (nugetResult.TimedOut)
-            {
-                throw new InvalidOperationException(
-                    $"nuget restore timed out after {nugetResult.Elapsed} for {path}");
-            }
-
-            if (nugetResult.ExitCode != 0)
-            {
-                var details = string.Join("\n",
-                    new[] { nugetResult.Stdout, nugetResult.Stderr }
-                        .Where(s => !string.IsNullOrWhiteSpace(s)));
-                throw new InvalidOperationException(
-                    $"nuget restore failed (exit code {nugetResult.ExitCode}) for {path}\n{details}");
-            }
-
-            // Restore the .NET Framework reference assemblies and web-application targets
-            // so MSBuildWorkspace can evaluate legacy projects on non-Windows machines.
-            var buildAssets = await NuGetRestore.RestoreNetFrameworkBuildAssetsAsync(ct);
+            var buildAssets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(ct);
             if (buildAssets.VSToolsPath != null)
                 msbuildProperties["VSToolsPath"] = buildAssets.VSToolsPath;
             if (buildAssets.TargetFrameworkRootPath != null)
                 msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;
         }
+
+        _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
         var sw = Stopwatch.StartNew();
         Log.Debug("MSBuildWorkspace: creating workspace");
@@ -873,19 +633,45 @@ public class SolutionParser
         return new DotNetProject(Guid.NewGuid(), projectName, tfms, sdk);
     }
 
-    private static void EnsureMSBuildRegistered()
+    /// <summary>
+    /// Returns true if the solution/project directory tree contains a classic (non-SDK-style)
+    /// project file — one whose root Project element has no Sdk attribute. Such projects need
+    /// the .NET Framework build assets to evaluate on non-Windows machines, whether or not
+    /// they still use packages.config.
+    /// </summary>
+    private static bool HasNonSdkProject(string path)
     {
-        if (!_msbuildRegistered)
+        try
         {
-            MSBuildLocator.RegisterDefaults();
-            _msbuildRegistered = true;
+            var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (dir == null)
+                return false;
+            foreach (var projectFile in Directory.EnumerateFiles(dir, "*.csproj", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    var root = XDocument.Load(projectFile).Root;
+                    if (root != null && root.Attribute("Sdk") == null)
+                        return true;
+                }
+                catch
+                {
+                    // Unparseable project file — ignore.
+                }
+            }
         }
+        catch (Exception ex)
+        {
+            Log.Debug("HasNonSdkProject: failed for {Path} ({ExType}: {ExMessage}), assuming none",
+                path, ex.GetType().Name, ex.Message);
+        }
+        return false;
     }
 
     /// <summary>
     /// Returns true if the solution/project directory tree contains a <c>packages.config</c>,
-    /// which marks a legacy non-SDK-style project whose NuGet dependencies must be restored
-    /// with the standalone NuGet CLI rather than <c>dotnet restore</c>.
+    /// which marks a legacy non-SDK-style project whose NuGet dependencies are materialized
+    /// into the solution-local packages folder and attested via a synthesized restore graph.
     /// </summary>
     private static bool HasPackagesConfig(string path)
     {
