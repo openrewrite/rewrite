@@ -29,12 +29,7 @@ public class KotlinSubstitutions extends Substitutions {
         return "__P__./*__p" + index + "__*/p<" + toKotlinTypeSyntax(fqn) + ">()";
     }
 
-    /**
-     * Parameter types are rendered in Java syntax, in which wildcards ({@code ? extends X},
-     * {@code ? super X}, {@code ?}) must be converted to Kotlin type projections
-     * ({@code out X}, {@code in X}, {@code *}) to parse as Kotlin. A {@code ?} cannot
-     * occur in a type name, so plain string replacement is unambiguous.
-     */
+    // Wildcards are rendered in Java syntax; a `?` cannot occur in a type name, so plain replacement is unambiguous
     private static String toKotlinTypeSyntax(String fqn) {
         return fqn
                 .replace("? extends ", "out ")

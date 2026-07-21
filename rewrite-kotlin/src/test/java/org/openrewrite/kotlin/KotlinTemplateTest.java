@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -586,6 +587,7 @@ class KotlinTemplateTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
     @Test
     void replaceAnnotationArgumentsWithWildcardTypedSubstitution() {
+        List<String> stubs = new ArrayList<>();
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
@@ -595,10 +597,8 @@ class KotlinTemplateTest implements RewriteTest {
                       annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
                       assignment.getVariable() instanceof J.Identifier attribute &&
                       "include".equals(attribute.getSimpleName())) {
-                      // The collection literal is typed by the declared attribute type
-                      // `Array<KClass<out Throwable>>`, whose wildcard must not be rendered
-                      // in Java syntax (`? extends`) in the Kotlin template stub
                       return KotlinTemplate.builder("includes = #{any()}")
+                        .doBeforeParseTemplate(stubs::add)
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
                           assignment.getAssignment());
@@ -630,19 +630,20 @@ class KotlinTemplateTest implements RewriteTest {
               }
               """
           ));
+        assertThat(stubs).anyMatch(stub -> stub.contains("p<kotlin.Array<kotlin.reflect.KClass<out kotlin.Throwable>>>()"));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
     @Test
     void contravariantAndStarProjectionTypedSubstitution() {
+        List<String> stubs = new ArrayList<>();
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().getFirst().getSimpleName().startsWith("x")) {
-                      // The parameter types `Comparator<? super String>` and `KClass<?>` must be
-                      // rendered as `Comparator<in String>` and `KClass<*>` in the template stub
                       return KotlinTemplate.builder("println(#{any()})")
+                        .doBeforeParseTemplate(stubs::add)
                         .build()
                         .apply(getCursor(), multiVariable.getCoordinates().replace(),
                           multiVariable.getVariables().getFirst().getInitializer());
@@ -668,6 +669,8 @@ class KotlinTemplateTest implements RewriteTest {
               }
               """
           ));
+        assertThat(stubs).anyMatch(stub -> stub.contains("Comparator<in kotlin.String>"));
+        assertThat(stubs).anyMatch(stub -> stub.contains("KClass<*>"));
     }
 
     @Test

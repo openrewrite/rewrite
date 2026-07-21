@@ -402,11 +402,7 @@ public class Substitutions {
                 return maybeParameter(j1, j1);
             }
 
-            /**
-             * @param marker   the element whose prefix carries the {@code __pN__} marker comment
-             * @param replaced the element being replaced, whose prefix supplies the whitespace
-             *                 preceding the placeholder
-             */
+            // marker carries the __pN__ comment; replaced supplies the whitespace preceding the placeholder
             private @Nullable J maybeParameter(J marker, J replaced) {
                 Integer param = parameterIndex(marker.getPrefix());
                 if (param != null) {

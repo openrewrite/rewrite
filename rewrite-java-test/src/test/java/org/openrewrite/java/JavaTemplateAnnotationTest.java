@@ -176,8 +176,6 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
     @Test
     void replaceAnnotationArgumentsWithAssignmentShapedSubstitution() {
-        // The substituted expression must keep the space after `=`; annotation argument
-        // replacement does not run autoFormat, so unsubstitution has to restore it
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
