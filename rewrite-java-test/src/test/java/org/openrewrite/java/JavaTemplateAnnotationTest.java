@@ -173,6 +173,52 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             .isEqualTo(stub.chars().filter(c -> c == '}').count()));
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
+    @Test
+    void replaceAnnotationArgumentsWithAssignmentShapedSubstitution() {
+        // The substituted expression must keep the space after `=`; annotation argument
+        // replacement does not run autoFormat, so unsubstitution has to restore it
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Retry".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && !annotation.getArguments().isEmpty() &&
+                      annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
+                      assignment.getVariable() instanceof J.Identifier attribute &&
+                      "include".equals(attribute.getSimpleName())) {
+                      return JavaTemplate.builder("includes = #{any()}")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          assignment.getAssignment());
+                  }
+                  return annotation;
+              }
+          })),
+          java(
+            """
+              @interface Retry {
+                  Class<? extends Throwable>[] include() default {};
+                  Class<? extends Throwable>[] includes() default {};
+              }
+              """
+          ),
+          java(
+            """
+              class MyService {
+                  @Retry(include = {IllegalStateException.class})
+                  void doWork() {}
+              }
+              """,
+            """
+              class MyService {
+                  @Retry(includes = {IllegalStateException.class})
+                  void doWork() {}
+              }
+              """
+          ));
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4634")
     @Test
     void replacesInRecordVisitor() {
