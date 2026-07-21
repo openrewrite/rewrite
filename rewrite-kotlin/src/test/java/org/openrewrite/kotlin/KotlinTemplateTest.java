@@ -583,6 +583,55 @@ class KotlinTemplateTest implements RewriteTest {
           ));
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
+    @Test
+    void replaceAnnotationArgumentsWithWildcardTypedSubstitution() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Retry".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && !annotation.getArguments().isEmpty() &&
+                      annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
+                      assignment.getVariable() instanceof J.Identifier attribute &&
+                      "include".equals(attribute.getSimpleName())) {
+                      // The collection literal is typed by the declared attribute type
+                      // `Array<KClass<out Throwable>>`, whose wildcard must not be rendered
+                      // in Java syntax (`? extends`) in the Kotlin template stub
+                      return KotlinTemplate.builder("includes = #{any()}")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          assignment.getAssignment());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              import kotlin.reflect.KClass
+
+              annotation class Retry(
+                  val include: Array<KClass<out Throwable>> = [],
+                  val includes: Array<KClass<out Throwable>> = []
+              )
+              """
+          ),
+          kotlin(
+            """
+              class MyService {
+                  @Retry(include = [IllegalStateException::class])
+                  fun doWork() {}
+              }
+              """,
+            """
+              class MyService {
+                  @Retry(includes = [IllegalStateException::class])
+                  fun doWork() {}
+              }
+              """
+          ));
+    }
+
     @Test
     void replaceAnnotationArgumentsOnProperty() {
         rewriteRun(
