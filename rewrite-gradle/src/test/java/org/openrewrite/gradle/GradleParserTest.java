@@ -573,17 +573,6 @@ class GradleParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 
-    /**
-     * {@code org.openrewrite.gradle.Assertions#gradleParser} is a single {@code static final}
-     * {@link GradleParser.Builder} that every {@code gradle(...)} spec reuses, and {@code RewriteTest} clones
-     * it per test method to isolate state while JUnit Jupiter runs those methods concurrently. Cloning must
-     * therefore give every clone its own {@link JavaTypeCache}: the cache's backing
-     * {@link org.openrewrite.internal.AdaptiveRadixTree} is not thread-safe, so a shared cache written from
-     * multiple threads corrupts it and (with assertions enabled) trips
-     * {@code AdaptiveRadixTree$InternalNode.split}. {@link GroovyParser.Builder#clone()} and
-     * {@link KotlinParser.Builder#clone()} already clone their caches; {@link GradleParser.Builder} must
-     * propagate that to both sub-builders rather than inheriting a shallow {@link Object#clone()}.
-     */
     @Issue("https://github.com/openrewrite/rewrite/pull/8301")
     @Test
     void cloneIsolatesGroovyAndKotlinTypeCaches() throws Exception {
