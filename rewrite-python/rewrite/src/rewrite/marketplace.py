@@ -78,7 +78,9 @@ class RecipeMarketplace:
                     try:
                         recipe_inst = recipe()
                         desc = recipe_inst.descriptor()
-                        self._recipes[desc.name] = (desc, recipe)
+                        # First-wins: matches the host's name-keyed RecipeListing and this
+                        # engine's own first-wins attribution (RecipeAttribution.setdefault).
+                        self._recipes.setdefault(desc.name, (desc, recipe))
                     except Exception as e:
                         raise RuntimeError(
                             f"Failed to install recipe {recipe}. "
@@ -86,7 +88,7 @@ class RecipeMarketplace:
                         ) from e
                 else:
                     # It's already a RecipeDescriptor
-                    self._recipes[recipe.name] = (recipe, None)
+                    self._recipes.setdefault(recipe.name, (recipe, None))
                 return
 
             # Get the first category in the path

@@ -17,13 +17,19 @@
 from __future__ import annotations
 
 import inspect
+import logging
+import re
+import sys
 from importlib.metadata import entry_points
+from pathlib import Path
 from typing import Dict, List, NewType, Optional, Set, Tuple, Type
 
 from rewrite.category import CategoryDescriptor
 from rewrite.decorators import get_recipe_category
 from rewrite.marketplace import RecipeMarketplace
 from rewrite.recipe import Recipe
+
+logger = logging.getLogger(__name__)
 
 
 # A recipe's fully qualified name (e.g., ``org.openrewrite.python.RemovePass``).
@@ -118,27 +124,39 @@ def discover_recipes(
     if marketplace is None:
         marketplace = RecipeMarketplace()
 
-    # Python 3.10+ uses select parameter via SelectableGroups
-    eps = entry_points(group="openrewrite.recipes")
-
-    for ep in eps:
-        try:
-            module = ep.load()
-            if not hasattr(module, "activate") or not callable(module.activate):
-                continue
-            if attribution is None:
-                module.activate(marketplace)
-                continue
-            dist_name = ep.dist.name if ep.dist is not None else None
-            before = recipe_name_set(marketplace)
-            module.activate(marketplace)
-            if dist_name:
-                attribution.record(dist_name, recipe_name_set(marketplace) - before)
-        except Exception:
-            # Log or handle the error - for now, skip failed activations
-            pass
+    for ep in entry_points(group="openrewrite.recipes"):
+        _activate_entry_point(ep, marketplace, attribution)
 
     return marketplace
+
+
+def _activate_entry_point(ep, marketplace: RecipeMarketplace,
+                          attribution: Optional[RecipeAttribution],
+                          attribution_name: Optional[str] = None) -> None:
+    """Load and run one ``openrewrite.recipes`` entry point into ``marketplace``.
+
+    An entry point may name the module (``pkg = pkg``), so ``load()`` yields a module whose
+    ``activate`` we want, or the function itself (``pkg = pkg:activate`` — the form the engine and
+    the recipe bundles declare), in which case ``load()`` has already yielded ``activate``. A failed
+    activation contributes nothing but is logged, never silently swallowed — otherwise a bundle's
+    recipes vanish with no explanation.
+
+    ``attribution_name`` records the recipes under a caller-supplied identity (a local install's
+    supplied path, which the host keys the bundle by) instead of the distribution's own name.
+    """
+    dist_name = ep.dist.name if ep.dist is not None else None
+    try:
+        loaded = ep.load()
+        activate = getattr(loaded, "activate", loaded)
+        if not callable(activate):
+            return
+        before = recipe_name_set(marketplace)
+        activate(marketplace)
+        recorded = attribution_name or dist_name
+        if attribution is not None and recorded:
+            attribution.record(recorded, recipe_name_set(marketplace) - before)
+    except Exception:
+        logger.warning("Failed to activate recipes from distribution %r", dist_name, exc_info=True)
 
 
 def recipe_name_set(marketplace: RecipeMarketplace) -> Set[RecipeName]:
@@ -153,6 +171,77 @@ def _normalize_package_name(name: str) -> NormalizedDistName:
     resolving distribution identity.
     """
     return NormalizedDistName(name.replace("-", "_").replace(".", "_").lower())
+
+
+def discover_root_recipes(
+    root_dist_name: str,
+    marketplace: Optional[RecipeMarketplace] = None,
+    attribution: Optional[RecipeAttribution] = None,
+    attribution_name: Optional[str] = None,
+) -> RecipeMarketplace:
+    """Activate only the entry point whose owning distribution is ``root_dist_name``.
+
+    ``entry_points()`` is environment-wide, so a bundle venv that transitively
+    contains other recipe packages would otherwise surface them. Restricting
+    activation to the root distribution keeps a bundle's marketplace to its own
+    direct recipes; transitive recipe packages remain importable
+    for in-boundary composition but are never listed or attributed here.
+
+    ``attribution_name`` labels the discovered recipes with a caller-supplied identity rather than
+    ``root_dist_name`` — a local install is filtered by its resolved distribution name but must be
+    attributed to the source path the host supplied and keys the bundle by.
+    """
+    if marketplace is None:
+        marketplace = RecipeMarketplace()
+
+    root_key = _normalize_package_name(root_dist_name)
+    for ep in entry_points(group="openrewrite.recipes"):
+        dist_name = ep.dist.name if ep.dist is not None else None
+        if dist_name is None or _normalize_package_name(dist_name) != root_key:
+            continue
+        _activate_entry_point(ep, marketplace, attribution, attribution_name)
+    return marketplace
+
+
+def distribution_name_from_source(local_path: Path) -> Optional[str]:
+    """The distribution name declared by a local package source, or None.
+
+    A local install (``pip install ./recipes``) arrives as a path, but the venv and its child are
+    keyed by distribution name — so it must be resolved before install, from ``pyproject.toml``
+    (PEP 621 ``[project]`` or ``[tool.poetry]``) or a ``setup.py`` ``name=``.
+    """
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError:
+            return None
+
+    pyproject = local_path / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+            project = data.get("project", {})
+            if "name" in project:
+                return project["name"]
+            poetry = data.get("tool", {}).get("poetry", {})
+            if "name" in poetry:
+                return poetry["name"]
+        except Exception as e:
+            logger.warning("Failed to parse %s: %s", pyproject, e)
+
+    setup_py = local_path / "setup.py"
+    if setup_py.exists():
+        try:
+            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', setup_py.read_text())
+            if match:
+                return match.group(1)
+        except Exception as e:
+            logger.warning("Failed to parse %s: %s", setup_py, e)
+
+    return None
 
 
 def discover_decorated_recipes_in_module(
