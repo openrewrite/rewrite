@@ -26,7 +26,15 @@ public class KotlinSubstitutions extends Substitutions {
 
     @Override
     protected String newObjectParameter(String fqn, int index) {
-        return "__P__./*__p" + index + "__*/p<" + fqn + ">()";
+        return "__P__./*__p" + index + "__*/p<" + toKotlinTypeSyntax(fqn) + ">()";
+    }
+
+    // Wildcards are rendered in Java syntax; a `?` cannot occur in a type name, so plain replacement is unambiguous
+    private static String toKotlinTypeSyntax(String fqn) {
+        return fqn
+                .replace("? extends ", "out ")
+                .replace("? super ", "in ")
+                .replace("?", "*");
     }
 
     @Override

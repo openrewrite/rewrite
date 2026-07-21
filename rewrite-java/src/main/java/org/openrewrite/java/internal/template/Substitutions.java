@@ -352,7 +352,7 @@ public class Substitutions {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                J param = maybeParameter(method.getName());
+                J param = maybeParameter(method.getName(), method);
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
                 } else if (param != null) {
@@ -399,10 +399,15 @@ public class Substitutions {
             }
 
             private @Nullable J maybeParameter(J j1) {
-                Integer param = parameterIndex(j1.getPrefix());
+                return maybeParameter(j1, j1);
+            }
+
+            // marker carries the __pN__ comment; replaced supplies the whitespace preceding the placeholder
+            private @Nullable J maybeParameter(J marker, J replaced) {
+                Integer param = parameterIndex(marker.getPrefix());
                 if (param != null) {
                     J j2 = (J) parameters[param];
-                    return j2.withPrefix(j2.getPrefix().withWhitespace(j1.getPrefix().getWhitespace()));
+                    return j2.withPrefix(j2.getPrefix().withWhitespace(replaced.getPrefix().getWhitespace()));
                 }
                 return null;
             }
