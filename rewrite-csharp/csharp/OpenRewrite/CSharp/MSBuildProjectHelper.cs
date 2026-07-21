@@ -107,11 +107,11 @@ public static class MSBuildProjectHelper
         var sdk = doc.Root.GetAttributeValue("Sdk");
 
         if (rootDir == null)
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return CreateFromXml(doc, sdk);
 
         var projectPath = Path.GetFullPath(Path.Combine(rootDir, doc.SourcePath));
         if (!File.Exists(projectPath))
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return CreateFromXml(doc, sdk);
 
         try
         {
@@ -119,7 +119,7 @@ public static class MSBuildProjectHelper
                 .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
                 .GetAwaiter().GetResult();
             if (lockFile == null)
-                return new MSBuildProject(Guid.NewGuid(), sdk);
+                return CreateFromXml(doc, sdk);
 
             var projectDir = Path.GetDirectoryName(projectPath)!;
             return CreateFromLockFile(sdk, lockFile, projectDir,
@@ -128,9 +128,72 @@ public static class MSBuildProjectHelper
         catch (Exception ex)
         {
             Log.Debug("Failed to resolve lock file for {Path}: {Error}", projectPath, ex.Message);
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return CreateFromXml(doc, sdk);
         }
     }
+
+    /// <summary>
+    ///     Builds a marker from the declared <c>&lt;PackageReference&gt;</c> items and
+    ///     <c>&lt;TargetFramework(s)&gt;</c> read straight from the csproj XML, used whenever an
+    ///     in-process NuGet restore is unavailable (no project on disk, restore-graph evaluation
+    ///     failed, offline, etc.). This keeps the marker's declared package references 1:1 with
+    ///     the csproj — recipes such as FindNuGetPackageReference / UpgradeNuGetPackageVersion /
+    ///     RemoveNuGetPackageReference query the declared references and must not silently no-op
+    ///     just because the transitive graph could not be resolved. Only <see cref="PackageReference.ResolvedVersion"/>
+    ///     (the restore-computed value) is absent in this fallback.
+    /// </summary>
+    private static MSBuildProject CreateFromXml(Document doc, string? sdk)
+    {
+        var tfms = new List<string>();
+        var declared = new List<PackageReference>();
+        foreach (var tag in DescendantTags(doc.Root))
+        {
+            if (string.Equals(tag.Name, "TargetFramework", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tag.Name, "TargetFrameworks", StringComparison.OrdinalIgnoreCase))
+            {
+                var value = tag.GetValue();
+                if (!string.IsNullOrWhiteSpace(value) && !IsPropertyReference(value))
+                {
+                    foreach (var tfm in value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        if (!tfms.Contains(tfm))
+                            tfms.Add(tfm);
+                }
+            }
+            else if (string.Equals(tag.Name, "PackageReference", StringComparison.OrdinalIgnoreCase))
+            {
+                var include = tag.GetAttributeValue("Include") ?? tag.GetAttributeValue("Update");
+                if (string.IsNullOrWhiteSpace(include))
+                    continue;
+                var version = tag.GetAttributeValue("Version") ?? tag.GetChild("Version")?.GetValue();
+                declared.Add(new PackageReference(include, version));
+            }
+        }
+
+        if (declared.Count == 0)
+            return new MSBuildProject(Guid.NewGuid(), sdk);
+
+        if (tfms.Count == 0)
+            tfms.Add("");
+
+        var tfmList = new List<TargetFramework>(tfms.Count);
+        foreach (var tfm in tfms)
+            tfmList.Add(new TargetFramework(tfm, new List<PackageReference>(declared)));
+
+        return new MSBuildProject(Guid.NewGuid(), sdk, null, null, tfmList);
+    }
+
+    private static IEnumerable<Tag> DescendantTags(Tag tag)
+    {
+        foreach (var child in tag.GetChildren())
+        {
+            yield return child;
+            foreach (var descendant in DescendantTags(child))
+                yield return descendant;
+        }
+    }
+
+    private static bool IsPropertyReference(string value)
+        => value.StartsWith("$(") && value.EndsWith(")");
 
     /// <summary>
     ///     Creates an MSBuildProject marker from a pre-resolved <see cref="LockFile"/>

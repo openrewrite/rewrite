@@ -225,4 +225,66 @@ public class CsprojParserTests
         Assert.True(newtonsoft.HasXdtTransforms);
         Assert.True(newtonsoft.HasLegacyContentFolder);
     }
+
+    // When an in-process restore is unavailable (offline CI, restore-graph failure), the marker
+    // must still expose declared <PackageReference> items from the XML, or the Find/Upgrade/Remove
+    // NuGet recipes silently no-op.
+    [Fact]
+    public void MarkerExposesDeclaredPackageReferencesWithoutRestore()
+    {
+        var doc = new XmlParser().Parse(
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+                <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.0" />
+              </ItemGroup>
+            </Project>
+            """,
+            "project.csproj");
+
+        // No rootDir -> no restore is attempted; the marker is built from the XML alone.
+        var marker = MSBuildProjectHelper.CreateMarker(doc);
+
+        Assert.NotNull(marker);
+        Assert.Equal("Microsoft.NET.Sdk.Web", marker.Sdk);
+        var tfm = Assert.Single(marker.TargetFrameworks);
+        Assert.Equal("net8.0", tfm.TargetFrameworkMoniker);
+        Assert.Equal(2, tfm.PackageReferences.Count);
+        Assert.Contains(tfm.PackageReferences, p => p.Include == "Swashbuckle.AspNetCore" && p.RequestedVersion == "6.4.0");
+        Assert.Contains(tfm.PackageReferences, p => p.Include == "Microsoft.AspNetCore.OpenApi" && p.RequestedVersion == "7.0.0");
+    }
+
+    [Fact]
+    public void MarkerExposesDeclaredPackageReferencesForMultiTargetWithoutRestore()
+    {
+        var doc = new XmlParser().Parse(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Newtonsoft.Json">
+                  <Version>13.0.3</Version>
+                </PackageReference>
+              </ItemGroup>
+            </Project>
+            """,
+            "project.csproj");
+
+        var marker = MSBuildProjectHelper.CreateMarker(doc);
+
+        Assert.NotNull(marker);
+        Assert.Equal(2, marker.TargetFrameworks.Count);
+        foreach (var tfm in marker.TargetFrameworks)
+        {
+            var pkgRef = Assert.Single(tfm.PackageReferences);
+            Assert.Equal("Newtonsoft.Json", pkgRef.Include);
+            Assert.Equal("13.0.3", pkgRef.RequestedVersion);
+        }
+    }
 }
