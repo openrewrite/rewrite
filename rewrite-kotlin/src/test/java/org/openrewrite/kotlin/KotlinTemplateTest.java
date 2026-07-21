@@ -632,6 +632,44 @@ class KotlinTemplateTest implements RewriteTest {
           ));
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
+    @Test
+    void contravariantAndStarProjectionTypedSubstitution() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().getFirst().getSimpleName().startsWith("x")) {
+                      // The parameter types `Comparator<? super String>` and `KClass<?>` must be
+                      // rendered as `Comparator<in String>` and `KClass<*>` in the template stub
+                      return KotlinTemplate.builder("println(#{any()})")
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(),
+                          multiVariable.getVariables().getFirst().getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })),
+          kotlin(
+            """
+              import kotlin.reflect.KClass
+
+              fun test(c: Comparator<in String>, k: KClass<*>) {
+                  val x1 = c
+                  val x2 = k
+              }
+              """,
+            """
+              import kotlin.reflect.KClass
+
+              fun test(c: Comparator<in String>, k: KClass<*>) {
+                  println(c)
+                  println(k)
+              }
+              """
+          ));
+    }
+
     @Test
     void replaceAnnotationArgumentsOnProperty() {
         rewriteRun(
