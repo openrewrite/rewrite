@@ -25,7 +25,6 @@ These tests require ty-types to be installed and on PATH.
 import ast
 import pytest
 import tempfile
-import textwrap
 import os
 from pathlib import Path
 
@@ -298,7 +297,7 @@ class TestTypeAttributionWithImports:
 
     def test_stdlib_function_call(self):
         """Test type attribution for stdlib function calls."""
-        source = textwrap.dedent('''\
+        source = dedent('''
             import os
             os.getcwd()
         ''')
@@ -324,7 +323,7 @@ class TestTypeAttributionWithImports:
 
     def test_stdlib_method_on_result(self):
         """Test calling methods on stdlib function results."""
-        source = textwrap.dedent('''\
+        source = dedent('''
             import os
             os.getcwd().split("/")
         ''')
@@ -2628,7 +2627,7 @@ class TestClassObjectTypeAttribution:
     First-party only — no third-party dependency environment required.
     """
 
-    _SOURCE = textwrap.dedent('''\
+    _SOURCE = dedent('''
         class M:
             x: int = 0
 
@@ -2900,7 +2899,7 @@ class TestExternalSupertypeResolutionInParsePath:
     the test interpreter; otherwise ty-types would resolve it ambiently.
     """
 
-    _SOURCE = textwrap.dedent('''\
+    _SOURCE = dedent('''
         from pydantic import BaseModel
 
 
@@ -2910,7 +2909,7 @@ class TestExternalSupertypeResolutionInParsePath:
             def field_names(self):
                 return list(self.model_fields.keys())
     ''')
-    _PYPROJECT = textwrap.dedent('''\
+    _PYPROJECT = dedent('''
         [project]
         name = "tyrepro"
         version = "0.0.0"
@@ -3014,14 +3013,14 @@ class TestProjectParseSupertypeAcrossFiles:
     because a fresh session per parse never triggers the dedup.
     """
 
-    _PYPROJECT = textwrap.dedent('''\
+    _PYPROJECT = dedent('''
         [project]
         name = "tyrepro"
         version = "0.0.0"
         requires-python = ">=3.10"
         dependencies = ["pydantic>=2.11"]
     ''')
-    _A = textwrap.dedent('''\
+    _A = dedent('''
         from pydantic import BaseModel
 
 
@@ -3031,7 +3030,7 @@ class TestProjectParseSupertypeAcrossFiles:
             def fa(self):
                 return self.model_fields
     ''')
-    _B = textwrap.dedent('''\
+    _B = dedent('''
         from pydantic import BaseModel
 
 
@@ -3314,7 +3313,7 @@ class TestPydanticModelMembers:
     resolution setup in ``TestExternalSupertypeResolutionInParsePath``.
     """
 
-    _SOURCE = textwrap.dedent('''\
+    _SOURCE = dedent('''
         from pydantic import BaseModel
 
 
@@ -3325,7 +3324,7 @@ class TestPydanticModelMembers:
             def greeting(self) -> str:
                 return self.name
     ''')
-    _PYPROJECT = textwrap.dedent('''\
+    _PYPROJECT = dedent('''
         [project]
         name = "tyrepro"
         version = "0.0.0"
