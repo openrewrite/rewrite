@@ -1150,6 +1150,9 @@ public class ResolvedPom {
                         includedByMap.put(resolved, includedBy);
                     }
 
+                    // dd's own local scope, not a transitively-composed one - correct at any depth because
+                    // scope degradation only ever bottoms out at "runtime", whose own isDirectlyIncludedIn
+                    // set already matches what that degradation would otherwise enforce.
                     if (dd.getScope().isDirectlyIncludedIn(scope)) {
                         dependencies.add(resolved);
                     } else {
