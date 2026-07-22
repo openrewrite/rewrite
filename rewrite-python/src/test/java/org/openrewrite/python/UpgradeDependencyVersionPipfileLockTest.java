@@ -199,6 +199,75 @@ class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
 
     @Test
     @Timeout(120)
+    void unrelatedStaleDependencyDoesNotBlockUpgrade() {
+        // The Pipfile declares click, but it predates the lock (absent from it) — a pre-existing
+        // inconsistency the recipe never touched. Upgrading requests must still succeed, leaving
+        // click alone rather than aborting with "click is not in the existing lock".
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.32.0", null, null))
+            .executionContext(ctx),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              click = ">=8.3.2"
+              """,
+            s -> s.after(actual -> {
+                assertThat(actual).contains("requests = \">=2.32.0\"");
+                return actual;
+            }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+              .as("upgrade should not warn about the unrelated stale dependency")
+              .isEmpty())
+          ),
+          json(
+            """
+              {
+                  "_meta": {
+                      "hash": {
+                          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+                      },
+                      "pipfile-spec": 6,
+                      "requires": {},
+                      "sources": [
+                          {
+                              "name": "pypi",
+                              "url": "https://pypi.org/simple",
+                              "verify_ssl": true
+                          }
+                      ]
+                  },
+                  "default": {
+                      "certifi": {
+                          "hashes": [
+                              "sha256:%s"
+                          ],
+                          "markers": "python_version >= '3.6'",
+                          "version": "==2024.2.2"
+                      },
+                      "requests": {
+                          "hashes": [
+                              "sha256:%s",
+                              "sha256:%s"
+                          ],
+                          "index": "pypi",
+                          "markers": "python_version >= '3.7'",
+                          "version": "==2.31.0"
+                      }
+                  },
+                  "develop": {}
+              }
+              """.formatted(CERTIFI, WHEEL_2310, SDIST_2310),
+            spec -> spec.path("Pipfile.lock").noTrim().after(actual -> {
+                assertThat(actual).contains("\"version\": \"==2.32.4\"");
+                assertThat(actual).doesNotContain("click");
+                return actual;
+            })
+          )
+        );
+    }
+
+    @Test
+    @Timeout(120)
     void recordsStructuredFailureInDataTableAndWarns() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("requests", "==9.9.9", null, null))
