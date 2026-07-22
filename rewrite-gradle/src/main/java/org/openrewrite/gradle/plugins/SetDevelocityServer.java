@@ -26,17 +26,11 @@ import org.openrewrite.TreeVisitor;
 @EqualsAndHashCode(callSuper = false)
 public class SetDevelocityServer extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Set the Develocity `server`";
-    }
+    String displayName = "Set the Develocity `server`";
 
-    @Override
-    public String getDescription() {
-        return "Sets the `server` in the `develocity` block of a Gradle settings file, adding it as the first " +
-               "statement when absent or updating it when it differs. Use this to point builds at a different " +
-               "Develocity server, for example when migrating between servers.";
-    }
+    String description = "Sets the `server` in the `develocity` block of a Gradle settings file, adding it as the first " +
+                         "statement when absent or updating it when it differs. Use this to point builds at a different " +
+                         "Develocity server, for example when migrating between servers.";
 
     @Option(displayName = "Server",
             description = "The value to set for `server`.",

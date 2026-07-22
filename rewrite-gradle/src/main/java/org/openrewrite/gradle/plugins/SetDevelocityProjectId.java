@@ -26,17 +26,11 @@ import org.openrewrite.TreeVisitor;
 @EqualsAndHashCode(callSuper = false)
 public class SetDevelocityProjectId extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Set the Develocity `projectId`";
-    }
+    String displayName = "Set the Develocity `projectId`";
 
-    @Override
-    public String getDescription() {
-        return "Sets the `projectId` in the `develocity` block of a Gradle settings file, adding it after the " +
-               "`server` assignment when absent or updating it when it differs. The `projectId` is used by newer " +
-               "Develocity servers to associate build scans with a project.";
-    }
+    String description = "Sets the `projectId` in the `develocity` block of a Gradle settings file, adding it after the " +
+                         "`server` assignment when absent or updating it when it differs. The `projectId` is used by newer " +
+                         "Develocity servers to associate build scans with a project.";
 
     @Option(displayName = "Project ID",
             description = "The value to set for `projectId`.",
