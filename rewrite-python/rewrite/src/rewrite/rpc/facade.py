@@ -5,7 +5,7 @@ installs each bundle into its own venv+child (``BundleChildren``), serves ``GetM
 the merged cache, and routes recipe execution to the owning child — tracking which child produced
 each prepared recipe's visitors so later ``Visit``/``Generate`` calls route to the right child.
 
-Scope note: precondition routing remains a follow-up to validate against a real CLI run.
+``Print``/``GetObject`` are not routed: the facade owns the working tree and answers those itself.
 """
 from pathlib import Path
 
@@ -19,8 +19,6 @@ class Facade:
         self._hub_pull = hub_pull
         self._bundle_by_visitor = {}    # visitor name (edit:/scan:) -> bundle
         self._bundle_by_recipe_id = {}  # prepared recipe id -> bundle
-        self._bundle_by_tree = {}       # visited tree id -> bundle that holds the modified tree
-        self._active_bundle = None      # bundle of the most recent visit (fallback owner during a run)
 
     def install_recipes(self, params: dict) -> dict:
         recipes = params.get("recipes")
@@ -97,9 +95,6 @@ class Facade:
         # the same for each of its runs; a single-recipe run reaches this path instead.
         if self._hub_pull is not None and tree_id is not None and result.get("modified"):
             self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"))
-        if tree_id is not None:
-            self._bundle_by_tree[tree_id] = bundle
-        self._active_bundle = bundle
         return result
 
     def batch_visit(self, params: dict) -> dict:
@@ -132,27 +127,12 @@ class Facade:
             response = self._children.request(owner, "BatchVisit", {**params, "visitors": sub_visitors})
             sub_results = response.get("results", [])
             results.extend(sub_results)
-            self._active_bundle = owner
             # Pull this bundle's edit into the facade's tree so the next bundle starts from it.
             # Only when it actually changed something -- an unmodified run has nothing to contribute.
             if (self._hub_pull is not None and tree_id is not None and
                     any(r.get("modified") for r in sub_results)):
                 self._hub_pull(self._children, owner, tree_id, source_file_type)
-        if tree_id is not None and self._active_bundle is not None:
-            self._bundle_by_tree[tree_id] = self._active_bundle
         return {"results": results}
-
-    def tree_owner(self, params: dict):
-        """The child that should service a Print/GetObject, or None to fall back to the facade-local
-        handler. Print sends 'treeId', GetObject sends 'id'. A modifying visit re-keys the tree under
-        a new id (and Java also fetches the execution context and cursors by id), so an exact-id miss
-        during a run still belongs to the child that just visited — the facade holds no trees then.
-        Only before any visit (build time) is there no active bundle, leaving those objects local."""
-        tree_id = params.get("treeId") or params.get("id")
-        return self._bundle_by_tree.get(tree_id) or self._active_bundle
-
-    def route_to_child(self, bundle, method: str, params: dict) -> dict:
-        return self._children.request(bundle, method, params)
 
     def evict(self, params: dict) -> bool:
         # The facade runs no recipes and holds no source trees; the children do. Fan the host's

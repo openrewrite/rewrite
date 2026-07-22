@@ -96,25 +96,6 @@ def test_facade_rejects_a_local_path_without_a_resolvable_name(tmp_path):
         assert "distribution name" in str(e)
 
 
-def test_facade_routes_print_and_getobject_to_the_child_that_visited_the_tree():
-    children = _FakeChildren()
-    f = Facade(children)
-    f._bundle_by_visitor["edit:r"] = "pkg"
-
-    # Before any visit (build time) there is no active child, so objects stay facade-local.
-    assert f.tree_owner({"treeId": "T1"}) is None
-
-    # A visit records treeId -> bundle and marks the active child. A later Print/GetObject reaches
-    # the child that holds the modified tree and its RPC ref-state — by exact id, and (because a
-    # modifying visit re-keys the tree and Java also fetches the context/cursors by id) by the
-    # active-child fallback for ids the map never recorded.
-    f.visit({"visitor": "edit:r", "treeId": "T1"})
-    assert f.tree_owner({"treeId": "T1"}) == "pkg"          # Print carries 'treeId'
-    assert f.tree_owner({"id": "T1"}) == "pkg"              # GetObject carries 'id'
-    assert f.tree_owner({"treeId": "re-keyed-id"}) == "pkg" # untracked during a run -> active child
-    assert f.route_to_child("pkg", "Print", {"treeId": "T1"}) == {"ok": "Print"}
-
-
 def test_facade_batch_visit_splits_consecutive_runs_across_bundles():
     children = _FakeChildren()
     f = Facade(children)
@@ -129,8 +110,6 @@ def test_facade_batch_visit_splits_consecutive_runs_across_bundles():
     # dispatched as maximal consecutive same-owner runs: A gets [a1,a2], then B gets [b1]
     batches = [c for c in children.calls if c[0] == "batch"]
     assert batches == [("batch", "A", ["edit:a1", "edit:a2"]), ("batch", "B", ["edit:b1"])]
-    # tree ownership follows the last child to touch it (for a later Print/GetObject)
-    assert f.tree_owner({"treeId": "T"}) == "B"
 
 
 def test_facade_batch_visit_re_splits_when_owners_alternate():
@@ -245,9 +224,6 @@ def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp
         def visit(self, params): ...
         def batch_visit(self, params): ...
         def generate(self, params): ...
-
-        def route_to_child(self, bundle, method, params):
-            raise AssertionError("Print/GetObject must never round-trip to a child")
 
     monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
     monkeypatch.setattr(server, "_child_bundle", None)
