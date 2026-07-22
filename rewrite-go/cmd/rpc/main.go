@@ -2247,6 +2247,10 @@ type parseProjectResponseItem struct {
 // Multi-module repos (root go.mod plus nested submodules) are honored:
 // each .go file resolves against its closest-ancestor go.mod, not the
 // project root's.
+// Files larger than this are recorded as Quarks rather than parsed into an AST.
+// Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
+const maxParseableSizeBytes = 1 << 20
+
 func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	var req parseProjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -2257,8 +2261,9 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 
 	// Discover all .go files AND every go.mod in the project tree.
 	type discovered struct {
-		goFiles []string
-		goMods  []string
+		goFiles       []string
+		oversizeFiles []string
+		goMods        []string
 	}
 	var disc discovered
 	err := filepath.Walk(req.ProjectPath, func(path string, info os.FileInfo, err error) error {
@@ -2284,7 +2289,12 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		case filepath.Base(path) == "go.mod":
 			disc.goMods = append(disc.goMods, path)
 		case strings.HasSuffix(path, ".go"):
-			disc.goFiles = append(disc.goFiles, path)
+			// Files too large to parse into an AST are recorded as Quarks below.
+			if info.Size() > maxParseableSizeBytes {
+				disc.oversizeFiles = append(disc.oversizeFiles, path)
+			} else {
+				disc.goFiles = append(disc.goFiles, path)
+			}
 		}
 		return nil
 	})
@@ -2515,6 +2525,22 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			ID:             id,
 			SourceFileType: "org.openrewrite.golang.tree.Go$CompilationUnit",
 			SourcePath:     o.sourcePath,
+		})
+	}
+
+	// Oversize .go files aren't parsed; emit each as a Quark the Java side
+	// builds locally from its path (no content over the wire, no localObjects entry).
+	for _, goFile := range disc.oversizeFiles {
+		sourcePath := goFile
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, err := filepath.Rel(*req.RelativeTo, goFile); err == nil {
+				sourcePath = rel
+			}
+		}
+		items = append(items, parseProjectResponseItem{
+			ID:             uuid.New().String(),
+			SourceFileType: "org.openrewrite.quark.Quark",
+			SourcePath:     sourcePath,
 		})
 	}
 

@@ -402,6 +402,31 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+# Files larger than this are recorded as Quarks rather than parsed into an AST.
+# Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
+MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
+
+
+def _create_quark(path: str, relative_to: Optional[str]) -> dict:
+    """Represent a file that won't be parsed (currently: too large) as a Quark.
+
+    No object is registered in ``local_objects``: the Java side builds the Quark
+    from ``sourcePath`` locally, so no content crosses the wire.
+    """
+    from rewrite import random_id
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return {
+        'id': str(random_id()),
+        'sourceFileType': 'org.openrewrite.quark.Quark',
+        'sourcePath': str(source_path),
+    }
+
+
 def _infer_project_root(inputs: list) -> Optional[str]:
     """Infer the project root from input paths.
 
@@ -555,6 +580,13 @@ def handle_parse_project(params: dict) -> List[dict]:
             for file in files:
                 if file.endswith('.py'):
                     path = os.path.join(root, file)
+                    try:
+                        oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
+                    except OSError:
+                        oversize = False  # let the normal path surface the read error
+                    if oversize:
+                        results.append(_create_quark(path, relative_to))
+                        continue
                     try:
                         result = parse_python_file(path, relative_to, ty_client,
                                                    language_level=language_level,

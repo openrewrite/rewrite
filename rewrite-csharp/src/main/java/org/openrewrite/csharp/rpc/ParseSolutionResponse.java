@@ -16,6 +16,7 @@
 package org.openrewrite.csharp.rpc;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,5 +51,12 @@ class ParseSolutionResponse {
          * Example: org.openrewrite.csharp.tree.Cs$CompilationUnit
          */
         String sourceFileType;
+
+        /**
+         * The relative source path; populated only for Quark items, from which the
+         * Java side builds the Quark locally. Null for normal items.
+         */
+        @Nullable
+        String sourcePath;
     }
 }
