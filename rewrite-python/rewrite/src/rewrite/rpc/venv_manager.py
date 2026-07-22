@@ -2,8 +2,8 @@
 
 Each recipe bundle gets its own venv so its dependency graph is fully isolated.
 Creation uses the stdlib ``venv`` module of a caller-supplied, rewrite-capable
-interpreter; uv is not assumed present. Uninstall is directory removal — one
-bundle owns one venv, so there is nothing to pip-uninstall.
+interpreter. Uninstall is directory removal — one bundle owns one venv, so
+there is nothing to pip-uninstall.
 """
 import os
 import shutil
@@ -91,13 +91,6 @@ def remove_venv(venv_dir: Path) -> None:
 
 
 def purge_non_venv_entries(root: Path) -> list:
-    """Remove everything in the venvs root that is not a per-bundle venv; return removed names.
-
-    A flat ``pip install --target <root>`` layout leaves package directories and ``*.dist-info``
-    in this root. They are dead to the facade, but a stale top-level ``*.dist-info`` makes a
-    *downgraded* pre-venv CLI skip pip and serve stale recipes from a half-clobbered flat layout.
-    An orphaned venv is kept — install rebuilds it.
-    """
     if not root.exists():
         return []
     removed = []

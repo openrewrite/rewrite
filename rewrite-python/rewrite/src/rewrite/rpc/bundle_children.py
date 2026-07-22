@@ -26,38 +26,27 @@ class BundleChildren:
         self._data_table_store = None  # cached SetDataTableStore params, broadcast to every child
 
     def _venv_dir(self, bundle_dist: str) -> Path:
-        # No version dimension: pip upgrades a venv in place. bundle_dist is PEP 503 normalized,
-        # hence inherently filesystem-safe.
         return self._venvs_root / bundle_dist
 
     def _ensure_child(self, bundle_dist: str):
         child = self._children.get(bundle_dist)
         if child is None:
-            # The venvs root is on the facade's PYTHONPATH (the Java host puts --recipe-install-dir
-            # there); keep it off the child's, so a bundle imports only from its own venv.
             cmd = child_command(self._venv_dir(bundle_dist), bundle_dist,
                                 attribution_name=self._attribution.get(bundle_dist))
-            # Bind the bundle into the upstream: the facade keeps one ref table per child
-            # connection, so it must know which child is calling back.
             child = self._spawn(cmd,
                                 upstream=lambda m, p, b=bundle_dist: self._upstream(m, p, b),
                                 exclude_paths=(str(self._venvs_root),))
             self._children[bundle_dist] = child
-            # SetDataTableStore often arrives before a bundle's child exists, so replay the
-            # cached config onto each child as it comes up.
             if self._data_table_store is not None:
                 child.request("SetDataTableStore", self._data_table_store)
         return child
 
     def set_data_table_store(self, params: dict) -> None:
-        """Apply to live children now; _ensure_child replays it onto ones spawned later."""
         self._data_table_store = params
         for child in self._children.values():
             child.request("SetDataTableStore", params)
 
     def broadcast_evict(self, params: dict) -> None:
-        """Fan a host Evict out to every child so each ref map rolls back in lockstep with the
-        host's send-side rollback. An unspawned child holds no state."""
         for child in self._children.values():
             child.request("Evict", params)
 
@@ -71,8 +60,6 @@ class BundleChildren:
         self._attribution[bundle_dist] = attribution_name   # None for a registry spec
         venv_dir = self._venv_dir(bundle_dist)
         if not self._venv_ops.is_usable_venv(venv_dir):
-            # Any child still bound to the old venv is about to lose it; reap it so the next
-            # request spawns against the rebuilt one.
             stale = self._children.pop(bundle_dist, None)
             if stale is not None:
                 stale.close()
@@ -86,7 +73,6 @@ class BundleChildren:
         return rows
 
     def marketplace(self):
-        """Merged descriptor cache across all bundles (first-wins on duplicate names)."""
         merged, seen = [], set()
         for rows in self._descriptors.values():
             for row in rows:

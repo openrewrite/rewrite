@@ -4,12 +4,10 @@ from rewrite.rpc.bundle_children import BundleChildren
 
 
 def _fake_venv_python(venv_dir):
-    """Stand-in for venv_manager.venv_python: the marker a real venv would have."""
     return venv_dir / "bin" / "python"
 
 
 def _make_venv(venv_dir):
-    """Create just enough of a venv that the usability guard accepts it."""
     interpreter = _fake_venv_python(venv_dir)
     interpreter.parent.mkdir(parents=True, exist_ok=True)
     interpreter.touch()
@@ -78,7 +76,6 @@ def test_install_marketplace_owner_route_uninstall_and_shutdown(tmp_path):
     assert bc.owner("pkga.Recipe") is None
     assert bc.resolved_version("pkga") is None
 
-    # shutdown reaps the rest
     bc.shutdown()
     assert spawned["pkgb"].closed
 
@@ -169,8 +166,6 @@ def test_install_rebuilds_a_directory_that_is_not_a_venv(tmp_path):
 
 
 def test_install_rebuilds_a_venv_orphaned_by_a_python_upgrade(tmp_path):
-    """uv encodes the patch version in the interpreter path, so upgrading Python orphans every
-    bundle venv built on it — while the copied python.exe leaves the venv looking intact."""
     ops = SimpleNamespace(created=[], installed=[])
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = lambda d: False          # base interpreter pruned away
@@ -198,8 +193,6 @@ def test_install_rebuilds_a_venv_orphaned_by_a_python_upgrade(tmp_path):
 
 
 def test_child_is_denied_the_shared_venvs_root_on_its_path(tmp_path):
-    """The Java host puts --recipe-install-dir on the facade's PYTHONPATH. A child must not inherit
-    it, or a stale flat package there would shadow the bundle's own copy."""
     created, installed = [], []
     seen = {}
 

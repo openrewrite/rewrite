@@ -57,7 +57,6 @@ def _names(marketplace):
 
 
 def test_root_only_activation_hides_transitive_recipe_packages(monkeypatch):
-    # Root bundle "root-pkg" plus a transitive recipe package "dep-pkg" both present in the venv.
     eps = [_EP("root-pkg", "org.example.Root"), _EP("dep-pkg", "org.example.Dep")]
     monkeypatch.setattr(discovery, "entry_points", lambda group: eps)
 
@@ -83,8 +82,6 @@ def test_root_activation_supports_attribute_form_entry_points(monkeypatch):
 
 
 def test_root_activation_attributes_to_the_supplied_name(monkeypatch):
-    # A local install is filtered by its resolved distribution name but must be attributed to the
-    # path the host supplied and keys the bundle by — not the distribution's own name.
     eps = [_AttributeEP("my-local-recipes", "org.example.Local")]
     monkeypatch.setattr(discovery, "entry_points", lambda group: eps)
 
@@ -116,9 +113,6 @@ def test_distribution_name_from_pyproject_and_setup_py(tmp_path):
 
 
 def test_flat_discovery_supports_attribute_form_entry_points(monkeypatch):
-    # discover_recipes shares _activate_entry_point with discover_root_recipes, so the engine's own
-    # `openrewrite = rewrite:activate` (function-form) and any recipe bundle's entry points activate
-    # in the non-facade path too — not silently skipped as they were before.
     eps = [_AttributeEP("pkg-a", "org.example.A"), _EP("pkg-b", "org.example.B")]
     monkeypatch.setattr(discovery, "entry_points", lambda group: eps)
 

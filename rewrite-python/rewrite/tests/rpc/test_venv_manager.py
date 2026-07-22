@@ -30,7 +30,6 @@ def test_create_venv_uses_stdlib_venv_of_given_interpreter(monkeypatch, tmp_path
 def test_venv_python_points_inside_the_venv(tmp_path):
     venv_dir = tmp_path / "b1"
     py = venv_manager.venv_python(venv_dir)
-    # Interpreter lives under the venv, in Scripts (Windows) or bin (POSIX).
     assert venv_dir in py.parents
     assert py.parent.name in ("Scripts", "bin")
 
@@ -83,8 +82,6 @@ def test_usable_venv_requires_an_interpreter_whose_base_still_exists(tmp_path):
 
 
 def test_usable_venv_is_false_when_the_base_interpreter_was_upgraded_away(tmp_path):
-    # uv encodes the patch version in the interpreter path, so a Python upgrade orphans the venv.
-    # On Windows the copied python.exe survives, so existence alone would wrongly say "usable".
     venv_dir = tmp_path / "b1"
     _fake_venv(venv_dir, tmp_path / "cpython-3.12.11-pruned")
     assert venv_manager.venv_python(venv_dir).exists()
@@ -158,8 +155,6 @@ def test_purge_keeps_venvs_and_removes_pre_venv_target_debris(tmp_path):
 
 
 def test_purge_keeps_an_orphaned_venv(tmp_path):
-    # An orphaned venv (base pruned by a Python upgrade) is still a venv; fix 2 rebuilds it on
-    # install. The sweep must not delete it just because it isn't currently usable.
     root = tmp_path / "pip"
     _fake_venv(root / "pkg", tmp_path / "pruned-base")
     assert not venv_manager.is_usable_venv(root / "pkg")

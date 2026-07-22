@@ -125,16 +125,12 @@ write({"jsonrpc": "2.0", "id": req["id"], "result": {"got": cb["result"]}})
 
 
 def test_engine_roots_supply_the_engine_and_its_runtime_dependency_locations():
-    # A recipe running in a child may parse a Python template, which reaches `parso`. The child's
-    # venv has no engine and no engine deps, so both must travel on PYTHONPATH.
     roots = _engine_roots()
     assert roots[0] == ENGINE_ROOT
     assert str(metadata.distribution("parso").locate_file("")) in roots
 
 
 def test_engine_roots_collapse_to_one_entry_when_deps_sit_beside_the_engine(monkeypatch):
-    # Production: `pip install --target <engineDir>` flattens engine + deps into one directory,
-    # so nothing beyond the engine root is exposed to children.
     def dist(name):
         if name == "openrewrite":
             return _FakeDist(requires=["parso>=0.7.1,<0.8", "more_itertools>=10.0.0"])
@@ -145,7 +141,6 @@ def test_engine_roots_collapse_to_one_entry_when_deps_sit_beside_the_engine(monk
 
 
 def test_engine_roots_skip_optional_extras(monkeypatch):
-    # dev/publish/profiling extras are not part of the platform a child needs.
     def dist(name):
         if name == "openrewrite":
             return _FakeDist(requires=[
@@ -165,7 +160,6 @@ def test_child_env_puts_the_engine_first_on_pythonpath(monkeypatch):
 
 def test_child_env_prepends_the_engine_ahead_of_an_inherited_pythonpath(monkeypatch):
     monkeypatch.setenv("PYTHONPATH", "/already/there")
-    # Engine first: it must win over anything the child venv or the host put on the path.
     assert _child_env()["PYTHONPATH"].split(os.pathsep) == [*_engine_roots(), "/already/there"]
 
 
@@ -175,8 +169,6 @@ def test_child_env_does_not_duplicate_an_already_present_engine(monkeypatch):
 
 
 def test_child_env_drops_excluded_inherited_paths(monkeypatch, tmp_path):
-    # The Java host puts --recipe-install-dir (the venvs root) on the facade's PYTHONPATH. A child
-    # must not inherit it: a stale flat package there would shadow the bundle's own copy.
     venvs_root = tmp_path / "recipes" / "pip"
     keep = str(tmp_path / "keep")
     monkeypatch.setenv("PYTHONPATH", os.pathsep.join([str(venvs_root), keep]))
@@ -187,8 +179,6 @@ def test_child_env_drops_excluded_inherited_paths(monkeypatch, tmp_path):
 
 
 def test_child_env_appends_the_facade_scripts_dir_to_path(monkeypatch):
-    # PYTHONPATH carries importable code, not console binaries. `ty-types` ships both, and the
-    # child's own interpreter has neither — so its binary is reachable only via PATH.
     scripts = sysconfig.get_path("scripts")
     monkeypatch.setenv("PATH", "/first")
 

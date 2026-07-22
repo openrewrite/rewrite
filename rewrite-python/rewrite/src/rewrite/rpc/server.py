@@ -97,12 +97,9 @@ _recipe_install_dir: Optional[Path] = None
 # Set via --child-bundle: the marketplace is scoped to exactly this distribution's recipes.
 _child_bundle: Optional[str] = None
 
-# Set via --attribution-name. Labels a child's recipes with the identity the host keys the bundle
-# by (a local install's supplied path) rather than the distribution name; None for a registry spec.
+# The identity the host keys a local bundle by (its supplied path); None for a registry spec.
 _attribution_name: Optional[str] = None
 
-# When --recipe-install-dir is set and this is not a child, this process is the facade: one venv
-# subdirectory per bundle under that root, recipe operations routed to per-bundle children.
 _facade = None
 
 
@@ -2026,8 +2023,6 @@ def handle_request(method: str, params: dict) -> Any:
             if method in ('Visit', 'BatchVisit'):
                 _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
             return facade_handler(params)
-        # The facade answers Java's Print/GetObject from its own accumulated tree, so a child's
-        # partial copy can never be mistaken for the whole edit.
         if method in ('Print', 'GetObject'):
             obj_id = params.get('treeId') or params.get('id')
             source_file_type = params.get('sourceFileType')
@@ -2037,7 +2032,6 @@ def handle_request(method: str, params: dict) -> Any:
             # that has no codec for them, desynchronizing the queue for every later object.
             if obj_id is not None and source_file_type and obj_id not in _hub_tree:
                 _hub_acquire(obj_id, source_file_type)
-        # Parse / GetLanguages / build-time GetObject / etc. run locally on the facade.
 
     handlers = {
         'Parse': handle_parse,

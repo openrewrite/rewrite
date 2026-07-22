@@ -1,5 +1,5 @@
 from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
-from rewrite.rpc.server import _collect_marketplace_rows  # proven iteration used by existing tests
+from rewrite.rpc.server import _collect_marketplace_rows
 
 
 def _recipe(name: str, description: str):

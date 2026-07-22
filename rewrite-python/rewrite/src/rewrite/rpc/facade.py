@@ -15,7 +15,6 @@ from rewrite.discovery import distribution_name_from_source
 class Facade:
     def __init__(self, children, hub_pull=None):
         self._children = children
-        # (children, bundle, tree_id, source_file_type) -> pull that child's edit into the facade's tree
         self._hub_pull = hub_pull
         self._bundle_by_visitor = {}    # visitor name (edit:/scan:) -> bundle
         self._bundle_by_recipe_id = {}  # prepared recipe id -> bundle

@@ -43,10 +43,6 @@ def test_plain_dict_is_not_mistaken_for_opaque():
 
 
 def test_visit_markers_with_opaque_marker_serializes_without_crashing():
-    # The marker list is the only place opaque values reach the id-getter. Its 'id' is a canonical
-    # UUID string, not the int a typed marker's _id is; passing it straight to id_to_str crashed full
-    # serialization with "%x format: an integer is required, not str". It must serialize cleanly and
-    # emit the marker under its original type.
     from rewrite.markers import Markers
     from rewrite.rpc.python_sender import PythonRpcSender
     opaque = {'kind': 'com.example.SomeMarker', 'id': '3f2504e0-4f89-41d3-9a0c-0305e82c3301', 'x': 1}

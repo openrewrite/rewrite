@@ -16,14 +16,12 @@ from pathlib import Path
 
 from rewrite.rpc import venv_manager
 
-# The directory holding the `rewrite` package — i.e. this engine's own location on sys.path.
 _ENGINE_ROOT = str(Path(__file__).resolve().parents[2])
 _ENGINE_DIST = "openrewrite"
 _REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def _path_key(path: str) -> str:
-    """Comparison key for a sys.path/PATH entry."""
     return os.path.normcase(os.path.abspath(path))
 
 
@@ -33,7 +31,6 @@ def _engine_roots() -> list:
     The platform a child needs is not just the ``rewrite`` package: a recipe may parse a Python
     template, which reaches ``parso``. A bundle venv has neither, so both must travel on the
     child's ``PYTHONPATH``.
-
     """
     roots: list = []
     seen: set = set()
@@ -64,9 +61,6 @@ def _engine_roots() -> list:
 
 
 def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None) -> list:
-    """Command to run a single-bundle child on the bundle's venv interpreter.
-
-    """
     cmd = [
         str(venv_manager.venv_python(venv_dir)),
         "-m", "rewrite.rpc.server",
@@ -113,8 +107,6 @@ def _child_env(exclude_paths=()) -> dict:
 
 
 class ChildConnection:
-    """A spawned child RPC server addressed over its stdin/stdout with Content-Length framing."""
-
     @classmethod
     def spawn(cls, cmd: list, upstream=None, exclude_paths=()) -> "ChildConnection":
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -122,14 +114,11 @@ class ChildConnection:
         return cls(proc, upstream)
 
     def __init__(self, proc: subprocess.Popen, upstream=None):
-        # upstream(method, params) -> result forwards a child's callback to Java; in the facade,
-        # server.send_request.
         self._proc = proc
         self._upstream = upstream
         self._id = 0
 
     def request(self, method: str, params: dict):
-        """Send a request and return its result, relaying any callbacks the child makes to Java."""
         self._id += 1
         rid = self._id
         self._write({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
@@ -148,8 +137,6 @@ class ChildConnection:
 
             callback_method = msg.get("method")
             if callback_method is not None:
-                # Inbound callback from the child: its GetObject/Print target the master objects
-                # on Java.
                 child_id = msg.get("id")
                 if self._upstream is None:
                     raise RuntimeError(

@@ -70,8 +70,6 @@ def test_facade_install_marketplace_prepare_visit_generate_routing():
 
 
 def test_facade_installs_a_local_path_by_resolved_distribution_name(tmp_path):
-    # A local install arrives as a path string; the facade resolves the distribution name from the
-    # source, keys the venv/child by it, and force-reinstalls the mutable source.
     src = tmp_path / "my-recipes"
     src.mkdir()
     (src / "pyproject.toml").write_text('[project]\nname = "my-local-recipes"\nversion = "0.1.0"\n')
@@ -156,13 +154,6 @@ def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
 
 
 def test_single_visit_pulls_its_edit_into_the_hub():
-    """A single-recipe run reaches `visit`, not `batch_visit`, and must pull its edit back too.
-
-    The facade answers Java's later Print/GetObject from its own tree, so an edit left behind in
-    the child is lost -- silently, because the run still succeeds and reports no changes. Observed
-    end-to-end as a modifying recipe producing a diff inside a composite but "No changes" when run
-    on its own.
-    """
     children = _EditingChildren()
     pulls = []
     f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
@@ -210,13 +201,9 @@ def test_unmodified_run_is_not_pulled():
 
 
 def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp_path):
-    """The facade owns the in-flight tree, so it answers Java itself instead of round-tripping to a
-    child -- whose copy carries only its own bundle's edit. It also acquires at the top level: a
-    fetch from inside a child's callback deadlocks (child waits on us, Java waits on this request)."""
     import rewrite.rpc.server as server
 
     class _FakeFacade:
-        # facade_handlers is built eagerly from these; stubs keep the dict construction happy
         def get_marketplace(self, params): ...
         def install_recipes(self, params): ...
         def prepare_recipe(self, params): ...
@@ -243,13 +230,6 @@ def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp
 
 
 def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path):
-    """Java fetches the execution context and cursors by id too, and those have no Python codec.
-
-    `GetObject.sourceFileType` is nullable and set only for trees, so it is what distinguishes
-    them. Acquiring a non-tree hands its property messages to a receiver that cannot consume
-    them, which desynchronizes the queue for every object that follows -- observed end-to-end as
-    "No RPC codec registered on the Python side for 'org.openrewrite.InMemoryExecutionContext'".
-    """
     import rewrite.rpc.server as server
 
     class _FakeFacade:
@@ -316,9 +296,6 @@ def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
 
 
 def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
-    """Evict drops the refs a file introduced from the child's receive map. If the facade kept them
-    in its send map it would later emit GET_REF for a ref the child no longer has -- the
-    "Received reference to unknown object" flood."""
     import rewrite.rpc.server as server
 
     server._hub_tree["T"] = object()
@@ -340,9 +317,6 @@ def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
 
 
 class _PreconditionChildren(_FakeChildren):
-    """PrepareRecipe returns a Preconditions.check(...) editor: the precondition names a Python
-    visitor of its own, which the host will later call back like any other visitor."""
-
     def request(self, bundle, method, params):
         if method == "PrepareRecipe":
             return {
@@ -356,8 +330,6 @@ class _PreconditionChildren(_FakeChildren):
 
 
 def test_precondition_visitors_route_to_the_child_that_prepared_them():
-    # A precondition's visitor is prepared inside the child but appears in neither editVisitor nor
-    # recipeList. Without registering it, the host's Visit for it would find no owner.
     children = _PreconditionChildren()
     f = Facade(children)
     f.prepare_recipe({"id": "pkg.R"})
