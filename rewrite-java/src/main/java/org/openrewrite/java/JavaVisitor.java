@@ -110,7 +110,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * formatting in the surrounding source.
      *
      * <p>If {@code before == after} (no change), returns {@code after}
-     * unchanged.
+     * unchanged. If no enclosing {@link JavaSourceFile} is available on the
+     * cursor (for example when a visitor is invoked on a subtree without a
+     * parent cursor, or {@code visitCompilationUnit} is called directly),
+     * returns {@code after} unchanged rather than throwing — blank-line
+     * cleanup is best-effort polish and must not fail nested recipe composition.
      */
     public <J2 extends J> J2 maybeRemoveBlankLines(J2 before, J2 after, P p) {
         return maybeRemoveBlankLines(before, after, p, getCursor().getParentTreeCursor());
@@ -123,7 +127,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         JavaSourceFile cu = (after instanceof JavaSourceFile) ?
                 (JavaSourceFile) after :
-                getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+                getCursor().firstEnclosing(JavaSourceFile.class);
+        if (cu == null) {
+            return after;
+        }
         AutoFormatService service = cu.service(AutoFormatService.class);
         J2 result = (J2) service.normalizeFormatVisitor(null).visit(after, p, parent);
         return (J2) service.blankLinesVisitor(cu, null).visit(result, p, parent);

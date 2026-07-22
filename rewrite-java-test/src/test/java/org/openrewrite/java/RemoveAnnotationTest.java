@@ -17,7 +17,11 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -53,6 +57,60 @@ class RemoveAnnotationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * {@link RemoveAnnotationVisitor} runs blank-line cleanup that needs an enclosing
+     * {@link org.openrewrite.java.tree.JavaSourceFile} on the cursor. Nested composition
+     * that calls {@code visitCompilationUnit} directly (or visits a subtree without a
+     * parent cursor) must still remove the annotation rather than throw.
+     */
+    @Issue("https://github.com/openrewrite/rewrite/issues/8130")
+    @Test
+    void removeAnnotationWhenInvokedFromNestedVisitor() {
+        rewriteRun(
+          spec -> spec.recipe(new NestedRemoveAnnotation()),
+          java(
+            """
+              @Deprecated
+              class FooBar {
+              }
+              """,
+            """
+              class FooBar {
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Mirrors the composition pattern from issue 8130: invoke
+     * {@link RemoveAnnotationVisitor#visitCompilationUnit} from another visitor so the
+     * nested visitor's cursor has no enclosing {@code JavaSourceFile}.
+     */
+    static class NestedRemoveAnnotation extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Remove annotation via nested visitor";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Invokes RemoveAnnotationVisitor from within another visitor.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                    cu = super.visitCompilationUnit(cu, ctx);
+                    return new RemoveAnnotationVisitor(new AnnotationMatcher("@java.lang.Deprecated"))
+                            .visitCompilationUnit(cu, ctx);
+                }
+            };
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/861")
