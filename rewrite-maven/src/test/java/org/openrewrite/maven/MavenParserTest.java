@@ -3259,6 +3259,68 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void runtimeScopedDirectDependencyIsNotOnProvidedClasspath() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>2.15.0</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Test)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Provided)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void transitiveRuntimeScopedDependencyIsNotOnProvidedClasspath() {
+        // org.openrewrite:rewrite-maven declares com.github.ben-manes.caffeine:caffeine with
+        // <scope>runtime</scope> in its own pom; it should not leak onto the compile-time
+        // "provided" classpath of a project that merely compile-depends on rewrite-maven.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-maven</artifactId>
+                    <version>8.81.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.github.ben-manes.caffeine", "caffeine", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.github.ben-manes.caffeine", "caffeine", Scope.Provided)).isEmpty();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4093")
     @Test
     void circularImportDependency() {

@@ -1028,7 +1028,7 @@ public class ResolvedPom {
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
-            if (dScope == scope || dScope.isInClasspathOf(scope)) {
+            if (dScope.isDirectlyIncludedIn(scope)) {
                 // For direct dependencies that are duplicated, last declaration wins
                 // TODO: We could introduce a ResolutionStrategy to handle this differently for Gradle which uses highest version
                 rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
@@ -1150,7 +1150,7 @@ public class ResolvedPom {
                         includedByMap.put(resolved, includedBy);
                     }
 
-                    if (dd.getScope().transitiveOf(scope) == scope) {
+                    if (dd.getScope().isDirectlyIncludedIn(scope)) {
                         dependencies.add(resolved);
                     } else {
                         continue;

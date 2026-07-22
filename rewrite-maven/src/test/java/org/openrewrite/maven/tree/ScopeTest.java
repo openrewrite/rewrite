@@ -27,4 +27,31 @@ class ScopeTest {
         assertThat(Scope.Runtime.isInClasspathOf(Scope.Compile)).isTrue();
         assertThat(Scope.Test.isInClasspathOf(Scope.Compile)).isFalse();
     }
+
+    @Test
+    void isDirectlyIncludedIn() {
+        // compile is available everywhere
+        assertThat(Scope.Compile.isDirectlyIncludedIn(Scope.Compile)).isTrue();
+        assertThat(Scope.Compile.isDirectlyIncludedIn(Scope.Provided)).isTrue();
+        assertThat(Scope.Compile.isDirectlyIncludedIn(Scope.Runtime)).isTrue();
+        assertThat(Scope.Compile.isDirectlyIncludedIn(Scope.Test)).isTrue();
+
+        // provided is only available in its own bucket (compile classpath)
+        assertThat(Scope.Provided.isDirectlyIncludedIn(Scope.Compile)).isFalse();
+        assertThat(Scope.Provided.isDirectlyIncludedIn(Scope.Provided)).isTrue();
+        assertThat(Scope.Provided.isDirectlyIncludedIn(Scope.Runtime)).isFalse();
+        assertThat(Scope.Provided.isDirectlyIncludedIn(Scope.Test)).isFalse();
+
+        // runtime is available at runtime and test, but not compile or provided
+        assertThat(Scope.Runtime.isDirectlyIncludedIn(Scope.Compile)).isFalse();
+        assertThat(Scope.Runtime.isDirectlyIncludedIn(Scope.Provided)).isFalse();
+        assertThat(Scope.Runtime.isDirectlyIncludedIn(Scope.Runtime)).isTrue();
+        assertThat(Scope.Runtime.isDirectlyIncludedIn(Scope.Test)).isTrue();
+
+        // test is only available in its own bucket
+        assertThat(Scope.Test.isDirectlyIncludedIn(Scope.Compile)).isFalse();
+        assertThat(Scope.Test.isDirectlyIncludedIn(Scope.Provided)).isFalse();
+        assertThat(Scope.Test.isDirectlyIncludedIn(Scope.Runtime)).isFalse();
+        assertThat(Scope.Test.isDirectlyIncludedIn(Scope.Test)).isTrue();
+    }
 }

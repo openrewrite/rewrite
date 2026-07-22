@@ -36,6 +36,31 @@ public enum Scope {
     }
 
     /**
+     * Unlike {@link #transitiveOf}/{@link #isInClasspathOf}, which govern how a dependency's scope degrades one hop
+     * further down its own transitive dependencies, this answers a single-hop question: does a dependency declared
+     * with this scope belong in the dependency set being assembled for the given target scope - regardless of what
+     * scope included the dependency one level further up the tree.
+     * <p>
+     * this (rows) x target scope (columns):
+     * <pre>
+     *           Compile   Provided   Runtime   Test
+     * Compile:    T         T          T         T
+     * Provided:   F         T          F         F
+     * Runtime:    F         F          T         T
+     * Test:       F         F          F         T
+     * </pre>
+     *
+     * @param scope The target scope whose dependency set is being assembled.
+     * @return If a dependency declared with this scope belongs in that target scope's dependency set.
+     */
+    public boolean isDirectlyIncludedIn(Scope scope) {
+        if (this == scope || this == Compile) {
+            return true;
+        }
+        return this == Runtime && scope == Test;
+    }
+
+    /**
      * See the table at <a href="Dependency Scope">https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#dependency-scope</a>.
      * <code>this</code> represents the scope on the top row of the table.
      *
