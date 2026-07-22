@@ -137,12 +137,9 @@ def _activate_entry_point(ep, marketplace: RecipeMarketplace,
 
     An entry point may name the module (``pkg = pkg``), so ``load()`` yields a module whose
     ``activate`` we want, or the function itself (``pkg = pkg:activate`` — the form the engine and
-    the recipe bundles declare), in which case ``load()`` has already yielded ``activate``. A failed
-    activation contributes nothing but is logged, never silently swallowed — otherwise a bundle's
-    recipes vanish with no explanation.
-
-    ``attribution_name`` records the recipes under a caller-supplied identity (a local install's
-    supplied path, which the host keys the bundle by) instead of the distribution's own name.
+    the recipe bundles declare), in which case ``load()`` has already yielded ``activate``. 
+    ``attribution_name`` overrides the distribution name for local installs, which the host keys
+    by supplied path.
     """
     dist_name = ep.dist.name if ep.dist is not None else None
     try:
@@ -181,15 +178,9 @@ def discover_root_recipes(
 ) -> RecipeMarketplace:
     """Activate only the entry point whose owning distribution is ``root_dist_name``.
 
-    ``entry_points()`` is environment-wide, so a bundle venv that transitively
-    contains other recipe packages would otherwise surface them. Restricting
-    activation to the root distribution keeps a bundle's marketplace to its own
-    direct recipes; transitive recipe packages remain importable
-    for in-boundary composition but are never listed or attributed here.
+    ``entry_points()`` is environment-wide, so a bundle venv's transitive recipe packages would
+    otherwise surface. They stay importable for in-boundary composition but are not listed here.
 
-    ``attribution_name`` labels the discovered recipes with a caller-supplied identity rather than
-    ``root_dist_name`` — a local install is filtered by its resolved distribution name but must be
-    attributed to the source path the host supplied and keys the bundle by.
     """
     if marketplace is None:
         marketplace = RecipeMarketplace()
@@ -206,9 +197,8 @@ def discover_root_recipes(
 def distribution_name_from_source(local_path: Path) -> Optional[str]:
     """The distribution name declared by a local package source, or None.
 
-    A local install (``pip install ./recipes``) arrives as a path, but the venv and its child are
-    keyed by distribution name — so it must be resolved before install, from ``pyproject.toml``
-    (PEP 621 ``[project]`` or ``[tool.poetry]``) or a ``setup.py`` ``name=``.
+    A local install arrives as a path, but the venv and its child are keyed by distribution name,
+    so the name must be resolved before install.
     """
     if sys.version_info >= (3, 11):
         import tomllib

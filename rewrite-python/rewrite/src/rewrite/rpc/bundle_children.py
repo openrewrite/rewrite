@@ -1,9 +1,7 @@
 """Facade orchestration: one isolated child per bundle, keyed by distribution name.
 
-Ties ``venv_manager`` and ``child_connection`` together. Spawn-on-demand: ``install`` creates the
-bundle's venv, installs the package, spawns its child, caches the child's (root-only) marketplace,
-and records recipe ownership first-wins. ``marketplace`` serves the merged cache; recipe execution
-is routed to the owning child. ``venv_ops`` and ``spawn`` are injectable for testing.
+Children are spawned on demand. Recipe ownership is first-wins across bundles. ``venv_ops`` and
+``spawn`` are injectable for testing.
 """
 from pathlib import Path
 
@@ -28,11 +26,8 @@ class BundleChildren:
         self._data_table_store = None  # cached SetDataTableStore params, broadcast to every child
 
     def _venv_dir(self, bundle_dist: str) -> Path:
-        # One venv per distribution under the shared root (reusing --recipe-install-dir), like the
-        # C# server's <root>/<id> layout. No version dimension: pip upgrades a venv in place, so
-        # (unlike C#'s immutable published assemblies + flaky ALC reload) there's no need for
-        # per-version sibling directories. bundle_dist is already PEP 503 normalized (lowercase +
-        # `_`) — the canonical distribution identity, and inherently filesystem-safe.
+        # No version dimension: pip upgrades a venv in place. bundle_dist is PEP 503 normalized,
+        # hence inherently filesystem-safe.
         return self._venvs_root / bundle_dist
 
     def _ensure_child(self, bundle_dist: str):
@@ -48,41 +43,33 @@ class BundleChildren:
                                 upstream=lambda m, p, b=bundle_dist: self._upstream(m, p, b),
                                 exclude_paths=(str(self._venvs_root),))
             self._children[bundle_dist] = child
-            # The recipe runs here, not on the facade, so the host's data-table store must be
-            # installed on the child. SetDataTableStore often arrives before a bundle's child exists
-            # (lazy spawn), so replay the cached config onto each child as it comes up.
+            # SetDataTableStore often arrives before a bundle's child exists, so replay the
+            # cached config onto each child as it comes up.
             if self._data_table_store is not None:
                 child.request("SetDataTableStore", self._data_table_store)
         return child
 
     def set_data_table_store(self, params: dict) -> None:
-        """Cache the host's data-table store config and apply it to every child — live ones now, and
-        ones spawned later at spawn time (see _ensure_child). Recipes emit rows from the children."""
+        """Apply to live children now; _ensure_child replays it onto ones spawned later."""
         self._data_table_store = params
         for child in self._children.values():
             child.request("SetDataTableStore", params)
 
     def broadcast_evict(self, params: dict) -> None:
-        """Fan a host Evict out to every spawned child so each rolls its own ref map back to the
-        per-file checkpoint (in lockstep with the host's send-side rollback). A child that never
-        fetched this file no-ops. Only live children matter — one not yet spawned holds no state."""
+        """Fan a host Evict out to every child so each ref map rolls back in lockstep with the
+        host's send-side rollback. An unspawned child holds no state."""
         for child in self._children.values():
             child.request("Evict", params)
 
     def install(self, bundle_dist: str, spec: str, force: bool = False, attribution_name=None):
         """Create/reuse the bundle's venv, install ``spec``, spawn its child, cache its recipes.
 
-        ``force`` re-copies a mutable local source (see ``venv_manager.install_into_venv``).
         ``attribution_name`` labels the recipes with the identity the host keys the bundle by (a
         local install's supplied path); by default they carry the distribution's own name.
         """
         bundle_dist = _normalize_package_name(bundle_dist)
         self._attribution[bundle_dist] = attribution_name   # None for a registry spec
         venv_dir = self._venv_dir(bundle_dist)
-        # Rebuild anything that isn't a venv with a live base interpreter: a half-created venv, a
-        # leftover flat `pip install --target` package directory of the same name (from before
-        # per-bundle venvs), or a venv orphaned by a Python upgrade. Testing the directory — or even
-        # the interpreter file — would call all three usable, then fail on exec or on import.
         if not self._venv_ops.is_usable_venv(venv_dir):
             # Any child still bound to the old venv is about to lose it; reap it so the next
             # request spawns against the rebuilt one.
@@ -90,11 +77,7 @@ class BundleChildren:
             if stale is not None:
                 stale.close()
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
-        # pip --upgrade in the venv resolves in place: a version-less install upgrades to the latest
-        # (fixes #8180); an exact pin already present is a near no-op.
         self._venv_ops.install_into_venv(venv_dir, spec, force=force)
-        # The install layer just ran pip, so it — not the child — is the authority on what version
-        # landed. Report that resolved version rather than echoing the requested (maybe null) spec.
         self._versions[bundle_dist] = self._venv_ops.installed_version(venv_dir, bundle_dist)
         rows = self._ensure_child(bundle_dist).request("GetMarketplace", {})
         self._descriptors[bundle_dist] = rows
@@ -115,19 +98,15 @@ class BundleChildren:
         return merged
 
     def owner(self, recipe_name: str):
-        """The bundle that owns ``recipe_name``, or None."""
         return self._owner.get(recipe_name)
 
     def resolved_version(self, bundle_dist: str):
-        """The version pip resolved for ``bundle_dist`` at install, or None."""
         return self._versions.get(_normalize_package_name(bundle_dist))
 
     def request(self, bundle_dist: str, method: str, params: dict):
-        """Route an operation to the given bundle's child."""
         return self._ensure_child(_normalize_package_name(bundle_dist)).request(method, params)
 
     def uninstall(self, bundle_dist: str) -> None:
-        """Reap the bundle's child, drop its cache/ownership, and remove its venv."""
         bundle_dist = _normalize_package_name(bundle_dist)
         child = self._children.pop(bundle_dist, None)
         if child is not None:
@@ -139,7 +118,6 @@ class BundleChildren:
         self._venv_ops.remove_venv(self._venv_dir(bundle_dist))
 
     def shutdown(self) -> None:
-        """Reap all children (session end)."""
         for child in self._children.values():
             child.close()
         self._children.clear()

@@ -78,8 +78,8 @@ class RecipeMarketplace:
                     try:
                         recipe_inst = recipe()
                         desc = recipe_inst.descriptor()
-                        # First-wins: matches the host's name-keyed RecipeListing and this
-                        # engine's own first-wins attribution (RecipeAttribution.setdefault).
+                        # First-wins must match the host's name-keyed RecipeListing and
+                        # RecipeAttribution.
                         self._recipes.setdefault(desc.name, (desc, recipe))
                     except Exception as e:
                         raise RuntimeError(

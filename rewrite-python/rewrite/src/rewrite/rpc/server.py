@@ -94,18 +94,15 @@ _python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
 # package pip installs it here before activating.
 _recipe_install_dir: Optional[Path] = None
 
-# Set via --child-bundle. When set, this process is a single-bundle child: its
-# marketplace is scoped to exactly this distribution's recipes (see _get_marketplace).
+# Set via --child-bundle: the marketplace is scoped to exactly this distribution's recipes.
 _child_bundle: Optional[str] = None
 
 # Set via --attribution-name. Labels a child's recipes with the identity the host keys the bundle
 # by (a local install's supplied path) rather than the distribution name; None for a registry spec.
 _attribution_name: Optional[str] = None
 
-# When --recipe-install-dir is set (and this is not a child), this process is the facade: it
-# installs each bundle into its own venv subdirectory under that root and routes recipe operations
-# to per-bundle children (see _facade_mode, _get_facade, handle_request). A future --server flag can
-# demarcate the facade explicitly.
+# When --recipe-install-dir is set and this is not a child, this process is the facade: one venv
+# subdirectory per bundle under that root, recipe operations routed to per-bundle children.
 _facade = None
 
 
@@ -751,8 +748,7 @@ def _get_marketplace():
         _marketplace = RecipeMarketplace()
 
         if _child_bundle:
-            # Child: only this bundle's direct recipes. No flat discovery,
-            # no built-in activation — a child owns exactly one distribution.
+            # A child owns exactly one distribution: no flat discovery, no built-in activation.
             from rewrite.discovery import discover_root_recipes
             discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
                                   attribution_name=_attribution_name)
@@ -892,8 +888,8 @@ def handle_install_recipes(params: dict) -> dict:
         else:
             logger.info(f"Activating recipes from local path: {recipes}")
 
-        # The distribution name imports/activates the package; attribution, though, is the supplied
-        # path — the identity the host keys a local bundle by (matching the facade's local install).
+        # Attribution is the supplied path, not the distribution name — the identity the host
+        # keys a local bundle by.
         package_name = _find_package_name(local_path)
         if package_name:
             before = recipe_name_set(marketplace)
@@ -1898,9 +1894,9 @@ def handle_generate(params: dict) -> dict:
 # runs its visitors, and its edit is pulled back as a diff and applied to the facade's tree before
 # the next bundle starts.
 #
-# Because the facade deserializes and re-generates per child, every hop is a diff between a matched
-# send/receive pair, and one child's ref numbering never has to mean anything to another child --
-# which is what made relaying a child's stream to a sibling unsafe.
+# Deserializing and re-generating per child keeps every hop a diff between a matched send/receive
+# pair, so one child's ref numbering never has to mean anything to another child. Relaying a
+# child's stream directly to a sibling is unsafe.
 # ---------------------------------------------------------------------------
 _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
 _hub_send_refs: Dict[str, Dict] = {}        # bundle -> send ref map      (facade -> child)
@@ -1976,10 +1972,7 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
 
 
 def _hub_release(obj_id: str) -> None:
-    """Drop the facade's copy of a finished file and roll each child's ref table back to where it
-    stood before that file.
-
-    The rollback must be symmetric with the child's own Evict: the child drops the refs this file
+    """The rollback must be symmetric with the child's own Evict: the child drops the refs this file
     introduced from its receive map, so if the facade kept them in its send map it would emit a
     GET_REF for a ref the child no longer has ("Received reference to unknown object").
     """
@@ -1997,8 +1990,8 @@ def _hub_release(obj_id: str) -> None:
 
 
 def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
-    """A child's upstream callback. GetObject is answered by the facade from the tree it owns (over
-    that child's ref table); anything else relays to Java."""
+    """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
+    to Java."""
     if method != 'GetObject':
         return send_request(method, params)
 
@@ -2015,15 +2008,13 @@ def _facade_mode() -> bool:
 
 
 def _get_facade():
-    """Lazily build the facade (BundleChildren + routing) rooted at --recipe-install-dir."""
     global _facade
     if _facade is None:
         from rewrite.rpc import venv_manager
         from rewrite.rpc.bundle_children import BundleChildren
         from rewrite.rpc.facade import Facade
-        # One-time migration: the root now holds only per-bundle venvs. Clear any pre-venv
-        # `pip install --target` residue so a later CLI downgrade reinstalls cleanly (a stale
-        # dist-info would otherwise make the old CLI skip pip and serve stale recipes).
+        # Clear pre-venv `pip install --target` residue: a stale dist-info makes an older CLI
+        # skip pip and serve stale recipes after a downgrade.
         removed = venv_manager.purge_non_venv_entries(_recipe_install_dir)
         if removed:
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
@@ -2037,9 +2028,7 @@ def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
     if _facade_mode():
         facade = _get_facade()
-        # Evict (host per-file notification): fan out to the children so each rolls back its own ref
-        # map in lockstep with the host, then drop the facade's own cached input bytes and any
-        # build-time state for that file.
+        # Fan Evict out to the children so each rolls back its ref map in lockstep with the host.
         if method == 'Evict':
             facade.evict(params)
             _hub_release(params.get('id'))
@@ -2055,16 +2044,13 @@ def handle_request(method: str, params: dict) -> Any:
         }
         facade_handler = facade_handlers.get(method)
         if facade_handler:
-            # Take ownership of the tree here, at the top level, before any child runs. A child's
-            # GetObject callback is then answered from what we already hold; fetching from Java down
-            # inside that callback would deadlock (the child waits on us, Java waits on this request).
+            # Acquire at the top level, before any child runs — acquiring inside a child's
+            # GetObject callback would deadlock (the child waits on us, Java on this request).
             if method in ('Visit', 'BatchVisit'):
                 _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
             return facade_handler(params)
-        # The facade owns the in-flight tree, so it answers Java's Print/GetObject itself from the
-        # accumulated result -- no child round-trip, and no child's partial copy can be mistaken for
-        # the whole edit. Acquire here (top level) if we don't hold it yet, then fall through to the
-        # local handlers, which read local_objects.
+        # The facade answers Java's Print/GetObject from its own accumulated tree, so a child's
+        # partial copy can never be mistaken for the whole edit.
         if method in ('Print', 'GetObject'):
             obj_id = params.get('treeId') or params.get('id')
             source_file_type = params.get('sourceFileType')

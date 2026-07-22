@@ -3,9 +3,8 @@
 Spawns a single-bundle child server (``server.py --child-bundle <dist>`` on the bundle's venv
 interpreter) and exchanges JSON-RPC over its stdin/stdout using the same Content-Length framing
 as the Java<->Python link. stdio is point-to-point, so the facade owns the child's pipes and speaks
-to it directly here. The child inherits the facade's environment, which is how it receives the
-engine itself (see ``_child_env``). A child's *outbound* callbacks toward Java (``GetObject`` etc.)
-are relayed by handling inbound requests inside ``request``'s read loop.
+to it directly here. A child's *outbound* callbacks toward Java (``GetObject`` etc.) are relayed
+by handling inbound requests inside ``request``'s read loop.
 """
 import json
 import os
@@ -24,8 +23,7 @@ _REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def _path_key(path: str) -> str:
-    """Comparison key for a sys.path/PATH entry, so the same directory spelled differently (case,
-    relative) compares equal."""
+    """Comparison key for a sys.path/PATH entry."""
     return os.path.normcase(os.path.abspath(path))
 
 
@@ -36,11 +34,6 @@ def _engine_roots() -> list:
     template, which reaches ``parso``. A bundle venv has neither, so both must travel on the
     child's ``PYTHONPATH``.
 
-    Resolving the dependencies' locations from metadata makes this self-tuning. In production the
-    engine is a ``pip install --target <dir>`` tree, so ``parso`` and friends already sit beside
-    ``rewrite`` and everything collapses to the single engine root — children see nothing else.
-    Only in an editable/dev install do the dependencies live elsewhere (the parent's
-    ``site-packages``), adding a second entry.
     """
     roots: list = []
     seen: set = set()
@@ -73,8 +66,6 @@ def _engine_roots() -> list:
 def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None) -> list:
     """Command to run a single-bundle child on the bundle's venv interpreter.
 
-    ``attribution_name`` (a local install's supplied path) labels the child's recipes with the
-    identity the host keys the bundle by, rather than the distribution name it filters on.
     """
     cmd = [
         str(venv_manager.venv_python(venv_dir)),
@@ -98,16 +89,12 @@ def _child_env(exclude_paths=()) -> dict:
     the bundle's venv (as a recipe's transitive dependency) is shadowed rather than loaded.
 
     ``exclude_paths`` drops inherited entries a child must not import from — notably the shared
-    recipe-install directory, which the Java host puts on the facade's ``PYTHONPATH``. Recipes now
-    live in per-bundle venvs, and anything left directly in that root (a flat ``pip install
-    --target`` layout from before per-bundle venvs) would otherwise be importable by *every* child,
-    shadowing its own copy.
+    recipe-install directory the Java host puts on the facade's ``PYTHONPATH``, whose flat contents
+    would otherwise be importable by *every* child, shadowing its own copy.
 
-    ``PATH`` gains the facade's scripts directory, because ``PYTHONPATH`` carries importable code
-    but not console binaries. ``ty-types`` ships both; a child's own interpreter has neither, and
-    ``ty_types.find_ty_types_bin`` only locates the binary beside the package under a ``pip install
-    --target`` layout. Appending (not prepending) leaves the bundle's own ``python``/``pip`` first
-    for the subprocesses a recipe's template workspace spawns.
+    ``PATH`` gains the facade's scripts directory because ``PYTHONPATH`` carries importable code
+    but not console binaries (``ty-types`` needs both). Append rather than prepend: the bundle's own
+    ``python``/``pip`` must stay first for subprocesses a recipe's template workspace spawns.
     """
     env = dict(os.environ)
 
@@ -135,8 +122,8 @@ class ChildConnection:
         return cls(proc, upstream)
 
     def __init__(self, proc: subprocess.Popen, upstream=None):
-        # upstream(method, params) -> result forwards a child's callback (e.g. GetObject) to Java.
-        # In the facade this is server.send_request; injected so this module needn't import server.
+        # upstream(method, params) -> result forwards a child's callback to Java; in the facade,
+        # server.send_request.
         self._proc = proc
         self._upstream = upstream
         self._id = 0
@@ -161,8 +148,8 @@ class ChildConnection:
 
             callback_method = msg.get("method")
             if callback_method is not None:
-                # Inbound callback request from the child (its GetObject/Print target the master
-                # objects on Java). Relay to upstream and feed the response back with the child's id.
+                # Inbound callback from the child: its GetObject/Print target the master objects
+                # on Java.
                 child_id = msg.get("id")
                 if self._upstream is None:
                     raise RuntimeError(
@@ -197,7 +184,7 @@ class ChildConnection:
         while True:
             line = self._proc.stdout.readline()
             if not line:
-                return None  # EOF
+                return None
             s = line.decode("ascii").strip()
             if s == "":
                 break

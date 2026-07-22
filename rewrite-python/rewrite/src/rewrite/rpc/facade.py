@@ -1,11 +1,9 @@
 """Facade request handling: route RPC operations across per-bundle children.
 
-In facade mode (``--recipe-install-dir`` set, not a child), the server holds no recipes itself. It
-installs each bundle into its own venv+child (``BundleChildren``), serves ``GetMarketplace`` from
-the merged cache, and routes recipe execution to the owning child — tracking which child produced
-each prepared recipe's visitors so later ``Visit``/``Generate`` calls route to the right child.
+In facade mode (``--recipe-install-dir`` set, not a child) the server holds no recipes itself: each
+bundle gets its own venv and child, and recipe execution routes to the owning child.
 
-``Print``/``GetObject`` are not routed: the facade owns the working tree and answers those itself.
+``Print``/``GetObject`` are not routed — the facade owns the working tree and answers those itself.
 """
 from pathlib import Path
 
@@ -34,20 +32,17 @@ class Facade:
             else:
                 spec = package
             rows = self._children.install(package, spec)
-            # Report what pip resolved, not the requested spec (which is null for a version-less
-            # install). The CLI pins the bundle to this so later resolves arrive with an exact spec.
+            # The CLI pins the bundle to the resolved version, so later resolves arrive exact.
             return {"recipesInstalled": len(rows), "version": self._children.resolved_version(package)}
         raise ValueError(f"Invalid recipes parameter: {recipes!r}")
 
     def _install_local(self, local_path: str) -> dict:
-        # A local install arrives as a path but the venv/child are keyed by distribution name, so
-        # resolve the name from the source before installing. force=True re-copies the mutable
-        # source even at an unchanged version.
+        # A local install arrives as a path, but the venv and child are keyed by distribution name.
         dist = distribution_name_from_source(Path(local_path))
         if not dist:
             raise ValueError(f"Could not determine the distribution name for local path '{local_path}'")
-        # Filter discovery by the resolved distribution name, but attribute the recipes to the
-        # supplied path — the identity the host keys the local bundle by.
+        # Discovery filters on the distribution name; attribution is the supplied path, which is
+        # the identity the host keys a local bundle by.
         rows = self._children.install(dist, local_path, force=True, attribution_name=local_path)
         return {"recipesInstalled": len(rows), "version": self._children.resolved_version(dist)}
 
@@ -71,9 +66,8 @@ class Facade:
             visitor = response.get(key)
             if visitor:
                 self._bundle_by_visitor[visitor] = bundle
-        # A precondition can name a Python visitor (`edit:<prepared id>`) that the host calls back
-        # like any other. It was prepared inside this child but appears in neither editVisitor nor
-        # recipeList, so without this the host's Visit for it finds no owner.
+        # A precondition may name one of this child's own visitors, and appears in neither
+        # editVisitor nor recipeList — unregistered, the host's Visit for it would find no owner.
         for key in ("editPreconditions", "scanPreconditions"):
             for precondition in (response.get(key) or []):
                 visitor = precondition.get("visitorName")
@@ -89,10 +83,8 @@ class Facade:
             raise ValueError(f"No child owns visitor '{visitor}'")
         result = self._children.request(bundle, "Visit", params)
         tree_id = params.get("treeId")
-        # The edit lives in the child; the facade answers Java's later Print/GetObject from its own
-        # tree. Pull it back here or that answer is the unmodified input and the edit is lost --
-        # silently, since the run still succeeds and simply reports no changes. `batch_visit` does
-        # the same for each of its runs; a single-recipe run reaches this path instead.
+        # The facade answers Java's later Print/GetObject from its own tree, so an edit left in the
+        # child is lost — silently, since the run still succeeds and reports no changes.
         if self._hub_pull is not None and tree_id is not None and result.get("modified"):
             self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"))
         return result
@@ -100,16 +92,11 @@ class Facade:
     def batch_visit(self, params: dict) -> dict:
         """Route a BatchVisit's visitors to their owning children, preserving sequence.
 
-        The Java scheduler (RecipeRunCycle) batches a tree's visitors across every recipe in the
-        run cycle, so one BatchVisit can span bundles. Split it into maximal consecutive same-owner
-        runs and dispatch each as a BatchVisit to that child, concatenating the per-visitor results
-        in order. A single-bundle composite collapses to one run — the whole batch to one child.
-
-        Each run is a "sub-BatchVisit" against the facade's hub: the child is served the facade's
-        current tree over that child's ref table, runs its visitors, and its edit is pulled back as a
-        diff and applied to the facade's tree before the next bundle starts. So bundle B sees bundle
-        A's result rather than the original, and the accumulated tree stays with the facade."""
-        groups = []  # maximal consecutive same-owner runs: [(owner, [visitor, ...]), ...]
+        The host batches a tree's visitors across every recipe in a run cycle, so one BatchVisit can
+        span bundles. Each same-owner run is served the facade's current tree over that child's ref
+        table, and its edit is pulled back before the next run starts — so the second bundle sees the
+        first one's result rather than the original."""
+        groups = []  # [(owner, [visitor, ...]), ...]
         for visitor in params.get("visitors", []):
             name = visitor.get("visitor")
             owner = self._bundle_by_visitor.get(name)
@@ -127,23 +114,21 @@ class Facade:
             response = self._children.request(owner, "BatchVisit", {**params, "visitors": sub_visitors})
             sub_results = response.get("results", [])
             results.extend(sub_results)
-            # Pull this bundle's edit into the facade's tree so the next bundle starts from it.
-            # Only when it actually changed something -- an unmodified run has nothing to contribute.
+            # Pull this bundle's edit in so the next bundle starts from it.
             if (self._hub_pull is not None and tree_id is not None and
                     any(r.get("modified") for r in sub_results)):
                 self._hub_pull(self._children, owner, tree_id, source_file_type)
         return {"results": results}
 
     def evict(self, params: dict) -> bool:
-        # The facade runs no recipes and holds no source trees; the children do. Fan the host's
-        # per-file Evict out to them so each rolls back its own ref map (bounding child memory and
-        # keeping ref numbering aligned with the host across files).
+        # Each child rolls back its own ref map, keeping ref numbering aligned with the host
+        # across files.
         self._children.broadcast_evict(params)
         return True
 
     def set_data_table_store(self, params: dict) -> bool:
-        # The facade runs no recipes, so it keeps no store of its own; it broadcasts the config to
-        # the children (where recipes emit data-table rows) and caches it for children spawned later.
+        # Recipes emit rows from the children, so the store is broadcast and cached for children
+        # spawned later.
         self._children.set_data_table_store(params)
         return True
 

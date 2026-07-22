@@ -2,10 +2,8 @@
 
 Each recipe bundle gets its own venv so its dependency graph is fully isolated.
 Creation uses the stdlib ``venv`` module of a caller-supplied, rewrite-capable
-interpreter; uv is not assumed present. Installing into a real venv gives pip
-proper resolution/upgrade/uninstall (dissolving the ``--target``defect class,
-incl. #8180). Uninstall is directory removal — one bundle owns one venv, so
-there is nothing to pip-uninstall.
+interpreter; uv is not assumed present. Uninstall is directory removal — one
+bundle owns one venv, so there is nothing to pip-uninstall.
 """
 import os
 import shutil
@@ -18,14 +16,12 @@ from rewrite.discovery import _normalize_package_name
 
 
 def venv_python(venv_dir: Path) -> Path:
-    """Path to the interpreter inside ``venv_dir`` (Scripts on Windows, bin on POSIX)."""
     if os.name == "nt":
         return venv_dir / "Scripts" / "python.exe"
     return venv_dir / "bin" / "python"
 
 
 def _site_packages(venv_dir: Path) -> Optional[Path]:
-    """The venv's ``site-packages`` (``Lib`` on Windows, ``lib/pythonX.Y`` on POSIX)."""
     if os.name == "nt":
         sp = venv_dir / "Lib" / "site-packages"
         return sp if sp.exists() else None
@@ -33,11 +29,9 @@ def _site_packages(venv_dir: Path) -> Optional[Path]:
 
 
 def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
-    """The resolved version of distribution ``dist`` installed in the venv, or None.
+    """The resolved version of ``dist`` installed in the venv, or None.
 
-    Read from the venv's ``dist-info`` on disk — the install layer that just ran pip is the
-    authority on what version landed, so the facade reports this rather than echoing the requested
-    (possibly version-less) spec. Reads metadata off disk, so no import of the recipe is needed.
+    Read off disk, so the recipe is never imported.
     """
     site_packages = _site_packages(venv_dir)
     if site_packages is None:
@@ -51,11 +45,7 @@ def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
 
 
 def create_venv(python_executable: str, venv_dir: Path, clear: bool = False) -> None:
-    """Create a venv at ``venv_dir`` using ``python_executable``'s stdlib venv.
-
-    ``clear`` empties the directory first, for rebuilding over a stale venv or a leftover flat
-    ``pip install --target`` package directory of the same name.
-    """
+    """Create a venv at ``venv_dir``; ``clear`` empties the directory first."""
     cmd = [python_executable, "-m", "venv"]
     if clear:
         cmd.append("--clear")
@@ -87,8 +77,7 @@ def is_usable_venv(venv_dir: Path) -> bool:
 def install_into_venv(venv_dir: Path, spec: str, force: bool = False) -> None:
     """Install/upgrade ``spec`` (a PEP 440 requirement or a local path) into the venv.
 
-    ``force`` adds ``--force-reinstall`` so a mutable local source is re-copied even when its
-    version is unchanged; a version-pinned registry spec never needs it.
+    ``force`` re-copies a mutable local source whose version is unchanged.
     """
     cmd = [str(venv_python(venv_dir)), "-m", "pip", "install", "--upgrade"]
     if force:
@@ -98,24 +87,16 @@ def install_into_venv(venv_dir: Path, spec: str, force: bool = False) -> None:
 
 
 def remove_venv(venv_dir: Path) -> None:
-    """Remove the bundle's venv directory (idempotent)."""
     shutil.rmtree(venv_dir, ignore_errors=True)
 
 
 def purge_non_venv_entries(root: Path) -> list:
     """Remove everything in the venvs root that is not a per-bundle venv; return removed names.
 
-    The facade's root holds only per-bundle venvs. Before per-bundle venvs, the Python server
-    installed recipes flat via ``pip install --target <root>``, leaving package directories,
-    ``*.dist-info``, and flattened dependencies directly in this root. Those are dead to the facade
-    (it discovers through children, which never see this root). But a stale top-level
-    ``*.dist-info`` makes a *downgraded* pre-venv CLI treat the package as already installed and
-    skip pip, then activate a half-clobbered flat layout — serving stale recipes. Removing it lets
-    that CLI reinstall cleanly, since ``pip install --upgrade --target`` overwrites the venv
-    directory in place.
-
-    A ``pyvenv.cfg`` marks a venv, kept even when orphaned (fix 2 rebuilds it on install).
-    Idempotent: a no-op once the root holds only venvs.
+    A flat ``pip install --target <root>`` layout leaves package directories and ``*.dist-info``
+    in this root. They are dead to the facade, but a stale top-level ``*.dist-info`` makes a
+    *downgraded* pre-venv CLI skip pip and serve stale recipes from a half-clobbered flat layout.
+    An orphaned venv is kept — install rebuilds it.
     """
     if not root.exists():
         return []
