@@ -24,28 +24,28 @@ import org.openrewrite.TreeVisitor;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class SetDevelocityProjectId extends Recipe {
+public class SetDevelocityServer extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Set the Develocity `projectId`";
+        return "Set the Develocity `server`";
     }
 
     @Override
     public String getDescription() {
-        return "Sets the `projectId` in the `develocity` block of a Gradle settings file, adding it after the " +
-               "`server` assignment when absent or updating it when it differs. The `projectId` is used by newer " +
-               "Develocity servers to associate build scans with a project.";
+        return "Sets the `server` in the `develocity` block of a Gradle settings file, adding it as the first " +
+               "statement when absent or updating it when it differs. Use this to point builds at a different " +
+               "Develocity server, for example when migrating between servers.";
     }
 
-    @Option(displayName = "Project ID",
-            description = "The value to set for `projectId`.",
-            example = "openrewrite")
-    String projectId;
+    @Option(displayName = "Server",
+            description = "The value to set for `server`.",
+            example = "https://community.develocity.cloud/")
+    String server;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Develocity.settingsBlockVisitor(block ->
-                Develocity.setStringProperty(block, "projectId", projectId, "server"));
+                Develocity.setStringProperty(block, "server", server, null));
     }
 }
