@@ -762,7 +762,7 @@
 
 - imageName: golang
   tagPatterns: ["1.24", "1.24.*", "1.24-*"]
-  eolDate: "2026-02-11"
+  eolDate: "2026-02-10"
   suggestedReplacement: 
 
 # Official OpenJDK image (deprecated in 2022, recommends eclipse-temurin)
