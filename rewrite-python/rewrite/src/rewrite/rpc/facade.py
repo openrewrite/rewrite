@@ -3,7 +3,9 @@
 In facade mode (``--recipe-install-dir`` set, not a child) the server holds no recipes itself: each
 bundle gets its own venv and child, and recipe execution routes to the owning child.
 
-``Print``/``GetObject`` are not routed — the facade owns the working tree and answers those itself.
+``Print``/``GetObject`` are not routed: the working source file is owned outside the children, so
+a child's edit has to be pulled back into it (``hub_pull``) or it is never seen. That store and the
+per-child ref tables it needs live in ``rewrite.rpc.server`` as the ``_hub_*`` functions.
 """
 from pathlib import Path
 
@@ -32,17 +34,13 @@ class Facade:
             else:
                 spec = package
             rows = self._children.install(package, spec)
-            # The CLI pins the bundle to the resolved version, so later resolves arrive exact.
             return {"recipesInstalled": len(rows), "version": self._children.resolved_version(package)}
         raise ValueError(f"Invalid recipes parameter: {recipes!r}")
 
     def _install_local(self, local_path: str) -> dict:
-        # A local install arrives as a path, but the venv and child are keyed by distribution name.
         dist = distribution_name_from_source(Path(local_path))
         if not dist:
             raise ValueError(f"Could not determine the distribution name for local path '{local_path}'")
-        # Discovery filters on the distribution name; attribution is the supplied path, which is
-        # the identity the host keys a local bundle by.
         rows = self._children.install(dist, local_path, force=True, attribution_name=local_path)
         return {"recipesInstalled": len(rows), "version": self._children.resolved_version(dist)}
 
@@ -66,8 +64,6 @@ class Facade:
             visitor = response.get(key)
             if visitor:
                 self._bundle_by_visitor[visitor] = bundle
-        # A precondition may name one of this child's own visitors, and appears in neither
-        # editVisitor nor recipeList — unregistered, the host's Visit for it would find no owner.
         for key in ("editPreconditions", "scanPreconditions"):
             for precondition in (response.get(key) or []):
                 visitor = precondition.get("visitorName")
@@ -83,8 +79,6 @@ class Facade:
             raise ValueError(f"No child owns visitor '{visitor}'")
         result = self._children.request(bundle, "Visit", params)
         tree_id = params.get("treeId")
-        # The facade answers Java's later Print/GetObject from its own tree, so an edit left in the
-        # child is lost — silently, since the run still succeeds and reports no changes.
         if self._hub_pull is not None and tree_id is not None and result.get("modified"):
             self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"))
         return result
@@ -114,21 +108,16 @@ class Facade:
             response = self._children.request(owner, "BatchVisit", {**params, "visitors": sub_visitors})
             sub_results = response.get("results", [])
             results.extend(sub_results)
-            # Pull this bundle's edit in so the next bundle starts from it.
             if (self._hub_pull is not None and tree_id is not None and
                     any(r.get("modified") for r in sub_results)):
                 self._hub_pull(self._children, owner, tree_id, source_file_type)
         return {"results": results}
 
     def evict(self, params: dict) -> bool:
-        # Each child rolls back its own ref map, keeping ref numbering aligned with the host
-        # across files.
         self._children.broadcast_evict(params)
         return True
 
     def set_data_table_store(self, params: dict) -> bool:
-        # Recipes emit rows from the children, so the store is broadcast and cached for children
-        # spawned later.
         self._children.set_data_table_store(params)
         return True
 

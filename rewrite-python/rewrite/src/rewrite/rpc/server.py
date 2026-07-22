@@ -748,7 +748,6 @@ def _get_marketplace():
         _marketplace = RecipeMarketplace()
 
         if _child_bundle:
-            # A child owns exactly one distribution: no flat discovery, no built-in activation.
             from rewrite.discovery import discover_root_recipes
             discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
                                   attribution_name=_attribution_name)
@@ -756,15 +755,8 @@ def _get_marketplace():
             from rewrite.discovery import discover_recipes, recipe_name_set
             from rewrite import activate
 
-            # Discover from installed packages, tracking which distribution
-            # contributed each recipe.
             discover_recipes(marketplace=_marketplace, attribution=_attribution)
 
-            # Also activate local recipes (in case the openrewrite distribution
-            # isn't pip-installed, e.g., when running from source). When it is
-            # installed, discovery already covered these and install() will dedupe
-            # by name; attribute the source-mode additions to "openrewrite" so
-            # they're returned by GetMarketplace/InstallRecipes for that package.
             before = recipe_name_set(_marketplace)
             activate(_marketplace)
             _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
@@ -1730,8 +1722,6 @@ def handle_batch_visit(params: dict) -> dict:
         if str(tree.id) != tree_id:
             local_objects[tree_id] = tree
 
-    # The edited tree stays in local_objects; the facade pulls it back as a diff (GetObject) after
-    # this sub-BatchVisit rather than having us serialize it in full here.
     return {'results': results}
 
 
@@ -1885,19 +1875,14 @@ def handle_generate(params: dict) -> dict:
     return {'ids': [], 'sourceFileTypes': []}
 
 
-# ---------------------------------------------------------------------------
-# Facade hub
-#
-# The facade owns the in-flight source file and keeps one RPC ref table per connection: its own
-# facade<->Java table (the module-level remote_objects/remote_refs) plus one per child. Each bundle
-# runs as a "sub-BatchVisit": the child is served the facade's current tree over that child's table,
-# runs its visitors, and its edit is pulled back as a diff and applied to the facade's tree before
-# the next bundle starts.
+# The facade owns the working source file and keeps one RPC ref table per connection: its own
+# facade<->Java table (remote_objects/remote_refs) plus one per child. Each bundle runs as a
+# "sub-BatchVisit": the child is served the current tree over that child's table, runs its visitors,
+# and its edit is pulled back as a diff and applied before the next bundle starts.
 #
 # Deserializing and re-generating per child keeps every hop a diff between a matched send/receive
 # pair, so one child's ref numbering never has to mean anything to another child. Relaying a
 # child's stream directly to a sibling is unsafe.
-# ---------------------------------------------------------------------------
 _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
 _hub_send_refs: Dict[str, Dict] = {}        # bundle -> send ref map      (facade -> child)
 _hub_send_next: Dict[str, int] = {}         # bundle -> next send ref number
@@ -1914,8 +1899,6 @@ def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
         tree = get_object_from_java(obj_id, source_file_type)
         if tree is not None:
             _hub_tree[obj_id] = tree
-            # Also the facade's own object, so the local Print/GetObject handlers answer Java from
-            # the tree the facade owns instead of round-tripping to a child.
             local_objects[obj_id] = tree
     return tree
 
@@ -1954,20 +1937,16 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
                                   {'id': obj_id, 'sourceFileType': source_file_type})]
 
     def pull():
-        # The child answers a GetObject in a single batch; any further pull drains empty.
         if not remaining:
             return []
         return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
 
-    # The child builds a fresh RpcSendQueue for every GetObject, so its send-ref numbering restarts
-    # at 0 each call; our receive table has to restart with it rather than accumulate.
     edited = RpcReceiveQueue({}, source_file_type, pull).receive(served, None)
     if edited is not None:
         _hub_tree[obj_id] = edited
         _hub_served[(bundle, obj_id)] = edited
         local_objects[obj_id] = edited
         if str(getattr(edited, 'id', obj_id)) != obj_id:
-            # A modifying visit can re-key the tree; Java still fetches it under the original id.
             local_objects[str(edited.id)] = edited
 
 
@@ -2013,8 +1992,6 @@ def _get_facade():
         from rewrite.rpc import venv_manager
         from rewrite.rpc.bundle_children import BundleChildren
         from rewrite.rpc.facade import Facade
-        # Clear pre-venv `pip install --target` residue: a stale dist-info makes an older CLI
-        # skip pip and serve stale recipes after a downgrade.
         removed = venv_manager.purge_non_venv_entries(_recipe_install_dir)
         if removed:
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
@@ -2028,7 +2005,7 @@ def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
     if _facade_mode():
         facade = _get_facade()
-        # Fan Evict out to the children so each rolls back its ref map in lockstep with the host.
+
         if method == 'Evict':
             facade.evict(params)
             _hub_release(params.get('id'))
