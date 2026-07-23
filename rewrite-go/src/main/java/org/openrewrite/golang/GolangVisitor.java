@@ -20,7 +20,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.golang.marker.TrailingComma;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.marker.Marker;
 
 public class GolangVisitor<P> extends JavaVisitor<P> {
 
@@ -34,6 +36,32 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return "go";
     }
 
+    // A TrailingComma stashes the whitespace around a trailing `,` (before the
+    // closing `)`/`}`/`]`) in its own Space fields, which the Go printer emits.
+    // Visit them so LST-walking code sees every space the printer does.
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        if (marker instanceof TrailingComma) {
+            TrailingComma tc = (TrailingComma) marker;
+            //noinspection unchecked
+            return (M) tc.withBefore(visitSpace(tc.getBefore(), Space.Location.LANGUAGE_EXTENSION, p))
+                    .withAfter(visitSpace(tc.getAfter(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        return super.visitMarker(marker, p);
+    }
+
+    // JavaVisitor.visitContainer visits the container's `before` and elements but
+    // not the container's own markers, where a param-list TrailingComma lives.
+    @Override
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
+                                                                  JContainer.Location loc, P p) {
+        JContainer<J2> c = super.visitContainer(container, loc, p);
+        if (c != null) {
+            c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        }
+        return c;
+    }
+
     // ---------------------------------------------------------------
     // Go-specific visit methods
     // ---------------------------------------------------------------
@@ -45,6 +73,10 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         if (c.getPadding().getPackageDecl() != null) {
             c = c.getPadding().withPackageDecl(
                     visitRightPadded(c.getPadding().getPackageDecl(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (c.getImportsContainer() != null) {
+            c = c.withImportsContainer(c.getImportsContainer().withBefore(
+                    visitSpace(c.getImportsContainer().getBefore(), Space.Location.LANGUAGE_EXTENSION, p)));
         }
         c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(),
                 el -> visitRightPadded(el, JRightPadded.Location.IMPORT, p)));
