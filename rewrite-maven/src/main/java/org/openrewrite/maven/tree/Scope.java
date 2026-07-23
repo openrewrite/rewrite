@@ -36,10 +36,10 @@ public enum Scope {
     }
 
     /**
-     * Unlike {@link #transitiveOf}/{@link #isInClasspathOf}, which govern how a dependency's scope degrades one hop
-     * further down its own transitive dependencies, this answers a single-hop question: does a dependency declared
-     * with this scope belong in the dependency set being assembled for the given target scope - regardless of what
-     * scope included the dependency one level further up the tree.
+     * Used to decide which of a project's own directly-requested dependencies seed the resolution of a given
+     * target scope. Unlike {@link #transitiveOf}/{@link #isInClasspathOf}, which govern how a dependency's scope
+     * degrades one hop further down its own transitive dependencies, this answers a single-hop question: does a
+     * dependency declared with this scope belong in the dependency set being assembled for the given target scope.
      * <p>
      * There are only three real classpaths - compile, runtime, and test - "provided" is not itself a classpath,
      * but a scope that contributes to the compile and test classpaths while being withheld from the runtime
@@ -56,7 +56,8 @@ public enum Scope {
      * </pre>
      *
      * @param scope The target scope whose dependency set is being assembled.
-     * @return If a dependency declared with this scope belongs in that target scope's dependency set.
+     * @return If a directly-requested dependency declared with this scope belongs in that target scope's
+     * dependency set.
      */
     public boolean isDirectlyIncludedIn(Scope scope) {
         if (this == scope) {
