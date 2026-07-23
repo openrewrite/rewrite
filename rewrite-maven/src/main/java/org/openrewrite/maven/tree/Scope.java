@@ -41,11 +41,16 @@ public enum Scope {
      * with this scope belong in the dependency set being assembled for the given target scope - regardless of what
      * scope included the dependency one level further up the tree.
      * <p>
+     * There are only three real classpaths - compile, runtime, and test - "provided" is not itself a classpath,
+     * but a scope that contributes to the compile and test classpaths while being withheld from the runtime
+     * classpath. This matches the scope table at
+     * <a href="https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#dependency-scope">Dependency Scope</a>.
+     * <p>
      * this (rows) x target scope (columns):
      * <pre>
      *           Compile   Provided   Runtime   Test
-     * Compile:    T         T          T         T
-     * Provided:   F         T          F         F
+     * Compile:    T         F          T         T
+     * Provided:   T         T          F         T
      * Runtime:    F         F          T         T
      * Test:       F         F          F         T
      * </pre>
@@ -54,10 +59,19 @@ public enum Scope {
      * @return If a dependency declared with this scope belongs in that target scope's dependency set.
      */
     public boolean isDirectlyIncludedIn(Scope scope) {
-        if (this == scope || this == Compile) {
+        if (this == scope) {
             return true;
         }
-        return this == Runtime && scope == Test;
+        switch (this) {
+            case Compile:
+                return scope == Runtime || scope == Test;
+            case Provided:
+                return scope == Compile || scope == Test;
+            case Runtime:
+                return scope == Test;
+            default:
+                return false;
+        }
     }
 
     /**
