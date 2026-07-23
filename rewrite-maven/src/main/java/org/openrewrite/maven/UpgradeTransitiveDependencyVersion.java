@@ -21,8 +21,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
@@ -169,7 +171,37 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AddManagedDependency.Scanned acc) {
-        return addManagedDependency().getScanner(acc);
+        TreeVisitor<?, ExecutionContext> addManagedDependencyScanner = addManagedDependency().getScanner(acc);
+        if (!Boolean.TRUE.equals(addToRootPom)) {
+            return addManagedDependencyScanner;
+        }
+        // When adding to the reactor root, record for each root the coordinates any pom under it
+        // holds transitively. The visitor phase reads this map to write the pins in one place
+        // instead of the pom that happens to hold each transitive.
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                addManagedDependencyScanner.visit(document, ctx);
+                MavenResolutionResult mrr = getResolutionResult();
+                Set<ResolvedDependency> matchingDependencies = mrr.findDependencies(groupId, artifactId, null)
+                        .stream()
+                        .filter(ResolvedDependency::isTransitive)
+                        .collect(toCollection(LinkedHashSet::new));
+                if (matchingDependencies.isEmpty()) {
+                    return document;
+                }
+                MavenResolutionResult current = mrr;
+                while (current.parentPomIsProjectPom()) {
+                    current = current.getParent();
+                }
+                ResolvedGroupArtifactVersion rootGav = current.getPom().getGav();
+                Set<GroupArtifact> coords = acc.reactorRootTransitives.computeIfAbsent(rootGav, k -> new LinkedHashSet<>());
+                for (ResolvedDependency dep : matchingDependencies) {
+                    coords.add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                }
+                return document;
+            }
+        };
     }
 
     @Override
@@ -177,6 +209,27 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                if (Boolean.TRUE.equals(addToRootPom)) {
+                    // Only fire on the reactor root; write every coordinate recorded against it by
+                    // the scanner. Skip non-root poms even if they hold the transitive - the point
+                    // of addToRootPom is to centralize the pin.
+                    MavenResolutionResult mrr = getResolutionResult();
+                    if (mrr.parentPomIsProjectPom()) {
+                        return document;
+                    }
+                    Set<GroupArtifact> coords = acc.reactorRootTransitives.get(mrr.getPom().getGav());
+                    if (coords == null || coords.isEmpty()) {
+                        return document;
+                    }
+                    Xml.Document d = document;
+                    for (GroupArtifact coord : coords) {
+                        d = (Xml.Document) addManagedDependency(coord.getGroupId(), coord.getArtifactId())
+                                .getVisitor(acc)
+                                .visitNonNull(d, ctx);
+                    }
+                    return d;
+                }
+
                 Set<ResolvedDependency> matchingDependencies = getResolutionResult().findDependencies(groupId, artifactId, null)
                         .stream()
                         .filter(ResolvedDependency::isTransitive)

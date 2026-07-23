@@ -381,4 +381,71 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addsManagedDependencyToReactorRootWhenAddToRootPomAndOnlyChildHoldsTheTransitive() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, true, null)),
+          mavenProject("parent",
+            pomXml(
+              """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+              </project>
+              """,
+              """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>2.12.5</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite</groupId>
+                            <artifactId>rewrite-java</artifactId>
+                            <version>7.0.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+              )
+            )
+          )
+        );
+    }
 }
