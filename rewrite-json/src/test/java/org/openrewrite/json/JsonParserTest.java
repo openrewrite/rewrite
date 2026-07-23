@@ -374,4 +374,56 @@ class JsonParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void acceptsJupyterNotebooks() {
+        JsonParser parser = new JsonParser();
+        assertThat(parser.accept(Paths.get("analysis.ipynb"))).isTrue();
+        assertThat(parser.accept(Paths.get("nested/dir/analysis.ipynb"))).isTrue();
+    }
+
+    @Test
+    void parseJupyterNotebook() {
+        rewriteRun(
+          json(
+            """
+              {
+               "cells": [
+                {
+                 "cell_type": "code",
+                 "execution_count": null,
+                 "metadata": {},
+                 "outputs": [],
+                 "source": [
+                  "import os\\n",
+                  "print(os.getcwd())"
+                 ]
+                },
+                {
+                 "cell_type": "markdown",
+                 "metadata": {},
+                 "source": [
+                  "# Heading"
+                 ]
+                }
+               ],
+               "metadata": {
+                "kernelspec": {
+                 "display_name": "Python 3",
+                 "language": "python",
+                 "name": "python3"
+                },
+                "language_info": {
+                 "name": "python",
+                 "version": "3.11.0"
+                }
+               },
+               "nbformat": 4,
+               "nbformat_minor": 5
+              }
+              """,
+            spec -> spec.path("analysis.ipynb")
+          )
+        );
+    }
 }

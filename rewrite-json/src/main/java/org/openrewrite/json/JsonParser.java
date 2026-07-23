@@ -79,7 +79,7 @@ public class JsonParser implements Parser {
     @Override
     public boolean accept(Path path) {
         String fileName = path.getFileName().toString();
-        return fileName.endsWith(".json") || "Pipfile.lock".equals(fileName);
+        return fileName.endsWith(".json") || fileName.endsWith(".ipynb") || "Pipfile.lock".equals(fileName);
     }
 
     @Override
