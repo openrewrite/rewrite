@@ -94,6 +94,14 @@ _python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
 # package pip installs it here before activating.
 _recipe_install_dir: Optional[Path] = None
 
+# Set via --child-bundle: the marketplace is scoped to exactly this distribution's recipes.
+_child_bundle: Optional[str] = None
+
+# The identity the host keys a local bundle by (its supplied path); None for a registry spec.
+_attribution_name: Optional[str] = None
+
+_facade = None
+
 
 def _next_request_id() -> int:
     """Generate a unique request ID for outgoing requests."""
@@ -733,24 +741,22 @@ def _get_marketplace():
     """
     global _marketplace
     if _marketplace is None:
-        from rewrite.discovery import discover_recipes, recipe_name_set
         from rewrite.marketplace import RecipeMarketplace
-        from rewrite import activate
-
         _marketplace = RecipeMarketplace()
 
-        # Discover from installed packages, tracking which distribution
-        # contributed each recipe.
-        discover_recipes(marketplace=_marketplace, attribution=_attribution)
+        if _child_bundle:
+            from rewrite.discovery import discover_root_recipes
+            discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
+                                  attribution_name=_attribution_name)
+        else:
+            from rewrite.discovery import discover_recipes, recipe_name_set
+            from rewrite import activate
 
-        # Also activate local recipes (in case the openrewrite distribution
-        # isn't pip-installed, e.g., when running from source). When it is
-        # installed, discovery already covered these and install() will dedupe
-        # by name; attribute the source-mode additions to "openrewrite" so
-        # they're returned by GetMarketplace/InstallRecipes for that package.
-        before = recipe_name_set(_marketplace)
-        activate(_marketplace)
-        _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
+            discover_recipes(marketplace=_marketplace, attribution=_attribution)
+
+            before = recipe_name_set(_marketplace)
+            activate(_marketplace)
+            _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
 
     return _marketplace
 
@@ -871,8 +877,8 @@ def handle_install_recipes(params: dict) -> dict:
         else:
             logger.info(f"Activating recipes from local path: {recipes}")
 
-        # Find and import the package
-        # For local paths, we look for the package name from setup.py/pyproject.toml
+        # Attribution is the supplied path, not the distribution name — the identity the host
+        # keys a local bundle by.
         package_name = _find_package_name(local_path)
         if package_name:
             before = recipe_name_set(marketplace)
@@ -953,44 +959,8 @@ def _add_source_to_path(local_path: Path) -> None:
 
 def _find_package_name(local_path: Path) -> Optional[str]:
     """Find the package name from a local path."""
-    import sys
-    if sys.version_info >= (3, 11):
-        import tomllib
-    else:
-        try:
-            import tomli as tomllib  # type: ignore[import-not-found]
-        except ModuleNotFoundError:
-            return None
-
-    # Try pyproject.toml first
-    pyproject_path = local_path / 'pyproject.toml'
-    if pyproject_path.exists():
-        try:
-            with open(pyproject_path, 'rb') as f:
-                data = tomllib.load(f)
-                # Try [project] section first (PEP 621)
-                if 'project' in data and 'name' in data['project']:
-                    return data['project']['name']
-                # Try [tool.poetry] section
-                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
-                    return data['tool']['poetry']['name']
-        except Exception as e:
-            logger.warning(f"Failed to parse pyproject.toml: {e}")
-
-    # Try setup.py
-    setup_py = local_path / 'setup.py'
-    if setup_py.exists():
-        # Simple heuristic: look for name= in setup.py
-        try:
-            content = setup_py.read_text()
-            import re
-            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
-            if match:
-                return match.group(1)
-        except Exception as e:
-            logger.warning(f"Failed to parse setup.py: {e}")
-
-    return None
+    from rewrite.discovery import distribution_name_from_source
+    return distribution_name_from_source(local_path)
 
 
 def _import_and_activate_package(package_name: str, marketplace, local_path: Optional[Path] = None):
@@ -1902,8 +1872,167 @@ def handle_generate(params: dict) -> dict:
     return {'ids': [], 'sourceFileTypes': []}
 
 
+# The facade owns the working source file and keeps one RPC ref table per connection: its own
+# facade<->Java table (remote_objects/remote_refs) plus one per child. Each bundle runs as a
+# "sub-BatchVisit": the child is served the current tree over that child's table, runs its visitors,
+# and its edit is pulled back as a diff and applied before the next bundle starts.
+#
+# Deserializing and re-generating per child keeps every hop a diff between a matched send/receive
+# pair, so one child's ref numbering never has to mean anything to another child. Relaying a
+# child's stream directly to a sibling is unsafe.
+_hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
+_hub_send_refs: Dict[str, Dict] = {}        # bundle -> send ref map      (facade -> child)
+_hub_send_next: Dict[str, int] = {}         # bundle -> next send ref number
+_hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
+_hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
+
+def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
+    first time it is needed and owned by the facade from then on."""
+    if obj_id is None:
+        return None
+    tree = _hub_tree.get(obj_id)
+    if tree is None:
+        tree = get_object_from_java(obj_id, source_file_type)
+        if tree is not None:
+            _hub_tree[obj_id] = tree
+            local_objects[obj_id] = tree
+    return tree
+
+
+def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) -> Any:
+    """Serve a child its view of the facade's tree over that child's ref table: a diff against
+    whatever that child was last served, or a full object the first time."""
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    # Serve only from what the facade already holds. Fetching from Java here would deadlock: we are
+    # inside a child's callback, the child is blocked on us, and Java is blocked on the request that
+    # got us here. handle_request acquires the tree at the top level before dispatching instead.
+    tree = _hub_tree.get(obj_id)
+    if tree is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+
+    q = RpcSendQueue(source_file_type)
+    q.refs = _hub_send_refs.setdefault(bundle, {})
+    q.next_ref = _hub_send_next.get(bundle, 0)
+    # Remember where this child's ref numbering stood before this file, so Evict can roll it back
+    # in lockstep with the child's own rollback (see _hub_release).
+    _hub_send_checkpoint.setdefault((bundle, obj_id), q.next_ref)
+    data = q.generate(tree, _hub_served.get((bundle, obj_id)))
+    _hub_send_next[bundle] = q.next_ref
+    _hub_served[(bundle, obj_id)] = tree
+    return data
+
+
+def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str]) -> None:
+    """Pull a child's edit back as a diff against what it was served and apply it to the facade's
+    tree, so the next bundle starts from this bundle's result."""
+    from rewrite.rpc.receive_queue import RpcReceiveQueue
+
+    served = _hub_served.get((bundle, obj_id))
+    remaining = [children.request(bundle, 'GetObject',
+                                  {'id': obj_id, 'sourceFileType': source_file_type})]
+
+    def pull():
+        if not remaining:
+            return []
+        return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
+
+    edited = RpcReceiveQueue({}, source_file_type, pull).receive(served, None)
+    if edited is not None:
+        _hub_tree[obj_id] = edited
+        _hub_served[(bundle, obj_id)] = edited
+        local_objects[obj_id] = edited
+        if str(getattr(edited, 'id', obj_id)) != obj_id:
+            local_objects[str(edited.id)] = edited
+
+
+def _hub_release(obj_id: str) -> None:
+    """The rollback must be symmetric with the child's own Evict: the child drops the refs this file
+    introduced from its receive map, so if the facade kept them in its send map it would emit a
+    GET_REF for a ref the child no longer has ("Received reference to unknown object").
+    """
+    _hub_tree.pop(obj_id, None)
+    for key in [k for k in _hub_served if k[1] == obj_id]:
+        del _hub_served[key]
+    for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
+        bundle = key[0]
+        checkpoint = _hub_send_checkpoint.pop(key)
+        refs = _hub_send_refs.get(bundle)
+        if refs is not None:
+            for ref_key in [k for k, (_, num) in refs.items() if num > checkpoint]:
+                del refs[ref_key]
+        _hub_send_next[bundle] = checkpoint
+
+
+def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
+    """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
+    to Java."""
+    if method != 'GetObject':
+        return send_request(method, params)
+
+    obj_id = params.get('id')
+    if obj_id is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+    if bundle is None:
+        return send_request('GetObject', params)
+    return _hub_serve_child(bundle, obj_id, params.get('sourceFileType'))
+
+
+def _facade_mode() -> bool:
+    return _recipe_install_dir is not None and _child_bundle is None
+
+
+def _get_facade():
+    global _facade
+    if _facade is None:
+        from rewrite.rpc import venv_manager
+        from rewrite.rpc.bundle_children import BundleChildren
+        from rewrite.rpc.facade import Facade
+        removed = venv_manager.purge_non_venv_entries(_recipe_install_dir)
+        if removed:
+            logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
+                        len(removed), _recipe_install_dir, ", ".join(removed))
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
+                         hub_pull=_hub_pull_child_edit)
+    return _facade
+
+
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
+    if _facade_mode():
+        facade = _get_facade()
+
+        if method == 'Evict':
+            facade.evict(params)
+            _hub_release(params.get('id'))
+            return handle_evict(params)
+        facade_handlers = {
+            'InstallRecipes': facade.install_recipes,
+            'GetMarketplace': facade.get_marketplace,
+            'PrepareRecipe': facade.prepare_recipe,
+            'SetDataTableStore': facade.set_data_table_store,
+            'Visit': facade.visit,
+            'BatchVisit': facade.batch_visit,
+            'Generate': facade.generate,
+        }
+        facade_handler = facade_handlers.get(method)
+        if facade_handler:
+            # Acquire at the top level, before any child runs — acquiring inside a child's
+            # GetObject callback would deadlock (the child waits on us, Java on this request).
+            if method in ('Visit', 'BatchVisit'):
+                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
+            return facade_handler(params)
+        if method in ('Print', 'GetObject'):
+            obj_id = params.get('treeId') or params.get('id')
+            source_file_type = params.get('sourceFileType')
+            # Java fetches non-tree objects by id as well (the execution context, cursors).
+            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+            # that has no codec for them, desynchronizing the queue for every later object.
+            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
+                _hub_acquire(obj_id, source_file_type)
+
     handlers = {
         'Parse': handle_parse,
         'ParseProject': handle_parse_project,
@@ -2199,6 +2328,11 @@ def main():
     parser.add_argument('--metrics-csv', help='Metrics CSV output path')
     parser.add_argument('--trace-rpc-messages', action='store_true', help='Enable RPC message tracing')
     parser.add_argument('--recipe-install-dir', help='Directory where recipe pip packages are installed')
+    parser.add_argument('--child-bundle',
+                        help='Run as a single-bundle child scoped to this distribution name')
+    parser.add_argument('--attribution-name',
+                        help='Label this child\'s recipes with this identity (a local install\'s '
+                             'supplied path) instead of the distribution name')
     args = parser.parse_args()
 
     _init_pyroscope()
@@ -2209,6 +2343,14 @@ def main():
     if args.recipe_install_dir:
         global _recipe_install_dir
         _recipe_install_dir = Path(args.recipe_install_dir)
+
+    if args.child_bundle:
+        global _child_bundle
+        _child_bundle = args.child_bundle
+
+    if args.attribution_name:
+        global _attribution_name
+        _attribution_name = args.attribution_name
 
     if args.log_file:
         file_handler = logging.FileHandler(args.log_file)
