@@ -29,6 +29,7 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.python.tree.Py;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -218,6 +219,16 @@ public class PythonRewriteRpc extends RewriteRpc {
 
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
+
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the Python side declined to parse; build the Quark
+                    // locally from its path (plus file attributes) — no content on the wire.
+                    Path base = relativeTo != null ? relativeTo : projectPath;
+                    Path sourcePath = Paths.get(item.getSourcePath());
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(base.resolve(sourcePath))));
+                    return true;
+                }
 
                 SourceFile sourceFile;
                 try {
