@@ -439,4 +439,39 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-testing-frameworks/issues/1061")
+    @MinimumJava11
+    @Test
+    void methodInvocationTypeBoundWhenArgumentTypeUnresolvable() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          java(
+            """
+              import static java.util.Objects.requireNonNull;
+              class MyTest {
+                  void test() {
+                      requireNonNull(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("requireNonNull".equals(method.getSimpleName())) {
+                            assertThat(method.getMethodType()).isNotNull();
+                            assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName())
+                                    .isEqualTo("java.util.Objects");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
+          )
+        );
+    }
 }
