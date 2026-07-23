@@ -696,11 +696,22 @@ def handle_print(params: dict) -> str:
         logger.warning(f"Object {obj_id} not found")
         return ""
 
-    # If it's a CompilationUnit, use the printer
+    # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
+    # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
+    name = params.get('markerPrinter')
     try:
-        from rewrite.python.printer import PythonPrinter
+        from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+        from rewrite.tree import PrintOutputCapture as CorePrintOutputCapture
+        marker_printer = {
+            'FENCED': CorePrintOutputCapture.MarkerPrinter.FENCED,
+            'SANITIZED': CorePrintOutputCapture.MarkerPrinter.SANITIZED,
+            'SEARCH_MARKERS_ONLY': CorePrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY,
+        }.get(name)
+        # A FENCED typo would otherwise silently fall back to /*~~>*/ and corrupt the diff.
+        if marker_printer is None and name not in (None, 'DEFAULT'):
+            logger.warning(f"Unknown markerPrinter '{name}'; using default rendering")
         printer = PythonPrinter()
-        return printer.print(obj)
+        return printer.print(obj, PrintOutputCapture(marker_printer))
     except ImportError as e:
         logger.error(f"Failed to import PythonPrinter: {e}")
         pass
