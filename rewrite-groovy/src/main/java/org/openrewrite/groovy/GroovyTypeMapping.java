@@ -208,7 +208,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         String[] finalParamNames = paramNames;
         return typeFactory.methodFor(signature,
                 () -> new JavaType.Method(
-                    null, node.getModifiers(), null,
+                    null, Flag.mapBytecodeAccessFlagsToBitMap(node.getModifiers()), null,
                     node instanceof ConstructorNode ? "<constructor>" : node.getName(),
                     null, finalParamNames, null, null, null, null, null),
                 method -> {
