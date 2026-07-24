@@ -20,6 +20,8 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypedTree;
 
+import java.util.Collections;
+
 import static java.util.Collections.emptySet;
 
 public class KotlinSubstitutions extends Substitutions {
@@ -40,7 +42,7 @@ public class KotlinSubstitutions extends Substitutions {
     // and render arrays as kotlin.Array<T> / primitive array types.
     private String toKotlinTypeSyntax(String fqn, int index, boolean starProjectRaw) {
         if (fqn.endsWith("[]")) {
-            return toKotlinArrayType(fqn.substring(0, fqn.length() - "[]".length()), index);
+            return toKotlinArrayType(fqn.substring(0, fqn.length() - 2), index);
         }
         String kotlinType = fqn
                 .replace("? extends ", "out ")
@@ -49,14 +51,7 @@ public class KotlinSubstitutions extends Substitutions {
         if (starProjectRaw && kotlinType.indexOf('<') < 0) {
             int arity = genericArity(index);
             if (arity > 0) {
-                StringBuilder sb = new StringBuilder(kotlinType).append('<');
-                for (int i = 0; i < arity; i++) {
-                    if (i > 0) {
-                        sb.append(", ");
-                    }
-                    sb.append('*');
-                }
-                return sb.append('>').toString();
+                return kotlinType + "<" + String.join(", ", Collections.nCopies(arity, "*")) + ">";
             }
         }
         return kotlinType;
