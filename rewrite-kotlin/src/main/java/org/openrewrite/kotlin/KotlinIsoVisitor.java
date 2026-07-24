@@ -28,6 +28,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.AnnotatedExpression visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, P p) {
+        return (K.AnnotatedExpression) super.visitAnnotatedExpression(annotatedExpression, p);
+    }
+
+    @Override
     public K.AnnotationType visitAnnotationType(K.AnnotationType annotationType, P p) {
         return (K.AnnotationType) super.visitAnnotationType(annotationType, p);
     }
