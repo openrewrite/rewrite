@@ -711,6 +711,33 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void versionCatalogTomlStringNotationWithGlob() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.example.*",
+            "old-*",
+            null,
+            "new-library",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              example = "com.example.foo:old-library:1.0.0"
+              """,
+            """
+              [libraries]
+              example = "com.example.foo:new-library:1.0.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void versionCatalogTomlWithoutNewVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(

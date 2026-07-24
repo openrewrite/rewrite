@@ -26,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
@@ -42,6 +43,7 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
     private final @Nullable Boolean overrideManagedVersion;
     private final MavenMetadataFailures metadataFailures;
     private final @Nullable GradleProject gradleProject;
+    private final DependencyMatcher dependencyMatcher;
 
     /**
      * Maps {@code version.ref} key names → selected new version string.
@@ -59,6 +61,7 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
         this.overrideManagedVersion = overrideManagedVersion;
         this.metadataFailures = metadataFailures;
         this.gradleProject = gradleProject;
+        this.dependencyMatcher = new DependencyMatcher(oldGroupId, oldArtifactId, null);
     }
 
     @Override
@@ -71,20 +74,26 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
     public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
         versionRefUpgrades.clear();
         Toml.Table libraries = VersionCatalogToml.findTable(document, "libraries");
+        Map<String, Integer> referenceCounts = new HashMap<>();
+        Map<String, Integer> matchingReferenceCounts = new HashMap<>();
 
         if (libraries != null && !StringUtils.isBlank(newVersion)) {
-            String replacementGroupId = StringUtils.isBlank(newGroupId) ? oldGroupId : newGroupId;
-            String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? oldArtifactId : newArtifactId;
-
             for (Toml value : libraries.getValues()) {
                 if (!(value instanceof Toml.KeyValue)) {
                     continue;
                 }
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                GradleVersionCatalogDependency dep = GradleVersionCatalogDependency.Matcher.extract(kv, oldGroupId, oldArtifactId);
+                GradleVersionCatalogDependency dep = GradleVersionCatalogDependency.Matcher.extract(kv, null, null);
                 if (dep == null || dep.getVersionRef() == null) {
                     continue;
                 }
+                referenceCounts.merge(dep.getVersionRef(), 1, Integer::sum);
+                if (!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                    continue;
+                }
+                matchingReferenceCounts.merge(dep.getVersionRef(), 1, Integer::sum);
+                String replacementGroupId = StringUtils.isBlank(newGroupId) ? dep.getGroupId() : newGroupId;
+                String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dep.getArtifactId() : newArtifactId;
                 try {
                     String selected = new DependencyVersionSelector(metadataFailures, gradleProject, null).select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
                     if (selected != null) {
@@ -94,6 +103,8 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
                     return e.warn(document);
                 }
             }
+            versionRefUpgrades.entrySet().removeIf(entry ->
+                    !referenceCounts.getOrDefault(entry.getKey(), 0).equals(matchingReferenceCounts.get(entry.getKey())));
         }
 
         return super.visitDocument(document, ctx);
@@ -106,8 +117,8 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
         GradleVersionCatalogDependency dep = new GradleVersionCatalogDependency.Matcher().groupPattern(oldGroupId).artifactPattern(oldArtifactId).get(getCursor()).orElse(null);
 
         if (dep != null) {
-            String replacementGroupId = StringUtils.isBlank(newGroupId) ? oldGroupId : newGroupId;
-            String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? oldArtifactId : newArtifactId;
+            String replacementGroupId = StringUtils.isBlank(newGroupId) ? dep.getGroupId() : newGroupId;
+            String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dep.getArtifactId() : newArtifactId;
             String selectedVersion = null;
             if (!StringUtils.isBlank(newVersion)) {
                 try {

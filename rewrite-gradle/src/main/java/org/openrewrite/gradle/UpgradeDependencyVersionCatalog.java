@@ -73,6 +73,8 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
         referencedVersions.clear();
         Toml.Table libraries = VersionCatalogToml.findTable(document, "libraries");
         Toml.Table versions = VersionCatalogToml.findTable(document, "versions");
+        Map<String, Integer> referenceCounts = new HashMap<>();
+        Map<String, Integer> matchingReferenceCounts = new HashMap<>();
         if (libraries == null) {
             return document;
         }
@@ -82,15 +84,18 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
                 continue;
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
-            GradleVersionCatalogDependency dep = GradleVersionCatalogDependency.Matcher.extract(kv, groupId, artifactId);
+            GradleVersionCatalogDependency dep = GradleVersionCatalogDependency.Matcher.extract(kv, null, null);
             if (dep == null || dep.getVersionRef() == null) {
                 continue;
             }
+            referenceCounts.merge(dep.getVersionRef(), 1, Integer::sum);
             if (!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
                 continue;
             }
+            matchingReferenceCounts.merge(dep.getVersionRef(), 1, Integer::sum);
             try {
-                String upgraded = selectVersion(VersionCatalogToml.getVersion(versions, dep.getVersionRef()), ctx);
+                String upgraded = selectVersion(VersionCatalogToml.getVersion(versions, dep.getVersionRef()),
+                        dep.getGroupId(), dep.getArtifactId(), ctx);
                 if (upgraded != null) {
                     referencedVersions.put(dep.getVersionRef(), upgraded);
                 }
@@ -98,6 +103,8 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
                 return e.warn(document);
             }
         }
+        referencedVersions.entrySet().removeIf(entry ->
+                !referenceCounts.getOrDefault(entry.getKey(), 0).equals(matchingReferenceCounts.get(entry.getKey())));
 
         return super.visitDocument(document, ctx);
     }
@@ -114,7 +121,7 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
 
         if (dep != null && dep.getVersionRef() == null && dep.getVersion() != null) {
             try {
-                String selected = selectVersion(dep.getVersion(), ctx);
+                String selected = selectVersion(dep.getVersion(), dep.getGroupId(), dep.getArtifactId(), ctx);
                 if (selected != null) {
                     return dep.withVersion(selected);
                 }
@@ -127,11 +134,13 @@ final class UpgradeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionCont
         return VersionCatalogToml.updateReferencedVersion(kv, getCursor(), referencedVersions);
     }
 
-    private @Nullable String selectVersion(@Nullable String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
+    private @Nullable String selectVersion(@Nullable String currentVersion, String dependencyGroupId,
+                                           String dependencyArtifactId, ExecutionContext ctx) throws MavenDownloadingException {
         if (currentVersion == null) {
             return null;
         }
         return new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                .select(new GroupArtifactVersion(groupId, artifactId, currentVersion), null, newVersion, versionPattern, ctx);
+                .select(new GroupArtifactVersion(dependencyGroupId, dependencyArtifactId, currentVersion), null,
+                        newVersion, versionPattern, ctx);
     }
 }

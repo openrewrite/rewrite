@@ -155,6 +155,24 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotUpgradeSharedVersionReferenceWithUnmatchedLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              shared = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "shared" }
+              junit = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void upgradesMultipleMatchingVersionCatalogLibraries() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),

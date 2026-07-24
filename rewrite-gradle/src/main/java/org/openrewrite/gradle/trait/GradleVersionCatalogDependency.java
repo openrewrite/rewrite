@@ -103,6 +103,21 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
     public Toml.KeyValue withInlineCoordinatesAndVersion(
             String newGroupId, String newArtifactId,
             @Nullable String newVersion, boolean overrideManagedVersion) {
+        if (getTree().getValue() instanceof Toml.Literal) {
+            Toml.Literal literal = (Toml.Literal) getTree().getValue();
+            if (!(literal.getValue() instanceof String)) {
+                return getTree();
+            }
+            Dependency dependency = DependencyNotation.parse((String) literal.getValue());
+            if (dependency == null) {
+                return getTree();
+            }
+            String version = newVersion == null ? dependency.getVersion() : newVersion;
+            String notation = DependencyNotation.toStringNotation(
+                    dependency.withGav(new org.openrewrite.maven.tree.GroupArtifactVersion(
+                            newGroupId, newArtifactId, version)));
+            return getTree().withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
+        }
         if (!(getTree().getValue() instanceof Toml.Table)) {
             return getTree();
         }

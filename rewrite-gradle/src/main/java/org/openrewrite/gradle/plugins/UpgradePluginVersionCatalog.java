@@ -16,7 +16,6 @@
 package org.openrewrite.gradle.plugins;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.DependencyVersionSelector;
@@ -68,6 +67,8 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
         referencedVersions.clear();
         Toml.Table plugins = VersionCatalogToml.findTable(document, "plugins");
         Toml.Table versions = VersionCatalogToml.findTable(document, "versions");
+        Map<String, Integer> referenceCounts = new HashMap<>();
+        Map<String, Integer> matchingReferenceCounts = new HashMap<>();
         if (plugins == null) {
             return document;
         }
@@ -75,11 +76,16 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
             if (!(value instanceof Toml.KeyValue)) {
                 continue;
             }
-            GradleVersionCatalogPlugin plugin = GradleVersionCatalogPlugin.Matcher.extract(
-                    (Toml.KeyValue) value, pluginIdPattern);
+            Toml.KeyValue keyValue = (Toml.KeyValue) value;
+            GradleVersionCatalogPlugin plugin = GradleVersionCatalogPlugin.Matcher.extract(keyValue, null);
             if (plugin == null || plugin.getVersionRef() == null) {
                 continue;
             }
+            referenceCounts.merge(plugin.getVersionRef(), 1, Integer::sum);
+            if (GradleVersionCatalogPlugin.Matcher.extract(keyValue, pluginIdPattern) == null) {
+                continue;
+            }
+            matchingReferenceCounts.merge(plugin.getVersionRef(), 1, Integer::sum);
             try {
                 String selected = select(VersionCatalogToml.getVersion(versions, plugin.getVersionRef()),
                         plugin.getPluginId(), ctx);
@@ -90,6 +96,8 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
                 return e.warn(document);
             }
         }
+        referencedVersions.entrySet().removeIf(entry ->
+                !referenceCounts.getOrDefault(entry.getKey(), 0).equals(matchingReferenceCounts.get(entry.getKey())));
 
         return super.visitDocument(document, ctx);
     }
