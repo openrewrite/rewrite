@@ -118,6 +118,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.StatementExpression visitStatementExpression(K.StatementExpression statementExpression, P p) {
+        return (K.StatementExpression) super.visitStatementExpression(statementExpression, p);
+    }
+
+    @Override
     public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, P p) {
         return (K.TypeAlias) super.visitTypeAlias(typeAlias, p);
     }

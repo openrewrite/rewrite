@@ -255,6 +255,32 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return s.withExpression(visitAndCast(s.getExpression(), p));
     }
 
+    public J visitStatementExpression(K.StatementExpression statementExpression, P p) {
+        K.StatementExpression s = statementExpression;
+        // Route through visitStatement/visitExpression like every other K statement-expression type
+        // (e.g. K.Return), so scope-based operations such as JavaTemplate replacements can target the
+        // wrapper node itself rather than transparently descending into the statement it wraps.
+        Statement temp = (Statement) visitStatement(s, p);
+        if (!(temp instanceof K.StatementExpression)) {
+            return temp;
+        } else {
+            s = (K.StatementExpression) temp;
+        }
+        Expression temp2 = (Expression) visitExpression(s, p);
+        if (!(temp2 instanceof K.StatementExpression)) {
+            return temp2;
+        } else {
+            s = (K.StatementExpression) temp2;
+        }
+        J statement = visit(s.getStatement(), p);
+        if (statement instanceof K.StatementExpression) {
+            return statement;
+        } else if (statement instanceof Statement) {
+            return s.withStatement((Statement) statement);
+        }
+        return statement;
+    }
+
     public J visitStringTemplate(K.StringTemplate stringTemplate, P p) {
         K.StringTemplate k = stringTemplate;
         k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.STRING_TEMPLATE_PREFIX, p));
