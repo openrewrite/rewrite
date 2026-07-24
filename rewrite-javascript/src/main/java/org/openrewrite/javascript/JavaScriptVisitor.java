@@ -19,8 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.tree.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
@@ -143,6 +145,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     public J visitExpressionStatement(JS.ExpressionStatement statement, P p) {
         JS.ExpressionStatement es = statement;
+        es = es.withPrefix(visitSpace(es.getPrefix(), JsSpace.Location.EXPRESSION_STATEMENT_PREFIX, p));
         es = es.withMarkers(visitMarkers(es.getMarkers(), p));
         Statement temp = (Statement) visitStatement(es, p);
         if (!(temp instanceof JS.ExpressionStatement)) {
@@ -474,6 +477,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     public J visitStatementExpression(JS.StatementExpression expression, P p) {
         JS.StatementExpression se = expression;
+        se = se.withPrefix(visitSpace(se.getPrefix(), JsSpace.Location.STATEMENT_EXPRESSION_PREFIX, p));
         Expression temp = (Expression) visitExpression(se, p);
         if (!(temp instanceof JS.StatementExpression)) {
             return temp;
@@ -772,6 +776,18 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
     public Space visitSpace(Space space, JsSpace.Location loc, P p) {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        // A TrailingComma stashes the whitespace after a trailing `,`; the printer emits it, so visit it.
+        if (marker instanceof TrailingComma) {
+            TrailingComma tc = (TrailingComma) marker;
+            return (M) tc.withSuffix(visitSpace(tc.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        return super.visitMarker(marker, p);
+    }
+
 
     public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JsRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);

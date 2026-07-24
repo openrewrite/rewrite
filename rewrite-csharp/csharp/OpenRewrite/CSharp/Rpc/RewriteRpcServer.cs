@@ -311,6 +311,19 @@ public class RewriteRpcServer
                 });
             }
 
+            // Oversize source files skipped during parsing are emitted as Quarks; the Java
+            // side builds each Quark from SourcePath locally, so they carry no content and
+            // are deliberately not registered in _localObjects (no GetObject round-trip).
+            foreach (var relPath in solutionParser.LastOversizePaths)
+            {
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    SourceFileType = "org.openrewrite.quark.Quark",
+                    SourcePath = relPath
+                });
+            }
+
             // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
             // The in-process restore during solution loading produced the in-memory LockFile
             // for each project; fall back to a fresh in-process resolve when absent.
@@ -1960,6 +1973,10 @@ public class ParseSolutionResponseItem
 {
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
+
+    // Relative source path; only populated for Quark items, from which the Java
+    // side builds the Quark locally. Null for normal items (fetched via GetObject).
+    public string? SourcePath { get; set; }
 }
 
 public class GetObjectRequest

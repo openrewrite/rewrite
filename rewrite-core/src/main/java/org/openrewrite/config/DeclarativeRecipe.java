@@ -399,6 +399,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
 
         @Override
+        public Collection<? extends SourceFile> generate(T acc, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
+            return delegate.generate(acc, generatedInThisCycle, ctx);
+        }
+
+        @Override
         public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
             return delegate.generate(acc, ctx);
         }

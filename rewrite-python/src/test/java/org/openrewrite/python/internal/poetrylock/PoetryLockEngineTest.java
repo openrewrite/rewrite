@@ -101,6 +101,33 @@ class PoetryLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
     }
 
+    @Test
+    void unrelatedMissingDependencyDoesNotBlockScopedUpgrade() {
+        stubPypiSix();
+        // attrs is declared but absent from the lock (pre-existing drift). Bumping six — which the
+        // recipe actually changed — must succeed and leave attrs alone, not abort on it.
+        String original = resource("i-upgrade/pyproject.toml.before")
+                .replace("six = \"1.16.0\"", "six = \"1.16.0\"\nattrs = \"25.1.0\"");
+        String edited = resource("i-upgrade/pyproject.toml.after")
+                .replace("six = \"1.17.0\"", "six = \"1.17.0\"\nattrs = \"25.1.0\"");
+        Result result = PoetryLockEngine.regenerate(edited, original, resource("i-upgrade/poetry.lock.before"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("version = \"1.17.0\"");
+        assertThat(result.getLockFileContent()).doesNotContain("attrs");
+    }
+
+    @Test
+    void newlyAddedDependencyStillDefersUnderScoping() {
+        // With the original supplied, adding attrs IS the change, so it still defers to resolution.
+        String original = resource("a-minimal/pyproject.toml");
+        String edited = original.replace("six = \"1.16.0\"", "six = \"1.16.0\"\nattrs = \"25.1.0\"");
+        Result result = PoetryLockEngine.regenerate(edited, original, resource("a-minimal/poetry.lock"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("attrs");
+    }
+
     static final class RoutedHttp implements HttpSender {
         final Map<String, byte[]> routes = new LinkedHashMap<>();
         final List<String> requests = new ArrayList<>();

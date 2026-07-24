@@ -290,10 +290,19 @@ public class SolutionParser
     /// is true, each successfully parsed file is printed and compared against the original
     /// source; mismatches are also returned as <see cref="ParseError"/>.
     /// </summary>
+    // Files larger than this are recorded as Quarks rather than parsed into a
+    // Roslyn tree/LST. Matches the 1 MB cap in the other RPC engines.
+    private const long MaxParseableSizeBytes = 1024 * 1024;
+
+    // Relative paths of source files skipped by the most recent ParseProject call
+    // because they exceed MaxParseableSizeBytes; the RPC layer emits these as Quarks.
+    public readonly List<string> LastOversizePaths = new();
+
     public List<SourceFile> ParseProject(
         Solution solution, string projectPath, string rootDir,
         bool requirePrintEqualsInput = true)
     {
+        LastOversizePaths.Clear();
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
         Log.Debug("ParseProject: starting {ProjectName}", projectName);
 
@@ -347,6 +356,17 @@ public class SolutionParser
         foreach (var doc in userDocs)
         {
             fileIndex++;
+
+            // Files too large to parse into a Roslyn tree/LST are recorded as Quarks
+            // (path only) by the RPC layer; skip the expensive parse entirely.
+            long docSize;
+            try { docSize = new FileInfo(doc.FilePath!).Length; } catch { docSize = 0; }
+            if (docSize > MaxParseableSizeBytes)
+            {
+                LastOversizePaths.Add(Path.GetRelativePath(rootDir, doc.FilePath!).Replace('\\', '/'));
+                continue;
+            }
+
             var source = doc.GetTextAsync().Result?.ToString();
             if (source == null) continue;
 
