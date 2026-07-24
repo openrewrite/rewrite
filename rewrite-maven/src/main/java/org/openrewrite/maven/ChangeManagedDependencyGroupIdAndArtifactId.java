@@ -28,6 +28,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.max;
@@ -137,8 +138,29 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             private Collection<String> availableVersions;
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
 
+            private static final String MANAGED_DEP_CHANGED_KEY = "org.openrewrite.maven.ChangeManagedDependencyGroupIdAndArtifactId.changed";
+
             @Override
+            @SuppressWarnings("unchecked")
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                // Apply pending model updates from parent POM processing.
+                // When a parent POM's managed dependency is changed, UpdateMavenModel re-resolves
+                // the parent and its modules, storing updated module results in the execution context.
+                // Child modules that don't have XML changes still need their resolved model updated.
+                // Only apply if this recipe actually changed a managed dependency (tracked via MANAGED_DEP_CHANGED_KEY).
+                Set<Path> changedPoms = ctx.getMessage(MANAGED_DEP_CHANGED_KEY);
+                if (changedPoms != null && !changedPoms.isEmpty()) {
+                    Map<Path, MavenResolutionResult> updatedModules = ctx.getMessage(UpdateMavenModel.UPDATED_MODULES_KEY);
+                    if (updatedModules != null) {
+                        MavenResolutionResult pending = updatedModules.remove(document.getSourcePath());
+                        if (pending != null) {
+                            MavenResolutionResult current = document.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
+                            if (current != null) {
+                                document = document.withMarkers(document.getMarkers().computeByType(current, (original, ignored) -> pending));
+                            }
+                        }
+                    }
+                }
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
                 return super.visitDocument(document, ctx);
             }
@@ -189,6 +211,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         }
                     }
                     if (t != tag) {
+                        ctx.putMessageInSet(MANAGED_DEP_CHANGED_KEY, getResolutionResult().getPom().getRequested().getSourcePath());
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                         String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
