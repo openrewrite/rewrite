@@ -120,6 +120,24 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionCatalogModuleLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = "29.0-jre" }
+              """,
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = "30.1.1-jre" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void upgradesVersionCatalogLibraryVersionReference() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
@@ -155,6 +173,30 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionCatalogModuleLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void upgradesStandaloneSharedVersionReferenceForMultipleMatchingLibraries() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
@@ -174,6 +216,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               [libraries]
               guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
               guava-alt = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesStandaloneSharedVersionReferenceForMultipleMatchingModuleLibraries() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              guava-alt = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              guava-alt = { module = "com.google.guava:guava", version.ref = "guava" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
           )
@@ -219,7 +287,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void doesNotUpgradeVersionReferenceWithUnsupportedModuleNotation() {
+    void doesNotUpgradeVersionReferenceWithUnmatchedModuleLibrary() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
           toml(

@@ -711,6 +711,66 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void versionCatalogTomlModuleNotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlModuleNotationChangesVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "2.0.5"
+
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void versionCatalogTomlStringNotationWithGlob() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(
