@@ -29,8 +29,11 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -182,6 +185,10 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     public static class Scanned {
         boolean usingType;
         List<SourceFile> rootPoms = new ArrayList<>();
+        // Populated by callers (e.g. UpgradeTransitiveDependencyVersion.getScanner) when
+        // addToRootPom=true and a transitive was found in a non-root pom under a reactor root.
+        // Keyed by the reactor root's GAV; values are the coordinates the writer should pin there.
+        Map<ResolvedGroupArtifactVersion, Set<GroupArtifact>> reactorRootTransitives = new HashMap<>();
     }
 
     @Override
