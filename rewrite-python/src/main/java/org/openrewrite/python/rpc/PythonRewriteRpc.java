@@ -33,6 +33,7 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -290,6 +291,119 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, ctx);
         return Stream.concat(rpcStream, manifestStream);
+    }
+
+    /**
+     * Parses an explicit list of Python files.
+     * <p>
+     * Unlike {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)}, which walks a
+     * directory and resolves the project's manifests, this parses exactly the files given and does
+     * no manifest discovery. The key capability is that {@code ty} (the type resolver) is rooted at
+     * {@code relativeTo} rather than at the files' own directory, so first-party imports resolve
+     * against a broader workspace root. This lets a caller parse a handful of files (e.g. the
+     * {@code .py} files of a single Bazel target) while cross-package first-party imports still
+     * resolve against the monorepo root, without parsing the rest of the tree.
+     *
+     * @param inputs         The files to parse.
+     * @param relativeTo     Project root that {@code ty} is initialized at, so imports resolve
+     *                       relative to it, and that source paths are made relative to. When
+     *                       {@code null}, the server infers a root from the input paths.
+     * @param dependencyPath Optional path to a virtual environment with the project's dependencies
+     *                       installed, so supertypes reaching into third-party packages resolve.
+     *                       The caller provisions it; the parser never provisions dependencies itself.
+     * @param ctx            Execution context for parsing.
+     * @return Stream of parsed source files, in the same order as {@code inputs}.
+     */
+    public Stream<SourceFile> parse(List<Path> inputs, @Nullable Path relativeTo,
+                                    @Nullable Path dependencyPath, ExecutionContext ctx) {
+        return parse(inputs, relativeTo, dependencyPath, null, ctx);
+    }
+
+    /**
+     * Parses an explicit list of Python files, forwarding per-parse options to the server.
+     *
+     * @param inputs         The files to parse.
+     * @param relativeTo     Project root that {@code ty} is initialized at; see
+     *                       {@link #parse(List, Path, Path, ExecutionContext)}.
+     * @param dependencyPath Optional dependency environment for third-party type resolution; see
+     *                       {@link #parse(List, Path, Path, ExecutionContext)}.
+     * @param options        Optional, parser-specific options (e.g. {@code {"languageLevel": "2.7"}}).
+     *                       Keys the server does not recognize are silently ignored.
+     * @param ctx            Execution context for parsing.
+     * @return Stream of parsed source files, in the same order as {@code inputs}.
+     */
+    public Stream<SourceFile> parse(List<Path> inputs, @Nullable Path relativeTo,
+                                    @Nullable Path dependencyPath, @Nullable Map<String, String> options,
+                                    ExecutionContext ctx) {
+        if (inputs.isEmpty()) {
+            return Stream.empty();
+        }
+
+        List<Parse.Input> mappedInputs = new ArrayList<>(inputs.size());
+        for (Path input : inputs) {
+            mappedInputs.add(new Parse.Input(input));
+        }
+
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        String sourceFileType = Py.CompilationUnit.class.getName();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable List<String> ids;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (ids == null) {
+                    parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputs.size()));
+                    ids = send("Parse", new Parse(mappedInputs, relativeTo, dependencyPath, options), ParseResponse.class);
+                    assert ids.size() == inputs.size();
+                }
+
+                if (index >= inputs.size()) {
+                    return false;
+                }
+
+                Path input = inputs.get(index);
+                String id = ids.get(index);
+                index++;
+
+                SourceFile sourceFile;
+                try {
+                    sourceFile = getObject(id, sourceFileType);
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                } catch (Exception e) {
+                    sourceFile = new ParseError(
+                            Tree.randomId(),
+                            new Markers(Tree.randomId(), Collections.singletonList(
+                                    ParseExceptionResult.build(PythonParser.class, e, null))),
+                            input,
+                            null,
+                            StandardCharsets.UTF_8.name(),
+                            false,
+                            null,
+                            e.getMessage(),
+                            null
+                    );
+                }
+                action.accept(sourceFile);
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return ids == null ? Long.MAX_VALUE : inputs.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                return ids == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
     }
 
     private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
