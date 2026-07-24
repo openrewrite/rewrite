@@ -766,6 +766,21 @@ class ChangeDependencyTest implements RewriteTest {
               testcontainers-mongo = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+              """
+                plugins {
+                    java
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation(libs.testcontainers.mongo)
+                }
+                """
           )
         );
     }
