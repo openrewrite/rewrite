@@ -23,11 +23,13 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.python.PythonVisitor;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.python.service.PythonAutoFormatService;
+import org.openrewrite.python.service.PythonImportService;
 import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
@@ -555,6 +557,8 @@ public interface Py extends J {
         public <S, T extends S> T service(Class<S> service) {
             if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) new PythonAutoFormatService();
+            } else if (ImportService.class.getName().equals(service.getName())) {
+                return (T) new PythonImportService();
             }
             return JavaSourceFile.super.service(service);
         }

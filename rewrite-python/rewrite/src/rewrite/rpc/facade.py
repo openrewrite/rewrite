@@ -12,12 +12,28 @@ from pathlib import Path
 from rewrite.discovery import distribution_name_from_source
 
 
+_LOCAL = object()  # stands in for a bundle when the facade runs a visitor itself
+
+
 class Facade:
-    def __init__(self, children, hub_pull=None):
+    def __init__(self, children, hub_pull=None, local_visit=None, is_local_visitor=None):
         self._children = children
         self._hub_pull = hub_pull
+        # Built-in visitors (auto-format, add-import) belong to no recipe bundle, so the facade runs
+        # them itself against the working tree it holds rather than failing to route them.
+        self._local_visit = local_visit
+        self._is_local_visitor = is_local_visitor or (lambda name: False)
         self._bundle_by_visitor = {}    # visitor name (edit:/scan:) -> bundle
         self._bundle_by_recipe_id = {}  # prepared recipe id -> bundle
+
+    def _owner(self, visitor_name):
+        """The bundle that owns ``visitor_name``, or ``_LOCAL`` when the facade runs it itself."""
+        bundle = self._bundle_by_visitor.get(visitor_name)
+        if bundle is not None:
+            return bundle
+        if self._local_visit is not None and self._is_local_visitor(visitor_name):
+            return _LOCAL
+        raise ValueError(f"No child owns visitor '{visitor_name}'")
 
     def install_recipes(self, params: dict) -> dict:
         recipes = params.get("recipes")
@@ -73,9 +89,10 @@ class Facade:
 
     def visit(self, params: dict) -> dict:
         visitor = params.get("visitor")
-        bundle = self._bundle_by_visitor.get(visitor)
-        if bundle is None:
-            raise ValueError(f"No child owns visitor '{visitor}'")
+        bundle = self._owner(visitor)
+        if bundle is _LOCAL:
+            item = {"visitor": visitor, "visitorOptions": params.get("visitorOptions")}
+            return {"modified": self._local_visit([item], params)[0]["modified"]}
         result = self._children.request(bundle, "Visit", params)
         tree_id = params.get("treeId")
         if self._hub_pull is not None and tree_id is not None and result.get("modified"):
@@ -91,10 +108,7 @@ class Facade:
         first one's result rather than the original."""
         groups = []  # [(owner, [visitor, ...]), ...]
         for visitor in params.get("visitors", []):
-            name = visitor.get("visitor")
-            owner = self._bundle_by_visitor.get(name)
-            if owner is None:
-                raise ValueError(f"No child owns visitor '{name}'")
+            owner = self._owner(visitor.get("visitor"))
             if groups and groups[-1][0] == owner:
                 groups[-1][1].append(visitor)
             else:
@@ -104,6 +118,9 @@ class Facade:
         source_file_type = params.get("sourceFileType")
         results = []
         for owner, sub_visitors in groups:
+            if owner is _LOCAL:
+                results.extend(self._local_visit(sub_visitors, params))
+                continue
             response = self._children.request(owner, "BatchVisit", {**params, "visitors": sub_visitors})
             sub_results = response.get("results", [])
             results.extend(sub_results)

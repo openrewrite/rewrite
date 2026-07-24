@@ -241,6 +241,12 @@ public class ChangeType extends Recipe {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
                 JavaSourceFile sf = (JavaSourceFile) tree;
+                // Languages that keep imports among the statements (Python) expose none through
+                // getImports(), so hand removal to their import service; on a genuinely import-less
+                // Java file there is nothing to remove and this is a no-op.
+                boolean removeThroughImportService = targetType instanceof JavaType.FullyQualified &&
+                        sf.getImports().isEmpty();
+
                 if (targetType instanceof JavaType.FullyQualified) {
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic()) {
@@ -278,6 +284,12 @@ public class ChangeType extends Recipe {
                             }
                         }
                     }
+                }
+
+                if (removeThroughImportService) {
+                    // Queued after the addition so the import service sees the name already bound by
+                    // the new import, which is what makes the old one safe to retire.
+                    maybeRemoveImport(originalType.getFullyQualifiedName());
                 }
 
                 j = sf.withImports(ListUtils.map(sf.getImports(), i -> {

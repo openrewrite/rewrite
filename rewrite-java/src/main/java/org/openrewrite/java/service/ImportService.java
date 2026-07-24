@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
 import org.openrewrite.java.tree.J;
 
@@ -32,6 +33,10 @@ public class ImportService {
                                                @Nullable String alias,
                                                boolean onlyIfReferenced) {
         return new AddImport<>(packageName, typeName, member,  alias, onlyIfReferenced);
+    }
+
+    public <P> JavaVisitor<P> removeImportVisitor(String fullyQualifiedName) {
+        return new RemoveImport<>(fullyQualifiedName);
     }
 
     public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {

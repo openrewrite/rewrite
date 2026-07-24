@@ -239,6 +239,18 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(server.remoteObjects).doesNotContainKey(id);
     }
 
+    /**
+     * The id-keyed object maps must stay concurrent, since {@code GetObject.Handler} reads them from
+     * its own thread pool while in-flight visits write them and a {@code HashMap} resize race dropped
+     * a present key as "Tree not found" (customer-requests#2858) -- an invariant rather than a
+     * behavioral test because the resize window is too small to hit deterministically.
+     */
+    @Test
+    void sharedObjectMapsAreThreadSafe() {
+        assertThat(client.localObjects).isInstanceOf(java.util.concurrent.ConcurrentMap.class);
+        assertThat(client.remoteObjects).isInstanceOf(java.util.concurrent.ConcurrentMap.class);
+    }
+
     @DocumentExample
     @Test
     void sendReceiveIdempotence() {

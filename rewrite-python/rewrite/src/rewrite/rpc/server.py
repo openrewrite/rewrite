@@ -1252,15 +1252,37 @@ _configured_data_table_store: Optional[Any] = None
 # Registry mapping fully-qualified visitor names to visitor classes.
 # Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
 # Lazily initialized to avoid circular imports.
-_VISITOR_REGISTRY: Optional[Dict[str, type]] = None
+_VISITOR_REGISTRY: Optional[Dict[str, Any]] = None
 
 
-def _get_visitor_registry() -> Dict[str, type]:
+def _get_visitor_registry() -> Dict[str, Any]:
+    """Built-in visitors Java can dispatch by name, each a factory taking the request's
+    ``visitorOptions`` dict so an argument-taking visitor (``AddImport``) is built from the wire."""
     global _VISITOR_REGISTRY
     if _VISITOR_REGISTRY is None:
+        from rewrite.python.add_import import AddImport, AddImportOptions
+        from rewrite.python.remove_import import RemoveImport, RemoveImportOptions
         from rewrite.python.format.auto_format import AutoFormatVisitor
+
+        def _add_import(options: Dict[str, Any]):
+            return AddImport(AddImportOptions(
+                module=options['module'],
+                name=options.get('name'),
+                alias=options.get('alias'),
+                only_if_referenced=bool(options.get('only_if_referenced', True)),
+            ))
+
+        def _remove_import(options: Dict[str, Any]):
+            return RemoveImport(RemoveImportOptions(
+                module=options['module'],
+                name=options.get('name'),
+                only_if_unused=bool(options.get('only_if_unused', True)),
+            ))
+
         _VISITOR_REGISTRY = {
-            'org.openrewrite.python.format.AutoFormatVisitor': AutoFormatVisitor,
+            'org.openrewrite.python.AddImport': _add_import,
+            'org.openrewrite.python.RemoveImport': _remove_import,
+            'org.openrewrite.python.format.AutoFormatVisitor': lambda options: AutoFormatVisitor(),
         }
     return _VISITOR_REGISTRY
 
@@ -1590,6 +1612,32 @@ def _install_data_table_store(ctx) -> None:
         ctx.put_message(DATA_TABLE_STORE, _configured_data_table_store)
 
 
+def _context_for(p_id: Optional[str]):
+    """The execution context the host identified by ``p``, created and remembered on first use."""
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        if p_id:
+            _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
+    _install_data_table_store(ctx)
+    return ctx
+
+
+def _build_cursor(cursor_ids: Optional[List[str]], source_file_type: Optional[str]):
+    """Rebuild the host's cursor chain, consuming the innermost-to-outermost IDs in reverse to build
+    it from the root inward (matching the JS implementation)."""
+    from rewrite.visitor import Cursor
+    cursor = Cursor(None, Cursor.ROOT_VALUE)
+    for cursor_id in reversed(cursor_ids or []):
+        cursor_obj = get_object_from_java(cursor_id, source_file_type)
+        if cursor_obj is not None:
+            cursor = Cursor(cursor, cursor_obj)
+    return cursor
+
+
 def handle_visit(params: dict) -> dict:
     """Handle a Visit RPC request.
 
@@ -1602,6 +1650,7 @@ def handle_visit(params: dict) -> dict:
         dict with 'modified' boolean
     """
     visitor_name = params.get('visitor')
+    visitor_options = params.get('visitorOptions')
     source_file_type = params.get('sourceFileType')
     tree_id = params.get('treeId')
     p_id = params.get('p')
@@ -1614,17 +1663,7 @@ def handle_visit(params: dict) -> dict:
 
     logger.debug(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
 
-    # Get or create execution context
-    if p_id and p_id in _execution_contexts:
-        ctx = _execution_contexts[p_id]
-    else:
-        from rewrite import InMemoryExecutionContext
-        ctx = InMemoryExecutionContext()
-        if p_id:
-            _execution_contexts[p_id] = ctx
-            local_objects[p_id] = ctx
-
-    _install_data_table_store(ctx)
+    ctx = _context_for(p_id)
 
     # Snapshot the remote_refs high-water for this file before fetching its tree (first visit wins).
     _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
@@ -1639,18 +1678,9 @@ def handle_visit(params: dict) -> dict:
     tree = _require_tree(tree, source_file_type)
 
     # Instantiate the visitor
-    visitor = _instantiate_visitor(visitor_name, ctx)
+    visitor = _instantiate_visitor(visitor_name, ctx, visitor_options)
 
-    # Reconstruct cursor from cursor IDs (if provided).
-    # Cursor IDs are ordered innermost-to-outermost, so we iterate in reverse
-    # to build the cursor chain from root inward (matching JS implementation).
-    from rewrite.visitor import Cursor
-    cursor = Cursor(None, Cursor.ROOT_VALUE)
-    if cursor_ids:
-        for cursor_id in reversed(cursor_ids):
-            cursor_obj = get_object_from_java(cursor_id, source_file_type)
-            if cursor_obj is not None:
-                cursor = Cursor(cursor, cursor_obj)
+    cursor = _build_cursor(cursor_ids, source_file_type)
 
     before = tree
     after = visitor.visit(tree, ctx, cursor)
@@ -1691,17 +1721,7 @@ def handle_batch_visit(params: dict) -> dict:
 
     logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
 
-    # Get or create execution context
-    if p_id and p_id in _execution_contexts:
-        ctx = _execution_contexts[p_id]
-    else:
-        from rewrite import InMemoryExecutionContext
-        ctx = InMemoryExecutionContext()
-        if p_id:
-            _execution_contexts[p_id] = ctx
-            local_objects[p_id] = ctx
-
-    _install_data_table_store(ctx)
+    ctx = _context_for(p_id)
 
     # Snapshot the remote_refs high-water for this file before fetching its tree.
     _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
@@ -1724,7 +1744,7 @@ def handle_batch_visit(params: dict) -> dict:
         visitor_name = item.get('visitor', '')
 
         # Instantiate and run visitor
-        visitor = _instantiate_visitor(visitor_name, ctx)
+        visitor = _instantiate_visitor(visitor_name, ctx, item.get('visitorOptions'))
         before = tree
         after = visitor.visit(tree, ctx, cursor)
 
@@ -1782,12 +1802,13 @@ def _collect_search_result_ids(tree) -> set:
     return ids
 
 
-def _instantiate_visitor(visitor_name: str, ctx):
+def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[str, Any]] = None):
     """Instantiate a visitor from its name.
 
     Visitor names can be:
     - 'edit:<recipe_id>' - get the editor from a prepared recipe
     - 'scan:<recipe_id>' - get the scanner from a prepared scanning recipe
+    - a fully-qualified built-in visitor name, constructed from ``visitor_options``
 
     For ScanningRecipes, the accumulator is persisted across calls so that
     data collected during the scan phase is available during the edit and
@@ -1844,10 +1865,10 @@ def _instantiate_visitor(visitor_name: str, ctx):
 
     else:
         # Look up visitor by fully-qualified name from registry
-        visitor_cls = _get_visitor_registry().get(visitor_name)
-        if visitor_cls is None:
+        factory = _get_visitor_registry().get(visitor_name)
+        if factory is None:
             raise ValueError(f"Unknown visitor name format: {visitor_name}")
-        return visitor_cls()
+        return factory(visitor_options or {})
 
 
 def handle_generate(params: dict) -> dict:
@@ -2008,6 +2029,47 @@ def _hub_release(obj_id: str) -> None:
         _hub_send_next[bundle] = checkpoint
 
 
+def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
+    """True for a visitor the server implements itself rather than one a recipe bundle owns."""
+    return bool(visitor_name) and visitor_name in _get_visitor_registry()
+
+
+def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
+    """Run the built-in service visitors (no recipe bundle owns them) against the facade's own tree
+    in order, threading each result into the next as a child would sequence a BatchVisit."""
+    tree_id = params.get('treeId')
+    source_file_type = params.get('sourceFileType')
+    tree = _hub_acquire(tree_id, source_file_type)
+    if tree is None:
+        raise ValueError(f"Tree not found: {tree_id}")
+    tree = _require_tree(tree, source_file_type)
+
+    ctx = _context_for(params.get('p'))
+    cursor = _build_cursor(params.get('cursor'), source_file_type)
+
+    results = []
+    for item in visitor_items:
+        before = tree
+        visitor = _instantiate_visitor(item['visitor'], ctx, item.get('visitorOptions'))
+        after = visitor.visit(before, ctx, cursor)
+        results.append({
+            'modified': after is not before,
+            'deleted': after is None,
+            'hasNewMessages': False,
+            'searchResultIds': [],
+        })
+        if after is None:
+            break
+        tree = after
+
+    if tree is not None and tree is not _hub_tree.get(tree_id):
+        _hub_tree[tree_id] = tree
+        local_objects[tree_id] = tree
+        if str(tree.id) != tree_id:
+            local_objects[str(tree.id)] = tree
+    return results
+
+
 def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
     """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
     to Java."""
@@ -2037,7 +2099,9 @@ def _get_facade():
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
                         len(removed), _recipe_install_dir, ", ".join(removed))
         _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
-                         hub_pull=_hub_pull_child_edit)
+                         hub_pull=_hub_pull_child_edit,
+                         local_visit=_hub_local_visit,
+                         is_local_visitor=_hub_is_builtin_visitor)
     return _facade
 
 
