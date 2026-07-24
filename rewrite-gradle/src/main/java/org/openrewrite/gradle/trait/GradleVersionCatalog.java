@@ -175,7 +175,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             if (plugin != null) {
                 plugins.add(plugin);
             }
-            @Nullable String versionRef = versionRef(keyValue);
+            String versionRef = versionRef(keyValue);
             if (versionRef == null) {
                 continue;
             }
@@ -189,25 +189,21 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
                 TomlTableValue.getString((Toml.Table) keyValue.getValue(), "version.ref") : null;
     }
 
-    /**
-     * Finds replacements that are safe to apply to their declared {@code [versions]} entry.
-     * The selector expresses recipe policy; this model enforces cross-entry safety.
-     */
-    Map<String, String> safeVersionRefReplacements(VersionRefSelector selector) throws MavenDownloadingException {
+    private Map<String, String> safeVersionRefReplacements(VersionRefSelector selector) throws MavenDownloadingException {
         Map<String, String> replacements = new LinkedHashMap<>();
         for (Map.Entry<String, List<VersionRefConsumer>> entry : versionRefConsumers.entrySet()) {
             String currentVersion = declaredVersions.get(entry.getKey());
             if (currentVersion == null) {
                 continue;
             }
-            @Nullable String replacement = null;
+            String replacement = null;
             boolean safe = true;
             for (VersionRefConsumer consumer : entry.getValue()) {
                 if (!consumer.isSupported()) {
                     safe = false;
                     break;
                 }
-                @Nullable String selected = selector.select(consumer, currentVersion);
+                String selected = selector.select(consumer, currentVersion);
                 if (selected == null || replacement != null && !replacement.equals(selected)) {
                     safe = false;
                     break;
@@ -221,9 +217,6 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         return replacements;
     }
 
-    /**
-     * Updates a declared version selected by {@link #safeVersionRefReplacements(VersionRefSelector)}.
-     */
     Toml.KeyValue withReferencedVersion(Toml.KeyValue keyValue, Cursor cursor,
                                         Map<String, String> replacements) {
         if (replacements.isEmpty() || !(keyValue.getKey() instanceof Toml.Identifier) ||
@@ -234,8 +227,9 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         if (parent == null || !(parent.getValue() instanceof Toml.Table)) {
             return keyValue;
         }
-        Toml.Table table = (Toml.Table) parent.getValue();
-        if (table.getName() == null || !"versions".equals(table.getName().getName())) {
+        Toml.Table table = parent.getValue();
+        Toml.Identifier tableName = table.getName();
+        if (tableName == null || !"versions".equals(tableName.getName())) {
             return keyValue;
         }
         String replacement = replacements.get(((Toml.Identifier) keyValue.getKey()).getName());
@@ -256,13 +250,20 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         @Nullable GradleVersionCatalogDependency dependency;
         @Nullable GradleVersionCatalogPlugin plugin;
 
+        VersionRefConsumer(String versionRef, @Nullable GradleVersionCatalogDependency dependency,
+                           @Nullable GradleVersionCatalogPlugin plugin) {
+            this.versionRef = versionRef;
+            this.dependency = dependency;
+            this.plugin = plugin;
+        }
+
         boolean isSupported() {
             return dependency != null || plugin != null;
         }
     }
 
     @FunctionalInterface
-    interface VersionRefSelector {
+    private interface VersionRefSelector {
         @Nullable String select(VersionRefConsumer consumer, String currentVersion) throws MavenDownloadingException;
     }
 

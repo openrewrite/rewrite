@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.trait;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -22,10 +23,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,23 +34,23 @@ class GradleVersionCatalogTest implements RewriteTest {
     private static final AtomicReference<String> consumerVersion = new AtomicReference<>();
 
     @Test
-    void rejectsConflictingReplacementForCrossSectionConsumers() throws Exception {
-        GradleVersionCatalogDependency dependency =
-          new GradleVersionCatalogDependency(null, "org.example", "library", null, "shared");
-        GradleVersionCatalogPlugin plugin =
-          new GradleVersionCatalogPlugin(null, "org.example.plugin", null, "shared");
-        List<GradleVersionCatalog.VersionRefConsumer> consumers = Arrays.asList(
-          new GradleVersionCatalog.VersionRefConsumer("shared", dependency, null),
-          new GradleVersionCatalog.VersionRefConsumer("shared", null, plugin));
-        GradleVersionCatalog catalog = new GradleVersionCatalog(null,
-          Collections.singletonList(dependency), Collections.singletonList(plugin),
-          Collections.singletonMap("shared", "1.0"),
-          Collections.singletonMap("shared", consumers));
-
-        Map<String, String> replacements = catalog.safeVersionRefReplacements((consumer, currentVersion) ->
-          consumer.getDependency() == null ? "3.0" : "2.0");
-
-        assertThat(replacements).isEmpty();
+    void leavesSharedVersionUnchangedWhenConsumersSelectDifferentReplacements() {
+        rewriteRun(
+          spec -> spec.recipe(new ConflictingVersionCatalogUpdateRecipe()),
+          toml(
+            """
+              [versions]
+              shared = "1.0"
+              
+              [libraries]
+              library = { group = "org.example", name = "library", version.ref = "shared" }
+              
+              [plugins]
+              plugin = { id = "org.example.plugin", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
     }
 
     @Test
@@ -79,32 +76,49 @@ class GradleVersionCatalogTest implements RewriteTest {
 
     static class CountingVersionCatalogUpdateRecipe extends Recipe {
         @Override
-        public String getDisplayName() {
+        public @NonNull String getDisplayName() {
             return "Update catalog version";
         }
 
         @Override
-        public String getDescription() {
+        public @NonNull String getDescription() {
             return "Updates a version catalog through its document-level API.";
         }
 
         @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
+        public @NonNull TreeVisitor<?, ExecutionContext> getVisitor() {
             return GradleVersionCatalog.visitor(new GradleVersionCatalog.VersionCatalogUpdate() {
                 @Override
-                public String selectReferencedVersion(GradleVersionCatalog.VersionRefConsumer consumer,
-                                                      String currentVersion, ExecutionContext ctx) {
+                public String selectReferencedVersion(GradleVersionCatalog.@NonNull VersionRefConsumer consumer,
+                                                      @NonNull String currentVersion, @NonNull ExecutionContext ctx) {
                     selections.incrementAndGet();
                     return "2.0";
                 }
 
                 @Override
-                public Toml.KeyValue updateDependency(GradleVersionCatalogDependency dependency,
-                                                      String referencedVersion, ExecutionContext ctx) {
+                public Toml.@NonNull KeyValue updateDependency(@NonNull GradleVersionCatalogDependency dependency,
+                                                               String referencedVersion, @NonNull ExecutionContext ctx) {
                     consumerVersion.set(referencedVersion);
                     return dependency.getTree();
                 }
             });
+        }
+    }
+
+    static class ConflictingVersionCatalogUpdateRecipe extends Recipe {
+        @Override
+        public @NonNull String getDisplayName() {
+            return "Update conflicting catalog versions";
+        }
+
+        @Override
+        public @NonNull String getDescription() {
+            return "Verifies that conflicting shared version selections are not applied.";
+        }
+
+        @Override
+        public @NonNull TreeVisitor<?, ExecutionContext> getVisitor() {
+            return GradleVersionCatalog.visitor((consumer, currentVersion, ctx) -> consumer.getDependency() == null ? "3.0" : "2.0");
         }
     }
 }
