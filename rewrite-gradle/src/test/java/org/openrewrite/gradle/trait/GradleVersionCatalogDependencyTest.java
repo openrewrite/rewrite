@@ -360,7 +360,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withInlineCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
           toml(
             """
               [libraries]
@@ -382,7 +382,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withInlineCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
           toml(
             """
               [libraries]
@@ -404,7 +404,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withInlineCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
           toml(
             """
               [libraries]
@@ -426,7 +426,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withInlineCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
           toml(
             """
               [libraries]

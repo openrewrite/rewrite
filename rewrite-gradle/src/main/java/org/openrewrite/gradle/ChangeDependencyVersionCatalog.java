@@ -79,7 +79,7 @@ final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.Versi
             selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                     .select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
         }
-        return dependency.withInlineCoordinatesAndVersion(replacementGroupId, replacementArtifactId,
+        return dependency.withCoordinatesAndVersion(replacementGroupId, replacementArtifactId,
                 selectedVersion, Boolean.TRUE.equals(overrideManagedVersion));
     }
 }

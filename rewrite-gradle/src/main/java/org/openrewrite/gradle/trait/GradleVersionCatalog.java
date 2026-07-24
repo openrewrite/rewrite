@@ -28,6 +28,8 @@ import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 import org.openrewrite.trait.Trait;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,7 +43,8 @@ import java.util.Map;
  * consumer is supported and selects the same replacement.
  */
 public class GradleVersionCatalog implements Trait<Toml.Document> {
-    static final String FILE_NAME = "libs.versions.toml";
+    private static final String FILE_NAME = "libs.versions.toml";
+    private static final Path CATALOG_PATH = Paths.get("gradle", FILE_NAME);
 
     private final Cursor cursor;
     private final Map<String, String> declaredVersions;
@@ -72,7 +75,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile instanceof Toml.Document &&
-                        sourceFile.getSourcePath().endsWith(FILE_NAME);
+                        sourceFile.getSourcePath().endsWith(CATALOG_PATH);
             }
 
             @Override

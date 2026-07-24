@@ -89,7 +89,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
     }
 
     /**
-     * Updates an inline-table library entry's coordinates and, optionally, its direct {@code version} value.
+     * Updates a library entry's coordinates and, optionally, its direct {@code version} value.
      * <p>
      * This method is the primary mutation helper for coordinate-change recipes. It:
      * <ul>
@@ -98,9 +98,8 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
      *   <li>If {@code newVersion} is non-null, {@code overrideManagedVersion} is {@code true}, and the entry
      *       has neither a {@code version} nor a {@code version.ref} key, the {@code version} key is added.</li>
      * </ul>
-     * Has no effect for string-notation entries.
      */
-    public Toml.KeyValue withInlineCoordinatesAndVersion(
+    public Toml.KeyValue withCoordinatesAndVersion(
             String newGroupId, String newArtifactId,
             @Nullable String newVersion, boolean overrideManagedVersion) {
         if (getTree().getValue() instanceof Toml.Literal) {
