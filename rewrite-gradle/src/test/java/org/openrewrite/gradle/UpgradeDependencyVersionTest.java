@@ -51,6 +51,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -58,6 +59,401 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
           .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
+    }
+
+    @Test
+    void upgradesVersionCatalogStringLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = "com.google.guava:guava:29.0-jre"
+              """,
+            """
+              [libraries]
+              guava = "com.google.guava:guava:30.1.1-jre"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogInlineLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = "29.0-jre" }
+              """,
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = "30.1.1-jre" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogModuleLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = "29.0-jre" }
+              """,
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = "30.1.1-jre" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogModuleLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesStandaloneSharedVersionReferenceForMultipleMatchingLibraries() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              guava-alt = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              guava-alt = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesStandaloneSharedVersionReferenceForMultipleMatchingModuleLibraries() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              guava-alt = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            """
+              [versions]
+              guava = "30.1.1-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version.ref = "guava" }
+              guava-alt = { module = "com.google.guava:guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void doesNotUpgradeSharedVersionReferenceWithUnmatchedLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              shared = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "shared" }
+              junit = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void doesNotUpgradeVersionReferenceSharedWithPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              shared = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "shared" }
+
+              [plugins]
+              unrelated = { id = "org.example.unrelated", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void doesNotUpgradeVersionReferenceWithUnmatchedModuleLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              shared = "29.0-jre"
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "shared" }
+              unsupported = { module = "org.example:unsupported", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesMultipleMatchingVersionCatalogLibraries() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = "com.google.guava:guava:29.0-jre"
+              guava-testlib = { group = "com.google.guava", name = "guava", version = "29.0-jre" }
+              """,
+            """
+              [libraries]
+              guava = "com.google.guava:guava:30.1.1-jre"
+              guava-testlib = { group = "com.google.guava", name = "guava", version = "30.1.1-jre" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void preservesSingleQuotesInVersionCatalogInlineLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = { group = 'com.google.guava', name = 'guava', version = '29.0-jre' }
+              """,
+            """
+              [libraries]
+              guava = { group = 'com.google.guava', name = 'guava', version = '30.1.1-jre' }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void leavesMissingVersionCatalogReferenceUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "missing" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void leavesNonStringVersionCatalogReferenceUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [versions]
+              guava = 29
+
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void leavesNonMatchingVersionCatalogLibraryUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.1.1-jre", null)),
+          toml(
+            """
+              [libraries]
+              junit = "org.junit.jupiter:junit-jupiter:5.10.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogLibraryWithRangeSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre")),
+          toml(
+            """
+              [libraries]
+              guava = "com.google.guava:guava:29.0-jre"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+                .after(actual -> assertThat(actual).containsPattern("com.google.guava:guava:30\\.\\d+\\.\\d+-jre").actual())
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void resolvesVersionCatalogRangeUsingRootProjectRepositories() {
+        rewriteRun(
+          settingsGradle(
+            """
+              rootProject.name = 'test'
+              include 'subproject'
+              """
+          ),
+          toml(
+            """
+              [libraries]
+              guava = "com.google.guava:guava:29.0-jre"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+              .after(actual -> assertThat(actual).containsPattern("com.google.guava:guava:30\\.\\d+\\.\\d+-jre").actual())
+          ),
+          buildGradle(
+            """
+              repositories {
+                  mavenCentral()
+              }
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+                  implementation(libs.guava)
+              }
+              """,
+            spec -> spec.path("subproject/build.gradle")
+          )
+        );
     }
 
     @DocumentExample

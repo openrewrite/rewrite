@@ -58,7 +58,6 @@ public class GradleProject implements ProjectIdentity, Serializable {
         return name;
     }
 
-
     @With
     @Builder.Default
     UUID id = randomId();
@@ -99,6 +98,10 @@ public class GradleProject implements ProjectIdentity, Serializable {
     @Builder.Default
     @With
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
+
+    public boolean isRootProject() {
+        return ":".equals(path);
+    }
 
     public GradleBuildscript getBuildscript() {
         // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.

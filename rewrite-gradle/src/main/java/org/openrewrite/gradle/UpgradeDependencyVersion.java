@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -26,6 +27,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -120,8 +122,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static final MethodMatcher PROPERTY_METHOD = new MethodMatcher("* property(String)");
     private static final MethodMatcher FIND_PROPERTY_METHOD = new MethodMatcher("* findProperty(String)");
 
-    @Value
+    @Getter
     public static class DependencyVersionState {
+        @Nullable
+        GradleProject gradleProject;
         Map<String, Map<GroupArtifact, Set<String>>> variableNames = new HashMap<>();
         Map<String, Map<GroupArtifact, Set<String>>> versionPropNameToGA = new HashMap<>();
 
@@ -165,6 +169,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (gradleProject != null && gradleProject.isRootProject()) {
+                        acc.gradleProject = gradleProject;
+                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -316,10 +323,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
+            private final TreeVisitor<?, ExecutionContext> updateVersionCatalog = GradleVersionCatalog.visitor(
+                    new UpgradeDependencyVersionCatalog(groupId, artifactId, newVersion, versionPattern,
+                            metadataFailures, acc.gradleProject));
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) ||
+                        updateVersionCatalog.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -332,6 +343,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
                         t = updateGradle.visitNonNull(t, ctx);
+                    } else if (updateVersionCatalog.isAcceptable(sf, ctx)) {
+                        t = updateVersionCatalog.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
                     if (tree != t && projectMarker.isPresent()) {
@@ -742,12 +755,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     .artifactId(artifactId)
                     .get(getCursor())
                     .orElse(null);
-            if (bomEntry != null) {
-                // Only update literal versions; property-based versions are handled by UpdateProperties/UpdateVariable
-                if (bomEntry.getVersionVariable() == null) {
-                    m = updateBomEntry(bomEntry, ctx);
-                }
+            if (bomEntry != null && bomEntry.getVersionVariable() == null) {
+                m = updateBomEntry(bomEntry, ctx);
             }
+
 
             if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
                 // rare case that gradle versions are set via settings.gradle ext block (only possible for Groovy DSL)
@@ -944,7 +955,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if (StringUtils.isBlank(project.getGroup())) {
             return project.getName();
         }
-        if (":".equals(project.getPath())) {
+        if (project.isRootProject()) {
             return project.getGroup();
         }
         return project.getGroup() + project.getPath().replace(":", ".");

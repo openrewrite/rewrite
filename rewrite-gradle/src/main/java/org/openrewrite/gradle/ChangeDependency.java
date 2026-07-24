@@ -25,6 +25,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -36,8 +37,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
@@ -166,13 +167,15 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     private boolean isGlobPattern() {
         return oldGroupId.contains("*") || oldGroupId.contains("?") ||
-               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+                oldArtifactId.contains("*") || oldArtifactId.contains("?");
     }
 
     public static class Accumulator {
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
         Set<GroupArtifact> failedResolutions = new HashSet<>();
+        @Nullable
+        GradleProject gradleProject;
     }
 
     @Override
@@ -198,6 +201,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     if (gradleProject == null) {
                         return (J) tree;
+                    }
+                    if (gradleProject.isRootProject()) {
+                        acc.gradleProject = gradleProject;
                     }
                 }
                 return super.visit(tree, ctx);
@@ -294,7 +300,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()){
+                if (!maybeGp.isPresent()) {
                     return sourceFile;
                 }
                 for (GradleDependencyConfiguration c : maybeGp.get().getConfigurations()) {
@@ -483,9 +489,23 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         });
 
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+        TreeVisitor<?, ExecutionContext> tomlVisitor = GradleVersionCatalog.visitor(new ChangeDependencyVersionCatalog(
+                oldGroupId,
+                oldArtifactId,
+                newGroupId,
+                newArtifactId,
+                newVersion,
+                versionPattern,
+                overrideManagedVersion,
+                metadataFailures,
+                acc.gradleProject
+        ));
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                if (tomlVisitor.isAcceptable(sourceFile, ctx)) {
+                    return true;
+                }
                 if (sourceFile instanceof Properties.File) {
                     return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                 }
@@ -495,6 +515,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile && tomlVisitor.isAcceptable((SourceFile) tree, ctx)) {
+                    return tomlVisitor.visit(tree, ctx);
+                }
                 if (tree instanceof Properties.File) {
                     Properties.File propsFile = (Properties.File) tree;
                     if (propsFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && !acc.versionVariableUpdates.isEmpty()) {

@@ -30,11 +30,183 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class UpgradePluginVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi());
+    }
+
+    @Test
+    void upgradesVersionCatalogStringPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.40.0"
+              """,
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.41.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  alias(libs.plugins.openrewrite)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogInlinePlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version = "5.40.0" }
+              """,
+            """
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version = "5.41.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  alias(libs.plugins.openrewrite)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogPluginVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [versions]
+              openrewrite = "5.40.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite" }
+              """,
+            """
+              [versions]
+              openrewrite = "5.41.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "openrewrite" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  alias(libs.plugins.openrewrite)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotUpgradeVersionReferenceSharedWithLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [versions]
+              shared = "5.40.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "shared" }
+
+              [libraries]
+              unrelated = { group = "org.example", name = "unrelated", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void leavesMissingVersionCatalogPluginReferenceUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "missing" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void leavesNonMatchingVersionCatalogPluginUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              spring = "org.springframework.boot:3.3.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesMultipleMatchingVersionCatalogPlugins() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.40.0"
+              openrewrite-alt = { id = "org.openrewrite.rewrite", version = "5.40.0" }
+              """,
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.41.0"
+              openrewrite-alt = { id = "org.openrewrite.rewrite", version = "5.41.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionCatalogPluginWithRangeSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+          toml(
+            """
+              [plugins]
+              openrewrite = "org.openrewrite.rewrite:5.40.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+                .after(actual -> assertThat(actual).containsPattern("org.openrewrite.rewrite:5\\.40\\.\\d+").actual())
+          ),
+          buildGradle(
+            """
+              plugins {
+                  alias(libs.plugins.openrewrite)
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample("Upgrading a build plugin")

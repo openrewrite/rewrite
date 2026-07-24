@@ -35,6 +35,7 @@ import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class ChangeDependencyTest implements RewriteTest {
     @Override
@@ -676,6 +677,294 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   val commonsLangVersion = "3.11"
                   implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogToml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            null,
+            null
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb" }
+              """,
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "testcontainers-mongodb" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlModuleNotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlModuleNotationChangesVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "2.0.5"
+
+              [libraries]
+              testcontainers-mongo = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+              """
+                plugins {
+                    java
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation(libs.testcontainers.mongo)
+                }
+                """
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlStringNotationWithGlob() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.example.*",
+            "old-*",
+            null,
+            "new-library",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              example = "com.example.foo:old-library:1.0.0"
+              """,
+            """
+              [libraries]
+              example = "com.example.foo:new-library:1.0.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlWithoutNewVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlOverridesMissingVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            true,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb" }
+              """,
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "testcontainers-mongodb", version = "2.0.5" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(libs.testcontainers.mongo)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlChangesVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "testcontainers-mongodb", version = "2.0.5" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(libs.testcontainers.mongo)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogTomlChangesVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "2.0.5"
+
+              [libraries]
+              testcontainers-mongo = { group = "org.testcontainers", name = "testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(libs.testcontainers.mongo)
               }
               """
           )
