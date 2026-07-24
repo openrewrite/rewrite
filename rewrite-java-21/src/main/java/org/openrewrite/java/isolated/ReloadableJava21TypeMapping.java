@@ -425,6 +425,15 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             } catch (Exception e) {
                 // ignore
             }
+
+            // On JDK 24+ an unresolvable argument leaves the select as a plain ErrorType even though
+            // the callee resolved; recover the invocation type javac computed (kept in the error's
+            // original type), falling back to the symbol's declared type, to keep the JavaType.Method.
+            if (symbol instanceof Symbol.MethodSymbol && symbol.kind != Kinds.Kind.ERR &&
+                symbol.type != null && !(symbol.type instanceof Type.ErrorType) && !isUnknownType(symbol.type)) {
+                Type originalType = selectType.getOriginalType();
+                return methodInvocationType(originalType instanceof Type.MethodType ? originalType : symbol.type, symbol);
+            }
         }
 
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR ||
@@ -703,7 +712,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     /**
-     * Check for the `UnknownType` which existed up until JDK 22; starting with JDK 23 only the `ErrorType` is used.
+     * Check for the `UnknownType` which existed up until JDK 23; starting with JDK 24 only the `ErrorType` is used.
      * Uses reflection to avoid compile-time dependency on the class, which was removed in JDK 24.
      */
     public static boolean isUnknownType(@Nullable Type type) {
