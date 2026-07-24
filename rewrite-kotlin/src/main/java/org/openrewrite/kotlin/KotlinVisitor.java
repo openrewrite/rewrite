@@ -274,17 +274,11 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitStatementExpression(K.StatementExpression statementExpression, P p) {
         K.StatementExpression s = statementExpression;
-        Statement temp = (Statement) visitStatement(s, p);
+        Expression temp = (Expression) visitExpression(s, p);
         if (!(temp instanceof K.StatementExpression)) {
             return temp;
         } else {
             s = (K.StatementExpression) temp;
-        }
-        Expression temp2 = (Expression) visitExpression(s, p);
-        if (!(temp2 instanceof K.StatementExpression)) {
-            return temp2;
-        } else {
-            s = (K.StatementExpression) temp2;
         }
         J statement = visit(s.getStatement(), p);
         if (statement instanceof K.StatementExpression) {
