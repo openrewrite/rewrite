@@ -255,6 +255,52 @@ class PipenvLockEngineTest {
     }
 
     @Test
+    void bareVersionIsTreatedAsExactPin() {
+        stubRequestsBaseline();
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = "2.32.4"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.32.4\"");
+    }
+
+    @Test
+    void bareVersionMatchingExistingPinRegeneratesWithoutError() {
+        stubRequestsBaseline();
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = "2.31.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.31.0\"");
+    }
+
+    @Test
     void requiresBumpRevalidatesEveryPinAndRewritesMeta() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
@@ -409,6 +455,165 @@ class PipenvLockEngineTest {
           """;
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("flask");
+    }
+
+    @Test
+    void preExistingDriftInUntouchedPackageDoesNotBlockScopedUpgrade() {
+        stubRequestsBaseline();
+        // click is declared in the Pipfile but predates the lock (absent from it): a pre-existing
+        // Pipfile/lock inconsistency the recipe never touched. Upgrading requests must not abort on it.
+        String original = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.31.0"
+          click = ">=8.3.2"
+
+          [requires]
+          python_version = "3.11"
+          """;
+        String edited = original.replace(">=2.31.0", ">=2.32.0");
+
+        Result result = PipenvLockEngine.regenerate(edited, original, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.32.4\"");
+        assertThat(result.getLockFileContent()).doesNotContain("click");
+    }
+
+    @Test
+    void staleLockVersionInUntouchedPackageIsLeftAsIs() {
+        stubRequestsBaseline();
+        // The Pipfile constraint (>=8.3.2) drifted above the locked click version (8.3.1). Because
+        // the recipe only upgrades requests, click is left exactly as the lock had it.
+        String original = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.31.0"
+          click = ">=8.3.2"
+
+          [requires]
+          python_version = "3.11"
+          """;
+        String edited = original.replace(">=2.31.0", ">=2.32.0");
+        // JSON is whitespace-insensitive on read, so the input lock is written plainly here.
+        String lock = """
+          {
+              "_meta": {
+                  "hash": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+                  "pipfile-spec": 6,
+                  "requires": {"python_version": "3.11"},
+                  "sources": [{"name": "pypi", "url": "https://pypi.org/simple", "verify_ssl": true}]
+              },
+              "default": {
+                  "certifi": {"hashes": ["sha256:%s"], "markers": "python_version >= '3.6'", "version": "==2024.2.2"},
+                  "click": {"hashes": ["sha256:%s"], "index": "pypi", "version": "==8.3.1"},
+                  "idna": {"hashes": ["sha256:%s"], "markers": "python_version >= '3.5'", "version": "==3.7"},
+                  "requests": {"hashes": ["sha256:%s", "sha256:%s"], "index": "pypi", "markers": "python_version >= '3.7'", "version": "==2.31.0"}
+              },
+              "develop": {}
+          }
+          """.formatted(CERTIFI, "1".repeat(64), IDNA, WHEEL_2310, SDIST_2310);
+
+        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.32.4\"");
+        assertThat(result.getLockFileContent()).contains("\"version\": \"==8.3.1\"");
+    }
+
+    @Test
+    void packageDeclaredInTwoCategoriesReLocksWhenOneChanges() {
+        stubRequestsBaseline();
+        // requests is declared in BOTH [packages] and [dev-packages]. The recipe bumps only the
+        // default one; scoping must re-lock it and not collapse the two declarations to "unchanged".
+        String original = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.31.0"
+
+          [dev-packages]
+          requests = ">=2.31.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+        String edited = original.replaceFirst("requests = \">=2.31.0\"", "requests = \">=2.32.0\"");
+        String lock = """
+          {
+              "_meta": {
+                  "hash": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+                  "pipfile-spec": 6,
+                  "requires": {"python_version": "3.11"},
+                  "sources": [{"name": "pypi", "url": "https://pypi.org/simple", "verify_ssl": true}]
+              },
+              "default": {
+                  "certifi": {"hashes": ["sha256:%s"], "markers": "python_version >= '3.6'", "version": "==2024.2.2"},
+                  "idna": {"hashes": ["sha256:%s"], "markers": "python_version >= '3.5'", "version": "==3.7"},
+                  "requests": {"hashes": ["sha256:%s", "sha256:%s"], "index": "pypi", "markers": "python_version >= '3.7'", "version": "==2.31.0"}
+              },
+              "develop": {
+                  "requests": {"hashes": ["sha256:%s", "sha256:%s"], "index": "pypi", "markers": "python_version >= '3.7'", "version": "==2.31.0"}
+              }
+          }
+          """.formatted(CERTIFI, IDNA, WHEEL_2310, SDIST_2310, WHEEL_2310, SDIST_2310);
+
+        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("==2.32.4"); // default re-locked, not skipped
+        assertThat(result.getLockFileContent()).contains("==2.31.0"); // develop left as-is
+    }
+
+    @Test
+    void newlyAddedAbsentPackageStillFailsLoudUnderScoping() {
+        // With the original supplied, an ADD (flask absent from lock and freshly declared) IS in
+        // scope, so the native engine still fails loud rather than emit a lock missing the dependency.
+        String original = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.31.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+        String edited = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.31.0"
+          flask = "*"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(edited, original, baseLock(), ctx);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);

@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -581,6 +582,95 @@ class KotlinTemplateTest implements RewriteTest {
               }
               """
           ));
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
+    @Test
+    void replaceAnnotationArgumentsWithWildcardTypedSubstitution() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Retry".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null && !annotation.getArguments().isEmpty() &&
+                      annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
+                      assignment.getVariable() instanceof J.Identifier attribute &&
+                      "include".equals(attribute.getSimpleName())) {
+                      return KotlinTemplate.builder("includes = #{any()}")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
+                          assignment.getAssignment());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              import kotlin.reflect.KClass
+
+              annotation class Retry(
+                  val include: Array<KClass<out Throwable>> = [],
+                  val includes: Array<KClass<out Throwable>> = []
+              )
+              """
+          ),
+          kotlin(
+            """
+              class MyService {
+                  @Retry(include = [IllegalStateException::class])
+                  fun doWork() {}
+              }
+              """,
+            """
+              class MyService {
+                  @Retry(includes = [IllegalStateException::class])
+                  fun doWork() {}
+              }
+              """
+          ));
+        assertThat(stubs).anyMatch(stub -> stub.contains("p<kotlin.Array<kotlin.reflect.KClass<out kotlin.Throwable>>>()"));
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2824")
+    @Test
+    void contravariantAndStarProjectionTypedSubstitution() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().getFirst().getSimpleName().startsWith("x")) {
+                      return KotlinTemplate.builder("println(#{any()})")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(),
+                          multiVariable.getVariables().getFirst().getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })),
+          kotlin(
+            """
+              import kotlin.reflect.KClass
+
+              fun test(c: Comparator<in String>, k: KClass<*>) {
+                  val x1 = c
+                  val x2 = k
+              }
+              """,
+            """
+              import kotlin.reflect.KClass
+
+              fun test(c: Comparator<in String>, k: KClass<*>) {
+                  println(c)
+                  println(k)
+              }
+              """
+          ));
+        assertThat(stubs).anyMatch(stub -> stub.contains("Comparator<in kotlin.String>"));
+        assertThat(stubs).anyMatch(stub -> stub.contains("KClass<*>"));
     }
 
     @Test
