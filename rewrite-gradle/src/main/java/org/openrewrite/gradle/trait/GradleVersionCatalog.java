@@ -40,15 +40,24 @@ import java.util.Map;
  * {@code version.ref} declarations. A referenced version can be changed only when every
  * consumer is supported and selects the same replacement.
  */
-@Value
 public class GradleVersionCatalog implements Trait<Toml.Document> {
     static final String FILE_NAME = "libs.versions.toml";
 
-    Cursor cursor;
-    List<GradleVersionCatalogDependency> libraries;
-    List<GradleVersionCatalogPlugin> plugins;
-    Map<String, String> declaredVersions;
-    Map<String, List<VersionRefConsumer>> versionRefConsumers;
+    private final Cursor cursor;
+    private final Map<String, String> declaredVersions;
+    private final Map<String, List<VersionRefConsumer>> versionRefConsumers;
+
+    private GradleVersionCatalog(Cursor cursor, Map<String, String> declaredVersions,
+                                 Map<String, List<VersionRefConsumer>> versionRefConsumers) {
+        this.cursor = cursor;
+        this.declaredVersions = declaredVersions;
+        this.versionRefConsumers = versionRefConsumers;
+    }
+
+    @Override
+    public Cursor getCursor() {
+        return cursor;
+    }
 
     /**
      * Creates a visitor for the conventional {@code libs.versions.toml} catalog.
@@ -113,8 +122,6 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
     private static GradleVersionCatalog from(Toml.Document document) {
         Map<String, String> declaredVersions = new LinkedHashMap<>();
         Map<String, List<VersionRefConsumer>> consumers = new LinkedHashMap<>();
-        List<GradleVersionCatalogDependency> libraries = new ArrayList<>();
-        List<GradleVersionCatalogPlugin> plugins = new ArrayList<>();
 
         Toml.Table versions = findTable(document, "versions");
         if (versions != null) {
@@ -130,10 +137,10 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             }
         }
 
-        indexConsumers(findTable(document, "libraries"), consumers, libraries, plugins);
-        indexConsumers(findTable(document, "plugins"), consumers, libraries, plugins);
+        indexConsumers(findTable(document, "libraries"), consumers);
+        indexConsumers(findTable(document, "plugins"), consumers);
         return new GradleVersionCatalog(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), document),
-                libraries, plugins, declaredVersions, consumers);
+                declaredVersions, consumers);
     }
 
     private static Toml.@Nullable Table findTable(Toml.Document document, String name) {
@@ -153,9 +160,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         return null;
     }
 
-    private static void indexConsumers(Toml.@Nullable Table table, Map<String, List<VersionRefConsumer>> consumers,
-                                       List<GradleVersionCatalogDependency> libraries,
-                                       List<GradleVersionCatalogPlugin> plugins) {
+    private static void indexConsumers(Toml.@Nullable Table table, Map<String, List<VersionRefConsumer>> consumers) {
         if (table == null) {
             return;
         }
@@ -169,12 +174,6 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
                     GradleVersionCatalogDependency.Matcher.extract(keyValue, null, null) : null;
             GradleVersionCatalogPlugin plugin = library ? null :
                     GradleVersionCatalogPlugin.Matcher.extract(keyValue, null);
-            if (dependency != null) {
-                libraries.add(dependency);
-            }
-            if (plugin != null) {
-                plugins.add(plugin);
-            }
             String versionRef = versionRef(keyValue);
             if (versionRef == null) {
                 continue;

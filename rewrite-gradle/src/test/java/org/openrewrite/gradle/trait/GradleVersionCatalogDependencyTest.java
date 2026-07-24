@@ -97,18 +97,8 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
         rewriteRun(
           toml(
             """
-              [versions]
-              guava = "29.0-jre"
-
-              [libraries]
-              guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
-              """,
-            """
-              [versions]
-              guava = "29.0-jre"
-
-              [libraries]
-              ~~(com.google.guava:guava (ref=guava))~~>guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+              [plugins]
+              guava = { id = "com.google.guava", version = "29.0-jre" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
           )

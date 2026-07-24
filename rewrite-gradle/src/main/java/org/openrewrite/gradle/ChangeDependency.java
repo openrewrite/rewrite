@@ -202,7 +202,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (gradleProject == null) {
                         return (J) tree;
                     }
-                    acc.gradleProject = gradleProject;
+                    if (gradleProject.isRootProject()) {
+                        acc.gradleProject = gradleProject;
+                    }
                 }
                 return super.visit(tree, ctx);
             }
