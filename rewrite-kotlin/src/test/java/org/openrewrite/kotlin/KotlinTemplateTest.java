@@ -878,6 +878,110 @@ class KotlinTemplateTest implements RewriteTest {
     }
 
     @Test
+    void attributesMemberCallOnSubstitutedPlaceholder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("placeholder".equals(method.getSimpleName())) {
+                      J.MethodInvocation applied = KotlinTemplate.builder("require(#{any(java.util.Collection)}.isEmpty())")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      J.MethodInvocation inner = (J.MethodInvocation) applied.getArguments().get(0);
+                      assertThat(inner.getMethodType()).as("inner isEmpty() methodType").isNotNull();
+                      assertThat(inner.getName().getType()).as("inner isEmpty() name type").isSameAs(inner.getMethodType());
+                      assertThat(applied.getMethodType()).as("enclosing require() methodType").isNotNull();
+                      return applied;
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  placeholder(c)
+              }
+              """,
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  require(c.isEmpty())
+              }
+              """
+          ));
+    }
+
+    @Test
+    void attributesPropertyAccessOnSubstitutedPlaceholder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("placeholder".equals(method.getSimpleName())) {
+                      J.MethodInvocation applied = KotlinTemplate.builder("require(#{any(java.util.Collection)}.size == 0)")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      J.Binary binary = (J.Binary) applied.getArguments().get(0);
+                      assertThat(binary.getLeft().getType()).as(".size property access type").isNotNull();
+                      return applied;
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  placeholder(c)
+              }
+              """,
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  require(c.size == 0)
+              }
+              """
+          ));
+    }
+
+    @Test
+    void attributesAnyArrayPlaceholder() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("placeholder".equals(method.getSimpleName())) {
+                      J.MethodInvocation applied = KotlinTemplate.builder("require(#{anyArray(kotlin.String)}.isEmpty())")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      J.MethodInvocation inner = (J.MethodInvocation) applied.getArguments().get(0);
+                      assertThat(inner.getMethodType()).as("inner isEmpty() methodType").isNotNull();
+                      return applied;
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun placeholder(a: Array<String>) {}
+              fun test(a: Array<String>) {
+                  placeholder(a)
+              }
+              """,
+            """
+              fun placeholder(a: Array<String>) {}
+              fun test(a: Array<String>) {
+                  require(a.isEmpty())
+              }
+              """
+          ));
+        assertThat(stubs).anyMatch(stub -> stub.contains("p<kotlin.Array<kotlin.String>>()"));
+    }
+
+    @Test
     void addAnnotationToMethod() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
