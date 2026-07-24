@@ -17,12 +17,17 @@ package org.openrewrite.kotlin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -103,6 +108,100 @@ class KotlinTemplateTest implements RewriteTest {
                       val x = value + 1
                       println("added")
                   }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceExpressionStatementWithTemplate() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                    J.Block b = super.visitBlock(block, ctx);
+                    return b.withStatements(ListUtils.map(b.getStatements(), s -> {
+                        if (!(s instanceof K.ExpressionStatement)) {
+                            return s;
+                        }
+                        return (J.MethodInvocation) JavaTemplate.builder("#{any()}.hashCode()")
+                          .build()
+                          .apply(new Cursor(getCursor(), s), s.getCoordinates().replace(), s);
+                    }));
+                }
+            })),
+          kotlin(
+            """
+              fun test(a: Int) {
+                  a
+              }
+              """,
+            """
+              fun test(a: Int) {
+                  a.hashCode()
+              }
+              """
+          ));
+    }
+
+    @Test
+    void wrapControlFlowReturnExpressionWithBuild() {
+        // A `return if (...) ... else ...` parses the `if` into a K.StatementExpression in the
+        // return's expression slot. Wrapping it with a `#{any(...)}.build()` template (as
+        // rewrite-testing-frameworks' UpdateMockWebServerDispatcher does) previously left the
+        // K.StatementExpression untouched, so callers casting the result to J.MethodInvocation hit a
+        // ClassCastException. The wrapper must be a first-class visited node for the scope-based
+        // template replacement to target it.
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.Return visitReturn(J.Return aReturn, ExecutionContext ctx) {
+                    J.Return r = super.visitReturn(aReturn, ctx);
+                    Expression expr = r.getExpression();
+                    if (!(expr instanceof K.StatementExpression)) {
+                        return r;
+                    }
+                    J.MethodInvocation wrapped = JavaTemplate.builder("#{any(a.b.Resp)}.build()")
+                      .build()
+                      .apply(new Cursor(getCursor(), expr), expr.getCoordinates().replace(), expr);
+                    return r.withExpression(wrapped);
+                }
+            })),
+          kotlin(
+            """
+              package a.b
+              class Resp {
+                  fun build(): Resp = this
+                  companion object {
+                      fun ok(): Resp = Resp()
+                      fun notFound(): Resp = Resp()
+                  }
+              }
+              fun dispatch(path: String): Resp {
+                  return if (path == "/") {
+                      Resp.ok()
+                  } else {
+                      Resp.notFound()
+                  }
+              }
+              """,
+            """
+              package a.b
+              class Resp {
+                  fun build(): Resp = this
+                  companion object {
+                      fun ok(): Resp = Resp()
+                      fun notFound(): Resp = Resp()
+                  }
+              }
+              fun dispatch(path: String): Resp {
+                  return if (path == "/") {
+                      Resp.ok()
+                  } else {
+                      Resp.notFound()
+                  }.build()
               }
               """
           ));
@@ -875,6 +974,110 @@ class KotlinTemplateTest implements RewriteTest {
               }
               """
           ));
+    }
+
+    @Test
+    void attributesMemberCallOnSubstitutedPlaceholder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("placeholder".equals(method.getSimpleName())) {
+                      J.MethodInvocation applied = KotlinTemplate.builder("require(#{any(java.util.Collection)}.isEmpty())")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      J.MethodInvocation inner = (J.MethodInvocation) applied.getArguments().get(0);
+                      assertThat(inner.getMethodType()).as("inner isEmpty() methodType").isNotNull();
+                      assertThat(inner.getName().getType()).as("inner isEmpty() name type").isSameAs(inner.getMethodType());
+                      assertThat(applied.getMethodType()).as("enclosing require() methodType").isNotNull();
+                      return applied;
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  placeholder(c)
+              }
+              """,
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  require(c.isEmpty())
+              }
+              """
+          ));
+    }
+
+    @Test
+    void attributesPropertyAccessOnSubstitutedPlaceholder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("placeholder".equals(method.getSimpleName())) {
+                      J.MethodInvocation applied = KotlinTemplate.builder("require(#{any(java.util.Collection)}.size == 0)")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      J.Binary binary = (J.Binary) applied.getArguments().get(0);
+                      assertThat(binary.getLeft().getType()).as(".size property access type").isNotNull();
+                      return applied;
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  placeholder(c)
+              }
+              """,
+            """
+              fun placeholder(c: java.util.Collection<Int>) {}
+              fun test(c: java.util.Collection<Int>) {
+                  require(c.size == 0)
+              }
+              """
+          ));
+    }
+
+    @Test
+    void attributesAnyArrayPlaceholder() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("placeholder".equals(method.getSimpleName())) {
+                      J.MethodInvocation applied = KotlinTemplate.builder("require(#{anyArray(kotlin.String)}.isEmpty())")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      J.MethodInvocation inner = (J.MethodInvocation) applied.getArguments().get(0);
+                      assertThat(inner.getMethodType()).as("inner isEmpty() methodType").isNotNull();
+                      return applied;
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun placeholder(a: Array<String>) {}
+              fun test(a: Array<String>) {
+                  placeholder(a)
+              }
+              """,
+            """
+              fun placeholder(a: Array<String>) {}
+              fun test(a: Array<String>) {
+                  require(a.isEmpty())
+              }
+              """
+          ));
+        assertThat(stubs).anyMatch(stub -> stub.contains("p<kotlin.Array<kotlin.String>>()"));
     }
 
     @Test

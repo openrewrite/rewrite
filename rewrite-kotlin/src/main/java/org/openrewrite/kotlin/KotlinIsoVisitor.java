@@ -28,6 +28,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.AnnotatedExpression visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, P p) {
+        return (K.AnnotatedExpression) super.visitAnnotatedExpression(annotatedExpression, p);
+    }
+
+    @Override
     public K.AnnotationType visitAnnotationType(K.AnnotationType annotationType, P p) {
         return (K.AnnotationType) super.visitAnnotationType(annotationType, p);
     }
@@ -60,6 +65,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
         return (K.DestructuringDeclaration) super.visitDestructuringDeclaration(destructuringDeclaration, p);
+    }
+
+    @Override
+    public K.ExpressionStatement visitExpressionStatement(K.ExpressionStatement expressionStatement, P p) {
+        return (K.ExpressionStatement) super.visitExpressionStatement(expressionStatement, p);
     }
 
     @Override
@@ -115,6 +125,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.SpreadArgument visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
         return (K.SpreadArgument) super.visitSpreadArgument(spreadArgument, p);
+    }
+
+    @Override
+    public K.StatementExpression visitStatementExpression(K.StatementExpression statementExpression, P p) {
+        return (K.StatementExpression) super.visitStatementExpression(statementExpression, p);
     }
 
     @Override
