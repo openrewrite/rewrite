@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.trait.GradleVersionCatalog.findTable;
 import static org.openrewrite.toml.Assertions.toml;
 
 class GradleVersionCatalogTest implements RewriteTest {
@@ -55,18 +54,6 @@ class GradleVersionCatalogTest implements RewriteTest {
           consumer.getDependency() == null ? "3.0" : "2.0");
 
         assertThat(replacements).isEmpty();
-    }
-
-    @Test
-    void ignoresInlineTablesWithoutNamesWhenFindingSections() {
-        rewriteRun(
-          toml(
-            "library = { group = \"org.example\", name = \"library\" }",
-            spec -> spec.afterRecipe(document ->
-              assertThat(findTable(document, "libraries")).isNull()
-            )
-          )
-        );
     }
 
     @Test
