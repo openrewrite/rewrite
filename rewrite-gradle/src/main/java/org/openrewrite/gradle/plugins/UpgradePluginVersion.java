@@ -24,6 +24,7 @@ import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.trait.GradlePlugin;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -214,7 +215,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
-        UpgradePluginVersionCatalog tomlVisitor = new UpgradePluginVersionCatalog(pluginIdPattern, newVersion, versionPattern, metadataFailures, acc.gradleProject, acc.gradleSettings);
+        TreeVisitor<?, ExecutionContext> tomlVisitor = GradleVersionCatalog.visitor(
+                new UpgradePluginVersionCatalog(pluginIdPattern, newVersion, versionPattern, metadataFailures,
+                        acc.gradleProject, acc.gradleSettings));
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {

@@ -17,30 +17,26 @@ package org.openrewrite.gradle.plugins;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.DependencyVersionSelector;
-import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.gradle.trait.GradleVersionCatalogPlugin;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.HashMap;
-import java.util.Map;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
-final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext> {
+final class UpgradePluginVersionCatalog implements GradleVersionCatalog.VersionCatalogUpdate {
     private final String pluginIdPattern;
     private final @Nullable String newVersion;
     private final @Nullable String versionPattern;
     private final MavenMetadataFailures metadataFailures;
     private final @Nullable GradleProject gradleProject;
     private final @Nullable GradleSettings gradleSettings;
-    private final Map<String, String> referencedVersions = new HashMap<>();
-
     UpgradePluginVersionCatalog(
             String pluginIdPattern,
             @Nullable String newVersion,
@@ -57,67 +53,28 @@ final class UpgradePluginVersionCatalog extends TomlIsoVisitor<ExecutionContext>
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        return sourceFile instanceof Toml.Document &&
-                sourceFile.getSourcePath().endsWith(VersionCatalogToml.FILE_NAME);
+    public @Nullable String selectReferencedVersion(GradleVersionCatalog.VersionRefConsumer consumer,
+                                                    String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
+        GradleVersionCatalogPlugin plugin = consumer.getPlugin();
+        if (plugin == null || !StringUtils.isBlank(pluginIdPattern) &&
+                !matchesGlob(plugin.getPluginId(), pluginIdPattern)) {
+            return null;
+        }
+        return select(currentVersion, plugin.getPluginId(), ctx);
     }
 
     @Override
-    public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-        referencedVersions.clear();
-        Toml.Table plugins = VersionCatalogToml.findTable(document, "plugins");
-        Toml.Table versions = VersionCatalogToml.findTable(document, "versions");
-        Map<String, Integer> referenceCounts = new HashMap<>();
-        Map<String, Integer> matchingReferenceCounts = new HashMap<>();
-        if (plugins == null) {
-            return document;
+    public Toml.KeyValue updatePlugin(GradleVersionCatalogPlugin plugin,
+                                      @Nullable String referencedVersion, ExecutionContext ctx)
+            throws MavenDownloadingException {
+        if (!StringUtils.isBlank(pluginIdPattern) && !matchesGlob(plugin.getPluginId(), pluginIdPattern)) {
+            return plugin.getTree();
         }
-        for (Toml value : plugins.getValues()) {
-            if (!(value instanceof Toml.KeyValue)) {
-                continue;
-            }
-            Toml.KeyValue keyValue = (Toml.KeyValue) value;
-            GradleVersionCatalogPlugin plugin = GradleVersionCatalogPlugin.Matcher.extract(keyValue, null);
-            if (plugin == null || plugin.getVersionRef() == null) {
-                continue;
-            }
-            referenceCounts.merge(plugin.getVersionRef(), 1, Integer::sum);
-            if (GradleVersionCatalogPlugin.Matcher.extract(keyValue, pluginIdPattern) == null) {
-                continue;
-            }
-            matchingReferenceCounts.merge(plugin.getVersionRef(), 1, Integer::sum);
-            try {
-                String selected = select(VersionCatalogToml.getVersion(versions, plugin.getVersionRef()),
-                        plugin.getPluginId(), ctx);
-                if (selected != null) {
-                    referencedVersions.put(plugin.getVersionRef(), selected);
-                }
-            } catch (MavenDownloadingException e) {
-                return e.warn(document);
-            }
+        if (plugin.getVersionRef() != null) {
+            return plugin.getTree();
         }
-        referencedVersions.entrySet().removeIf(entry ->
-                !referenceCounts.getOrDefault(entry.getKey(), 0).equals(matchingReferenceCounts.get(entry.getKey())));
-
-        return super.visitDocument(document, ctx);
-    }
-
-    @Override
-    public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
-        Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
-        GradleVersionCatalogPlugin plugin = new GradleVersionCatalogPlugin.Matcher()
-                .pluginIdPattern(pluginIdPattern)
-                .get(getCursor())
-                .orElse(null);
-        if (plugin != null && plugin.getVersionRef() == null && plugin.getVersion() != null) {
-            try {
-                String selected = select(plugin.getVersion(), plugin.getPluginId(), ctx);
-                return selected == null ? kv : plugin.withVersion(selected);
-            } catch (MavenDownloadingException e) {
-                return e.warn(kv);
-            }
-        }
-        return VersionCatalogToml.updateReferencedVersion(kv, getCursor(), referencedVersions);
+        String selected = select(plugin.getVersion(), plugin.getPluginId(), ctx);
+        return selected == null ? plugin.getTree() : plugin.withVersion(selected);
     }
 
     private @Nullable String select(@Nullable String current, String id, ExecutionContext ctx) throws MavenDownloadingException {

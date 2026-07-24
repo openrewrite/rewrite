@@ -27,6 +27,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -322,7 +323,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpgradeDependencyVersionCatalog updateVersionCatalog = new UpgradeDependencyVersionCatalog(groupId, artifactId, newVersion, versionPattern, metadataFailures, acc.gradleProject);
+            private final TreeVisitor<?, ExecutionContext> updateVersionCatalog = GradleVersionCatalog.visitor(
+                    new UpgradeDependencyVersionCatalog(groupId, artifactId, newVersion, versionPattern,
+                            metadataFailures, acc.gradleProject));
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {

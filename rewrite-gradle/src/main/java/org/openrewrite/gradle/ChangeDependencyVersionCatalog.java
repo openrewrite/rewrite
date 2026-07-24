@@ -16,24 +16,18 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.gradle.trait.GradleVersionCatalogDependency;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.DependencyMatcher;
-import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.HashMap;
-import java.util.Map;
-
-final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionContext> {
+final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.VersionCatalogUpdate {
     private final String oldGroupId;
     private final String oldArtifactId;
     private final @Nullable String newGroupId;
@@ -44,12 +38,6 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
     private final MavenMetadataFailures metadataFailures;
     private final @Nullable GradleProject gradleProject;
     private final DependencyMatcher dependencyMatcher;
-
-    /**
-     * Maps {@code version.ref} key names → selected new version string.
-     * Populated during {@link #visitDocument} and consumed during {@link #visitKeyValue}.
-     */
-    private final Map<String, String> versionRefUpgrades = new HashMap<>();
 
     ChangeDependencyVersionCatalog(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, MavenMetadataFailures metadataFailures, @Nullable GradleProject gradleProject) {
         this.oldGroupId = oldGroupId;
@@ -65,71 +53,37 @@ final class ChangeDependencyVersionCatalog extends TomlIsoVisitor<ExecutionConte
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        return sourceFile instanceof Toml.Document &&
-                sourceFile.getSourcePath().endsWith(VersionCatalogToml.FILE_NAME);
+    public @Nullable String selectReferencedVersion(GradleVersionCatalog.VersionRefConsumer consumer,
+                                                    String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
+        if (StringUtils.isBlank(newVersion)) {
+            return null;
+        }
+        GradleVersionCatalogDependency dependency = consumer.getDependency();
+        if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+            return null;
+        }
+        String replacementGroupId = StringUtils.isBlank(newGroupId) ? dependency.getGroupId() : newGroupId;
+        String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dependency.getArtifactId() : newArtifactId;
+        return new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                .select(new GroupArtifact(replacementGroupId, replacementArtifactId), null,
+                        newVersion, versionPattern, ctx);
     }
 
     @Override
-    public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-        versionRefUpgrades.clear();
-        Toml.Table libraries = VersionCatalogToml.findTable(document, "libraries");
-        Map<String, Integer> referenceCounts = new HashMap<>();
-        Map<String, Integer> matchingReferenceCounts = new HashMap<>();
-
-        if (libraries != null && !StringUtils.isBlank(newVersion)) {
-            for (Toml value : libraries.getValues()) {
-                if (!(value instanceof Toml.KeyValue)) {
-                    continue;
-                }
-                Toml.KeyValue kv = (Toml.KeyValue) value;
-                GradleVersionCatalogDependency dep = GradleVersionCatalogDependency.Matcher.extract(kv, null, null);
-                if (dep == null || dep.getVersionRef() == null) {
-                    continue;
-                }
-                referenceCounts.merge(dep.getVersionRef(), 1, Integer::sum);
-                if (!dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
-                    continue;
-                }
-                matchingReferenceCounts.merge(dep.getVersionRef(), 1, Integer::sum);
-                String replacementGroupId = StringUtils.isBlank(newGroupId) ? dep.getGroupId() : newGroupId;
-                String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dep.getArtifactId() : newArtifactId;
-                try {
-                    String selected = new DependencyVersionSelector(metadataFailures, gradleProject, null).select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
-                    if (selected != null) {
-                        versionRefUpgrades.put(dep.getVersionRef(), selected);
-                    }
-                } catch (MavenDownloadingException e) {
-                    return e.warn(document);
-                }
-            }
-            versionRefUpgrades.entrySet().removeIf(entry ->
-                    !referenceCounts.getOrDefault(entry.getKey(), 0).equals(matchingReferenceCounts.get(entry.getKey())));
+    public Toml.KeyValue updateDependency(GradleVersionCatalogDependency dependency,
+                                          @Nullable String referencedVersion, ExecutionContext ctx)
+            throws MavenDownloadingException {
+        if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+            return dependency.getTree();
         }
-
-        return super.visitDocument(document, ctx);
-    }
-
-    @Override
-    public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
-        Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
-
-        GradleVersionCatalogDependency dep = new GradleVersionCatalogDependency.Matcher().groupPattern(oldGroupId).artifactPattern(oldArtifactId).get(getCursor()).orElse(null);
-
-        if (dep != null) {
-            String replacementGroupId = StringUtils.isBlank(newGroupId) ? dep.getGroupId() : newGroupId;
-            String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dep.getArtifactId() : newArtifactId;
-            String selectedVersion = null;
-            if (!StringUtils.isBlank(newVersion)) {
-                try {
-                    selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null).select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
-                } catch (MavenDownloadingException e) {
-                    return e.warn(kv);
-                }
-            }
-            return dep.withInlineCoordinatesAndVersion(replacementGroupId, replacementArtifactId, selectedVersion, Boolean.TRUE.equals(overrideManagedVersion));
+        String replacementGroupId = StringUtils.isBlank(newGroupId) ? dependency.getGroupId() : newGroupId;
+        String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dependency.getArtifactId() : newArtifactId;
+        String selectedVersion = referencedVersion;
+        if (dependency.getVersionRef() == null && !StringUtils.isBlank(newVersion)) {
+            selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                    .select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
         }
-
-        return VersionCatalogToml.updateReferencedVersion(kv, getCursor(), versionRefUpgrades);
+        return dependency.withInlineCoordinatesAndVersion(replacementGroupId, replacementArtifactId,
+                selectedVersion, Boolean.TRUE.equals(overrideManagedVersion));
     }
 }

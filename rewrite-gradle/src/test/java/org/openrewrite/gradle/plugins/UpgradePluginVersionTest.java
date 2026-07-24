@@ -120,6 +120,26 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotUpgradeVersionReferenceSharedWithLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),
+          toml(
+            """
+              [versions]
+              shared = "5.40.0"
+
+              [plugins]
+              openrewrite = { id = "org.openrewrite.rewrite", version.ref = "shared" }
+
+              [libraries]
+              unrelated = { group = "org.example", name = "unrelated", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void leavesMissingVersionCatalogPluginReferenceUnchanged() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.41.0", null)),

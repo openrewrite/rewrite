@@ -25,6 +25,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -486,7 +487,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         });
 
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
-        TreeVisitor<?, ExecutionContext> tomlVisitor = new ChangeDependencyVersionCatalog(
+        TreeVisitor<?, ExecutionContext> tomlVisitor = GradleVersionCatalog.visitor(new ChangeDependencyVersionCatalog(
                 oldGroupId,
                 oldArtifactId,
                 newGroupId,
@@ -496,7 +497,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 overrideManagedVersion,
                 metadataFailures,
                 acc.gradleProject
-        );
+        ));
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
