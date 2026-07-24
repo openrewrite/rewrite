@@ -91,6 +91,7 @@ public class GroovyParserVisitor {
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
+    private final ExecutionContext ctx;
 
     private int cursor = 0;
 
@@ -108,8 +109,10 @@ public class GroovyParserVisitor {
     /**
      * Elements within GString expressions which omit curly braces have column positions which are incorrect.
      * The column positions act like there *is* a curly brace.
+     * @param sourcePath
      */
     private int columnOffset;
+    private List<String> libraryNames = Collections.emptyList();
 
     @Nullable
     private static Boolean olderThanGroovy3;
@@ -138,6 +141,7 @@ public class GroovyParserVisitor {
         this.charsetBomMarked = source.isCharsetBomMarked();
         JavaTypeFactory factory = typeFactory != null ? typeFactory : new org.openrewrite.java.internal.DefaultJavaTypeFactory(typeCache);
         this.typeMapping = new GroovyTypeMapping(factory);
+        this.ctx = ctx;
     }
 
     private static int groovyMajorVersion() {
@@ -160,6 +164,7 @@ public class GroovyParserVisitor {
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
+        this.libraryNames = getLibraryNames(ast);
         NavigableMap<LineColumn, ASTNode> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
             if (!isSynthetic(s)) {
@@ -2826,6 +2831,36 @@ public class GroovyParserVisitor {
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
+
+                if (methodType == null && call.isImplicitThis()) {
+                    String libraryName = null;
+                    Map<String, String> sharedLibrarySteps = ctx.getMessage("org.openrewrite.groovy.jenkins.sharedLibrarySteps");
+                    if (sharedLibrarySteps != null) {
+                        libraryName = sharedLibrarySteps.get(name.getSimpleName());
+                    }
+                    if (libraryName == null && !libraryNames.isEmpty()) {
+                        libraryName = libraryNames.get(0);
+                    }
+                    if (libraryName != null) {
+                        String sanitizedLib = libraryName.replaceAll("[-.]", "_");
+                        String declaringTypeFqn = "jenkins.sharedlibrary." + sanitizedLib + ".Vars";
+                        JavaType.FullyQualified declaringType = JavaType.ShallowClass.build(declaringTypeFqn);
+                        methodType = new JavaType.Method(
+                                null,
+                                Flag.Public.getBitMask(),
+                                declaringType,
+                                name.getSimpleName(),
+                                JavaType.Primitive.Void,
+                                (List<String>) null,
+                                (List<JavaType>) null,
+                                (List<JavaType>) null,
+                                (List<JavaType.FullyQualified>) null,
+                                null,
+                                null
+                        );
+                    }
+                }
+
                 return new J.MethodInvocation(randomId(), fmt, markers, select, typeParameters, name, args, methodType);
             }));
         }
@@ -4627,5 +4662,128 @@ public class GroovyParserVisitor {
         modifierNameToType.put("non-sealed", J.Modifier.Type.NonSealed);
         modifierNameToType.put("default", J.Modifier.Type.Default);
         modifierNameToType.put("strictfp", J.Modifier.Type.Strictfp);
+    }
+
+    private List<String> getLibraryNames(ModuleNode ast) {
+        List<String> libraryNames = new ArrayList<>();
+        if (ast.getPackage() != null) {
+            for (AnnotationNode annotation : ast.getPackage().getAnnotations()) {
+                if (isLibraryAnnotation(annotation)) {
+                    addLibraryNames(annotation, libraryNames);
+                }
+            }
+        }
+        for (ImportNode anImport : ast.getImports()) {
+            for (AnnotationNode annotation : anImport.getAnnotations()) {
+                if (isLibraryAnnotation(annotation)) {
+                    addLibraryNames(annotation, libraryNames);
+                }
+            }
+        }
+        for (ImportNode anImport : ast.getStarImports()) {
+            for (AnnotationNode annotation : anImport.getAnnotations()) {
+                if (isLibraryAnnotation(annotation)) {
+                    addLibraryNames(annotation, libraryNames);
+                }
+            }
+        }
+        for (ImportNode anImport : ast.getStaticImports().values()) {
+            for (AnnotationNode annotation : anImport.getAnnotations()) {
+                if (isLibraryAnnotation(annotation)) {
+                    addLibraryNames(annotation, libraryNames);
+                }
+            }
+        }
+        for (ClassNode aClass : ast.getClasses()) {
+            for (AnnotationNode annotation : aClass.getAnnotations()) {
+                if (isLibraryAnnotation(annotation)) {
+                    addLibraryNames(annotation, libraryNames);
+                }
+            }
+            for (FieldNode field : aClass.getFields()) {
+                for (AnnotationNode annotation : field.getAnnotations()) {
+                    if (isLibraryAnnotation(annotation)) {
+                        addLibraryNames(annotation, libraryNames);
+                    }
+                }
+            }
+            for (MethodNode method : aClass.getMethods()) {
+                for (AnnotationNode annotation : method.getAnnotations()) {
+                    if (isLibraryAnnotation(annotation)) {
+                        addLibraryNames(annotation, libraryNames);
+                    }
+                }
+                for (Parameter param : method.getParameters()) {
+                    for (AnnotationNode annotation : param.getAnnotations()) {
+                        if (isLibraryAnnotation(annotation)) {
+                            addLibraryNames(annotation, libraryNames);
+                        }
+                    }
+                }
+            }
+        }
+        for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
+            collectAnnotations(s, libraryNames);
+        }
+        return libraryNames;
+    }
+
+    private void collectAnnotations(@Nullable ASTNode node, List<String> libraryNames) {
+        if (node == null) {
+            return;
+        }
+        if (node instanceof AnnotatedNode) {
+            for (AnnotationNode annotation : ((AnnotatedNode) node).getAnnotations()) {
+                if (isLibraryAnnotation(annotation)) {
+                    addLibraryNames(annotation, libraryNames);
+                }
+            }
+        }
+        if (node instanceof BlockStatement) {
+            for (org.codehaus.groovy.ast.stmt.Statement s : ((BlockStatement) node).getStatements()) {
+                collectAnnotations(s, libraryNames);
+            }
+        } else if (node instanceof ExpressionStatement) {
+            collectAnnotations(((ExpressionStatement) node).getExpression(), libraryNames);
+        } else if (node instanceof DeclarationExpression) {
+            collectAnnotations(((DeclarationExpression) node).getLeftExpression(), libraryNames);
+            collectAnnotations(((DeclarationExpression) node).getRightExpression(), libraryNames);
+        } else if (node instanceof IfStatement) {
+            collectAnnotations(((IfStatement) node).getIfBlock(), libraryNames);
+            collectAnnotations(((IfStatement) node).getElseBlock(), libraryNames);
+        } else if (node instanceof TryCatchStatement) {
+            collectAnnotations(((TryCatchStatement) node).getTryStatement(), libraryNames);
+            for (CatchStatement cs : ((TryCatchStatement) node).getCatchStatements()) {
+                collectAnnotations(cs, libraryNames);
+            }
+            collectAnnotations(((TryCatchStatement) node).getFinallyStatement(), libraryNames);
+        } else if (node instanceof CatchStatement) {
+            collectAnnotations(((CatchStatement) node).getCode(), libraryNames);
+        }
+    }
+
+    private boolean isLibraryAnnotation(AnnotationNode annotation) {
+        String name = annotation.getClassNode().getUnresolvedName();
+        String fqn = annotation.getClassNode().getName();
+        return "Library".equals(name) || "org.jenkinsci.plugins.workflow.libs.Library".equals(fqn);
+    }
+
+    private void addLibraryNames(AnnotationNode annotation, List<String> libraryNames) {
+        org.codehaus.groovy.ast.expr.Expression value = annotation.getMember("value");
+        if (value instanceof org.codehaus.groovy.ast.expr.ConstantExpression) {
+            Object val = ((org.codehaus.groovy.ast.expr.ConstantExpression) value).getValue();
+            if (val != null) {
+                libraryNames.add(val.toString());
+            }
+        } else if (value instanceof org.codehaus.groovy.ast.expr.ListExpression) {
+            for (org.codehaus.groovy.ast.expr.Expression expr : ((org.codehaus.groovy.ast.expr.ListExpression) value).getExpressions()) {
+                if (expr instanceof org.codehaus.groovy.ast.expr.ConstantExpression) {
+                    Object val = ((org.codehaus.groovy.ast.expr.ConstantExpression) expr).getValue();
+                    if (val != null) {
+                        libraryNames.add(val.toString());
+                    }
+                }
+            }
+        }
     }
 }
