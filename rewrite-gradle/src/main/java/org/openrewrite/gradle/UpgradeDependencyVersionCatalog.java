@@ -27,8 +27,6 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.toml.tree.Toml;
 
 final class UpgradeDependencyVersionCatalog implements GradleVersionCatalog.VersionCatalogUpdate {
-    private final String groupId;
-    private final String artifactId;
     private final @Nullable String newVersion;
     private final @Nullable String versionPattern;
     private final MavenMetadataFailures metadataFailures;
@@ -42,8 +40,6 @@ final class UpgradeDependencyVersionCatalog implements GradleVersionCatalog.Vers
             @Nullable String versionPattern,
             MavenMetadataFailures metadataFailures,
             @Nullable GradleProject gradleProject) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
         this.metadataFailures = metadataFailures;

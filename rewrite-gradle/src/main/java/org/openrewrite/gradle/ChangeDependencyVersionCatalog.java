@@ -28,8 +28,6 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.toml.tree.Toml;
 
 final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.VersionCatalogUpdate {
-    private final String oldGroupId;
-    private final String oldArtifactId;
     private final @Nullable String newGroupId;
     private final @Nullable String newArtifactId;
     private final @Nullable String newVersion;
@@ -40,8 +38,6 @@ final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.Versi
     private final DependencyMatcher dependencyMatcher;
 
     ChangeDependencyVersionCatalog(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, MavenMetadataFailures metadataFailures, @Nullable GradleProject gradleProject) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
         this.newArtifactId = newArtifactId;
         this.newVersion = newVersion;
