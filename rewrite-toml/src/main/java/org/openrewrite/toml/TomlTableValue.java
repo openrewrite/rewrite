@@ -74,7 +74,8 @@ public final class TomlTableValue {
     public static Toml.Table withString(Toml.Table table, String key, String value) {
         return table.withValues(org.openrewrite.internal.ListUtils.map(table.getValues(), element -> {
             Toml.KeyValue keyValue = find(element, key);
-            if (keyValue == null || !(keyValue.getValue() instanceof Toml.Literal)) {
+            if (keyValue == null || !(keyValue.getValue() instanceof Toml.Literal) ||
+                !(((Toml.Literal) keyValue.getValue()).getValue() instanceof String)) {
                 return element;
             }
             Toml.Literal literal = (Toml.Literal) keyValue.getValue();
