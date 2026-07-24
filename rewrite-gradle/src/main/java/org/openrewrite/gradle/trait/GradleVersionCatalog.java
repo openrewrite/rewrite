@@ -21,7 +21,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
@@ -42,6 +41,8 @@ import java.util.Map;
  */
 @Value
 public class GradleVersionCatalog implements Trait<Toml.Document> {
+    static final String FILE_NAME = "libs.versions.toml";
+
     Cursor cursor;
     List<GradleVersionCatalogDependency> libraries;
     List<GradleVersionCatalogPlugin> plugins;
@@ -54,7 +55,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         List<GradleVersionCatalogDependency> libraries = new ArrayList<>();
         List<GradleVersionCatalogPlugin> plugins = new ArrayList<>();
 
-        Toml.Table versions = VersionCatalogToml.findTable(document, "versions");
+        Toml.Table versions = findTable(document, "versions");
         if (versions != null) {
             for (Toml value : versions.getValues()) {
                 if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getKey() instanceof Toml.Identifier) ||
@@ -68,10 +69,27 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             }
         }
 
-        indexConsumers(VersionCatalogToml.findTable(document, "libraries"), consumers, libraries, plugins);
-        indexConsumers(VersionCatalogToml.findTable(document, "plugins"), consumers, libraries, plugins);
+        indexConsumers(findTable(document, "libraries"), consumers, libraries, plugins);
+        indexConsumers(findTable(document, "plugins"), consumers, libraries, plugins);
         return new GradleVersionCatalog(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), document),
                 libraries, plugins, declaredVersions, consumers);
+    }
+
+    public static Toml.@Nullable Table findTable(Toml.Document document, String name) {
+        for (Toml value : document.getValues()) {
+            if (!(value instanceof Toml.Table)) {
+                continue;
+            }
+            Toml.Table table = (Toml.Table) value;
+            Toml.Identifier tableName = table.getName();
+            if (tableName == null) {
+                continue;
+            }
+            if (name.equals(tableName.getName())) {
+                return table;
+            }
+        }
+        return null;
     }
 
     /**
@@ -87,7 +105,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile instanceof Toml.Document &&
-                        sourceFile.getSourcePath().endsWith(VersionCatalogToml.FILE_NAME);
+                        sourceFile.getSourcePath().endsWith(FILE_NAME);
             }
 
             @Override
@@ -227,7 +245,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         if (replacement.equals(literal.getValue())) {
             return keyValue;
         }
-        return keyValue.withValue(literal.withSource(VersionCatalogToml.quoted(literal, replacement))
+        return keyValue.withValue(literal.withSource(TomlTableValue.quoted(literal, replacement))
                 .withValue(replacement));
     }
 

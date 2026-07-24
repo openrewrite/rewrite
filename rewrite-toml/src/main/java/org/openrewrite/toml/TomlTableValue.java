@@ -63,6 +63,12 @@ public final class TomlTableValue {
         return null;
     }
 
+    public static String quoted(Toml.Literal literal, String value) {
+        String source = literal.getSource();
+        String quote = source.isEmpty() ? "\"" : source.substring(0, 1);
+        return quote + value + quote;
+    }
+
     /**
      * Replaces an existing string-valued property while preserving its source formatting.
      *
@@ -79,9 +85,7 @@ public final class TomlTableValue {
                 return element;
             }
             Toml.Literal literal = (Toml.Literal) keyValue.getValue();
-            String source = literal.getSource();
-            String quote = source.isEmpty() ? "\"" : source.substring(0, 1);
-            return keyValue.withValue(literal.withSource(quote + value + quote).withValue(value));
+            return keyValue.withValue(literal.withSource(quoted(literal, value)).withValue(value));
         }));
     }
 

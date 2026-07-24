@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.toml.TomlIsoVisitor;
@@ -76,7 +75,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                 return kv;
             }
             String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(newVersion)));
-            return kv.withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
+            return kv.withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
         }
         if (kv.getValue() instanceof Toml.Table) {
             Toml.Table inline = (Toml.Table) kv.getValue();
@@ -116,7 +115,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             String notation = DependencyNotation.toStringNotation(
                     dependency.withGav(new org.openrewrite.maven.tree.GroupArtifactVersion(
                             newGroupId, newArtifactId, version)));
-            return getTree().withValue(literal.withSource(VersionCatalogToml.quoted(literal, notation)).withValue(notation));
+            return getTree().withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
         }
         if (!(getTree().getValue() instanceof Toml.Table)) {
             return getTree();

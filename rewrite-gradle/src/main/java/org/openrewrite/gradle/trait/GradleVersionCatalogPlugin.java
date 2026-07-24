@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.internal.VersionCatalogToml;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
@@ -54,7 +53,7 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
         if (keyValue.getValue() instanceof Toml.Literal) {
             Toml.Literal literal = (Toml.Literal) keyValue.getValue();
             return keyValue.withValue(literal
-                    .withSource(VersionCatalogToml.quoted(literal, pluginId + ":" + newVersion))
+                    .withSource(TomlTableValue.quoted(literal, pluginId + ":" + newVersion))
                     .withValue(pluginId + ":" + newVersion));
         }
         if (!(keyValue.getValue() instanceof Toml.Table)) {

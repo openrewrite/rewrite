@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.toml.tree.Toml;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.gradle.trait.GradleVersionCatalog.findTable;
 import static org.openrewrite.toml.Assertions.toml;
 
 class GradleVersionCatalogTest implements RewriteTest {
@@ -39,21 +40,33 @@ class GradleVersionCatalogTest implements RewriteTest {
     @Test
     void rejectsConflictingReplacementForCrossSectionConsumers() throws Exception {
         GradleVersionCatalogDependency dependency =
-                new GradleVersionCatalogDependency(null, "org.example", "library", null, "shared");
+          new GradleVersionCatalogDependency(null, "org.example", "library", null, "shared");
         GradleVersionCatalogPlugin plugin =
-                new GradleVersionCatalogPlugin(null, "org.example.plugin", null, "shared");
+          new GradleVersionCatalogPlugin(null, "org.example.plugin", null, "shared");
         List<GradleVersionCatalog.VersionRefConsumer> consumers = Arrays.asList(
-                new GradleVersionCatalog.VersionRefConsumer("shared", dependency, null),
-                new GradleVersionCatalog.VersionRefConsumer("shared", null, plugin));
+          new GradleVersionCatalog.VersionRefConsumer("shared", dependency, null),
+          new GradleVersionCatalog.VersionRefConsumer("shared", null, plugin));
         GradleVersionCatalog catalog = new GradleVersionCatalog(null,
-                Collections.singletonList(dependency), Collections.singletonList(plugin),
-                Collections.singletonMap("shared", "1.0"),
-                Collections.singletonMap("shared", consumers));
+          Collections.singletonList(dependency), Collections.singletonList(plugin),
+          Collections.singletonMap("shared", "1.0"),
+          Collections.singletonMap("shared", consumers));
 
         Map<String, String> replacements = catalog.safeVersionRefReplacements((consumer, currentVersion) ->
-                consumer.getDependency() == null ? "3.0" : "2.0");
+          consumer.getDependency() == null ? "3.0" : "2.0");
 
         assertThat(replacements).isEmpty();
+    }
+
+    @Test
+    void ignoresInlineTablesWithoutNamesWhenFindingSections() {
+        rewriteRun(
+          toml(
+            "library = { group = \"org.example\", name = \"library\" }",
+            spec -> spec.afterRecipe(document ->
+              assertThat(findTable(document, "libraries")).isNull()
+            )
+          )
+        );
     }
 
     @Test
@@ -66,7 +79,7 @@ class GradleVersionCatalogTest implements RewriteTest {
             """
               [versions]
               shared = "2.0"
-
+              
               [libraries]
               library = { group = "org.example", name = "library", version.ref = "shared" }
               """,
