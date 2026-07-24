@@ -147,6 +147,23 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), KContainer.Location.DESTRUCT_ASSIGNMENTS, p));
     }
 
+    public J visitExpressionStatement(K.ExpressionStatement expressionStatement, P p) {
+        K.ExpressionStatement e = expressionStatement;
+        Statement temp = (Statement) visitStatement(e, p);
+        if (!(temp instanceof K.ExpressionStatement)) {
+            return temp;
+        } else {
+            e = (K.ExpressionStatement) temp;
+        }
+        J expression = visit(e.getExpression(), p);
+        if (expression instanceof K.ExpressionStatement) {
+            return expression;
+        } else if (expression instanceof Expression) {
+            return e.withExpression((Expression) expression);
+        }
+        return expression;
+    }
+
     public J visitFunctionType(K.FunctionType functionType, P p) {
         K.FunctionType f = functionType;
         f = f.withPrefix(visitSpace(f.getPrefix(), KSpace.Location.FUNCTION_TYPE_PREFIX, p));

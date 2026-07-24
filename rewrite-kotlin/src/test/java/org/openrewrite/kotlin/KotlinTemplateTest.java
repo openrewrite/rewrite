@@ -21,6 +21,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.Expression;
@@ -107,6 +108,38 @@ class KotlinTemplateTest implements RewriteTest {
                       val x = value + 1
                       println("added")
                   }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceExpressionStatementWithTemplate() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                    J.Block b = super.visitBlock(block, ctx);
+                    return b.withStatements(ListUtils.map(b.getStatements(), s -> {
+                        if (!(s instanceof K.ExpressionStatement)) {
+                            return s;
+                        }
+                        return (J.MethodInvocation) JavaTemplate.builder("#{any()}.hashCode()")
+                          .build()
+                          .apply(new Cursor(getCursor(), s), s.getCoordinates().replace(), s);
+                    }));
+                }
+            })),
+          kotlin(
+            """
+              fun test(a: Int) {
+                  a
+              }
+              """,
+            """
+              fun test(a: Int) {
+                  a.hashCode()
               }
               """
           ));
