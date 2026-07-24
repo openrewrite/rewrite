@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RPC request to parse an entire JavaScript/TypeScript project.
@@ -48,17 +49,49 @@ class ParseProject implements RpcRequest {
     @Nullable
     Path relativeTo;
 
+    /**
+     * The incremental "changed files" channel (see {@code ParseProjectOptions#files}): the subset of source
+     * files to serialize and return, relative to {@link #relativeTo} (or {@link #projectPath} when
+     * {@code relativeTo} is {@code null}), normalized to forward slashes.
+     * <p>
+     * {@code null} = a full parse of the whole project (the default, original behavior). Non-{@code null} =
+     * the server still loads and type-checks the entire project for full type context, but returns only this
+     * set. The caller decides full vs. incremental and escalates to a full parse on configuration-input
+     * changes; the server never auto-upgrades.
+     */
+    @Nullable
+    List<String> files;
+
+    /**
+     * Forward-compatibility carrier for additional, as-yet-undefined parsing options — reserved, today
+     * always {@code null} and ignored by the server. Frozen into the wire shape now so a future addition
+     * (e.g. stateful-session control or true-incremental re-parsing hints) needs no second breaking change
+     * to the request type.
+     */
+    @Nullable
+    Map<String, Object> options;
+
     ParseProject(Path projectPath) {
-        this(projectPath, null, null);
+        this(projectPath, null, null, null, null);
     }
 
     ParseProject(Path projectPath, @Nullable List<String> exclusions) {
-        this(projectPath, exclusions, null);
+        this(projectPath, exclusions, null, null, null);
     }
 
     ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
+        this(projectPath, exclusions, relativeTo, null, null);
+    }
+
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, @Nullable List<String> files) {
+        this(projectPath, exclusions, relativeTo, files, null);
+    }
+
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, @Nullable List<String> files, @Nullable Map<String, Object> options) {
         this.projectPath = projectPath;
         this.exclusions = exclusions;
         this.relativeTo = relativeTo;
+        this.files = files;
+        this.options = options;
     }
 }

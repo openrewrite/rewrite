@@ -163,6 +163,27 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return parseProject(projectPath, ParseProjectOptions.builder()
+                .exclusions(exclusions)
+                .relativeTo(relativeTo)
+                .build(), ctx);
+    }
+
+    /**
+     * Parses an entire JavaScript/TypeScript project directory.
+     * Discovers and parses all relevant source files, package.json files, and lock files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param options     Optional parsing inputs — exclusions, relativeTo, and the optional {@code files}
+     *                    subset; see {@link ParseProjectOptions}. This is the only overload that accepts a
+     *                    {@code files} subset.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, ParseProjectOptions options, ExecutionContext ctx) {
+        @Nullable List<String> exclusions = options.getExclusions();
+        @Nullable Path relativeTo = options.getRelativeTo();
+        @Nullable List<String> files = options.getFiles();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
 
@@ -174,7 +195,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, files), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
