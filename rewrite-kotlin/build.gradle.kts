@@ -54,6 +54,7 @@ dependencies {
     implementation(kotlin("stdlib", kotlinVersion))
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
+    testImplementation("org.apiguardian:apiguardian-api:1.1.2")
     testImplementation(project(":rewrite-test"))
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
