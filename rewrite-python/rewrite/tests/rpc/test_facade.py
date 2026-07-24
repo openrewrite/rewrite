@@ -336,3 +336,65 @@ def test_precondition_visitors_route_to_the_child_that_prepared_them():
 
     assert f.visit({"visitor": "edit:precond-1"}) == {"ok": "Visit"}
     assert f.visit({"visitor": "scan:precond-2"}) == {"ok": "Visit"}
+
+
+# --- built-in (service) visitors -------------------------------------------------------------
+#
+# Built-in visitors like AutoFormatVisitor/AddImport belong to no recipe bundle, so instead of
+# failing with "No child owns visitor" the facade runs them itself against the working tree.
+
+_AUTO_FORMAT = "org.openrewrite.python.format.AutoFormatVisitor"
+_ADD_IMPORT = "org.openrewrite.python.AddImport"
+
+
+def _local_facade(children, ran):
+    return Facade(
+        children,
+        local_visit=lambda items, params: [
+            ran.append((i["visitor"], i.get("visitorOptions"), params.get("treeId")))
+            or {"modified": True, "deleted": False, "hasNewMessages": False, "searchResultIds": []}
+            for i in items
+        ],
+        is_local_visitor=lambda name: name in (_AUTO_FORMAT, _ADD_IMPORT),
+    )
+
+
+def test_single_visit_of_a_built_in_visitor_runs_on_the_facade():
+    children = _EditingChildren()
+    ran = []
+    f = _local_facade(children, ran)
+
+    resp = f.visit({"visitor": _ADD_IMPORT, "treeId": "T", "sourceFileType": "py",
+                    "visitorOptions": {"module": "collections.abc", "name": "Iterable"}})
+
+    assert resp == {"modified": True}
+    # the options reach the visitor, and no child was asked to do anything
+    assert ran == [(_ADD_IMPORT, {"module": "collections.abc", "name": "Iterable"}, "T")]
+    assert children.calls == []
+
+
+def test_batch_visit_interleaves_built_ins_with_bundle_owned_visitors_in_order():
+    children = _EditingChildren()
+    ran = []
+    f = _local_facade(children, ran)
+    f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py", "visitors": [
+        {"visitor": "edit:a"}, {"visitor": _AUTO_FORMAT}, {"visitor": "edit:b"}]})
+
+    # one result per visitor, in the order the host asked for them
+    assert len(resp["results"]) == 3
+    assert [r.get("visitor") for r in resp["results"]] == ["edit:a", None, "edit:b"]
+    # the built-in ran on the facade, between the two children
+    assert ran == [(_AUTO_FORMAT, None, "T")]
+    assert [c for c in children.calls if c[0] == "batch"] == [
+        ("batch", "A", ["edit:a"]), ("batch", "B", ["edit:b"])]
+
+
+def test_an_unknown_visitor_is_still_an_error():
+    f = _local_facade(_EditingChildren(), [])
+    try:
+        f.visit({"visitor": "edit:nobody", "treeId": "T"})
+        assert False, "expected a ValueError for a visitor no child owns"
+    except ValueError as e:
+        assert "No child owns visitor" in str(e)
