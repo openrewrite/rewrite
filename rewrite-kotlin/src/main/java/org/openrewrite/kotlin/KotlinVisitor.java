@@ -257,9 +257,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitStatementExpression(K.StatementExpression statementExpression, P p) {
         K.StatementExpression s = statementExpression;
-        // Route through visitStatement/visitExpression like every other K statement-expression type
-        // (e.g. K.Return), so scope-based operations such as JavaTemplate replacements can target the
-        // wrapper node itself rather than transparently descending into the statement it wraps.
         Statement temp = (Statement) visitStatement(s, p);
         if (!(temp instanceof K.StatementExpression)) {
             return temp;
