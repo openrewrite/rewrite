@@ -35,19 +35,9 @@ public class KotlinSubstitutions extends Substitutions {
         return "__P__./*__p" + index + "__*/p<" + toKotlinTypeSyntax(fqn, index, true) + ">()";
     }
 
-    /**
-     * Render a Java type name emitted by {@link Substitutions} as a Kotlin type so that the Kotlin
-     * parser can resolve members accessed on the substituted placeholder.
-     * <ul>
-     *     <li>Wildcards ({@code ? extends}, {@code ? super}, {@code ?}) become Kotlin variance/projection syntax.</li>
-     *     <li>Arrays ({@code T[]}) become {@code kotlin.Array<T>} or a primitive array type, since Kotlin has no
-     *     {@code T[]} syntax.</li>
-     *     <li>A top-level generic type named without type arguments (a raw type) gets star projections, since Kotlin
-     *     has no raw types and a bare generic name resolves to an error type — which suppresses attribution of any
-     *     member selected on it. Star projection only applies to the substituted type itself, whose arity is recovered
-     *     from the actual argument; nested type arguments (e.g. array elements) are rendered structurally only.</li>
-     * </ul>
-     */
+    // Kotlin has no `T[]` syntax and no raw types: a bare generic name resolves to an error type, which
+    // suppresses attribution of members selected on the placeholder. Star-project raw types (top-level only)
+    // and render arrays as kotlin.Array<T> / primitive array types.
     private String toKotlinTypeSyntax(String fqn, int index, boolean starProjectRaw) {
         if (fqn.endsWith("[]")) {
             return toKotlinArrayType(fqn.substring(0, fqn.length() - "[]".length()), index);
@@ -97,11 +87,8 @@ public class KotlinSubstitutions extends Substitutions {
         }
     }
 
-    /**
-     * The number of type parameters the substituted parameter's own type carries, used to star-project a
-     * template-declared raw generic type. The declared type (from the template text) is a shallow class with no
-     * type parameters, so the arity is recovered from the actual argument instead.
-     */
+    // The template-declared type is a shallow class with no type parameters, so a raw type's arity is
+    // recovered from the actual argument instead.
     private int genericArity(int index) {
         if (index < 0 || index >= parameters.length || !(parameters[index] instanceof TypedTree)) {
             return 0;
