@@ -29,6 +29,7 @@ recipeList:
   - org.openrewrite.gradle.security.UseHttpsForRepositories
   - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
       propertyName: distributionUrl
+  - org.openrewrite.gradle.RemoveEmptyBuildscriptBlock
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
