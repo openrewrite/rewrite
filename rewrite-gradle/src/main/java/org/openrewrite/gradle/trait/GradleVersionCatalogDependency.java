@@ -55,6 +55,15 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
      */
     @Nullable String versionRef;
 
+    public boolean hasUnsupportedVersionDeclaration() {
+        if (!(getTree().getValue() instanceof Toml.Table)) {
+            return false;
+        }
+        Toml.Table table = (Toml.Table) getTree().getValue();
+        return TomlTableValue.has(table, "version") && version == null ||
+                TomlTableValue.has(table, "version.ref") && versionRef == null;
+    }
+
     /**
      * Returns a new {@link Toml.KeyValue} with the version updated to {@code newVersion}.
      * <p>

@@ -972,6 +972,110 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void doesNotPartiallyChangeDependencyWhenVersionRefCannotBeUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              shared = "1.0.0"
+
+              [libraries]
+              target = { module = "org.testcontainers:mongodb", version.ref = "shared" }
+              other = { module = "org.example:other", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void doesNotPartiallyChangeDependencyWithRichVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "old.group",
+            "old-artifact",
+            "new.group",
+            "new-artifact",
+            "2.0.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = { module = "old.group:old-artifact", version = { strictly = "1.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void changesCoordinatesWhilePreservingRichVersionWithoutNewVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              target = { module = "org.testcontainers:mongodb", version = { strictly = "1.0.0" } }
+              """,
+            """
+              [libraries]
+              target = { module = "org.testcontainers:testcontainers-mongodb", version = { strictly = "1.0.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void changesVersionlessDependencyWithoutAddingVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "old.group",
+            "old-artifact",
+            "new.group",
+            "new-artifact",
+            "2.0.x",
+            null,
+            false,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = { module = "old.group:old-artifact" }
+              """,
+            """
+              [libraries]
+              library = { module = "new.group:new-artifact" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void dependencyPluginManagedDependencies() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("javax.validation", "validation-api", "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null, true)),

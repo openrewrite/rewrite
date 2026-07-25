@@ -72,10 +72,19 @@ final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.Versi
         if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
             return dependency.getTree();
         }
+        if (!StringUtils.isBlank(newVersion) && dependency.hasUnsupportedVersionDeclaration()) {
+            return dependency.getTree();
+        }
+        if (!StringUtils.isBlank(newVersion) && dependency.getVersionRef() != null && referencedVersion == null) {
+            return dependency.getTree();
+        }
         String replacementGroupId = StringUtils.isBlank(newGroupId) ? dependency.getGroupId() : newGroupId;
         String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dependency.getArtifactId() : newArtifactId;
         String selectedVersion = referencedVersion;
-        if (dependency.getVersionRef() == null && !StringUtils.isBlank(newVersion)) {
+        boolean shouldSelectDirectVersion = !StringUtils.isBlank(newVersion) &&
+                dependency.getVersionRef() == null &&
+                (dependency.getVersion() != null || Boolean.TRUE.equals(overrideManagedVersion));
+        if (shouldSelectDirectVersion) {
             selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                     .select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
         }
