@@ -102,7 +102,8 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
      * <p>
      * This method is the primary mutation helper for coordinate-change recipes. It:
      * <ul>
-     *   <li>Always updates the existing coordinate representation ({@code group}/{@code name} or {@code module}).</li>
+     *   <li>Updates the existing coordinate representation ({@code group}/{@code name} or {@code module}) unless
+     *       a requested version change targets an unsupported version declaration.</li>
      *   <li>If {@code newVersion} is non-null and the entry already has a {@code version} key, updates it.</li>
      *   <li>If {@code newVersion} is non-null, {@code overrideManagedVersion} is {@code true}, and the entry
      *       has neither a {@code version} nor a {@code version.ref} key, the {@code version} key is added.</li>

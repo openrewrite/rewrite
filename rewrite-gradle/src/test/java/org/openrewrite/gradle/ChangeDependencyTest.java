@@ -1103,6 +1103,33 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void changesVersionlessStringDependencyAndAddsVersionWhenOverrideEnabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            true,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = "org.testcontainers:mongodb"
+              """,
+            """
+              [libraries]
+              library = "org.testcontainers:testcontainers-mongodb:2.0.5"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void dependencyPluginManagedDependencies() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("javax.validation", "validation-api", "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null, true)),
