@@ -1076,6 +1076,33 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void changesVersionlessStringDependencyWithoutAddingVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "old.group",
+            "old-artifact",
+            "new.group",
+            "new-artifact",
+            "2.0.x",
+            null,
+            false,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = "old.group:old-artifact"
+              """,
+            """
+              [libraries]
+              library = "new.group:new-artifact"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void dependencyPluginManagedDependencies() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("javax.validation", "validation-api", "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null, true)),

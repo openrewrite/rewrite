@@ -111,6 +111,9 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
     public Toml.KeyValue withCoordinatesAndVersion(
             String newGroupId, String newArtifactId,
             @Nullable String newVersion, boolean overrideManagedVersion) {
+        if (newVersion != null && hasUnsupportedVersionDeclaration()) {
+            return getTree();
+        }
         if (getTree().getValue() instanceof Toml.Literal) {
             Toml.Literal literal = (Toml.Literal) getTree().getValue();
             if (!(literal.getValue() instanceof String)) {
@@ -120,7 +123,10 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             if (dependency == null) {
                 return getTree();
             }
-            String version = newVersion == null ? dependency.getVersion() : newVersion;
+            String version = dependency.getVersion();
+            if (newVersion != null && (version != null || overrideManagedVersion)) {
+                version = newVersion;
+            }
             String notation = DependencyNotation.toStringNotation(
                     dependency.withGav(new org.openrewrite.maven.tree.GroupArtifactVersion(
                             newGroupId, newArtifactId, version)));

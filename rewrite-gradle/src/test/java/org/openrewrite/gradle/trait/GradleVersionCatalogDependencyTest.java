@@ -440,4 +440,88 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void withStringCoordinatesDoesNotAddVersionWithoutOverrideManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", false)))),
+          toml(
+            """
+              [libraries]
+              my-lib = "org.old:old-artifact"
+              """,
+            """
+              [libraries]
+              my-lib = "org.new:new-artifact"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withStringCoordinatesAddsVersionWhenOverrideManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+          toml(
+            """
+              [libraries]
+              my-lib = "org.old:old-artifact"
+              """,
+            """
+              [libraries]
+              my-lib = "org.new:new-artifact:2.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withCoordinatesAndVersionLeavesRichVersionUnchangedWhenVersionRequested() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+          toml(
+            """
+              [libraries]
+              my-lib = { module = "org.old:old-artifact", version = { strictly = "1.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withCoordinatesAndVersionUpdatesCoordinatesWhilePreservingRichVersion() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
+          toml(
+            """
+              [libraries]
+              my-lib = { module = "org.old:old-artifact", version = { strictly = "1.0" } }
+              """,
+            """
+              [libraries]
+              my-lib = { module = "org.new:new-artifact", version = { strictly = "1.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
 }
