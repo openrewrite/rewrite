@@ -429,6 +429,15 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             } catch (Exception e) {
                 // ignore
             }
+
+            // An unresolvable argument leaves the select as a plain ErrorType even though the callee
+            // resolved; recover the invocation type javac computed (kept in the error's original
+            // type), falling back to the symbol's declared type, to keep the JavaType.Method.
+            if (symbol instanceof Symbol.MethodSymbol && symbol.kind != Kinds.Kind.ERR &&
+                symbol.type != null && !(symbol.type instanceof Type.ErrorType)) {
+                Type originalType = selectType.getOriginalType();
+                return methodInvocationType(originalType instanceof Type.MethodType ? originalType : symbol.type, symbol);
+            }
         }
 
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR) {

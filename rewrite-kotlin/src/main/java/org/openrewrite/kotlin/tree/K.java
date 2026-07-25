@@ -995,13 +995,7 @@ public interface K extends J {
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            J j = v.visit(getExpression(), p);
-            if (j instanceof ExpressionStatement) {
-                return j;
-            } else if (j instanceof Expression) {
-                return withExpression((Expression) j);
-            }
-            return j;
+            return v.visitExpressionStatement(this, p);
         }
 
         @Override
@@ -1655,13 +1649,7 @@ public interface K extends J {
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            J j = v.visit(getStatement(), p);
-            if (j instanceof StatementExpression) {
-                return j;
-            } else if (j instanceof Statement) {
-                return withStatement((Statement) j);
-            }
-            return j;
+            return v.visitStatementExpression(this, p);
         }
 
         @Override
