@@ -77,6 +77,46 @@ class RemoveEmptyBuildscriptBlockTest implements RewriteTest {
     }
 
     @Test
+    void removeEmptyBuildscriptBlockNestedInAnotherBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              allprojects {
+                  buildscript {
+                  }
+                  repositories {
+                  }
+              }
+              """,
+            """
+              allprojects {
+                  repositories {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeEmptyBuildscriptBlockNestedInAnotherBlockKts() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              allprojects {
+                  buildscript {
+                  }
+              }
+              """,
+            """
+              allprojects {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeBuildscriptBlockContainingOnlyEmptyBlocks() {
         rewriteRun(
           buildGradle(

@@ -30,7 +30,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.kotlin.tree.K;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -54,12 +53,10 @@ public class RemoveEmptyBuildscriptBlock extends Recipe {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 J j = super.visit(tree, ctx);
+                // A Groovy script holds its statements on the compilation unit, so they are unreachable from
+                // visitBlock. A Kotlin script instead wraps them all in a single block, which visitBlock handles.
                 if (j instanceof G.CompilationUnit) {
                     G.CompilationUnit c = (G.CompilationUnit) j;
-                    return c.withStatements(withoutEmptyBuildscriptBlocks(c.getStatements()));
-                }
-                if (j instanceof K.CompilationUnit) {
-                    K.CompilationUnit c = (K.CompilationUnit) j;
                     return c.withStatements(withoutEmptyBuildscriptBlocks(c.getStatements()));
                 }
                 return j;
