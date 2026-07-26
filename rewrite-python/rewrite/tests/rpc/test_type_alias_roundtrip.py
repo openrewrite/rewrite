@@ -45,10 +45,12 @@ def _round_trip_print(src):
     return PythonPrinter().print(cu), PythonPrinter().print(rebuilt)
 
 
+# Spaced out to also exercise whitespace fidelity: JContainer.before (before `[`) and the
+# element padding (inside the brackets, around the `:` bound and the commas).
 @pytest.mark.parametrize("src", [
-    "type X[T] = list[T]\n",
-    "type X[T: int] = list[T]\n",
-    "type F[T, *Ts, **P] = Callable[P, T]\n",
+    "type X [ T ] = list[T]\n",
+    "type X [ T : int ] = list[T]\n",
+    "type F [ T , *Ts , **P ] = Callable[P, T]\n",
     "type X = int\n",  # no params — must remain a no-op
 ])
 def test_type_alias_params_survive_rpc(src):
