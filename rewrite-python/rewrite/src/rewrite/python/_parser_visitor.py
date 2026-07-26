@@ -1157,10 +1157,6 @@ class ParserVisitor(ast.NodeVisitor):
         # Use __convert_match_pattern to handle parentheses (GROUP patterns)
         pattern = self.__convert_match_pattern(node.pattern)
         if node.guard:
-            # The guard source (`if <cond>`) must be consumed whenever a guard is present, or the
-            # cursor drifts and every subsequent node is parsed against misaligned text. Value and
-            # capture patterns are returned bare (not wrapped in py.MatchCase), so wrap them here to
-            # give the guard a home — the printer emits LITERAL/VALUE/CAPTURE as the inner element.
             guard = self.__pad_left(self.__source_before('if'), self.__convert(node.guard))
             if isinstance(pattern, py.MatchCase):
                 pattern = pattern.padding.replace(guard=guard)
@@ -1426,9 +1422,6 @@ class ParserVisitor(ast.NodeVisitor):
                             Markers.EMPTY,
                             cast(j.Identifier, self.__convert_name(kwd)),
                             _EMPTY_LIST,
-                            # __convert_match_pattern (not __convert) so a parenthesized GROUP value
-                            # like `k=(A() | B())` has its parens consumed — matching positional
-                            # patterns above; __convert alone leaves the parens and drifts the cursor.
                             self.__pad_left(self.__source_before('='), self.__convert_match_pattern(node.kwd_patterns[i])),
                             None
                         ), Space.EMPTY)
