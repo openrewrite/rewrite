@@ -237,6 +237,7 @@ public class PythonReceiver extends PythonVisitor<RpcReceiveQueue> {
     public J visitTypeAlias(Py.TypeAlias typeAlias, RpcReceiveQueue q) {
         return typeAlias
                 .withName(q.receive(typeAlias.getName(), name -> (J.Identifier) visitNonNull(name, q)))
+                .getPadding().withTypeParameters(q.receive(typeAlias.getPadding().getTypeParameters(), el -> visitContainer(el, q)))
                 .getPadding().withValue(q.receive(typeAlias.getPadding().getValue(), el -> visitLeftPadded(el, q)))
                 .withType(q.receive(typeAlias.getType(), type -> visitType(type, q)));
     }
