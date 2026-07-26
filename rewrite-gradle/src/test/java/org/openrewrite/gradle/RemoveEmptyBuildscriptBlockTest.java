@@ -51,6 +51,32 @@ class RemoveEmptyBuildscriptBlockTest implements RewriteTest {
     }
 
     @Test
+    void removeConsecutiveEmptyBuildscriptBlocks() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+              }
+
+              buildscript {
+                  repositories {
+                  }
+              }
+
+              plugins {
+                  id 'java'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeBuildscriptBlockContainingOnlyEmptyBlocks() {
         rewriteRun(
           buildGradle(

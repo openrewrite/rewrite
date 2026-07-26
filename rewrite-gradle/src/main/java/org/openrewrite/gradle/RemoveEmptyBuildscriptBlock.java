@@ -23,16 +23,17 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.tree.K;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Preconditions.or;
 
@@ -49,40 +50,25 @@ public class RemoveEmptyBuildscriptBlock extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new TreeVisitor<Tree, ExecutionContext>() {
+        return Preconditions.check(or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof G.CompilationUnit) {
-                    return new GroovyIsoVisitor<ExecutionContext>() {
-                        @Override
-                        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                            G.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
-                            return c.withStatements(withoutEmptyBuildscriptBlocks(c.getStatements()));
-                        }
-
-                        @Override
-                        public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                            J.Block b = super.visitBlock(block, ctx);
-                            return b.withStatements(withoutEmptyBuildscriptBlocks(b.getStatements()));
-                        }
-                    }.visit(tree, ctx);
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                J j = super.visit(tree, ctx);
+                if (j instanceof G.CompilationUnit) {
+                    G.CompilationUnit c = (G.CompilationUnit) j;
+                    return c.withStatements(withoutEmptyBuildscriptBlocks(c.getStatements()));
                 }
-                if (tree instanceof K.CompilationUnit) {
-                    return new KotlinIsoVisitor<ExecutionContext>() {
-                        @Override
-                        public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                            K.CompilationUnit c = super.visitCompilationUnit(cu, ctx);
-                            return c.withStatements(withoutEmptyBuildscriptBlocks(c.getStatements()));
-                        }
-
-                        @Override
-                        public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                            J.Block b = super.visitBlock(block, ctx);
-                            return b.withStatements(withoutEmptyBuildscriptBlocks(b.getStatements()));
-                        }
-                    }.visit(tree, ctx);
+                if (j instanceof K.CompilationUnit) {
+                    K.CompilationUnit c = (K.CompilationUnit) j;
+                    return c.withStatements(withoutEmptyBuildscriptBlocks(c.getStatements()));
                 }
-                return tree;
+                return j;
+            }
+
+            @Override
+            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                J.Block b = super.visitBlock(block, ctx);
+                return b.withStatements(withoutEmptyBuildscriptBlocks(b.getStatements()));
             }
         });
     }
@@ -94,22 +80,21 @@ public class RemoveEmptyBuildscriptBlock extends Recipe {
      * behind on whatever follows it.
      */
     private static List<Statement> withoutEmptyBuildscriptBlocks(List<Statement> statements) {
-        List<Statement> result = statements;
-        for (int i = 0; i < result.size(); i++) {
-            Statement statement = result.get(i);
-            if (statement instanceof J.MethodInvocation &&
-                "buildscript".equals(((J.MethodInvocation) statement).getSimpleName()) &&
-                isEmptyBlock((J.MethodInvocation) statement)) {
-                List<Statement> remaining = new ArrayList<>(result);
-                Statement removed = remaining.remove(i);
-                if (i < remaining.size()) {
-                    remaining.set(i, remaining.get(i).withPrefix(removed.getPrefix()));
-                }
-                result = remaining;
-                i--;
+        AtomicReference<@Nullable Space> orphanedPrefix = new AtomicReference<>(null);
+        return ListUtils.map(statements, statement -> {
+            if (isEmptyBuildscriptBlock(statement)) {
+                orphanedPrefix.compareAndSet(null, statement.getPrefix());
+                return null;
             }
-        }
-        return result;
+            Space inherited = orphanedPrefix.getAndSet(null);
+            return inherited == null ? statement : statement.withPrefix(inherited);
+        });
+    }
+
+    private static boolean isEmptyBuildscriptBlock(Statement statement) {
+        return statement instanceof J.MethodInvocation &&
+               "buildscript".equals(((J.MethodInvocation) statement).getSimpleName()) &&
+               isEmptyBlock((J.MethodInvocation) statement);
     }
 
     /**
