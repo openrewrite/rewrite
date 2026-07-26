@@ -89,9 +89,21 @@ public class RemoveEmptyBuildscriptBlock extends Recipe {
     }
 
     private static boolean isEmptyBuildscriptBlock(Statement statement) {
-        return statement instanceof J.MethodInvocation &&
-               "buildscript".equals(((J.MethodInvocation) statement).getSimpleName()) &&
-               isEmptyBlock((J.MethodInvocation) statement);
+        Statement unwrapped = withoutImplicitReturn(statement);
+        return unwrapped instanceof J.MethodInvocation &&
+               "buildscript".equals(((J.MethodInvocation) unwrapped).getSimpleName()) &&
+               isEmptyBlock((J.MethodInvocation) unwrapped);
+    }
+
+    /**
+     * Groovy gives the last statement of a closure an implicit {@code return}, which wraps a {@code buildscript}
+     * block written there. Kotlin has no such wrapper.
+     */
+    private static Statement withoutImplicitReturn(Statement statement) {
+        if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof Statement) {
+            return (Statement) ((J.Return) statement).getExpression();
+        }
+        return statement;
     }
 
     /**
@@ -114,11 +126,7 @@ public class RemoveEmptyBuildscriptBlock extends Recipe {
             if (!statement.getPrefix().getComments().isEmpty()) {
                 return false;
             }
-            // Groovy gives the last statement of a closure an implicit `return`
-            Statement unwrapped = statement;
-            if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof Statement) {
-                unwrapped = (Statement) ((J.Return) statement).getExpression();
-            }
+            Statement unwrapped = withoutImplicitReturn(statement);
             if (!(unwrapped instanceof J.MethodInvocation) || !isEmptyBlock((J.MethodInvocation) unwrapped)) {
                 return false;
             }
