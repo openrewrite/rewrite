@@ -170,4 +170,29 @@ class GradleBestPracticesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeEmptyBuildscriptBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript { }
+              plugins { id 'java' }
+              """,
+            """
+              plugins { id 'java' }
+              """),
+          properties(
+            //language=properties
+            """
+              """,
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
 }
