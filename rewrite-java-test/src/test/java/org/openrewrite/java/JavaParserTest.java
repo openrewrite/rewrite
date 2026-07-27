@@ -189,7 +189,7 @@ class JavaParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/8334")
     @Test
     void runtimeClasspathIncludesIsolatedClassLoaderEntries(@TempDir Path temp) throws Exception {
-        // Build tools load recipe artifacts into a class loader of their own, which is never reflected in `java.class.path`
+        // Build tools load recipe artifacts into their own class loader, never reflected in `java.class.path`
         Path recipeJar = Files.createFile(temp.resolve("recipe-artifact-1.0.jar"));
         ClassLoader originalTccl = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(

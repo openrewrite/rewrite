@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
@@ -46,6 +47,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.synchronizedMap;
 import static java.util.Collections.unmodifiableList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -421,19 +423,21 @@ public interface JavaParser extends Parser {
 
 @UtilityClass
 class RuntimeClasspathCache {
-    private static final Map<ClassLoader, List<Path>> runtimeClasspaths = new WeakHashMap<>();
+    private static final Map<ClassLoader, List<Path>> runtimeClasspaths = synchronizedMap(new WeakHashMap<>());
 
     static List<Path> getRuntimeClasspath() {
         ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-        ClassLoader key = contextClassLoader == null ? RuntimeClasspathCache.class.getClassLoader() : contextClassLoader;
-        synchronized (RuntimeClasspathCache.class) {
-            List<Path> paths = runtimeClasspaths.get(key);
-            if (paths == null) {
-                paths = discover(contextClassLoader);
-                runtimeClasspaths.put(key, paths);
+        ClassLoader key = contextClassLoader == null ?
+                RuntimeClasspathCache.class.getClassLoader() : contextClassLoader;
+        List<Path> paths = runtimeClasspaths.get(key);
+        if (paths == null) {
+            paths = discover(contextClassLoader);
+            List<Path> raced = runtimeClasspaths.putIfAbsent(key, paths);
+            if (raced != null) {
+                paths = raced;
             }
-            return paths;
         }
+        return paths;
     }
 
     private static List<Path> discover(@Nullable ClassLoader contextClassLoader) {
@@ -443,7 +447,7 @@ class RuntimeClasspathCache {
         // only reachable through this system property.
         String cp = System.getProperty("java.class.path");
         if (cp != null) {
-            for (String entry : cp.split(System.getProperty("path.separator"))) {
+            for (String entry : cp.split(File.pathSeparator)) {
                 addIfExists(paths, Paths.get(entry));
             }
         }
