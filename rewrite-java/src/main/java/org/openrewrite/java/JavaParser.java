@@ -31,6 +31,8 @@ import org.openrewrite.style.NamedStyles;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,6 +46,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.unmodifiableList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -418,25 +421,64 @@ public interface JavaParser extends Parser {
 
 @UtilityClass
 class RuntimeClasspathCache {
-    @Nullable
-    private static volatile List<Path> runtimeClasspath = null;
+    private static final Map<ClassLoader, List<Path>> runtimeClasspaths = new WeakHashMap<>();
 
     static List<Path> getRuntimeClasspath() {
-        List<Path> paths = runtimeClasspath;
-        if (paths == null) {
-            synchronized (RuntimeClasspathCache.class) {
-                paths = runtimeClasspath;
-                if (paths == null) {
-                    String cp = System.getProperty("java.class.path");
-                    runtimeClasspath = paths = cp == null ? Collections.emptyList() :
-                            Arrays.stream(cp.split(System.getProperty("path.separator")))
-                                    .map(Paths::get)
-                                    .filter(Files::exists)
-                                    .collect(toList());
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader key = contextClassLoader == null ? RuntimeClasspathCache.class.getClassLoader() : contextClassLoader;
+        synchronized (RuntimeClasspathCache.class) {
+            List<Path> paths = runtimeClasspaths.get(key);
+            if (paths == null) {
+                paths = discover(contextClassLoader);
+                runtimeClasspaths.put(key, paths);
+            }
+            return paths;
+        }
+    }
+
+    private static List<Path> discover(@Nullable ClassLoader contextClassLoader) {
+        Set<Path> paths = new LinkedHashSet<>();
+
+        // On Java 9+ the application class loader is not a URLClassLoader, so its entries are
+        // only reachable through this system property.
+        String cp = System.getProperty("java.class.path");
+        if (cp != null) {
+            for (String entry : cp.split(System.getProperty("path.separator"))) {
+                addIfExists(paths, Paths.get(entry));
+            }
+        }
+
+        // Build tools load their plugins, and any recipe artifacts those plugins resolve, into
+        // isolated class loaders whose entries never appear on `java.class.path`.
+        addClassLoaderEntries(paths, contextClassLoader);
+        addClassLoaderEntries(paths, RuntimeClasspathCache.class.getClassLoader());
+
+        return unmodifiableList(new ArrayList<>(paths));
+    }
+
+    private static void addClassLoaderEntries(Set<Path> paths, @Nullable ClassLoader classLoader) {
+        Deque<ClassLoader> hierarchy = new ArrayDeque<>();
+        for (ClassLoader cl = classLoader; cl != null; cl = cl.getParent()) {
+            hierarchy.addFirst(cl);
+        }
+        for (ClassLoader cl : hierarchy) {
+            if (cl instanceof URLClassLoader) {
+                for (URL url : ((URLClassLoader) cl).getURLs()) {
+                    if ("file".equals(url.getProtocol())) {
+                        try {
+                            addIfExists(paths, Paths.get(url.toURI()));
+                        } catch (Exception ignored) {
+                        }
+                    }
                 }
             }
         }
-        return paths;
+    }
+
+    private static void addIfExists(Set<Path> paths, Path path) {
+        if (Files.exists(path)) {
+            paths.add(path);
+        }
     }
 }
 
