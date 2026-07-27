@@ -24,6 +24,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.toml.tree.Toml;
 
@@ -61,7 +62,7 @@ final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.Versi
         String replacementGroupId = StringUtils.isBlank(newGroupId) ? dependency.getGroupId() : newGroupId;
         String replacementArtifactId = StringUtils.isBlank(newArtifactId) ? dependency.getArtifactId() : newArtifactId;
         return new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                .select(new GroupArtifact(replacementGroupId, replacementArtifactId), null,
+                .select(new GroupArtifactVersion(replacementGroupId, replacementArtifactId, currentVersion), null,
                         newVersion, versionPattern, ctx);
     }
 
@@ -85,8 +86,15 @@ final class ChangeDependencyVersionCatalog implements GradleVersionCatalog.Versi
                 dependency.getVersionRef() == null &&
                 (dependency.getVersion() != null || Boolean.TRUE.equals(overrideManagedVersion));
         if (shouldSelectDirectVersion) {
-            selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                    .select(new GroupArtifact(replacementGroupId, replacementArtifactId), null, newVersion, versionPattern, ctx);
+            DependencyVersionSelector selector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+            selectedVersion = dependency.getVersion() == null ?
+                    selector.select(new GroupArtifact(replacementGroupId, replacementArtifactId), null,
+                            newVersion, versionPattern, ctx) :
+                    selector.select(new GroupArtifactVersion(replacementGroupId, replacementArtifactId, dependency.getVersion()),
+                            null, newVersion, versionPattern, ctx);
+            if (selectedVersion == null) {
+                return dependency.getTree();
+            }
         }
         return dependency.withCoordinatesAndVersion(replacementGroupId, replacementArtifactId,
                 selectedVersion, Boolean.TRUE.equals(overrideManagedVersion));

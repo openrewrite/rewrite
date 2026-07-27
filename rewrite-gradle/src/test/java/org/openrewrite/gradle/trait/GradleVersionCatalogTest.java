@@ -93,6 +93,25 @@ class GradleVersionCatalogTest implements RewriteTest {
         assertThat(selections).hasValue(0);
     }
 
+    @Test
+    void ignoresLibsVersionsTomlInNestedGradleBuild() {
+        selections.set(0);
+        rewriteRun(
+          spec -> spec.recipe(new CountingVersionCatalogUpdateRecipe()),
+          toml(
+            """
+              [versions]
+              shared = "1.0"
+
+              [libraries]
+              library = { group = "org.example", name = "library", version.ref = "shared" }
+              """,
+            spec -> spec.path("included-build/gradle/libs.versions.toml")
+          )
+        );
+        assertThat(selections).hasValue(0);
+    }
+
     static class CountingVersionCatalogUpdateRecipe extends Recipe {
         @Override
         public @NonNull String getDisplayName() {

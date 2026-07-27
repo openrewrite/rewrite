@@ -1130,6 +1130,101 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void doesNotPartiallyRelocateModuleWhenVersionSelectionFails() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "99.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void doesNotPartiallyRelocateStringWhenVersionSelectionFails() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "99.x",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = "org.testcontainers:mongodb:1.0.0"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void selectsLatestPatchUsingDirectCatalogVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.apache.commons",
+            "commons-lang3",
+            null,
+            null,
+            "latest.patch",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              library = { module = "org.apache.commons:commons-lang3", version = "3.12.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void selectsLatestPatchUsingReferencedCatalogVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.apache.commons",
+            "commons-lang3",
+            null,
+            null,
+            "latest.patch",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              commons = "3.12.0"
+
+              [libraries]
+              library = { module = "org.apache.commons:commons-lang3", version.ref = "commons" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void dependencyPluginManagedDependencies() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("javax.validation", "validation-api", "jakarta.validation", "jakarta.validation-api", "3.0.x", null, null, true)),

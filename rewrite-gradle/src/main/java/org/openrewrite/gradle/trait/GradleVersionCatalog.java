@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A document-level semantic model for a Gradle version catalog.
+ * A document-level semantic model for the root Gradle version catalog.
  * <p>
  * In addition to indexing catalog entries, this model coordinates changes to shared
  * {@code version.ref} declarations. A referenced version can be changed only when every
@@ -63,7 +63,8 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
     }
 
     /**
-     * Creates a visitor for the conventional {@code libs.versions.toml} catalog.
+     * Creates a visitor for the root project's conventional {@code gradle/libs.versions.toml} catalog.
+     * Catalogs in nested or included builds are not supported.
      * The supplied policy determines which entries are eligible and how their versions are selected;
      * this visitor applies that policy consistently to direct and shared {@code version.ref} entries.
      */
@@ -75,7 +76,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile instanceof Toml.Document &&
-                        sourceFile.getSourcePath().endsWith(CATALOG_PATH);
+                        sourceFile.getSourcePath().equals(CATALOG_PATH);
             }
 
             @Override
