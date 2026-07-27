@@ -608,10 +608,14 @@ public class SemanticallyEqual {
                         !isOfType(fieldType, ((J.Identifier) j).getFieldType()) ||
                         !fieldAccess.getSimpleName().equals(((J.Identifier) j).getSimpleName())) {
                         isEqual.set(false);
-                    } else {
-                        if (fieldType != null && !fieldType.hasFlags(Flag.Static)) {
+                    } else if (fieldType == null) {
+                        // A null field type is either a type reference (`java.util.regex.Pattern` vs `Pattern`)
+                        // or a variable whose type attribution is missing; only the former is safe to compare by name.
+                        if (!isTypeReference(fieldAccess.getName()) || !isTypeReference((J.Identifier) j)) {
                             isEqual.set(false);
                         }
+                    } else if (!fieldType.hasFlags(Flag.Static)) {
+                        isEqual.set(false);
                     }
                     return fieldAccess;
                 }
@@ -710,6 +714,10 @@ public class SemanticallyEqual {
                     // Consider implicit-this "a" equivalent to "this.a"
                     // Definitely does not account for every possible edge case around "this", but handles the common case
                     if (fieldTarget instanceof J.Identifier && "this".equals(((J.Identifier) fieldTarget).getSimpleName())) {
+                        if (identifier.getFieldType() == null || field.getName().getFieldType() == null) {
+                            isEqual.set(false);
+                            return identifier;
+                        }
                         visit(identifier, field.getName());
                         return identifier;
                     }
@@ -1559,6 +1567,12 @@ public class SemanticallyEqual {
                 }
             }
             return firstTypeName;
+        }
+
+        private static boolean isTypeReference(J.Identifier identifier) {
+            return identifier.getFieldType() == null &&
+                   identifier.getType() instanceof JavaType.FullyQualified &&
+                   !(identifier.getType() instanceof JavaType.Unknown);
         }
 
         protected boolean isOfType(JavaType target, JavaType source) {
