@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
@@ -36,6 +37,8 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
+
+    transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "The name of the npm package to add (e.g., `lodash`, `@types/node`).",
@@ -77,6 +80,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
         @Nullable String capturedLockContent;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
@@ -142,6 +146,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            recordFailure(ctx, ps, p);
                             out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
@@ -167,6 +172,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
                     return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
                 }
+                if (lockPs.regenResult != null) {
+                    recordFailure(ctx, lockPs, packagePath);
+                    return Markup.warn(sf, new RuntimeException(
+                            "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                }
                 return tree;
             }
 
@@ -183,5 +193,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
             }
         };
+    }
+
+    private void recordFailure(ExecutionContext ctx, ProjectState ps, Path packageJsonPath) {
+        if (ps.failureRecorded || ps.regenResult == null) {
+            return;
+        }
+        ps.failureRecorded = true;
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
     }
 }

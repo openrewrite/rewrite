@@ -17,20 +17,28 @@ package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.yaml.YamlParser;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.function.Consumer;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 @SuppressWarnings({"unused", "DataFlowIssue"})
 public class Assertions {
@@ -148,6 +156,89 @@ public class Assertions {
         json.after(s -> after);
         spec.accept(json);
         return json;
+    }
+
+    // --- PM-free lock-file factories (pure-Java parsers, no package manager) -----------------
+    // Parse package.json + its lock with in-process parsers so recipe end-to-end tests run
+    // without executing a package manager. The NodeResolutionResult marker is supplied by the
+    // test rather than derived from a real install.
+
+    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+                                          NodeResolutionResult marker) {
+        return packageJson(before, after, marker, s -> {
+        });
+    }
+
+    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+                                          NodeResolutionResult marker, Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, JsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package.json");
+        if (after != null) {
+            json.after(s -> after);
+        }
+        json.markers(marker);
+        spec.accept(json);
+        return json;
+    }
+
+    public static SourceSpecs packageLock(@Language("json") @Nullable String before, @Language("json") @Nullable String after) {
+        return packageLock(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs packageLock(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+                                          Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, JsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package-lock.json");
+        if (after != null) {
+            json.after(s -> after);
+        }
+        spec.accept(json);
+        return json;
+    }
+
+    public static SourceSpecs pnpmLock(@Language("yaml") @Nullable String before, @Language("yaml") @Nullable String after) {
+        return pnpmLock(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs pnpmLock(@Language("yaml") @Nullable String before, @Language("yaml") @Nullable String after,
+                                       Consumer<SourceSpec<Yaml.Documents>> spec) {
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(
+                Yaml.Documents.class, null, YamlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        yaml.path("pnpm-lock.yaml");
+        if (after != null) {
+            yaml.after(s -> after);
+        }
+        spec.accept(yaml);
+        return yaml;
+    }
+
+    /** A minimal {@link NodeResolutionResult} for PM-free recipe tests, carrying the declared deps and package manager. */
+    public static NodeResolutionResult nodeResolutionResult(PackageManager pm, Dependency... dependencies) {
+        return new NodeResolutionResult(
+                Tree.randomId(), null, null, null, "package.json", null,
+                Arrays.asList(dependencies),
+                emptyList(), emptyList(), emptyList(), emptyList(),
+                emptyList(), pm, null, null);
+    }
+
+    public static Dependency dependency(String name, String versionConstraint) {
+        return new Dependency(name, versionConstraint, null);
     }
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before) {
