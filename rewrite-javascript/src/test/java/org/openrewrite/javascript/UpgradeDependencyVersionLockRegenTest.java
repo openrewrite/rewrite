@@ -98,6 +98,35 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
     }
 
     @Test
+    void npmWorkspaceMemberBumpRegeneratesRootLockByteExact() {
+        routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
+
+        // A monorepo with one root lock covering member manifests. The recipe edits the member's dep;
+        // the root package-lock.json must regenerate with the member's importer re-pinned.
+        String rootPkg = "{\n" +
+                "  \"name\": \"npm-lock-ws\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"workspaces\": [\n" +
+                "    \"packages/*\"\n" +
+                "  ]\n" +
+                "}\n";
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "3.0.1")).executionContext(ctx),
+                packageJson(rootPkg, null,
+                        nodeResolutionResult(PackageManager.Npm, singletonList("packages/foo/package.json"))),
+                packageJson(resource("lock/npm/workspace/pkg-before"), resource("lock/npm/workspace/pkg-after"),
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
+                        s -> s.path("packages/foo/package.json")),
+                packageLock(resource("lock/npm/workspace/before"), resource("lock/npm/workspace/after"),
+                        s -> s.noTrim().afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("successful regeneration must not warn").isEmpty()))
+        );
+    }
+
+    @Test
     void pnpmClosureUnchangedBumpRegeneratesLockByteExact() {
         routes.put("https://registry.npmjs.org/ms", resource("lock/pnpm/v9/http/ms"));
         routes.put("https://registry.npmjs.org/ms/2.1.2", resource("lock/pnpm/v9/http/ms-2.1.2"));

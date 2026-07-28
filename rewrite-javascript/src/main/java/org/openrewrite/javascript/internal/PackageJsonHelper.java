@@ -32,6 +32,7 @@ import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -53,6 +54,26 @@ public class PackageJsonHelper {
     /** Map a lock file path to the sibling {@code package.json}. */
     public static Path correspondingPackageJsonPath(Path lockFilePath) {
         return lockFilePath.resolveSibling("package.json");
+    }
+
+    /**
+     * Resolve the source paths of a workspace root's member {@code package.json} files from its
+     * {@link NodeResolutionResult#getWorkspacePackagePaths()} (each relative to the root manifest's
+     * directory). Empty when the manifest is not a workspace root. Lets a recipe pair a root lock with
+     * the member manifests it covers, so an edit to a member regenerates the ancestor root lock.
+     */
+    public static List<Path> workspaceMemberPaths(SourceFile rootPackageJson) {
+        NodeResolutionResult marker = rootPackageJson.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || marker.getWorkspacePackagePaths() == null) {
+            return Collections.emptyList();
+        }
+        Path base = rootPackageJson.getSourcePath().getParent();
+        List<Path> members = new ArrayList<>();
+        for (String rel : marker.getWorkspacePackagePaths()) {
+            members.add((base == null ? Paths.get(rel) : base.resolve(rel)).normalize());
+        }
+        return members;
     }
 
     // --- ctx side-channel for cross-recipe chaining ----------------------

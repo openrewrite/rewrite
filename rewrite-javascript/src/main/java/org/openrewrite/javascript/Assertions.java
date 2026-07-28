@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
@@ -230,8 +231,18 @@ public class Assertions {
 
     /** A minimal {@link NodeResolutionResult} for PM-free recipe tests, carrying the declared deps and package manager. */
     public static NodeResolutionResult nodeResolutionResult(PackageManager pm, Dependency... dependencies) {
+        return nodeResolutionResult(pm, null, dependencies);
+    }
+
+    /**
+     * A {@link NodeResolutionResult} for a workspace root, additionally carrying the resolved member
+     * {@code package.json} paths (relative to the root manifest's directory).
+     */
+    public static NodeResolutionResult nodeResolutionResult(PackageManager pm,
+                                                            @Nullable List<String> workspacePackagePaths,
+                                                            Dependency... dependencies) {
         return new NodeResolutionResult(
-                Tree.randomId(), null, null, null, "package.json", null,
+                Tree.randomId(), null, null, null, "package.json", workspacePackagePaths,
                 Arrays.asList(dependencies),
                 emptyList(), emptyList(), emptyList(), emptyList(),
                 emptyList(), pm, null, null);

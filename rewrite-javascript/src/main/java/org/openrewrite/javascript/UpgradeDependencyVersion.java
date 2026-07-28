@@ -165,6 +165,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        linkWorkspaceMembers(acc);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -204,29 +205,34 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 Path packagePath = acc.lockToPackage.get(p);
                 if (packagePath == null) return tree;
-                ProjectState lockPs = acc.projects.get(packagePath);
-                if (lockPs == null) return tree;
-                if (lockPs.modifiedPackageJson == null) {
-                    SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
-                    if (pkg == null) pkg = lockPs.capturedPackageJson;
-                    // If scanner found no matches on the original tree, recompute from live tree.
-                    if (lockPs.matchedDeps != null && lockPs.matchedDeps.isEmpty() && pkg != null) {
-                        lockPs.matchedDeps = findMatches(pkg);
-                    }
-                    if (pkg != null && lockPs.matchedDeps != null && !lockPs.matchedDeps.isEmpty()) {
-                        ensureComputed(lockPs, pkg, ctx);
-                        if (lockPs.modifiedPackageJson != null) {
-                            PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
+                ProjectState rootPs = acc.projects.get(packagePath);
+                if (rootPs == null) return tree;
+
+                for (Path importer : lockImporters(acc, packagePath, rootPs)) {
+                    ProjectState ips = acc.projects.get(importer);
+                    if (ips == null) continue;
+                    if (ips.modifiedPackageJson == null) {
+                        SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
+                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        // If the scanner found no matches on the original tree, recompute from the live tree.
+                        if (ips.matchedDeps != null && ips.matchedDeps.isEmpty() && pkg != null) {
+                            ips.matchedDeps = findMatches(pkg);
+                        }
+                        if (pkg != null && ips.matchedDeps != null && !ips.matchedDeps.isEmpty()) {
+                            ensureComputed(ips, pkg, ctx);
+                            if (ips.modifiedPackageJson != null) {
+                                PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
+                            }
                         }
                     }
-                }
-                if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
-                    return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
-                }
-                if (lockPs.regenResult != null) {
-                    recordFailure(ctx, lockPs, packagePath);
-                    return Markup.warn(sf, new RuntimeException(
-                            "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                    if (ips.regenResult != null) {
+                        if (ips.regenResult.isSuccess()) {
+                            return PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
+                        }
+                        recordFailure(ctx, ips, importer);
+                        return Markup.warn(sf, new RuntimeException(
+                                "lock regeneration failed: " + ips.regenResult.getErrorMessage()));
+                    }
                 }
                 return tree;
             }
@@ -254,5 +260,38 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
         ps.failureRecorded = true;
         LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
+    }
+
+    /**
+     * Link each workspace-member {@code package.json} to the ancestor root lock, so editing a member
+     * regenerates that lock. A member with its own sibling lock keeps it.
+     */
+    private void linkWorkspaceMembers(Accumulator acc) {
+        for (Map.Entry<Path, Path> e : acc.lockToPackage.entrySet()) {
+            ProjectState root = acc.projects.get(e.getValue());
+            if (root == null || root.capturedPackageJson == null || root.capturedLockContent == null) {
+                continue;
+            }
+            for (Path member : PackageJsonHelper.workspaceMemberPaths(root.capturedPackageJson)) {
+                ProjectState memberPs = acc.projects.get(member);
+                if (memberPs != null && memberPs.capturedLockContent == null) {
+                    memberPs.capturedLockContent = root.capturedLockContent;
+                }
+            }
+        }
+    }
+
+    /** The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers. */
+    private List<Path> lockImporters(Accumulator acc, Path packagePath, ProjectState rootPs) {
+        List<Path> importers = new ArrayList<>();
+        importers.add(packagePath);
+        if (rootPs.capturedPackageJson != null) {
+            for (Path member : PackageJsonHelper.workspaceMemberPaths(rootPs.capturedPackageJson)) {
+                if (!member.equals(packagePath) && acc.projects.containsKey(member)) {
+                    importers.add(member);
+                }
+            }
+        }
+        return importers;
     }
 }
