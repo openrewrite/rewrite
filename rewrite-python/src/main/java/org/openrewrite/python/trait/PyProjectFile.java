@@ -284,9 +284,9 @@ public class PyProjectFile implements PythonDependencyFile {
                         value);
 
                 List<Toml> values = t.getValues();
-                Space entryPrefix = !values.isEmpty()
-                        ? values.get(values.size() - 1).getPrefix()
-                        : Space.format("\n");
+                Space entryPrefix = values.isEmpty()
+                        ? Space.format("\n")
+                        : values.get(values.size() - 1).getPrefix();
                 newKv = newKv.withPrefix(entryPrefix);
 
                 return t.withValues(concat(values, newKv));
@@ -412,7 +412,7 @@ public class PyProjectFile implements PythonDependencyFile {
 
     private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {
         try {
-            Cursor arrayCursor = cursor.dropParentUntil(v -> v instanceof Toml.Array);
+            Cursor arrayCursor = cursor.dropParentUntil(Toml.Array.class::isInstance);
             return PyProjectHelper.isInsideDependencyArray(arrayCursor, scope, groupName);
         } catch (IllegalStateException e) {
             return false;

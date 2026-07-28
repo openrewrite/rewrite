@@ -23,6 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -30,7 +31,6 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.DependenciesDeclared;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
-import org.openrewrite.Validated;
 
 @Value
 @EqualsAndHashCode(callSuper = false)

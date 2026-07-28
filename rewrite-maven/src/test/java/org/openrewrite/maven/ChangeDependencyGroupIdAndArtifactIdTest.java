@@ -926,7 +926,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactId() {
-       var recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", null, null, null, null);;
+       var recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", null, null, null, null);
         assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
             .contains("newGroupId OR newArtifactId must be different from before");
     }

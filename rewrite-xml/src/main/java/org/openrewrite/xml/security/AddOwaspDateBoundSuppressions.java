@@ -66,7 +66,7 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (SUPPRESS_WITHOUT_UNTIL.matches(getCursor())) {
-                    String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plusDays(30).toString();
+                    String date = untilDate != null && !untilDate.isEmpty() ? untilDate : LocalDate.now().plusDays(30).toString();
                     return t.withAttributes(ListUtils.concat(t.getAttributes(), autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
                             new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                             "",

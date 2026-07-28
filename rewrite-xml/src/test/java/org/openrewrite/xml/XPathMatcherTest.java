@@ -698,7 +698,7 @@ class XPathMatcherTest {
 
     private int matchCount(@Language("xpath") String xpath, SourceFile x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
-        return (new XmlVisitor<AtomicInteger>() {
+        return new XmlVisitor<AtomicInteger>() {
             @Override
             public Xml visitTag(Xml.Tag tag, AtomicInteger ctx) {
                 if (matcher.matches(getCursor())) {
@@ -714,7 +714,7 @@ class XPathMatcherTest {
                 }
                 return super.visitAttribute(attribute, ctx);
             }
-        }).reduce(x, new AtomicInteger()).get();
+        }.reduce(x, new AtomicInteger()).get();
     }
 
     @Test

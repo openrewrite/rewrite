@@ -43,8 +43,8 @@ public class XmlReceiver extends XmlVisitor<RpcReceiveQueue> {
     @Override
     public Xml visitDocument(Xml.Document document, RpcReceiveQueue q) {
         Xml.Document d = document;
-        d = d.withSourcePath(q.<Path, String>receiveAndGet(d.getSourcePath(), Paths::get));
-        d = (Xml.Document) d.withCharset(q.<Charset, String>receiveAndGet(d.getCharset(), Charset::forName));
+        d = d.withSourcePath(q.receiveAndGet(d.getSourcePath(), Paths::get));
+        d = (Xml.Document) d.withCharset(q.receiveAndGet(d.getCharset(), Charset::forName));
         d = d.withCharsetBomMarked(q.receive(d.isCharsetBomMarked()));
         d = d.withChecksum(q.receive(d.getChecksum()));
         d = d.withFileAttributes(q.receive(d.getFileAttributes()));
@@ -92,7 +92,9 @@ public class XmlReceiver extends XmlVisitor<RpcReceiveQueue> {
         // Tag.withName() has a custom implementation that NPEs on Objenesis-created objects.
         // Build a new Tag if name is being set on an uninitialized object.
         String name = q.receive(tag.getName());
-        if (name == null) name = tag.getName() != null ? tag.getName() : "";
+        if (name == null) {
+            name = tag.getName() != null ? tag.getName() : "";
+        }
         Xml.Tag t = tag.getName() == null ?
                 new Xml.Tag(tag.getId(), tag.getPrefix(), tag.getMarkers(), name,
                         tag.getAttributes() != null ? tag.getAttributes() : java.util.Collections.emptyList(),
@@ -123,7 +125,7 @@ public class XmlReceiver extends XmlVisitor<RpcReceiveQueue> {
     @Override
     public Xml visitAttributeValue(Xml.Attribute.Value value, RpcReceiveQueue q) {
         return value
-                .withQuote(q.<Xml.Attribute.Value.Quote, String>receiveAndGet(value.getQuote(), Xml.Attribute.Value.Quote::valueOf))
+                .withQuote(q.receiveAndGet(value.getQuote(), Xml.Attribute.Value.Quote::valueOf))
                 .withValue(q.receive(value.getValue()));
     }
 

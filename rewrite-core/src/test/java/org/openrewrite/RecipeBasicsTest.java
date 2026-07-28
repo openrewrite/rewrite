@@ -170,7 +170,7 @@ class RecipeBasicsTest {
     void enumMethodOptionDeducesValidValues() {
         RecipeDescriptor d = new RecipeWithEnumMethod(Color.GREEN).createRecipeDescriptor();
         OptionDescriptor opt = d.getOptions().stream()
-                .filter(o -> o.getName().equals("color"))
+                .filter(o -> "color".equals(o.getName()))
                 .findFirst().orElseThrow();
         assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
     }

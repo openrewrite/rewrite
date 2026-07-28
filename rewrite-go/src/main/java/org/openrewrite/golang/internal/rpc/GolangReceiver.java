@@ -17,10 +17,10 @@ package org.openrewrite.golang.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
@@ -353,9 +353,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                     });
             importStmt = importStmt.withQualid(qualid);
 
-            importStmt = importStmt.getPadding().withAlias(
+            return importStmt.getPadding().withAlias(
                     q.receive(importStmt.getPadding().getAlias(), a -> visitLeftPadded(a, q)));
-            return importStmt;
         }
     }
 }

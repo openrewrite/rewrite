@@ -43,7 +43,7 @@ public class JavaNamingService implements NamingService {
                         }
                     } else {
                         if (!Character.isLetterOrDigit(c)) {
-                            while ((!Character.isLetterOrDigit(c) || c > 'z')) {
+                            while (!Character.isLetterOrDigit(c) || c > 'z') {
                                 i++;
                                 if (i < nameLength) {
                                     c = oldMethodName.charAt(i);

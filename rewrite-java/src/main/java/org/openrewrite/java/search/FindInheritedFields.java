@@ -27,7 +27,7 @@ import java.util.Set;
 
 import static java.util.Collections.emptySet;
 
-public class FindInheritedFields {
+public final class FindInheritedFields {
     private FindInheritedFields() {
     }
 

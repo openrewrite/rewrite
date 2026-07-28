@@ -55,8 +55,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     @Nullable
     private final FileAttributes fileAttributes;
 
-    private int cursor = 0;
-    private int codePointCursor = 0;
+    private int cursor;
+    private int codePointCursor;
 
     public TomlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
         this.path = path;
@@ -201,7 +201,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     public Toml visitString(TomlParser.StringContext ctx) {
         return convert(ctx, (c, prefix) -> {
             String string = c.getText();
-            String value = (string.startsWith("\"\"\"") || string.startsWith("'''"))
+            String value = string.startsWith("\"\"\"") || string.startsWith("'''")
                     ? string.substring(3, string.length() - 3)
                     : string.substring(1, string.length() - 1);
             return new Toml.Literal(

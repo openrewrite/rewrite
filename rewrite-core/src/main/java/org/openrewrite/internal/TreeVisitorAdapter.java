@@ -36,7 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public class TreeVisitorAdapter {
+public final class TreeVisitorAdapter {
     private static final Integer classCreationLock = 1;
     private static final Map<ClassLoader, TreeVisitorAdapterClassLoader> classLoaders = new IdentityHashMap<>();
 

@@ -19,7 +19,6 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
@@ -29,6 +28,7 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
@@ -206,11 +206,15 @@ public class PackageJsonHelper {
         }
         List<Dependency> out = new ArrayList<>();
         for (Json m : scope.getMembers()) {
-            if (!(m instanceof Json.Member)) continue;
+            if (!(m instanceof Json.Member)) {
+                continue;
+            }
             Json.Member member = (Json.Member) m;
             String key = literalString(member.getKey());
             String value = literalString(member.getValue());
-            if (key == null || value == null) continue;
+            if (key == null || value == null) {
+                continue;
+            }
             Dependency prior = previousByName.get(key);
             // Preserve resolved-dep linkage when version constraint is unchanged.
             if (prior != null && value.equals(prior.getVersionConstraint())) {
@@ -348,7 +352,9 @@ public class PackageJsonHelper {
      * present the document is returned unchanged.
      */
     public static Json.Document addDependency(Json.Document doc, String name, String version, String scope) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 
         Json.JsonObject existingScope = findObjectMember(root, scope);
@@ -385,7 +391,7 @@ public class PackageJsonHelper {
         // Check if the existing scope is effectively empty (contains only Json.Empty placeholder).
         // The TypeScript JSON parser represents {} as a single Json.Empty member.
         boolean scopeEffectivelyEmpty = existingScope.getMembers().stream()
-                .allMatch(m -> m instanceof Json.Empty);
+                .allMatch(Json.Empty.class::isInstance);
 
         Json.JsonObject updatedScope;
         if (scopeEffectivelyEmpty) {
@@ -410,7 +416,9 @@ public class PackageJsonHelper {
      * Returns the document unchanged if no matching member was found in any scope.
      */
     public static Json.Document removeDependency(Json.Document doc, String name, Set<String> scopes) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 
         List<JsonRightPadded<Json>> rootMembers = new ArrayList<>(root.getPadding().getMembers());
@@ -418,11 +426,17 @@ public class PackageJsonHelper {
 
         for (int i = 0; i < rootMembers.size(); i++) {
             Json elem = rootMembers.get(i).getElement();
-            if (!(elem instanceof Json.Member)) continue;
+            if (!(elem instanceof Json.Member)) {
+                continue;
+            }
             Json.Member m = (Json.Member) elem;
             String key = literalString(m.getKey());
-            if (key == null || !scopes.contains(key)) continue;
-            if (!(m.getValue() instanceof Json.JsonObject)) continue;
+            if (key == null || !scopes.contains(key)) {
+                continue;
+            }
+            if (!(m.getValue() instanceof Json.JsonObject)) {
+                continue;
+            }
             Json.JsonObject scopeObj = (Json.JsonObject) m.getValue();
 
             List<JsonRightPadded<Json>> kept = new ArrayList<>();
@@ -450,7 +464,9 @@ public class PackageJsonHelper {
             Json.JsonObject newScope = scopeObj.getPadding().withMembers(kept);
             rootMembers.set(i, rootMembers.get(i).withElement(m.withValue(newScope)));
         }
-        if (!changed) return doc;
+        if (!changed) {
+            return doc;
+        }
 
         // If we removed a top-level member, also fix the trailing whitespace of the new last root member.
         if (rootMembers.size() < root.getPadding().getMembers().size() && !rootMembers.isEmpty()) {
@@ -551,22 +567,32 @@ public class PackageJsonHelper {
 
         for (int i = 0; i < rootMembers.size(); i++) {
             Json elem = rootMembers.get(i).getElement();
-            if (!(elem instanceof Json.Member)) continue;
+            if (!(elem instanceof Json.Member)) {
+                continue;
+            }
             Json.Member m = (Json.Member) elem;
             String scopeKey = literalString(m.getKey());
             Set<String> targetNames = scopeKey == null ? null : scopeToNames.get(scopeKey);
-            if (targetNames == null || !(m.getValue() instanceof Json.JsonObject)) continue;
+            if (targetNames == null || !(m.getValue() instanceof Json.JsonObject)) {
+                continue;
+            }
             Json.JsonObject scope = (Json.JsonObject) m.getValue();
 
             List<JsonRightPadded<Json>> children = new ArrayList<>(scope.getPadding().getMembers());
             boolean scopeChanged = false;
             for (int j = 0; j < children.size(); j++) {
                 Json child = children.get(j).getElement();
-                if (!(child instanceof Json.Member)) continue;
+                if (!(child instanceof Json.Member)) {
+                    continue;
+                }
                 Json.Member depMember = (Json.Member) child;
                 String name = literalString(depMember.getKey());
-                if (name == null || !targetNames.contains(name)) continue;
-                if (!(depMember.getValue() instanceof Json.Literal)) continue;
+                if (name == null || !targetNames.contains(name)) {
+                    continue;
+                }
+                if (!(depMember.getValue() instanceof Json.Literal)) {
+                    continue;
+                }
                 Json.Literal newLit = makeStringLiteral(newVersion);
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
                 newLit = newLit.withPrefix(oldLit.getPrefix());
@@ -579,7 +605,9 @@ public class PackageJsonHelper {
                 changed = true;
             }
         }
-        if (!changed) return doc;
+        if (!changed) {
+            return doc;
+        }
         return doc.withValue(root.getPadding().withMembers(rootMembers));
     }
 
@@ -587,7 +615,9 @@ public class PackageJsonHelper {
                                                  String oldName, String newName,
                                                  @Nullable String newVersion,
                                                  @Nullable String scope) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 
         List<JsonRightPadded<Json>> rootMembers = new ArrayList<>(root.getPadding().getMembers());
@@ -595,22 +625,36 @@ public class PackageJsonHelper {
 
         for (int i = 0; i < rootMembers.size(); i++) {
             Json elem = rootMembers.get(i).getElement();
-            if (!(elem instanceof Json.Member)) continue;
+            if (!(elem instanceof Json.Member)) {
+                continue;
+            }
             Json.Member scopeMember = (Json.Member) elem;
             String scopeKey = literalString(scopeMember.getKey());
-            if (scopeKey == null) continue;
-            if (scope != null && !scope.equals(scopeKey)) continue;
-            if (!isDeclaredScope(scopeKey)) continue;
-            if (!(scopeMember.getValue() instanceof Json.JsonObject)) continue;
+            if (scopeKey == null) {
+                continue;
+            }
+            if (scope != null && !scope.equals(scopeKey)) {
+                continue;
+            }
+            if (!isDeclaredScope(scopeKey)) {
+                continue;
+            }
+            if (!(scopeMember.getValue() instanceof Json.JsonObject)) {
+                continue;
+            }
             Json.JsonObject scopeObj = (Json.JsonObject) scopeMember.getValue();
 
             List<JsonRightPadded<Json>> children = new ArrayList<>(scopeObj.getPadding().getMembers());
             boolean scopeChanged = false;
             for (int j = 0; j < children.size(); j++) {
                 Json child = children.get(j).getElement();
-                if (!(child instanceof Json.Member)) continue;
+                if (!(child instanceof Json.Member)) {
+                    continue;
+                }
                 Json.Member depMember = (Json.Member) child;
-                if (!oldName.equals(literalString(depMember.getKey()))) continue;
+                if (!oldName.equals(literalString(depMember.getKey()))) {
+                    continue;
+                }
 
                 Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
                 Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());

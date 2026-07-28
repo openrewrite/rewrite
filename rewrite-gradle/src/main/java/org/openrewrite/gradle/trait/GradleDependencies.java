@@ -126,7 +126,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                 }
 
                 GradleProject gradleProject = getGradleProject(cursor);
-                if (gradleProject == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation))) {
+                if (gradleProject == null && !DEPENDENCY_DSL_MATCHER.matches(methodInvocation)) {
                     return null;
                 }
 
@@ -143,7 +143,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
         private final Cursor cursor;
 
         public Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
-            return mapStatements(mapper, (J.Return::withExpression));
+            return mapStatements(mapper, J.Return::withExpression);
         }
 
         public Block mapStatements(Function<Statement, @Nullable Statement> mapper, BiFunction<J.Return, Expression, J.Return> returnMapper) {

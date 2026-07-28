@@ -496,7 +496,7 @@ class GeneratesCompilationUnitMissingTypes extends ScanningRecipe<AtomicBoolean>
     public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
         return JavaParser.fromJavaVersion().build()
           .parse("public class A {\n    void foo() {\n    }\n}\n")
-          .map(cu -> (J.CompilationUnit) cu)
+          .map(J.CompilationUnit.class::cast)
           .map(cu -> cu.withClasses(cu.getClasses().stream()
             .map(c -> c.withType(null))
             .collect(Collectors.toList())))

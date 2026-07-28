@@ -54,11 +54,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     /**
      * Track position within the file by character
      */
-    private int cursor = 0;
+    private int cursor;
     /**
      * Track parsing position within the file by Unicode code point
      */
-    private int codePointCursor = 0;
+    private int codePointCursor;
 
     public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;

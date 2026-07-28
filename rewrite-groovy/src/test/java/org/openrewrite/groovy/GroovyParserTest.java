@@ -15,13 +15,14 @@
  */
 package org.openrewrite.groovy;
 
-import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.stream.Stream;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 

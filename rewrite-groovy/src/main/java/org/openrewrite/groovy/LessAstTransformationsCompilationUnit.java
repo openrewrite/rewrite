@@ -38,8 +38,8 @@ public class LessAstTransformationsCompilationUnit extends CompilationUnit {
     private static final int CONVERT_ENUM_OPERATION = 0;
     private static final int STATIC_IMPORT_OPERATION = 0;
 
-    private int conversionOperation = 0;
-    private int semanticAnalysisOperation = 0;
+    private int conversionOperation;
+    private int semanticAnalysisOperation;
 
     public LessAstTransformationsCompilationUnit(CompilerConfiguration configuration, @Nullable CodeSource codeSource, GroovyClassLoader loader, GroovyClassLoader transformLoader) {
         super(configuration, codeSource, loader, transformLoader);

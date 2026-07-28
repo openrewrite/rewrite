@@ -391,7 +391,7 @@ class AutoFormatVisitorTest implements RewriteTest {
           spec -> spec.parser(KotlinParser.builder().styles(singletonList(
             new NamedStyles(
               randomId(), "test", "test", "test", emptySet(),
-              singletonList((AddImportTest.importAliasesSeparatelyStyle()))
+              singletonList(AddImportTest.importAliasesSeparatelyStyle())
             )
           ))),
           kotlin(

@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class HclContainer<T> {
+public final class HclContainer<T> {
     private transient Padding<T> padding;
 
     private static final HclContainer<?> EMPTY = new HclContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);

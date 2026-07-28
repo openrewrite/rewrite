@@ -27,7 +27,7 @@ import static org.openrewrite.semver.Semver.isVersion;
 /**
  * <a href="https://github.com/npm/node-semver#hyphen-ranges-xyz---abc">Hyphen ranges</a>.
  */
-public class HyphenRange extends LatestRelease {
+public final class HyphenRange extends LatestRelease {
     private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)\\s*-\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)");
 
     private final String upper;

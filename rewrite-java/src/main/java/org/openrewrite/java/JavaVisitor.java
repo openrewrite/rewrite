@@ -88,7 +88,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
-        JavaSourceFile cu = (j instanceof JavaSourceFile) ?
+        JavaSourceFile cu = j instanceof JavaSourceFile ?
                 (JavaSourceFile) j :
                 getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         AutoFormatService service = cu.service(AutoFormatService.class);
@@ -121,7 +121,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (before == after) {
             return after;
         }
-        JavaSourceFile cu = (after instanceof JavaSourceFile) ?
+        JavaSourceFile cu = after instanceof JavaSourceFile ?
                 (JavaSourceFile) after :
                 getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         AutoFormatService service = cu.service(AutoFormatService.class);
@@ -1358,7 +1358,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
         Markers markers = visitMarkers(right.getMarkers(), p);
-        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+        return after == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ?
                 right : new JRightPadded<>(t, after, markers);
     }
 

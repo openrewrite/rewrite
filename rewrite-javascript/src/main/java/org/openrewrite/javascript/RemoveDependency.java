@@ -29,12 +29,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -82,7 +77,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -98,7 +95,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
@@ -110,19 +109,30 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     private @Nullable Set<String> findContainingScopes(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return null;
+        if (marker == null) {
+            return null;
+        }
         Set<String> result = new LinkedHashSet<>();
         addIfPresent(result, "dependencies", marker.getDependencies());
         addIfPresent(result, "devDependencies", marker.getDevDependencies());
         addIfPresent(result, "peerDependencies", marker.getPeerDependencies());
         addIfPresent(result, "optionalDependencies", marker.getOptionalDependencies());
         addIfPresent(result, "bundledDependencies", marker.getBundledDependencies());
-        if (scope != null) result.retainAll(Collections.singleton(scope));
+        if (scope != null) {
+            result.retainAll(Collections.singleton(scope));
+        }
         return result.isEmpty() ? null : result;
     }
 
     private void addIfPresent(Set<String> out, String name, @Nullable List<Dependency> deps) {
-        if (deps != null) for (Dependency d : deps) if (packageName.equals(d.getName())) { out.add(name); return; }
+        if (deps != null) {
+            for (Dependency d : deps) {
+                if (packageName.equals(d.getName())) {
+                    out.add(name);
+                    return;
+                }
+            }
+        }
     }
 
     @Override
@@ -130,7 +140,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -151,12 +163,18 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 ProjectState lockPs = acc.projects.get(packagePath);
-                if (lockPs == null) return tree;
+                if (lockPs == null) {
+                    return tree;
+                }
                 if (lockPs.modifiedPackageJson == null) {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
-                    if (pkg == null) pkg = lockPs.capturedPackageJson;
+                    if (pkg == null) {
+                        pkg = lockPs.capturedPackageJson;
+                    }
                     if (pkg != null && (lockPs.scopesContainingPackage = findContainingScopes(pkg)) != null) {
                         ensureComputed(lockPs, pkg);
                         if (lockPs.modifiedPackageJson != null) {
@@ -171,8 +189,12 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
             }
 
             private void ensureComputed(ProjectState ps, SourceFile pkg) {
-                if (ps.modifiedPackageJson != null) return;
-                if (ps.scopesContainingPackage == null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
+                if (ps.scopesContainingPackage == null) {
+                    return;
+                }
                 Set<String> scopes = ps.scopesContainingPackage;
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,

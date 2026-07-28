@@ -86,7 +86,7 @@ public class DockerParser implements Parser {
         return prefix.resolve("Dockerfile");
     }
 
-    private static class ForwardingErrorListener extends BaseErrorListener {
+    private static final class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 

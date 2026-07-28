@@ -16,8 +16,8 @@
 package org.openrewrite.python.internal.index;
 
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.python.internal.Hashing;
 import org.openrewrite.python.PythonPackageIndex;
+import org.openrewrite.python.internal.Hashing;
 import org.openrewrite.python.internal.index.PythonIndexException.Reason;
 
 import java.io.IOException;

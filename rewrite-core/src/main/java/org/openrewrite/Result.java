@@ -17,13 +17,13 @@ package org.openrewrite;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.binary.Binary;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.binary.Binary;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 

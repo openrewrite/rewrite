@@ -41,8 +41,8 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
-        return document.withSourcePath(q.<Path, String>receiveAndGet(document.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(document.getCharset(), Charset::forName))
+        return document.withSourcePath(q.receiveAndGet(document.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(document.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(document.isCharsetBomMarked()))
                 .withChecksum(q.receive(document.getChecksum()))
                 .withFileAttributes(q.receive(document.getFileAttributes()))

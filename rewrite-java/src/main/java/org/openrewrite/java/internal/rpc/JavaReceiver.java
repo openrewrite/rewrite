@@ -159,11 +159,11 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, RpcReceiveQueue q) {
         return cu
-                .withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
+                .withSourcePath(q.receiveAndGet(cu.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
-                .<J.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
+                .withFileAttributes(q.receive(cu.getFileAttributes()))
                 .getPadding().withPackageDeclaration(q.receive(cu.getPadding().getPackageDeclaration(), p -> visitRightPadded(p, q)))
                 .getPadding().withImports(q.receiveList(cu.getPadding().getImports(), i -> visitRightPadded(i, q)))
                 .withClasses(q.receiveList(cu.getClasses(), c -> (J.ClassDeclaration) visitNonNull(c, q)))

@@ -131,7 +131,7 @@ public class AddUserInstruction extends Recipe {
                 String lastGroupName = extractText(lastUser.getGroup());
 
                 boolean userMatches = userName.equals(lastUserName);
-                boolean groupMatches = (groupName == null || groupName.isEmpty()) ?
+                boolean groupMatches = groupName == null || groupName.isEmpty() ?
                         (lastGroupName == null || lastGroupName.isEmpty()) :
                         groupName.equals(lastGroupName);
 

@@ -87,7 +87,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -103,7 +105,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
@@ -115,15 +119,23 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
     private boolean matchesAdd(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return false;
+        if (marker == null) {
+            return false;
+        }
         return notIn(marker.getDependencies()) && notIn(marker.getDevDependencies())
                 && notIn(marker.getPeerDependencies()) && notIn(marker.getOptionalDependencies())
                 && notIn(marker.getBundledDependencies());
     }
 
     private boolean notIn(@Nullable List<Dependency> deps) {
-        if (deps == null) return true;
-        for (Dependency d : deps) if (packageName.equals(d.getName())) return false;
+        if (deps == null) {
+            return true;
+        }
+        for (Dependency d : deps) {
+            if (packageName.equals(d.getName())) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -132,7 +144,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -153,12 +167,18 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 ProjectState lockPs = acc.projects.get(packagePath);
-                if (lockPs == null) return tree;
+                if (lockPs == null) {
+                    return tree;
+                }
                 if (lockPs.modifiedPackageJson == null) {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
-                    if (pkg == null) pkg = lockPs.capturedPackageJson;
+                    if (pkg == null) {
+                        pkg = lockPs.capturedPackageJson;
+                    }
                     if (pkg != null && matchesAdd(pkg)) {
                         ensureComputed(lockPs, pkg);
                         if (lockPs.modifiedPackageJson != null) {
@@ -173,7 +193,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
             }
 
             private void ensureComputed(ProjectState ps, SourceFile pkg) {
-                if (ps.modifiedPackageJson != null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,
                         doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope()),

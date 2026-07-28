@@ -124,7 +124,7 @@ class CSharpSenderDocCommentTest {
 
         CsDocComment.DocComment doc = new CsDocComment.DocComment(Tree.randomId(), Markers.EMPTY,
                 List.of(text(" "), lineBreak("\n///"), text(" "), summary), "\n");
-        return Space.EMPTY.withComments(List.<Comment>of(doc));
+        return Space.EMPTY.withComments(List.of(doc));
     }
 
     private static CsDocComment.XmlText text(String value) {

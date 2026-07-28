@@ -39,8 +39,8 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
     @Override
     public Yaml visitDocuments(Yaml.Documents documents, RpcReceiveQueue q) {
         Yaml.Documents d = documents;
-        d = d.withSourcePath(q.<Path, String>receiveAndGet(d.getSourcePath(), Paths::get));
-        d = (Yaml.Documents) d.withCharset(q.<Charset, String>receiveAndGet(d.getCharset(), Charset::forName));
+        d = d.withSourcePath(q.receiveAndGet(d.getSourcePath(), Paths::get));
+        d = (Yaml.Documents) d.withCharset(q.receiveAndGet(d.getCharset(), Charset::forName));
         d = d.withCharsetBomMarked(q.receive(d.isCharsetBomMarked()));
         d = d.withChecksum(q.receive(d.getChecksum()));
         d = d.withFileAttributes(q.receive(d.getFileAttributes()));
@@ -94,7 +94,7 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, RpcReceiveQueue q) {
         return scalar
-                .withStyle(q.<Yaml.Scalar.Style, String>receiveAndGet(scalar.getStyle(), Yaml.Scalar.Style::valueOf))
+                .withStyle(q.receiveAndGet(scalar.getStyle(), Yaml.Scalar.Style::valueOf))
                 .withAnchor(q.receive(scalar.getAnchor(), a -> (Yaml.Anchor) visitNonNull(a, q)))
                 .withTag(q.receive(scalar.getTag(), t -> (Yaml.Tag) visitNonNull(t, q)))
                 .withValue(q.receive(scalar.getValue()));
@@ -135,6 +135,6 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
         return tag
                 .withName(q.receive(tag.getName()))
                 .withSuffix(q.receive(tag.getSuffix()))
-                .withKind(q.<Yaml.Tag.Kind, String>receiveAndGet(tag.getKind(), Yaml.Tag.Kind::valueOf));
+                .withKind(q.receiveAndGet(tag.getKind(), Yaml.Tag.Kind::valueOf));
     }
 }

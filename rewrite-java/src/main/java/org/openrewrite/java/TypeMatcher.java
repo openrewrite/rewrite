@@ -96,12 +96,7 @@ public class TypeMatcher implements Reference.Matcher {
                     this::matchesTargetTypeName
             );
         }
-
-        if (type instanceof JavaType.Primitive && typeNameMatcher.matches(type.toString())) {
-            return true;
-        }
-
-        return false;
+        return type instanceof JavaType.Primitive && typeNameMatcher.matches(type.toString());
     }
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {

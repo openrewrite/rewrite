@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
 
-public class ScalaTemplate extends JavaTemplate {
+public final class ScalaTemplate extends JavaTemplate {
     private ScalaTemplate(boolean contextSensitive,
                           ScalaParser.Builder parser,
                           String code,

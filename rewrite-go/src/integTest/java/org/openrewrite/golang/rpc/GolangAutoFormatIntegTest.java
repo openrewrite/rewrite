@@ -15,20 +15,13 @@
  */
 package org.openrewrite.golang.rpc;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.golang.format.AutoFormatVisitor;
-import org.openrewrite.golang.format.BlankLinesVisitor;
-import org.openrewrite.golang.format.NormalizeLineBreaksVisitor;
-import org.openrewrite.golang.format.RemoveTrailingWhitespaceVisitor;
-import org.openrewrite.golang.format.TabsAndIndentsVisitor;
+import org.openrewrite.golang.format.*;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
@@ -38,8 +31,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import org.openrewrite.internal.ThrowingConsumer;
-
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 

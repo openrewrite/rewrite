@@ -28,7 +28,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
+        spec.recipe(toRecipe(SimplifyBooleanExpressionVisitor::new));
     }
 
     @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/303")

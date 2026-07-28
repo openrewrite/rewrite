@@ -515,7 +515,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
      * are only computed once, and converts CSV {@code String[]} rows back to
      * typed objects via Jackson.
      */
-    private static class RowMetadata {
+    private static final class RowMetadata {
         final Class<?> rowClass;
         final List<String> fieldNames;
 

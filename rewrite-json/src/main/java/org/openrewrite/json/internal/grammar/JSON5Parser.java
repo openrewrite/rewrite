@@ -34,13 +34,29 @@ public class JSON5Parser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7,
-		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12,
-		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
-	public static final int
-		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4,
-		RULE_arr = 5, RULE_number = 6;
+    public static final int T__0 = 1;
+    public static final int T__1 = 2;
+    public static final int T__2 = 3;
+    public static final int T__3 = 4;
+    public static final int T__4 = 5;
+    public static final int T__5 = 6;
+    public static final int SINGLE_LINE_COMMENT = 7;
+    public static final int MULTI_LINE_COMMENT = 8;
+    public static final int LITERAL = 9;
+    public static final int STRING = 10;
+    public static final int NUMBER = 11;
+    public static final int NUMERIC_LITERAL = 12;
+    public static final int SYMBOL = 13;
+    public static final int IDENTIFIER = 14;
+    public static final int WS = 15;
+    public static final int UTF_8_BOM = 16;
+    public static final int RULE_json5 = 0;
+    public static final int RULE_obj = 1;
+    public static final int RULE_member = 2;
+    public static final int RULE_key = 3;
+    public static final int RULE_value = 4;
+    public static final int RULE_arr = 5;
+    public static final int RULE_number = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"json5", "obj", "member", "key", "value", "arr", "number"
@@ -125,16 +141,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_json5; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterJson5(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterJson5(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitJson5(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitJson5(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitJson5(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitJson5(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -148,7 +171,7 @@ public class JSON5Parser extends Parser {
 			setState(15);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 15906L) != 0)) {
+			if ((_la & ~0x3f) == 0 && ((1L << _la) & 15906L) != 0) {
 				{
 				setState(14);
 				value();
@@ -184,16 +207,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_obj; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterObj(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterObj(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitObj(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitObj(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitObj(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitObj(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -205,56 +235,49 @@ public class JSON5Parser extends Parser {
 			int _alt;
 			setState(35);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,3,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(19);
-				match(T__0);
-				setState(20);
-				member();
-				setState(25);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(21);
-						match(T__1);
-						setState(22);
-						member();
-						}
-						}
-					}
-					setState(27);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-				}
-				setState(29);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==T__1) {
-					{
-					setState(28);
-					match(T__1);
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 3, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(19);
+                match(T__0);
+                setState(20);
+                member();
+                setState(25);
+                _errHandler.sync(this);
+                _alt = getInterpreter().adaptivePredict(_input, 1, _ctx);
+                while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (_alt == 1) {
+                        {
+                            {
+                                setState(21);
+                                match(T__1);
+                                setState(22);
+                                member();
+                            }
+                        }
+                    }
+                    setState(27);
+                    _errHandler.sync(this);
+                    _alt = getInterpreter().adaptivePredict(_input, 1, _ctx);
+                }
+                setState(29);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                if (_la == T__1) {
+                    {
+                        setState(28);
+                        match(T__1);
+                    }
+                }
 
-				setState(31);
-				match(T__2);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(33);
-				match(T__0);
-				setState(34);
-				match(T__2);
-				}
-				break;
-			}
+                setState(31);
+                match(T__2);
+            } else if (getInterpreter().adaptivePredict(_input, 3, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(33);
+                match(T__0);
+                setState(34);
+                match(T__2);
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -281,16 +304,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_member; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterMember(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterMember(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitMember(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitMember(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitMember(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitMember(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -329,16 +359,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_key; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterKey(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitKey(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -355,7 +392,9 @@ public class JSON5Parser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -391,16 +430,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_value; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterValue(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitValue(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -477,16 +523,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_arr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterArr(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterArr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitArr(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitArr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitArr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitArr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -498,56 +551,49 @@ public class JSON5Parser extends Parser {
 			int _alt;
 			setState(66);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,7,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(50);
-				match(T__4);
-				setState(51);
-				value();
-				setState(56);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(52);
-						match(T__1);
-						setState(53);
-						value();
-						}
-						}
-					}
-					setState(58);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
-				}
-				setState(60);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==T__1) {
-					{
-					setState(59);
-					match(T__1);
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 7, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(50);
+                match(T__4);
+                setState(51);
+                value();
+                setState(56);
+                _errHandler.sync(this);
+                _alt = getInterpreter().adaptivePredict(_input, 5, _ctx);
+                while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (_alt == 1) {
+                        {
+                            {
+                                setState(52);
+                                match(T__1);
+                                setState(53);
+                                value();
+                            }
+                        }
+                    }
+                    setState(58);
+                    _errHandler.sync(this);
+                    _alt = getInterpreter().adaptivePredict(_input, 5, _ctx);
+                }
+                setState(60);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                if (_la == T__1) {
+                    {
+                        setState(59);
+                        match(T__1);
+                    }
+                }
 
-				setState(62);
-				match(T__5);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(64);
-				match(T__4);
-				setState(65);
-				match(T__5);
-				}
-				break;
-			}
+                setState(62);
+                match(T__5);
+            } else if (getInterpreter().adaptivePredict(_input, 7, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(64);
+                match(T__4);
+                setState(65);
+                match(T__5);
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -571,16 +617,23 @@ public class JSON5Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_number; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).enterNumber(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).enterNumber(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JSON5Listener ) ((JSON5Listener)listener).exitNumber(this);
+            if (listener instanceof JSON5Listener) {
+                ((JSON5Listener) listener).exitNumber(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitNumber(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof JSON5Visitor) {
+                return ((JSON5Visitor<? extends T>) visitor).visitNumber(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -607,7 +660,9 @@ public class JSON5Parser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}

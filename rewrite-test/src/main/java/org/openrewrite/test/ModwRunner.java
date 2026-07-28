@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.openrewrite.Changeset;
 import org.openrewrite.DataTable;
+import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -33,7 +34,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.RecipeRun;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
-import org.openrewrite.DataTableStore;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -481,10 +481,10 @@ public class ModwRunner implements RewriteRunner {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         if (os.contains("linux")) {
-            if (arch.equals("amd64") || arch.equals("x86_64")) {
+            if ("amd64".equals(arch) || "x86_64".equals(arch)) {
                 return "moderne-cli-linux-x64";
             }
-            if (arch.equals("aarch64") || arch.equals("arm64")) {
+            if ("aarch64".equals(arch) || "arm64".equals(arch)) {
                 return "moderne-cli-linux-aarch64";
             }
             return null;
@@ -614,7 +614,9 @@ public class ModwRunner implements RewriteRunner {
         List<Result> results = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(afterFenced)) {
             for (Path after : (Iterable<Path>) stream::iterator) {
-                if (!Files.isRegularFile(after)) continue;
+                if (!Files.isRegularFile(after)) {
+                    continue;
+                }
                 Path relative = afterFenced.relativize(after);
                 SourceFile beforeLst = beforeByPath.get(relative);
                 SourceSpec<?> spec = specByPath.getOrDefault(relative, specByDerivedPath.get(relative));
@@ -674,7 +676,9 @@ public class ModwRunner implements RewriteRunner {
         try (Stream<Path> stream = Files.list(datatables)) {
             for (Path csv : (Iterable<Path>) stream::iterator) {
                 String name = csv.getFileName().toString();
-                if (!name.endsWith(".csv.gz")) continue;
+                if (!name.endsWith(".csv.gz")) {
+                    continue;
+                }
                 String fqn = name.substring(0, name.length() - ".csv.gz".length());
                 Class<?> dtClass;
                 try {
@@ -687,7 +691,9 @@ public class ModwRunner implements RewriteRunner {
                     store.putRaw(fqn, readRawRows(csv));
                     continue;
                 }
-                if (!DataTable.class.isAssignableFrom(dtClass)) continue;
+                if (!DataTable.class.isAssignableFrom(dtClass)) {
+                    continue;
+                }
                 DataTable<?> dt = instantiateDataTable(dtClass, recipe);
                 Class<?> rowType = dt.getType();
                 List<Object> rows = readTypedRows(csv, rowType, mapper);
@@ -712,7 +718,9 @@ public class ModwRunner implements RewriteRunner {
 
     private static List<Object> readTypedRows(Path csvGz, Class<?> rowType, CsvMapper mapper) throws IOException {
         String csv = readUndecoratedCsv(csvGz);
-        if (csv.isEmpty()) return Collections.emptyList();
+        if (csv.isEmpty()) {
+            return Collections.emptyList();
+        }
         CsvSchema schema = CsvSchema.emptySchema().withHeader();
         try (MappingIterator<?> it = mapper.readerFor(rowType).with(schema).readValues(csv)) {
             List<Object> out = new ArrayList<>();
@@ -727,7 +735,9 @@ public class ModwRunner implements RewriteRunner {
         // Fallback when we can't load the DataTable class. Each row is a
         // Map<String, String> keyed by column name.
         String csv = readUndecoratedCsv(csvGz);
-        if (csv.isEmpty()) return Collections.emptyList();
+        if (csv.isEmpty()) {
+            return Collections.emptyList();
+        }
         CsvMapper mapper = new CsvMapper();
         CsvSchema schema = CsvSchema.emptySchema().withHeader();
         try (MappingIterator<Map<String, String>> it = mapper
@@ -747,7 +757,9 @@ public class ModwRunner implements RewriteRunner {
              BufferedReader r = new BufferedReader(new InputStreamReader(gz, StandardCharsets.UTF_8))) {
             String line;
             while ((line = r.readLine()) != null) {
-                if (line.startsWith("#")) continue;
+                if (line.startsWith("#")) {
+                    continue;
+                }
                 csv.append(line).append('\n');
             }
         }
@@ -755,7 +767,9 @@ public class ModwRunner implements RewriteRunner {
     }
 
     private static void deleteRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) return;
+        if (!Files.exists(path)) {
+            return;
+        }
         try (Stream<Path> stream = Files.walk(path)) {
             stream.sorted(Comparator.reverseOrder()).forEach(p -> {
                 try {

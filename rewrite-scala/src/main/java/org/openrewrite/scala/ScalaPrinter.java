@@ -35,21 +35,21 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.AmpersandIntersection;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
+import org.openrewrite.scala.marker.ContextFunctionArrow;
 import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.Implicit;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.InfixTypeNotation;
+import org.openrewrite.scala.marker.PackageSemicolon;
+import org.openrewrite.scala.marker.PartialFunctionLiteral;
 import org.openrewrite.scala.marker.SObject;
+import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TrailingComma;
-import org.openrewrite.scala.marker.TypeProjection;
-import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
-import org.openrewrite.scala.marker.PartialFunctionLiteral;
-import org.openrewrite.scala.marker.ContextFunctionArrow;
+import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.marker.ValVarKeyword;
-import org.openrewrite.scala.marker.PackageSemicolon;
 import org.openrewrite.scala.tree.S;
 
 import java.util.List;
@@ -69,7 +69,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // For type parameters, check if we're being called with explicit brackets
             // If so, use them; otherwise default to Scala-style square brackets
             String openBracket = before.isEmpty() ? "[" : before;
-            String closeBracket = (after == null || after.isEmpty()) ? "]" : after;
+            String closeBracket = after == null || after.isEmpty() ? "]" : after;
             
             if (container != null) {
                 visitSpace(container.getBefore(), location.getBeforeLocation(), p);
@@ -614,10 +614,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
-        // In Scala, semicolons are optional. An explicit ';' found in the source
-        // is preserved via a Semicolon marker on the JRightPadded and emitted by
-        // visitMarker below. No default terminator is printed here.
-        return;
     }
 
     @Override
@@ -2148,7 +2144,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(enumerator.getPrefix(), enumerator.getMarkers(), Space.Location.LANGUAGE_EXTENSION, p);
         switch (enumerator.getKind()) {
             case Generator:
-                if (enumerator.getLhs() != null) visit(enumerator.getLhs(), p);
+                if (enumerator.getLhs() != null) {
+                    visit(enumerator.getLhs(), p);
+                }
                 visitSpace(enumerator.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("<-");
                 visit(enumerator.getRhs(), p);
@@ -2159,7 +2157,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visit(enumerator.getRhs(), p);
                 break;
             case Assignment:
-                if (enumerator.getLhs() != null) visit(enumerator.getLhs(), p);
+                if (enumerator.getLhs() != null) {
+                    visit(enumerator.getLhs(), p);
+                }
                 visitSpace(enumerator.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("=");
                 visit(enumerator.getRhs(), p);

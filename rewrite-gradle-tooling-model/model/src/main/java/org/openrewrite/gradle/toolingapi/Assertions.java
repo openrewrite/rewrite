@@ -126,7 +126,7 @@ public class Assertions {
                                 ("distributionBase=GRADLE_USER_HOME\n" +
                                  "distributionPath=wrapper/dists\n" +
                                  "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                                 ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
+                                 (gradleWrapper.getDistributionChecksum() == null ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
                                  "zipStoreBase=GRADLE_USER_HOME\n" +
                                  "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);

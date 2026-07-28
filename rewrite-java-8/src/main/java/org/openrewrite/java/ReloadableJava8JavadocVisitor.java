@@ -24,6 +24,7 @@ import com.sun.source.tree.WildcardTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
+import com.sun.tools.javac.code.BoundKind;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.comp.Attr;
@@ -69,7 +70,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private String firstPrefix = "";
 
     private String source;
-    private int cursor = 0;
+    private int cursor;
 
     public ReloadableJava8JavadocVisitor(Context context, TreePath scope, ReloadableJava8TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
@@ -129,8 +130,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     inFirstPrefix = false;
                 } else {
                     // Handle consecutive new lines.
-                    if ((prev == '\n' ||
-                            prev == '\r' && source.charAt(i - 2) == '\n')) {
+                    if (prev == '\n' ||
+                            prev == '\r' && source.charAt(i - 2) == '\n') {
                         String prevLineLine = prev == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
@@ -671,7 +672,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             JavaType.Class classType = (JavaType.Class) type;
 
             JavaType.@Nullable Method method = methodReferenceType(ref, classType.getMethods());
-            if (method != null) return method;
+            if (method != null) {
+                return method;
+            }
 
             // Superclass fields takes presence over interface fields
             method = methodReferenceType(ref, classType.getSupertype());
@@ -679,7 +682,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             if (method == null) {
                 for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
                     method = methodReferenceType(ref, interface_.getMethods());
-                    if (method != null) return method;
+                    if (method != null) {
+                        return method;
+                    }
                 }
             }
 
@@ -1074,7 +1079,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             int tempCursor = cursor;
             List<Javadoc> end = whitespaceBefore();
             if (cursor < source.length()) {
-                boolean containsEndLine = end.stream().anyMatch(p -> p instanceof Javadoc.LineBreak);
+                boolean containsEndLine = end.stream().anyMatch(Javadoc.LineBreak.class::isInstance);
                 if (source.charAt(cursor) == '}') {
                     end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
                     cursor++;
@@ -1263,15 +1268,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             JCTree.JCWildcard wildcard = (JCTree.JCWildcard) node;
             JLeftPadded<J.Wildcard.Bound> bound = null;
             if (wildcard.kind.kind != null) {
-                switch (wildcard.kind.kind) {
-                    case EXTENDS:
-                        bound = JLeftPadded.build(J.Wildcard.Bound.Extends).withBefore(whitespace());
-                        cursor += "extends".length();
-                        break;
-                    case SUPER:
-                        bound = JLeftPadded.build(J.Wildcard.Bound.Super).withBefore(whitespace());
-                        cursor += "super".length();
-                        break;
+                if (wildcard.kind.kind == BoundKind.EXTENDS) {
+                    bound = JLeftPadded.build(J.Wildcard.Bound.Extends).withBefore(whitespace());
+                    cursor += "extends".length();
+                } else if (wildcard.kind.kind == BoundKind.SUPER) {
+                    bound = JLeftPadded.build(J.Wildcard.Bound.Super).withBefore(whitespace());
+                    cursor += "super".length();
                 }
             }
 

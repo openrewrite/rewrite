@@ -68,8 +68,8 @@ import static org.openrewrite.java.tree.Space.format;
  * for each compilation unit visited.
  */
 public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
-    private final static int SURR_FIRST = 0xD800;
-    private final static int SURR_LAST = 0xDFFF;
+    private static final int SURR_FIRST = 0xD800;
+    private static final int SURR_LAST = 0xDFFF;
 
     private final Path sourcePath;
 
@@ -90,7 +90,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     @SuppressWarnings("NotNullFieldNotInitialized")
     private DocCommentTable docCommentTable;
 
-    private int cursor = 0;
+    private int cursor;
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
@@ -918,7 +918,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
+        Symbol methodSymbol = jcSelect instanceof JCFieldAccess ? ((JCFieldAccess) jcSelect).sym :
                 ((JCIdent) jcSelect).sym;
 
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
@@ -1000,11 +1000,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         Space paramFmt = sourceBefore("(");
-        JContainer<Statement> params = !node.getParameters().isEmpty() ?
-                JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
-                        Markers.EMPTY) :
+        JContainer<Statement> params = node.getParameters().isEmpty() ?
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
-                        Markers.EMPTY), EMPTY)), Markers.EMPTY);
+                        Markers.EMPTY), EMPTY)), Markers.EMPTY) :
+                JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
+                        Markers.EMPTY);
 
         List<JLeftPadded<Space>> cStyleDimensions = cStyleArrayReturn ? arrayDimensions() : emptyList();
 
@@ -1892,8 +1892,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             if (treeGroup.size() == 1) {
                 Tree t = treeGroup.get(0);
                 int startPosition = ((JCTree) t).getStartPosition();
-                if (cursor > startPosition)
+                if (cursor > startPosition) {
                     continue;
+                }
                 if (!(t instanceof JCSkip)) {
                     while (cursor < startPosition) {
                         int nonWhitespaceIndex = indexOfNextNonWhitespace(cursor, source);
@@ -1965,7 +1966,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static boolean hasLombokGeneratedSymbol(Tree t) {
-        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
+        Tree tree = t instanceof JCAnnotation ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = extractSymbol(tree);
         if (sym == null) {
@@ -2052,33 +2053,28 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     char c1 = source.charAt(delimIndex);
                     char c2 = source.charAt(delimIndex + 1);
-                    switch (c1) {
-                        case '/':
-                            switch (c2) {
-                                case '/':
-                                    inSingleLineComment = !inMultiLineComment;
-                                    delimIndex++;
-                                    break;
-                                case '*':
-                                    inMultiLineComment = true;
-                                    delimIndex++;
-                                    break;
-                            }
-                            break;
-                        case '*':
-                            if (c2 == '/') {
-                                inMultiLineComment = false;
-                                delimIndex++;
-                                continue;
-                            }
-                            break;
+                    if (c1 == '/') {
+                        if (c2 == '/') {
+                            inSingleLineComment = !inMultiLineComment;
+                            delimIndex++;
+                        } else if (c2 == '*') {
+                            inMultiLineComment = true;
+                            delimIndex++;
+                        }
+                    } else if (c1 == '*') {
+                        if (c2 == '/') {
+                            inMultiLineComment = false;
+                            delimIndex++;
+                            continue;
+                        }
                     }
                 }
 
                 if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop)
+                    if (stop != null && source.charAt(delimIndex) == stop) {
                         return -1; // reached stop word before finding the delimiter
 
+                    }
                     if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!
                     }
@@ -2207,7 +2203,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
-                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                if (Character.isWhitespace(c) || (noSpace = i + 1 < source.length() && source.charAt(i + 1) == '@')) {
                     if (noSpace) {
                         word.getAndUpdate(w -> w + c);
                         noSpace = false;

@@ -135,7 +135,7 @@ public class FindPlugins extends Recipe {
                             plugin.getArguments().get(0) instanceof J.Literal) {
                         return Stream.of(new GradlePlugin(
                                 plugin,
-                                requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
+                                requireNonNull(((J.Literal) requireNonNull((J.MethodInvocation) plugin.getSelect())
                                         .getArguments().get(0)).getValue()).toString(),
                                 requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
                         ));

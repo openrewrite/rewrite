@@ -19,6 +19,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Content;
+import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -49,9 +50,9 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
     @Override
     public Xml visitProlog(Xml.Prolog prolog, RpcSendQueue q) {
         q.getAndSend(prolog, Xml.Prolog::getXmlDecl, d -> visit(d, q));
-        q.getAndSendList(prolog, Xml.Prolog::getMisc, m -> m.getId(),
+        q.getAndSendList(prolog, Xml.Prolog::getMisc, Misc::getId,
                 m -> visit(m, q));
-        q.getAndSendList(prolog, Xml.Prolog::getJspDirectives, j -> j.getId(),
+        q.getAndSendList(prolog, Xml.Prolog::getJspDirectives, Xml.JspDirective::getId,
                 j -> visit(j, q));
         return prolog;
     }
@@ -59,7 +60,7 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
     @Override
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, RpcSendQueue q) {
         q.getAndSend(xmlDecl, Xml.XmlDecl::getName);
-        q.getAndSendList(xmlDecl, Xml.XmlDecl::getAttributes, a -> a.getId(),
+        q.getAndSendList(xmlDecl, Xml.XmlDecl::getAttributes, Xml.Attribute::getId,
                 a -> visit(a, q));
         q.getAndSend(xmlDecl, Xml.XmlDecl::getBeforeTagDelimiterPrefix);
         return xmlDecl;
@@ -77,9 +78,9 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
     @Override
     public Xml visitTag(Xml.Tag tag, RpcSendQueue q) {
         q.getAndSend(tag, Xml.Tag::getName);
-        q.getAndSendList(tag, Xml.Tag::getAttributes, a -> a.getId(),
+        q.getAndSendList(tag, Xml.Tag::getAttributes, Xml.Attribute::getId,
                 a -> visit(a, q));
-        q.getAndSendList(tag, t -> (List<Content>) t.getContent(), c -> c.getId(),
+        q.getAndSendList(tag, t -> (List<Content>) t.getContent(), Content::getId,
                 c -> visit(c, q));
         q.getAndSend(tag, Xml.Tag::getClosing, c -> visit(c, q));
         q.getAndSend(tag, Xml.Tag::getBeforeTagDelimiterPrefix);
@@ -127,7 +128,7 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
         q.getAndSend(docTypeDecl, Xml.DocTypeDecl::getName, n -> visit(n, q));
         q.getAndSend(docTypeDecl, Xml.DocTypeDecl::getDocumentDeclaration);
         q.getAndSend(docTypeDecl, Xml.DocTypeDecl::getExternalId, e -> visit(e, q));
-        q.getAndSendList(docTypeDecl, Xml.DocTypeDecl::getInternalSubset, i -> i.getId(),
+        q.getAndSendList(docTypeDecl, Xml.DocTypeDecl::getInternalSubset, Xml.Ident::getId,
                 i -> visit(i, q));
         q.getAndSend(docTypeDecl, Xml.DocTypeDecl::getExternalSubsets, e -> visit(e, q));
         q.getAndSend(docTypeDecl, Xml.DocTypeDecl::getBeforeTagDelimiterPrefix);
@@ -136,14 +137,14 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
 
     @Override
     public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, RpcSendQueue q) {
-        q.getAndSendList(externalSubsets, Xml.DocTypeDecl.ExternalSubsets::getElements, e -> e.getId(),
+        q.getAndSendList(externalSubsets, Xml.DocTypeDecl.ExternalSubsets::getElements, Xml.Element::getId,
                 e -> visit(e, q));
         return externalSubsets;
     }
 
     @Override
     public Xml visitElement(Xml.Element element, RpcSendQueue q) {
-        q.getAndSendList(element, Xml.Element::getSubset, i -> i.getId(),
+        q.getAndSendList(element, Xml.Element::getSubset, Xml.Ident::getId,
                 i -> visit(i, q));
         q.getAndSend(element, Xml.Element::getBeforeTagDelimiterPrefix);
         return element;
@@ -159,7 +160,7 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
     public Xml visitJspDirective(Xml.JspDirective jspDirective, RpcSendQueue q) {
         q.getAndSend(jspDirective, Xml.JspDirective::getBeforeTypePrefix);
         q.getAndSend(jspDirective, Xml.JspDirective::getType);
-        q.getAndSendList(jspDirective, Xml.JspDirective::getAttributes, a -> a.getId(),
+        q.getAndSendList(jspDirective, Xml.JspDirective::getAttributes, Xml.Attribute::getId,
                 a -> visit(a, q));
         q.getAndSend(jspDirective, Xml.JspDirective::getBeforeDirectiveEndPrefix);
         return jspDirective;

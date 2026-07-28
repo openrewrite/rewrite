@@ -203,19 +203,19 @@ class RequirementsTxtParserTest {
 
         // requests should have certifi and charset_normalizer as dependencies
         ResolvedDependency requests = linked.stream()
-                .filter(d -> d.getName().equals("requests")).findFirst().orElseThrow();
+                .filter(d -> "requests".equals(d.getName())).findFirst().orElseThrow();
         assertThat(requests.getDependencies()).hasSize(2);
         assertThat(requests.getDependencies().stream().map(ResolvedDependency::getName))
                 .containsExactlyInAnyOrder("certifi", "charset-normalizer");
 
         // certifi should have no dependencies
         ResolvedDependency certifi = linked.stream()
-                .filter(d -> d.getName().equals("certifi")).findFirst().orElseThrow();
+                .filter(d -> "certifi".equals(d.getName())).findFirst().orElseThrow();
         assertThat(certifi.getDependencies()).isNull();
 
         // charset-normalizer should have no dependencies
         ResolvedDependency charset = linked.stream()
-                .filter(d -> d.getName().equals("charset-normalizer")).findFirst().orElseThrow();
+                .filter(d -> "charset-normalizer".equals(d.getName())).findFirst().orElseThrow();
         assertThat(charset.getDependencies()).isNull();
     }
 
@@ -254,7 +254,7 @@ class RequirementsTxtParserTest {
 
         // requests should have transitive dependencies linked
         ResolvedDependency requests = marker.getResolvedDependencies().stream()
-                .filter(r -> r.getName().equals("requests")).findFirst().orElse(null);
+                .filter(r -> "requests".equals(r.getName())).findFirst().orElse(null);
         assertThat(requests).isNotNull();
         assertThat(requests.getDependencies()).isNotNull();
         assertThat(requests.getDependencies().stream().map(ResolvedDependency::getName))

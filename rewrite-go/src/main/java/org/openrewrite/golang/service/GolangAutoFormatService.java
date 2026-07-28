@@ -17,9 +17,9 @@ package org.openrewrite.golang.service;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
+import org.openrewrite.golang.format.AutoFormatVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
-import org.openrewrite.golang.format.AutoFormatVisitor;
 
 public class GolangAutoFormatService extends AutoFormatService {
     @Override

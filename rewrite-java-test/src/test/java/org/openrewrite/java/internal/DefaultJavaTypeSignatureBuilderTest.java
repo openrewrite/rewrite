@@ -85,8 +85,8 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     public JavaType innerClassSignature(String innerClassSimpleName) {
         return requireNonNull(goatCu.getClasses().getFirst().getBody().getStatements()
           .stream()
-          .filter(it -> it instanceof J.ClassDeclaration)
-          .map(it -> (J.ClassDeclaration) it)
+          .filter(J.ClassDeclaration.class::isInstance)
+          .map(J.ClassDeclaration.class::cast)
           .filter(cd -> requireNonNull(cd.getType()).getFullyQualifiedName().endsWith("$" + innerClassSimpleName))
           .findAny()
           .orElseThrow()

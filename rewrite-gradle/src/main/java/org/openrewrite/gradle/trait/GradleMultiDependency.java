@@ -33,11 +33,11 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
-import static java.util.Collections.singletonList;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Collections.singletonList;
 import static org.openrewrite.gradle.trait.GradleDependency.isDependencyDeclaration;
 
 /**

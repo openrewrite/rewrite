@@ -28,7 +28,7 @@ import java.util.stream.Stream;
  * This class is used to find the caller of {@link JavaParser#dependenciesFromResources(ExecutionContext, String...)},
  * which is used to load classpath resources for {@link JavaParser}.
  */
-class JavaParserCaller {
+final class JavaParserCaller {
     private JavaParserCaller() {
     }
 
@@ -54,7 +54,7 @@ class JavaParserCaller {
                     })
                     // Drop anything before the parser or builder class, as well as those classes themselves
                     .filter(new Predicate<Class<?>>() {
-                        boolean parserOrBuilderFound = false;
+                        boolean parserOrBuilderFound;
 
                         @Override
                         public boolean test(Class<?> c1) {

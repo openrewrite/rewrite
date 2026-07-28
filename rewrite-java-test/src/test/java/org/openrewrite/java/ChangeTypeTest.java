@@ -2308,7 +2308,7 @@ class ChangeTypeTest implements RewriteTest {
               package hello;
               public class HelloClass {}
               """,
-            spec -> spec.beforeRecipe((source) -> {
+            spec -> spec.beforeRecipe(source -> {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
                 var cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());

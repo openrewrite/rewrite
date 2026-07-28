@@ -199,7 +199,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.FieldAccess) exp, getAttributeValues(annotation)));
                     }
                     //noinspection ConstantConditions
-                    return getJavaTemplate("#{} = #{}").<J.Annotation>apply(getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
+                    return getJavaTemplate("#{} = #{}").apply(getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
                             .getArguments().get(annotation.getArguments().indexOf(as));
                 }
                 return as;
@@ -248,7 +248,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(",", "{", "}")) :
                             newAttributeValue;
                     //noinspection ConstantConditions
-                    return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                    return getJavaTemplate("#{}").apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
                             .getArguments().get(0);
                 }
                 // Make the attribute name explicit, before we add the new value below
@@ -260,7 +260,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (isFullyQualifiedClass()) {
                     JavaType.ShallowClass fqn = JavaType.ShallowClass.build(attributeValue.substring(0, attributeValue.length() - 6));
                     builder
-                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;%npublic interface %s {}%n", fqn.getPackageName(), fqn.getClassName())))
                             .imports(fqn.getFullyQualifiedName());
                 }
                 return builder.build();
@@ -279,13 +279,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
                 String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString(annotation) : newAttributeValue;
                 //noinspection ConstantConditions
-                return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                return getJavaTemplate("#{}").apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
                         .getArguments().get(0);
             }
 
             private J.Assignment createAnnotationAssignment(J.Annotation annotation, String name, @Nullable Object parameter) {
                 //noinspection ConstantConditions
-                return (J.Assignment) getJavaTemplate(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}")).<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), parameter)
+                return (J.Assignment) getJavaTemplate(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}")).apply(getCursor(), annotation.getCoordinates().replaceArguments(), parameter)
                         .getArguments().get(0);
             }
 
@@ -301,7 +301,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
                 // Use a template to create the array structure, then replace the initializer
                 //noinspection ConstantConditions
-                J.NewArray template = (J.NewArray) getJavaTemplate("{#{any()}}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
+                J.NewArray template = (J.NewArray) getJavaTemplate("{#{any()}}").apply(getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
                         .getArguments().get(0);
                 return template.withInitializer(initializer);
             }
@@ -319,14 +319,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             templateValue = getFullyQualifiedClass(attributeValue);
                         }
                         //noinspection ConstantConditions
-                        Expression newExpr = getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), templateValue)
+                        Expression newExpr = getJavaTemplate("#{}").apply(getCursor(), annotation.getCoordinates().replaceArguments(), templateValue)
                                 .getArguments().get(0).withPrefix(SINGLE_SPACE);
                         initializer.add(newExpr);
                     }
                 }
                 // Use a template to create the array structure, then replace the initializer
                 //noinspection ConstantConditions
-                J.NewArray template = (J.NewArray) JavaTemplate.<J.Annotation>apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingFieldAccess)
+                J.NewArray template = (J.NewArray) JavaTemplate.apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingFieldAccess)
                         .getArguments().get(0);
                 return template.withInitializer(initializer);
             }

@@ -191,7 +191,7 @@ class ParseProjectIntegTest {
                 .contains("main.py", "pyproject.toml");
 
         SourceFile pyproject = sources.stream()
-                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("pyproject.toml"))
+                .filter(sf -> "pyproject.toml".equals(sf.getSourcePath().getFileName().toString()))
                 .findFirst()
                 .orElseThrow();
         assertThat(pyproject).isInstanceOf(Toml.Document.class);
@@ -219,7 +219,7 @@ class ParseProjectIntegTest {
                 .contains("main.py", "requirements.txt");
 
         SourceFile reqsTxt = sources.stream()
-                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("requirements.txt"))
+                .filter(sf -> "requirements.txt".equals(sf.getSourcePath().getFileName().toString()))
                 .findFirst()
                 .orElseThrow();
         assertThat(reqsTxt).isInstanceOf(PlainText.class);
@@ -254,14 +254,14 @@ class ParseProjectIntegTest {
                 .contains("main.py", "Pipfile", "Pipfile.lock");
 
         SourceFile pipfile = sources.stream()
-                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("Pipfile"))
+                .filter(sf -> "Pipfile".equals(sf.getSourcePath().getFileName().toString()))
                 .findFirst()
                 .orElseThrow();
         assertThat(pipfile).isInstanceOf(Toml.Document.class);
         assertThat(pipfile.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
 
         SourceFile pipfileLock = sources.stream()
-                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("Pipfile.lock"))
+                .filter(sf -> "Pipfile.lock".equals(sf.getSourcePath().getFileName().toString()))
                 .findFirst()
                 .orElseThrow();
         assertThat(pipfileLock).isInstanceOf(Json.Document.class);
@@ -319,11 +319,11 @@ class ParseProjectIntegTest {
                 .contains("main.py", "requirements.txt", "requirements-dev.txt");
 
         SourceFile reqsTxt = sources.stream()
-                .filter(s -> s.getSourcePath().getFileName().toString().equals("requirements.txt"))
+                .filter(s -> "requirements.txt".equals(s.getSourcePath().getFileName().toString()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Missing requirements.txt"));
         SourceFile reqsDevTxt = sources.stream()
-                .filter(s -> s.getSourcePath().getFileName().toString().equals("requirements-dev.txt"))
+                .filter(s -> "requirements-dev.txt".equals(s.getSourcePath().getFileName().toString()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Missing requirements-dev.txt"));
 

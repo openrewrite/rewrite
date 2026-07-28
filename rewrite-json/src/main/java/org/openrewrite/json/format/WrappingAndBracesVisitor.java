@@ -116,7 +116,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
                 throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
             }
             if (!newPrefixString.equals(prefix.getWhitespace()) && elem.getAfter().getComments().isEmpty()) {
-                return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace((newPrefixString))));
+                return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace(newPrefixString)));
             } else {
                 return elem;
             }
@@ -153,7 +153,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             // visiting only partial tree.
             Optional<Json> containingNode = getCursor().getPathAsStream().filter(obj ->
                     (obj instanceof Json) && ((Json) obj).getPrefix().getWhitespace().contains("\n")
-            ).findFirst().map(obj -> (Json) obj);
+            ).findFirst().map(Json.class::cast);
             return containingNode.map(node -> node.getPrefix().getWhitespaceIndent()).orElse("");
         }
         return ret;

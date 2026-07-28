@@ -15,14 +15,15 @@
  */
 // Generated from rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
-import java.util.List;
-import java.util.Iterator;
+
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class HCLParser extends Parser {
@@ -31,29 +32,101 @@ public class HCLParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, BooleanLiteral=5, NULL=6, LBRACE=7,
-		RBRACE=8, ASSIGN=9, Identifier=10, WS=11, COMMENT=12, LINE_COMMENT=13,
-		NEWLINE=14, NumericLiteral=15, QUOTE=16, HEREDOC_START=17, PLUS=18, AND=19,
-		EQ=20, LT=21, DOUBLE_COLON=22, COLON=23, LBRACK=24, LPAREN=25, MINUS=26,
-		OR=27, NEQ=28, GT=29, QUESTION=30, RBRACK=31, RPAREN=32, MUL=33, NOT=34,
-		LEQ=35, DOT=36, DIV=37, GEQ=38, ARROW=39, COMMA=40, MOD=41, ELLIPSIS=42,
-		TILDE=43, TEMPLATE_INTERPOLATION_START=44, TemplateStringLiteral=45, TemplateStringLiteralChar=46,
-		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51,
-		H_NEWLINE=52;
-	public static final int
-		RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3,
-		RULE_block = 4, RULE_blockLabel = 5, RULE_expression = 6, RULE_exprTerm = 7,
-		RULE_blockExpr = 8, RULE_literalValue = 9, RULE_collectionValue = 10,
-		RULE_tuple = 11, RULE_object = 12, RULE_objectelem = 13, RULE_qualifiedIdentifier = 14,
-		RULE_forExpr = 15, RULE_forTupleExpr = 16, RULE_forObjectExpr = 17, RULE_forIntro = 18,
-		RULE_forCond = 19, RULE_variableExpr = 20, RULE_functionCall = 21, RULE_functionName = 22,
-		RULE_arguments = 23, RULE_index = 24, RULE_getAttr = 25, RULE_legacyIndexAttr = 26,
-		RULE_splat = 27, RULE_attrSplat = 28, RULE_fullSplat = 29, RULE_operation = 30,
-		RULE_unaryOp = 31, RULE_binaryOp = 32, RULE_binaryOperator = 33, RULE_compareOperator = 34,
-		RULE_arithmeticOperator = 35, RULE_logicOperator = 36, RULE_templateExpr = 37,
-		RULE_heredocTemplatePart = 38, RULE_heredocLiteral = 39, RULE_quotedTemplatePart = 40,
-		RULE_stringLiteral = 41, RULE_templateInterpolation = 42;
+    public static final int FOR_BRACE = 1;
+    public static final int FOR_BRACK = 2;
+    public static final int IF = 3;
+    public static final int IN = 4;
+    public static final int BooleanLiteral = 5;
+    public static final int NULL = 6;
+    public static final int LBRACE = 7;
+    public static final int RBRACE = 8;
+    public static final int ASSIGN = 9;
+    public static final int Identifier = 10;
+    public static final int WS = 11;
+    public static final int COMMENT = 12;
+    public static final int LINE_COMMENT = 13;
+    public static final int NEWLINE = 14;
+    public static final int NumericLiteral = 15;
+    public static final int QUOTE = 16;
+    public static final int HEREDOC_START = 17;
+    public static final int PLUS = 18;
+    public static final int AND = 19;
+    public static final int EQ = 20;
+    public static final int LT = 21;
+    public static final int DOUBLE_COLON = 22;
+    public static final int COLON = 23;
+    public static final int LBRACK = 24;
+    public static final int LPAREN = 25;
+    public static final int MINUS = 26;
+    public static final int OR = 27;
+    public static final int NEQ = 28;
+    public static final int GT = 29;
+    public static final int QUESTION = 30;
+    public static final int RBRACK = 31;
+    public static final int RPAREN = 32;
+    public static final int MUL = 33;
+    public static final int NOT = 34;
+    public static final int LEQ = 35;
+    public static final int DOT = 36;
+    public static final int DIV = 37;
+    public static final int GEQ = 38;
+    public static final int ARROW = 39;
+    public static final int COMMA = 40;
+    public static final int MOD = 41;
+    public static final int ELLIPSIS = 42;
+    public static final int TILDE = 43;
+    public static final int TEMPLATE_INTERPOLATION_START = 44;
+    public static final int TemplateStringLiteral = 45;
+    public static final int TemplateStringLiteralChar = 46;
+    public static final int HP_WS = 47;
+    public static final int HP_COMMENT = 48;
+    public static final int HP_LINE_COMMENT = 49;
+    public static final int HTemplateLiteral = 50;
+    public static final int HTemplateLiteralChar = 51;
+    public static final int H_NEWLINE = 52;
+    public static final int RULE_configFile = 0;
+    public static final int RULE_body = 1;
+    public static final int RULE_bodyContent = 2;
+    public static final int RULE_attribute = 3;
+    public static final int RULE_block = 4;
+    public static final int RULE_blockLabel = 5;
+    public static final int RULE_expression = 6;
+    public static final int RULE_exprTerm = 7;
+    public static final int RULE_blockExpr = 8;
+    public static final int RULE_literalValue = 9;
+    public static final int RULE_collectionValue = 10;
+    public static final int RULE_tuple = 11;
+    public static final int RULE_object = 12;
+    public static final int RULE_objectelem = 13;
+    public static final int RULE_qualifiedIdentifier = 14;
+    public static final int RULE_forExpr = 15;
+    public static final int RULE_forTupleExpr = 16;
+    public static final int RULE_forObjectExpr = 17;
+    public static final int RULE_forIntro = 18;
+    public static final int RULE_forCond = 19;
+    public static final int RULE_variableExpr = 20;
+    public static final int RULE_functionCall = 21;
+    public static final int RULE_functionName = 22;
+    public static final int RULE_arguments = 23;
+    public static final int RULE_index = 24;
+    public static final int RULE_getAttr = 25;
+    public static final int RULE_legacyIndexAttr = 26;
+    public static final int RULE_splat = 27;
+    public static final int RULE_attrSplat = 28;
+    public static final int RULE_fullSplat = 29;
+    public static final int RULE_operation = 30;
+    public static final int RULE_unaryOp = 31;
+    public static final int RULE_binaryOp = 32;
+    public static final int RULE_binaryOperator = 33;
+    public static final int RULE_compareOperator = 34;
+    public static final int RULE_arithmeticOperator = 35;
+    public static final int RULE_logicOperator = 36;
+    public static final int RULE_templateExpr = 37;
+    public static final int RULE_heredocTemplatePart = 38;
+    public static final int RULE_heredocLiteral = 39;
+    public static final int RULE_quotedTemplatePart = 40;
+    public static final int RULE_stringLiteral = 41;
+    public static final int RULE_templateInterpolation = 42;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"configFile", "body", "bodyContent", "attribute", "block", "blockLabel",
@@ -154,16 +227,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_configFile; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterConfigFile(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterConfigFile(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitConfigFile(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitConfigFile(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitConfigFile(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitConfigFile(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -202,16 +282,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_body; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBody(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBody(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -263,16 +350,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_bodyContent; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBodyContent(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBodyContent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBodyContent(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBodyContent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBodyContent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBodyContent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -282,22 +376,15 @@ public class HCLParser extends Parser {
 		try {
 			setState(96);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,1,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(94);
-				attribute();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(95);
-				block();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(94);
+                attribute();
+            } else if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(95);
+                block();
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -324,16 +411,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_attribute; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterAttribute(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterAttribute(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitAttribute(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitAttribute(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitAttribute(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitAttribute(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -350,7 +444,9 @@ public class HCLParser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -389,16 +485,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_block; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBlock(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBlock(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBlock(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBlock(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBlock(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBlock(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -456,16 +559,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_blockLabel; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBlockLabel(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBlockLabel(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBlockLabel(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBlockLabel(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBlockLabel(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBlockLabel(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -521,6 +631,7 @@ public class HCLParser extends Parser {
 			super.copyFrom(ctx);
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class OperationExpressionContext extends ExpressionContext {
 		public OperationContext operation() {
@@ -529,18 +640,26 @@ public class HCLParser extends Parser {
 		public OperationExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterOperationExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterOperationExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitOperationExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitOperationExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitOperationExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitOperationExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class ConditionalExpressionContext extends ExpressionContext {
 		public List<ExpressionContext> expression() {
@@ -554,18 +673,26 @@ public class HCLParser extends Parser {
 		public ConditionalExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterConditionalExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterConditionalExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitConditionalExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitConditionalExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitConditionalExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitConditionalExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class ExpressionTermContext extends ExpressionContext {
 		public ExprTermContext exprTerm() {
@@ -574,16 +701,23 @@ public class HCLParser extends Parser {
 		public ExpressionTermContext(ExpressionContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterExpressionTerm(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterExpressionTerm(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitExpressionTerm(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitExpressionTerm(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitExpressionTerm(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitExpressionTerm(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -604,41 +738,38 @@ public class HCLParser extends Parser {
 			{
 			setState(121);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,4,_ctx) ) {
-			case 1:
-				{
-				_localctx = new ExpressionTermContext(_localctx);
-				_ctx = _localctx;
-				_prevctx = _localctx;
+                if (getInterpreter().adaptivePredict(_input, 4, _ctx) == 1) {
+                    _localctx = new ExpressionTermContext(_localctx);
+                    _ctx = _localctx;
+                    _prevctx = _localctx;
 
-				setState(119);
-				exprTerm(0);
-				}
-				break;
-			case 2:
-				{
-				_localctx = new OperationExpressionContext(_localctx);
-				_ctx = _localctx;
-				_prevctx = _localctx;
-				setState(120);
-				operation();
-				}
-				break;
-			}
+                    setState(119);
+                    exprTerm(0);
+                } else if (getInterpreter().adaptivePredict(_input, 4, _ctx) == 2) {
+                    _localctx = new OperationExpressionContext(_localctx);
+                    _ctx = _localctx;
+                    _prevctx = _localctx;
+                    setState(120);
+                    operation();
+                }
 			_ctx.stop = _input.LT(-1);
 			setState(131);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
-					if ( _parseListeners!=null ) triggerExitRuleEvent();
+                    if (_parseListeners != null) {
+                        triggerExitRuleEvent();
+                    }
 					_prevctx = _localctx;
 					{
 					{
 					_localctx = new ConditionalExpressionContext(new ExpressionContext(_parentctx, _parentState));
 					pushNewRecursionContext(_localctx, _startState, RULE_expression);
 					setState(123);
-					if (!(precpred(_ctx, 1))) throw new FailedPredicateException(this, "precpred(_ctx, 1)");
+                        if (!precpred(_ctx, 1)) {
+                            throw new FailedPredicateException(this, "precpred(_ctx, 1)");
+                        }
 					setState(124);
 					match(QUESTION);
 					setState(125);
@@ -679,6 +810,7 @@ public class HCLParser extends Parser {
 			super.copyFrom(ctx);
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class ParentheticalExpressionContext extends ExprTermContext {
 		public TerminalNode LPAREN() { return getToken(HCLParser.LPAREN, 0); }
@@ -689,18 +821,26 @@ public class HCLParser extends Parser {
 		public ParentheticalExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterParentheticalExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterParentheticalExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitParentheticalExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitParentheticalExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitParentheticalExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitParentheticalExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class AttributeAccessExpressionContext extends ExprTermContext {
 		public ExprTermContext exprTerm() {
@@ -712,18 +852,26 @@ public class HCLParser extends Parser {
 		public AttributeAccessExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterAttributeAccessExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterAttributeAccessExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitAttributeAccessExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitAttributeAccessExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitAttributeAccessExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitAttributeAccessExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class LiteralExpressionContext extends ExprTermContext {
 		public LiteralValueContext literalValue() {
@@ -732,18 +880,26 @@ public class HCLParser extends Parser {
 		public LiteralExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterLiteralExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterLiteralExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitLiteralExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitLiteralExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitLiteralExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitLiteralExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class TemplateExpressionContext extends ExprTermContext {
 		public TemplateExprContext templateExpr() {
@@ -752,18 +908,26 @@ public class HCLParser extends Parser {
 		public TemplateExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterTemplateExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterTemplateExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitTemplateExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitTemplateExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitTemplateExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitTemplateExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class VariableExpressionContext extends ExprTermContext {
 		public VariableExprContext variableExpr() {
@@ -772,18 +936,26 @@ public class HCLParser extends Parser {
 		public VariableExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterVariableExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterVariableExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitVariableExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitVariableExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitVariableExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitVariableExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class SplatExpressionContext extends ExprTermContext {
 		public ExprTermContext exprTerm() {
@@ -795,18 +967,26 @@ public class HCLParser extends Parser {
 		public SplatExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterSplatExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterSplatExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitSplatExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitSplatExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitSplatExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitSplatExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class IndexAccessExpressionContext extends ExprTermContext {
 		public ExprTermContext exprTerm() {
@@ -818,18 +998,26 @@ public class HCLParser extends Parser {
 		public IndexAccessExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterIndexAccessExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterIndexAccessExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitIndexAccessExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitIndexAccessExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitIndexAccessExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitIndexAccessExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class LegacyIndexAttributeExpressionContext extends ExprTermContext {
 		public ExprTermContext exprTerm() {
@@ -841,18 +1029,26 @@ public class HCLParser extends Parser {
 		public LegacyIndexAttributeExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterLegacyIndexAttributeExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterLegacyIndexAttributeExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitLegacyIndexAttributeExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitLegacyIndexAttributeExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitLegacyIndexAttributeExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitLegacyIndexAttributeExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class ForExpressionContext extends ExprTermContext {
 		public ForExprContext forExpr() {
@@ -861,18 +1057,26 @@ public class HCLParser extends Parser {
 		public ForExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterForExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterForExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitForExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitForExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitForExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitForExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class FunctionCallExpressionContext extends ExprTermContext {
 		public FunctionCallContext functionCall() {
@@ -881,18 +1085,26 @@ public class HCLParser extends Parser {
 		public FunctionCallExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterFunctionCallExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterFunctionCallExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitFunctionCallExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitFunctionCallExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitFunctionCallExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitFunctionCallExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class CollectionValueExpressionContext extends ExprTermContext {
 		public CollectionValueContext collectionValue() {
@@ -901,16 +1113,23 @@ public class HCLParser extends Parser {
 		public CollectionValueExpressionContext(ExprTermContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterCollectionValueExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterCollectionValueExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitCollectionValueExpression(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitCollectionValueExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitCollectionValueExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitCollectionValueExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1007,7 +1226,9 @@ public class HCLParser extends Parser {
 			_alt = getInterpreter().adaptivePredict(_input,8,_ctx);
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
-					if ( _parseListeners!=null ) triggerExitRuleEvent();
+                    if (_parseListeners != null) {
+                        triggerExitRuleEvent();
+                    }
 					_prevctx = _localctx;
 					{
 					setState(155);
@@ -1018,7 +1239,9 @@ public class HCLParser extends Parser {
 						_localctx = new IndexAccessExpressionContext(new ExprTermContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_exprTerm);
 						setState(147);
-						if (!(precpred(_ctx, 5))) throw new FailedPredicateException(this, "precpred(_ctx, 5)");
+                            if (!precpred(_ctx, 5)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 5)");
+                            }
 						setState(148);
 						index();
 						}
@@ -1028,7 +1251,9 @@ public class HCLParser extends Parser {
 						_localctx = new AttributeAccessExpressionContext(new ExprTermContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_exprTerm);
 						setState(149);
-						if (!(precpred(_ctx, 4))) throw new FailedPredicateException(this, "precpred(_ctx, 4)");
+                            if (!precpred(_ctx, 4)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 4)");
+                            }
 						setState(150);
 						getAttr();
 						}
@@ -1038,7 +1263,9 @@ public class HCLParser extends Parser {
 						_localctx = new LegacyIndexAttributeExpressionContext(new ExprTermContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_exprTerm);
 						setState(151);
-						if (!(precpred(_ctx, 3))) throw new FailedPredicateException(this, "precpred(_ctx, 3)");
+                            if (!precpred(_ctx, 3)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 3)");
+                            }
 						setState(152);
 						legacyIndexAttr();
 						}
@@ -1048,7 +1275,9 @@ public class HCLParser extends Parser {
 						_localctx = new SplatExpressionContext(new ExprTermContext(_parentctx, _parentState));
 						pushNewRecursionContext(_localctx, _startState, RULE_exprTerm);
 						setState(153);
-						if (!(precpred(_ctx, 2))) throw new FailedPredicateException(this, "precpred(_ctx, 2)");
+                            if (!precpred(_ctx, 2)) {
+                                throw new FailedPredicateException(this, "precpred(_ctx, 2)");
+                            }
 						setState(154);
 						splat();
 						}
@@ -1086,16 +1315,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_blockExpr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBlockExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBlockExpr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBlockExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBlockExpr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBlockExpr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBlockExpr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1135,16 +1371,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_literalValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterLiteralValue(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterLiteralValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitLiteralValue(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitLiteralValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitLiteralValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitLiteralValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1157,11 +1400,13 @@ public class HCLParser extends Parser {
 			{
 			setState(164);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 32864L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 32864L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1192,16 +1437,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_collectionValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterCollectionValue(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterCollectionValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitCollectionValue(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitCollectionValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitCollectionValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitCollectionValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1261,16 +1513,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_tuple; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterTuple(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterTuple(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitTuple(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitTuple(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitTuple(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitTuple(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1287,7 +1546,7 @@ public class HCLParser extends Parser {
 			setState(182);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 17297540326L) != 0)) {
+			if ((_la & ~0x3f) == 0 && ((1L << _la) & 17297540326L) != 0) {
 				{
 				setState(171);
 				expression(0);
@@ -1353,16 +1612,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_object; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterObject(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterObject(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitObject(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitObject(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitObject(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitObject(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1378,7 +1644,7 @@ public class HCLParser extends Parser {
 			setState(190);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 17297540326L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 17297540326L) != 0) {
 				{
 				{
 				setState(187);
@@ -1437,16 +1703,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_objectelem; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterObjectelem(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterObjectelem(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitObjectelem(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitObjectelem(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitObjectelem(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitObjectelem(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1517,7 +1790,9 @@ public class HCLParser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1562,16 +1837,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_qualifiedIdentifier; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterQualifiedIdentifier(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterQualifiedIdentifier(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitQualifiedIdentifier(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitQualifiedIdentifier(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitQualifiedIdentifier(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitQualifiedIdentifier(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1627,16 +1909,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_forExpr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterForExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterForExpr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitForExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitForExpr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitForExpr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitForExpr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1696,16 +1985,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_forTupleExpr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterForTupleExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterForTupleExpr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitForTupleExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitForTupleExpr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitForTupleExpr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitForTupleExpr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1774,16 +2070,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_forObjectExpr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterForObjectExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterForObjectExpr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitForObjectExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitForObjectExpr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitForObjectExpr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitForObjectExpr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1858,16 +2161,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_forIntro; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterForIntro(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterForIntro(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitForIntro(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitForIntro(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitForIntro(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitForIntro(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1921,16 +2231,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_forCond; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterForCond(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterForCond(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitForCond(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitForCond(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitForCond(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitForCond(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1966,16 +2283,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_variableExpr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterVariableExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterVariableExpr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitVariableExpr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitVariableExpr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitVariableExpr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitVariableExpr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2016,16 +2340,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_functionCall; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterFunctionCall(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterFunctionCall(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitFunctionCall(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitFunctionCall(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitFunctionCall(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitFunctionCall(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2043,7 +2374,7 @@ public class HCLParser extends Parser {
 			setState(268);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 17297540326L) != 0)) {
+			if ((_la & ~0x3f) == 0 && ((1L << _la) & 17297540326L) != 0) {
 				{
 				setState(267);
 				arguments();
@@ -2081,16 +2412,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_functionName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterFunctionName(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterFunctionName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitFunctionName(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitFunctionName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitFunctionName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitFunctionName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2151,16 +2489,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_arguments; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterArguments(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterArguments(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitArguments(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitArguments(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitArguments(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitArguments(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2203,7 +2548,9 @@ public class HCLParser extends Parser {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -2236,16 +2583,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_index; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterIndex(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterIndex(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitIndex(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitIndex(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitIndex(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitIndex(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2284,16 +2638,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_getAttr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterGetAttr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterGetAttr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitGetAttr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitGetAttr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitGetAttr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitGetAttr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2330,16 +2691,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_legacyIndexAttr; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterLegacyIndexAttr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterLegacyIndexAttr(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitLegacyIndexAttr(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitLegacyIndexAttr(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitLegacyIndexAttr(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitLegacyIndexAttr(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2380,16 +2748,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_splat; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterSplat(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterSplat(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitSplat(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitSplat(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitSplat(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitSplat(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2445,16 +2820,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_attrSplat; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterAttrSplat(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterAttrSplat(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitAttrSplat(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitAttrSplat(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitAttrSplat(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitAttrSplat(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2521,16 +2903,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_fullSplat; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterFullSplat(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterFullSplat(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitFullSplat(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitFullSplat(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitFullSplat(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitFullSplat(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2604,16 +2993,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_operation; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterOperation(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterOperation(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitOperation(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitOperation(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitOperation(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitOperation(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2623,22 +3019,15 @@ public class HCLParser extends Parser {
 		try {
 			setState(325);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,31,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(323);
-				unaryOp();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(324);
-				binaryOp();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 31, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(323);
+                unaryOp();
+            } else if (getInterpreter().adaptivePredict(_input, 31, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(324);
+                binaryOp();
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -2664,16 +3053,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_unaryOp; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterUnaryOp(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterUnaryOp(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitUnaryOp(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitUnaryOp(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitUnaryOp(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitUnaryOp(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2690,7 +3086,9 @@ public class HCLParser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -2732,16 +3130,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_binaryOp; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBinaryOp(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBinaryOp(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBinaryOp(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBinaryOp(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBinaryOp(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBinaryOp(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2784,20 +3189,13 @@ public class HCLParser extends Parser {
 			binaryOperator();
 			setState(337);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,33,_ctx) ) {
-			case 1:
-				{
-				setState(335);
-				exprTerm(0);
-				}
-				break;
-			case 2:
-				{
-				setState(336);
-				operation();
-				}
-				break;
-			}
+                if (getInterpreter().adaptivePredict(_input, 33, _ctx) == 1) {
+                    setState(335);
+                    exprTerm(0);
+                } else if (getInterpreter().adaptivePredict(_input, 33, _ctx) == 2) {
+                    setState(336);
+                    operation();
+                }
 			}
 		}
 		catch (RecognitionException re) {
@@ -2828,16 +3226,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_binaryOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterBinaryOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterBinaryOperator(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitBinaryOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitBinaryOperator(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitBinaryOperator(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitBinaryOperator(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2908,16 +3313,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_compareOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterCompareOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterCompareOperator(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitCompareOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitCompareOperator(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitCompareOperator(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitCompareOperator(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2930,11 +3342,13 @@ public class HCLParser extends Parser {
 			{
 			setState(344);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 310046097408L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 310046097408L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -2964,16 +3378,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_arithmeticOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterArithmeticOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterArithmeticOperator(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitArithmeticOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitArithmeticOperator(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitArithmeticOperator(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitArithmeticOperator(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2986,11 +3407,13 @@ public class HCLParser extends Parser {
 			{
 			setState(346);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 2345119514624L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 2345119514624L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -3017,16 +3440,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_logicOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterLogicOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterLogicOperator(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitLogicOperator(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitLogicOperator(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitLogicOperator(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitLogicOperator(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3043,7 +3473,9 @@ public class HCLParser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -3072,6 +3504,7 @@ public class HCLParser extends Parser {
 			super.copyFrom(ctx);
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class QuotedTemplateContext extends TemplateExprContext {
 		public List<TerminalNode> QUOTE() { return getTokens(HCLParser.QUOTE); }
@@ -3087,18 +3520,26 @@ public class HCLParser extends Parser {
 		public QuotedTemplateContext(TemplateExprContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterQuotedTemplate(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterQuotedTemplate(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitQuotedTemplate(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitQuotedTemplate(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitQuotedTemplate(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitQuotedTemplate(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class HeredocContext extends TemplateExprContext {
 		public TerminalNode HEREDOC_START() { return getToken(HCLParser.HEREDOC_START, 0); }
@@ -3119,16 +3560,23 @@ public class HCLParser extends Parser {
 		public HeredocContext(TemplateExprContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterHeredoc(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterHeredoc(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitHeredoc(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitHeredoc(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitHeredoc(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitHeredoc(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3233,16 +3681,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_heredocTemplatePart; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterHeredocTemplatePart(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterHeredocTemplatePart(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitHeredocTemplatePart(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitHeredocTemplatePart(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitHeredocTemplatePart(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitHeredocTemplatePart(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3291,16 +3746,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_heredocLiteral; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterHeredocLiteral(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterHeredocLiteral(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitHeredocLiteral(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitHeredocLiteral(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitHeredocLiteral(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitHeredocLiteral(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3339,16 +3801,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_quotedTemplatePart; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterQuotedTemplatePart(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterQuotedTemplatePart(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitQuotedTemplatePart(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitQuotedTemplatePart(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitQuotedTemplatePart(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitQuotedTemplatePart(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3397,16 +3866,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_stringLiteral; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterStringLiteral(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterStringLiteral(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitStringLiteral(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitStringLiteral(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitStringLiteral(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitStringLiteral(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3444,16 +3920,23 @@ public class HCLParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_templateInterpolation; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).enterTemplateInterpolation(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).enterTemplateInterpolation(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof HCLParserListener ) ((HCLParserListener)listener).exitTemplateInterpolation(this);
+            if (listener instanceof HCLParserListener) {
+                ((HCLParserListener) listener).exitTemplateInterpolation(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof HCLParserVisitor ) return ((HCLParserVisitor<? extends T>)visitor).visitTemplateInterpolation(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof HCLParserVisitor) {
+                return ((HCLParserVisitor<? extends T>) visitor).visitTemplateInterpolation(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3483,22 +3966,20 @@ public class HCLParser extends Parser {
 	}
 
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 6:
-			return expression_sempred((ExpressionContext)_localctx, predIndex);
-		case 7:
-			return exprTerm_sempred((ExprTermContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 6) {
+            return expressionSempred((ExpressionContext) _localctx, predIndex);
+        } else if (ruleIndex == 7) {
+            return exprTermSempred((ExprTermContext) _localctx, predIndex);
+        }
 		return true;
 	}
-	private boolean expression_sempred(ExpressionContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return precpred(_ctx, 1);
-		}
+	private boolean expressionSempred(ExpressionContext _localctx, int predIndex) {
+        if (predIndex == 0) {
+            return precpred(_ctx, 1);
+        }
 		return true;
 	}
-	private boolean exprTerm_sempred(ExprTermContext _localctx, int predIndex) {
+	private boolean exprTermSempred(ExprTermContext _localctx, int predIndex) {
 		switch (predIndex) {
 		case 1:
 			return precpred(_ctx, 5);

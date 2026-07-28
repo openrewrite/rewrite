@@ -35,20 +35,59 @@ public class TomlParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, NL=2, COMMENT=3, L_BRACKET=4, DOUBLE_L_BRACKET=5, R_BRACKET=6, DOUBLE_R_BRACKET=7,
-		EQUALS=8, DOT=9, COMMA=10, BASIC_STRING=11, LITERAL_STRING=12, UNQUOTED_KEY=13,
-		VALUE_WS=14, L_BRACE=15, BOOLEAN=16, ML_BASIC_STRING=17, ML_LITERAL_STRING=18,
-		FLOAT=19, INF=20, NAN=21, DEC_INT=22, HEX_INT=23, OCT_INT=24, BIN_INT=25,
-		OFFSET_DATE_TIME=26, LOCAL_DATE_TIME=27, LOCAL_DATE=28, LOCAL_TIME=29,
-		INLINE_TABLE_WS=30, R_BRACE=31, ARRAY_WS=32;
-	public static final int
-		RULE_document = 0, RULE_expression = 1, RULE_comment = 2, RULE_keyValue = 3,
-		RULE_key = 4, RULE_simpleKey = 5, RULE_unquotedKey = 6, RULE_quotedKey = 7,
-		RULE_dottedKey = 8, RULE_value = 9, RULE_string = 10, RULE_integer = 11,
-		RULE_floatingPoint = 12, RULE_bool = 13, RULE_dateTime = 14, RULE_commentOrNl = 15,
-		RULE_array = 16, RULE_table = 17, RULE_standardTable = 18, RULE_inlineTable = 19,
-		RULE_arrayTable = 20;
+    public static final int WS = 1;
+    public static final int NL = 2;
+    public static final int COMMENT = 3;
+    public static final int L_BRACKET = 4;
+    public static final int DOUBLE_L_BRACKET = 5;
+    public static final int R_BRACKET = 6;
+    public static final int DOUBLE_R_BRACKET = 7;
+    public static final int EQUALS = 8;
+    public static final int DOT = 9;
+    public static final int COMMA = 10;
+    public static final int BASIC_STRING = 11;
+    public static final int LITERAL_STRING = 12;
+    public static final int UNQUOTED_KEY = 13;
+    public static final int VALUE_WS = 14;
+    public static final int L_BRACE = 15;
+    public static final int BOOLEAN = 16;
+    public static final int ML_BASIC_STRING = 17;
+    public static final int ML_LITERAL_STRING = 18;
+    public static final int FLOAT = 19;
+    public static final int INF = 20;
+    public static final int NAN = 21;
+    public static final int DEC_INT = 22;
+    public static final int HEX_INT = 23;
+    public static final int OCT_INT = 24;
+    public static final int BIN_INT = 25;
+    public static final int OFFSET_DATE_TIME = 26;
+    public static final int LOCAL_DATE_TIME = 27;
+    public static final int LOCAL_DATE = 28;
+    public static final int LOCAL_TIME = 29;
+    public static final int INLINE_TABLE_WS = 30;
+    public static final int R_BRACE = 31;
+    public static final int ARRAY_WS = 32;
+    public static final int RULE_document = 0;
+    public static final int RULE_expression = 1;
+    public static final int RULE_comment = 2;
+    public static final int RULE_keyValue = 3;
+    public static final int RULE_key = 4;
+    public static final int RULE_simpleKey = 5;
+    public static final int RULE_unquotedKey = 6;
+    public static final int RULE_quotedKey = 7;
+    public static final int RULE_dottedKey = 8;
+    public static final int RULE_value = 9;
+    public static final int RULE_string = 10;
+    public static final int RULE_integer = 11;
+    public static final int RULE_floatingPoint = 12;
+    public static final int RULE_bool = 13;
+    public static final int RULE_dateTime = 14;
+    public static final int RULE_commentOrNl = 15;
+    public static final int RULE_array = 16;
+    public static final int RULE_table = 17;
+    public static final int RULE_standardTable = 18;
+    public static final int RULE_inlineTable = 19;
+    public static final int RULE_arrayTable = 20;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"document", "expression", "comment", "keyValue", "key", "simpleKey",
@@ -147,16 +186,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_document; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterDocument(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterDocument(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitDocument(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitDocument(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitDocument(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitDocument(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -170,7 +216,7 @@ public class TomlParser extends Parser {
 			setState(43);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0)) {
+			if ((_la & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0) {
 				{
 				setState(42);
 				expression();
@@ -188,7 +234,7 @@ public class TomlParser extends Parser {
 				setState(47);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0)) {
+				if ((_la & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0) {
 					{
 					setState(46);
 					expression();
@@ -233,16 +279,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_expression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterExpression(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterExpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitExpression(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitExpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitExpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitExpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -322,16 +375,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_comment; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterComment(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterComment(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitComment(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitComment(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitComment(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitComment(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -371,16 +431,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_keyValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterKeyValue(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterKeyValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitKeyValue(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitKeyValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitKeyValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitKeyValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -423,16 +490,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_key; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -442,22 +516,15 @@ public class TomlParser extends Parser {
 		try {
 			setState(75);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,6,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(73);
-				simpleKey();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(74);
-				dottedKey();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 6, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(73);
+                simpleKey();
+            } else if (getInterpreter().adaptivePredict(_input, 6, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(74);
+                dottedKey();
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -484,16 +551,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_simpleKey; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterSimpleKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterSimpleKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitSimpleKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitSimpleKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitSimpleKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitSimpleKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -543,16 +617,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_unquotedKey; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterUnquotedKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterUnquotedKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitUnquotedKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitUnquotedKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitUnquotedKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitUnquotedKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -587,16 +668,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_quotedKey; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterQuotedKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterQuotedKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitQuotedKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitQuotedKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitQuotedKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitQuotedKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -613,7 +701,9 @@ public class TomlParser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -648,16 +738,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_dottedKey; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterDottedKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterDottedKey(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitDottedKey(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitDottedKey(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitDottedKey(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitDottedKey(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -728,16 +825,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_value; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterValue(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitValue(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -835,16 +939,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_string; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterString(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterString(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitString(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitString(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitString(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitString(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -857,11 +968,13 @@ public class TomlParser extends Parser {
 			{
 			setState(101);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 399360L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 399360L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -890,16 +1003,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_integer; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterInteger(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterInteger(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitInteger(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitInteger(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitInteger(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitInteger(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -912,11 +1032,13 @@ public class TomlParser extends Parser {
 			{
 			setState(103);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 62914560L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 62914560L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -944,16 +1066,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_floatingPoint; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterFloatingPoint(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterFloatingPoint(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitFloatingPoint(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitFloatingPoint(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitFloatingPoint(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitFloatingPoint(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -966,11 +1095,13 @@ public class TomlParser extends Parser {
 			{
 			setState(105);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 3670016L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 3670016L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -996,16 +1127,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_bool; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterBool(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterBool(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitBool(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitBool(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitBool(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitBool(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1042,16 +1180,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_dateTime; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterDateTime(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterDateTime(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitDateTime(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitDateTime(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitDateTime(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitDateTime(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1064,11 +1209,13 @@ public class TomlParser extends Parser {
 			{
 			setState(109);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 1006632960L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 1006632960L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1095,16 +1242,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_commentOrNl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterCommentOrNl(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterCommentOrNl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitCommentOrNl(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitCommentOrNl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitCommentOrNl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitCommentOrNl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1166,16 +1320,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_array; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterArray(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterArray(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitArray(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitArray(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitArray(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitArray(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1187,112 +1348,105 @@ public class TomlParser extends Parser {
 			int _alt;
 			setState(156);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,17,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(116);
-				match(L_BRACKET);
-				setState(120);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==NL || _la==COMMENT) {
-					{
-					{
-					setState(117);
-					commentOrNl();
-					}
-					}
-					setState(122);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(123);
-				match(R_BRACKET);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(124);
-				match(L_BRACKET);
-				setState(128);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==NL || _la==COMMENT) {
-					{
-					{
-					setState(125);
-					commentOrNl();
-					}
-					}
-					setState(130);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(131);
-				value();
-				setState(142);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,14,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(132);
-						match(COMMA);
-						setState(136);
-						_errHandler.sync(this);
-						_la = _input.LA(1);
-						while (_la==NL || _la==COMMENT) {
-							{
-							{
-							setState(133);
-							commentOrNl();
-							}
-							}
-							setState(138);
-							_errHandler.sync(this);
-							_la = _input.LA(1);
-						}
-						setState(139);
-						value();
-						}
-						}
-					}
-					setState(144);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,14,_ctx);
-				}
-				setState(146);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==COMMA) {
-					{
-					setState(145);
-					match(COMMA);
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 17, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(116);
+                match(L_BRACKET);
+                setState(120);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                while (_la == NL || _la == COMMENT) {
+                    {
+                        {
+                            setState(117);
+                            commentOrNl();
+                        }
+                    }
+                    setState(122);
+                    _errHandler.sync(this);
+                    _la = _input.LA(1);
+                }
+                setState(123);
+                match(R_BRACKET);
+            } else if (getInterpreter().adaptivePredict(_input, 17, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(124);
+                match(L_BRACKET);
+                setState(128);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                while (_la == NL || _la == COMMENT) {
+                    {
+                        {
+                            setState(125);
+                            commentOrNl();
+                        }
+                    }
+                    setState(130);
+                    _errHandler.sync(this);
+                    _la = _input.LA(1);
+                }
+                setState(131);
+                value();
+                setState(142);
+                _errHandler.sync(this);
+                _alt = getInterpreter().adaptivePredict(_input, 14, _ctx);
+                while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (_alt == 1) {
+                        {
+                            {
+                                setState(132);
+                                match(COMMA);
+                                setState(136);
+                                _errHandler.sync(this);
+                                _la = _input.LA(1);
+                                while (_la == NL || _la == COMMENT) {
+                                    {
+                                        {
+                                            setState(133);
+                                            commentOrNl();
+                                        }
+                                    }
+                                    setState(138);
+                                    _errHandler.sync(this);
+                                    _la = _input.LA(1);
+                                }
+                                setState(139);
+                                value();
+                            }
+                        }
+                    }
+                    setState(144);
+                    _errHandler.sync(this);
+                    _alt = getInterpreter().adaptivePredict(_input, 14, _ctx);
+                }
+                setState(146);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                if (_la == COMMA) {
+                    {
+                        setState(145);
+                        match(COMMA);
+                    }
+                }
 
-				setState(151);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==NL || _la==COMMENT) {
-					{
-					{
-					setState(148);
-					commentOrNl();
-					}
-					}
-					setState(153);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(154);
-				match(R_BRACKET);
-				}
-				break;
-			}
+                setState(151);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                while (_la == NL || _la == COMMENT) {
+                    {
+                        {
+                            setState(148);
+                            commentOrNl();
+                        }
+                    }
+                    setState(153);
+                    _errHandler.sync(this);
+                    _la = _input.LA(1);
+                }
+                setState(154);
+                match(R_BRACKET);
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -1319,16 +1473,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_table; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterTable(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitTable(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitTable(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitTable(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1393,16 +1554,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_standardTable; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterStandardTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterStandardTable(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitStandardTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitStandardTable(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitStandardTable(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitStandardTable(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1489,16 +1657,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_inlineTable; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterInlineTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterInlineTable(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitInlineTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitInlineTable(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitInlineTable(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitInlineTable(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1510,112 +1685,105 @@ public class TomlParser extends Parser {
 			int _alt;
 			setState(217);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,27,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(177);
-				match(L_BRACE);
-				setState(181);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==NL || _la==COMMENT) {
-					{
-					{
-					setState(178);
-					commentOrNl();
-					}
-					}
-					setState(183);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(184);
-				match(R_BRACE);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(185);
-				match(L_BRACE);
-				setState(189);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==NL || _la==COMMENT) {
-					{
-					{
-					setState(186);
-					commentOrNl();
-					}
-					}
-					setState(191);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(192);
-				keyValue();
-				setState(203);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,24,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(193);
-						match(COMMA);
-						setState(197);
-						_errHandler.sync(this);
-						_la = _input.LA(1);
-						while (_la==NL || _la==COMMENT) {
-							{
-							{
-							setState(194);
-							commentOrNl();
-							}
-							}
-							setState(199);
-							_errHandler.sync(this);
-							_la = _input.LA(1);
-						}
-						setState(200);
-						keyValue();
-						}
-						}
-					}
-					setState(205);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,24,_ctx);
-				}
-				setState(207);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==COMMA) {
-					{
-					setState(206);
-					match(COMMA);
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 27, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(177);
+                match(L_BRACE);
+                setState(181);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                while (_la == NL || _la == COMMENT) {
+                    {
+                        {
+                            setState(178);
+                            commentOrNl();
+                        }
+                    }
+                    setState(183);
+                    _errHandler.sync(this);
+                    _la = _input.LA(1);
+                }
+                setState(184);
+                match(R_BRACE);
+            } else if (getInterpreter().adaptivePredict(_input, 27, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(185);
+                match(L_BRACE);
+                setState(189);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                while (_la == NL || _la == COMMENT) {
+                    {
+                        {
+                            setState(186);
+                            commentOrNl();
+                        }
+                    }
+                    setState(191);
+                    _errHandler.sync(this);
+                    _la = _input.LA(1);
+                }
+                setState(192);
+                keyValue();
+                setState(203);
+                _errHandler.sync(this);
+                _alt = getInterpreter().adaptivePredict(_input, 24, _ctx);
+                while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                    if (_alt == 1) {
+                        {
+                            {
+                                setState(193);
+                                match(COMMA);
+                                setState(197);
+                                _errHandler.sync(this);
+                                _la = _input.LA(1);
+                                while (_la == NL || _la == COMMENT) {
+                                    {
+                                        {
+                                            setState(194);
+                                            commentOrNl();
+                                        }
+                                    }
+                                    setState(199);
+                                    _errHandler.sync(this);
+                                    _la = _input.LA(1);
+                                }
+                                setState(200);
+                                keyValue();
+                            }
+                        }
+                    }
+                    setState(205);
+                    _errHandler.sync(this);
+                    _alt = getInterpreter().adaptivePredict(_input, 24, _ctx);
+                }
+                setState(207);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                if (_la == COMMA) {
+                    {
+                        setState(206);
+                        match(COMMA);
+                    }
+                }
 
-				setState(212);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				while (_la==NL || _la==COMMENT) {
-					{
-					{
-					setState(209);
-					commentOrNl();
-					}
-					}
-					setState(214);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				}
-				setState(215);
-				match(R_BRACE);
-				}
-				break;
-			}
+                setState(212);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                while (_la == NL || _la == COMMENT) {
+                    {
+                        {
+                            setState(209);
+                            commentOrNl();
+                        }
+                    }
+                    setState(214);
+                    _errHandler.sync(this);
+                    _la = _input.LA(1);
+                }
+                setState(215);
+                match(R_BRACE);
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -1653,16 +1821,23 @@ public class TomlParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_arrayTable; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).enterArrayTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).enterArrayTable(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TomlParserListener ) ((TomlParserListener)listener).exitArrayTable(this);
+            if (listener instanceof TomlParserListener) {
+                ((TomlParserListener) listener).exitArrayTable(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitArrayTable(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TomlParserVisitor) {
+                return ((TomlParserVisitor<? extends T>) visitor).visitArrayTable(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 

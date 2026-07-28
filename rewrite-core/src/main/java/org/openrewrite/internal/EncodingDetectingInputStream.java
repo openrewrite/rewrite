@@ -42,7 +42,7 @@ public class EncodingDetectingInputStream extends InputStream {
      * Number of UTF-8 continuation bytes (0x80-0xBF) still expected
      * to complete the current multi-byte sequence. Zero when idle.
      */
-    int remainingContinuationBytes = 0;
+    int remainingContinuationBytes;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this(inputStream, null);
@@ -121,18 +121,19 @@ public class EncodingDetectingInputStream extends InputStream {
             } else {
                 charset = WINDOWS_1252;
             }
-        } else if (aByte <= 0x7F) {
+        } else if (aByte > 0x7F) {
+     if (aByte >= 0xC2 && aByte <= 0xDF) {
+                remainingContinuationBytes = 1;
+            } else if (aByte >= 0xE0 && aByte <= 0xEF) {
+                remainingContinuationBytes = 2;
+            } else if (aByte >= 0xF0 && aByte <= 0xF4) {
+                remainingContinuationBytes = 3;
+            } else {
+                // 0x80-0xBF (bare continuation), 0xC0-0xC1 (overlong),
+                // 0xF5-0xFF (above max Unicode) — all invalid UTF-8
+                charset = WINDOWS_1252;
+            }
             // ASCII — valid, nothing to track
-        } else if (aByte >= 0xC2 && aByte <= 0xDF) {
-            remainingContinuationBytes = 1;
-        } else if (aByte >= 0xE0 && aByte <= 0xEF) {
-            remainingContinuationBytes = 2;
-        } else if (aByte >= 0xF0 && aByte <= 0xF4) {
-            remainingContinuationBytes = 3;
-        } else {
-            // 0x80-0xBF (bare continuation), 0xC0-0xC1 (overlong),
-            // 0xF5-0xFF (above max Unicode) — all invalid UTF-8
-            charset = WINDOWS_1252;
         }
     }
 

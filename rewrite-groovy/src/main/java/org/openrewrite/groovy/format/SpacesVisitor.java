@@ -55,10 +55,8 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
 
     @Override
     public @Nullable <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
-        switch (loc) {
-            case METHOD_SELECT:
-                loc = JRightPadded.Location.LANGUAGE_EXTENSION;
-                break;
+        if (loc == JRightPadded.Location.METHOD_SELECT) {
+            loc = JRightPadded.Location.LANGUAGE_EXTENSION;
         }
         return super.visitRightPadded(right, loc, p);
     }

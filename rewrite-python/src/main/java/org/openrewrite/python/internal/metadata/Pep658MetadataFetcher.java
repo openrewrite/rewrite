@@ -21,7 +21,7 @@ import org.openrewrite.ipc.http.HttpSender;
 /**
  * Fetches the PEP 658/714 {@code .metadata} sidecar published next to a distribution file.
  */
-public class Pep658MetadataFetcher {
+public final class Pep658MetadataFetcher {
 
     private Pep658MetadataFetcher() {
     }

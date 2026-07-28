@@ -201,7 +201,7 @@ public class SourcePositionService {
         AtomicBoolean found = new AtomicBoolean(false);
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
             @Nullable
-            J foundJ = null;
+            J foundJ;
 
             @Override
             protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<TreeVisitor<?, ?>> p) {
@@ -338,7 +338,6 @@ public class SourcePositionService {
                         startCol.set(1);
                         rowIndent.set(0);
                         indenting.set(true);
-                        ;
                     } else if (c == '\r') {
                         // Skip \r in \r\n
                         if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') {
@@ -346,7 +345,6 @@ public class SourcePositionService {
                             startCol.set(1);
                             rowIndent.set(0);
                             indenting.set(true);
-                            ;
                         }
                     } else {
                         startCol.incrementAndGet();

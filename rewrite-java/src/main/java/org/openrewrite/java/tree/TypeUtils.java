@@ -29,7 +29,7 @@ import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.FROM;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.TO;
 
-public class TypeUtils {
+public final class TypeUtils {
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
     private static final Set<String> COMMON_JAVA_LANG_TYPES =
             new HashSet<>(Arrays.asList(
@@ -403,11 +403,11 @@ public class TypeUtils {
         }
 
         JavaType.FullyQualified[] toFq = to.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         JavaType.FullyQualified[] fromFq = from.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         for (int i = 0; i < toFq.length; i++) {
@@ -1271,7 +1271,7 @@ public class TypeUtils {
         }
     }
 
-    public static class ComparisonContext {
+    public static final class ComparisonContext {
         public static final ComparisonContext INFER = new ComparisonContext(null, null, InferenceDirection.TO, null);
         public static final ComparisonContext BOUND = new ComparisonContext(null, null, InferenceDirection.NONE, null);
         private final @Nullable JavaType to;

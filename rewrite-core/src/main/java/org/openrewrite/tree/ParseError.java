@@ -138,11 +138,11 @@ public class ParseError implements SourceFile, RpcCodec<ParseError> {
     public ParseError rpcReceive(ParseError t, RpcReceiveQueue q) {
         return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
                 .withMarkers(q.receive(t.getMarkers()))
-                .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(t.getCharset(), Charset::forName))
+                .withSourcePath(q.receiveAndGet(t.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(t.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
-                .<ParseError>withFileAttributes(q.receive(t.getFileAttributes()))
+                .withFileAttributes(q.receive(t.getFileAttributes()))
                 .withText(q.receive(t.getText()));
     }
 }

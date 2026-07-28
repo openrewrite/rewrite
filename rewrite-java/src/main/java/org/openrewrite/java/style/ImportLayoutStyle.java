@@ -356,7 +356,7 @@ public class ImportLayoutStyle implements JavaStyle {
         List<Block> effectiveLayout = getLayout();
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
         Map<Boolean, List<Block>> blockGroups = effectiveLayout.stream()
-                .collect(partitioningBy(block -> block instanceof Block.AllOthers));
+                .collect(partitioningBy(Block.AllOthers.class::isInstance));
         List<Block> noCatchalls = blockGroups.get(false);
         List<Block> onlyCatchalls = blockGroups.get(true);
 
@@ -559,7 +559,7 @@ public class ImportLayoutStyle implements JavaStyle {
         private final List<JRightPadded<J.Import>> originalImports;
         private final boolean classpathDirty;
         private final Set<String> jvmClasspathNames = new HashSet<>();
-        private @Nullable Set<String> containsClassNameConflict = null;
+        private @Nullable Set<String> containsClassNameConflict;
 
         ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
             this(classpath, originalImports, false);
@@ -690,7 +690,7 @@ public class ImportLayoutStyle implements JavaStyle {
         class ImportPackage implements Block {
 
             // VisibleForTesting
-            final static Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
+            static final Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
                 String[] import1 = i1.getElement().getQualid().printTrimmed().split("\\.");
                 String[] import2 = i2.getElement().getQualid().printTrimmed().split("\\.");
 

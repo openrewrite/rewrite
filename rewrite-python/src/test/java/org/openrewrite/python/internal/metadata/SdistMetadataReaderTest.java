@@ -195,7 +195,7 @@ class SdistMetadataReaderTest {
         byte[] header = new byte[512];
         byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
         System.arraycopy(nameBytes, 0, header, 0, nameBytes.length);
-        writeOctal(header, 100, 8, 0644);
+        writeOctal(header, 100, 8, 420);
         writeOctal(header, 108, 8, 0);
         writeOctal(header, 116, 8, 0);
         writeOctal(header, 124, 12, data.length);

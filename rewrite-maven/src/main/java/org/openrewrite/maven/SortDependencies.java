@@ -72,7 +72,7 @@ public class SortDependencies extends Recipe {
                 }
 
                 List<DependencyGroup> sorted = new ArrayList<>(groups);
-                sorted.sort(Comparator.<DependencyGroup, Boolean>comparing(
+                sorted.sort(Comparator.comparing(
                     g -> "test".equals(g.tag.getChildValue("scope").orElse(null))
                 ).thenComparing(
                     g -> g.tag.getChildValue("groupId").orElse("") + ":" +

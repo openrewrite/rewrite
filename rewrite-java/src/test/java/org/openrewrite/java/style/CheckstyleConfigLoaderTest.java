@@ -327,7 +327,7 @@ class CheckstyleConfigLoaderTest {
         """, emptyMap());
 
         assertThat(checkstyle.getStyles()).hasSize(2);
-        assertThat(checkstyle.getStyles()).allMatch(s -> s instanceof UnnecessaryParenthesesStyle);
+        assertThat(checkstyle.getStyles()).allMatch(UnnecessaryParenthesesStyle.class::isInstance);
 
         UnnecessaryParenthesesStyle unnecessaryParenthesesStyle = (UnnecessaryParenthesesStyle) checkstyle.getStyles().iterator().next();
         assertThat(unnecessaryParenthesesStyle.getStringLiteral()).isTrue();
@@ -352,7 +352,7 @@ class CheckstyleConfigLoaderTest {
 
         // CustomImportOrder is converted to ImportLayoutStyle
         assertThat(checkstyle.getStyles()).hasSize(1);
-        assertThat(checkstyle.getStyles()).allMatch(s -> s instanceof ImportLayoutStyle);
+        assertThat(checkstyle.getStyles()).allMatch(ImportLayoutStyle.class::isInstance);
 
         ImportLayoutStyle importLayout = (ImportLayoutStyle) checkstyle.getStyles().iterator().next();
         // Rules: STANDARD_JAVA_PACKAGE, THIRD_PARTY_PACKAGE, SPECIAL_IMPORTS, STATIC
@@ -363,7 +363,7 @@ class CheckstyleConfigLoaderTest {
                 .count()).isGreaterThanOrEqualTo(2); // java.*, javax.*, org.*
 
         assertThat(importLayout.getLayout().stream()
-                .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
+                .filter(ImportLayoutStyle.Block.AllOthers.class::isInstance)
                 .count()).isEqualTo(2); // non-static catch-all + static catch-all
     }
 
@@ -861,13 +861,13 @@ class CheckstyleConfigLoaderTest {
             // Default option is "under" — statics after non-statics
             // Should have: non-static catch-all, blank, static catch-all
             assertThat(importLayout.getLayout().stream()
-                    .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
+                    .filter(ImportLayoutStyle.Block.AllOthers.class::isInstance)
                     .count()).isEqualTo(2);
 
             // First AllOthers should be non-static (under = statics after)
             ImportLayoutStyle.Block.AllOthers firstAllOthers = importLayout.getLayout().stream()
-                    .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
-                    .map(b -> (ImportLayoutStyle.Block.AllOthers) b)
+                    .filter(ImportLayoutStyle.Block.AllOthers.class::isInstance)
+                    .map(ImportLayoutStyle.Block.AllOthers.class::cast)
                     .findFirst().orElseThrow();
             assertThat(firstAllOthers.isStatic()).isFalse();
         });
@@ -895,7 +895,7 @@ class CheckstyleConfigLoaderTest {
             ImportLayoutStyle importLayout = (ImportLayoutStyle) style;
             // With separated=false, blank lines should only appear between static and non-static sections
             long blankLineCount = importLayout.getLayout().stream()
-                    .filter(b -> b instanceof ImportLayoutStyle.Block.BlankLines)
+                    .filter(ImportLayoutStyle.Block.BlankLines.class::isInstance)
                     .count();
             // At least one blank line between statics and non-statics
             assertThat(blankLineCount).isGreaterThanOrEqualTo(1);
@@ -925,16 +925,16 @@ class CheckstyleConfigLoaderTest {
             ImportLayoutStyle importLayout = (ImportLayoutStyle) style;
             // Should have exactly one AllOthers block with inflow=true
             assertThat(importLayout.getLayout().stream()
-                    .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
+                    .filter(ImportLayoutStyle.Block.AllOthers.class::isInstance)
                     .count()).isEqualTo(1);
             ImportLayoutStyle.Block.AllOthers inflowBlock = importLayout.getLayout().stream()
-                    .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
-                    .map(b -> (ImportLayoutStyle.Block.AllOthers) b)
+                    .filter(ImportLayoutStyle.Block.AllOthers.class::isInstance)
+                    .map(ImportLayoutStyle.Block.AllOthers.class::cast)
                     .findFirst().orElseThrow();
             assertThat(inflowBlock.isInflow()).isTrue();
             // No blank lines between static and non-static groups
             assertThat(importLayout.getLayout().stream()
-                    .filter(b -> b instanceof ImportLayoutStyle.Block.BlankLines)
+                    .filter(ImportLayoutStyle.Block.BlankLines.class::isInstance)
                     .count()).isEqualTo(0);
         });
     }

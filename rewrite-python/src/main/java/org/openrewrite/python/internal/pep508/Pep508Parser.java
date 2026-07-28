@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  * Port of pypa/packaging's {@code _tokenizer.Tokenizer} and {@code _parser} recursive
  * descent parser for PEP 508 dependency specifiers and environment markers.
  */
-class Pep508Parser {
+final class Pep508Parser {
     static class SyntaxException extends RuntimeException {
         SyntaxException(String message) {
             super(message);

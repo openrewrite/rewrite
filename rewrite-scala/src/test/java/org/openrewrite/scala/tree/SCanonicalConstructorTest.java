@@ -40,7 +40,7 @@ class SCanonicalConstructorTest {
     @TestFactory
     Stream<DynamicTest> everyConcreteSTypeHasPublicCanonicalConstructor() {
         return Arrays.stream(S.class.getDeclaredClasses())
-                .filter(c -> S.class.isAssignableFrom(c))
+                .filter(S.class::isAssignableFrom)
                 .filter(c -> !c.isInterface() && !Modifier.isAbstract(c.getModifiers()))
                 .map(c -> DynamicTest.dynamicTest(c.getSimpleName(), () -> {
                     long fieldCount = Arrays.stream(c.getDeclaredFields())

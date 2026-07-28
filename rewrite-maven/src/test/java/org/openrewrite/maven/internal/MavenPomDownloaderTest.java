@@ -75,7 +75,7 @@ class MavenPomDownloaderTest implements RewriteTest {
           .build();
         MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
           MavenExecutionContextView.view(ctx), null);
-        assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
+        assertThat(repo).isNotNull().extracting(MavenRepository::getUri).isEqualTo(ossSonatype.getUri());
     }
 
     @CsvSource(textBlock = """
@@ -1370,8 +1370,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                     @Override
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
                         assert recordedRequest.getPath() != null;
-                        return !recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
-                          new MockResponse().setResponseCode(404).setBody("") :
+                        return recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
                           new MockResponse().setResponseCode(200).setBody(
                             //language=xml
                             """
@@ -1380,7 +1379,8 @@ class MavenPomDownloaderTest implements RewriteTest {
                                   <artifactId>spring-cloud-dataflow-build</artifactId>
                                   <version>2.10.0-SNAPSHOT</version>
                               </project>
-                              """);
+                              """) :
+                          new MockResponse().setResponseCode(404).setBody("");
                     }
                 });
                 mockRepo.start();

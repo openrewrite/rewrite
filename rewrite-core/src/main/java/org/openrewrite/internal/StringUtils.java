@@ -28,7 +28,7 @@ import java.util.Arrays;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-public class StringUtils {
+public final class StringUtils {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
     private static final Pattern URI_PROTOCOL_PATTERN = Pattern.compile("(?<!\\\\)://");
 
@@ -524,8 +524,8 @@ public class StringUtils {
             }
             // Find the pattern between padIdxStart & padIdxTmp in str between
             // strIdxStart & strIdxEnd
-            int patLength = (patIdxTmp - patIdxStart - 1);
-            int strLength = (strIdxEnd - strIdxStart + 1);
+            int patLength = patIdxTmp - patIdxStart - 1;
+            int strLength = strIdxEnd - strIdxStart + 1;
 
             int foundIdx = findPatternInString(pattern, patIdxStart + 1, patLength,
                     str, strIdxStart, strLength);

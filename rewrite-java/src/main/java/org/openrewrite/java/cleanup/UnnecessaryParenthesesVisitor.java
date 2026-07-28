@@ -231,7 +231,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                 return mi;
             }
             Expression tree = (Expression) parentheses.getTree();
-            mi = mi.withSelect(tree.withPrefix((mergeSpace(mi.getSelect().getPrefix(), tree.getPrefix()))));
+            mi = mi.withSelect(tree.withPrefix(mergeSpace(mi.getSelect().getPrefix(), tree.getPrefix())));
         }
         return mi.withArguments(ListUtils.map(mi.getArguments(), arg -> {
             if (arg instanceof J.Parentheses) {

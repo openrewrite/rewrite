@@ -358,8 +358,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             is FirResolvedQualifier -> ExpressionType.QUALIFIER
             is FirCollectionLiteral -> ExpressionType.METHOD_INVOCATION
             is FirFunctionCall -> {
-                if (fir.calleeReference is FirErrorNamedReference)
+                if (fir.calleeReference is FirErrorNamedReference) {
                     return null
+                }
 
                 val sym = fir.calleeReference.resolved?.resolvedSymbol
                 when {

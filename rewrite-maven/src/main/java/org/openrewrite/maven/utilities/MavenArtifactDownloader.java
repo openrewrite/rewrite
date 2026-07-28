@@ -240,7 +240,8 @@ public class MavenArtifactDownloader {
     }
 
     private String @Nullable [] resolveCredentials(MavenRepository repository) {
-        String username, password;
+        String username;
+        String password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             username = authInfo.getUsername();

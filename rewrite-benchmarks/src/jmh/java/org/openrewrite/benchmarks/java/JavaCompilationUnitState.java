@@ -122,11 +122,11 @@ public class JavaCompilationUnitState {
 
     void printMemory() {
         long retainedSize = GraphLayout.parseInstance(radixMapTypeCache).totalSize();
-        System.out.printf("Retained AdaptiveRadixTree size: %10d bytes\n", retainedSize);
+        System.out.printf("Retained AdaptiveRadixTree size: %10d bytes%n", retainedSize);
         retainedSize = GraphLayout.parseInstance(snappyTypeCache).totalSize();
-        System.out.printf("Retained Snappy size:            %10d bytes\n", retainedSize);
+        System.out.printf("Retained Snappy size:            %10d bytes%n", retainedSize);
         retainedSize = GraphLayout.parseInstance(typeCache).totalSize();
-        System.out.printf("Retained HashMap size:           %10d bytes\n", retainedSize);
+        System.out.printf("Retained HashMap size:           %10d bytes%n", retainedSize);
     }
 
     @TearDown(Level.Trial)

@@ -30,8 +30,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public static Double PI;
     public static double PI_PRIMITIVE;
 
-    public static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
-        public InheritedJavaTypeGoat() {
+    public abstract static class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
+        protected InheritedJavaTypeGoat() {
             super();
         }
     }
@@ -53,7 +53,7 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
     }
 
-    public static abstract class Extension<U extends Extension<U>> {}
+    public abstract static class Extension<U extends Extension<U>> {}
 
     public static class TypeA {}
     public static class TypeB {}

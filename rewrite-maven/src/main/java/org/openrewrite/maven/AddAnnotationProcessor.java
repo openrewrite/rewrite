@@ -34,13 +34,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -356,9 +350,9 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                                             currentMrr.getPom().getManagedVersion(groupId, artifactId, null, null) != null &&
                                                     compilerPluginSupportsManagedVersions(currentMrr.getPom());
                                     String pathXml = omitVersion ?
-                                            String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n</path>",
+                                            String.format("<path>%n<groupId>%s</groupId>%n<artifactId>%s</artifactId>%n</path>",
                                                     groupId, artifactId) :
-                                            String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
+                                            String.format("<path>%n<groupId>%s</groupId>%n<artifactId>%s</artifactId>%n<version>%s</version>%n</path>",
                                                     groupId, artifactId, version);
                                     return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(pathXml)));
                                 }

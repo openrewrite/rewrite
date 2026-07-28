@@ -23,7 +23,7 @@ import org.openrewrite.java.MethodMatcher;
  * {@link MethodAccess.Matcher}, or {@link Annotated.Matcher} instead.
  */
 @Deprecated
-public class Traits {
+public final class Traits {
     private Traits() {
     }
 

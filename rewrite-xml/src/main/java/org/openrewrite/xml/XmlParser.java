@@ -139,8 +139,8 @@ public class XmlParser implements Parser {
             }
         }
         String fileName = path.getFileName().toString().toLowerCase();
-        return fileName.equals("nuget.config") ||
-                fileName.equals("packages.config") ||
+        return "nuget.config".equals(fileName) ||
+                "packages.config".equals(fileName) ||
                 // .NET Framework app/web config and their XDT transform variants
                 // (e.g. Web.Release.config, App.Debug.config)
                 ((fileName.startsWith("app.") || fileName.startsWith("web.")) && fileName.endsWith(".config"));
@@ -151,7 +151,7 @@ public class XmlParser implements Parser {
         return prefix.resolve("file.xml");
     }
 
-    private static class ForwardingErrorListener extends BaseErrorListener {
+    private static final class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 

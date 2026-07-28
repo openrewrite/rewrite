@@ -194,7 +194,7 @@ public interface RewriteTest extends SourceSpecs {
                 testMethodSpec.recipe;
 
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
-            !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
+            !(recipe instanceof CompositeRecipe) && !recipe.equals(Recipe.noop()) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
@@ -501,8 +501,8 @@ public interface RewriteTest extends SourceSpecs {
                 }
                 String paths = allResults.stream()
                         .map(it -> {
-                            String beforePath = (it.getBefore() == null) ? "null" : it.getBefore().getSourcePath().toString();
-                            String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
+                            String beforePath = it.getBefore() == null ? "null" : it.getBefore().getSourcePath().toString();
+                            String afterPath = it.getAfter() == null ? "null" : it.getAfter().getSourcePath().toString();
                             return "    " + beforePath + " -> " + afterPath;
                         })
                         .collect(joining("\n"));
@@ -675,8 +675,8 @@ public interface RewriteTest extends SourceSpecs {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
-                        String beforePath = (result.getBefore() == null) ? "null" : result.getBefore().getSourcePath().toString();
-                        String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String beforePath = result.getBefore() == null ? "null" : result.getBefore().getSourcePath().toString();
+                        String afterPath = result.getAfter() == null ? "null" : result.getAfter().getSourcePath().toString();
                         String status = it.getValue() ? "❌️" : "✔";
                         return "    " + beforePath + " | " + afterPath + " | " + status;
                     })

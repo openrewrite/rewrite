@@ -214,7 +214,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                                 new GradleDependency.Matcher().get(getCursor()).ifPresent(it -> {
                                                     if (it.getResolvedDependency().getRequested().getVersion() != null) {
                                                         requestedToDeclaration.put(it.getResolvedDependency().getRequested().getGav(), m1);
-                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), (groupArtifact -> new ArrayList<>()))
+                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), groupArtifact -> new ArrayList<>())
                                                                 .add(it.getResolvedDependency().getRequested().getVersion());
                                                     }
                                                 });
@@ -393,7 +393,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                        m = GradleMultiDependency.matcher()
+                        return GradleMultiDependency.matcher()
                                 .groupId(groupPattern)
                                 .artifactId(artifactPattern)
                                 .get(getCursor())
@@ -432,7 +432,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     }
                                     return gradleDependency.getTree();
                                 })).orElse(m);
-                        return m;
                     }
 
                     private @Nullable String getSpringBootVersionFromPlugin() {

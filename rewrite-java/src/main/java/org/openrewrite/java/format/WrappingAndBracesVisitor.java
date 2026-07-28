@@ -79,7 +79,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-        int size = container.getElements().stream().allMatch(it -> it instanceof J.Empty) ? 0 : container.getElements().size();
+        int size = container.getElements().stream().allMatch(J.Empty.class::isInstance) ? 0 : container.getElements().size();
         AtomicBoolean hasNewLinedElement = new AtomicBoolean(false);
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, right) -> {
             J jElement = right.getElement();
@@ -139,7 +139,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                             cursor = cursor.getParentTreeCursor();
                         }
                         // Not long enough to wrap
-                        if (positionService.columnsOf(cursor).getMaxColumn() <= evaluate(() -> style.getHardWrapAt(), 120)) {
+                        if (positionService.columnsOf(cursor).getMaxColumn() <= evaluate(style::getHardWrapAt, 120)) {
                             break;
                         }
                     }
@@ -164,6 +164,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 if (wrappedRight.getElement() instanceof J.If) {
                     break;
                 }
+                break;
                 //Falling through on purpose here
             case IF_THEN:
                 if (!(wrappedRight.getElement() instanceof J.Block)) {
@@ -369,13 +370,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                                 if (positionService.columnsOf(getCursor()).getMaxColumn() < style.getHardWrapAt()) {
                                     break;
                                 }
+                                break;
                             case WrapAlways:
                                 parentTreeCursor.putMessage("annotations-wrapped", true);
-                                if (annotations.indexOf(getCursor().getValue()) > 0) {
+                                if (annotations.indexOf(getCursor().getValue()) >= 1) {
                                     space = withWhitespace(space, "\n");
                                 }
                         }
                     }
+                    break;
                     break;
                 case CLASS_KIND:
                     if (Boolean.TRUE.equals(getCursor().pollMessage("modifiers-wrapped")) ||  Boolean.TRUE.equals(getCursor().pollMessage("annotations-wrapped"))) {
@@ -405,6 +408,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     break;
                 case IMPORT_PREFIX:
                     space = withWhitespace(space, space.getWhitespace().replaceAll(" ", ""));
+                    break;
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         space = withWhitespace(space, "\n");
@@ -514,21 +518,20 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         }
         JavaSourceFile sourceFile;
         if (wrap != null) {
-            switch (wrap) {
-                case WrapAlways:
-                    if (size <= minSizeForWrap) {
-                        return false;
-                    }
-                    if (index == 0) {
-                        return openNewLine;
-                    }
-                    return true;
-                case ChopIfTooLong:
-                    sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (sourceFile != null) {
-                        boolean isLong = sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), container).getMaxColumn() >= style.getHardWrapAt();
-                        return isLong && (openNewLine || index != 0);
-                    }
+            if (wrap == LineWrapSetting.WrapAlways) {
+                if (size <= minSizeForWrap) {
+                    return false;
+                }
+                if (index == 0) {
+                    return openNewLine;
+                }
+                return true;
+            } else if (wrap == LineWrapSetting.ChopIfTooLong) {
+                sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (sourceFile != null) {
+                    boolean isLong = sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), container).getMaxColumn() >= style.getHardWrapAt();
+                    return isLong && (openNewLine || index != 0);
+                }
             }
         }
         return false;
@@ -556,14 +559,13 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         }
         JavaSourceFile sourceFile;
         if (wrap != null) {
-            switch (wrap) {
-                case WrapAlways:
-                    return openNewLine == null || openNewLine;
-                case ChopIfTooLong:
-                    sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (sourceFile != null && countUntil != null) {
-                        return sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), countUntil).getMaxColumn() >= style.getHardWrapAt();
-                    }
+            if (wrap == LineWrapSetting.WrapAlways) {
+                return openNewLine == null || openNewLine;
+            } else if (wrap == LineWrapSetting.ChopIfTooLong) {
+                sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                if (sourceFile != null && countUntil != null) {
+                    return sourceFile.service(SourcePositionService.class).columnsOf(getCursor(), countUntil).getMaxColumn() >= style.getHardWrapAt();
+                }
             }
         }
         return false;

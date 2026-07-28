@@ -100,8 +100,8 @@ public class Autodetect {
     }
 
     private static class FindLineFormatYamlVisitor<P> extends YamlIsoVisitor<P> {
-        private int linesWithCRLFNewLines = 0;
-        private int linesWithLFNewLines = 0;
+        private int linesWithCRLFNewLines;
+        private int linesWithLFNewLines;
 
         public boolean isIndentedWithLFNewLines() {
             return linesWithLFNewLines >= linesWithCRLFNewLines;

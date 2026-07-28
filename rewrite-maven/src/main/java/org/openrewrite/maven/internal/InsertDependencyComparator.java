@@ -40,7 +40,7 @@ public class InsertDependencyComparator implements Comparator<Content> {
         }
 
         // Assign initial positions based on current order, keeping comments with their dependencies
-        float position = 0f;
+        float position = 0F;
         for (Map.Entry<Xml.Tag, List<Content>> entry : dependencyWithPrecedingComments.entrySet()) {
             // Position the comments just before their dependency
             for (Content comment : entry.getValue()) {

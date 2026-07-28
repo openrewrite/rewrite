@@ -90,7 +90,7 @@ public class AnnotationService {
             allAnnotations.addAll(modifier.getAnnotations());
         }
         if (variableDeclarations.getTypeExpression() instanceof J.AnnotatedType) {
-            allAnnotations.addAll(getAllAnnotations(((J.AnnotatedType) variableDeclarations.getTypeExpression())));
+            allAnnotations.addAll(getAllAnnotations((J.AnnotatedType) variableDeclarations.getTypeExpression()));
         }
         return allAnnotations;
     }

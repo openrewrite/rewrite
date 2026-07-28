@@ -368,7 +368,11 @@ class KotlinTypeMapping(
                 }
                 variance = when {
                     classifierSymbol.variance == Variance.INVARIANT -> {
-                        if (bounds == null) GenericTypeVariable.Variance.INVARIANT else GenericTypeVariable.Variance.COVARIANT
+                        if (bounds == null) {
+                            GenericTypeVariable.Variance.INVARIANT
+                        } else {
+                            GenericTypeVariable.Variance.COVARIANT
+                        }
                     }
 
                     classifierSymbol.variance == Variance.IN_VARIANCE && bounds != null -> {
@@ -680,7 +684,9 @@ class KotlinTypeMapping(
             }
             val parameterTypes: MutableList<JavaType>? = when {
                 function.receiverParameter != null || function.valueParameters.isNotEmpty() -> {
-                    ArrayList(function.valueParameters.size + (if (function.receiverParameter != null) 1 else 0))
+                    ArrayList(function.valueParameters.size + (if (function.receiverParameter != null) { 1
+                    } else { 0
+                    }))
                 }
 
                 else -> null
@@ -915,7 +921,9 @@ class KotlinTypeMapping(
             val returnType = if (javaOrigin) remapKotlinBuiltin(type(function.resolvedType)) else type(function.resolvedType)
 
             if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
-                if (paramTypes == null) paramTypes = ArrayList()
+                if (paramTypes == null) {
+                    paramTypes = ArrayList()
+                }
                 val rt = type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.fir.typeRef)
                 paramTypes.add(if (javaOrigin) remapKotlinBuiltin(rt)!! else rt)
             }
@@ -1056,7 +1064,9 @@ class KotlinTypeMapping(
      * kotlin.Throwable / ...) surface as the JVM FQN the Java parser would produce.
      */
     private fun remapKotlinBuiltin(t: JavaType?): JavaType? {
-        if (t == null) return null
+        if (t == null) {
+            return null
+        }
         val fq = TypeUtils.asFullyQualified(t)
         return if (fq != null) remapKotlinBuiltin(fq) else t
     }

@@ -30,11 +30,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -96,7 +92,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
         q.getAndSendList(after, m -> new ArrayList<>(m.getProperties().keySet()),
                 k -> k, k -> q.getAndSend(k, x -> x));
         q.getAndSendList(after, m -> new ArrayList<>(m.getProperties().values()),
-                v -> v.getValue(), v -> v.rpcSend(v, q));
+                MSBuildProject.PropertyValue::getValue, v -> v.rpcSend(v, q));
         q.getAndSendList(after, MSBuildProject::getPackageSources,
                 PackageSource::getKey,
                 ps -> ps.rpcSend(ps, q));
@@ -413,7 +409,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
         public PropertyValue rpcReceive(PropertyValue before, RpcReceiveQueue q) {
             return before
                     .withValue(q.receive(before.value))
-                    .withDefinedIn(q.<Path, String>receiveAndGet(
+                    .withDefinedIn(q.receiveAndGet(
                             before.definedIn, s -> s == null ? null : Paths.get(s)));
         }
     }

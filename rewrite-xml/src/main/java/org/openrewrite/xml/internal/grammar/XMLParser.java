@@ -15,14 +15,15 @@
  */
 // Generated from rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
-import java.util.List;
-import java.util.Iterator;
+
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class XMLParser extends XMLParserBase {
@@ -31,22 +32,69 @@ public class XMLParser extends XMLParserBase {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, COMMENT=2, CDATA=3, ParamEntityRef=4, EntityRef=5, CharRef=6, SEA_WS=7,
-		UTF_ENCODING_BOM=8, QUESTION_MARK=9, SPECIAL_OPEN_XML=10, OPEN=11, SPECIAL_OPEN=12,
-		DTD_OPEN=13, JSP_COMMENT=14, JSP_DECLARATION=15, JSP_EXPRESSION=16, JSP_SCRIPTLET=17,
-		TEXT=18, DTD_CLOSE=19, DTD_SUBSET_OPEN=20, DTD_S=21, DOCTYPE=22, DTD_SUBSET_CLOSE=23,
-		MARKUP_OPEN=24, DTS_SUBSET_S=25, MARK_UP_CLOSE=26, MARKUP_S=27, MARKUP_STRING=28,
-		MARKUP_TEXT=29, MARKUP_SUBSET=30, PI_S=31, PI_TEXT=32, CLOSE=33, SPECIAL_CLOSE=34,
-		SLASH_CLOSE=35, S=36, DIRECTIVE_OPEN=37, DIRECTIVE_CLOSE=38, SLASH=39,
-		EQUALS=40, STRING=41, Name=42;
-	public static final int
-		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4,
-		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8,
-		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11,
-		RULE_voidClose = 12, RULE_jspdirective = 13, RULE_jspscriptlet = 14, RULE_jspexpression = 15,
-		RULE_jspdeclaration = 16, RULE_jspcomment = 17, RULE_reference = 18, RULE_attribute = 19,
-		RULE_chardata = 20;
+    public static final int WS = 1;
+    public static final int COMMENT = 2;
+    public static final int CDATA = 3;
+    public static final int ParamEntityRef = 4;
+    public static final int EntityRef = 5;
+    public static final int CharRef = 6;
+    public static final int SEA_WS = 7;
+    public static final int UTF_ENCODING_BOM = 8;
+    public static final int QUESTION_MARK = 9;
+    public static final int SPECIAL_OPEN_XML = 10;
+    public static final int OPEN = 11;
+    public static final int SPECIAL_OPEN = 12;
+    public static final int DTD_OPEN = 13;
+    public static final int JSP_COMMENT = 14;
+    public static final int JSP_DECLARATION = 15;
+    public static final int JSP_EXPRESSION = 16;
+    public static final int JSP_SCRIPTLET = 17;
+    public static final int TEXT = 18;
+    public static final int DTD_CLOSE = 19;
+    public static final int DTD_SUBSET_OPEN = 20;
+    public static final int DTD_S = 21;
+    public static final int DOCTYPE = 22;
+    public static final int DTD_SUBSET_CLOSE = 23;
+    public static final int MARKUP_OPEN = 24;
+    public static final int DTS_SUBSET_S = 25;
+    public static final int MARK_UP_CLOSE = 26;
+    public static final int MARKUP_S = 27;
+    public static final int MARKUP_STRING = 28;
+    public static final int MARKUP_TEXT = 29;
+    public static final int MARKUP_SUBSET = 30;
+    public static final int PI_S = 31;
+    public static final int PI_TEXT = 32;
+    public static final int CLOSE = 33;
+    public static final int SPECIAL_CLOSE = 34;
+    public static final int SLASH_CLOSE = 35;
+    public static final int S = 36;
+    public static final int DIRECTIVE_OPEN = 37;
+    public static final int DIRECTIVE_CLOSE = 38;
+    public static final int SLASH = 39;
+    public static final int EQUALS = 40;
+    public static final int STRING = 41;
+    public static final int Name = 42;
+    public static final int RULE_document = 0;
+    public static final int RULE_prolog = 1;
+    public static final int RULE_xmldecl = 2;
+    public static final int RULE_misc = 3;
+    public static final int RULE_doctypedecl = 4;
+    public static final int RULE_intsubset = 5;
+    public static final int RULE_markupdecl = 6;
+    public static final int RULE_declSep = 7;
+    public static final int RULE_externalid = 8;
+    public static final int RULE_processinginstruction = 9;
+    public static final int RULE_content = 10;
+    public static final int RULE_element = 11;
+    public static final int RULE_voidClose = 12;
+    public static final int RULE_jspdirective = 13;
+    public static final int RULE_jspscriptlet = 14;
+    public static final int RULE_jspexpression = 15;
+    public static final int RULE_jspdeclaration = 16;
+    public static final int RULE_jspcomment = 17;
+    public static final int RULE_reference = 18;
+    public static final int RULE_attribute = 19;
+    public static final int RULE_chardata = 20;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset",
@@ -144,16 +192,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_document; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDocument(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterDocument(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDocument(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitDocument(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDocument(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitDocument(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -222,16 +277,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_prolog; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterProlog(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterProlog(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitProlog(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitProlog(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitProlog(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitProlog(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -256,7 +318,7 @@ public class XMLParser extends XMLParserBase {
 			setState(55);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 61444L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 61444L) != 0) {
 				{
 				{
 				setState(52);
@@ -312,16 +374,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_xmldecl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterXmldecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterXmldecl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitXmldecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitXmldecl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitXmldecl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitXmldecl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -384,16 +453,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_misc; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterMisc(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterMisc(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitMisc(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitMisc(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMisc(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitMisc(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -476,16 +552,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_doctypedecl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDoctypedecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterDoctypedecl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDoctypedecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitDoctypedecl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDoctypedecl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitDoctypedecl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -567,16 +650,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_intsubset; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterIntsubset(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterIntsubset(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitIntsubset(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitIntsubset(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitIntsubset(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitIntsubset(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -590,7 +680,7 @@ public class XMLParser extends XMLParserBase {
 			setState(102);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 16781332L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 16781332L) != 0) {
 				{
 				setState(100);
 				_errHandler.sync(this);
@@ -656,16 +746,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_markupdecl; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterMarkupdecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterMarkupdecl(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitMarkupdecl(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitMarkupdecl(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMarkupdecl(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitMarkupdecl(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -697,7 +794,9 @@ public class XMLParser extends XMLParserBase {
 						_errHandler.recoverInline(this);
 						}
 						else {
-							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                            if (_input.LA(1) == Token.EOF) {
+                                matchedEOF = true;
+                            }
 							_errHandler.reportMatch(this);
 							consume();
 						}
@@ -734,7 +833,9 @@ public class XMLParser extends XMLParserBase {
 					_errHandler.recoverInline(this);
 					}
 					else {
-						if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                        if (_input.LA(1) == Token.EOF) {
+                            matchedEOF = true;
+                        }
 						_errHandler.reportMatch(this);
 						consume();
 					}
@@ -787,16 +888,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_declSep; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterDeclSep(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterDeclSep(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitDeclSep(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitDeclSep(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDeclSep(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitDeclSep(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -830,16 +938,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_externalid; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterExternalid(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterExternalid(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitExternalid(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitExternalid(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitExternalid(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitExternalid(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -887,16 +1002,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_processinginstruction; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterProcessinginstruction(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterProcessinginstruction(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitProcessinginstruction(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitProcessinginstruction(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitProcessinginstruction(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitProcessinginstruction(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -972,16 +1094,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_content; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterContent(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterContent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitContent(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitContent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitContent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitContent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1111,16 +1240,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_element; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterElement(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterElement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitElement(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitElement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitElement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitElement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1165,44 +1301,39 @@ public class XMLParser extends XMLParserBase {
 				match(CLOSE);
 				setState(176);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,20,_ctx) ) {
-				case 1:
-					{
-					setState(164);
-					if (!(isVoidElement((((ElementContext)_localctx).name!=null?((ElementContext)_localctx).name.getText():null)))) throw new FailedPredicateException(this, "isVoidElement($name.text)");
-					setState(165);
-					voidClose();
-					}
-					break;
-				case 2:
-					{
-					setState(169);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,19,_ctx);
-					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-						if ( _alt==1 ) {
-							{
-							{
-							setState(166);
-							content();
-							}
-							}
-						}
-						setState(171);
-						_errHandler.sync(this);
-						_alt = getInterpreter().adaptivePredict(_input,19,_ctx);
-					}
-					setState(172);
-					match(OPEN);
-					setState(173);
-					match(SLASH);
-					setState(174);
-					match(Name);
-					setState(175);
-					match(CLOSE);
-					}
-					break;
-				}
+                    if (getInterpreter().adaptivePredict(_input, 20, _ctx) == 1) {
+                        setState(164);
+                        if (!isVoidElement(((ElementContext) _localctx).name != null ? ((ElementContext) _localctx).name.getText() : null)) {
+                            throw new FailedPredicateException(this, "isVoidElement($name.text)");
+                        }
+                        setState(165);
+                        voidClose();
+                    } else if (getInterpreter().adaptivePredict(_input, 20, _ctx) == 2) {
+                        setState(169);
+                        _errHandler.sync(this);
+                        _alt = getInterpreter().adaptivePredict(_input, 19, _ctx);
+                        while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
+                            if (_alt == 1) {
+                                {
+                                    {
+                                        setState(166);
+                                        content();
+                                    }
+                                }
+                            }
+                            setState(171);
+                            _errHandler.sync(this);
+                            _alt = getInterpreter().adaptivePredict(_input, 19, _ctx);
+                        }
+                        setState(172);
+                        match(OPEN);
+                        setState(173);
+                        match(SLASH);
+                        setState(174);
+                        match(Name);
+                        setState(175);
+                        match(CLOSE);
+                    }
 				}
 				break;
 			default:
@@ -1229,16 +1360,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_voidClose; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterVoidClose(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterVoidClose(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitVoidClose(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitVoidClose(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitVoidClose(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitVoidClose(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1247,8 +1385,6 @@ public class XMLParser extends XMLParserBase {
 		enterRule(_localctx, 24, RULE_voidClose);
 		try {
 			enterOuterAlt(_localctx, 1);
-			{
-			}
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -1280,16 +1416,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_jspdirective; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterJspdirective(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterJspdirective(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitJspdirective(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitJspdirective(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspdirective(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitJspdirective(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1346,16 +1489,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_jspscriptlet; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterJspscriptlet(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterJspscriptlet(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitJspscriptlet(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitJspscriptlet(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspscriptlet(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitJspscriptlet(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1389,16 +1539,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_jspexpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterJspexpression(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterJspexpression(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitJspexpression(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitJspexpression(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspexpression(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitJspexpression(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1432,16 +1589,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_jspdeclaration; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterJspdeclaration(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterJspdeclaration(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitJspdeclaration(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitJspdeclaration(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspdeclaration(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitJspdeclaration(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1475,16 +1639,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_jspcomment; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterJspcomment(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterJspcomment(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitJspcomment(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitJspcomment(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspcomment(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitJspcomment(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1519,16 +1690,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_reference; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterReference(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterReference(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitReference(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitReference(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitReference(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitReference(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1545,7 +1723,9 @@ public class XMLParser extends XMLParserBase {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1573,16 +1753,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_attribute; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterAttribute(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterAttribute(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitAttribute(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitAttribute(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitAttribute(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitAttribute(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1622,16 +1809,23 @@ public class XMLParser extends XMLParserBase {
 		@Override public int getRuleIndex() { return RULE_chardata; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).enterChardata(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).enterChardata(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof XMLParserListener ) ((XMLParserListener)listener).exitChardata(this);
+            if (listener instanceof XMLParserListener) {
+                ((XMLParserListener) listener).exitChardata(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitChardata(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof XMLParserVisitor) {
+                return ((XMLParserVisitor<? extends T>) visitor).visitChardata(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1644,11 +1838,13 @@ public class XMLParser extends XMLParserBase {
 			{
 			setState(208);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 262784L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 262784L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1666,17 +1862,15 @@ public class XMLParser extends XMLParserBase {
 	}
 
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 11:
-			return element_sempred((ElementContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 11) {
+            return elementSempred((ElementContext) _localctx, predIndex);
+        }
 		return true;
 	}
-	private boolean element_sempred(ElementContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return isVoidElement((((ElementContext)_localctx).name!=null?((ElementContext)_localctx).name.getText():null));
-		}
+	private boolean elementSempred(ElementContext _localctx, int predIndex) {
+        if (predIndex == 0) {
+            return isVoidElement(((ElementContext) _localctx).name != null ? ((ElementContext) _localctx).name.getText() : null);
+        }
 		return true;
 	}
 

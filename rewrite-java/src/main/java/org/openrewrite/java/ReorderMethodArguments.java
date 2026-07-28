@@ -111,7 +111,7 @@ public class ReorderMethodArguments extends Recipe {
         }, new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern, matchOverrides)));
     }
 
-    private class ReorderMethodArgumentsVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private final class ReorderMethodArgumentsVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
 
         private ReorderMethodArgumentsVisitor(MethodMatcher methodMatcher) {

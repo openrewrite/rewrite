@@ -238,10 +238,10 @@ public interface JavaParser extends Parser {
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
-        protected boolean logCompilationWarningsAndErrors = false;
+        protected boolean logCompilationWarningsAndErrors;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
-        public Builder() {
+        protected Builder() {
             super(J.CompilationUnit.class);
         }
 
@@ -419,7 +419,7 @@ public interface JavaParser extends Parser {
 @UtilityClass
 class RuntimeClasspathCache {
     @Nullable
-    private static volatile List<Path> runtimeClasspath = null;
+    private static volatile List<Path> runtimeClasspath;
 
     static List<Path> getRuntimeClasspath() {
         List<Path> paths = runtimeClasspath;
@@ -443,7 +443,7 @@ class RuntimeClasspathCache {
 @UtilityClass
 class JdkParserBuilderCache {
     // Cached supplier for the parser builder - initialized on first access
-    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier = null;
+    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier;
 
     static JavaParser.Builder<? extends JavaParser, ?> getBuilder() {
         Supplier<JavaParser.Builder<? extends JavaParser, ?>> supplier = cachedBuilderSupplier;

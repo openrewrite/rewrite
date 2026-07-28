@@ -37,7 +37,7 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
         q.getAndSend(documents, Yaml.Documents::isCharsetBomMarked);
         q.getAndSend(documents, Yaml.Documents::getChecksum);
         q.getAndSend(documents, Yaml.Documents::getFileAttributes);
-        q.getAndSendList(documents, Yaml.Documents::getDocuments, doc -> doc.getId(),
+        q.getAndSendList(documents, Yaml.Documents::getDocuments, Yaml.Document::getId,
                 doc -> visit(doc, q));
         q.getAndSend(documents, Yaml.Documents::getSuffix);
         return documents;
@@ -45,7 +45,7 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
 
     @Override
     public Yaml visitDocument(Yaml.Document document, RpcSendQueue q) {
-        q.getAndSendList(document, Yaml.Document::getDirectives, dir -> dir.getId(),
+        q.getAndSendList(document, Yaml.Document::getDirectives, Yaml.Directive::getId,
                 dir -> visit(dir, q));
         q.getAndSend(document, Yaml.Document::isExplicit);
         q.getAndSend(document, Yaml.Document::getBlock, b -> visit(b, q));
@@ -69,7 +69,7 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, RpcSendQueue q) {
         q.getAndSend(mapping, Yaml.Mapping::getOpeningBracePrefix);
-        q.getAndSendList(mapping, Yaml.Mapping::getEntries, e -> e.getId(),
+        q.getAndSendList(mapping, Yaml.Mapping::getEntries, Yaml.Mapping.Entry::getId,
                 e -> visit(e, q));
         q.getAndSend(mapping, Yaml.Mapping::getClosingBracePrefix);
         q.getAndSend(mapping, Yaml.Mapping::getAnchor, a -> visit(a, q));
@@ -97,7 +97,7 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, RpcSendQueue q) {
         q.getAndSend(sequence, Yaml.Sequence::getOpeningBracketPrefix);
-        q.getAndSendList(sequence, Yaml.Sequence::getEntries, e -> e.getId(),
+        q.getAndSendList(sequence, Yaml.Sequence::getEntries, Yaml.Sequence.Entry::getId,
                 e -> visit(e, q));
         q.getAndSend(sequence, Yaml.Sequence::getClosingBracketPrefix);
         q.getAndSend(sequence, Yaml.Sequence::getAnchor, a -> visit(a, q));

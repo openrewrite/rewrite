@@ -59,11 +59,11 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitCompilationUnit(Cs.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
+        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
-                .<Cs.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
+                .withFileAttributes(q.receive(cu.getFileAttributes()))
                 .getPadding().withExterns(q.receiveList(cu.getPadding().getExterns(), el -> visitRightPadded(el, q)))
                 .getPadding().withUsings(q.receiveList(cu.getPadding().getUsings(), el -> visitRightPadded(el, q)))
                 .withAttributeLists(q.receiveList(cu.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
@@ -307,9 +307,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withAccessors(q.receive(propertyDeclaration.getAccessors(), el -> (J.Block) visitNonNull(el, q)));
         propertyDeclaration = propertyDeclaration
                 .getPadding().withExpressionBody(q.receive(propertyDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)));
-        propertyDeclaration = propertyDeclaration
+        return propertyDeclaration
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
-        return propertyDeclaration;
     }
 
     @Override

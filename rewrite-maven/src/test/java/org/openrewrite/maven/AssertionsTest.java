@@ -161,7 +161,7 @@ class AssertionsTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new MavenIsoVisitor<ExecutionContext>() {
+            return new MavenIsoVisitor<>() {
                 @Nullable
                 private String filename;
 

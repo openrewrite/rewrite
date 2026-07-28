@@ -25,7 +25,6 @@ import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.quark.Quark;
@@ -33,6 +32,7 @@ import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -50,10 +50,9 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-
-import static java.util.Collections.singletonList;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Getter
@@ -167,7 +166,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
+            private int index;
             private @Nullable ParseProjectResponse response;
 
             @Override

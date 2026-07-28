@@ -354,7 +354,7 @@ public interface Xml extends Tree {
 
         public Optional<Tag> getChild(String name) {
             return content == null ? Optional.empty() : content.stream()
-                    .filter(t -> t instanceof Xml.Tag)
+                    .filter(Xml.Tag.class::isInstance)
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
                     .findAny();
@@ -362,7 +362,7 @@ public interface Xml extends Tree {
 
         public List<Tag> getChildren(String name) {
             return content == null ? emptyList() : content.stream()
-                    .filter(t -> t instanceof Xml.Tag)
+                    .filter(Xml.Tag.class::isInstance)
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
                     .collect(toList());
@@ -370,7 +370,7 @@ public interface Xml extends Tree {
 
         public List<Tag> getChildren() {
             return content == null ? emptyList() : content.stream()
-                    .filter(t -> t instanceof Xml.Tag)
+                    .filter(Xml.Tag.class::isInstance)
                     .map(Tag.class::cast)
                     .collect(toList());
         }
@@ -406,7 +406,7 @@ public interface Xml extends Tree {
             if (content.size() == 1 && content.get(0) instanceof Xml.CharData) {
                 return Optional.of(((CharData) content.get(0)).getText());
             }
-            if (content.stream().allMatch(c -> c instanceof Xml.CharData)) {
+            if (content.stream().allMatch(Xml.CharData.class::isInstance)) {
                 return Optional.of(content.stream()
                         .map(c -> ((CharData) c).getText())
                         .map(StringEscapeUtils::unescapeXml)

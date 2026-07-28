@@ -15,11 +15,11 @@
  */
 // Generated from rewrite-xml/src/main/antlr/XPathLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
@@ -31,12 +31,35 @@ public class XPathLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, SLASH=2, DOUBLE_SLASH=3, AXIS_SEP=4, LBRACKET=5, RBRACKET=6, LPAREN=7,
-		RPAREN=8, AT=9, DOTDOT=10, DOT=11, COMMA=12, EQUALS=13, NOT_EQUALS=14,
-		LTE=15, GTE=16, LT=17, GT=18, WILDCARD=19, NUMBER=20, AND=21, OR=22, TEXT=23,
-		COMMENT=24, NODE=25, PROCESSING_INSTRUCTION=26, STRING_LITERAL=27, QNAME=28,
-		NCNAME=29;
+    public static final int WS = 1;
+    public static final int SLASH = 2;
+    public static final int DOUBLE_SLASH = 3;
+    public static final int AXIS_SEP = 4;
+    public static final int LBRACKET = 5;
+    public static final int RBRACKET = 6;
+    public static final int LPAREN = 7;
+    public static final int RPAREN = 8;
+    public static final int AT = 9;
+    public static final int DOTDOT = 10;
+    public static final int DOT = 11;
+    public static final int COMMA = 12;
+    public static final int EQUALS = 13;
+    public static final int NOT_EQUALS = 14;
+    public static final int LTE = 15;
+    public static final int GTE = 16;
+    public static final int LT = 17;
+    public static final int GT = 18;
+    public static final int WILDCARD = 19;
+    public static final int NUMBER = 20;
+    public static final int AND = 21;
+    public static final int OR = 22;
+    public static final int TEXT = 23;
+    public static final int COMMENT = 24;
+    public static final int NODE = 25;
+    public static final int PROCESSING_INSTRUCTION = 26;
+    public static final int STRING_LITERAL = 27;
+    public static final int QNAME = 28;
+    public static final int NCNAME = 29;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

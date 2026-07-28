@@ -23,9 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
-import static org.openrewrite.java.tree.JavaType.EMPTY_ANNOTATION_VALUE_ARRAY;
-import static org.openrewrite.java.tree.JavaType.EMPTY_FULLY_QUALIFIED_ARRAY;
-import static org.openrewrite.java.tree.JavaType.EMPTY_JAVA_TYPE_ARRAY;
+import static org.openrewrite.java.tree.JavaType.*;
 
 public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
     private final String[] EMPTY_STRING_ARRAY = new String[0];

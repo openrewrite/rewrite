@@ -87,7 +87,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -103,7 +105,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
@@ -123,7 +127,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -144,12 +150,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 ProjectState lockPs = acc.projects.get(packagePath);
-                if (lockPs == null) return tree;
+                if (lockPs == null) {
+                    return tree;
+                }
                 if (lockPs.modifiedPackageJson == null) {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
-                    if (pkg == null) pkg = lockPs.capturedPackageJson;
+                    if (pkg == null) {
+                        pkg = lockPs.capturedPackageJson;
+                    }
                     if (pkg != null && canApply(pkg)) {
                         ensureComputed(lockPs, pkg);
                         if (lockPs.modifiedPackageJson != null) {
@@ -164,9 +176,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
 
             private void ensureComputed(ProjectState ps, SourceFile pkg) {
-                if (ps.modifiedPackageJson != null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
                 NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                if (marker == null || marker.getPackageManager() == null) return;
+                if (marker == null || marker.getPackageManager() == null) {
+                    return;
+                }
                 NodeResolutionResult.PackageManager pm = marker.getPackageManager();
                 List<DependencyPathSegment> parsedPath = dependencyPath == null
                         ? null

@@ -46,8 +46,8 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     @Nullable
     private final FileAttributes fileAttributes;
 
-    private int cursor = 0;
-    private int codePointCursor = 0;
+    private int cursor;
+    private int codePointCursor;
 
     public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;

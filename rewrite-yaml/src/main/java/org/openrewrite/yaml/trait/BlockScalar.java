@@ -76,7 +76,7 @@ public class BlockScalar implements Trait<Yaml.Scalar> {
         String value = scalar.getValue();
         int headerEnd = value.indexOf('\n');
         String header = headerEnd < 0 ? value : value.substring(0, headerEnd + 1);
-        String newLine = (headerEnd > 0 && value.charAt(headerEnd - 1) == '\r') ? "\r\n" : "\n";
+        String newLine = headerEnd > 0 && value.charAt(headerEnd - 1) == '\r' ? "\r\n" : "\n";
         int bodyEnd = value.length();
         while (bodyEnd > 0 && Character.isWhitespace(value.charAt(bodyEnd - 1))) {
             bodyEnd--;

@@ -15,11 +15,11 @@
  */
 package org.openrewrite.scala.internal
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.scala.ScalaParser
-import org.openrewrite.java.tree.*
-import org.openrewrite.scala.tree.*
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.*
+import org.openrewrite.scala.ScalaParser
+import org.openrewrite.scala.tree.*
 
 class ExtendsImplementsTest {
 
@@ -56,14 +56,13 @@ class ExtendsImplementsTest {
     assertEquals("Dog", cls.getName.getSimpleName)
     assertNotNull(cls.getExtends, "Should have extends clause")
 
-    cls.getExtends match {
-      case id: J.Identifier =>
-        assertEquals("Animal", id.getSimpleName)
-        assertEquals(" ", id.getPrefix.getWhitespace, "Should have space before type")
-      case _ => fail("Extends should be J.Identifier")
-    }
-
-    assertNull(cls.getImplements, "Should not have implements")
+    
+      if (cls.getExtends ==id: J.Identifier) {
+          assertEquals("Animal", id.getSimpleName)
+          assertEquals(" ", id.getPrefix.getWhitespace, "Should have space before type")
+      } else if (cls.getExtends ==_) {
+          fail("Extends should be J.Identifier")
+      }assertNull(cls.getImplements, "Should not have implements")
   }
 
   @Test
@@ -75,13 +74,12 @@ class ExtendsImplementsTest {
     assertEquals("Dog", cls.getName.getSimpleName)
     assertNotNull(cls.getExtends, "Should have extends clause")
 
-    cls.getExtends match {
-      case id: J.Identifier =>
-        assertEquals("Animal", id.getSimpleName)
-      case _ => fail("Extends should be J.Identifier")
-    }
-
-    assertNotNull(cls.getBody, "Should have body")
+    
+      if (cls.getExtends ==id: J.Identifier) {
+          assertEquals("Animal", id.getSimpleName)
+      } else if (cls.getExtends ==_) {
+          fail("Extends should be J.Identifier")
+      }assertNotNull(cls.getBody, "Should have body")
   }
 
   @Test
@@ -91,20 +89,20 @@ class ExtendsImplementsTest {
     assertEquals("Dog", cls.getName.getSimpleName)
     assertNotNull(cls.getExtends, "Should have extends clause")
 
-    cls.getExtends match {
-      case id: J.Identifier =>
-        assertEquals("Animal", id.getSimpleName)
-      case _ => fail("Extends should be J.Identifier")
-    }
-
-    assertNotNull(cls.getImplements, "Should have implements (with clause)")
+    
+      if (cls.getExtends ==id: J.Identifier) {
+          assertEquals("Animal", id.getSimpleName)
+      } else if (cls.getExtends ==_) {
+          fail("Extends should be J.Identifier")
+      }assertNotNull(cls.getImplements, "Should have implements (with clause)")
     assertEquals(1, cls.getImplements.size())
 
-    cls.getImplements.get(0) match {
-      case id: J.Identifier =>
-        assertEquals("Trainable", id.getSimpleName)
-      case _ => fail("Implements element should be J.Identifier")
-    }
+    
+      if (cls.getImplements.get(0) ==id: J.Identifier) {
+          assertEquals("Trainable", id.getSimpleName)
+      } else if (cls.getImplements.get(0) ==_) {
+          fail("Implements element should be J.Identifier")
+      }
   }
 
   @Test
@@ -117,15 +115,17 @@ class ExtendsImplementsTest {
     assertEquals(2, cls.getImplements.size(), "Should have 2 with clauses")
 
     val impls = cls.getImplements
-    impls.get(0) match {
-      case id: J.Identifier => assertEquals("Trainable", id.getSimpleName)
-      case _ => fail("First implements should be J.Identifier")
-    }
-
-    impls.get(1) match {
-      case id: J.Identifier => assertEquals("Friendly", id.getSimpleName)
-      case _ => fail("Second implements should be J.Identifier")
-    }
+    
+      if (impls.get(0) ==id: J.Identifier) {
+          assertEquals("Trainable", id.getSimpleName)
+      } else if (impls.get(0) ==_) {
+          fail("First implements should be J.Identifier")
+      }
+      if (impls.get(1) ==id: J.Identifier) {
+          assertEquals("Friendly", id.getSimpleName)
+      } else if (impls.get(1) ==_) {
+          fail("Second implements should be J.Identifier")
+      }
   }
 
   @Test
@@ -135,17 +135,17 @@ class ExtendsImplementsTest {
     assertEquals("Dog", cls.getName.getSimpleName)
     assertNotNull(cls.getExtends, "Should have extends clause")
 
-    cls.getExtends match {
-      case fa: J.FieldAccess =>
-        assertEquals("Animal", fa.getName.getSimpleName)
-        // Verify the qualified name structure
-        fa.getTarget match {
-          case fa2: J.FieldAccess =>
-            assertEquals("example", fa2.getName.getSimpleName)
-          case _ => fail("Target should be FieldAccess")
-        }
-      case _ => fail("Extends should be J.FieldAccess for qualified type")
-    }
+    
+      if (cls.getExtends ==fa: J.FieldAccess) {
+          assertEquals("Animal", fa.getName.getSimpleName)
+          if (fa.getTarget ==fa2: J.FieldAccess) {
+              assertEquals("example", fa2.getName.getSimpleName)
+          } else if (fa.getTarget ==_) {
+              fail("Target should be FieldAccess")
+          }
+      } else if (cls.getExtends ==_) {
+          fail("Extends should be J.FieldAccess for qualified type")
+      }
   }
 
   @Test
@@ -155,14 +155,12 @@ class ExtendsImplementsTest {
     assertEquals("Dog", cls.getName.getSimpleName)
     assertNotNull(cls.getExtends, "Should have extends clause")
 
-    cls.getExtends match {
-      case id: J.Identifier =>
-        assertEquals("Animal", id.getSimpleName)
-      case _ => fail("Extends should be J.Identifier")
-    }
-
-    // Constructor parameters should be preserved as Unknown in primaryConstructor
-    assertNotNull(cls.getPrimaryConstructor)
+    
+      if (cls.getExtends ==id: J.Identifier) {
+          assertEquals("Animal", id.getSimpleName)
+      } else if (cls.getExtends ==_) {
+          fail("Extends should be J.Identifier")
+      }assertNotNull(cls.getPrimaryConstructor)
     assertEquals(1, cls.getPrimaryConstructor.size())
   }
 
@@ -175,11 +173,12 @@ class ExtendsImplementsTest {
     assertEquals(J.Modifier.Type.Final, cls.getModifiers.get(0).getType)
 
     assertNotNull(cls.getExtends, "Should have extends clause")
-    cls.getExtends match {
-      case id: J.Identifier =>
-        assertEquals("Animal", id.getSimpleName)
-      case _ => fail("Extends should be J.Identifier")
-    }
+    
+      if (cls.getExtends ==id: J.Identifier) {
+          assertEquals("Animal", id.getSimpleName)
+      } else if (cls.getExtends ==_) {
+          fail("Extends should be J.Identifier")
+      }
   }
 
   @Test
@@ -189,10 +188,11 @@ class ExtendsImplementsTest {
 
     // Just verify that we parsed successfully with extends
     assertNotNull(cls.getExtends, "Should have extends clause")
-    assertEquals("Animal", cls.getExtends match {
-      case id: J.Identifier => id.getSimpleName
-      case _ => fail("Extends should be J.Identifier")
-    })
+    assertEquals("Animal", if (cls.getExtends ==id: J.Identifier) {
+      id.getSimpleName
+  } else if (cls.getExtends ==_) {
+      fail("Extends should be J.Identifier")
+  })
   }
 
   @Test
@@ -201,10 +201,11 @@ class ExtendsImplementsTest {
     val cls = parseAndGetClass("class Dog  extends  Animal")
 
     assertNotNull(cls.getExtends, "Should have extends clause")
-    assertEquals("Animal", cls.getExtends match {
-      case id: J.Identifier => id.getSimpleName
-      case _ => fail("Extends should be J.Identifier")
-    })
+    assertEquals("Animal", if (cls.getExtends ==id: J.Identifier) {
+      id.getSimpleName
+  } else if (cls.getExtends ==_) {
+      fail("Extends should be J.Identifier")
+  })
   }
 
   @Test
@@ -213,10 +214,11 @@ class ExtendsImplementsTest {
     val cls = parseAndGetClass("class Dog\textends\tAnimal")
 
     assertNotNull(cls.getExtends, "Should have extends clause")
-    assertEquals("Animal", cls.getExtends match {
-      case id: J.Identifier => id.getSimpleName
-      case _ => fail("Extends should be J.Identifier")
-    })
+    assertEquals("Animal", if (cls.getExtends ==id: J.Identifier) {
+      id.getSimpleName
+  } else if (cls.getExtends ==_) {
+      fail("Extends should be J.Identifier")
+  })
   }
 
   @Test
@@ -225,9 +227,10 @@ class ExtendsImplementsTest {
     val cls = parseAndGetClass("class Dog\n  extends Animal")
 
     assertNotNull(cls.getExtends, "Should have extends clause")
-    assertEquals("Animal", cls.getExtends match {
-      case id: J.Identifier => id.getSimpleName
-      case _ => fail("Extends should be J.Identifier")
-    })
+    assertEquals("Animal", if (cls.getExtends ==id: J.Identifier) {
+      id.getSimpleName
+  } else if (cls.getExtends ==_) {
+      fail("Extends should be J.Identifier")
+  })
   }
 }

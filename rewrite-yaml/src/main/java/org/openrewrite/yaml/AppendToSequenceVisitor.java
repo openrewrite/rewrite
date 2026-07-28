@@ -134,7 +134,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 .filter(Yaml.Documents.class::isInstance)
                 .map(Yaml.Documents.class::cast)
                 .map(docs -> docs.getDocuments().get(0).getBlock())
-                .<Yaml.Block>flatMap(block -> {
+                .flatMap(block -> {
                     if (block instanceof Yaml.Mapping) {
                         // Calculate the base indentation for the new item
                         String baseIndent = StringUtils.indent(entryPrefix.replace("\n", ""));

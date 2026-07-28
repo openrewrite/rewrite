@@ -44,15 +44,13 @@ public class GoSumVisitor<P> extends TreeVisitor<GoSumTree, P> {
         g = g.withPrefix(visitSpace(g.getPrefix(), p));
         g = g.withMarkers(visitMarkers(g.getMarkers(), p));
         g = g.withLines(ListUtils.map(g.getLines(), l -> visitRightPadded(l, p)));
-        g = g.withEof(visitSpace(g.getEof(), p));
-        return g;
+        return g.withEof(visitSpace(g.getEof(), p));
     }
 
     public GoSumTree visitLine(GoSum.Line line, P p) {
         GoSum.Line l = line;
         l = l.withPrefix(visitSpace(l.getPrefix(), p));
-        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
-        return l;
+        return l.withMarkers(visitMarkers(l.getMarkers(), p));
     }
 
     public Space visitSpace(Space space, P p) {

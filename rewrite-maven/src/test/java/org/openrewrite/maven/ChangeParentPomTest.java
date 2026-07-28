@@ -23,6 +23,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -31,9 +33,6 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedPom;
 
 class ChangeParentPomTest implements RewriteTest {
 
@@ -2535,7 +2534,7 @@ class ChangeParentPomTest implements RewriteTest {
                         MavenResolutionResult childModule = result.getModules().get(0);
                         assertThat(childModule.getPom().getDependencyManagement())
                             .describedAs("Root's child module should have new junit 6.0.1 entries in dependency management")
-                            .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
+                            .anyMatch(dep -> "org.junit.jupiter:junit-jupiter:6.0.1".equals(dep.getGav().toString()));
                     })
                 ),
                 mavenProject(
@@ -2577,17 +2576,17 @@ class ChangeParentPomTest implements RewriteTest {
                                 .isEqualTo("6.0.1");
                             assertThat(result.getParent().getPom().getDependencyManagement())
                                 .describedAs("Parent's dependency management should not contain old junit 5.10.3 entries")
-                                .noneMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:5.10.3"));
+                                .noneMatch(dep -> "org.junit.jupiter:junit-jupiter:5.10.3".equals(dep.getGav().toString()));
                             assertThat(result.getParent().getPom().getDependencyManagement())
                                 .describedAs("Parent's dependency management should contain new junit 6.0.1 entries")
-                                .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
+                                .anyMatch(dep -> "org.junit.jupiter:junit-jupiter:6.0.1".equals(dep.getGav().toString()));
                             // Verify child's own resolved dependency management reflects the new grandparent
                             assertThat(result.getPom().getDependencyManagement())
                                 .describedAs("Child's own dependency management should not contain old junit 5.10.3 entries")
-                                .noneMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:5.10.3"));
+                                .noneMatch(dep -> "org.junit.jupiter:junit-jupiter:5.10.3".equals(dep.getGav().toString()));
                             assertThat(result.getPom().getDependencyManagement())
                                 .describedAs("Child's own dependency management should contain new junit 6.0.1 entries")
-                                .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
+                                .anyMatch(dep -> "org.junit.jupiter:junit-jupiter:6.0.1".equals(dep.getGav().toString()));
                         })
                     )
                 )

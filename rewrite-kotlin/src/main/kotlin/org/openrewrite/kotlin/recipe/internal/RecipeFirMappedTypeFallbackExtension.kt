@@ -171,10 +171,18 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
 
             for (method in javaClass.declaredMethods) {
                 val mods = method.modifiers
-                if (!Modifier.isPublic(mods)) continue
-                if (Modifier.isStatic(mods)) continue
-                if (method.isSynthetic) continue
-                if (method.isBridge) continue
+                if (!Modifier.isPublic(mods)) {
+                    continue
+                }
+                if (Modifier.isStatic(mods)) {
+                    continue
+                }
+                if (method.isSynthetic) {
+                    continue
+                }
+                if (method.isBridge) {
+                    continue
+                }
                 // Note: vararg methods like `String.formatted(Object... args)`
                 // are re-exposed as real Kotlin `vararg` parameters below
                 // (see generateExtensionFor), so authors keep the natural
@@ -182,7 +190,9 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
                 // Skip methods whose name collides with an existing kotlin
                 // member of the same arity to avoid `equals/hashCode/toString`
                 // double-declaration in the generated facade.
-                if (method.name in MASKED_INHERITED_NAMES) continue
+                if (method.name in MASKED_INHERITED_NAMES) {
+                    continue
+                }
                 // Only fill genuine gaps. If the method name already resolves on
                 // the Kotlin side as a real stdlib extension (e.g. `toUpperCase`,
                 // `trim`, `substring`, `isEmpty` all live in `kotlin.text`),
@@ -194,7 +204,9 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
                 // so authored recipes never match at runtime. We want ONLY the
                 // methods Kotlin's mapped-type customizer hides with no Kotlin
                 // equivalent — e.g. `String.stripIndent`/`formatted`/`translateEscapes`.
-                if (resolvesAsKotlinExtension(Name.identifier(method.name))) continue
+                if (resolvesAsKotlinExtension(Name.identifier(method.name))) {
+                    continue
+                }
                 // Deduplicate at the *erased* JVM-bytecode level. The generated
                 // top-level extensions all sit in the same facade class
                 // `__GENERATED__CALLABLES__Kt`; two extensions on the same
@@ -213,7 +225,9 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
                 val erasedSignature = "${javaClassId.asFqNameString()}::${method.name}(${
                     method.parameterTypes.joinToString(",") { erasedJvmDescriptor(it) }
                 })"
-                if (!seenSignatures.add(erasedSignature)) continue
+                if (!seenSignatures.add(erasedSignature)) {
+                    continue
+                }
                 entries += Entry(kotlinClassId, javaClass, method)
             }
         }
@@ -309,8 +323,12 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
         context: DeclarationGenerationContext.Member?
     ): List<FirNamedFunctionSymbol> {
         // We only generate top-level functions in our synthetic package.
-        if (callableId.packageName != GENERATED_PACKAGE) return emptyList()
-        if (context != null) return emptyList()  // not generating members of any class
+        if (callableId.packageName != GENERATED_PACKAGE) {
+            return emptyList()
+        }
+        if (context != null) {
+            return emptyList()  // not generating members of any class
+        }
         val name = callableId.callableName
         val entries = callableIdsByName[name] ?: return emptyList()
 

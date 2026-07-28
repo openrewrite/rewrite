@@ -15,14 +15,14 @@
  */
 package org.openrewrite.scala.internal
 
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.java.JavaParser
+import scala.jdk.CollectionConverters.*
 
 import java.nio.file.Path
 import java.util.ArrayList
-import scala.jdk.CollectionConverters.*
 
 /**
  * Regression tests for the stdlib self-heal: when a caller passes a
@@ -45,7 +45,10 @@ class DottyImportTypeAttributionTest {
     JavaParser.runtimeClasspath().forEach(p => all.add(p.toString))
     val filtered = new ArrayList[String]()
     all.asScala.foreach { entry =>
-      if (entry.contains("scala3-compiler_3")) filtered.add(entry)
+      
+          if (entry.contains("scala3-compiler_3")) {
+              filtered.add(entry)
+          }
     }
     filtered
   }

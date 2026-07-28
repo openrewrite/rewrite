@@ -15,11 +15,11 @@
  */
 // Generated from rewrite-protobuf/src/main/antlr/Protobuf2Lexer.g4 by ANTLR 4.13.2
 package org.openrewrite.protobuf.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
@@ -31,17 +31,68 @@ public class Protobuf2Lexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8,
-		FIXED64=9, FLOAT=10, GROUP=11, IMPORT=12, INT32=13, INT64=14, MAP=15,
-		MESSAGE=16, ONEOF=17, OPTION=18, PACKAGE=19, PUBLIC=20, REPEATED=21, REQUIRED=22,
-		RESERVED=23, RETURNS=24, RPC=25, SERVICE=26, SFIXED32=27, SFIXED64=28,
-		SINT32=29, SINT64=30, STREAM=31, STRING=32, SYNTAX=33, TO=34, UINT32=35,
-		UINT64=36, WEAK=37, OPTIONAL=38, Ident=39, IntegerLiteral=40, NumericLiteral=41,
-		FloatLiteral=42, BooleanLiteral=43, StringLiteral=44, Quote=45, LPAREN=46,
-		RPAREN=47, LBRACE=48, RBRACE=49, LBRACK=50, RBRACK=51, LCHEVR=52, RCHEVR=53,
-		COMMA=54, DOT=55, MINUS=56, PLUS=57, ASSIGN=58, WS=59, UTF_8_BOM=60, COMMENT=61,
-		LINE_COMMENT=62;
+    public static final int SEMI = 1;
+    public static final int COLON = 2;
+    public static final int BOOL = 3;
+    public static final int BYTES = 4;
+    public static final int DOUBLE = 5;
+    public static final int ENUM = 6;
+    public static final int EXTEND = 7;
+    public static final int FIXED32 = 8;
+    public static final int FIXED64 = 9;
+    public static final int FLOAT = 10;
+    public static final int GROUP = 11;
+    public static final int IMPORT = 12;
+    public static final int INT32 = 13;
+    public static final int INT64 = 14;
+    public static final int MAP = 15;
+    public static final int MESSAGE = 16;
+    public static final int ONEOF = 17;
+    public static final int OPTION = 18;
+    public static final int PACKAGE = 19;
+    public static final int PUBLIC = 20;
+    public static final int REPEATED = 21;
+    public static final int REQUIRED = 22;
+    public static final int RESERVED = 23;
+    public static final int RETURNS = 24;
+    public static final int RPC = 25;
+    public static final int SERVICE = 26;
+    public static final int SFIXED32 = 27;
+    public static final int SFIXED64 = 28;
+    public static final int SINT32 = 29;
+    public static final int SINT64 = 30;
+    public static final int STREAM = 31;
+    public static final int STRING = 32;
+    public static final int SYNTAX = 33;
+    public static final int TO = 34;
+    public static final int UINT32 = 35;
+    public static final int UINT64 = 36;
+    public static final int WEAK = 37;
+    public static final int OPTIONAL = 38;
+    public static final int Ident = 39;
+    public static final int IntegerLiteral = 40;
+    public static final int NumericLiteral = 41;
+    public static final int FloatLiteral = 42;
+    public static final int BooleanLiteral = 43;
+    public static final int StringLiteral = 44;
+    public static final int Quote = 45;
+    public static final int LPAREN = 46;
+    public static final int RPAREN = 47;
+    public static final int LBRACE = 48;
+    public static final int RBRACE = 49;
+    public static final int LBRACK = 50;
+    public static final int RBRACK = 51;
+    public static final int LCHEVR = 52;
+    public static final int RCHEVR = 53;
+    public static final int COMMA = 54;
+    public static final int DOT = 55;
+    public static final int MINUS = 56;
+    public static final int PLUS = 57;
+    public static final int ASSIGN = 58;
+    public static final int WS = 59;
+    public static final int UTF_8_BOM = 60;
+    public static final int COMMENT = 61;
+    public static final int LINE_COMMENT = 62;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

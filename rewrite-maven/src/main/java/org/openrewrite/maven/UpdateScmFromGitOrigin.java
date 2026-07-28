@@ -202,7 +202,7 @@ public class UpdateScmFromGitOrigin extends Recipe {
                 String originalPath = protocolMatcher.group(4);
                 String suffix = protocolMatcher.group(5) != null ? protocolMatcher.group(5) : "";
 
-                String userPrefix = (user != null) ? user + "@" : "";
+                String userPrefix = user != null ? user + "@" : "";
 
                 // Determine if we need to add .git extension
                 boolean needsGitExtension = originalPath != null && originalPath.endsWith(".git") && !path.endsWith(".git");

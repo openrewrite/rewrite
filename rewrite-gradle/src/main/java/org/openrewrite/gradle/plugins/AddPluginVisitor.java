@@ -226,7 +226,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                     if (parsed instanceof ParseError) {
                         throw ((ParseError) parsed).toException();
                     }
-                    return ((G.CompilationUnit) parsed);
+                    return (G.CompilationUnit) parsed;
                 })
                 .map(parsed -> parsed.getStatements().get(0))
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
@@ -350,7 +350,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                     if (parsed instanceof ParseError) {
                         throw ((ParseError) parsed).toException();
                     }
-                    return ((K.CompilationUnit) parsed);
+                    return (K.CompilationUnit) parsed;
                 })
                 .map(parsed -> parsed.getStatements().get(0))
                 .map(block -> ((J.Block) block).getStatements().get(0))

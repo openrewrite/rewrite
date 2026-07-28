@@ -288,7 +288,7 @@ public class KotlinParser implements Parser {
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
-        private boolean isKotlinScript = false;
+        private boolean isKotlinScript;
         private List<String> scriptImplicitReceivers = emptyList();
         private List<String> scriptDefaultImports = emptyList();
 

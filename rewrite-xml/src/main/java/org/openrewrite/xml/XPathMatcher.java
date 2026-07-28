@@ -446,7 +446,9 @@ public class XPathMatcher {
      * Get the parent cursor that contains a tag, skipping non-tag nodes.
      */
     private @Nullable Cursor getParentTagCursor(@Nullable Cursor cursor) {
-        if (cursor == null) return null;
+        if (cursor == null) {
+            return null;
+        }
         Cursor parent = cursor.getParent();
         while (parent != null && !(parent.getValue() instanceof Xml.Tag)) {
             if (parent.getValue() instanceof Xml.Document) {
@@ -1363,7 +1365,9 @@ public class XPathMatcher {
      */
     @SuppressWarnings("ConstantValue")
     private @Nullable Object resolveFilterValue(CompiledExpr expr, Xml.Tag tag, int position, int size) {
-        if (expr == null) return null;
+        if (expr == null) {
+            return null;
+        }
 
         switch (expr.type) {
             case STRING:

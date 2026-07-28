@@ -165,7 +165,7 @@ class ArrayAccessTest implements RewriteTest {
                         // Only count array access, not Array construction
                         if (method.getSelect() != null && 
                             !(method.getSelect() instanceof J.Identifier && 
-                              ((J.Identifier) method.getSelect()).getSimpleName().equals("Array"))) {
+                              "Array".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
                             functionApplicationCount.incrementAndGet();
                             foundFunctionApplication.set(true);
                             System.out.println("Found array access via function application: " + method);
@@ -243,7 +243,7 @@ class ArrayAccessTest implements RewriteTest {
                         // Only count array access, not Array construction
                         if (method.getSelect() != null && 
                             !(method.getSelect() instanceof J.Identifier && 
-                              ((J.Identifier) method.getSelect()).getSimpleName().equals("Array"))) {
+                              "Array".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
                             foundFunctionApplication.set(true);
                             functionApplicationCount.incrementAndGet();
                             System.out.println("  -> This is array access via function application!");

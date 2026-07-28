@@ -107,7 +107,7 @@ public class Markers implements RpcCodec<Markers> {
             }
             return m;
         });
-        return withMarkers(!updated.get() ? ListUtils.concat(markers, identity) : markers);
+        return withMarkers(updated.get() ? markers : ListUtils.concat(markers, identity));
     }
 
     public Markers removeByType(Class<? extends Marker> type) {

@@ -129,7 +129,7 @@ public class ScalaCompilerContext {
                 for (int i = 0; i < result.warnings().size(); i++) {
                     ScalaWarning w = result.warnings().get(i);
                     Parser.Input input = inputsByPath.get(path);
-                    String location = (input != null ? input.getPath().toString() : path);
+                    String location = input != null ? input.getPath().toString() : path;
                     String formatted = location + " at line " + w.line() + ":" + w.column() + " " + w.message();
                     warnings.add(new ParseWarning(Tree.randomId(), formatted));
                     if (logCompilationWarningsAndErrors) {

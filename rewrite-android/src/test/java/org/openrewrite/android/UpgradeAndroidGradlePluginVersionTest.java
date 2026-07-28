@@ -20,10 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradleKts;
+import static org.openrewrite.gradle.Assertions.*;
 
 class UpgradeAndroidGradlePluginVersionTest implements RewriteTest {
 

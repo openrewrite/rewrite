@@ -57,8 +57,8 @@ public class ReflectionUtils {
     public static @Nullable Method findMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
         Class<?> searchType = clazz;
         while (searchType != null) {
-            Method[] methods = (searchType.isInterface() ? searchType.getMethods() :
-                    getDeclaredMethods(searchType));
+            Method[] methods = searchType.isInterface() ? searchType.getMethods() :
+                    getDeclaredMethods(searchType);
             for (Method method : methods) {
                 if (name.equals(method.getName()) && hasSameParams(method, paramTypes)) {
                     return method;
@@ -108,7 +108,7 @@ public class ReflectionUtils {
                 } else {
                     result = declaredMethods;
                 }
-                DECLARED_METHODS_CACHE.put(clazz, (result.length == 0 ? EMPTY_METHOD_ARRAY : result));
+                DECLARED_METHODS_CACHE.put(clazz, result.length == 0 ? EMPTY_METHOD_ARRAY : result);
             } catch (Throwable ex) {
                 throw new IllegalStateException("Failed to introspect Class [" + clazz.getName() +
                                                 "] from ClassLoader [" + clazz.getClassLoader() + "]", ex);
@@ -133,7 +133,7 @@ public class ReflectionUtils {
     }
 
     private static boolean hasSameParams(Method method, Class<?>[] paramTypes) {
-        return (paramTypes.length == method.getParameterCount() &&
-                Arrays.equals(paramTypes, method.getParameterTypes()));
+        return paramTypes.length == method.getParameterCount() &&
+                Arrays.equals(paramTypes, method.getParameterTypes());
     }
 }

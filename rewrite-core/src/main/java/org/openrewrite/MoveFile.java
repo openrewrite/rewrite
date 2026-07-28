@@ -59,7 +59,7 @@ public class MoveFile extends Recipe {
             return validated
                     .and(Validated.invalid("folder", folder, "folder or fileMatcher must be set"))
                     .and(Validated.invalid("fileMatcher", fileMatcher, "folder or fileMatcher must be set"));
-        } else if (!(StringUtils.isNullOrEmpty(folder)) && !(StringUtils.isNullOrEmpty(fileMatcher))) {
+        } else if (!StringUtils.isNullOrEmpty(folder) && !StringUtils.isNullOrEmpty(fileMatcher)) {
             return validated
                     .and(Validated.invalid("folder", folder, "folder and fileMatcher cannot both be set"))
                     .and(Validated.invalid("fileMatcher", fileMatcher, "folder and fileMatcher cannot both be set"));

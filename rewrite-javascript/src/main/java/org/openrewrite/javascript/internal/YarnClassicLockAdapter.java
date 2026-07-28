@@ -72,7 +72,7 @@ public final class YarnClassicLockAdapter {
                 current = parseBlockHeader(trimmed);
                 inDeps = false;
             } else if (current != null && indent == 2) {
-                if (trimmed.equals("dependencies:")) {
+                if ("dependencies:".equals(trimmed)) {
                     inDeps = true;
                 } else {
                     inDeps = false;

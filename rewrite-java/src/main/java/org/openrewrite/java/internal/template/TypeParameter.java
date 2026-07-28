@@ -83,10 +83,9 @@ public class TypeParameter {
                     type = JavaType.ShallowClass.build("java.lang.String");
                 } else if ("Object".equals(fqn)) {
                     type = TYPE_OBJECT;
-                } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
-                    // empty
-                } else {
+                } else if ((type = JavaType.Primitive.fromKeyword(fqn)) == null) {
                     throw new IllegalArgumentException("Unknown type " + fqn + ". Make sure all types are fully qualified.");
+                    // empty
                 }
                 return type;
             }

@@ -16,11 +16,7 @@
 package org.openrewrite.golang.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
@@ -33,13 +29,12 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.golang.Assertions.go;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -578,11 +573,17 @@ class GolangRecipeIntegTest implements RewriteTest {
             java.nio.file.Path goMod = recipesGoDir.toPath().resolve("go.mod");
             for (String line : java.nio.file.Files.readAllLines(goMod)) {
                 String t = line.trim();
-                if (!t.startsWith("replace ")) continue;
+                if (!t.startsWith("replace ")) {
+                    continue;
+                }
                 int arrow = t.indexOf("=>");
-                if (arrow < 0) continue;
+                if (arrow < 0) {
+                    continue;
+                }
                 String target = t.substring(arrow + 2).trim();
-                if (target.contains("@")) continue;
+                if (target.contains("@")) {
+                    continue;
+                }
                 java.nio.file.Path resolved = recipesGoDir.toPath().resolve(target).normalize();
                 if (target.contains("rewrite-go") && !java.nio.file.Files.isDirectory(resolved)) {
                     return false;

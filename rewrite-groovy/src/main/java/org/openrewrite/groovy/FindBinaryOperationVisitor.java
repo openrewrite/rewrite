@@ -26,7 +26,7 @@ public class FindBinaryOperationVisitor extends CodeVisitorSupport {
     private final String tokenToFind;
 
     @Getter
-    private boolean found = false;
+    private boolean found;
 
     public FindBinaryOperationVisitor(String tokenToFind, int index, int[] sourceLineNumberOffsets) {
         this.index = index;

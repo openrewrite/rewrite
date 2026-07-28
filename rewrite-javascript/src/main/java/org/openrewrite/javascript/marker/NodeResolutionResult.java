@@ -266,9 +266,8 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
                             dep -> dep.rpcReceive(dep, q)));
             before = before
                     .withEngines(q.receive(before.engines));
-            before = before
+            return before
                     .withLicense(q.receive(before.license));
-            return before;
         }
     }
 

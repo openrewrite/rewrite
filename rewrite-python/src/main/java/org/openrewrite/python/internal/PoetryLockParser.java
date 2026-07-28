@@ -15,13 +15,8 @@
  */
 package org.openrewrite.python.internal;
 
-import org.openrewrite.python.internal.poetrylock.PoetryLock;
-import org.openrewrite.python.internal.poetrylock.PoetryLockDependency;
-import org.openrewrite.python.internal.poetrylock.PoetryLockFormatException;
-import org.openrewrite.python.internal.poetrylock.PoetryLockPackage;
-import org.openrewrite.python.internal.poetrylock.PoetryLockReader;
-import org.openrewrite.python.internal.poetrylock.PoetryLockSource;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.internal.poetrylock.*;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
@@ -29,11 +24,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Extracts resolved-dependency information from poetry.lock for overlay onto the

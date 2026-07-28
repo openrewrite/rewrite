@@ -22,11 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.Recipe;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 

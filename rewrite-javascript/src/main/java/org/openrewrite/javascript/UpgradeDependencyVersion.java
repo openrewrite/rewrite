@@ -99,7 +99,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -115,7 +117,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
@@ -128,7 +132,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private List<MatchedDependency> findMatches(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return Collections.emptyList();
+        if (marker == null) {
+            return Collections.emptyList();
+        }
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> result = new ArrayList<>();
         collectMatches(result, "dependencies", marker.getDependencies(), nameMatcher);
@@ -149,7 +155,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private void collectMatches(List<MatchedDependency> out, String scopeName,
                                 @Nullable List<Dependency> deps, Predicate<String> nameMatcher) {
-        if (deps == null) return;
+        if (deps == null) {
+            return;
+        }
         for (Dependency d : deps) {
             if (nameMatcher.test(d.getName())) {
                 // TODO: add semver.gt check (matches TS shouldUpgrade); for v1 we always set the new version.
@@ -166,7 +174,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -200,12 +210,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 ProjectState lockPs = acc.projects.get(packagePath);
-                if (lockPs == null) return tree;
+                if (lockPs == null) {
+                    return tree;
+                }
                 if (lockPs.modifiedPackageJson == null) {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
-                    if (pkg == null) pkg = lockPs.capturedPackageJson;
+                    if (pkg == null) {
+                        pkg = lockPs.capturedPackageJson;
+                    }
                     // If scanner found no matches on the original tree, recompute from live tree.
                     if (lockPs.matchedDeps != null && lockPs.matchedDeps.isEmpty() && pkg != null) {
                         lockPs.matchedDeps = findMatches(pkg);
@@ -224,8 +240,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             private void ensureComputed(ProjectState ps, SourceFile pkg) {
-                if (ps.modifiedPackageJson != null) return;
-                if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
+                if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) {
+                    return;
+                }
                 List<MatchedDependency> matches = ps.matchedDeps;
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,

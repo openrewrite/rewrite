@@ -25,22 +25,21 @@ import org.openrewrite.*;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.*;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
+import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.rpc.RpcRecipe;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
-
-import org.openrewrite.marker.SearchResult;
-import org.openrewrite.rpc.RewriteRpc;
-import org.openrewrite.rpc.DynamicDispatchRpcCodec;
-import org.openrewrite.rpc.RpcRecipe;
-import org.openrewrite.rpc.request.BatchVisit;
-import org.openrewrite.rpc.request.BatchVisitResponse;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -641,7 +640,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return emptyMap();
         }
 
-        String beforePath = (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString());
+        String beforePath = before == null ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString());
         String afterPath = PathUtils.separatorsToUnix(after.getSourcePath().toString());
         Map<String, List<SearchResults.Row>> resultsByRecipe = new HashMap<>();
 
@@ -660,14 +659,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             for (Map.Entry<UUID, String> entry : newSearchResultDescriptions.entrySet()) {
                 UUID id = entry.getKey();
                 String creator = attributionMap.get(id);
-                if (creator == null) continue;
+                if (creator == null) {
+                    continue;
+                }
 
                 String fence = "{{" + id + "}}";
                 int start = fenced.indexOf(fence);
                 if (start >= 0) {
                     int contentStart = start + fence.length();
                     int end = fenced.indexOf(fence, contentStart);
-                    String snippet = (end > contentStart)
+                    String snippet = end > contentStart
                             ? StringUtils.trimIndent(fenced.substring(contentStart, end))
                             : "";
                     resultsByRecipe.computeIfAbsent(creator, k -> new ArrayList<>())
@@ -690,10 +691,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                                   List<Recipe> recipeStack,
                                                   Map<String, List<SearchResults.Row>> searchResultsByRecipe,
                                                   ExecutionContext ctx) {
-        String beforePath = (before == null) ? "" : before.getSourcePath().toString();
-        String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+        String beforePath = before == null ? "" : before.getSourcePath().toString();
+        String afterPath = after == null ? "" : after.getSourcePath().toString();
         Recipe recipe = leaf(recipeStack);
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+        Long effortSeconds = recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
         String parentName = "";
@@ -730,10 +731,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                              List<Recipe> recipeStack,
                                              Map<UUID, String> attributionMap,
                                              ExecutionContext ctx) {
-        String beforePath = (before == null) ? "" : before.getSourcePath().toString();
-        String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+        String beforePath = before == null ? "" : before.getSourcePath().toString();
+        String afterPath = after == null ? "" : after.getSourcePath().toString();
         Recipe recipe = leaf(recipeStack);
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+        Long effortSeconds = recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
         String parentName = "";
@@ -762,10 +763,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {
-        String beforePath = (before == null) ? "" : before.getSourcePath().toString();
-        String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+        String beforePath = before == null ? "" : before.getSourcePath().toString();
+        String afterPath = after == null ? "" : after.getSourcePath().toString();
         Recipe recipe = leaf(recipeStack);
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+        Long effortSeconds = recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
         String parentName = "";
@@ -940,7 +941,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     }
                     if (cursor.getValue() instanceof Tree) {
                         ctx.add(new SearchResults.Row(
-                                (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString()),
+                                before == null ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString()),
                                 PathUtils.separatorsToUnix(after.getSourcePath().toString()),
                                 StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
                                 sr.getDescription(),

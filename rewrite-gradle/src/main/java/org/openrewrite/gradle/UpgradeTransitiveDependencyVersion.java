@@ -169,7 +169,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     public static class DependencyVersionState {
         Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
-        private boolean dependenciesToUpdateCalculated = false;
+        private boolean dependenciesToUpdateCalculated;
         private final Map<GroupArtifact, String> dependenciesToUpdate = new HashMap<>();
 
         /**

@@ -128,8 +128,8 @@ public class MergeYaml extends Recipe {
 
     String description = "Merge a YAML snippet with an existing YAML document.";
 
-    final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
-    final static String REMOVE_PREFIX = "REMOVE_PREFIX";
+    static final String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
+    static final String REMOVE_PREFIX = "REMOVE_PREFIX";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

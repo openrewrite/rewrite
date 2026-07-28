@@ -191,7 +191,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
             List<String> availableVersions, VersionComparator versionComparator,
             String groupId, String artifactId, String currentVersion,
             MavenIsoVisitor<?> visitor, ExecutionContext ctx) throws MavenDownloadingException {
-        String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+        String finalCurrentVersion = Semver.isVersion(currentVersion) ? currentVersion : "0.0.0";
 
         if (availableVersions.isEmpty()) {
             MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> visitor.downloadMetadata(groupId, artifactId, ctx));

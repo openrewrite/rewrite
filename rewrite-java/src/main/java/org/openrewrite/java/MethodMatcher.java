@@ -913,7 +913,7 @@ public class MethodMatcher {
         private List<MethodMatcher.ArgumentMatcher> argumentMatchers;
         private int varArgsPosition = -1;
         private @Nullable String declaringTypeMatchPrefix;
-        private boolean hasWildcardVarArgs = false;  // Track if we've seen .. wildcard
+        private boolean hasWildcardVarArgs;  // Track if we've seen .. wildcard
 
         void parse() {
             int openParen = pattern.indexOf('(');

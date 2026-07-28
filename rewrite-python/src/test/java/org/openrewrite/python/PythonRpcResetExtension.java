@@ -36,7 +36,7 @@ import org.openrewrite.python.rpc.PythonRewriteRpc;
  * </pre>
  */
 public class PythonRpcResetExtension implements BeforeEachCallback, AfterEachCallback {
-    private static boolean factoryConfigured = false;
+    private static boolean factoryConfigured;
 
     @Override
     public void beforeEach(ExtensionContext context) {

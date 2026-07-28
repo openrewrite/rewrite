@@ -63,11 +63,15 @@ public final class BunLockAdapter {
             Map.Entry<String, JsonNode> entry = it.next();
             String key = entry.getKey();
             JsonNode value = entry.getValue();
-            if (!value.isArray() || value.size() < 1) continue;
+            if (!value.isArray() || value.size() < 1) {
+                continue;
+            }
 
             String nameAtVersion = value.get(0).asText("");
             int atIdx = nameAtVersion.lastIndexOf('@');
-            if (atIdx <= 0) continue;
+            if (atIdx <= 0) {
+                continue;
+            }
             String name = nameAtVersion.substring(0, atIdx);
             String version = nameAtVersion.substring(atIdx + 1);
 
@@ -95,7 +99,9 @@ public final class BunLockAdapter {
             // Nested: "parent/child" -> "node_modules/parent/node_modules/child"
             StringBuilder sb = new StringBuilder();
             for (String part : bunKey.split("/")) {
-                if (sb.length() > 0) sb.append('/');
+                if (sb.length() > 0) {
+                    sb.append('/');
+                }
                 sb.append("node_modules/").append(part);
             }
             return sb.toString();

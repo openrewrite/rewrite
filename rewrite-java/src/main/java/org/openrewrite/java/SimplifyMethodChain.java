@@ -68,7 +68,7 @@ public class SimplifyMethodChain extends Recipe {
         reverse(matchers);
         @SuppressWarnings("unchecked")
         TreeVisitor<?, ExecutionContext> allMethods = Preconditions.and(matchers.stream()
-                .<TreeVisitor<?, ExecutionContext>>map(UsesMethod::new)
+                .map(UsesMethod::new)
                 .toArray(TreeVisitor[]::new));
         return Preconditions.check(allMethods, new JavaIsoVisitor<ExecutionContext>() {
             @Override

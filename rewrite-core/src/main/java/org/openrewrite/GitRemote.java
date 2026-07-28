@@ -157,19 +157,16 @@ public class GitRemote {
 
             path = path.replaceFirst("^/", "");
             boolean ssh = "ssh".equals(protocol);
-            switch (service) {
-                case Bitbucket:
-                    if (!ssh) {
-                        path = "scm/" + path;
-                    }
-                    break;
-                case AzureDevOps:
-                    if (ssh) {
-                        path = "v3/" + path;
-                    } else {
-                        path = path.replaceFirst("([^/]+)/([^/]+)/(.*)", "$1/$2/_git/$3");
-                    }
-                    break;
+            if (service == GitRemote.Service.Bitbucket) {
+                if (!ssh) {
+                    path = "scm/" + path;
+                }
+            } else if (service == GitRemote.Service.AzureDevOps) {
+                if (ssh) {
+                    path = "v3/" + path;
+                } else {
+                    path = path.replaceFirst("([^/]+)/([^/]+)/(.*)", "$1/$2/_git/$3");
+                }
             }
             if (service != Service.AzureDevOps) {
                 path += ".git";
@@ -246,19 +243,16 @@ public class GitRemote {
             RemoteServerMatch match = matchRemoteServer(normalizedUri);
             String repositoryPath = repositoryPath(match, normalizedUri);
 
-            switch (match.service) {
-                case AzureDevOps:
-                    if ("ssh.dev.azure.com".equalsIgnoreCase(match.matchedUri.getHost())) {
-                        repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
-                    } else {
-                        repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");
-                    }
-                    break;
-                case Bitbucket:
-                    if (url.startsWith("http")) {
-                        repositoryPath = repositoryPath.replaceFirst("(?i)scm/", "");
-                    }
-                    break;
+            if (match.service == GitRemote.Service.AzureDevOps) {
+                if ("ssh.dev.azure.com".equalsIgnoreCase(match.matchedUri.getHost())) {
+                    repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
+                } else {
+                    repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");
+                }
+            } else if (match.service == GitRemote.Service.Bitbucket) {
+                if (url.startsWith("http")) {
+                    repositoryPath = repositoryPath.replaceFirst("(?i)scm/", "");
+                }
             }
             String organization = null;
             String repositoryName;
@@ -355,8 +349,9 @@ public class GitRemote {
         }
 
         private static String maybePort(int port, String scheme) {
-            if (isDefaultPort(port, scheme))
+            if (isDefaultPort(port, scheme)) {
                 return "";
+            }
             return ":" + port;
         }
 

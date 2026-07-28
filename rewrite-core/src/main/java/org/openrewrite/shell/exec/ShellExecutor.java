@@ -41,7 +41,8 @@ public interface ShellExecutor {
     }
 
     default Path exec(List<String> command, Path workingDirectory, Map<String, String> environment, Duration timeout, ExecutionContext ctx) {
-        Path stdOut = null, stdErr = null;
+        Path stdOut = null;
+        Path stdErr = null;
         try {
             ProcessBuilder builder = new ProcessBuilder();
             builder.command(command);

@@ -23,21 +23,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.TypeNameMatcher;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Collections.newSetFromMap;
@@ -278,7 +266,9 @@ public class TypesInUse {
     }
 
     private synchronized void populateImplicitPass(FqnTrie t) {
-        if (implicitPopulated) return;
+        if (implicitPopulated) {
+            return;
+        }
         Set<String> visited = new HashSet<>();
         for (JavaType.Method method : usedMethods) {
             walkAssignableTo(method.getDeclaringType(), t, false, visited);

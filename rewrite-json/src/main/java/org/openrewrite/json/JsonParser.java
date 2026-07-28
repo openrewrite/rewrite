@@ -22,11 +22,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -87,7 +87,7 @@ public class JsonParser implements Parser {
         return prefix.resolve("file.json");
     }
 
-    private static class ForwardingErrorListener extends BaseErrorListener {
+    private static final class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 

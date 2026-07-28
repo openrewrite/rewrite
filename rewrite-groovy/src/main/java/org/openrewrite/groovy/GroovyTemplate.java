@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
 
-public class GroovyTemplate extends JavaTemplate {
+public final class GroovyTemplate extends JavaTemplate {
     private GroovyTemplate(boolean contextSensitive, GroovyParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         super(
                 code,

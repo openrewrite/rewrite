@@ -420,8 +420,8 @@ class TypeUtilsTest implements RewriteTest {
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
                     J.VariableDeclarations.NamedVariable li = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(0)).getVariables().get(0);
                     J.VariableDeclarations.NamedVariable lo = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(1)).getVariables().get(0);
-                    var listIntegerType = ((JavaType.Parameterized) li.getVariableType().getType());
-                    var listObjectType = ((JavaType.Parameterized) lo.getVariableType().getType());
+                    var listIntegerType = (JavaType.Parameterized) li.getVariableType().getType();
+                    var listObjectType = (JavaType.Parameterized) lo.getVariableType().getType();
 
                     assertThat(TypeUtils.isAssignableTo(listIntegerType.getType(), listIntegerType)).isTrue();
                     assertThat(TypeUtils.isAssignableTo(listObjectType, listIntegerType)).isFalse();

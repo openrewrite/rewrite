@@ -27,9 +27,7 @@ import org.openrewrite.text.PlainText;
 import java.nio.file.Path;
 import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
 class RpcReceiveQueueTest {
 

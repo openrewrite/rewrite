@@ -51,8 +51,7 @@ public final class PythonResolutionLinker {
         marker = marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));
         marker = marker.withDependencyGroups(linkMap(marker.getDependencyGroups(), resolvedDeps));
         marker = marker.withConstraintDependencies(link(marker.getConstraintDependencies(), resolvedDeps));
-        marker = marker.withOverrideDependencies(link(marker.getOverrideDependencies(), resolvedDeps));
-        return marker;
+        return marker.withOverrideDependencies(link(marker.getOverrideDependencies(), resolvedDeps));
     }
 
     /**
@@ -64,8 +63,7 @@ public final class PythonResolutionLinker {
                                                       List<ResolvedDependency> resolvedDeps) {
         marker = marker.withResolvedDependencies(resolvedDeps);
         marker = marker.withDependencies(link(marker.getDependencies(), resolvedDeps));
-        marker = marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));
-        return marker;
+        return marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));
     }
 
     public static List<Dependency> link(List<Dependency> deps, List<ResolvedDependency> resolved) {

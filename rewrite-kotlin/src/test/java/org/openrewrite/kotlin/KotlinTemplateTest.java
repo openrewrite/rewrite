@@ -31,14 +31,13 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -82,7 +81,7 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   var m = (J.MethodDeclaration) super.visitMethodDeclaration(method, ctx);
-                  if (m.getSimpleName().equals("configure")) {
+                  if ("configure".equals(m.getSimpleName())) {
                       List<Statement> statements = m.getBody().getStatements();
                       if (statements.stream().noneMatch(s -> s.toString().contains("println"))) {
                           return JavaTemplate.builder("println(\"added\")")

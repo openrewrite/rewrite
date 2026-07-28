@@ -77,11 +77,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
             v = v.and(Validated.required("groupName", groupName));
         }
-        v = v.and(Validated.test("newVersion",
+        return v.and(Validated.test("newVersion",
                 "must be a PEP 440 version or version specifier", newVersion,
                 nv -> nv != null && !nv.trim().isEmpty() &&
                         PythonVersionSpecifierSet.parse(PyProjectHelper.normalizeVersionConstraint(nv)) != null));
-        return v;
     }
 
     @Override

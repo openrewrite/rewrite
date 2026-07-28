@@ -69,7 +69,7 @@ public class CSharpParser implements Parser {
                     if (ref.contains("@")) {
                         String[] parts = ref.split("@", 2);
                         packageRefs.append(String.format(
-                                "\n    <PackageReference Include=\"%s\" Version=\"%s\" />",
+                                "%n    <PackageReference Include=\"%s\" Version=\"%s\" />",
                                 parts[0], parts[1]));
                     }
                 }

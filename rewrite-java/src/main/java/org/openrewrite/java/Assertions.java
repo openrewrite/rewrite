@@ -49,7 +49,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
-public class Assertions {
+public final class Assertions {
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
     private static final Map<String, JavaSourceSet> javaSourceSets = new ConcurrentHashMap<>();

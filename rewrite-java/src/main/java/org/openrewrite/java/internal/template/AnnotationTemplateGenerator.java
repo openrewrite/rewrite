@@ -380,7 +380,7 @@ public class AnnotationTemplateGenerator {
         if (!(maybeAnnotation instanceof J.Annotation)) {
             return false;
         }
-        Cursor sourceFileCursor = cursor.dropParentUntil(is -> is instanceof JavaSourceFile);
+        Cursor sourceFileCursor = cursor.dropParentUntil(JavaSourceFile.class::isInstance);
         AnnotationService annotationService = sourceFileCursor.<JavaSourceFile>getValue().service(AnnotationService.class);
         return annotationService.getAllAnnotations(cursor).contains(maybeAnnotation);
     }

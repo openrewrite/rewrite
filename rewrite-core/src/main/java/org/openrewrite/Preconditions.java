@@ -192,7 +192,7 @@ public class Preconditions {
      * Installs a no-op {@link DataTableStore} that silently drops inserts
      * while delegating reads to the real store.
      */
-    private static class DataTableSuppressingExecutionContextView extends DelegatingExecutionContext {
+    private static final class DataTableSuppressingExecutionContextView extends DelegatingExecutionContext {
         private DataTableSuppressingExecutionContextView(ExecutionContext delegate) {
             super(delegate);
         }

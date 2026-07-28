@@ -26,7 +26,7 @@ abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public static final PT<TypeA> parameterizedField = new PT<TypeA>() {
     }
 
-    static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
+    abstract static class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
         InheritedJavaTypeGoat() {
             super()
         }
@@ -49,7 +49,7 @@ abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
     }
 
-    static abstract class Extension<U extends Extension<U>> {}
+    abstract static class Extension<U extends Extension<U>> {}
 
     static class TypeA {}
     static class TypeB {}

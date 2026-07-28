@@ -15,7 +15,7 @@
  */
 package org.openrewrite;
 
-public class DataTableExecutionContextView extends DelegatingExecutionContext {
+public final class DataTableExecutionContextView extends DelegatingExecutionContext {
     public static final String DATA_TABLE_STORE = "org.openrewrite.dataTables.store";
 
     private DataTableExecutionContextView(ExecutionContext delegate) {

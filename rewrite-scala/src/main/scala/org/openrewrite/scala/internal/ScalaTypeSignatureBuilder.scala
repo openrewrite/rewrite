@@ -32,7 +32,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   private var typeVariableNameStack: HashSet[String] = null
 
   def signature(tpe: Type): String = {
-    if (tpe == null) return "{undefined}"
+      if (tpe == null) {
+          return "{undefined}"
+      }
 
     try {
       tpe.dealias match {
@@ -85,7 +87,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private def typeRefSignature(tr: TypeRef): String = {
     val sym = tr.symbol
-    if (!sym.exists) return tr.show
+    
+      if (!sym.exists) {
+          return tr.show
+      }
 
     val fqn = sym.fullName.toString
     mapScalaFqnToJava(fqn)
@@ -93,7 +98,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private def termRefSignature(tmr: TermRef): String = {
     val sym = tmr.symbol
-    if (!sym.exists) return tmr.show
+    
+      if (!sym.exists) {
+          return tmr.show
+      }
     sym.fullName.toString
   }
 
@@ -109,8 +117,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   private def genericSignature(tp: TypeParamRef): String = {
     val name = tp.paramName.toString
 
-    if (typeVariableNameStack == null)
-      typeVariableNameStack = new HashSet[String]()
+    
+      if (typeVariableNameStack == null) {
+          typeVariableNameStack = new HashSet[String]()
+      }
 
     if (!typeVariableNameStack.add(name)) {
       typeVariableNameStack.remove(name)
@@ -119,14 +129,12 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
     val sb = new StringBuilder("Generic{" + name)
 
-    tp.underlying match {
-      case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
-        sb.append(" extends ")
-        sb.append(signature(tb.hi))
-      case _ =>
-    }
-
-    typeVariableNameStack.remove(name)
+    
+      if (tp.underlying ==tb: TypeBounds) {
+          sb.append(" extends ")
+          sb.append(signature(tb.hi))
+      } else if (tp.underlying ==_) {
+      }typeVariableNameStack.remove(name)
     sb.append("}").toString()
   }
 
@@ -142,7 +150,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   def methodSignature(sym: Symbols.Symbol): String = {
     val owner = sym.owner.fullName.toString
-    val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
+    val name = if (sym.isConstructor) { "<constructor>"
+    } else {
+        sym.name.toString
+    }
     val returnType = sym.info.finalResultType match {
       case NoType => "void"
       case rt => signature(rt)
@@ -157,11 +168,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
       case mt: MethodType =>
         mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
       case pt: PolyType =>
-        pt.resultType match {
-          case mt: MethodType =>
-            mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-          case _ =>
-        }
+          if (pt.resultType ==mt: MethodType) {
+              mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
+          } else if (pt.resultType ==_) {
+          }
       case _ =>
     }
     sb.append(",parameters=").append(paramTypes)

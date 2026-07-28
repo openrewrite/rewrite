@@ -20,8 +20,8 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
@@ -76,7 +76,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
         Iterator<Object> itr = parent.getPath(J.class::isInstance);
-        J next = (itr.hasNext()) ? (J) itr.next() : null;
+        J next = itr.hasNext() ? (J) itr.next() : null;
         if (next != null) {
             preVisit(next, p);
         }
@@ -422,7 +422,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
     @SuppressWarnings("NullableProblems")

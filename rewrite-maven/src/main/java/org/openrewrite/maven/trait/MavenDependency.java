@@ -60,7 +60,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
             MavenMetadataFailures metadataFailures,
             VersionComparator versionComparator,
             ExecutionContext ctx) throws MavenDownloadingException {
-        String finalVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+        String finalVersion = Semver.isVersion(currentVersion) ? currentVersion : "0.0.0";
 
         // in the case of "latest.patch", a new version can only be derived if the
         // current version is a semantic version. The metadata pattern is intentionally

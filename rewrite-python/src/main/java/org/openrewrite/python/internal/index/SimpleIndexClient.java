@@ -28,11 +28,7 @@ import org.openrewrite.python.internal.pep508.Pep508Requirement;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -119,7 +115,7 @@ public class SimpleIndexClient {
 
     private static @Nullable String contentType(HttpSender.Response response) {
         for (Map.Entry<String, List<String>> header : response.getHeaders().entrySet()) {
-            if (header.getKey() != null && "content-type".equalsIgnoreCase(header.getKey()) &&
+            if ("content-type".equalsIgnoreCase(header.getKey()) &&
                     !header.getValue().isEmpty()) {
                 return header.getValue().get(0);
             }

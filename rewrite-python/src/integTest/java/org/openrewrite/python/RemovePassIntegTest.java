@@ -20,8 +20,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.util.concurrent.TimeUnit;
 import org.openrewrite.Recipe;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.test.RecipeSpec;
@@ -31,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.python.Assertions.python;
 

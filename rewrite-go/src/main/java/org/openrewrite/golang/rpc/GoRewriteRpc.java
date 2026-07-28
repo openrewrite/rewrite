@@ -17,12 +17,7 @@ package org.openrewrite.golang.rpc;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.DataTableStore;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.internal.GoExecutor;
 import org.openrewrite.marker.Markers;
@@ -38,24 +33,14 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Spliterator;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -248,7 +233,7 @@ public class GoRewriteRpc extends RewriteRpc {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
+            private int index;
             private @Nullable ParseProjectResponse response;
 
             @Override

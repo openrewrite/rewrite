@@ -173,7 +173,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, RpcSendQueue q) {
         q.getAndSendList(conditionalDirective, Cs.ConditionalDirective::getDirectiveLines,
-                dl -> dl.getLineNumber(), dl -> {
+                Cs.DirectiveLine::getLineNumber, dl -> {
                     q.getAndSend(dl, Cs.DirectiveLine::getLineNumber);
                     q.getAndSend(dl, Cs.DirectiveLine::getText);
                     q.getAndSend(dl, d -> d.getKind().ordinal());

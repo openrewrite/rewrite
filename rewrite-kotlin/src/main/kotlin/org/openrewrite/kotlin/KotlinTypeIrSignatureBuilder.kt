@@ -152,8 +152,10 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
 
     private fun fileSignature(type: IrFile): String {
         return (if (type.packageFqName.asString()
-                .isNotEmpty()
-        ) type.packageFqName.asString() + "." else "") + type.name.replace(".kt", "Kt")
+            .isNotEmpty()
+        ) { type.packageFqName.asString() + "."
+        } else { ""
+        }) + type.name.replace(".kt", "Kt")
     }
 
     /**
@@ -334,7 +336,9 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
     private fun methodArgumentSignature(function: IrFunction): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
         for (param in function.parameters) {
-            if (param.kind == IrParameterKind.DispatchReceiver) continue
+            if (param.kind == IrParameterKind.DispatchReceiver) {
+                continue
+            }
             genericArgumentTypes.add(signature(param.type))
         }
         return genericArgumentTypes.toString()
@@ -365,7 +369,9 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
         val ownerParams = function.symbol.owner.parameters
         for ((index, param) in ownerParams.withIndex()) {
-            if (param.kind == IrParameterKind.DispatchReceiver) continue
+            if (param.kind == IrParameterKind.DispatchReceiver) {
+                continue
+            }
             val arg = function.arguments.getOrNull(index)
             if (arg != null) {
                 genericArgumentTypes.add(signature(arg.type))

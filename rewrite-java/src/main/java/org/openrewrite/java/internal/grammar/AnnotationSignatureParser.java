@@ -15,14 +15,15 @@
  */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
-import java.util.List;
-import java.util.Iterator;
+
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class AnnotationSignatureParser extends Parser {
@@ -31,15 +32,39 @@ public class AnnotationSignatureParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
-		DOTDOT=20, COLONCOLON=21, WS=22, Identifier=23;
-	public static final int
-		RULE_annotation = 0, RULE_annotationName = 1, RULE_qualifiedName = 2, 
-		RULE_elementValuePairs = 3, RULE_elementValuePair = 4, RULE_elementValue = 5, 
-		RULE_primary = 6, RULE_type = 7, RULE_classOrInterfaceType = 8, RULE_literal = 9;
+    public static final int IntegerLiteral = 1;
+    public static final int FloatingPointLiteral = 2;
+    public static final int BooleanLiteral = 3;
+    public static final int CharacterLiteral = 4;
+    public static final int StringLiteral = 5;
+    public static final int LPAREN = 6;
+    public static final int RPAREN = 7;
+    public static final int LBRACK = 8;
+    public static final int RBRACK = 9;
+    public static final int COMMA = 10;
+    public static final int DOT = 11;
+    public static final int ASSIGN = 12;
+    public static final int COLON = 13;
+    public static final int ADD = 14;
+    public static final int SUB = 15;
+    public static final int AND = 16;
+    public static final int OR = 17;
+    public static final int AT = 18;
+    public static final int ELLIPSIS = 19;
+    public static final int DOTDOT = 20;
+    public static final int COLONCOLON = 21;
+    public static final int WS = 22;
+    public static final int Identifier = 23;
+    public static final int RULE_annotation = 0;
+    public static final int RULE_annotationName = 1;
+    public static final int RULE_qualifiedName = 2;
+    public static final int RULE_elementValuePairs = 3;
+    public static final int RULE_elementValuePair = 4;
+    public static final int RULE_elementValue = 5;
+    public static final int RULE_primary = 6;
+    public static final int RULE_type = 7;
+    public static final int RULE_classOrInterfaceType = 8;
+    public static final int RULE_literal = 9;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"annotation", "annotationName", "qualifiedName", "elementValuePairs", 
@@ -136,16 +161,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_annotation; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterAnnotation(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterAnnotation(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitAnnotation(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitAnnotation(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitAnnotation(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitAnnotation(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -177,20 +209,13 @@ public class AnnotationSignatureParser extends Parser {
 				match(LPAREN);
 				setState(27);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,1,_ctx) ) {
-				case 1:
-					{
-					setState(25);
-					elementValuePairs();
-					}
-					break;
-				case 2:
-					{
-					setState(26);
-					elementValue();
-					}
-					break;
-				}
+                    if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 1) {
+                        setState(25);
+                        elementValuePairs();
+                    } else if (getInterpreter().adaptivePredict(_input, 1, _ctx) == 2) {
+                        setState(26);
+                        elementValue();
+                    }
 				setState(29);
 				match(RPAREN);
 				}
@@ -220,16 +245,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_annotationName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterAnnotationName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterAnnotationName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitAnnotationName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitAnnotationName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitAnnotationName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitAnnotationName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -274,16 +306,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_qualifiedName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterQualifiedName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterQualifiedName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitQualifiedName(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitQualifiedName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitQualifiedName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitQualifiedName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -308,7 +347,9 @@ public class AnnotationSignatureParser extends Parser {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -351,16 +392,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_elementValuePairs; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterElementValuePairs(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterElementValuePairs(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitElementValuePairs(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitElementValuePairs(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValuePairs(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValuePairs(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -415,16 +463,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_elementValuePair; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterElementValuePair(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterElementValuePair(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitElementValuePair(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitElementValuePair(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValuePair(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValuePair(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -464,16 +519,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_elementValue; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterElementValue(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterElementValue(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitElementValue(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitElementValue(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValue(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValue(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -512,16 +574,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_primary; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterPrimary(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterPrimary(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitPrimary(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitPrimary(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitPrimary(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitPrimary(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -584,16 +653,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_type; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -659,16 +735,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_classOrInterfaceType; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterClassOrInterfaceType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterClassOrInterfaceType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitClassOrInterfaceType(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitClassOrInterfaceType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitClassOrInterfaceType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitClassOrInterfaceType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -684,16 +767,18 @@ public class AnnotationSignatureParser extends Parser {
 			setState(73);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3147776L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 3147776L) != 0) {
 				{
 				{
 				setState(69);
 				_la = _input.LA(1);
-				if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 3147776L) != 0)) ) {
+				if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 3147776L) != 0) ) {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -731,16 +816,23 @@ public class AnnotationSignatureParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_literal; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).enterLiteral(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).enterLiteral(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof AnnotationSignatureParserListener ) ((AnnotationSignatureParserListener)listener).exitLiteral(this);
+            if (listener instanceof AnnotationSignatureParserListener) {
+                ((AnnotationSignatureParserListener) listener).exitLiteral(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitLiteral(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof AnnotationSignatureParserVisitor) {
+                return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitLiteral(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -753,11 +845,13 @@ public class AnnotationSignatureParser extends Parser {
 			{
 			setState(76);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 62L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 62L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}

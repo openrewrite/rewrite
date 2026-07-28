@@ -192,7 +192,7 @@ class TypeParameterTest {
           });
 
         JavaType.GenericTypeVariable type = result.get("T");
-        JavaType.Parameterized parameterizedType = ((JavaType.Parameterized) type.getBounds().getFirst());
+        JavaType.Parameterized parameterizedType = (JavaType.Parameterized) type.getBounds().getFirst();
         assertThat(TypeUtils.toString(parameterizedType)).isSubstringOf(name);
         if (name.contains("?")) {
             JavaType.GenericTypeVariable wildcard = (JavaType.GenericTypeVariable) parameterizedType.getTypeParameters().getFirst();

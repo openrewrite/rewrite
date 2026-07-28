@@ -16,6 +16,7 @@
 package org.openrewrite.scala.marker
 
 import org.openrewrite.marker.Marker
+
 import java.util.UUID
 
 /**

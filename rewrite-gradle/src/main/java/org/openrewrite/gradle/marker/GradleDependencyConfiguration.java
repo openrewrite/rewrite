@@ -24,15 +24,15 @@ import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.attributes.Attributed;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Version;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
-import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 
 import java.io.Serializable;
@@ -192,6 +192,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         resolutionContext.markForReResolution(repositories, ctx);
         return this;
     }
+
     private class LazyResolutionContext {
         private boolean resolveRequired;
         private boolean transitivesResolved;

@@ -52,7 +52,7 @@ public abstract class SimpleTraitMatcher<U extends Trait<?>> implements TraitMat
     @Override
     public Stream<U> lower(Cursor cursor) {
         Stream.Builder<U> stream = Stream.builder();
-        this.<Stream.Builder<U>>asVisitor((va, sb) -> {
+        this.asVisitor((va, sb) -> {
             sb.add(test(va.getCursor()));
             return va.getTree();
         }).visit(cursor.getValue(), stream, cursor.getParentOrThrow());

@@ -24,7 +24,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.HashSet;
 import java.util.Set;
 
-public class FindReferencedTypes {
+public final class FindReferencedTypes {
     private FindReferencedTypes() {
     }
 

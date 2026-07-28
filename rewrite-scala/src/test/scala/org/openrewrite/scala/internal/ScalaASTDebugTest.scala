@@ -15,9 +15,9 @@
  */
 package org.openrewrite.scala.internal
 
+import dotty.tools.dotc.ast.Trees.*
 import dotty.tools.dotc.ast.untpd
 import dotty.tools.dotc.core.Contexts.*
-import dotty.tools.dotc.ast.Trees.*
 
 object ScalaASTDebugTest {
   def main(args: Array[String]): Unit = {
@@ -59,7 +59,9 @@ object ScalaASTDebugTest {
       case td: untpd.TypeDef =>
         println(s"${prefix}TypeDef(name=${td.name})")
       case _ =>
-        println(s"${prefix}${tree.getClass.getSimpleName}${if (tree.isEmpty) " (empty)" else ""}")
+        println(s"${prefix}${tree.getClass.getSimpleName}${if (tree.isEmpty) { " (empty)"
+        } else { ""
+        }}")
     }
   }
 }

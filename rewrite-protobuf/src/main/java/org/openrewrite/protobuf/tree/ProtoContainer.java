@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class ProtoContainer<T> {
+public final class ProtoContainer<T> {
     private transient Padding<T> padding;
 
     private static final ProtoContainer<?> EMPTY = new ProtoContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);

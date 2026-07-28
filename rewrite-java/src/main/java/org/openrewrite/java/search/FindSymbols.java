@@ -74,23 +74,41 @@ public class FindSymbols extends Recipe {
             }
 
             private String classVisibility(J.ClassDeclaration cd) {
-                if (cd.hasModifier(J.Modifier.Type.Public)) return "PUBLIC";
-                if (cd.hasModifier(J.Modifier.Type.Protected)) return "PROTECTED";
-                if (cd.hasModifier(J.Modifier.Type.Private)) return "PRIVATE";
+                if (cd.hasModifier(J.Modifier.Type.Public)) {
+                    return "PUBLIC";
+                }
+                if (cd.hasModifier(J.Modifier.Type.Protected)) {
+                    return "PROTECTED";
+                }
+                if (cd.hasModifier(J.Modifier.Type.Private)) {
+                    return "PRIVATE";
+                }
                 return "PACKAGE_PRIVATE";
             }
 
             private String methodVisibility(J.MethodDeclaration md) {
-                if (md.hasModifier(J.Modifier.Type.Public)) return "PUBLIC";
-                if (md.hasModifier(J.Modifier.Type.Protected)) return "PROTECTED";
-                if (md.hasModifier(J.Modifier.Type.Private)) return "PRIVATE";
+                if (md.hasModifier(J.Modifier.Type.Public)) {
+                    return "PUBLIC";
+                }
+                if (md.hasModifier(J.Modifier.Type.Protected)) {
+                    return "PROTECTED";
+                }
+                if (md.hasModifier(J.Modifier.Type.Private)) {
+                    return "PRIVATE";
+                }
                 return "PACKAGE_PRIVATE";
             }
 
             private String fieldVisibility(J.VariableDeclarations vd) {
-                if (vd.hasModifier(J.Modifier.Type.Public)) return "PUBLIC";
-                if (vd.hasModifier(J.Modifier.Type.Protected)) return "PROTECTED";
-                if (vd.hasModifier(J.Modifier.Type.Private)) return "PRIVATE";
+                if (vd.hasModifier(J.Modifier.Type.Public)) {
+                    return "PUBLIC";
+                }
+                if (vd.hasModifier(J.Modifier.Type.Protected)) {
+                    return "PROTECTED";
+                }
+                if (vd.hasModifier(J.Modifier.Type.Private)) {
+                    return "PRIVATE";
+                }
                 return "PACKAGE_PRIVATE";
             }
 
@@ -109,7 +127,9 @@ public class FindSymbols extends Recipe {
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
                                                             ExecutionContext ctx) {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
-                if (!shouldProcess()) return cd;
+                if (!shouldProcess()) {
+                    return cd;
+                }
 
                 JavaType.FullyQualified type = cd.getType();
                 String name = cd.getSimpleName();
@@ -130,7 +150,9 @@ public class FindSymbols extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                               ExecutionContext ctx) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
-                if (!shouldProcess()) return md;
+                if (!shouldProcess()) {
+                    return md;
+                }
 
                 boolean isConstructor = md.isConstructor();
                 String name = md.getSimpleName();
@@ -167,7 +189,9 @@ public class FindSymbols extends Recipe {
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
                                                                      ExecutionContext ctx) {
                 J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
-                if (!shouldProcess()) return vd;
+                if (!shouldProcess()) {
+                    return vd;
+                }
 
                 // Only emit fields (class-level variables), not local variables
                 Object parentValue = getCursor().getParentTreeCursor().getValue();

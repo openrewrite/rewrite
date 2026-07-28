@@ -693,7 +693,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // Update properties using the ExtraProperty trait
                     cu = (JavaSourceFile) new ExtraProperty.Matcher()
                             .matchVariableDeclarations(true)
-                            .<ExecutionContext>asVisitor((prop, execCtx) -> {
+                            .asVisitor((prop, execCtx) -> {
                                 String variableName = prop.getName();
                                 if (!acc.variableNames.containsKey(variableName)) {
                                     return prop.getTree();

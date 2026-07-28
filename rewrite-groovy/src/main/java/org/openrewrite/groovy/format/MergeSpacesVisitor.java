@@ -1697,7 +1697,7 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), newRight.getAfter());
         Markers markers = visitMarkers(right.getMarkers(), newRight.getMarkers());
-        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+        return after == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ?
                 right : new JRightPadded<>(t, after, markers);
     }
 

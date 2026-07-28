@@ -26,7 +26,7 @@ import java.util.*;
 
 @Incubating(since = "7.25.0")
 @Value
-public class VariableNameUtils {
+public final class VariableNameUtils {
 
     private VariableNameUtils() {
     }

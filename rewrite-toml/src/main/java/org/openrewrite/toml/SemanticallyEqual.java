@@ -25,7 +25,7 @@ import java.util.List;
  * Recursively check the equality of TOML elements.
  * Ignores whitespace and formatting differences.
  */
-public class SemanticallyEqual {
+public final class SemanticallyEqual {
 
     private SemanticallyEqual() {
     }

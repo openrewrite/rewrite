@@ -89,7 +89,7 @@ class CSharpRecipeTest implements RewriteTest {
           "Newtonsoft.Json", "13.0.1");
 
         List<SourceFile> csFiles = sourceFiles.stream()
-          .filter(sf -> sf instanceof Cs.CompilationUnit)
+          .filter(Cs.CompilationUnit.class::isInstance)
           .toList();
         assertThat(csFiles).hasSize(1);
         SourceFile sf = csFiles.getFirst();
@@ -202,7 +202,7 @@ class CSharpRecipeTest implements RewriteTest {
               .getBytes(StandardCharsets.UTF_8));
         }
         SourceFile sf = rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext())
-          .filter(f -> f instanceof Cs.CompilationUnit).toList().getFirst();
+          .filter(Cs.CompilationUnit.class::isInstance).toList().getFirst();
 
         SourceFile modified = (SourceFile) new CSharpIsoVisitor<InMemoryExecutionContext>()
           .visit(sf, new InMemoryExecutionContext());
@@ -220,7 +220,7 @@ class CSharpRecipeTest implements RewriteTest {
           "Newtonsoft.Json", "13.0.1");
 
         List<SourceFile> csFiles = sourceFiles.stream()
-          .filter(f -> f instanceof Cs.CompilationUnit)
+          .filter(Cs.CompilationUnit.class::isInstance)
           .toList();
         assertThat(csFiles).hasSize(1);
         SourceFile sf = csFiles.getFirst();

@@ -17,15 +17,15 @@ package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.ast.Trees.*
 import dotty.tools.dotc.ast.{tpd, untpd}
+import dotty.tools.dotc.config.ScalaSettings
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Phases
 import dotty.tools.dotc.parsing.Parsers
-import dotty.tools.dotc.util.SourceFile
 import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
-import dotty.tools.dotc.config.ScalaSettings
-
+import dotty.tools.dotc.util.SourceFile
 import scala.collection.mutable.ListBuffer
+
 import java.io.File
 import java.nio.file.Paths
 import java.util.{ArrayList, HashMap, LinkedHashSet, List => JList, Map => JMap}
@@ -154,7 +154,10 @@ class ScalaCompilerBridge {
         val unitList = {
           val buf = new ListBuffer[CompilationUnit]()
           val uIter = units.iterator()
-          while (uIter.hasNext) buf += uIter.next()
+          
+            while (uIter.hasNext) {
+                buf += uIter.next()
+            }
           buf.toList
         }
 
@@ -204,7 +207,10 @@ class ScalaCompilerBridge {
   }
 
   private def diagnosticSourcePath(d: Diagnostic): String =
-    if (d.pos.exists && d.pos.source != null) d.pos.source.path else ""
+      if (d.pos.exists && d.pos.source != null) {
+          d.pos.source.path
+      } else { ""
+      }
 
   private def toScalaWarning(d: Diagnostic): ScalaWarning = {
     val (line, column) =
@@ -268,9 +274,13 @@ class ScalaCompilerBridge {
    */
   private def parseOne(path: String, content: String)(using ctx: Context): ParsedUnit = {
     val wrapping =
-      if (path != null && path.endsWith(".sbt")) Wrapping.ObjectScript
-      else if (isSimpleExpression(content)) Wrapping.Expression
-      else Wrapping.None
+              if (path != null && path.endsWith(".sbt")) {
+                  Wrapping.ObjectScript
+              } else if (isSimpleExpression(content)) {
+                  Wrapping.Expression
+              } else {
+                  Wrapping.None
+              }
 
     // Each attempt parses under its own reporter so a failed attempt's syntax
     // errors don't surface on the file when a later attempt parses cleanly.
@@ -314,18 +324,21 @@ class ScalaCompilerBridge {
       context = ctx
     )
 
-  private def extractExpression(tree: untpd.Tree)(using Context): Option[untpd.Tree] = tree match {
-    case pkgDef: untpd.PackageDef =>
-      pkgDef.stats.collectFirst {
-        case mod: untpd.ModuleDef if mod.name.toString == "ExprWrapper" =>
-          mod.impl.body.collectFirst {
-            case vd: untpd.ValDef if vd.name.toString == "result" =>
-              // The rhs (right-hand side) is the expression we want
-              vd.rhs
-          }
-      }.flatten
-    case _ => None
-  }
+  private def extractExpression(tree: untpd.Tree)(using Context): Option[untpd.Tree] =
+      if (tree ==pkgDef: untpd.PackageDef) {
+          pkgDef.stats.collectFirst{
+              case mod: untpd.ModuleDef if mod.name.toString == "ExprWrapper" =>
+                  mod.impl.body.collectFirst{
+                      case vd: untpd.ValDef if vd.name.toString == "result" =>
+                          // The rhs (right-hand side) is the expression we want
+                          vd.rhs
+                      
+                  }
+              
+          }.flatten
+      } else if (tree ==_) {
+          None
+      }
 
   private def isSimpleExpression(content: String): Boolean = {
     val trimmed = content.trim
@@ -393,11 +406,16 @@ object ScalaCompilerBridge {
       while (it.hasNext) {
         val e = it.next()
         if (e != null && !e.isEmpty) {
-          if (sb.nonEmpty) sb.append(File.pathSeparator)
+        if (sb.nonEmpty) {
+            sb.append(File.pathSeparator)
+        }
           sb.append(e)
           val fn = fileName(e)
           present.add(fn)
-          if (isScalaArtifact(fn)) hasScalaArtifact = true
+          
+        if (isScalaArtifact(fn)) {
+            hasScalaArtifact = true
+        }
         }
       }
     }
@@ -417,7 +435,9 @@ object ScalaCompilerBridge {
     val sb = new StringBuilder(cpString)
     val present = new LinkedHashSet[String]()
     if (cpString.nonEmpty) {
-      cpString.split(File.pathSeparator).foreach(e => if (e.nonEmpty) present.add(fileName(e)))
+      cpString.split(File.pathSeparator).foreach(e => if (e.nonEmpty) {
+          present.add(fileName(e))
+      })
     }
     appendStdlibTo(sb, present)
     sb.toString()
@@ -427,7 +447,9 @@ object ScalaCompilerBridge {
     for (cls <- StdlibProbeClasses) {
       locateJar(cls).foreach { jar =>
         if (!present.contains(fileName(jar))) {
-          if (sb.nonEmpty) sb.append(File.pathSeparator)
+            if (sb.nonEmpty) {
+                sb.append(File.pathSeparator)
+            }
           sb.append(jar)
           present.add(fileName(jar))
         }
@@ -442,16 +464,29 @@ object ScalaCompilerBridge {
 
   private def fileName(path: String): String = {
     val p = Paths.get(path).getFileName
-    if (p == null) path else p.toString
+    
+      if (p == null) { path
+      } else {
+          p.toString
+      }
   }
 
   private def locateJar(cls: Class[?]): Option[String] = {
     val pd = cls.getProtectionDomain
-    if (pd == null) return None
+    
+      if (pd == null) {
+          return None
+      }
     val cs = pd.getCodeSource
-    if (cs == null) return None
+    
+      if (cs == null) {
+          return None
+      }
     val url = cs.getLocation
-    if (url == null) return None
+    
+      if (url == null) {
+          return None
+      }
     try Some(Paths.get(url.toURI).toString)
     catch { case _: Throwable => None }
   }

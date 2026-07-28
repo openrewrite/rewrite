@@ -139,7 +139,7 @@ public class ChangeType extends Recipe {
         });
     }
 
-    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private static final class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
@@ -398,7 +398,7 @@ public class ChangeType extends Recipe {
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
                                     ident.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
                                 JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
-                                maybeAddImport((targetFqn).getFullyQualifiedName(), ident.getSimpleName());
+                                maybeAddImport(targetFqn.getFullyQualifiedName(), ident.getSimpleName());
                                 break;
                             }
                         }
@@ -423,7 +423,7 @@ public class ChangeType extends Recipe {
                                 JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
 
                                 addImport(targetFqn);
-                                maybeAddImport((targetFqn).getFullyQualifiedName(), method.getName().getSimpleName());
+                                maybeAddImport(targetFqn.getFullyQualifiedName(), method.getName().getSimpleName());
                                 break;
                             }
                         }
@@ -732,7 +732,7 @@ public class ChangeType extends Recipe {
         }
     }
 
-    private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
+    private static final class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
         private final MethodMatcher originalConstructor;

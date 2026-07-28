@@ -19,13 +19,13 @@ import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.openrewrite.hcl.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.hcl.internal.ThrowingErrorListener;
 import org.openrewrite.hcl.internal.grammar.JsonPathLexer;
 import org.openrewrite.hcl.internal.grammar.JsonPathParser;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserBaseVisitor;
@@ -154,7 +154,7 @@ public class JsonPathMatcher {
 
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
-            return (scope = nextResult);
+            return scope = nextResult;
         }
 
         @Override
@@ -166,10 +166,10 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Hcl.Block)
+                        .filter(Hcl.Block.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
-                                .filter(t -> t instanceof Hcl.ConfigFile)
+                                .filter(Hcl.ConfigFile.class::isInstance)
                                 .findFirst()
                                 .orElse(null));
             }
@@ -342,7 +342,7 @@ public class JsonPathMatcher {
                 List<Object> matches = new ArrayList<>();
                 for (Object result : results) {
                     if (result instanceof List) {
-                        matches.addAll(((List<Object>) result));
+                        matches.addAll((List<Object>) result);
                     } else {
                         matches.add(result);
                     }
@@ -382,7 +382,7 @@ public class JsonPathMatcher {
                     // Unwrap lists of results from visitProperty to match the position of the cursor.
                     for (Object result : results) {
                         if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
+                            matches.addAll((List<Object>) result);
                         } else {
                             matches.add(result);
                         }
@@ -467,7 +467,7 @@ public class JsonPathMatcher {
                     List<Object> matches = new ArrayList<>();
                     for (Object result : results) {
                         if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
+                            matches.addAll((List<Object>) result);
                         } else {
                             matches.add(result);
                         }
@@ -593,10 +593,10 @@ public class JsonPathMatcher {
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
                 switch (ctx.LOGICAL_OPERATOR().getText()) {
-                    case ("&&"):
+                    case "&&":
                         operator = "&&";
                         break;
-                    case ("||"):
+                    case "||":
                         operator = "||";
                         break;
                     default:
@@ -622,10 +622,10 @@ public class JsonPathMatcher {
                 rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
-                    case ("=="):
+                    case "==":
                         operator = "==";
                         break;
-                    case ("!="):
+                    case "!=":
                         operator = "!=";
                         break;
                     default:

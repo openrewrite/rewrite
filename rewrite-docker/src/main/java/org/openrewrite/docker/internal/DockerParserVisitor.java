@@ -49,8 +49,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     @Nullable
     private final FileAttributes fileAttributes;
 
-    private int cursor = 0;
-    private int codePointCursor = 0;
+    private int cursor;
+    private int codePointCursor;
 
     public DockerParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
         this.path = path;
@@ -1431,7 +1431,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 i++;
             }
 
-            if (i >= text.length()) break;
+            if (i >= text.length()) {
+                break;
+            }
 
             // Check for closing bracket
             if (text.charAt(i) == ']') {
@@ -1450,7 +1452,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 }
             }
 
-            if (i >= text.length()) break;
+            if (i >= text.length()) {
+                break;
+            }
 
             // Check for closing bracket again
             if (text.charAt(i) == ']') {

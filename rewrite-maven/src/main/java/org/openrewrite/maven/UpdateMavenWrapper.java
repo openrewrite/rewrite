@@ -150,8 +150,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     }
 
     static class MavenWrapperState {
-        boolean mavenProject = false;
-        boolean needsWrapperUpdate = false;
+        boolean mavenProject;
+        boolean needsWrapperUpdate;
 
         @Nullable BuildTool updatedMarker;
 

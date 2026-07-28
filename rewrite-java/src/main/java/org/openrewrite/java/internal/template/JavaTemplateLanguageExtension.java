@@ -50,7 +50,7 @@ public abstract class JavaTemplateLanguageExtension {
     @NonFinal
     boolean substituted;
 
-    public JavaTemplateLanguageExtension(JavaTemplateParser templateParser, Substitutions substitutions,
+    protected JavaTemplateLanguageExtension(JavaTemplateParser templateParser, Substitutions substitutions,
                                          String substitutedTemplate, JavaCoordinates coordinates) {
         this.templateParser = templateParser;
         this.substitutions = substitutions;

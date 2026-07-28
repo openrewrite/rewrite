@@ -270,7 +270,7 @@ class InMemoryDiffEntryTest {
     void addBinary() {
         PlainText after = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
         after = after.withSourcePath(Paths.get("file.txt"))
-          .withMarkers(after.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+          .withMarkers(after.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 33188)));
 
         try (var entry = new InMemoryDiffEntry(null, after, null, null, Set.of(), true)) {
             assertThat(entry.getDiff()).isEqualTo("""
@@ -293,7 +293,7 @@ class InMemoryDiffEntryTest {
     void deleteBinary() {
         PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
         before = before.withSourcePath(Paths.get("file.txt"))
-          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 33188)));
 
         try (var entry = new InMemoryDiffEntry(before, null, null, null, Set.of(), true)) {
             assertThat(entry.getDiff()).isEqualTo("""
@@ -316,7 +316,7 @@ class InMemoryDiffEntryTest {
     void renameBinary() {
         PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
         before = before.withSourcePath(Paths.get("file.txt"))
-          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "06085efc592f6851a3f54f502f1a270db233ebf0", 0100644)));
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "06085efc592f6851a3f54f502f1a270db233ebf0", 33188)));
         PlainText after = before.withSourcePath(Paths.get("renamed.txt"));
 
         try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
@@ -333,7 +333,7 @@ class InMemoryDiffEntryTest {
     void modifyBinary() {
         PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get();
         before = before.withSourcePath(Paths.get("file.txt"))
-          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 33188)));
         PlainText after = before.withText("Hello, jon.bak!\n");
 
         try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
@@ -356,7 +356,7 @@ class InMemoryDiffEntryTest {
     void breakModifyBinary() {
         PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get();
         before = before.withSourcePath(Paths.get("file.txt"))
-          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 33188)));
         PlainText after = before.withSourcePath(Paths.get("renamed.txt"))
           .withText("Hello, jon.bak!\n");
 
@@ -381,7 +381,7 @@ class InMemoryDiffEntryTest {
 
     @Test
     void quarkBinary() {
-        Quark before = new Quark(randomId(), Paths.get("file.txt"), Markers.build(singletonList(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644))), null, new FileAttributes(null, null, null, true, true, false, 0));
+        Quark before = new Quark(randomId(), Paths.get("file.txt"), Markers.build(singletonList(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 33188))), null, new FileAttributes(null, null, null, true, true, false, 0));
         PlainText after = PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get()
           .withSourcePath(Paths.get("file.txt"))
           .withMarkers(before.getMarkers());

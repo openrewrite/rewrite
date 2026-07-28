@@ -15,14 +15,15 @@
  */
 // Generated from rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.13.2
 package org.openrewrite.protobuf.internal.grammar;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
-import java.util.List;
-import java.util.Iterator;
+
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class Protobuf2Parser extends Parser {
@@ -31,28 +32,106 @@ public class Protobuf2Parser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8,
-		FIXED64=9, FLOAT=10, GROUP=11, IMPORT=12, INT32=13, INT64=14, MAP=15,
-		MESSAGE=16, ONEOF=17, OPTION=18, PACKAGE=19, PUBLIC=20, REPEATED=21, REQUIRED=22,
-		RESERVED=23, RETURNS=24, RPC=25, SERVICE=26, SFIXED32=27, SFIXED64=28,
-		SINT32=29, SINT64=30, STREAM=31, STRING=32, SYNTAX=33, TO=34, UINT32=35,
-		UINT64=36, WEAK=37, OPTIONAL=38, Ident=39, IntegerLiteral=40, NumericLiteral=41,
-		FloatLiteral=42, BooleanLiteral=43, StringLiteral=44, Quote=45, LPAREN=46,
-		RPAREN=47, LBRACE=48, RBRACE=49, LBRACK=50, RBRACK=51, LCHEVR=52, RCHEVR=53,
-		COMMA=54, DOT=55, MINUS=56, PLUS=57, ASSIGN=58, WS=59, UTF_8_BOM=60, COMMENT=61,
-		LINE_COMMENT=62;
-	public static final int
-		RULE_proto = 0, RULE_stringLiteral = 1, RULE_identOrReserved = 2, RULE_syntax = 3,
-		RULE_importStatement = 4, RULE_packageStatement = 5, RULE_optionName = 6,
-		RULE_option = 7, RULE_optionDef = 8, RULE_optionList = 9, RULE_topLevelDef = 10,
-		RULE_ident = 11, RULE_message = 12, RULE_messageField = 13, RULE_group = 14,
-		RULE_messageBody = 15, RULE_extend = 16, RULE_enumDefinition = 17, RULE_enumBody = 18,
-		RULE_enumField = 19, RULE_service = 20, RULE_serviceBody = 21, RULE_rpc = 22,
-		RULE_rpcInOut = 23, RULE_rpcBody = 24, RULE_reserved = 25, RULE_ranges = 26,
-		RULE_range = 27, RULE_fieldNames = 28, RULE_type = 29, RULE_field = 30,
-		RULE_oneOf = 31, RULE_mapField = 32, RULE_keyType = 33, RULE_reservedWord = 34,
-		RULE_fullIdent = 35, RULE_emptyStatement = 36, RULE_constant = 37;
+    public static final int SEMI = 1;
+    public static final int COLON = 2;
+    public static final int BOOL = 3;
+    public static final int BYTES = 4;
+    public static final int DOUBLE = 5;
+    public static final int ENUM = 6;
+    public static final int EXTEND = 7;
+    public static final int FIXED32 = 8;
+    public static final int FIXED64 = 9;
+    public static final int FLOAT = 10;
+    public static final int GROUP = 11;
+    public static final int IMPORT = 12;
+    public static final int INT32 = 13;
+    public static final int INT64 = 14;
+    public static final int MAP = 15;
+    public static final int MESSAGE = 16;
+    public static final int ONEOF = 17;
+    public static final int OPTION = 18;
+    public static final int PACKAGE = 19;
+    public static final int PUBLIC = 20;
+    public static final int REPEATED = 21;
+    public static final int REQUIRED = 22;
+    public static final int RESERVED = 23;
+    public static final int RETURNS = 24;
+    public static final int RPC = 25;
+    public static final int SERVICE = 26;
+    public static final int SFIXED32 = 27;
+    public static final int SFIXED64 = 28;
+    public static final int SINT32 = 29;
+    public static final int SINT64 = 30;
+    public static final int STREAM = 31;
+    public static final int STRING = 32;
+    public static final int SYNTAX = 33;
+    public static final int TO = 34;
+    public static final int UINT32 = 35;
+    public static final int UINT64 = 36;
+    public static final int WEAK = 37;
+    public static final int OPTIONAL = 38;
+    public static final int Ident = 39;
+    public static final int IntegerLiteral = 40;
+    public static final int NumericLiteral = 41;
+    public static final int FloatLiteral = 42;
+    public static final int BooleanLiteral = 43;
+    public static final int StringLiteral = 44;
+    public static final int Quote = 45;
+    public static final int LPAREN = 46;
+    public static final int RPAREN = 47;
+    public static final int LBRACE = 48;
+    public static final int RBRACE = 49;
+    public static final int LBRACK = 50;
+    public static final int RBRACK = 51;
+    public static final int LCHEVR = 52;
+    public static final int RCHEVR = 53;
+    public static final int COMMA = 54;
+    public static final int DOT = 55;
+    public static final int MINUS = 56;
+    public static final int PLUS = 57;
+    public static final int ASSIGN = 58;
+    public static final int WS = 59;
+    public static final int UTF_8_BOM = 60;
+    public static final int COMMENT = 61;
+    public static final int LINE_COMMENT = 62;
+    public static final int RULE_proto = 0;
+    public static final int RULE_stringLiteral = 1;
+    public static final int RULE_identOrReserved = 2;
+    public static final int RULE_syntax = 3;
+    public static final int RULE_importStatement = 4;
+    public static final int RULE_packageStatement = 5;
+    public static final int RULE_optionName = 6;
+    public static final int RULE_option = 7;
+    public static final int RULE_optionDef = 8;
+    public static final int RULE_optionList = 9;
+    public static final int RULE_topLevelDef = 10;
+    public static final int RULE_ident = 11;
+    public static final int RULE_message = 12;
+    public static final int RULE_messageField = 13;
+    public static final int RULE_group = 14;
+    public static final int RULE_messageBody = 15;
+    public static final int RULE_extend = 16;
+    public static final int RULE_enumDefinition = 17;
+    public static final int RULE_enumBody = 18;
+    public static final int RULE_enumField = 19;
+    public static final int RULE_service = 20;
+    public static final int RULE_serviceBody = 21;
+    public static final int RULE_rpc = 22;
+    public static final int RULE_rpcInOut = 23;
+    public static final int RULE_rpcBody = 24;
+    public static final int RULE_reserved = 25;
+    public static final int RULE_ranges = 26;
+    public static final int RULE_range = 27;
+    public static final int RULE_fieldNames = 28;
+    public static final int RULE_type = 29;
+    public static final int RULE_field = 30;
+    public static final int RULE_oneOf = 31;
+    public static final int RULE_mapField = 32;
+    public static final int RULE_keyType = 33;
+    public static final int RULE_reservedWord = 34;
+    public static final int RULE_fullIdent = 35;
+    public static final int RULE_emptyStatement = 36;
+    public static final int RULE_constant = 37;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"proto", "stringLiteral", "identOrReserved", "syntax", "importStatement",
@@ -186,16 +265,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_proto; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterProto(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterProto(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitProto(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitProto(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitProto(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitProto(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -219,7 +305,7 @@ public class Protobuf2Parser extends Parser {
 			setState(86);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 67965122L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 67965122L) != 0) {
 				{
 				setState(84);
 				_errHandler.sync(this);
@@ -289,16 +375,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_stringLiteral; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterStringLiteral(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterStringLiteral(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitStringLiteral(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitStringLiteral(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitStringLiteral(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitStringLiteral(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -337,16 +430,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_identOrReserved; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterIdentOrReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterIdentOrReserved(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitIdentOrReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitIdentOrReserved(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitIdentOrReserved(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitIdentOrReserved(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -435,16 +535,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_syntax; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterSyntax(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterSyntax(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitSyntax(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitSyntax(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitSyntax(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitSyntax(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -490,16 +597,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_importStatement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterImportStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterImportStatement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitImportStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitImportStatement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitImportStatement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitImportStatement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -523,7 +637,9 @@ public class Protobuf2Parser extends Parser {
 				_errHandler.recoverInline(this);
 				}
 				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
 					_errHandler.reportMatch(this);
 					consume();
 				}
@@ -560,16 +676,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_packageStatement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterPackageStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterPackageStatement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitPackageStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitPackageStatement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitPackageStatement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitPackageStatement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -624,16 +747,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_optionName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOptionName(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOptionName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOptionName(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOptionName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -710,16 +840,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_option; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOption(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOption(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOption(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOption(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOption(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOption(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -761,16 +898,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_optionDef; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOptionDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOptionDef(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOptionDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOptionDef(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionDef(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionDef(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -819,16 +963,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_optionList; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOptionList(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOptionList(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOptionList(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOptionList(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionList(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionList(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -896,16 +1047,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_topLevelDef; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterTopLevelDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterTopLevelDef(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitTopLevelDef(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitTopLevelDef(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitTopLevelDef(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitTopLevelDef(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -968,16 +1126,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_ident; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterIdent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitIdent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitIdent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitIdent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1017,16 +1182,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_message; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMessage(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMessage(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMessage(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMessage(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessage(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessage(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1069,16 +1241,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_messageField; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMessageField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMessageField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMessageField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMessageField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessageField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessageField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1091,11 +1270,13 @@ public class Protobuf2Parser extends Parser {
 			{
 			setState(158);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 274884198400L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 274884198400L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1134,16 +1315,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_group; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterGroup(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterGroup(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitGroup(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitGroup(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitGroup(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitGroup(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1156,11 +1344,13 @@ public class Protobuf2Parser extends Parser {
 			{
 			setState(161);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 274884198400L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 274884198400L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -1257,16 +1447,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_messageBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMessageBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMessageBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMessageBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMessageBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessageBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessageBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1282,7 +1479,7 @@ public class Protobuf2Parser extends Parser {
 			setState(181);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 274893078722L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 274893078722L) != 0) {
 				{
 				setState(179);
 				_errHandler.sync(this);
@@ -1394,16 +1591,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_extend; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterExtend(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterExtend(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitExtend(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitExtend(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitExtend(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitExtend(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1423,7 +1627,7 @@ public class Protobuf2Parser extends Parser {
 			setState(193);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 274884198402L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 274884198402L) != 0) {
 				{
 				setState(191);
 				_errHandler.sync(this);
@@ -1480,16 +1684,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_enumDefinition; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEnumDefinition(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEnumDefinition(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEnumDefinition(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEnumDefinition(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumDefinition(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumDefinition(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1546,16 +1757,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_enumBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEnumBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEnumBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEnumBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEnumBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1571,7 +1789,7 @@ public class Protobuf2Parser extends Parser {
 			setState(208);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 549756076034L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 549756076034L) != 0) {
 				{
 				setState(206);
 				_errHandler.sync(this);
@@ -1635,16 +1853,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_enumField; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEnumField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEnumField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEnumField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEnumField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1711,16 +1936,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_service; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterService(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterService(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitService(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitService(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitService(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitService(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1777,16 +2009,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_serviceBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterServiceBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterServiceBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitServiceBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitServiceBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitServiceBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitServiceBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1802,7 +2041,7 @@ public class Protobuf2Parser extends Parser {
 			setState(234);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 33816578L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 33816578L) != 0) {
 				{
 				setState(232);
 				_errHandler.sync(this);
@@ -1871,16 +2110,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_rpc; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRpc(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRpc(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRpc(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRpc(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpc(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpc(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1946,16 +2192,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_rpcInOut; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRpcInOut(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRpcInOut(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRpcInOut(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRpcInOut(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpcInOut(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpcInOut(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -1969,14 +2222,10 @@ public class Protobuf2Parser extends Parser {
 			match(LPAREN);
 			setState(250);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,20,_ctx) ) {
-			case 1:
-				{
-				setState(249);
-				match(STREAM);
-				}
-				break;
-			}
+                if (getInterpreter().adaptivePredict(_input, 20, _ctx) == 1) {
+                    setState(249);
+                    match(STREAM);
+                }
 			setState(252);
 			((RpcInOutContext)_localctx).messageType = fullIdent();
 			setState(253);
@@ -2016,16 +2265,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_rpcBody; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRpcBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRpcBody(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRpcBody(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRpcBody(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpcBody(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpcBody(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2097,16 +2353,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_reserved; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterReserved(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitReserved(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitReserved(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitReserved(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitReserved(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2169,16 +2432,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_ranges; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRanges(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRanges(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRanges(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRanges(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRanges(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRanges(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2233,16 +2503,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_range; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterRange(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterRange(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitRange(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitRange(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRange(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRange(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2298,16 +2575,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_fieldNames; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterFieldNames(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterFieldNames(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitFieldNames(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitFieldNames(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFieldNames(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFieldNames(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2361,6 +2645,7 @@ public class Protobuf2Parser extends Parser {
 			super.copyFrom(ctx);
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class FullyQualifiedTypeContext extends TypeContext {
 		public FullIdentContext fullIdent() {
@@ -2369,18 +2654,26 @@ public class Protobuf2Parser extends Parser {
 		public FullyQualifiedTypeContext(TypeContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterFullyQualifiedType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterFullyQualifiedType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitFullyQualifiedType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitFullyQualifiedType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFullyQualifiedType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFullyQualifiedType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
+
 	@SuppressWarnings("CheckReturnValue")
 	public static class PrimitiveTypeContext extends TypeContext {
 		public TerminalNode DOUBLE() { return getToken(Protobuf2Parser.DOUBLE, 0); }
@@ -2401,16 +2694,23 @@ public class Protobuf2Parser extends Parser {
 		public PrimitiveTypeContext(TypeContext ctx) { copyFrom(ctx); }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterPrimitiveType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterPrimitiveType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitPrimitiveType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitPrimitiveType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitPrimitiveType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitPrimitiveType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2421,32 +2721,26 @@ public class Protobuf2Parser extends Parser {
 		try {
 			setState(295);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,27,_ctx) ) {
-			case 1:
-				_localctx = new PrimitiveTypeContext(_localctx);
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(293);
-				_la = _input.LA(1);
-				if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 109387474744L) != 0)) ) {
-				_errHandler.recoverInline(this);
-				}
-				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-					_errHandler.reportMatch(this);
-					consume();
-				}
-				}
-				break;
-			case 2:
-				_localctx = new FullyQualifiedTypeContext(_localctx);
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(294);
-				fullIdent();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 27, _ctx) == 1) {
+                _localctx = new PrimitiveTypeContext(_localctx);
+                enterOuterAlt(_localctx, 1);
+                setState(293);
+                _la = _input.LA(1);
+                if (!((_la & ~0x3f) == 0 && ((1L << _la) & 109387474744L) != 0)) {
+                    _errHandler.recoverInline(this);
+                } else {
+                    if (_input.LA(1) == Token.EOF) {
+                        matchedEOF = true;
+                    }
+                    _errHandler.reportMatch(this);
+                    consume();
+                }
+            } else if (getInterpreter().adaptivePredict(_input, 27, _ctx) == 2) {
+                _localctx = new FullyQualifiedTypeContext(_localctx);
+                enterOuterAlt(_localctx, 2);
+                setState(294);
+                fullIdent();
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -2480,16 +2774,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_field; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2559,16 +2860,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_oneOf; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOneOf(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterOneOf(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOneOf(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitOneOf(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOneOf(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOneOf(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2588,7 +2896,7 @@ public class Protobuf2Parser extends Parser {
 			setState(313);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 36029896530591738L) != 0)) {
+			while ((_la & ~0x3f) == 0 && ((1L << _la) & 36029896530591738L) != 0) {
 				{
 				setState(311);
 				_errHandler.sync(this);
@@ -2692,16 +3000,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_mapField; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterMapField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterMapField(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitMapField(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitMapField(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMapField(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMapField(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2775,16 +3090,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_keyType; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterKeyType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterKeyType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitKeyType(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitKeyType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitKeyType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitKeyType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2797,11 +3119,13 @@ public class Protobuf2Parser extends Parser {
 			{
 			setState(332);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 109387473672L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 109387473672L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -2862,16 +3186,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_reservedWord; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterReservedWord(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterReservedWord(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitReservedWord(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitReservedWord(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitReservedWord(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitReservedWord(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2884,11 +3215,13 @@ public class Protobuf2Parser extends Parser {
 			{
 			setState(334);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 549755813880L) != 0)) ) {
+			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & 549755813880L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -2923,16 +3256,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_fullIdent; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterFullIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterFullIdent(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitFullIdent(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitFullIdent(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFullIdent(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFullIdent(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -2996,16 +3336,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_emptyStatement; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterEmptyStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterEmptyStatement(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitEmptyStatement(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitEmptyStatement(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEmptyStatement(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEmptyStatement(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -3045,16 +3392,23 @@ public class Protobuf2Parser extends Parser {
 		@Override public int getRuleIndex() { return RULE_constant; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterConstant(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).enterConstant(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitConstant(this);
+            if (listener instanceof Protobuf2ParserListener) {
+                ((Protobuf2ParserListener) listener).exitConstant(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitConstant(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof Protobuf2ParserVisitor) {
+                return ((Protobuf2ParserVisitor<? extends T>) visitor).visitConstant(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 

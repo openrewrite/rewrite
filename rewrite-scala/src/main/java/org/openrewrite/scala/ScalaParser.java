@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -29,7 +30,6 @@ import org.openrewrite.scala.tree.S;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
-import org.openrewrite.internal.EncodingDetectingInputStream;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -60,7 +60,7 @@ public class ScalaParser implements Parser {
         boolean hasClass = classMatcher.find();
         String simpleName = hasClass ? classMatcher.group(3) : Long.toString(System.nanoTime());
 
-        String extension = (!hasPackage && !hasClass) ? ".sbt" : ".scala";
+        String extension = !hasPackage && !hasClass ? ".sbt" : ".scala";
         return pkg + simpleName + extension;
     }
 
@@ -192,7 +192,7 @@ public class ScalaParser implements Parser {
         @Nullable
         private JavaTypeFactory typeFactory;
 
-        private boolean logCompilationWarningsAndErrors = false;
+        private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {

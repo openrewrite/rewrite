@@ -385,7 +385,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
                 paramTypes!!.add(type(param.type))
             }
             method.unsafeSet(declaringType,
-                (if (function is IrConstructor) declaringType else returnType) ?: JavaType.Unknown.getInstance(),
+                (if (function is IrConstructor) { declaringType
+                } else { returnType
+                }) ?: JavaType.Unknown.getInstance(),
                 paramTypes, null, listAnnotations(function.annotations)
             )
         }
@@ -421,7 +423,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             val paramTypes: MutableList<JavaType>? =
                 if (nonDispatchParams.isNotEmpty()) ArrayList(nonDispatchParams.size) else null
             for ((index, param) in ownerParams.withIndex()) {
-                if (param.kind == IrParameterKind.DispatchReceiver) continue
+                if (param.kind == IrParameterKind.DispatchReceiver) {
+                    continue
+                }
                 val arg = type.arguments.getOrNull(index)
                 if (arg != null) {
                     paramTypes!!.add(type(arg.type))
@@ -451,7 +455,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             val paramTypes: MutableList<JavaType>? =
                 if (nonDispatchParams.isNotEmpty()) ArrayList(nonDispatchParams.size) else null
             for ((index, param) in ownerParams.withIndex()) {
-                if (param.kind == IrParameterKind.DispatchReceiver) continue
+                if (param.kind == IrParameterKind.DispatchReceiver) {
+                    continue
+                }
                 val arg = type.arguments.getOrNull(index)
                 if (arg != null) {
                     paramTypes!!.add(type(arg.type))
@@ -513,7 +519,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
 
     private fun typeProjection(type: Any, signature: String): JavaType {
         val variance = when (type) {
-            is IrTypeProjection -> if (type.variance == Variance.OUT_VARIANCE) COVARIANT else CONTRAVARIANT
+            is IrTypeProjection -> if (type.variance == Variance.OUT_VARIANCE) { COVARIANT
+            } else { CONTRAVARIANT
+            }
             is IrStarProjection -> INVARIANT
             else -> throw UnsupportedOperationException("Unexpected type projection: " + type.javaClass)
         }

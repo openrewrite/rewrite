@@ -21,11 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.marker.GoResolutionResult;
-import org.openrewrite.golang.marker.GoResolutionResult.Exclude;
-import org.openrewrite.golang.marker.GoResolutionResult.Replace;
-import org.openrewrite.golang.marker.GoResolutionResult.ResolvedDependency;
-import org.openrewrite.golang.marker.GoResolutionResult.Retract;
-import org.openrewrite.golang.marker.GoResolutionResult.Require;
+import org.openrewrite.golang.marker.GoResolutionResult.*;
 import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.text.PlainText;
@@ -173,7 +169,7 @@ public class GoModParser implements Parser {
             }
 
             // Close block on trailing ')'
-            if (block != BlockState.NONE && line.trim().equals(")")) {
+            if (block != BlockState.NONE && ")".equals(line.trim())) {
                 block = BlockState.NONE;
                 continue;
             }

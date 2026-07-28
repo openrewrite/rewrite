@@ -100,8 +100,8 @@ class ParseProjectModuleContextTest {
         // the heavy GoResolutionResult stays on the sibling go.mod, mirroring
         // MavenResolutionResult on pom.xml / NodeResolutionResult on package.json.
         List<Go.CompilationUnit> cus = sources.stream()
-                .filter(s -> s instanceof Go.CompilationUnit)
-                .map(s -> (Go.CompilationUnit) s)
+                .filter(Go.CompilationUnit.class::isInstance)
+                .map(Go.CompilationUnit.class::cast)
                 .collect(Collectors.toList());
         assertThat(cus).as("expected 2 .go compilation units").hasSize(2);
 
@@ -136,8 +136,8 @@ class ParseProjectModuleContextTest {
         List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
 
         List<GoMod> goMods = sources.stream()
-                .filter(s -> s instanceof GoMod)
-                .map(s -> (GoMod) s)
+                .filter(GoMod.class::isInstance)
+                .map(GoMod.class::cast)
                 .collect(Collectors.toList());
         assertThat(goMods).as("expected the go.mod to be parsed as a GoMod").hasSize(1);
         assertThat(sources).noneMatch(s -> s instanceof PlainText);
@@ -209,8 +209,8 @@ class ParseProjectModuleContextTest {
 
     private static Go.CompilationUnit findBySuffix(List<SourceFile> sources, String suffix) {
         return sources.stream()
-                .filter(s -> s instanceof Go.CompilationUnit)
-                .map(s -> (Go.CompilationUnit) s)
+                .filter(Go.CompilationUnit.class::isInstance)
+                .map(Go.CompilationUnit.class::cast)
                 .filter(cu -> cu.getSourcePath().toString().replace('\\', '/').endsWith(suffix))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no source ending with " + suffix +

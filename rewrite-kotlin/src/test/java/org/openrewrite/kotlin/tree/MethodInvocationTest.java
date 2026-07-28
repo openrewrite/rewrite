@@ -670,9 +670,9 @@ class MethodInvocationTest implements RewriteTest {
               val z = surface[4, 2]
               """,
             spec -> spec.afterRecipe(cu -> {
-                assertThat(((J.VariableDeclarations) cu.getStatements().get(cu.getStatements().size() - 1))).satisfies(
+                assertThat((J.VariableDeclarations) cu.getStatements().get(cu.getStatements().size() - 1)).satisfies(
                     z ->
-                        assertThat(((J.MethodInvocation) z.getVariables().getFirst().getInitializer())).satisfies(
+                        assertThat((J.MethodInvocation) z.getVariables().getFirst().getInitializer()).satisfies(
                             get -> {
                                 assertThat(get.getMarkers().findFirst(IndexedAccess.class)).isPresent();
                                 assertThat(((J.Identifier) get.getSelect()).getSimpleName()).isEqualTo("surface");

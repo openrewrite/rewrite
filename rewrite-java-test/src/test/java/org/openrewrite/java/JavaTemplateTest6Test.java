@@ -442,7 +442,7 @@ class JavaTemplateTest6Test implements RewriteTest {
                   if (!method.isAbstract()) {
                       return method;
                   }
-                  return JavaTemplate.<J.MethodDeclaration>apply("", getCursor(), method.getCoordinates().replaceBody())
+                  return JavaTemplate.apply("", getCursor(), method.getCoordinates().replaceBody())
                     .withModifiers(emptyList())
                     .withReturnTypeExpression(method.getReturnTypeExpression().withPrefix(Space.EMPTY));
               }
@@ -551,8 +551,8 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                  if (m.getSimpleName().equals("compare") && m.getLeadingAnnotations().stream().noneMatch(
-                    a -> a.getSimpleName().equals("Deprecated"))) {
+                  if ("compare".equals(m.getSimpleName()) && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> "Deprecated".equals(a.getSimpleName()))) {
                       return JavaTemplate.builder("@Deprecated")
                         .contextSensitive()
                         .build()
@@ -597,8 +597,8 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                  if (m.getSimpleName().equals("toString") && m.getLeadingAnnotations().stream().noneMatch(
-                    a -> a.getSimpleName().equals("SuppressWarnings"))) {
+                  if ("toString".equals(m.getSimpleName()) && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> "SuppressWarnings".equals(a.getSimpleName()))) {
                       return JavaTemplate.builder("@SuppressWarnings(\"all\")")
                         .contextSensitive()
                         .build()

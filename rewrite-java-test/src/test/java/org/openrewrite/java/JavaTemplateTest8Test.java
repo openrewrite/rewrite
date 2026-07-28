@@ -41,7 +41,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("toString")) {
+                  if ("toString".equals(method.getSimpleName())) {
                       return t.apply(getCursor(), method.getCoordinates().replace(),
                         method.getSelect());
                   }
@@ -78,7 +78,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                   newClass = super.visitNewClass(newClass, ctx);
                   if (newClass.getClazz() != null &&
-                      newClass.getClazz().toString().equals("StringBuffer") &&
+                      "StringBuffer".equals(newClass.getClazz().toString()) &&
                       newClass.getArguments().size() == 1) {
                       return t.apply(getCursor(), newClass.getCoordinates().replace(),
                         newClass.getArguments().get(0));
@@ -116,7 +116,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("toString")) {
+                  if ("toString".equals(method.getSimpleName())) {
                       return t.apply(getCursor(), method.getCoordinates().replace(),
                         method.getSelect());
                   }
@@ -154,7 +154,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                   newClass = super.visitNewClass(newClass, ctx);
                   if (newClass.getClazz() != null &&
-                      newClass.getClazz().toString().equals("StringBuffer") &&
+                      "StringBuffer".equals(newClass.getClazz().toString()) &&
                       newClass.getArguments().size() == 1) {
                       return t.apply(getCursor(), newClass.getCoordinates().replace(),
                         newClass.getArguments().get(0));
@@ -188,7 +188,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("visitClassDeclaration") &&
+                  if ("visitClassDeclaration".equals(method.getSimpleName()) &&
                       method.getSelect() != null &&
                       !(method.getSelect() instanceof J.Identifier &&
                         "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
@@ -265,7 +265,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("visitClassDeclaration") &&
+                  if ("visitClassDeclaration".equals(method.getSimpleName()) &&
                       method.getSelect() != null &&
                       !(method.getSelect() instanceof J.Identifier &&
                         "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
@@ -343,7 +343,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("visitMethodDeclaration") &&
+                  if ("visitMethodDeclaration".equals(method.getSimpleName()) &&
                       method.getSelect() != null &&
                       method.getArguments().size() == 2 &&
                       !(method.getSelect() instanceof J.Identifier &&
@@ -424,7 +424,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("visitClassDeclaration") &&
+                  if ("visitClassDeclaration".equals(method.getSimpleName()) &&
                       method.getSelect() != null &&
                       !(method.getSelect() instanceof J.Identifier &&
                         "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
@@ -643,9 +643,9 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);
-                  if (method.getSimpleName().equals("singletonMap") &&
+                  if ("singletonMap".equals(method.getSimpleName()) &&
                       method.getMethodType() != null &&
-                      method.getMethodType().getDeclaringType().getFullyQualifiedName().equals("java.util.Collections")) {
+                      "java.util.Collections".equals(method.getMethodType().getDeclaringType().getFullyQualifiedName())) {
                       return JavaTemplate.builder("Map.of(#{any()}, #{any()})")
                         .contextSensitive()
                         .imports("java.util.Map")

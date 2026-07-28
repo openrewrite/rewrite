@@ -81,17 +81,17 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.ObjectValue visitObjectValue(final Hcl.ObjectValue ov, final P p) {
         boolean multiLine = isMultiline(ov);
         if (multiLine) {
-            final List<Expression> newAttributes = ListUtils.map(ov.getAttributes(), ((i, attr) -> {
+            final List<Expression> newAttributes = ListUtils.map(ov.getAttributes(), (i, attr) -> {
                 if (!attr.getPrefix().getLastWhitespace().contains("\n")) {
                     return attr.withPrefix(attr.getPrefix().withLastWhitespace("\n"));
                 } else {
                     return attr;
                 }
-            }));
+            });
             return super.visitObjectValue(ov.withArguments(newAttributes), p);
         } else {
             final List<Expression> newAttributes = ListUtils.map(ov.getAttributes(),
-                    ((i, attr) -> attr.withPrefix(attr.getPrefix().withWhitespace(" "))));
+                    (i, attr) -> attr.withPrefix(attr.getPrefix().withWhitespace(" ")));
             return super.visitObjectValue(ov.withArguments(newAttributes), p);
         }
     }
@@ -110,13 +110,13 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.Tuple visitTuple(final Hcl.Tuple tuple, final P p) {
         boolean multiLine = isMultiline(tuple);
         if (multiLine) {
-            final List<Expression> newValues = ListUtils.map(tuple.getValues(), ((i, value) -> {
+            final List<Expression> newValues = ListUtils.map(tuple.getValues(), (i, value) -> {
                 if (!value.getPrefix().getLastWhitespace().contains("\n")) {
                     return value.withPrefix(value.getPrefix().withLastWhitespace("\n"));
                 } else {
                     return value;
                 }
-            }));
+            });
             return super.visitTuple(tuple.withValues(newValues), p);
         }
         return super.visitTuple(tuple, p);

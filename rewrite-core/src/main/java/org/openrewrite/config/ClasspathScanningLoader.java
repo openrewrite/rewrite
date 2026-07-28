@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.Nullable;
+import org.objectweb.asm.ClassReader;
 import org.openrewrite.AbstractRecipe;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
@@ -27,9 +28,6 @@ import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.*;
-
-import org.objectweb.asm.ClassReader;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.net.URI;

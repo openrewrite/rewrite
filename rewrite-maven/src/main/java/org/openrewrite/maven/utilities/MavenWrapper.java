@@ -85,7 +85,7 @@ public class MavenWrapper {
     String distributionUri;
     Checksum distributionChecksum;
 
-    private final static Cache<URI, Checksum> artifactChecksumCache = Caffeine.newBuilder().maximumSize(20).build();
+    private static final Cache<URI, Checksum> artifactChecksumCache = Caffeine.newBuilder().maximumSize(20).build();
 
     public static MavenWrapper create(
             @Nullable String wrapperVersion,

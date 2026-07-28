@@ -19,7 +19,7 @@ package org.openrewrite.gradle.trait;
  * @deprecated Use specific matchers like {@link GradleDependency.Matcher} or {@link JvmTestSuite.Matcher} instead.
  */
 @Deprecated
-public class Traits {
+public final class Traits {
     private Traits() {
     }
 

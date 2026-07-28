@@ -72,7 +72,7 @@ class KotlinVisitorReturnTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new JavaVisitor<ExecutionContext>() {
+            return new JavaVisitor<>() {
                 @Override
                 public J visitReturn(J.Return retrn, ExecutionContext ctx) {
                     Expression expression = retrn.getExpression();

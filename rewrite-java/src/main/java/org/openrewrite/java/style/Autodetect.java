@@ -117,8 +117,8 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class GeneralFormatStatistics {
-        private int linesWithCRLFNewLines = 0;
-        private int linesWithLFNewLines = 0;
+        private int linesWithCRLFNewLines;
+        private int linesWithLFNewLines;
 
         public boolean isIndentedWithLFNewLines() {
             return linesWithLFNewLines >= linesWithCRLFNewLines;
@@ -195,10 +195,10 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
-        private long accumulateDepthCount = 0;
+        private long accumulateDepthCount;
 
         @Getter
-        private int depth = 0;
+        private int depth;
         @Getter
         private int continuationDepth = 1;
 
@@ -263,7 +263,7 @@ public class Autodetect extends NamedStyles {
             // Calculate tabSize based on the frequency, pick up the biggest frequency group.
             // Using frequency are less susceptible to outliers than means.
             int moreFrequentTabSize = getBiggestGroupOfTabSize(deltaSpaceIndentFrequencies);
-            int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
+            int tabSize = moreFrequentTabSize == 0 ? 4 : moreFrequentTabSize;
 
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
             int continuationIndent = continuationFrequencies.continuationIndent(useTabs ? 1 : tabSize) * (useTabs ? tabSize : 1);
@@ -444,7 +444,7 @@ public class Autodetect extends NamedStyles {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
             for (Expression argument : m.getArguments()) {
                 if (argument instanceof J.Lambda) {
-                    visit((((J.Lambda) argument).getBody()), stats);
+                    visit(((J.Lambda) argument).getBody(), stats);
                 }
             }
 
@@ -540,10 +540,10 @@ public class Autodetect extends NamedStyles {
     private static class ImportLayoutStatistics {
         List<List<Block>> blocksPerSourceFile = new ArrayList<>();
         Map<String, String> pkgToBlockPattern = new LinkedHashMap<>();
-        int staticAtTopCount = 0;
-        int staticAtBotCount = 0;
-        int javaBeforeJavaxCount = 0;
-        int javaxBeforeJavaCount = 0;
+        int staticAtTopCount;
+        int staticAtBotCount;
+        int javaBeforeJavaxCount;
+        int javaxBeforeJavaCount;
         int minimumFoldedImports = Integer.MAX_VALUE;
         int minimumFoldedStaticImports = Integer.MAX_VALUE;
 
@@ -566,7 +566,7 @@ public class Autodetect extends NamedStyles {
             // assume that represents the most variation in the project
             return blocksPerSourceFile.stream()
                     .max(Comparator
-                            .<List<Block>, Integer>comparing(List::size)
+                            .comparing(List::size)
                             .thenComparing(blocks -> blocks.stream()
                                     .filter(b -> "all other imports".equals(b.pattern))
                                     .count()
@@ -919,10 +919,10 @@ public class Autodetect extends NamedStyles {
             for (List<ImportAttributes> imports : importsBySourceFile) {
                 Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
-                importLayoutStatistics.staticAtBotCount += (!imports.isEmpty() &&
-                                                            imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
-                importLayoutStatistics.staticAtTopCount += (!imports.isEmpty() &&
-                                                            imports.get(0).isStatic()) ? 1 : 0;
+                importLayoutStatistics.staticAtBotCount += !imports.isEmpty() &&
+                                                            imports.get(imports.size() - 1).isStatic() ? 1 : 0;
+                importLayoutStatistics.staticAtTopCount += !imports.isEmpty() &&
+                                                            imports.get(0).isStatic() ? 1 : 0;
 
                 boolean staticBlock = false;
                 int blockStart = 0;
@@ -1043,21 +1043,21 @@ public class Autodetect extends NamedStyles {
 
     private static class SpacesStatistics {
         int beforeIf = 1;
-        int beforeMethodCall = 0;
-        int beforeMethodDeclaration = 0;
+        int beforeMethodCall;
+        int beforeMethodDeclaration;
         int beforeFor = 1;
         int beforeWhile = 1;
         int beforeSwitch = 1;
         int beforeTry = 1;
         int beforeCatch = 1;
         int beforeSynchronized = 1;
-        int beforeComma = 0;
+        int beforeComma;
         int afterComma = 1;
         int beforeColonInForEach = 1;
-        int beforeForSemiColon = 0;
-        int afterForSemiColon = 0;
-        int afterTypeCast = 0;
-        int withinMethodCallParentheses = 0;
+        int beforeForSemiColon;
+        int afterForSemiColon;
+        int afterTypeCast;
+        int withinMethodCallParentheses;
 
         public SpacesStyle getSpacesStyle() {
             SpacesStyle spaces = IntelliJ.spaces();
@@ -1285,15 +1285,15 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class WrappingAndBracesStatistics {
-        int elseOnNewLine = 0;
-        int classAnnotationsWrapped = 0;
-        int methodAnnotationsWrapped = 0;
-        int fieldAnnotationsWrapped = 0;
-        int parameterAnnotationsWrapped = 0;
-        int localVariableAnnotationsWrapped = 0;
-        int enumFieldAnnotationsWrapped = 0;
-        int multilineAlignedToFirstArgument = 0;
-        int multilineNotAlignedToFirstArgument = 0;
+        int elseOnNewLine;
+        int classAnnotationsWrapped;
+        int methodAnnotationsWrapped;
+        int fieldAnnotationsWrapped;
+        int parameterAnnotationsWrapped;
+        int localVariableAnnotationsWrapped;
+        int enumFieldAnnotationsWrapped;
+        int multilineAlignedToFirstArgument;
+        int multilineNotAlignedToFirstArgument;
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();

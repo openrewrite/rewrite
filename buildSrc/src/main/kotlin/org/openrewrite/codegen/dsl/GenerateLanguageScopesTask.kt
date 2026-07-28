@@ -70,7 +70,9 @@ abstract class GenerateLanguageScopesTask @Inject constructor() : DefaultTask() 
         val pkgDir = outRoot.resolve("org/openrewrite/dsl/scopes").also { it.mkdirs() }
         // Clean stale scope files so a removed language descriptor doesn't
         // leave an orphan file.
-        pkgDir.listFiles()?.forEach { f -> if (f.name.endsWith("Scope.kt")) f.delete() }
+        pkgDir.listFiles()?.forEach { f -> if (f.name.endsWith("Scope.kt")) {
+            f.delete()
+        } }
         languages.get().forEach { lang ->
             val scope = buildScope(lang, classIndex)
             pkgDir.resolve("${lang.scopeName}.kt").writeText(scope)
@@ -114,40 +116,58 @@ abstract class GenerateLanguageScopesTask @Inject constructor() : DefaultTask() 
     private fun MethodNode.isCandidateVisitMethod(): Boolean {
         // public, non-static, non-bridge, non-synthetic, name starts with `visit`
         // and isn't one of the bookkeeping methods.
-        if ((access and Opcodes.ACC_PUBLIC) == 0) return false
-        if ((access and Opcodes.ACC_STATIC) != 0) return false
-        if ((access and (Opcodes.ACC_BRIDGE or Opcodes.ACC_SYNTHETIC)) != 0) return false
-        if (!name.startsWith("visit") || name.length == 5) return false
+        if ((access and Opcodes.ACC_PUBLIC) == 0) {
+            return false
+        }
+        if ((access and Opcodes.ACC_STATIC) != 0) {
+            return false
+        }
+        if ((access and (Opcodes.ACC_BRIDGE or Opcodes.ACC_SYNTHETIC)) != 0) {
+            return false
+        }
+        if (!name.startsWith("visit") || name.length == 5) {
+            return false
+        }
         // Skip explicitly bookkeeping methods: visit(Tree, P), visitNonNull(Tree, P),
         // visitMarker, visitMarkers, visitContainer, visitRightPadded, visitLeftPadded,
         // visitContainer*, visitTreeNode (rare), etc. The IR-level helpers are
         // shape (Tree?, P) -> Tree? or (Container, P) -> Container — they don't
         // match our (NodeType, P) -> NodeType template anyway.
-        if (name in BOOKKEEPING_METHODS) return false
+        if (name in BOOKKEEPING_METHODS) {
+            return false
+        }
         // Skip methods that DECLARE their own type parameters (e.g.
         // `<J2 extends J> visitParentheses(Parentheses<J2>, P)`). Their generic
         // signature starts with `<`. Bytecode erases the type args, so we'd
         // emit a Kotlin signature that doesn't satisfy the parent's parameter-
         // ized override. Methods that only reference the class-level `P` type
         // var have a signature but it doesn't start with `<` — those are fine.
-        if (signature?.startsWith("<") == true) return false
+        if (signature?.startsWith("<") == true) {
+            return false
+        }
         return true
     }
 
     private fun parseVisitMethod(m: MethodNode): VisitMethod? {
         // Descriptor of the form (LNodeType;LP;)LReturn; — exactly 2 reference params.
         val (params, retType) = splitDescriptor(m.desc) ?: return null
-        if (params.size != 2) return null
+        if (params.size != 2) {
+            return null
+        }
         val nodeInternal = params[0].asReferenceTypeInternal() ?: return null
         val pInternal = params[1].asReferenceTypeInternal()
         // Skip if second param isn't a generic `P` (which on JVM resolves to java/lang/Object)
         // or any tree-or-ctx — we want the canonical (Node, P) shape.
-        if (pInternal != "java/lang/Object" && pInternal != "org/openrewrite/ExecutionContext") return null
+        if (pInternal != "java/lang/Object" && pInternal != "org/openrewrite/ExecutionContext") {
+            return null
+        }
         // Returns a node — must be a reference type.
         val retInternal = retType.asReferenceTypeInternal() ?: return null
         // Skip if return type is Container/RightPadded/LeftPadded — those are
         // structural carriers, not visitable nodes per se.
-        if (retInternal in STRUCTURAL_RETURN_TYPES) return null
+        if (retInternal in STRUCTURAL_RETURN_TYPES) {
+            return null
+        }
         return VisitMethod(
             methodName = m.name,
             descriptor = m.desc,
@@ -157,9 +177,13 @@ abstract class GenerateLanguageScopesTask @Inject constructor() : DefaultTask() 
     }
 
     private fun splitDescriptor(desc: String): Pair<List<String>, String>? {
-        if (!desc.startsWith("(")) return null
+        if (!desc.startsWith("(")) {
+            return null
+        }
         val close = desc.indexOf(')')
-        if (close < 0) return null
+        if (close < 0) {
+            return null
+        }
         val paramsRaw = desc.substring(1, close)
         val ret = desc.substring(close + 1)
         val params = mutableListOf<String>()
@@ -173,13 +197,20 @@ abstract class GenerateLanguageScopesTask @Inject constructor() : DefaultTask() 
     }
 
     private fun readDescriptorToken(s: String, start: Int): Pair<String, Int>? {
-        if (start >= s.length) return null
+        if (start >= s.length) {
+            return null
+        }
         var i = start
-        while (i < s.length && s[i] == '[') i++  // arrays
+        while (i < s.length && s[i] == '[') {
+            i++  // arrays
+        }
         return when (s[i]) {
             'L' -> {
                 val end = s.indexOf(';', i)
-                if (end < 0) null else s.substring(start, end + 1) to (end + 1 - start)
+                if (end < 0) { null
+                } else {
+                    s.substring(start, end + 1) to (end + 1 - start)
+                }
             }
             in setOf('B', 'C', 'D', 'F', 'I', 'J', 'S', 'V', 'Z') -> s.substring(start, i + 1) to (i + 1 - start)
             else -> null
@@ -187,7 +218,9 @@ abstract class GenerateLanguageScopesTask @Inject constructor() : DefaultTask() 
     }
 
     private fun String.asReferenceTypeInternal(): String? {
-        if (!startsWith("L") || !endsWith(";")) return null
+        if (!startsWith("L") || !endsWith(";")) {
+            return null
+        }
         return substring(1, length - 1)
     }
 

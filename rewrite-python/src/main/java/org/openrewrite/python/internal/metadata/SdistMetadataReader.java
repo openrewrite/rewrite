@@ -31,7 +31,7 @@ import java.util.zip.ZipInputStream;
  * Downloads an sdist and parses its top-level {@code PKG-INFO}. Whether the resulting
  * metadata is trustworthy is the caller's concern via {@link CoreMetadata#hasStaticRequiresDist()}.
  */
-public class SdistMetadataReader {
+public final class SdistMetadataReader {
 
     private SdistMetadataReader() {
     }

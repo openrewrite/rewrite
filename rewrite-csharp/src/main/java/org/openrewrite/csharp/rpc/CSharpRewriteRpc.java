@@ -137,7 +137,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true));
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
+            private int index;
             private @Nullable ParseSolutionResponse response;
 
             @Override

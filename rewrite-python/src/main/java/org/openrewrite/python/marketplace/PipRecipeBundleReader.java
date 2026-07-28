@@ -19,11 +19,11 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.python.rpc.PythonRewriteRpc;
 
 import java.util.Map;
 

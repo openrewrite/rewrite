@@ -244,7 +244,7 @@ public class RpcSendQueue {
             // If the class is a subtype of JavaType but in a different package,
             // return the superclass name instead
             Class<?> jt = getJavaTypeClass(afterType);
-            if (jt != null && pkg != null && !pkg.getName().equals(JAVA_TYPE_PACKAGE) && jt.isAssignableFrom(afterType)) {
+            if (jt != null && pkg != null && !JAVA_TYPE_PACKAGE.equals(pkg.getName()) && jt.isAssignableFrom(afterType)) {
                 Class<?> superclass = afterType.getSuperclass();
                 if (superclass != null && !Object.class.equals(superclass)) {
                     return superclass.getName();

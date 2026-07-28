@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * pre-release policy: pre-releases are excluded by default unless some clause itself
  * references a pre-release version, or {@code includePrereleases} is passed explicitly.
  */
-public class PythonVersionSpecifierSet {
+public final class PythonVersionSpecifierSet {
     private final List<PythonVersionSpecifier> specifiers;
 
     private PythonVersionSpecifierSet(List<PythonVersionSpecifier> specifiers) {

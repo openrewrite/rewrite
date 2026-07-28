@@ -78,7 +78,7 @@ public class Semver {
 
     private static Validated<VersionComparator> doValidate(String toVersion, @Nullable String metadataPattern) {
         String canonicalPattern = canonicalizeMetadataPattern(metadataPattern);
-        return Validated.<VersionComparator, String>testNone(
+        return Validated.testNone(
                 "metadataPattern",
                 "must be a valid regular expression or glob",
                 metadataPattern, metadata -> metadata == null || canonicalPattern != null
@@ -178,23 +178,33 @@ public class Semver {
         try {
             long maj1 = Long.parseLong(major1);
             long maj2 = Long.parseLong(major2);
-            if (maj1 != maj2) return maj1 > maj2 ? version1 : version2;
+            if (maj1 != maj2) {
+                return maj1 > maj2 ? version1 : version2;
+            }
 
             long min1 = Long.parseLong(minor1);
             long min2 = Long.parseLong(minor2);
-            if (min1 != min2) return min1 > min2 ? version1 : version2;
+            if (min1 != min2) {
+                return min1 > min2 ? version1 : version2;
+            }
 
             String[] parts1 = version1.split("[.-]");
             String[] parts2 = version2.split("[.-]");
             long patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Long.parseLong(parts1[2]) : 0;
             long patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Long.parseLong(parts2[2]) : 0;
-            if (patch1 != patch2) return patch1 > patch2 ? version1 : version2;
+            if (patch1 != patch2) {
+                return patch1 > patch2 ? version1 : version2;
+            }
 
             String label1 = parts1.length > 3 ? parts1[3].toLowerCase() : "";
             String label2 = parts2.length > 3 ? parts2[3].toLowerCase() : "";
 
-            if (label1.isEmpty() && !label2.isEmpty()) return version1;
-            if (!label1.isEmpty() && label2.isEmpty()) return version2;
+            if (label1.isEmpty() && !label2.isEmpty()) {
+                return version1;
+            }
+            if (!label1.isEmpty() && label2.isEmpty()) {
+                return version2;
+            }
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Error comparing version number \"" + version1 + "\" to \"" + version2 + "\"", e);
         }

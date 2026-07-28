@@ -63,7 +63,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
         // Check if already imported by examining the qualid path string
         for (J.Import anImport : cu.getImports()) {
             String existingPath = getImportPath(anImport);
-            if (existingPath != null && importPath.equals(existingPath)) {
+            if (importPath.equals(existingPath)) {
                 return cu;
             }
         }

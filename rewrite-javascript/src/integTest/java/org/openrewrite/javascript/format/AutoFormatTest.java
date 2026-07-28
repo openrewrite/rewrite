@@ -53,7 +53,7 @@ class AutoFormatTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new JavaIsoVisitor<ExecutionContext>() {
+            return new JavaIsoVisitor<>() {
                 @Override
                 public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                     return autoFormat(super.visitBlock(block, ctx), ctx);

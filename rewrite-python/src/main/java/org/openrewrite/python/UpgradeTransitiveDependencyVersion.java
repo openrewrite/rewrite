@@ -158,11 +158,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         if (marker.findDependency(packageName) != null) {
             return false;
         }
-        if (marker.getPackageManager() == PythonResolutionResult.PackageManager.Uv &&
-                marker.getResolvedDependency(packageName) == null) {
-            return false;
-        }
-        return true;
+        return !(marker.getPackageManager() == PythonResolutionResult.PackageManager.Uv &&
+                marker.getResolvedDependency(packageName) == null);
     }
 
     @Override

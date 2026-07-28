@@ -87,8 +87,8 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class GeneralFormatStatistics {
-        private int linesWithCRLFNewLines = 0;
-        private int linesWithLFNewLines = 0;
+        private int linesWithCRLFNewLines;
+        private int linesWithLFNewLines;
 
         public boolean isIndentedWithLFNewLines() {
             return linesWithLFNewLines >= linesWithCRLFNewLines;
@@ -101,7 +101,7 @@ public class Autodetect extends NamedStyles {
         }
     }
 
-    private static class WrappingStatistics {
+    private static final class WrappingStatistics {
         private Map<Boolean, AtomicInteger> arraysWrapped = new HashMap<>();
         private Map<Boolean, AtomicInteger> objectsWrapped = new HashMap<>();
 
@@ -123,8 +123,8 @@ public class Autodetect extends NamedStyles {
     private static class IndentFrequencies {
         private final Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
         private final Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
-        private int linesWithSpaceIndents = 0;
-        private int linesWithTabIndents = 0;
+        private int linesWithSpaceIndents;
+        private int linesWithTabIndents;
 
         public boolean isIndentedWithSpaces() {
             return linesWithSpaceIndents >= linesWithTabIndents;

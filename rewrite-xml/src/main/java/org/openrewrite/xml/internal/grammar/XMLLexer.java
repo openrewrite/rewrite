@@ -15,11 +15,11 @@
  */
 // Generated from rewrite-xml/src/main/antlr/XMLLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
@@ -31,18 +31,55 @@ public class XMLLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, COMMENT=2, CDATA=3, ParamEntityRef=4, EntityRef=5, CharRef=6, SEA_WS=7,
-		UTF_ENCODING_BOM=8, QUESTION_MARK=9, SPECIAL_OPEN_XML=10, OPEN=11, SPECIAL_OPEN=12,
-		DTD_OPEN=13, JSP_COMMENT=14, JSP_DECLARATION=15, JSP_EXPRESSION=16, JSP_SCRIPTLET=17,
-		TEXT=18, DTD_CLOSE=19, DTD_SUBSET_OPEN=20, DTD_S=21, DOCTYPE=22, DTD_SUBSET_CLOSE=23,
-		MARKUP_OPEN=24, DTS_SUBSET_S=25, MARK_UP_CLOSE=26, MARKUP_S=27, MARKUP_STRING=28,
-		MARKUP_TEXT=29, MARKUP_SUBSET=30, PI_S=31, PI_TEXT=32, CLOSE=33, SPECIAL_CLOSE=34,
-		SLASH_CLOSE=35, S=36, DIRECTIVE_OPEN=37, DIRECTIVE_CLOSE=38, SLASH=39,
-		EQUALS=40, STRING=41, Name=42;
-	public static final int
-		INSIDE_DTD=1, INSIDE_DTD_SUBSET=2, INSIDE_MARKUP=3, INSIDE_MARKUP_SUBSET=4,
-		INSIDE_PROCESS_INSTRUCTION=5, INSIDE_PI_TEXT=6, INSIDE=7;
+    public static final int WS = 1;
+    public static final int COMMENT = 2;
+    public static final int CDATA = 3;
+    public static final int ParamEntityRef = 4;
+    public static final int EntityRef = 5;
+    public static final int CharRef = 6;
+    public static final int SEA_WS = 7;
+    public static final int UTF_ENCODING_BOM = 8;
+    public static final int QUESTION_MARK = 9;
+    public static final int SPECIAL_OPEN_XML = 10;
+    public static final int OPEN = 11;
+    public static final int SPECIAL_OPEN = 12;
+    public static final int DTD_OPEN = 13;
+    public static final int JSP_COMMENT = 14;
+    public static final int JSP_DECLARATION = 15;
+    public static final int JSP_EXPRESSION = 16;
+    public static final int JSP_SCRIPTLET = 17;
+    public static final int TEXT = 18;
+    public static final int DTD_CLOSE = 19;
+    public static final int DTD_SUBSET_OPEN = 20;
+    public static final int DTD_S = 21;
+    public static final int DOCTYPE = 22;
+    public static final int DTD_SUBSET_CLOSE = 23;
+    public static final int MARKUP_OPEN = 24;
+    public static final int DTS_SUBSET_S = 25;
+    public static final int MARK_UP_CLOSE = 26;
+    public static final int MARKUP_S = 27;
+    public static final int MARKUP_STRING = 28;
+    public static final int MARKUP_TEXT = 29;
+    public static final int MARKUP_SUBSET = 30;
+    public static final int PI_S = 31;
+    public static final int PI_TEXT = 32;
+    public static final int CLOSE = 33;
+    public static final int SPECIAL_CLOSE = 34;
+    public static final int SLASH_CLOSE = 35;
+    public static final int S = 36;
+    public static final int DIRECTIVE_OPEN = 37;
+    public static final int DIRECTIVE_CLOSE = 38;
+    public static final int SLASH = 39;
+    public static final int EQUALS = 40;
+    public static final int STRING = 41;
+    public static final int Name = 42;
+    public static final int INSIDE_DTD = 1;
+    public static final int INSIDE_DTD_SUBSET = 2;
+    public static final int INSIDE_MARKUP = 3;
+    public static final int INSIDE_MARKUP_SUBSET = 4;
+    public static final int INSIDE_PROCESS_INSTRUCTION = 5;
+    public static final int INSIDE_PI_TEXT = 6;
+    public static final int INSIDE = 7;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

@@ -20,7 +20,7 @@ import org.openrewrite.ExecutionContext;
 
 import java.nio.file.Paths;
 
-public class RemoteExecutionContextView extends DelegatingExecutionContext {
+public final class RemoteExecutionContextView extends DelegatingExecutionContext {
     private static final RemoteArtifactCache DEFAULT_ARTIFACT_CACHE = new LocalRemoteArtifactCache(
             Paths.get(System.getProperty("user.home") + "/.rewrite/remote"));
 

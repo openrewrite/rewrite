@@ -143,7 +143,7 @@ public class JsonPathMatcher {
 
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
-            return (scope = nextResult);
+            return scope = nextResult;
         }
 
         @Override
@@ -155,7 +155,7 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Json.JsonObject)
+                        .filter(Json.JsonObject.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
                                 .filter(t -> t instanceof Json.Document && ((Json.Document) t).getValue() instanceof Json.JsonObject)
@@ -318,7 +318,7 @@ public class JsonPathMatcher {
                         matches.add(result);
                     }
                     return getResultFromList(matches);
-                } else if (((member.getValue() instanceof Json.Literal))) {
+                } else if (member.getValue() instanceof Json.Literal) {
                     return key.equals(name) ? member : null;
                 }
 
@@ -365,7 +365,7 @@ public class JsonPathMatcher {
                 List<Object> matches = new ArrayList<>();
                 for (Object result : results) {
                     if (result instanceof List) {
-                        matches.addAll(((List<Object>) result));
+                        matches.addAll((List<Object>) result);
                     } else {
                         matches.add(result);
                     }
@@ -398,7 +398,7 @@ public class JsonPathMatcher {
                     // Unwrap lists of results from visitProperty to match the position of the cursor.
                     for (Object result : results) {
                         if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
+                            matches.addAll((List<Object>) result);
                         } else {
                             matches.add(result);
                         }
@@ -491,7 +491,7 @@ public class JsonPathMatcher {
                     List<Object> matches = new ArrayList<>();
                     for (Object result : results) {
                         if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
+                            matches.addAll((List<Object>) result);
                         } else {
                             matches.add(result);
                         }
@@ -546,8 +546,8 @@ public class JsonPathMatcher {
                         if (member.getValue() instanceof Json.Array) {
                             Json.Array array = (Json.Array) ((Json.Member) lhs).getValue();
                             if (array.getValues().stream()
-                                    .filter(o -> o instanceof Json.Literal)
-                                    .map(o -> (Json.Literal) o)
+                                    .filter(Json.Literal.class::isInstance)
+                                    .map(Json.Literal.class::cast)
                                     .anyMatch(o -> String.valueOf(o.getValue()).contains(String.valueOf(rhs)))) {
                                 return originalScope;
                             }
@@ -630,10 +630,10 @@ public class JsonPathMatcher {
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
                 switch( ctx.LOGICAL_OPERATOR().getText()) {
-                    case ("&&"):
+                    case "&&":
                         operator = "&&";
                         break;
-                    case ("||"):
+                    case "||":
                         operator = "||";
                         break;
                     default:
@@ -670,10 +670,10 @@ public class JsonPathMatcher {
                 rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
-                    case ("=="):
+                    case "==":
                         operator = "==";
                         break;
-                    case ("!="):
+                    case "!=":
                         operator = "!=";
                         break;
                     default:

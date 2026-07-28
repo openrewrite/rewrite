@@ -226,7 +226,7 @@ class RecipeMarketplaceReaderTest {
           """);
 
         RecipeListing first = marketplace.getAllRecipes().stream()
-          .filter(r -> r.getName().equals("org.openrewrite.java.cleanup.UnnecessaryParentheses"))
+          .filter(r -> "org.openrewrite.java.cleanup.UnnecessaryParentheses".equals(r.getName()))
           .findFirst()
           .orElseThrow();
         assertThat(first.getMetadata())
@@ -234,7 +234,7 @@ class RecipeMarketplaceReaderTest {
         assertThat(first.getRecipeCount()).isEqualTo(42);
 
         RecipeListing second = marketplace.getAllRecipes().stream()
-          .filter(r -> r.getName().equals("org.openrewrite.java.format.AutoFormat"))
+          .filter(r -> "org.openrewrite.java.format.AutoFormat".equals(r.getName()))
           .findFirst()
           .orElseThrow();
         assertThat(second.getMetadata())

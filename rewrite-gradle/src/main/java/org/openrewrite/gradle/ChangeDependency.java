@@ -36,8 +36,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
@@ -231,8 +231,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             }
 
             private void resolveAndRecordVersion(String varName, J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
-                String resolvedGroupId = !StringUtils.isBlank(newGroupId) ? newGroupId : dep.getGroupId();
-                String resolvedArtifactId = !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId();
+                String resolvedGroupId = StringUtils.isBlank(newGroupId) ? dep.getGroupId() : newGroupId;
+                String resolvedArtifactId = StringUtils.isBlank(newArtifactId) ? dep.getArtifactId() : newArtifactId;
                 try {
                     String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(new GroupArtifact(resolvedGroupId, resolvedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
@@ -392,8 +392,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(
-                                                    !StringUtils.isBlank(newGroupId) ? newGroupId : dep.getGroupId(),
-                                                    !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId()),
+                                                    StringUtils.isBlank(newGroupId) ? dep.getGroupId() : newGroupId,
+                                                    StringUtils.isBlank(newArtifactId) ? dep.getArtifactId() : newArtifactId),
                                             dep.getConfigurationName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);

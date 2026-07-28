@@ -90,7 +90,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         Iterator<Object> itr = parent.getPath(J.class::isInstance);
-        J next = (itr.hasNext()) ? (J) itr.next() : null;
+        J next = itr.hasNext() ? (J) itr.next() : null;
         if (next != null) {
             preVisit(next, p);
         }
@@ -412,12 +412,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
-        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(elem -> elem instanceof J.Empty)) {
+        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(J.Empty.class::isInstance)) {
             return super.visitContainer(container, loc, p);
         }
 
@@ -452,27 +452,23 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             SourcePositionService positionService = sourceFile.service(SourcePositionService.class);
             J alignWith;
             ColSpan colSpan;
-            switch (loc) {
-                case THROWS:
-                    if (!container.getBefore().getLastWhitespace().contains("\n")) {
-                        colSpan = positionService.columnsOf(getCursor().getParentTreeCursor(), ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getPadding().getParameters());
-                        getCursor().putMessage("indentType", IndentType.ALIGN);
-                        getCursor().putMessage("lastIndent", indent + colSpan.getEndColumn() - colSpan.getIndent() + 1);
-                    } else {
-                        getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                    }
-                    break;
-                default:
-                    alignWith = container.getElements().get(0);
-                    if (!alignWith.getPrefix().getLastWhitespace().contains("\n")) {
-                        colSpan = positionService.columnsOf(getCursor(), alignWith);
-                        getCursor().putMessage("indentType", IndentType.ALIGN);
-                        getCursor().putMessage("lastIndent", indent + colSpan.getStartColumn() - colSpan.getIndent() - 1);
-                    } else {
-                        getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                    }
-                    break;
-
+            if (loc == JContainer.Location.THROWS) {
+                if (!container.getBefore().getLastWhitespace().contains("\n")) {
+                    colSpan = positionService.columnsOf(getCursor().getParentTreeCursor(), ((J.MethodDeclaration) getCursor().getParentTreeCursor().getValue()).getPadding().getParameters());
+                    getCursor().putMessage("indentType", IndentType.ALIGN);
+                    getCursor().putMessage("lastIndent", indent + colSpan.getEndColumn() - colSpan.getIndent() + 1);
+                } else {
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                }
+            } else {
+                alignWith = container.getElements().get(0);
+                if (!alignWith.getPrefix().getLastWhitespace().contains("\n")) {
+                    colSpan = positionService.columnsOf(getCursor(), alignWith);
+                    getCursor().putMessage("indentType", IndentType.ALIGN);
+                    getCursor().putMessage("lastIndent", indent + colSpan.getStartColumn() - colSpan.getIndent() - 1);
+                } else {
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                }
             }
         } else {
             switch (loc) {

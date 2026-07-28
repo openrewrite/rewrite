@@ -164,7 +164,9 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
             public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right,
                     JRightPadded.Location loc,
                     ExecutionContext executionContext) {
-                if (right == null) return null;
+                if (right == null) {
+                    return null;
+                }
                 return prefix.isEmpty() ? right : right.withAfter(prefix.pop());
             }
         }.visitNonNull(method, new InMemoryExecutionContext());

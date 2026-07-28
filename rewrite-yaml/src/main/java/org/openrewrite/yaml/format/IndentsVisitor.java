@@ -80,7 +80,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             if (y instanceof Yaml.Sequence.Entry) {
                 indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
-                int seqIndentOffset = evaluate(() -> style.isIndentedSequences(), true) ? style.getIndentSize() : 0;
+                int seqIndentOffset = evaluate(style::isIndentedSequences, true) ? style.getIndentSize() : 0;
                 int dashColumn = indent + seqIndentOffset;
                 y = y.withPrefix(indentTo(y.getPrefix(), dashColumn));
 

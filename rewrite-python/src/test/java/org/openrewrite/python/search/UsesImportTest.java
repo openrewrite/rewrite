@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
-import org.openrewrite.python.PythonIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.python.PythonIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;

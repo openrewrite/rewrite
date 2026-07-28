@@ -174,7 +174,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 ));
             }
 
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
+            ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, (SourceFile) cu))
                     .orElse(IntelliJ.importLayout());
 
             Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
@@ -241,7 +241,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
-        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, ((SourceFile) cu)))
+        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, (SourceFile) cu))
                 .orElse(autodetectGeneralFormatStyle(cu));
         if (generalFormatStyle.isUseCRLFNewLines()) {
             return ListUtils.map(newImports, rp -> rp.map(

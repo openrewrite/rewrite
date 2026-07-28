@@ -247,7 +247,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         List<JRightPadded<Statement>> rps = jc.getPadding().getElements();
         if (rps.size() > 1) {
             int range = rps.size() - 1;
-            rps = ListUtils.map(rps, (index, rp) -> (index < range) ? spaceAfter(rp, style.getOther().getBeforeComma()) : rp);
+            rps = ListUtils.map(rps, (index, rp) -> index < range ? spaceAfter(rp, style.getOther().getBeforeComma()) : rp);
             m = m.getPadding().withParameters(jc.getPadding().withElements(rps));
         }
 

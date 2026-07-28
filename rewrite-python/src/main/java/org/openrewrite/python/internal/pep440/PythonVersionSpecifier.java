@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  * {@code <}, {@code >}, {@code ~=}, {@code ===}, including prefix matching such as
  * {@code ==1.2.*}), ported from pypa/packaging's {@code specifiers.Specifier}.
  */
-public class PythonVersionSpecifier {
+public final class PythonVersionSpecifier {
 
     /**
      * Port of packaging's {@code Specifier._specifier_regex_str}; also used by the PEP 508

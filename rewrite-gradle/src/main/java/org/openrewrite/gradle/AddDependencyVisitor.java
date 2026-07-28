@@ -125,6 +125,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
     public enum DependencyModifier {
         PLATFORM,
-        ENFORCED_PLATFORM;
+        ENFORCED_PLATFORM
     }
 }

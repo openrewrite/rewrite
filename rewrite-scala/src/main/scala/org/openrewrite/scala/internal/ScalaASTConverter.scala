@@ -58,20 +58,28 @@ class ScalaASTConverter {
     var packageDecl: J.Package = null
 
     // Use the context from the parse result (carries type info from batch compilation)
-    given Context = if (parseResult.context != null) parseResult.context else dotty.tools.dotc.core.Contexts.NoContext
+    given Context = if (parseResult.context != null) {
+        parseResult.context
+    } else {
+        dotty.tools.dotc.core.Contexts.NoContext
+    }
 
     // Calculate offset adjustment if content was wrapped before parsing.
     // For `.sbt` content wrapped as `object __SbtScript__ { ... }`, spans in
     // the parsed tree are offset by the wrapper prefix (`object __SbtScript__ {\n`).
     val offsetAdjustment =
-      if (parseResult.wasObjectWrapped) ScalaParseResultConstants.ObjectScriptPrefix.length
-      else if (parseResult.wasWrapped) "object ExprWrapper { val result = ".length
-      else 0
+              if (parseResult.wasObjectWrapped) {
+                  ScalaParseResultConstants.ObjectScriptPrefix.length
+              } else if (parseResult.wasWrapped) {
+                  "object ExprWrapper { val result = ".length
+              } else { 0
+              }
 
     // Build type mapping from typed tree if available
     val mapping: Option[ScalaTypeMapping] = if (typeFactory != null) {
       parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeFactory, tpd))
-    } else None
+    } else { None
+    }
 
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment, mapping)
     // Traverse the untyped tree for source-faithful structure.
@@ -113,7 +121,9 @@ class ScalaASTConverter {
                 if mod.name.toString == ScalaParseResultConstants.ObjectScriptWrapperName =>
                 mod.impl.body.filter(s => !s.isEmpty && s.span.exists)
             }.getOrElse(pkgDef.stats)
-          } else pkgDef.stats
+          } else {
+              pkgDef.stats
+          }
 
         statements.addAll(convertBody(rawStats, visitor))
       case imp: Trees.Import[?] =>
@@ -149,17 +159,21 @@ class ScalaASTConverter {
     val out = new util.ArrayList[Statement]()
     // Sort by source position to ensure source order is preserved —
     // the Dotty parser may reorder brace imports internally.
-    val sortedStats = rawStats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
+    val sortedStats = rawStats.sortBy(s => if (s.span.exists) {
+        s.span.start
+    } else {
+        Int.MaxValue
+    })
     sortedStats.foreach {
       case pkg: Trees.PackageDef[?] if isBracedPackage(pkg, visitor) =>
         out.add(buildBracedPackage(pkg, visitor))
       case _: Trees.PackageDef[?] =>
         // Non-braced nested package — not yet modeled, skip.
       case imp: Trees.Import[?] =>
-        visitor.visitTree(imp) match {
-          case stmt: Statement => out.add(stmt)
-          case _ =>
-        }
+          if (visitor.visitTree(imp) ==stmt: Statement) {
+              out.add(stmt)
+          } else if (visitor.visitTree(imp) ==_) {
+          }
       case stat =>
         visitor.visitTree(stat) match {
           case null =>
@@ -177,12 +191,20 @@ class ScalaASTConverter {
    * indented (`package a:`) or synthetic empty-package forms.
    */
   private def isBracedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): Boolean = {
-    if (!pkgDef.pid.span.exists) return false
+      if (!pkgDef.pid.span.exists) {
+          return false
+      }
     val packageName = extractPackageName(pkgDef)
-    if (packageName.isEmpty || packageName == "<empty>") return false
+    
+      if (packageName.isEmpty || packageName == "<empty>") {
+          return false
+      }
     val srcText = visitor.getSourceText
     val scanStart = pkgDef.pid.span.end - visitor.getOffsetAdjustment
-    if (scanStart < 0 || scanStart > srcText.length) return false
+    
+      if (scanStart < 0 || scanStart > srcText.length) {
+          return false
+      }
     var i = scanStart
     while (i < srcText.length && Character.isWhitespace(srcText.charAt(i))) {
       i += 1
@@ -265,12 +287,17 @@ class ScalaASTConverter {
     while (scanIdx < srcText.length && (srcText.charAt(scanIdx) == ' ' || srcText.charAt(scanIdx) == '\t')) {
       scanIdx += 1
     }
-    val nextChar = if (scanIdx < srcText.length) srcText.charAt(scanIdx) else 0.toChar
+    val nextChar = if (scanIdx < srcText.length) {
+        srcText.charAt(scanIdx)
+    } else {
+        0.toChar
+    }
     val hasIndentedColon = nextChar == ':'
     val hasSemicolon = nextChar == ';'
     val cursorAfter =
-      if (hasIndentedColon || hasSemicolon) scanIdx + 1 + srcOffset
-      else packageEndPos
+              if (hasIndentedColon || hasSemicolon) { scanIdx + 1 + srcOffset
+              } else { packageEndPos
+              }
 
     // Update the visitor's cursor to after the package declaration
     // This is crucial to prevent the package text from being included
@@ -287,7 +314,11 @@ class ScalaASTConverter {
     if (hasSemicolon) {
       markerList.add(PackageSemicolon(Tree.randomId()))
     }
-    val markers = if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)
+    val markers = if (markerList.isEmpty) {
+        Markers.EMPTY
+    } else {
+        Markers.build(markerList)
+    }
 
     new J.Package(
       Tree.randomId(),

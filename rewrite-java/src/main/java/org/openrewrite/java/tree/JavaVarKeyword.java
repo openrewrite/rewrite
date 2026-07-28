@@ -22,7 +22,7 @@ import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
-public class JavaVarKeyword implements Marker {
+public final class JavaVarKeyword implements Marker {
     private static final JavaVarKeyword INSTANCE = new JavaVarKeyword();
 
     @Getter

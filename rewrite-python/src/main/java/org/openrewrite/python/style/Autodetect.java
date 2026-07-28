@@ -66,7 +66,7 @@ public class Autodetect extends NamedStyles implements PythonStyle {
     }
 
     private static class FindIndentVisitor extends PythonIsoVisitor<IndentStatistics> {
-        private int currentBlockIndent = 0;
+        private int currentBlockIndent;
 
         private int countSpaces(String s) {
             int withoutSpaces = s.replaceAll(" ", "").length();
@@ -115,41 +115,45 @@ public class Autodetect extends NamedStyles implements PythonStyle {
     }
 
     private static class SpacesStatistics {
-        int beforeParenthesesMethodCall = 0;
-        int beforeParenthesesMethodDeclaration = 0;
-        int beforeParenthesesLeftBracket = 0;
+        int beforeParenthesesMethodCall;
+        int beforeParenthesesMethodDeclaration;
+        int beforeParenthesesLeftBracket;
 
-        int aroundOperatorsAssignment = 0;
-        int aroundOperatorsEquality = 0;
-        int aroundOperatorsRelational = 0;
-        int aroundOperatorsBitwise = 0;
-        int aroundOperatorsAdditive = 0;
-        int aroundOperatorsMultiplicative = 0;
-        int aroundOperatorsShift = 0;
-        int aroundOperatorsPower = 0;
-        int aroundOperatorsEqInNamedParameter = 0;
-        int aroundOperatorsEqInKeywordArgument = 0;
+        int aroundOperatorsAssignment;
+        int aroundOperatorsEquality;
+        int aroundOperatorsRelational;
+        int aroundOperatorsBitwise;
+        int aroundOperatorsAdditive;
+        int aroundOperatorsMultiplicative;
+        int aroundOperatorsShift;
+        int aroundOperatorsPower;
+        int aroundOperatorsEqInNamedParameter;
+        int aroundOperatorsEqInKeywordArgument;
 
-        int withinBrackets = 0;
-        int withinMethodDeclarationParentheses = 0;
-        int withinEmptyMethodDeclarationParentheses = 0;
-        int withinMethodCallParentheses = 0;
-        int withinEmptyMethodCallParentheses = 0;
-        int withinBraces = 0;
+        int withinBrackets;
+        int withinMethodDeclarationParentheses;
+        int withinEmptyMethodDeclarationParentheses;
+        int withinMethodCallParentheses;
+        int withinEmptyMethodCallParentheses;
+        int withinBraces;
 
-        int otherBeforeComma = 0;
-        int otherAfterComma = 0;
-        int otherBeforeForSemicolon = 0;
-        int otherBeforeColon = 0;
-        int otherAfterColon = 0;
-        int otherBeforeBackslash = 0;
-        int otherBeforeHash = 0;
-        int otherAfterHash = 0;
+        int otherBeforeComma;
+        int otherAfterComma;
+        int otherBeforeForSemicolon;
+        int otherBeforeColon;
+        int otherAfterColon;
+        int otherBeforeBackslash;
+        int otherBeforeHash;
+        int otherAfterHash;
 
         // Helper method to determine boolean value based on count
         private static Boolean determineStyleValue(int count, Boolean defaultValue) {
-            if (count > 0) return true;
-            if (count < 0) return false;
+            if (count > 0) {
+                return true;
+            }
+            if (count < 0) {
+                return false;
+            }
             return defaultValue;
         }
 

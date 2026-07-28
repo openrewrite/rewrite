@@ -296,7 +296,7 @@ class MavenRecipeMarketplaceGeneratorTest {
         // Verify we're not finding recipes from the classpath (like rewrite-core recipes)
         // The directory only has our one recipe, so we should only find that one
         List<RecipeListing> recipesFromOurBundle = marketplace.getAllRecipes().stream()
-                .filter(r -> r.getBundle().getPackageName().equals("org.openrewrite.test:generated-recipes"))
+                .filter(r -> "org.openrewrite.test:generated-recipes".equals(r.getBundle().getPackageName()))
                 .toList();
 
         assertThat(recipesFromOurBundle)

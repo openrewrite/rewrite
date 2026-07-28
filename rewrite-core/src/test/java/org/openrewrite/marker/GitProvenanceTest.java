@@ -25,7 +25,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.GitRemote;
-import org.openrewrite.marker.GitProvenance.CommitHistory;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.Constants;
@@ -33,6 +32,7 @@ import org.openrewrite.jgit.lib.RepositoryCache;
 import org.openrewrite.jgit.transport.TagOpt;
 import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.jgit.util.FS;
+import org.openrewrite.marker.GitProvenance.CommitHistory;
 import org.openrewrite.marker.ci.*;
 
 import java.io.ByteArrayOutputStream;

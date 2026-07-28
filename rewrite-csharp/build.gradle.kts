@@ -386,7 +386,9 @@ val csharpPublishLocal by tasks.registering {
         fun run(vararg args: String, dir: File? = null, ignoreExitCode: Boolean = false): String {
             val pb = ProcessBuilder(*args)
                 .redirectErrorStream(true)
-            if (dir != null) pb.directory(dir)
+            if (dir != null) {
+                pb.directory(dir)
+            }
             val proc = pb.start()
             val output = proc.inputStream.bufferedReader().readText()
             val exitCode = proc.waitFor()

@@ -26,7 +26,7 @@ import java.util.Locale;
  * RFC 5322-style parser for Python core metadata (METADATA / PKG-INFO). Parsing stops at the
  * first blank line; the body (package description) is ignored.
  */
-public class MetadataParser {
+public final class MetadataParser {
 
     private MetadataParser() {
     }

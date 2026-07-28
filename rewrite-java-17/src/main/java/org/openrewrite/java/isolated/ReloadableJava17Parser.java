@@ -67,7 +67,7 @@ import static java.util.stream.Collectors.toList;
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
 @NullMarked
-public class ReloadableJava17Parser implements JavaParser {
+public final class ReloadableJava17Parser implements JavaParser {
     private final JavaTypeCache typeCache;
     private final JavaTypeFactory typeFactory;
 
@@ -389,7 +389,7 @@ public class ReloadableJava17Parser implements JavaParser {
         }
     }
 
-    private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
+    private static final class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
         @Getter
         private final String className;

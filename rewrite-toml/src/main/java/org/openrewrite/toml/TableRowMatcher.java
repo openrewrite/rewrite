@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Utility methods for matching table rows and extracting values from TOML tables.
  */
-public class TableRowMatcher {
+public final class TableRowMatcher {
 
     private TableRowMatcher() {
     }

@@ -90,7 +90,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         Map<String, Object> messages = new HashMap<>();
         messages.put("containerLocation", loc);
-        messages.put("empty", container.getElements().stream().allMatch(element -> element instanceof J.Empty));
+        messages.put("empty", container.getElements().stream().allMatch(J.Empty.class::isInstance));
         messages.put("size", container.getElements().size());
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, t) -> {
             messages.put("index", index);
@@ -163,9 +163,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case FOR_INIT:
                 J.ForLoop.Control controlInit = getCursor().getValue();
-                if (controlInit.getInit().stream().allMatch(i -> i instanceof J.Empty)) {
+                if (controlInit.getInit().stream().allMatch(J.Empty.class::isInstance)) {
                     if (emptyForInitializerPadStyle != null) {
-                        before = evaluate(() -> emptyForInitializerPadStyle.getSpace(), false) ? " " : "";
+                        before = evaluate(emptyForInitializerPadStyle::getSpace, false) ? " " : "";
                     } else {
                         before = evaluate(() -> spacesStyle.getWithin().getForParentheses(), evaluate(() -> spacesStyle.getOther().getBeforeForSemicolon(), false)) ? " " : "";
                     }
@@ -188,9 +188,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case FOR_UPDATE:
                 J.ForLoop.Control controlUpdate = getCursor().getValue();
-                if (controlUpdate.getUpdate().stream().allMatch(i -> i instanceof J.Empty)) {
+                if (controlUpdate.getUpdate().stream().allMatch(J.Empty.class::isInstance)) {
                     if (emptyForIteratorPadStyle != null) {
-                        before = evaluate(() -> emptyForIteratorPadStyle.getSpace(), false) ? " " : "";
+                        before = evaluate(emptyForIteratorPadStyle::getSpace, false) ? " " : "";
                     } else {
                         before = evaluate(() -> spacesStyle.getOther().getAfterForSemicolon(), evaluate(() -> spacesStyle.getWithin().getForParentheses(), true)) ? " " : "";
                     }
@@ -265,6 +265,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 if (right.getElement() instanceof J.If) {
                     break;
                 }
+                break;
                 //Falling through on purpose here
             case IF_THEN:
                 if (right.getElement() instanceof J.Block) {
@@ -307,6 +308,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                         break;
                     }
                 }
+                break;
                 //Falling through on purpose here
             default:
                 if (containerLocation != null || hasLineBreakInSpace(right.getAfter())) {
@@ -374,7 +376,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             afterSpace = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
         }
         Markers markers = visitMarkers(right.getMarkers(), p);
-        return (afterSpace == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ? right : new JRightPadded<>(t, afterSpace, markers);
+        return afterSpace == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ? right : new JRightPadded<>(t, afterSpace, markers);
     }
 
     @Override
@@ -521,7 +523,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     } else if (parent instanceof J.VariableDeclarations) {
                         modifiers = ((J.VariableDeclarations) parent).getModifiers();
                     }
-                    if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) > 0) {
+                    if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) >= 1) {
                         whitespace = " ";
                     }
                     if (modifiers != null && modifiers.indexOf((J.Modifier) getCursor().getValue()) == 0) {

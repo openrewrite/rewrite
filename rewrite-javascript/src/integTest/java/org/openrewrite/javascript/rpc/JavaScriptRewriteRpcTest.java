@@ -436,10 +436,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
         // Verify that both JS files share the same Autodetect marker instance (deduplication)
         SourceFile indexJs = sourceFiles.stream()
-          .filter(sf -> sf.getSourcePath().toString().equals("index.js"))
+          .filter(sf -> "index.js".equals(sf.getSourcePath().toString()))
           .findFirst().orElseThrow();
         SourceFile otherJs = sourceFiles.stream()
-          .filter(sf -> sf.getSourcePath().toString().equals("other.js"))
+          .filter(sf -> "other.js".equals(sf.getSourcePath().toString()))
           .findFirst().orElseThrow();
 
         Autodetect indexAutodetect = indexJs.getMarkers().findFirst(Autodetect.class).orElseThrow();

@@ -202,7 +202,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
+            private int index;
             private @Nullable ParseProjectResponse response;
 
             @Override

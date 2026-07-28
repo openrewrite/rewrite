@@ -27,11 +27,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Upgrade the Android Gradle Plugin (AGP) version.
