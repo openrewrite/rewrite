@@ -116,25 +116,42 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void writeThroughEnginesBumpReachesAbsentPatcher() {
+    void npmEnginesWriteThroughNotYetSupported() {
+        // The engine's proof PASSES an engines-only delta (write-through tier), then dispatches to the npm
+        // patcher — which applies license/deprecated write-through but defers engines/bin (nested objects
+        // need a real golden to pin byte-exact npm output), failing loud SAFELY. The engine and the pnpm
+        // patcher fully support write-through; npm engines/bin is a tracked follow-up.
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.20",
                 "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{},\"engines\":{\"node\":\">=12\"}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.21",
                 "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{},\"engines\":{\"node\":\">=14\"}," +
-                        "\"dist\":{\"tarball\":\"https://r/lodash-4.17.21.tgz\",\"integrity\":\"sha512-x\",\"shasum\":\"abc\"}}");
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
+
+        String lock = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"name\": \"x\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\",\n" +
+                "      \"engines\": {\"node\": \">=12\"}\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
 
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
+                lock);
 
-        // The engines-only delta passes the closure proof (write-through tier), so the engine reaches the
-        // patcher-dispatch seam; Wave 3 has not registered a patcher yet, so it fails loud but cleanly.
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("no native patcher");
+        assertThat(result.getFailure().getDetail()).contains("write-through is not supported");
     }
 
     @Test

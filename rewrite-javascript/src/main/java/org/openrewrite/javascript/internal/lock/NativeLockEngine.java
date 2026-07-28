@@ -462,9 +462,14 @@ public final class NativeLockEngine {
     }
 
     private static @Nullable LockPatcher patcherFor(PackageManager pm) {
-        // Wave 3 registers a format-faithful LockPatcher per package manager here. Until then every
-        // proven-safe edit set reaches this seam and the engine fails loud with a clear "no patcher" reason.
-        return null;
+        switch (pm) {
+            case Npm:         return new NpmLockPatcher();
+            case Pnpm:        return new PnpmLockPatcher();
+            case YarnClassic: return new YarnClassicLockPatcher();
+            case YarnBerry:   return new YarnBerryLockPatcher();
+            case Bun:         return new BunLockPatcher();
+            default:          return null;
+        }
     }
 
     private static Map<String, Object> parseJsonObject(String content, boolean manifest) {
