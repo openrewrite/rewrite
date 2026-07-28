@@ -27,6 +27,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -154,8 +155,9 @@ public final class NativeLockEngine {
         String name = change.name;
 
         if (change.oldConstraint == null) {
-            // Added dependency — a new node in the closure needs the hoisting-aware resolver (Phase B).
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "adding " + name + " requires resolution");
+            // Added dependency (Phase B). A scalar-only leaf resolves-and-continues; anything with a
+            // transitive closure or non-scalar metadata still needs the hoisting-aware resolver.
+            return resolveAdd(pm, change, existingLock, registries, client);
         }
 
         Set<String> lockedVersions = findLockedVersions(pm, existingLock, name);
@@ -221,6 +223,129 @@ public final class NativeLockEngine {
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
                 .writeThroughMetadata(writeThrough(oldManifest, newManifest))
                 .build();
+    }
+
+    /**
+     * Phase B increment 1: a direct dependency the recipe added. Only a scalar-only leaf (empty
+     * dependencies/optionalDependencies/peerDependencies, and a lock entry using only scalar fields)
+     * that is absent from the lock and conflict-free is resolved here; everything else fails loud
+     * pending the hoisting-aware resolver.
+     */
+    private static LockEditSet.PackageEdit resolveAdd(PackageManager pm, DepChange change, String existingLock,
+                                                      NodeRegistries registries, NpmRegistryClient client) {
+        String name = change.name;
+        String constraint = Objects.requireNonNull(change.newConstraint);
+
+        // Only the npm patcher can insert an entry so far; other formats defer.
+        if (pm != PackageManager.Npm) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "adding " + name + " requires resolution");
+        }
+        if (isUnsupportedProtocol(constraint)) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name,
+                    name + " uses an unsupported entry type: " + constraint);
+        }
+        // A name already in the lock means adding into an existing closure (dedup/fork) — Phase B I2.
+        if (!findLockedVersions(pm, existingLock, name).isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is already present in the lock; adding into an existing closure requires resolution");
+        }
+
+        NodeRegistry registry = registries.registryFor(name);
+        String targetVersion = resolveAddedVersion(client, registry, name, constraint);
+        VersionManifest manifest = client.getManifest(registry, name, targetVersion);
+
+        requireScalarOnlyLeaf(name, manifest);
+
+        // A stray reverse-dependent whose recorded constraint excludes the resolved version → fail loud.
+        proveReverseDependentsAccept(pm, name, targetVersion, targetVersion, existingLock);
+
+        VersionManifest.Dist dist = manifest.getDist();
+        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name,
+                    name + "@" + targetVersion + " has no registry tarball/integrity");
+        }
+
+        return LockEditSet.PackageEdit.builder()
+                .name(name)
+                .oldVersion("")
+                .newVersion(targetVersion)
+                .newResolved(dist.getTarball())
+                .newIntegrity(dist.getIntegrity())
+                .newShasum(dist.getShasum())
+                .scope(change.scope)
+                .importerDir(null)
+                .added(true)
+                .writeThroughMetadata(leafMetadata(manifest))
+                .build();
+    }
+
+    private static String resolveAddedVersion(NpmRegistryClient client, NodeRegistry registry,
+                                              String name, String constraint) {
+        AbbreviatedPackument packument = client.getPackument(registry, name);
+        if (NodeSemver.validRange(constraint)) {
+            String best = NodeSemver.maxSatisfying(packument.getVersions(), constraint);
+            if (best != null) {
+                return best;
+            }
+        }
+        String tagged = packument.getDistTags().get(constraint);
+        if (tagged != null && packument.getVersions().contains(tagged)) {
+            return tagged;
+        }
+        throw new EngineFailure(Reason.VERSION_NOT_FOUND, name,
+                "no published version of " + name + " satisfies " + constraint);
+    }
+
+    /**
+     * A leaf whose lock entry the npm patcher can insert byte-exactly today: no runtime closure, and no
+     * object/array metadata (engines/os/cpu/bin/…) that would need a nested byte-exact insert. Only
+     * {@code version}/{@code resolved}/{@code integrity} plus the scalar {@code dev}/{@code deprecated}/
+     * {@code license} appear in the emitted entry.
+     */
+    private static void requireScalarOnlyLeaf(String name, VersionManifest m) {
+        if (notEmpty(m.getDependencies()) || notEmpty(m.getOptionalDependencies()) || notEmpty(m.getPeerDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " pulls in transitive dependencies; closure resolution required");
+        }
+        String metadata = firstNonScalarMetadata(m);
+        if (metadata != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " carries " + metadata + " metadata not yet supported for native adds");
+        }
+    }
+
+    private static @Nullable String firstNonScalarMetadata(VersionManifest m) {
+        if (notEmpty(m.getEngines())) return "engines";
+        if (notEmpty(m.getOs())) return "os";
+        if (notEmpty(m.getCpu())) return "cpu";
+        if (notEmpty(m.getLibc())) return "libc";
+        if (m.getBin() != null) return "bin";
+        if (bool(m.getHasInstallScript())) return "hasInstallScript";
+        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
+        if (notEmpty(m.getPeerDependenciesMeta())) return "peerDependenciesMeta";
+        if (bool(m.getHasShrinkwrap())) return "hasShrinkwrap";
+        if (m.getFunding() != null) return "funding";
+        if (notEmpty(m.getAcceptDependencies())) return "acceptDependencies";
+        if (m.getWorkspaces() != null) return "workspaces";
+        return null;
+    }
+
+    private static LockEditSet.@Nullable WriteThroughMetadata leafMetadata(VersionManifest m) {
+        if (m.getLicenseString() == null && m.getDeprecated() == null) {
+            return null;
+        }
+        return LockEditSet.WriteThroughMetadata.builder()
+                .license(m.getLicenseString())
+                .deprecated(m.getDeprecated())
+                .build();
+    }
+
+    private static boolean notEmpty(@Nullable Map<String, ?> map) {
+        return map != null && !map.isEmpty();
+    }
+
+    private static boolean notEmpty(@Nullable List<?> list) {
+        return list != null && !list.isEmpty();
     }
 
     private static String resolveTarget(NpmRegistryClient client, NodeRegistries registries,

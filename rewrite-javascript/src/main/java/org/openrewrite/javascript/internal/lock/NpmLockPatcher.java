@@ -93,6 +93,10 @@ public final class NpmLockPatcher implements LockPatcher {
                 removals.add(edit);
                 continue;
             }
+            if (edit.isAdded()) {
+                root = applyAdd(root, lockfileVersion, editedManifest, edit);
+                continue;
+            }
             root = applyBump(root, lockfileVersion, editedManifest, edit);
         }
         if (!removals.isEmpty()) {
@@ -185,6 +189,232 @@ public final class NpmLockPatcher implements LockPatcher {
         entry = setStringField(entry, "integrity", edit.getNewIntegrity());
         legacy = putMember(legacy, name, entry);
         return putMember(root, "dependencies", legacy);
+    }
+
+    // --- leaf add (Phase B increment 1) ----------------------------------
+
+    /**
+     * Insert a brand-new scalar-only leaf: a {@code packages} entry, the importer's declared constraint
+     * (creating the scope object when absent), and — for lockfileVersion 2 — the minimal legacy tree
+     * entry. Each insert lands at npm's own sort position ({@link NpmKeyOrder}) with byte-exact whitespace.
+     */
+    private Json.JsonObject applyAdd(Json.JsonObject root, int lockfileVersion,
+                                     @Nullable JsonNode editedManifest, PackageEdit edit) {
+        String name = edit.getName();
+        Json.JsonObject packages = requirePackages(root);
+        requireFlatPlacement(packages);
+
+        String entryKey = "node_modules/" + name;
+        if (getMember(packages, entryKey) != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " is already placed in node_modules");
+        }
+        if (edit.getNewResolved() == null || edit.getNewIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name, name + " has no registry locator");
+        }
+
+        // Site (1): the hoisted package entry.
+        String entryText = leafEntryText(packages, edit);
+        packages = graftSorted(packages, entryKey, entryText, true);
+        root = putMember(root, "packages", packages);
+
+        // Site (2): the importer's declared constraint.
+        root = insertImporterConstraint(root, editedManifest, edit);
+
+        // Site (3): the v2 legacy dependencies tree.
+        if (lockfileVersion == 2) {
+            root = insertLegacyEntry(root, edit);
+        }
+        return root;
+    }
+
+    /** The scalar-only leaf entry object source, fields in npm's serialization order. */
+    private String leafEntryText(Json.JsonObject packages, PackageEdit edit) {
+        String fieldWs = nestedMemberWhitespace(packages);
+        String closeWs = memberWhitespace(packages);
+        if (fieldWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive entry indentation");
+        }
+        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        String deprecated = wt == null ? null : wt.getDeprecated();
+        String license = wt == null ? null : wt.getLicense();
+        boolean dev = "devDependencies".equals(edit.getScope());
+
+        List<String> fields = new ArrayList<>();
+        fields.add(field(fieldWs, "version", jsonEncode(edit.getNewVersion())));
+        fields.add(field(fieldWs, "resolved", jsonEncode(edit.getNewResolved())));
+        fields.add(field(fieldWs, "integrity", jsonEncode(edit.getNewIntegrity())));
+        // Scalars after the preference keys sort alphabetically: deprecated < dev < license.
+        if (deprecated != null) {
+            fields.add(field(fieldWs, "deprecated", jsonEncode(deprecated)));
+        }
+        if (dev) {
+            fields.add(field(fieldWs, "dev", "true"));
+        }
+        if (license != null) {
+            fields.add(field(fieldWs, "license", jsonEncode(license)));
+        }
+        return "{" + String.join(",", fields) + closeWs + "}";
+    }
+
+    private Json.JsonObject insertImporterConstraint(Json.JsonObject root, @Nullable JsonNode editedManifest,
+                                                     PackageEdit edit) {
+        String newConstraint = lookupConstraint(editedManifest, edit.getScope(), edit.getName());
+        if (newConstraint == null) {
+            return root;
+        }
+        String importerKey = edit.getImporterDir() == null ? "" : edit.getImporterDir();
+        Json.JsonObject packages = requirePackages(root);
+        Json.JsonObject importer = getObjectMember(packages, importerKey);
+        if (importer == null) {
+            return root;
+        }
+        Json.JsonObject scope = getObjectMember(importer, edit.getScope());
+        if (scope != null) {
+            // Existing scope: insert the single scalar constraint, sorted.
+            scope = graftSorted(scope, edit.getName(), jsonEncode(newConstraint), false);
+            importer = putMember(importer, edit.getScope(), scope);
+        } else {
+            // First dependency of this scope: create the whole scope object with one member.
+            String fieldWs = nestedMemberWhitespace(importer);
+            String closeWs = memberWhitespace(importer);
+            if (fieldWs == null) {
+                throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive importer indentation");
+            }
+            String scopeText = "{" + field(fieldWs, edit.getName(), jsonEncode(newConstraint)) + closeWs + "}";
+            importer = graftSorted(importer, edit.getScope(), scopeText, true);
+        }
+        packages = putMember(packages, importerKey, importer);
+        return putMember(root, "packages", packages);
+    }
+
+    private Json.JsonObject insertLegacyEntry(Json.JsonObject root, PackageEdit edit) {
+        Json.JsonObject legacy = getObjectMember(root, "dependencies");
+        if (legacy == null) {
+            return root;
+        }
+        String fieldWs = nestedMemberWhitespace(legacy);
+        String closeWs = memberWhitespace(legacy);
+        if (fieldWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive legacy tree indentation");
+        }
+        List<String> fields = new ArrayList<>();
+        fields.add(field(fieldWs, "version", jsonEncode(edit.getNewVersion())));
+        fields.add(field(fieldWs, "resolved", jsonEncode(edit.getNewResolved())));
+        fields.add(field(fieldWs, "integrity", jsonEncode(edit.getNewIntegrity())));
+        String entryText = "{" + String.join(",", fields) + closeWs + "}";
+        legacy = graftSorted(legacy, edit.getName(), entryText, true);
+        return putMember(root, "dependencies", legacy);
+    }
+
+    /** Reject a lock with any nested {@code node_modules} placement; a flat tree is required to insert soundly. */
+    private void requireFlatPlacement(Json.JsonObject packages) {
+        for (Json member : packages.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = memberKey((Json.Member) member);
+                if (key != null && key.indexOf("node_modules/") != key.lastIndexOf("node_modules/")) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "cannot add into a lock with nested node_modules placements: " + key);
+                }
+            }
+        }
+    }
+
+    private static String field(String fieldWs, String key, String valueSource) {
+        return fieldWs + jsonEncode(key) + ": " + valueSource;
+    }
+
+    /**
+     * Splice a new member (built from source text so its inner whitespace is exact) into {@code obj} at
+     * npm's sort position. The new member reuses a sibling's newline+indent prefix; when it becomes the
+     * new last member it inherits the previous last member's pre-brace {@code after}.
+     */
+    private Json.JsonObject graftSorted(Json.JsonObject obj, String key, String valueSource, boolean valueIsObject) {
+        String prefixWs = memberWhitespace(obj);
+        if (prefixWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "cannot insert into an object with no members");
+        }
+        Json.Member newMember = parseMember(prefixWs + jsonEncode(key) + ": " + valueSource);
+
+        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
+        int idx = sortedIndex(members, key, valueIsObject);
+        JsonRightPadded<Json> newRp = new JsonRightPadded<>(newMember, Space.EMPTY, Markers.EMPTY);
+        if (idx == members.size()) {
+            int lastReal = lastMemberIndex(members);
+            if (lastReal >= 0) {
+                JsonRightPadded<Json> prevLast = members.get(lastReal);
+                newRp = newRp.withAfter(prevLast.getAfter());
+                members.set(lastReal, prevLast.withAfter(Space.EMPTY));
+            }
+            members.add(newRp);
+        } else {
+            members.add(idx, newRp);
+        }
+        return obj.getPadding().withMembers(members);
+    }
+
+    private int sortedIndex(List<JsonRightPadded<Json>> members, String newKey, boolean newIsObject) {
+        int newGroup = newIsObject ? 1 : 0;
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            if (!(el instanceof Json.Member)) {
+                continue;
+            }
+            Json.Member m = (Json.Member) el;
+            String k = memberKey(m);
+            if (k == null) {
+                continue;
+            }
+            int group = m.getValue() instanceof Json.JsonObject ? 1 : 0;
+            if (group > newGroup || (group == newGroup && NpmKeyOrder.compareKeys(k, newKey) > 0)) {
+                return i;
+            }
+        }
+        return members.size();
+    }
+
+    private static int lastMemberIndex(List<JsonRightPadded<Json>> members) {
+        for (int i = members.size() - 1; i >= 0; i--) {
+            if (members.get(i).getElement() instanceof Json.Member) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** The newline+indent prefix of {@code obj}'s first member, or {@code null} if it has none. */
+    private static @Nullable String memberWhitespace(Json.JsonObject obj) {
+        for (Json member : obj.getMembers()) {
+            if (member instanceof Json.Member) {
+                return ((Json.Member) member).getPrefix().getWhitespace();
+            }
+        }
+        return null;
+    }
+
+    /** The newline+indent prefix one level deeper, read from a sibling's nested object member. */
+    private static @Nullable String nestedMemberWhitespace(Json.JsonObject obj) {
+        for (Json member : obj.getMembers()) {
+            if (member instanceof Json.Member && ((Json.Member) member).getValue() instanceof Json.JsonObject) {
+                String ws = memberWhitespace((Json.JsonObject) ((Json.Member) member).getValue());
+                if (ws != null) {
+                    return ws;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Parse a single member from a throwaway wrapper so its internal whitespace round-trips byte-exact. */
+    private static Json.Member parseMember(String memberSource) {
+        Json.Document doc = parse("{" + memberSource + "\n}");
+        if (doc.getValue() instanceof Json.JsonObject) {
+            for (Json member : ((Json.JsonObject) doc.getValue()).getMembers()) {
+                if (member instanceof Json.Member) {
+                    return (Json.Member) member;
+                }
+            }
+        }
+        throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct new lock member");
     }
 
     private Json.JsonObject applyWriteThrough(String name, Json.JsonObject entry, @Nullable WriteThroughMetadata wt) {

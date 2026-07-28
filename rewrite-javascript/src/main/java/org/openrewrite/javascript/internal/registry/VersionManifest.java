@@ -95,6 +95,17 @@ public class VersionManifest {
     @Nullable
     Dist dist;
 
+    /** Raw {@code funding} node (npm copies it verbatim into the lock entry); a String, object, or array. */
+    @Nullable
+    JsonNode funding;
+
+    @Nullable
+    Map<String, String> acceptDependencies;
+
+    /** Raw {@code workspaces} node, if a published manifest carries one. */
+    @Nullable
+    JsonNode workspaces;
+
     @Value
     public static class Dist {
         @Nullable

@@ -117,6 +117,43 @@ class NpmLockPatcherTest {
         assertThat(out).isEqualTo(golden("remove-orphan/after"));
     }
 
+    // --- leaf add (Phase B increment 1) ----------------------------------
+
+    private static PackageEdit leafAdd(String scope) {
+        return PackageEdit.builder()
+                .name("left-pad")
+                .oldVersion("")
+                .newVersion("1.3.0")
+                .newResolved("https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz")
+                .newIntegrity("sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==")
+                .scope(scope)
+                .importerDir(null)
+                .added(true)
+                .writeThroughMetadata(LockEditSet.WriteThroughMetadata.builder()
+                        .license("WTFPL")
+                        .deprecated("use String.prototype.padStart()")
+                        .build())
+                .build();
+    }
+
+    @Test
+    void leafAddV3IsByteExact() {
+        String out = new NpmLockPatcher().patch(editSet("add-leaf", leafAdd("dependencies")));
+        assertThat(out).isEqualTo(golden("add-leaf/after"));
+    }
+
+    @Test
+    void leafAddV2DualMapIsByteExact() {
+        String out = new NpmLockPatcher().patch(editSet("add-leaf-v2", leafAdd("dependencies")));
+        assertThat(out).isEqualTo(golden("add-leaf-v2/after"));
+    }
+
+    @Test
+    void leafAddDevScopeIsByteExact() {
+        String out = new NpmLockPatcher().patch(editSet("add-leaf-dev", leafAdd("devDependencies")));
+        assertThat(out).isEqualTo(golden("add-leaf-dev/after"));
+    }
+
     @Test
     void v1LockfileVersionFailsLoud() {
         LockEditSet set = new LockEditSet(

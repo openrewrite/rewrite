@@ -102,6 +102,12 @@ public class LockEditSet {
         /** The workspace member directory owning this dependency, or {@code null} for the root importer. */
         @Nullable
         String importerDir;
+
+        /**
+         * A brand-new dependency the recipe added (Phase B). The patcher inserts a new entry rather than
+         * rewriting an existing one; {@code oldVersion} is empty. Only a scalar-only leaf is emitted so far.
+         */
+        boolean added;
     }
 
     /**

@@ -43,9 +43,10 @@ import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 
 /**
- * PM-free end-to-end test that an add — outside the Phase-A closure-safe whitelist — fails loud: the
- * lock is left untouched, both files carry a {@link Markup.Warn}, and a structured
- * {@link NodeLockRegenerationFailures} row is emitted with reason {@code RESOLUTION_REQUIRED}.
+ * PM-free end-to-end tests for {@link AddDependency} lock regeneration: a scalar-only leaf add is
+ * resolved and written into the lock byte-exactly (Phase B increment 1), while a closure-changing add
+ * (a package with transitives) still fails loud — the lock is left untouched, both files carry a
+ * {@link Markup.Warn}, and a structured {@link NodeLockRegenerationFailures} row records the reason.
  */
 class AddDependencyLockRegenTest implements RewriteTest {
 
@@ -70,7 +71,31 @@ class AddDependencyLockRegenTest implements RewriteTest {
     }
 
     @Test
-    void addFailsLoudWarnsAndRecordsDataTableRow() {
+    void leafAddRegeneratesLockByteExact() {
+        routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
+        routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("left-pad", "^1.3.0", "dependencies"))
+                        .executionContext(ctx),
+                packageJson(resource("lock/npm/add-leaf/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-number", "6.0.0")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"left-pad\": \"^1.3.0\"");
+                            return actual;
+                        })),
+                packageLock(resource("lock/npm/add-leaf/before"), resource("lock/npm/add-leaf/after"),
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
+    void closureAddFailsLoudWarnsAndRecordsDataTableRow() {
+        // A package whose resolved version pulls a transitive is a closure add (Phase B I2), not a leaf.
+        routes.put("https://registry.npmjs.org/needs-transitive", "{\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/needs-transitive/1.0.0",
+                "{\"name\":\"needs-transitive\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^6.0.0\"}}");
+
         String pkgBefore = "{\n" +
                 "  \"name\": \"npm-lock-v3\",\n" +
                 "  \"version\": \"1.0.0\",\n" +
@@ -81,18 +106,18 @@ class AddDependencyLockRegenTest implements RewriteTest {
         String lock = resource("lock/npm/v3/before");
 
         rewriteRun(
-                spec -> spec.recipe(new AddDependency("left-pad", "^1.3.0", "dependencies"))
+                spec -> spec.recipe(new AddDependency("needs-transitive", "^1.0.0", "dependencies"))
                         .executionContext(ctx)
                         .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
                             assertThat(rows).hasSize(1);
                             assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
-                            assertThat(rows.get(0).getPackageName()).isEqualTo("left-pad");
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("needs-transitive");
                             assertThat(rows.get(0).getReason()).isEqualTo("RESOLUTION_REQUIRED");
                         }),
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
                         s -> s.after(actual -> {
-                            assertThat(actual).contains("\"left-pad\": \"^1.3.0\"");
+                            assertThat(actual).contains("\"needs-transitive\": \"^1.0.0\"");
                             return actual;
                         }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("manifest carries the lock-regen-failure warning").isPresent())),
@@ -100,7 +125,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         s -> s.after(actual -> {
                             assertThat(actual)
                                     .as("the add was not written into the lock — it is left untouched")
-                                    .doesNotContain("node_modules/left-pad")
+                                    .doesNotContain("node_modules/needs-transitive")
                                     .contains("\"is-odd\": \"3.0.0\"");
                             return actual;
                         }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))

@@ -249,7 +249,10 @@ public class NpmRegistryClient {
                 bundleDependencies(root),
                 text(root, "deprecated"),
                 root.has("_hasShrinkwrap") ? root.get("_hasShrinkwrap").asBoolean() : null,
-                dist);
+                dist,
+                root.get("funding"),
+                stringMap(root.get("acceptDependencies")),
+                root.get("workspaces"));
     }
 
     private static @Nullable Boolean deriveInstallScript(@Nullable Map<String, String> scripts) {

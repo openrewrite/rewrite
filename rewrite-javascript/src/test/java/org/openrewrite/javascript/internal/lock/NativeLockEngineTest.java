@@ -170,16 +170,54 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void addFailsLoud() {
+    void nonLeafAddFailsLoud() {
+        // A package whose resolved version pulls transitives is a closure add (Phase B I2), not a leaf.
+        routes.put("https://registry.npmjs.org/is-odd", "{\"versions\":{\"3.0.1\":{}}}");
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1",
+                "{\"name\":\"is-odd\",\"version\":\"3.0.1\",\"dependencies\":{\"is-number\":\"^6.0.0\"}}");
+
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{}}",
-                "{\"dependencies\":{\"left-pad\":\"^1.3.0\"}}",
+                "{\"dependencies\":{\"is-odd\":\"^3.0.1\"}}",
                 "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}");
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("left-pad");
-        assertThat(result.getFailure().getDetail()).contains("adding");
+        assertThat(result.getFailure().getPackageName()).isEqualTo("is-odd");
+        assertThat(result.getFailure().getDetail()).contains("transitive dependencies");
+    }
+
+    @Test
+    void nonScalarMetadataLeafAddFailsLoud() {
+        // A dependency-free package that still carries object metadata (engines) needs the object-field
+        // insert (I1-follow), so it defers rather than emit a maybe-wrong entry.
+        routes.put("https://registry.npmjs.org/is-number", "{\"versions\":{\"6.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/is-number/6.0.0",
+                "{\"name\":\"is-number\",\"version\":\"6.0.0\",\"dependencies\":{},\"engines\":{\"node\":\">=0.10.0\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{}}",
+                "{\"dependencies\":{\"is-number\":\"^6.0.0\"}}",
+                "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}");
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("engines").contains("not yet supported");
+    }
+
+    @Test
+    void leafAddByteExact() {
+        routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
+        routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                resource("lock/npm/add-leaf/pkg-after"),
+                resource("lock/npm/add-leaf/pkg-before"),
+                resource("lock/npm/add-leaf/before"),
+                null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-leaf/after"));
     }
 
     @Test
