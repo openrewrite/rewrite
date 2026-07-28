@@ -219,6 +219,14 @@ public class GradleParser implements Parser {
         public String getDslName() {
             return "gradle";
         }
+
+        @Override
+        public Builder clone() {
+            Builder clone = (Builder) super.clone();
+            clone.groovyParser = this.groovyParser.clone();
+            clone.kotlinParser = this.kotlinParser.clone();
+            return clone;
+        }
     }
 
     private List<Path> defaultClasspath(ExecutionContext ctx) {

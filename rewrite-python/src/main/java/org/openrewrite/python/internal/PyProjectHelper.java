@@ -291,8 +291,9 @@ public class PyProjectHelper {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile modified = refreshMarker((SourceFile) updated.getTree());
+        String originalDepsContent = ((SourceFile) trait.getTree()).printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(modified, capturedLockContent, ctx);
+                : regenerateLockContent(modified, originalDepsContent, capturedLockContent, ctx);
         if (regen != null && regen.isSuccess() && regen.getLockFileContent() != null) {
             modified = applyResolvedDependencies(modified, regen.getLockFileContent());
         }
@@ -331,6 +332,17 @@ public class PyProjectHelper {
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile depsFile, @Nullable String capturedLockContent, ExecutionContext ctx) {
+        return regenerateLockContent(depsFile, null, capturedLockContent, ctx);
+    }
+
+    /**
+     * @param originalDepsContent the pre-edit dependencies-file content, or {@code null}; lets the
+     *                            engine reconcile only the packages the edit changed (see
+     *                            {@link LockFileRegeneration#regenerate}).
+     */
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile depsFile, @Nullable String originalDepsContent,
+            @Nullable String capturedLockContent, ExecutionContext ctx) {
         PythonResolutionResult marker = depsFile.getMarkers()
                 .findFirst(PythonResolutionResult.class).orElse(null);
         if (marker == null) {
@@ -340,7 +352,7 @@ public class PyProjectHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(depsFile.printAll(), capturedLockContent, ctx);
+        return regen.regenerate(depsFile.printAll(), originalDepsContent, capturedLockContent, ctx);
     }
 
     /**

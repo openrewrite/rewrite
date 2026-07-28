@@ -136,7 +136,13 @@ public abstract class LockFileRegeneration {
     }
 
     public final Result regenerate(String dependenciesContent, @Nullable String existingLockContent, ExecutionContext ctx) {
-        return regenerate(dependenciesContent, existingLockContent, Collections.emptyMap(), ctx);
+        return regenerate(dependenciesContent, null, existingLockContent, Collections.emptyMap(), ctx);
+    }
+
+    public final Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
+                                   @Nullable String existingLockContent, ExecutionContext ctx) {
+        return regenerate(dependenciesContent, originalDependenciesContent, existingLockContent,
+                Collections.emptyMap(), ctx);
     }
 
     /**
@@ -144,50 +150,62 @@ public abstract class LockFileRegeneration {
      * When an existing lock file is provided a minimal update is performed
      * rather than re-resolving every dependency from scratch.
      *
-     * @param dependenciesContent the dependencies-file content to lock
-     * @param existingLockContent the current lock file content, or {@code null}
-     * @param environment         ignored; retained for API compatibility with the
-     *                            former shell-out implementation. Environment-style
-     *                            proxy/index configuration has no effect on the
-     *                            native engines; use {@code ctx} instead
-     * @param ctx                 supplies the HTTP transport (proxy included) via
-     *                            {@link org.openrewrite.HttpSenderExecutionContextView}
-     *                            and host-configured package indexes/credentials via
-     *                            {@link org.openrewrite.python.PythonExecutionContextView}
+     * @param dependenciesContent         the dependencies-file content to lock
+     * @param originalDependenciesContent the pre-edit dependencies-file content, or {@code null}.
+     *                                    When provided, engines that support it reconcile only the
+     *                                    packages the edit actually changed, leaving pre-existing
+     *                                    drift in untouched packages as-is instead of aborting
+     * @param existingLockContent         the current lock file content, or {@code null}
+     * @param environment                 ignored; retained for API compatibility with the
+     *                                    former shell-out implementation. Environment-style
+     *                                    proxy/index configuration has no effect on the
+     *                                    native engines; use {@code ctx} instead
+     * @param ctx                         supplies the HTTP transport (proxy included) via
+     *                                    {@link org.openrewrite.HttpSenderExecutionContextView}
+     *                                    and host-configured package indexes/credentials via
+     *                                    {@link org.openrewrite.python.PythonExecutionContextView}
      * @return a result containing the new lock file content, or a failure
      */
-    public abstract Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
-                                      Map<String, String> environment, ExecutionContext ctx);
+    public abstract Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
+                                      @Nullable String existingLockContent, Map<String, String> environment,
+                                      ExecutionContext ctx);
 
     private static final class NativePipenv extends LockFileRegeneration {
         @Override
-        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
-                                 Map<String, String> environment, ExecutionContext ctx) {
-            return PipenvLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
+        public Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
+                                 @Nullable String existingLockContent, Map<String, String> environment,
+                                 ExecutionContext ctx) {
+            return PipenvLockEngine.regenerate(dependenciesContent, originalDependenciesContent,
+                    existingLockContent, ctx);
         }
     }
 
     private static final class NativeUv extends LockFileRegeneration {
         @Override
-        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
-                                 Map<String, String> environment, ExecutionContext ctx) {
+        public Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
+                                 @Nullable String existingLockContent, Map<String, String> environment,
+                                 ExecutionContext ctx) {
             return UvLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
         }
     }
 
     private static final class NativePoetry extends LockFileRegeneration {
         @Override
-        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
-                                 Map<String, String> environment, ExecutionContext ctx) {
-            return PoetryLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
+        public Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
+                                 @Nullable String existingLockContent, Map<String, String> environment,
+                                 ExecutionContext ctx) {
+            return PoetryLockEngine.regenerate(dependenciesContent, originalDependenciesContent,
+                    existingLockContent, ctx);
         }
     }
 
     private static final class NativePdm extends LockFileRegeneration {
         @Override
-        public Result regenerate(String dependenciesContent, @Nullable String existingLockContent,
-                                 Map<String, String> environment, ExecutionContext ctx) {
-            return PdmLockEngine.regenerate(dependenciesContent, existingLockContent, ctx);
+        public Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
+                                 @Nullable String existingLockContent, Map<String, String> environment,
+                                 ExecutionContext ctx) {
+            return PdmLockEngine.regenerate(dependenciesContent, originalDependenciesContent,
+                    existingLockContent, ctx);
         }
     }
 }

@@ -101,6 +101,12 @@ export interface DiscoveredFiles {
     };
     /** JavaScript/TypeScript files (includes .prettierrc.js, prettier.config.js) */
     jsFiles: string[];
+    /**
+     * JS/TS files that won't be parsed into an AST and are instead recorded as
+     * Quarks (path only, no content). Currently only files over
+     * {@link MAX_PARSEABLE_SIZE_BYTES}; other unparseable cases may join later.
+     */
+    unparseableFiles: string[];
     /** JSON files (tsconfig.json, .prettierrc.json, other .json) */
     jsonFiles: string[];
     /** YAML files (.prettierrc.yaml, other .yaml/.yml) */
@@ -128,6 +134,14 @@ export const DEFAULT_EXCLUSIONS = [
 const SOURCE_EXTENSIONS = new Set([
     ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"
 ]);
+
+/**
+ * JS/TS files larger than this are recorded as Quarks rather than parsed into a
+ * full AST. Matches the 1 MB default in the JVM {@code JavaScriptParser}, which
+ * likewise diverts oversize files off the parse path. A ~20 MB JSON-like `.js`
+ * otherwise balloons the TypeScript parser to multi-GB / OOM.
+ */
+const MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024;
 
 /**
  * All lock file names for quick lookup.
@@ -412,6 +426,7 @@ export class ProjectParser {
                 text: []
             },
             jsFiles: [],
+            unparseableFiles: [],
             jsonFiles: [],
             yamlFiles: [],
             textFiles: []
@@ -434,7 +449,7 @@ export class ProjectParser {
             if (basename === "package.json") {
                 discovered.packageJsonFiles.push(file);
             } else if (SOURCE_EXTENSIONS.has(ext)) {
-                discovered.jsFiles.push(file);
+                (this.isOversize(file) ? discovered.unparseableFiles : discovered.jsFiles).push(file);
             } else if ((JSON_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
                 discovered.lockFiles.json.push(file);
             } else if (basename === "yarn.lock") {
@@ -605,6 +620,19 @@ export class ProjectParser {
     }
 
     /**
+     * Whether a source file exceeds {@link MAX_PARSEABLE_SIZE_BYTES}. A stat
+     * failure returns false so the file follows the normal parse path (which
+     * surfaces a real read error as a ParseError) rather than being quarked.
+     */
+    private isOversize(filePath: string): boolean {
+        try {
+            return fs.statSync(filePath).size > MAX_PARSEABLE_SIZE_BYTES;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Classifies a yarn.lock file as YAML (Berry) or text (Classic).
      */
     private async classifyYarnLockFile(filePath: string): Promise<"yaml" | "text"> {
@@ -633,6 +661,7 @@ export class ProjectParser {
             discovered.lockFiles.yaml.length +
             discovered.lockFiles.text.length +
             discovered.jsFiles.length +
+            discovered.unparseableFiles.length +
             discovered.jsonFiles.length +
             discovered.yamlFiles.length +
             discovered.textFiles.length
@@ -652,6 +681,7 @@ export class ProjectParser {
                 text: discovered.lockFiles.text.filter(filter)
             },
             jsFiles: discovered.jsFiles.filter(filter),
+            unparseableFiles: discovered.unparseableFiles.filter(filter),
             jsonFiles: discovered.jsonFiles.filter(filter),
             yamlFiles: discovered.yamlFiles.filter(filter),
             textFiles: discovered.textFiles.filter(filter)

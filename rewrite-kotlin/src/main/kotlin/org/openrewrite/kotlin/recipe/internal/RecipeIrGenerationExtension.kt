@@ -60,6 +60,7 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrReturn
 import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrStringConcatenation
 import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.expressions.IrVarargElement
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
@@ -430,8 +431,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         if (displayNameIdx < 0 || descriptionIdx < 0) return null
-        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
-        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
+        val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
 
         val tagsIdx = params.indexOfFirst { it.name == Name.identifier("tags") }
         val tagsArg = if (tagsIdx >= 0) substantiveArgOrNull(call.arguments[tagsIdx]) else null
@@ -455,8 +456,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         val recipesIdx = params.indexOfFirst { it.name == Name.identifier("recipes") }
         if (displayNameIdx < 0 || descriptionIdx < 0 || recipesIdx < 0) return null
-        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
-        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
+        val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
         val recipesVararg = call.arguments[recipesIdx] as? org.jetbrains.kotlin.ir.expressions.IrVararg ?: return null
         return CompositeRecipeMetadata(displayName, description, recipesVararg)
     }
@@ -478,6 +479,38 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
         }
         return arg
+    }
+
+    /**
+     * Fold a `displayName` / `description` argument to a compile-time constant
+     * String. This runs BEFORE the IR const-evaluation lowering, so even a
+     * literal `"a" + "b"` is still an unlowered `IrCall`/`IrStringConcatenation`
+     * here — a plain `as? IrConst` would miss it and silently drop the recipe.
+     */
+    private fun evalConstString(expr: IrExpression?): String? {
+        return when (expr) {
+            null -> null
+            is IrConst -> expr.value?.toString()
+            is IrStringConcatenation -> buildString {
+                for (part in expr.arguments) append(evalConstString(part) ?: return null)
+            }
+            is IrCall -> when (expr.symbol.owner.kotlinFqName.asString()) {
+                "kotlin.String.plus" -> {
+                    val left = evalConstString(expr.arguments.getOrNull(0)) ?: return null
+                    val right = evalConstString(expr.arguments.getOrNull(1)) ?: return null
+                    left + right
+                }
+                "kotlin.text.trimIndent" -> evalConstString(expr.arguments.getOrNull(0))?.trimIndent()
+                "kotlin.text.trimMargin" -> {
+                    val receiver = evalConstString(expr.arguments.getOrNull(0)) ?: return null
+                    val marginArg = expr.arguments.getOrNull(1)
+                    if (marginArg == null) receiver.trimMargin()
+                    else receiver.trimMargin(evalConstString(marginArg) ?: return null)
+                }
+                else -> null
+            }
+            else -> null
+        }
     }
 
     // ------------------------------------------------------------------

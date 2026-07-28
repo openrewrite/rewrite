@@ -92,6 +92,33 @@ class PdmLockEngineTest {
         assertThat(http.requests).isEmpty();
     }
 
+    @Test
+    void unrelatedMissingDependencyDoesNotBlockScopedUpgrade() {
+        stubPypiSix();
+        // attrs is declared but absent from the lock (pre-existing drift). Bumping six — which the
+        // recipe actually changed — must succeed and leave attrs alone, not abort on it.
+        String original = resource("g-upgrade/pyproject.toml.before")
+                .replace("dependencies = [\"six==1.16.0\"]", "dependencies = [\"six==1.16.0\", \"attrs==25.1.0\"]");
+        String edited = resource("g-upgrade/pyproject.toml.after")
+                .replace("dependencies = [\"six==1.17.0\"]", "dependencies = [\"six==1.17.0\", \"attrs==25.1.0\"]");
+        Result result = PdmLockEngine.regenerate(edited, original, resource("g-upgrade/pdm.lock.before"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getLockFileContent()).contains("version = \"1.17.0\"");
+        assertThat(result.getLockFileContent()).doesNotContain("attrs");
+    }
+
+    @Test
+    void newlyAddedDependencyStillDefersUnderScoping() {
+        // With the original supplied, adding attrs IS the change, so it still defers to resolution.
+        String original = resource("a-minimal/pyproject.toml");
+        String edited = original.replace("dependencies = [\"six==1.16.0\"]", "dependencies = [\"six==1.16.0\", \"attrs==25.1.0\"]");
+        Result result = PdmLockEngine.regenerate(edited, original, resource("a-minimal/pdm.lock"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("attrs");
+    }
+
     static final class RoutedHttp implements HttpSender {
         final Map<String, byte[]> routes = new LinkedHashMap<>();
         final List<String> requests = new ArrayList<>();

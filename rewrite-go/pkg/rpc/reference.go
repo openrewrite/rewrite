@@ -61,6 +61,28 @@ func (m *ReferenceMap) Len() int {
 	return len(m.refs)
 }
 
+// NextID returns the id that will be assigned to the next new reference. Capture it
+// before a source file is visited to use as a rollback checkpoint (see RollbackTo).
+func (m *ReferenceMap) NextID() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.nextID
+}
+
+// RollbackTo drops every reference assigned at or after the checkpoint and resets the id
+// counter so the next file re-allocates the same ids. Unlike DiscardNewReferences, this is
+// safe only because the remote receiver rolls back in lockstep (per-source-file evict).
+func (m *ReferenceMap) RollbackTo(checkpoint int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for obj, ref := range m.refs {
+		if ref >= checkpoint {
+			delete(m.refs, obj)
+		}
+	}
+	m.nextID = checkpoint
+}
+
 func (m *ReferenceMap) deleteIfMatches(obj any, ref int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

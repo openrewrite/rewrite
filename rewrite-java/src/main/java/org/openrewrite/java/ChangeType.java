@@ -748,8 +748,13 @@ public class ChangeType extends Recipe {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 for (J.ClassDeclaration declaration : cu.getClasses()) {
-                    // Check the class name instead of source path, as it might differ
-                    String fqn = declaration.getType().getFullyQualifiedName();
+                    // Check the class name instead of source path, as it might differ.
+                    // Non-Java (e.g. Python) class declarations may lack type attribution.
+                    JavaType.FullyQualified declarationType = declaration.getType();
+                    if (declarationType == null) {
+                        continue;
+                    }
+                    String fqn = declarationType.getFullyQualifiedName();
                     if (fqn.equals(originalType.getFullyQualifiedName())) {
                         getCursor().putMessage("UPDATE_PACKAGE", true);
                         break;

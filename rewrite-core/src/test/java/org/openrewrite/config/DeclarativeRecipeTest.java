@@ -42,6 +42,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -292,6 +293,84 @@ class DeclarativeRecipeTest implements RewriteTest {
             ))
             .expectedCyclesThatMakeChanges(1),
           text("1")
+        );
+    }
+
+    @Test
+    void yamlPreconditionWithScanningRecipeOverridingThreeArgGenerate() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: 1
+              recipeList:
+                - org.openrewrite.text.AppendToTextFile:
+                   relativeFileName: file.txt
+                   content: content
+              """, "org.openrewrite.PreconditionTest"),
+          text("1", spec -> spec.path("trigger.txt")),
+          text(
+            null,
+            """
+              content
+              """,
+            spec -> spec.path("file.txt")
+          )
+        );
+    }
+
+    @Test
+    void yamlPreconditionNotMetStillGeneratesSources() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: 1
+              recipeList:
+                - org.openrewrite.text.AppendToTextFile:
+                   relativeFileName: file.txt
+                   content: content
+              """, "org.openrewrite.PreconditionTest"),
+          text("2", spec -> spec.path("trigger.txt")),
+          text(
+            null,
+            """
+              content
+              """,
+            spec -> spec.path("file.txt")
+          )
+        );
+    }
+
+    @Test
+    void preconditionDecoratorDelegatesThreeArgGenerate() {
+        rewriteRun(
+          spec -> {
+              spec.validateRecipeSerialization(false);
+              var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+                null, URI.create("null"), false, emptyList());
+              dr.addPrecondition(
+                toRecipe(() -> new PlainTextVisitor<>() {
+                    @Override
+                    public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                        return SearchResult.found(text);
+                    }
+                })
+              );
+              dr.addUninitialized(new ThreeArgGenerateRecipe());
+              dr.initialize(List.of());
+              spec.recipe(dr);
+          },
+          text("trigger", spec -> spec.path("trigger.txt")),
+          text(null, "generated", spec -> spec.path("generated.txt"))
         );
     }
 
@@ -906,6 +985,47 @@ class DeclarativeRecipeTest implements RewriteTest {
           .hasSize(1)
           .first()
           .satisfies(r -> assertThat(r.getName()).isEqualTo("leaf"));
+    }
+
+    static class ThreeArgGenerateRecipe extends ScanningRecipe<AtomicBoolean> {
+        @Override
+        public String getDisplayName() {
+            return "Three-arg generate recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Generates a file by overriding only the three-arg generate overload.";
+        }
+
+        @Override
+        public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+            return new AtomicBoolean(false);
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean fileExists) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if (Path.of("generated.txt").equals(text.getSourcePath())) {
+                        fileExists.set(true);
+                    }
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public Collection<SourceFile> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
+            if (fileExists.get()) {
+                return emptyList();
+            }
+            return List.of(PlainText.builder()
+              .sourcePath(Path.of("generated.txt"))
+              .text("generated")
+              .build());
+        }
     }
 
     static class CountingRecipe extends ScanningRecipe<List<String>> {

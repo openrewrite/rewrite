@@ -7,7 +7,7 @@ and type-specific visit methods handling only additional fields.
 from typing import Any, TYPE_CHECKING
 
 from rewrite import Markers
-from rewrite.utils import id_to_str
+from rewrite.utils import id_to_int, id_to_str
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.parser import ParseError
 from rewrite.python import CompilationUnit
@@ -821,10 +821,11 @@ class PythonRpcSender:
         if markers is None:
             return
         q.get_and_send(markers, lambda x: id_to_str(x._id))
-        # Send markers list as ref - for now send as regular list
-        # Java uses getAndSendListAsRef but we'll use regular list for simplicity
+        # A marker whose type Python lacks a codec for is held opaquely as {'kind': ..., 'id': ...},
+        # where 'id' is a canonical UUID string (not the 128-bit int a typed node's _id is); normalise
+        # it so id_to_str gets an int. (Markers is the only list that can carry opaque elements.)
         q.get_and_send_list(markers, lambda x: x.markers,
-                           lambda m: id_to_str(m._id),
+                           lambda m: id_to_str(id_to_int(m['id']) if isinstance(m, dict) else m._id),
                            None)  # No on_change - each marker is sent as-is
 
     def _visit_type(self, java_type, q: 'RpcSendQueue') -> None:

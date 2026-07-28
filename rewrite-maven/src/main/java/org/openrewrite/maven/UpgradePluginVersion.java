@@ -153,18 +153,6 @@ public class UpgradePluginVersion extends Recipe {
                 return super.visitTag(tag, ctx);
             }
 
-            private boolean hasManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
-                for (Plugin p : ListUtils.concatAll(resolvedPom.getPluginManagement(),
-                        resolvedPom.getRequested().getPluginManagement())) {
-                    if (p.getGroupId().equals(groupId) &&
-                            p.getArtifactId().equals(artifactId) &&
-                            p.getVersion() != null) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId,
                                                                 String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadPluginMetadata(groupId, artifactId, ctx));
@@ -177,6 +165,18 @@ public class UpgradePluginVersion extends Recipe {
                 return versionComparator.upgrade(currentVersion, availableVersions);
             }
         });
+    }
+
+    private static boolean hasManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
+        for (Plugin p : ListUtils.concatAll(resolvedPom.getPluginManagement(),
+                resolvedPom.getRequested().getPluginManagement())) {
+            if (p.getGroupId().equals(groupId) &&
+                    p.getArtifactId().equals(artifactId) &&
+                    p.getVersion() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Value
@@ -202,7 +202,7 @@ public class UpgradePluginVersion extends Recipe {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }
                     }
-                } else if (addVersionIfMissing) {
+                } else if (addVersionIfMissing && !hasManagedPluginVersion(getResolutionResult().getPom(), groupId, artifactId)) {
                     Xml.Tag newTag = Xml.Tag.build("<version>" + newVersion + "</version>");
                     doAfterVisit(new AddToTagVisitor<>(tag, newTag, new MavenTagInsertionComparator(tag.getChildren())));
                 }

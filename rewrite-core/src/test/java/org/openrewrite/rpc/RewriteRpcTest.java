@@ -198,6 +198,47 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(result.getText()).isEqualTo("Fixed");
     }
 
+    /**
+     * {@link RewriteRpc#evict} drops the tree from both peers and rolls the client's ref maps
+     * back to the pre-file checkpoint.
+     */
+    @SneakyThrows
+    @Test
+    void evictDropsTreeFromBothPeers() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // High-water before the client fetches anything, so evict rolls back exactly this exchange.
+        int[] checkpoint = client.refCheckpoint();
+
+        // Server holds the tree; client fetches it → both peers cache it.
+        server.localObjects.put(id, original);
+        client.getObject(id, sourceFileType);
+        assertThat(client.localObjects).containsKey(id);
+        assertThat(client.remoteObjects).containsKey(id);
+        assertThat(server.localObjects).containsKey(id);
+        assertThat(server.remoteObjects).containsKey(id);
+
+        client.evict(id, checkpoint[0], checkpoint[1]);
+
+        // Client cleared synchronously, including refs rolled back to the checkpoint.
+        assertThat(client.localObjects).doesNotContainKey(id);
+        assertThat(client.remoteObjects).doesNotContainKey(id);
+        assertThat(client.remoteRefs.keySet()).allMatch(ref -> ref <= checkpoint[1]);
+
+        // The Evict notification is fire-and-forget; wait for the server to apply it.
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (server.localObjects.containsKey(id) && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(server.localObjects).doesNotContainKey(id);
+        assertThat(server.remoteObjects).doesNotContainKey(id);
+    }
+
     @DocumentExample
     @Test
     void sendReceiveIdempotence() {

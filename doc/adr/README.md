@@ -9,3 +9,4 @@
 * [7. JavaScript templating engine enhancements](0007-javascript-templating-enhancements.md)
 * [8. Data table stores across the Rewrite RPC boundary](0008-rpc-data-table-stores.md)
 * [9. Native Python lock file regeneration](0009-native-python-lock-regeneration.md)
+* [10. Native uv.lock delta resolution: sizing and a greedy-forward approach](0010-native-uv-lock-delta-resolution.md)

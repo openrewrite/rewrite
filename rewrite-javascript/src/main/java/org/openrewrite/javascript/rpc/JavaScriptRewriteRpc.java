@@ -28,6 +28,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -183,6 +184,16 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
+
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the TypeScript side declined to parse; build the Quark
+                    // locally from its path (plus file attributes) — no content on the wire.
+                    Path base = relativeTo != null ? relativeTo : projectPath;
+                    Path sourcePath = Paths.get(item.getSourcePath());
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(base.resolve(sourcePath))));
+                    return true;
+                }
 
                 SourceFile sourceFile;
                 try {

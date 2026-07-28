@@ -27,7 +27,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.python.tree.*;
 
@@ -509,9 +511,16 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         if (space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null) {
             return space;
         }
-        if (space.getComments().isEmpty()) {
-            return space;
-        }
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        if (marker instanceof TrailingComma) {
+            TrailingComma tc = (TrailingComma) marker;
+            //noinspection unchecked
+            return (M) tc.withSuffix(visitSpace(tc.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        return super.visitMarker(marker, p);
     }
 }

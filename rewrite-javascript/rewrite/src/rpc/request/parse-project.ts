@@ -232,6 +232,17 @@ export class ParseProject {
                         }
                     }
 
+                    // Unparseable JS/TS files (currently: too large) are recorded as
+                    // Quarks. The Java side builds the Quark locally from sourcePath,
+                    // so no GetObject round-trip and no content crosses the wire.
+                    for (const filePath of discovered.unparseableFiles) {
+                        resultItems.push({
+                            id: randomId(),
+                            sourceFileType: "org.openrewrite.quark.Quark", // break cycle
+                            sourcePath: path.relative(relativeTo, filePath)
+                        });
+                    }
+
                     // Parse other YAML files
                     if (discovered.yamlFiles.length > 0) {
                         const parser = Parsers.createParser("yaml", {ctx, relativeTo});

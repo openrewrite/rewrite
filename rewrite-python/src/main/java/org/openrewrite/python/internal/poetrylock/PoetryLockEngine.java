@@ -53,6 +53,11 @@ public final class PoetryLockEngine {
     }
 
     public static Result regenerate(String pyprojectContent, @Nullable String oldLockContent, ExecutionContext ctx) {
+        return regenerate(pyprojectContent, null, oldLockContent, ctx);
+    }
+
+    public static Result regenerate(String pyprojectContent, @Nullable String originalPyprojectContent,
+                                    @Nullable String oldLockContent, ExecutionContext ctx) {
         if (oldLockContent == null) {
             return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null, null,
                     "No existing poetry.lock; locking from scratch requires full dependency resolution, " +
@@ -70,8 +75,10 @@ public final class PoetryLockEngine {
             return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null,
                     "Edited pyproject.toml could not be parsed as TOML"));
         }
+        // Best-effort: a null or unparseable original falls back to whole-pyproject reconciliation.
+        Toml.Document originalPyproject = originalPyprojectContent == null ? null : parseToml(originalPyprojectContent);
         try {
-            return new Run(pyproject, lock, ctx).regenerate();
+            return new Run(pyproject, originalPyproject, lock, ctx).regenerate();
         } catch (PythonIndexException e) {
             return Result.failure(indexFailure(null, e));
         } catch (PoetryLockFormatException e) {
@@ -126,6 +133,7 @@ public final class PoetryLockEngine {
 
     private static final class Run {
         private final Toml.Document pyproject;
+        private final Toml.@Nullable Document originalPyproject;
         private final PoetryLock lock;
         private final HttpSender http;
         private final SimpleIndexClient simpleClient;
@@ -135,8 +143,9 @@ public final class PoetryLockEngine {
 
         private List<PoetryLockPackage> packages;
 
-        Run(Toml.Document pyproject, PoetryLock lock, ExecutionContext ctx) {
+        Run(Toml.Document pyproject, Toml.@Nullable Document originalPyproject, PoetryLock lock, ExecutionContext ctx) {
             this.pyproject = pyproject;
+            this.originalPyproject = originalPyproject;
             this.lock = lock;
             this.http = HttpSenderExecutionContextView.view(ctx).getHttpSender();
             this.simpleClient = new SimpleIndexClient(http);
@@ -157,7 +166,10 @@ public final class PoetryLockEngine {
             packages = new ArrayList<>(lock.getPackages());
             String newHash = PoetryContentHash.hash(pyproject);
 
-            Map<String, @Nullable PythonVersionSpecifierSet> declared = collectDirectDeps();
+            Map<String, @Nullable PythonVersionSpecifierSet> declared = collectDirectDeps(pyproject);
+            Map<String, @Nullable PythonVersionSpecifierSet> originalDeclared =
+                    originalPyproject == null ? null : collectDirectDeps(originalPyproject);
+            Set<String> changedPackages = changedNames(originalDeclared, declared);
 
             Map<String, Integer> byName = new HashMap<>();
             for (int i = 0; i < packages.size(); i++) {
@@ -166,6 +178,10 @@ public final class PoetryLockEngine {
 
             List<Change> changes = new ArrayList<>();
             for (Map.Entry<String, @Nullable PythonVersionSpecifierSet> dep : declared.entrySet()) {
+                // Leave pre-existing drift in a dependency the recipe never touched exactly as-is.
+                if (changedPackages != null && !changedPackages.contains(dep.getKey())) {
+                    continue;
+                }
                 Integer idx = byName.get(dep.getKey());
                 if (idx == null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep.getKey(),
@@ -182,7 +198,11 @@ public final class PoetryLockEngine {
                 }
             }
 
-            requireNoOrphans(declared.keySet(), byName);
+            // Tolerate orphans that already existed under the original declarations; only fail loud
+            // on packages this edit orphaned (a removal or closure-shrinking change).
+            Set<String> tolerated = originalDeclared == null ?
+                    Collections.emptySet() : orphansUnder(originalDeclared.keySet(), byName);
+            requireNoOrphans(declared.keySet(), byName, tolerated);
 
             for (Change change : changes) {
                 applyLeafChange(change);
@@ -192,12 +212,53 @@ public final class PoetryLockEngine {
             return Result.success(PoetryLockWriter.write(updated));
         }
 
+        private static @Nullable Set<String> changedNames(
+                @Nullable Map<String, @Nullable PythonVersionSpecifierSet> original,
+                Map<String, @Nullable PythonVersionSpecifierSet> edited) {
+            if (original == null) {
+                return null;
+            }
+            Set<String> changed = new HashSet<>();
+            Set<String> names = new HashSet<>(original.keySet());
+            names.addAll(edited.keySet());
+            for (String name : names) {
+                if (!Objects.equals(original.get(name), edited.get(name))) {
+                    changed.add(name);
+                }
+            }
+            return changed;
+        }
+
         /**
          * Every locked package must be reachable by name from a declared direct dependency, so a
          * pure version change leaves no orphan. A removed dependency (or one pruned by an upgrade)
          * shows up as an orphan and defers to a real relock.
          */
-        private void requireNoOrphans(Set<String> roots, Map<String, Integer> byName) {
+        private void requireNoOrphans(Set<String> roots, Map<String, Integer> byName, Set<String> tolerated) {
+            Set<String> reachable = reachableFrom(roots, byName);
+            for (PoetryLockPackage pkg : packages) {
+                String canonical = Pep508Requirement.canonicalize(pkg.getName());
+                if (!reachable.contains(canonical) && !tolerated.contains(canonical)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                            "Locked package " + pkg.getName() + " is not reachable from the declared " +
+                                    "dependencies; pruning or adding a dependency requires resolution");
+                }
+            }
+        }
+
+        private Set<String> orphansUnder(Set<String> roots, Map<String, Integer> byName) {
+            Set<String> reachable = reachableFrom(roots, byName);
+            Set<String> orphans = new HashSet<>();
+            for (PoetryLockPackage pkg : packages) {
+                String canonical = Pep508Requirement.canonicalize(pkg.getName());
+                if (!reachable.contains(canonical)) {
+                    orphans.add(canonical);
+                }
+            }
+            return orphans;
+        }
+
+        private Set<String> reachableFrom(Set<String> roots, Map<String, Integer> byName) {
             Set<String> reachable = new HashSet<>();
             Deque<String> queue = new ArrayDeque<>();
             for (String root : roots) {
@@ -217,13 +278,7 @@ public final class PoetryLockEngine {
                     }
                 }
             }
-            for (PoetryLockPackage pkg : packages) {
-                if (!reachable.contains(Pep508Requirement.canonicalize(pkg.getName()))) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
-                            "Locked package " + pkg.getName() + " is not reachable from the declared " +
-                                    "dependencies; pruning or adding a dependency requires resolution");
-                }
-            }
+            return reachable;
         }
 
         private void applyLeafChange(Change change) {
@@ -418,7 +473,7 @@ public final class PoetryLockEngine {
         // ---- manifest reading ----
 
         @SuppressWarnings("unchecked")
-        private Map<String, @Nullable PythonVersionSpecifierSet> collectDirectDeps() {
+        private Map<String, @Nullable PythonVersionSpecifierSet> collectDirectDeps(Toml.Document pyproject) {
             Map<String, Object> root = PyprojectData.toNestedMap(pyproject);
             Map<String, @Nullable PythonVersionSpecifierSet> deps = new LinkedHashMap<>();
 

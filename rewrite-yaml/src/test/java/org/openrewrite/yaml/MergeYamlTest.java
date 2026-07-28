@@ -3139,6 +3139,154 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @MethodSource("insertNextToLastSiblingFollowedByBlankLinesOptions")
+    void insertNewKeyDirectlyNextToLastSiblingWhenFollowedByBlankLines(MergeYaml.@Nullable InsertMode insertMode,
+                                                                       @Nullable String insertProperty,
+                                                                       String after) {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.service_config",
+              // language=yaml
+              """
+                enabled: true
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              service_config:
+                name: 'hello'
+
+
+
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertNextToLastSiblingFollowedByBlankLinesOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(Last, null,
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(After, "name",
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(Before, "name",
+            """
+              service_config:
+                enabled: true
+                name: 'hello'
+
+
+
+              """)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertNextToLastSiblingPrecededByBlankLinesOptions")
+    void insertNewKeyDirectlyNextToLastSiblingWhenPrecededByBlankLines(MergeYaml.@Nullable InsertMode insertMode,
+                                                                       @Nullable String insertProperty,
+                                                                       String after) {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.service_config",
+              // language=yaml
+              """
+                enabled: true
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              service_config:
+
+
+
+                name: 'hello'
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertNextToLastSiblingPrecededByBlankLinesOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(Last, null,
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(After, "name",
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(Before, "name",
+            """
+              service_config:
+
+
+
+                enabled: true
+                name: 'hello'
+              """)
+        );
+    }
+
     @Test
     void invalidYaml() {
         var recipe = new MergeYaml(

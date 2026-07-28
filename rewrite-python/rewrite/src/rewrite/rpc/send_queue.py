@@ -277,7 +277,12 @@ class RpcSendQueue:
         # Primitives and built-ins don't need type info
         if obj_type in (str, int, float, bool, type(None)):
             return None
-        if isinstance(obj, (list, dict)):
+        if isinstance(obj, dict):
+            # An opaque value the remote side has a codec for but Python does not is received as
+            # {'kind': <valueType>, **fields} (see RpcReceiveQueue._do_change). Re-emit its original
+            # valueType so it round-trips unchanged; an ordinary dict (no 'kind') stays untyped.
+            return obj.get('kind')
+        if isinstance(obj, list):
             return None
         if isinstance(obj, UUID):
             return None
@@ -318,6 +323,10 @@ class RpcSendQueue:
         import math
         if obj is None:
             return None
+        if isinstance(obj, dict) and 'kind' in obj:
+            # Opaque value (see _get_value_type): its wire payload is every field except the
+            # synthetic 'kind' tag the receiver added. Emit that back as the value.
+            return {k: v for k, v in obj.items() if k != 'kind'}
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):

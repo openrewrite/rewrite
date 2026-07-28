@@ -81,6 +81,9 @@ public class RewriteRpcProcess extends Thread {
     private Thread stderrDrainThread;
 
     @Nullable
+    private Thread rssSamplerThread;
+
+    @Nullable
     private IOException startupFailure;
 
     public RewriteRpcProcess(String... command) {
@@ -218,6 +221,8 @@ public class RewriteRpcProcess extends Thread {
         }, "rpc-shutdown");
         Runtime.getRuntime().addShutdownHook(shutdownHook);
 
+        startRssSampler();
+
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
         module.addDeserializer(Path.class, new PathDeserializer());
@@ -231,6 +236,10 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public void shutdown() {
+        if (rssSamplerThread != null) {
+            rssSamplerThread.interrupt();
+            rssSamplerThread = null;
+        }
         if (shutdownHook != null) {
             try {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
@@ -270,6 +279,75 @@ public class RewriteRpcProcess extends Thread {
                 Thread.currentThread().interrupt();
             }
             stderrDrainThread = null;
+        }
+    }
+
+    /**
+     * Opt-in RSS profiling ({@code REWRITE_RPC_RSS_MS}): sample the subprocess RSS — which catches
+     * native/off-heap growth the in-process counters miss — into {@code rpc-rss-<pid>.csv}.
+     */
+    private void startRssSampler() {
+        String intervalEnv = System.getenv("REWRITE_RPC_RSS_MS");
+        Path dir = workingDirectory;
+        Process p = process;
+        if (intervalEnv == null || dir == null || p == null) {
+            return;
+        }
+        long intervalMs;
+        try {
+            intervalMs = Long.parseLong(intervalEnv.trim());
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (intervalMs <= 0) {
+            return;
+        }
+        long pid;
+        try {
+            // Process.pid() is Java 9+, but this module compiles at Java 8 source level.
+            pid = (long) Process.class.getMethod("pid").invoke(p);
+        } catch (Exception e) {
+            return;
+        }
+        Path rssCsv = dir.resolve("rpc-rss-" + pid + ".csv");
+        Thread sampler = new Thread(() -> {
+            try (OutputStream out = Files.newOutputStream(rssCsv,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                out.write("timestamp_ms,rss_kb\n".getBytes());
+                out.flush();
+                while (p.isAlive() && !Thread.currentThread().isInterrupted()) {
+                    long rssKb = readRssKb(pid);
+                    if (rssKb >= 0) {
+                        out.write((System.currentTimeMillis() + "," + rssKb + "\n").getBytes());
+                        out.flush();
+                    }
+                    Thread.sleep(intervalMs);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (IOException ignored) {
+                // Best-effort profiling; never disturb the run.
+            }
+        }, "rpc-rss-sampler");
+        sampler.setDaemon(true);
+        sampler.start();
+        this.rssSamplerThread = sampler;
+    }
+
+    /** Resident set size of {@code pid} in KiB via {@code ps} (macOS + Linux), or -1 on failure. */
+    private static long readRssKb(long pid) {
+        try {
+            Process ps = new ProcessBuilder("ps", "-o", "rss=", "-p", Long.toString(pid))
+                    .redirectErrorStream(true).start();
+            String out = readFully(ps.getInputStream()).trim();
+            ps.waitFor(2, TimeUnit.SECONDS);
+            if (out.isEmpty()) {
+                return -1;
+            }
+            String[] tokens = out.split("\\s+");
+            return Long.parseLong(tokens[tokens.length - 1]);
+        } catch (Exception e) {
+            return -1;
         }
     }
 

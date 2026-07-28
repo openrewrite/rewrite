@@ -22,6 +22,7 @@ Bidirectional RPC:
 
 import argparse
 import ast
+import csv
 import json
 import logging
 import os
@@ -32,9 +33,15 @@ import time
 import traceback
 import threading
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Set
 from uuid import uuid4
+
+try:
+    import resource
+except ImportError:  # not available on Windows
+    resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName
 
@@ -59,6 +66,14 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
+# Per-source-file remote_refs high-water, captured before a file is first visited so
+# handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
+_ref_checkpoints: Dict[str, int] = {}
+
+# Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
+_metrics_file = None
+_metrics_writer = None
+_metrics_lock = threading.Lock()
 
 # Request ID counter for outgoing requests
 _request_id_counter = 0
@@ -78,6 +93,14 @@ _python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
 # Set via --recipe-install-dir; an InstallRecipes RPC for a not-yet-importable
 # package pip installs it here before activating.
 _recipe_install_dir: Optional[Path] = None
+
+# Set via --child-bundle: the marketplace is scoped to exactly this distribution's recipes.
+_child_bundle: Optional[str] = None
+
+# The identity the host keys a local bundle by (its supplied path); None for a registry spec.
+_attribution_name: Optional[str] = None
+
+_facade = None
 
 
 def _next_request_id() -> int:
@@ -387,6 +410,31 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+# Files larger than this are recorded as Quarks rather than parsed into an AST.
+# Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
+MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
+
+
+def _create_quark(path: str, relative_to: Optional[str]) -> dict:
+    """Represent a file that won't be parsed (currently: too large) as a Quark.
+
+    No object is registered in ``local_objects``: the Java side builds the Quark
+    from ``sourcePath`` locally, so no content crosses the wire.
+    """
+    from rewrite import random_id
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return {
+        'id': str(random_id()),
+        'sourceFileType': 'org.openrewrite.quark.Quark',
+        'sourcePath': str(source_path),
+    }
+
+
 def _infer_project_root(inputs: list) -> Optional[str]:
     """Infer the project root from input paths.
 
@@ -541,6 +589,13 @@ def handle_parse_project(params: dict) -> List[dict]:
                 if file.endswith('.py'):
                     path = os.path.join(root, file)
                     try:
+                        oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
+                    except OSError:
+                        oversize = False  # let the normal path surface the read error
+                    if oversize:
+                        results.append(_create_quark(path, relative_to))
+                        continue
+                    try:
                         result = parse_python_file(path, relative_to, ty_client,
                                                    language_level=language_level,
                                                    project_language_level=project_language_level)
@@ -641,11 +696,22 @@ def handle_print(params: dict) -> str:
         logger.warning(f"Object {obj_id} not found")
         return ""
 
-    # If it's a CompilationUnit, use the printer
+    # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
+    # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
+    name = params.get('markerPrinter')
     try:
-        from rewrite.python.printer import PythonPrinter
+        from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+        from rewrite.tree import PrintOutputCapture as CorePrintOutputCapture
+        marker_printer = {
+            'FENCED': CorePrintOutputCapture.MarkerPrinter.FENCED,
+            'SANITIZED': CorePrintOutputCapture.MarkerPrinter.SANITIZED,
+            'SEARCH_MARKERS_ONLY': CorePrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY,
+        }.get(name)
+        # A FENCED typo would otherwise silently fall back to /*~~>*/ and corrupt the diff.
+        if marker_printer is None and name not in (None, 'DEFAULT'):
+            logger.warning(f"Unknown markerPrinter '{name}'; using default rendering")
         printer = PythonPrinter()
-        return printer.print(obj)
+        return printer.print(obj, PrintOutputCapture(marker_printer))
     except ImportError as e:
         logger.error(f"Failed to import PythonPrinter: {e}")
         pass
@@ -673,8 +739,26 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
+    _ref_checkpoints.clear()
 
     logger.info("Reset: cleared all cached state")
+    return True
+
+
+def handle_evict(params: dict) -> bool:
+    """Handle an Evict RPC notification - drop one source file's tree and roll back the
+    refs it introduced, bounding memory to roughly one source file at a time. Recipe,
+    accumulator, and execution-context state (keyed separately) is left intact.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    local_objects.pop(obj_id, None)
+    remote_objects.pop(obj_id, None)
+    checkpoint = _ref_checkpoints.pop(obj_id, None)
+    if checkpoint is not None:
+        for ref_id in [k for k in remote_refs if k > checkpoint]:
+            del remote_refs[ref_id]
     return True
 
 
@@ -700,24 +784,22 @@ def _get_marketplace():
     """
     global _marketplace
     if _marketplace is None:
-        from rewrite.discovery import discover_recipes, recipe_name_set
         from rewrite.marketplace import RecipeMarketplace
-        from rewrite import activate
-
         _marketplace = RecipeMarketplace()
 
-        # Discover from installed packages, tracking which distribution
-        # contributed each recipe.
-        discover_recipes(marketplace=_marketplace, attribution=_attribution)
+        if _child_bundle:
+            from rewrite.discovery import discover_root_recipes
+            discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
+                                  attribution_name=_attribution_name)
+        else:
+            from rewrite.discovery import discover_recipes, recipe_name_set
+            from rewrite import activate
 
-        # Also activate local recipes (in case the openrewrite distribution
-        # isn't pip-installed, e.g., when running from source). When it is
-        # installed, discovery already covered these and install() will dedupe
-        # by name; attribute the source-mode additions to "openrewrite" so
-        # they're returned by GetMarketplace/InstallRecipes for that package.
-        before = recipe_name_set(_marketplace)
-        activate(_marketplace)
-        _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
+            discover_recipes(marketplace=_marketplace, attribution=_attribution)
+
+            before = recipe_name_set(_marketplace)
+            activate(_marketplace)
+            _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
 
     return _marketplace
 
@@ -838,8 +920,8 @@ def handle_install_recipes(params: dict) -> dict:
         else:
             logger.info(f"Activating recipes from local path: {recipes}")
 
-        # Find and import the package
-        # For local paths, we look for the package name from setup.py/pyproject.toml
+        # Attribution is the supplied path, not the distribution name — the identity the host
+        # keys a local bundle by.
         package_name = _find_package_name(local_path)
         if package_name:
             before = recipe_name_set(marketplace)
@@ -920,44 +1002,8 @@ def _add_source_to_path(local_path: Path) -> None:
 
 def _find_package_name(local_path: Path) -> Optional[str]:
     """Find the package name from a local path."""
-    import sys
-    if sys.version_info >= (3, 11):
-        import tomllib
-    else:
-        try:
-            import tomli as tomllib  # type: ignore[import-not-found]
-        except ModuleNotFoundError:
-            return None
-
-    # Try pyproject.toml first
-    pyproject_path = local_path / 'pyproject.toml'
-    if pyproject_path.exists():
-        try:
-            with open(pyproject_path, 'rb') as f:
-                data = tomllib.load(f)
-                # Try [project] section first (PEP 621)
-                if 'project' in data and 'name' in data['project']:
-                    return data['project']['name']
-                # Try [tool.poetry] section
-                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
-                    return data['tool']['poetry']['name']
-        except Exception as e:
-            logger.warning(f"Failed to parse pyproject.toml: {e}")
-
-    # Try setup.py
-    setup_py = local_path / 'setup.py'
-    if setup_py.exists():
-        # Simple heuristic: look for name= in setup.py
-        try:
-            content = setup_py.read_text()
-            import re
-            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
-            if match:
-                return match.group(1)
-        except Exception as e:
-            logger.warning(f"Failed to parse setup.py: {e}")
-
-    return None
+    from rewrite.discovery import distribution_name_from_source
+    return distribution_name_from_source(local_path)
 
 
 def _import_and_activate_package(package_name: str, marketplace, local_path: Optional[Path] = None):
@@ -1580,6 +1626,9 @@ def handle_visit(params: dict) -> dict:
 
     _install_data_table_store(ctx)
 
+    # Snapshot the remote_refs high-water for this file before fetching its tree (first visit wins).
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1653,6 +1702,9 @@ def handle_batch_visit(params: dict) -> dict:
             local_objects[p_id] = ctx
 
     _install_data_table_store(ctx)
+
+    # Snapshot the remote_refs high-water for this file before fetching its tree.
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1863,8 +1915,167 @@ def handle_generate(params: dict) -> dict:
     return {'ids': [], 'sourceFileTypes': []}
 
 
+# The facade owns the working source file and keeps one RPC ref table per connection: its own
+# facade<->Java table (remote_objects/remote_refs) plus one per child. Each bundle runs as a
+# "sub-BatchVisit": the child is served the current tree over that child's table, runs its visitors,
+# and its edit is pulled back as a diff and applied before the next bundle starts.
+#
+# Deserializing and re-generating per child keeps every hop a diff between a matched send/receive
+# pair, so one child's ref numbering never has to mean anything to another child. Relaying a
+# child's stream directly to a sibling is unsafe.
+_hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
+_hub_send_refs: Dict[str, Dict] = {}        # bundle -> send ref map      (facade -> child)
+_hub_send_next: Dict[str, int] = {}         # bundle -> next send ref number
+_hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
+_hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
+
+def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
+    first time it is needed and owned by the facade from then on."""
+    if obj_id is None:
+        return None
+    tree = _hub_tree.get(obj_id)
+    if tree is None:
+        tree = get_object_from_java(obj_id, source_file_type)
+        if tree is not None:
+            _hub_tree[obj_id] = tree
+            local_objects[obj_id] = tree
+    return tree
+
+
+def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) -> Any:
+    """Serve a child its view of the facade's tree over that child's ref table: a diff against
+    whatever that child was last served, or a full object the first time."""
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    # Serve only from what the facade already holds. Fetching from Java here would deadlock: we are
+    # inside a child's callback, the child is blocked on us, and Java is blocked on the request that
+    # got us here. handle_request acquires the tree at the top level before dispatching instead.
+    tree = _hub_tree.get(obj_id)
+    if tree is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+
+    q = RpcSendQueue(source_file_type)
+    q.refs = _hub_send_refs.setdefault(bundle, {})
+    q.next_ref = _hub_send_next.get(bundle, 0)
+    # Remember where this child's ref numbering stood before this file, so Evict can roll it back
+    # in lockstep with the child's own rollback (see _hub_release).
+    _hub_send_checkpoint.setdefault((bundle, obj_id), q.next_ref)
+    data = q.generate(tree, _hub_served.get((bundle, obj_id)))
+    _hub_send_next[bundle] = q.next_ref
+    _hub_served[(bundle, obj_id)] = tree
+    return data
+
+
+def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str]) -> None:
+    """Pull a child's edit back as a diff against what it was served and apply it to the facade's
+    tree, so the next bundle starts from this bundle's result."""
+    from rewrite.rpc.receive_queue import RpcReceiveQueue
+
+    served = _hub_served.get((bundle, obj_id))
+    remaining = [children.request(bundle, 'GetObject',
+                                  {'id': obj_id, 'sourceFileType': source_file_type})]
+
+    def pull():
+        if not remaining:
+            return []
+        return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
+
+    edited = RpcReceiveQueue({}, source_file_type, pull).receive(served, None)
+    if edited is not None:
+        _hub_tree[obj_id] = edited
+        _hub_served[(bundle, obj_id)] = edited
+        local_objects[obj_id] = edited
+        if str(getattr(edited, 'id', obj_id)) != obj_id:
+            local_objects[str(edited.id)] = edited
+
+
+def _hub_release(obj_id: str) -> None:
+    """The rollback must be symmetric with the child's own Evict: the child drops the refs this file
+    introduced from its receive map, so if the facade kept them in its send map it would emit a
+    GET_REF for a ref the child no longer has ("Received reference to unknown object").
+    """
+    _hub_tree.pop(obj_id, None)
+    for key in [k for k in _hub_served if k[1] == obj_id]:
+        del _hub_served[key]
+    for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
+        bundle = key[0]
+        checkpoint = _hub_send_checkpoint.pop(key)
+        refs = _hub_send_refs.get(bundle)
+        if refs is not None:
+            for ref_key in [k for k, (_, num) in refs.items() if num > checkpoint]:
+                del refs[ref_key]
+        _hub_send_next[bundle] = checkpoint
+
+
+def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
+    """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
+    to Java."""
+    if method != 'GetObject':
+        return send_request(method, params)
+
+    obj_id = params.get('id')
+    if obj_id is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+    if bundle is None:
+        return send_request('GetObject', params)
+    return _hub_serve_child(bundle, obj_id, params.get('sourceFileType'))
+
+
+def _facade_mode() -> bool:
+    return _recipe_install_dir is not None and _child_bundle is None
+
+
+def _get_facade():
+    global _facade
+    if _facade is None:
+        from rewrite.rpc import venv_manager
+        from rewrite.rpc.bundle_children import BundleChildren
+        from rewrite.rpc.facade import Facade
+        removed = venv_manager.purge_non_venv_entries(_recipe_install_dir)
+        if removed:
+            logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
+                        len(removed), _recipe_install_dir, ", ".join(removed))
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
+                         hub_pull=_hub_pull_child_edit)
+    return _facade
+
+
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
+    if _facade_mode():
+        facade = _get_facade()
+
+        if method == 'Evict':
+            facade.evict(params)
+            _hub_release(params.get('id'))
+            return handle_evict(params)
+        facade_handlers = {
+            'InstallRecipes': facade.install_recipes,
+            'GetMarketplace': facade.get_marketplace,
+            'PrepareRecipe': facade.prepare_recipe,
+            'SetDataTableStore': facade.set_data_table_store,
+            'Visit': facade.visit,
+            'BatchVisit': facade.batch_visit,
+            'Generate': facade.generate,
+        }
+        facade_handler = facade_handlers.get(method)
+        if facade_handler:
+            # Acquire at the top level, before any child runs — acquiring inside a child's
+            # GetObject callback would deadlock (the child waits on us, Java on this request).
+            if method in ('Visit', 'BatchVisit'):
+                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
+            return facade_handler(params)
+        if method in ('Print', 'GetObject'):
+            obj_id = params.get('treeId') or params.get('id')
+            source_file_type = params.get('sourceFileType')
+            # Java fetches non-tree objects by id as well (the execution context, cursors).
+            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+            # that has no codec for them, desynchronizing the queue for every later object.
+            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
+                _hub_acquire(obj_id, source_file_type)
+
     handlers = {
         'Parse': handle_parse,
         'ParseProject': handle_parse_project,
@@ -1872,6 +2083,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'Evict': handle_evict,
         'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
@@ -2083,6 +2295,73 @@ def _init_pyroscope() -> None:
     )
 
 
+_METRICS_HEADER = ['timestamp', 'method', 'duration_ms', 'error', 'memory_used_bytes',
+                   'memory_max_bytes', 'local_objects', 'remote_objects', 'refs']
+
+
+def _init_metrics_csv(path: str) -> None:
+    """Open the per-call metrics CSV and write its header. Best-effort: a failure here
+    disables metrics but never blocks the server."""
+    global _metrics_file, _metrics_writer
+    try:
+        _metrics_file = open(path, 'w', newline='')
+        _metrics_writer = csv.writer(_metrics_file)
+        _metrics_writer.writerow(_METRICS_HEADER)
+        _metrics_file.flush()
+    except OSError as e:
+        logger.warning(f"metrics-csv: cannot open {path!r}: {e} - metrics disabled")
+        _metrics_file = _metrics_writer = None
+
+
+def _rss_bytes():
+    """Best-effort (current, peak) RSS in bytes; blank without /proc or the resource module (Windows).
+    The RewriteRpcProcess RSS sampler is the source of truth; these columns just annotate each row."""
+    current = ''
+    peak = ''
+    try:
+        with open('/proc/self/statm') as f:
+            current = int(f.read().split()[1]) * os.sysconf('SC_PAGE_SIZE')
+    except (OSError, ValueError, IndexError):
+        pass
+    if resource is not None:
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # macOS reports ru_maxrss in bytes; Linux and most others in kilobytes.
+        peak = maxrss if sys.platform == 'darwin' else maxrss * 1024
+        if current == '':
+            current = peak
+    return current, peak
+
+
+def _record_metric(method: str, duration_ms: float, error: str) -> None:
+    """Append one row of timing + cache residency. refs counts remote_refs only: Python's send-side
+    refs live on a per-call RpcSendQueue, the only cross-call ref cache handle_evict rolls back."""
+    if _metrics_writer is None:
+        return
+    used, peak = _rss_bytes()
+    with _metrics_lock:
+        if _metrics_writer is None:
+            return
+        try:
+            _metrics_writer.writerow([
+                datetime.now(timezone.utc).isoformat(), method, f"{duration_ms:.0f}", error,
+                used, peak, len(local_objects), len(remote_objects), len(remote_refs)])
+            _metrics_file.flush()
+        except OSError as e:
+            logger.warning(f"metrics-csv: write failed: {e}")
+
+
+def _close_metrics() -> None:
+    global _metrics_file, _metrics_writer
+    with _metrics_lock:
+        if _metrics_file is not None:
+            try:
+                _metrics_file.flush()
+                _metrics_file.close()
+            except OSError:
+                pass
+        _metrics_file = _metrics_writer = None
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -2092,13 +2371,29 @@ def main():
     parser.add_argument('--metrics-csv', help='Metrics CSV output path')
     parser.add_argument('--trace-rpc-messages', action='store_true', help='Enable RPC message tracing')
     parser.add_argument('--recipe-install-dir', help='Directory where recipe pip packages are installed')
+    parser.add_argument('--child-bundle',
+                        help='Run as a single-bundle child scoped to this distribution name')
+    parser.add_argument('--attribution-name',
+                        help='Label this child\'s recipes with this identity (a local install\'s '
+                             'supplied path) instead of the distribution name')
     args = parser.parse_args()
 
     _init_pyroscope()
 
+    if args.metrics_csv:
+        _init_metrics_csv(args.metrics_csv)
+
     if args.recipe_install_dir:
         global _recipe_install_dir
         _recipe_install_dir = Path(args.recipe_install_dir)
+
+    if args.child_bundle:
+        global _child_bundle
+        _child_bundle = args.child_bundle
+
+    if args.attribution_name:
+        global _attribution_name
+        _attribution_name = args.attribution_name
 
     if args.log_file:
         file_handler = logging.FileHandler(args.log_file)
@@ -2128,6 +2423,8 @@ def main():
                 logger.error("Missing 'method' in request")
                 continue
 
+            metric_start = time.monotonic()
+            metric_error = ''
             try:
                 result = handle_request(method, params)
                 response = {
@@ -2139,6 +2436,7 @@ def main():
                 logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
+                metric_error = str(e)
                 response = {
                     'jsonrpc': '2.0',
                     'id': request_id,
@@ -2148,11 +2446,15 @@ def main():
                         'data': tb_str
                     }
                 }
+            _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
 
             if args.trace_rpc_messages:
                 logger.debug(f"Sending: {json.dumps(response)}")
 
-            write_message(response)
+            # Notifications (no id, e.g. Evict) get no reply — a null-id response would
+            # fail every in-flight request on the Java reader.
+            if request_id is not None:
+                write_message(response)
 
         except Exception as e:
             logger.exception(f"Fatal error: {e}")
@@ -2160,6 +2462,7 @@ def main():
 
     # No ty-types cleanup needed here — clients are scoped per parse batch
 
+    _close_metrics()
     logger.info("Python RPC server shutting down...")
 
 

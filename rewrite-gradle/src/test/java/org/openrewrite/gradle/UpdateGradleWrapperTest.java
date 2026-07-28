@@ -73,8 +73,13 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
+        // Resolving versions fetches checksums from downloads.gradle.org; the 1s default connect timeout flakes on CI.
+        HttpUrlConnectionSender sender = new HttpUrlConnectionSender(Duration.ofSeconds(30), Duration.ofMinutes(1));
         spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null, null))
-          .beforeRecipe(withToolingApi());
+          .beforeRecipe(withToolingApi())
+          .executionContext(HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+            .setHttpSender(sender)
+            .setLargeFileHttpSender(sender));
     }
 
     @DocumentExample("Update existing Gradle wrapper")

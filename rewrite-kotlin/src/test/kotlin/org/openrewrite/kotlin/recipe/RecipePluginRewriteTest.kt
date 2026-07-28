@@ -1136,6 +1136,66 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `concatenated displayName and description fold to constants`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val MyRecipe = recipe(
+                    displayName = "Replace " + "lowercase",
+                    description = "Uses " + "uppercase" + " instead",
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "MyRecipe",
+        )
+        assertThat(r.displayName).isEqualTo("Replace lowercase")
+        assertThat(r.description).isEqualTo("Uses uppercase instead")
+    }
+
+    @Test
+    fun `text-block description with trimIndent folds to a constant`() {
+        val tq = "\"\"\""
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val MyRecipe = recipe(
+                    displayName = "d",
+                    description = $tq
+                        Alpha
+                        Beta
+                    $tq.trimIndent(),
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "MyRecipe",
+        )
+        assertThat(r.displayName).isEqualTo("d")
+        assertThat(r.description).isEqualTo("Alpha\nBeta")
+    }
+
+    @Test
+    fun `composite recipes metadata folds concatenation`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                import org.openrewrite.recipes
+                val A = recipe("A", "first") { edit { kotlin { visitClassDeclaration { it } } } }
+                val Combo = recipes("Co" + "mbo", "A" + " only", A)
+            """.trimIndent(),
+            propertyName = "Combo",
+        )
+        assertThat(r.displayName).isEqualTo("Combo")
+        assertThat(r.description).isEqualTo("A only")
+        assertThat(r.recipeList).hasSize(1)
+    }
+
+    @Test
     fun `variadic by-example — asList to List_of matches any arity`() {
         // The author writes a representative 3-arg shape; because `asList` is a
         // varargs method the recipe generalizes to ANY arity (2, 4, even 0).

@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import static java.util.Collections.emptyList;
@@ -83,6 +84,11 @@ public final class PipenvLockEngine {
     }
 
     public static Result regenerate(String pipfileContent, @Nullable String oldLockContent, ExecutionContext ctx) {
+        return regenerate(pipfileContent, null, oldLockContent, ctx);
+    }
+
+    public static Result regenerate(String pipfileContent, @Nullable String originalPipfileContent,
+                                    @Nullable String oldLockContent, ExecutionContext ctx) {
         if (oldLockContent == null) {
             return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null, null,
                     "No existing Pipfile.lock; locking from scratch requires full dependency resolution, " +
@@ -107,8 +113,13 @@ public final class PipenvLockEngine {
             return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null, detail));
         }
 
+        // Parsed best-effort: a null or unparseable original falls back to whole-Pipfile
+        // reconciliation. The edited Pipfile already parsed above, so this rarely fails.
+        Toml.Document originalPipfile = originalPipfileContent == null ? null :
+                parsePipfile(originalPipfileContent, new String[1]);
+
         try {
-            return new Run(pipfile, lock, oldLockContent, ctx).regenerate();
+            return new Run(pipfile, originalPipfile, lock, oldLockContent, ctx).regenerate();
         } catch (PythonIndexException e) {
             return Result.failure(indexFailure(null, e));
         }
@@ -196,9 +207,16 @@ public final class PipenvLockEngine {
         private final MarkerEnvironment env;
         private final @Nullable PythonVersion lockPython;
 
+        // Canonical names of packages the recipe actually changed, or null to reconcile the
+        // whole Pipfile. When non-null, entries the recipe left untouched are preserved as-is
+        // so pre-existing Pipfile/lock drift in an unrelated package can't abort the edit.
+        private final @Nullable Set<String> changedPackages;
+
         @SuppressWarnings("unchecked")
-        Run(Toml.Document pipfile, Map<String, Object> lock, String oldLockContent, ExecutionContext ctx) {
+        Run(Toml.Document pipfile, Toml.@Nullable Document originalPipfile, Map<String, Object> lock,
+            String oldLockContent, ExecutionContext ctx) {
             this.pipfile = pipfile;
+            this.changedPackages = changedPackages(originalPipfile, pipfile);
             this.lock = lock;
             this.newline = oldLockContent.contains("\r\n") ? "\r\n" : "\n";
             this.http = HttpSenderExecutionContextView.view(ctx).getHttpSender();
@@ -225,7 +243,7 @@ public final class PipenvLockEngine {
         }
 
         Result regenerate() {
-            Map<String, Map<String, PipfileEntry>> pipfileCategories = readPipfileCategories();
+            Map<String, Map<String, PipfileEntry>> pipfileCategories = readPipfileCategories(pipfile);
             if (pipfileCategories == null) {
                 return Result.failure(new Failure(Reason.UNSUPPORTED_ENTRY_TYPE, null, null,
                         "Pipfile contains a dependency entry the native engine cannot represent"));
@@ -270,7 +288,7 @@ public final class PipenvLockEngine {
          * Reads [packages]/[dev-packages]/custom category tables keyed by lock category name.
          * Returns null when an entry value cannot be interpreted.
          */
-        private @Nullable Map<String, Map<String, PipfileEntry>> readPipfileCategories() {
+        private static @Nullable Map<String, Map<String, PipfileEntry>> readPipfileCategories(Toml.Document pipfile) {
             Map<String, Map<String, PipfileEntry>> categories = new LinkedHashMap<>();
             for (TomlValue value : pipfile.getValues()) {
                 if (!(value instanceof Toml.Table)) {
@@ -303,6 +321,63 @@ public final class PipenvLockEngine {
             return categories;
         }
 
+        /**
+         * Canonical names of packages whose Pipfile declaration differs between the original
+         * (pre-edit) and edited Pipfile — the ones the recipe actually touched. Returns null
+         * when the original is unavailable or unrepresentable, in which case the whole Pipfile
+         * is reconciled against the lock (the historical behavior).
+         */
+        private static @Nullable Set<String> changedPackages(Toml.@Nullable Document original, Toml.Document edited) {
+            if (original == null) {
+                return null;
+            }
+            Map<String, String> before = declarationSignatures(original);
+            Map<String, String> after = declarationSignatures(edited);
+            if (before == null || after == null) {
+                return null;
+            }
+            Set<String> changed = new HashSet<>();
+            Set<String> names = new HashSet<>(before.keySet());
+            names.addAll(after.keySet());
+            for (String canonical : names) {
+                if (!Objects.equals(before.get(canonical), after.get(canonical))) {
+                    changed.add(canonical);
+                }
+            }
+            return changed;
+        }
+
+        /**
+         * Each declared package (by canonical name) mapped to a signature aggregating every field
+         * that affects locking across every category it appears in: category, version constraint,
+         * extras, markers, and index. Aggregating (rather than last-category-wins) matters because
+         * {@code computeEdits} reconciles per category, so a change in any one must mark the package.
+         */
+        private static @Nullable Map<String, String> declarationSignatures(Toml.Document pipfile) {
+            Map<String, Map<String, PipfileEntry>> categories = readPipfileCategories(pipfile);
+            if (categories == null) {
+                return null;
+            }
+            Map<String, TreeSet<String>> byCanonical = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, PipfileEntry>> category : categories.entrySet()) {
+                for (PipfileEntry entry : category.getValue().values()) {
+                    String canonical = Pep508Requirement.canonicalize(entry.keyAsWritten);
+                    byCanonical.computeIfAbsent(canonical, k -> new TreeSet<>()).add(category.getKey() + '|' +
+                            entry.constraint + '|' +
+                            new TreeSet<>(entry.extras) + '|' +
+                            entry.markers + '|' +
+                            new TreeMap<>(entry.markerKeys) + '|' +
+                            entry.indexName + '|' +
+                            entry.unsupported);
+                }
+            }
+            Map<String, String> signatures = new LinkedHashMap<>();
+            for (Map.Entry<String, TreeSet<String>> e : byCanonical.entrySet()) {
+                signatures.put(e.getKey(), e.getValue().toString());
+            }
+            return signatures;
+        }
+
         private static String lockCategoryName(String pipfileTable) {
             if ("packages".equals(pipfileTable)) {
                 return "default";
@@ -313,7 +388,7 @@ public final class PipenvLockEngine {
             return pipfileTable;
         }
 
-        private @Nullable PipfileEntry readEntry(String key, Toml value) {
+        private static @Nullable PipfileEntry readEntry(String key, Toml value) {
             PipfileEntry entry = new PipfileEntry(key);
             if (value instanceof Toml.Literal) {
                 Object v = ((Toml.Literal) value).getValue();
@@ -376,6 +451,11 @@ public final class PipenvLockEngine {
 
                 for (PipfileEntry entry : category.getValue().values()) {
                     String canonical = Pep508Requirement.canonicalize(entry.keyAsWritten);
+                    // Preserve entries the recipe did not touch: pre-existing Pipfile/lock drift
+                    // in an unrelated package must not add an edit or abort this regeneration.
+                    if (changedPackages != null && !changedPackages.contains(canonical)) {
+                        continue;
+                    }
                     String lockKey = lockKeysByCanonical.get(canonical);
                     if (lockKey == null) {
                         if (entry.unsupported) {
@@ -426,8 +506,11 @@ public final class PipenvLockEngine {
                 }
                 for (Map.Entry<String, Object> lockEntry : lockEntries.entrySet()) {
                     Map<String, Object> e = entryMap(lockEntry.getValue());
-                    if (e.containsKey("index") &&
-                            !pipfileCanonical.contains(Pep508Requirement.canonicalize(lockEntry.getKey()))) {
+                    String canonical = Pep508Requirement.canonicalize(lockEntry.getKey());
+                    if (changedPackages != null && !changedPackages.contains(canonical)) {
+                        continue; // only remove a package the recipe actually removed
+                    }
+                    if (e.containsKey("index") && !pipfileCanonical.contains(canonical)) {
                         edits.add(new Edit(lockCategory, new PipfileEntry(lockEntry.getKey()),
                                 lockEntry.getKey(), Edit.Kind.REMOVAL));
                     }
@@ -1352,10 +1435,17 @@ public final class PipenvLockEngine {
             return stringOrNull(lockEntry.get("index"));
         }
 
+        private static final List<String> VERSION_OPERATORS =
+                Arrays.asList("===", "==", "~=", "!=", "<=", ">=", "<", ">");
+
         private static @Nullable PythonVersionSpecifierSet parseConstraint(String constraint) {
             String trimmed = constraint.trim();
             if (trimmed.isEmpty() || "*".equals(trimmed)) {
                 return PythonVersionSpecifierSet.parse("");
+            }
+            // pipenv treats a bare version like "2.33.0" as an exact pin; normalize to "==2.33.0".
+            if (VERSION_OPERATORS.stream().noneMatch(trimmed::startsWith)) {
+                trimmed = "==" + trimmed;
             }
             return PythonVersionSpecifierSet.parse(trimmed);
         }
