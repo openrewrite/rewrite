@@ -269,6 +269,11 @@ public final class NpmLockPatcher implements LockPatcher {
             addMetadataField(fields, "bin", wt.getBin(), keyIndent, unit);
             addMetadataField(fields, "funding", wt.getFunding(), keyIndent, unit);
         }
+        // A closure member records its dependency edges as constraints (the resolved versions live
+        // implicitly via placement); npm keeps them under the entry's `dependencies` map.
+        if (edit.getNewDependencies() != null && !edit.getNewDependencies().isEmpty()) {
+            addMetadataField(fields, "dependencies", edit.getNewDependencies(), keyIndent, unit);
+        }
         fields.sort((a, b) -> a.object != b.object ? (a.object ? 1 : -1) : NpmKeyOrder.compareKeys(a.key, b.key));
 
         List<String> rendered = new ArrayList<>();
@@ -384,15 +389,29 @@ public final class NpmLockPatcher implements LockPatcher {
         if (legacy == null) {
             return root;
         }
+        // The v2 legacy tree marks dev entries with "dev": true; its byte-exact form for a dev closure
+        // add is not yet verified, so defer rather than emit a maybe-wrong entry.
+        if ("devDependencies".equals(edit.getScope())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "adding a devDependency closure to a lockfileVersion 2 lock is not yet supported");
+        }
         String fieldWs = nestedMemberWhitespace(legacy);
         String closeWs = memberWhitespace(legacy);
-        if (fieldWs == null) {
+        if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive legacy tree indentation");
         }
         List<String> fields = new ArrayList<>();
         fields.add(field(fieldWs, "version", jsonEncode(edit.getNewVersion())));
         fields.add(field(fieldWs, "resolved", jsonEncode(edit.getNewResolved())));
         fields.add(field(fieldWs, "integrity", jsonEncode(edit.getNewIntegrity())));
+        // A dependent records its edges under `requires` (constraints); a leaf transitive has none.
+        if (edit.getNewDependencies() != null && !edit.getNewDependencies().isEmpty()) {
+            String keyIndent = indentOf(fieldWs);
+            String closeIndent = indentOf(closeWs);
+            String unit = keyIndent.length() > closeIndent.length() ? keyIndent.substring(closeIndent.length()) : "  ";
+            String requires = renderNode(JSON.valueToTree(edit.getNewDependencies()), keyIndent, unit);
+            fields.add(field(fieldWs, "requires", requires));
+        }
         String entryText = "{" + String.join(",", fields) + closeWs + "}";
         legacy = graftSorted(legacy, edit.getName(), entryText, true);
         return putMember(root, "dependencies", legacy);

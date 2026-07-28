@@ -170,21 +170,63 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void nonLeafAddFailsLoud() {
-        // A package whose resolved version pulls transitives is a closure add (Phase B I2), not a leaf.
+    void closureAddTransitiveConflictFailsLoud() {
+        // is-odd pulls is-number ^7.0.0, but is-number is already pinned at 6.0.0 top-level — npm would
+        // nest a second copy (fork). The greedy-forward resolver refuses rather than reshape (I3/I5).
         routes.put("https://registry.npmjs.org/is-odd", "{\"versions\":{\"3.0.1\":{}}}");
         routes.put("https://registry.npmjs.org/is-odd/3.0.1",
-                "{\"name\":\"is-odd\",\"version\":\"3.0.1\",\"dependencies\":{\"is-number\":\"^6.0.0\"}}");
+                "{\"name\":\"is-odd\",\"version\":\"3.0.1\",\"dependencies\":{\"is-number\":\"^7.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz\"," +
+                        "\"integrity\":\"sha512-ODD\"}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"is-number\": \"6.0.0\"}},\n" +
+                "    \"node_modules/is-number\": {\"version\": \"6.0.0\"}\n" +
+                "  }\n" +
+                "}\n";
 
         Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{}}",
-                "{\"dependencies\":{\"is-odd\":\"^3.0.1\"}}",
-                "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}");
+                "{\"dependencies\":{\"is-number\":\"6.0.0\"}}",
+                "{\"dependencies\":{\"is-number\":\"6.0.0\",\"is-odd\":\"^3.0.1\"}}",
+                lock);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("is-odd");
-        assertThat(result.getFailure().getDetail()).contains("transitive dependencies");
+        assertThat(result.getFailure().getPackageName()).isEqualTo("is-number");
+        assertThat(result.getFailure().getDetail()).contains("does not satisfy");
+    }
+
+    @Test
+    void closureAddCascadeUpgradeFailsLoud() {
+        // Adding needy pulls color-name ~1.1.4, but color-name is locked at 1.1.3 top-level. Even though a
+        // ^-ranged reverse-dependent would accept 1.1.4, moving an already-placed package is a cascade —
+        // deferred to I3 rather than resolved greedily.
+        routes.put("https://registry.npmjs.org/needy", "{\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/needy/1.0.0",
+                "{\"name\":\"needy\",\"version\":\"1.0.0\",\"dependencies\":{\"color-name\":\"~1.1.4\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/needy/-/needy-1.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-NEEDY\"}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"has-color\": \"1.0.0\"}},\n" +
+                "    \"node_modules/color-name\": {\"version\": \"1.1.3\"},\n" +
+                "    \"node_modules/has-color\": {\"version\": \"1.0.0\", \"dependencies\": {\"color-name\": \"^1.1.0\"}}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"has-color\":\"1.0.0\"}}",
+                "{\"dependencies\":{\"has-color\":\"1.0.0\",\"needy\":\"^1.0.0\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("color-name");
+        assertThat(result.getFailure().getDetail()).contains("does not satisfy");
     }
 
     @Test

@@ -111,11 +111,36 @@ class AddDependencyLockRegenTest implements RewriteTest {
     }
 
     @Test
+    void closureAddRegeneratesLockByteExact() {
+        // supports-color pulls has-flag: both hoist top-level, no conflict — the whole closure is written
+        // byte-exact end-to-end (Phase B I2).
+        routes.put("https://registry.npmjs.org/supports-color", resource("lock/npm/closure-basic/http/supports-color"));
+        routes.put("https://registry.npmjs.org/supports-color/7.2.0",
+                resource("lock/npm/closure-basic/http/supports-color-7.2.0"));
+        routes.put("https://registry.npmjs.org/has-flag", resource("lock/npm/closure-basic/http/has-flag"));
+        routes.put("https://registry.npmjs.org/has-flag/4.0.0", resource("lock/npm/closure-basic/http/has-flag-4.0.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("supports-color", "^7.2.0", "dependencies"))
+                        .executionContext(ctx),
+                packageJson(resource("lock/npm/closure-basic/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-number", "6.0.0")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"supports-color\": \"^7.2.0\"");
+                            return actual;
+                        })),
+                packageLock(resource("lock/npm/closure-basic/before"), resource("lock/npm/closure-basic/after"),
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
     void closureAddFailsLoudWarnsAndRecordsDataTableRow() {
-        // A package whose resolved version pulls a transitive is a closure add (Phase B I2), not a leaf.
+        // A package declaring a peerDependency triggers npm's peer auto-install, which the greedy-forward
+        // resolver does not model — it defers (Phase B I2+) rather than emit a maybe-wrong tree.
         routes.put("https://registry.npmjs.org/needs-transitive", "{\"versions\":{\"1.0.0\":{}}}");
         routes.put("https://registry.npmjs.org/needs-transitive/1.0.0",
-                "{\"name\":\"needs-transitive\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^6.0.0\"}}");
+                "{\"name\":\"needs-transitive\",\"version\":\"1.0.0\",\"peerDependencies\":{\"react\":\">=17\"}}");
 
         String pkgBefore = "{\n" +
                 "  \"name\": \"npm-lock-v3\",\n" +
