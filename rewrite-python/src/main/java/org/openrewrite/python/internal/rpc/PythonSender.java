@@ -231,6 +231,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     @Override
     public J visitTypeAlias(Py.TypeAlias typeAlias, RpcSendQueue q) {
         q.getAndSend(typeAlias, Py.TypeAlias::getName, el -> visit(el, q));
+        q.getAndSend(typeAlias, el -> el.getPadding().getTypeParameters(), el -> visitContainer(el, q));
         q.getAndSend(typeAlias, el -> el.getPadding().getValue(), el -> visitLeftPadded(el, q));
         q.getAndSend(typeAlias, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return typeAlias;
