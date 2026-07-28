@@ -39,6 +39,16 @@ public class ImportService {
         return new RemoveImport<>(fullyQualifiedName);
     }
 
+    /**
+     * Whether the language keeps its imports among the statements rather than in
+     * {@link org.openrewrite.java.tree.JavaSourceFile#getImports()}. Such a language exposes no
+     * {@link J.Import}, so callers that would otherwise walk that list have to route the edit
+     * through this service instead.
+     */
+    public boolean usesStatementBasedImports() {
+        return false;
+    }
+
     public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {
         return new ShortenFullyQualifiedTypeReferences().getVisitor();
     }

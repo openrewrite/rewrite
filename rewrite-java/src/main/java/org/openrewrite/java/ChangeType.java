@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -241,12 +242,6 @@ public class ChangeType extends Recipe {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
                 JavaSourceFile sf = (JavaSourceFile) tree;
-                // Languages that keep imports among the statements (Python) expose none through
-                // getImports(), so hand removal to their import service; on a genuinely import-less
-                // Java file there is nothing to remove and this is a no-op.
-                boolean removeThroughImportService = targetType instanceof JavaType.FullyQualified &&
-                        sf.getImports().isEmpty();
-
                 if (targetType instanceof JavaType.FullyQualified) {
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic()) {
@@ -286,12 +281,11 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                if (removeThroughImportService) {
+                if (targetType instanceof JavaType.FullyQualified && service(ImportService.class).usesStatementBasedImports()) {
                     // Queued after the addition so the import service sees the name already bound by
                     // the new import, which is what makes the old one safe to retire.
                     maybeRemoveImport(originalType.getFullyQualifiedName());
                 }
-
                 j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
                     Cursor cursor = getCursor();
                     setCursor(new Cursor(cursor, i));

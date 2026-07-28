@@ -2059,9 +2059,15 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
             'searchResultIds': [],
         })
         if after is None:
+            _hub_release(tree_id)
+            tree = None
             break
         tree = after
 
+    # Advance the facade's tree only. _hub_served must keep pointing at what each child was last
+    # served, because that is the "before" the next _hub_serve_child diffs against — leaving it
+    # behind is exactly what makes this edit travel down to the children. Updating it here would
+    # make the facade claim the children already have this tree and silently drop the edit.
     if tree is not None and tree is not _hub_tree.get(tree_id):
         _hub_tree[tree_id] = tree
         local_objects[tree_id] = tree

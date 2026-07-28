@@ -76,17 +76,14 @@ public class RewriteRpc {
     /**
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
-     * between two processes.
-     * <p>
-     * Concurrent because {@link GetObject.Handler} reads these from its own thread pool while
-     * multiple in-flight {@link #visit} calls write them, and a {@code HashMap} resize racing a
-     * {@code get} would drop a present key, which the peer surfaces as "Tree not found".
+     * between two processes. Note these do not need to be ConcurrentHashMap as
+     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager
      */
     @VisibleForTesting
-    final Map<String, Object> remoteObjects = new ConcurrentHashMap<>();
+    final Map<String, Object> remoteObjects = new HashMap<>();
 
     @VisibleForTesting
-    final Map<String, Object> localObjects = new ConcurrentHashMap<>();
+    final Map<String, Object> localObjects = new HashMap<>();
 
     /* A reverse map of the objects back to their IDs */
     final Map<Object, String> localObjectIds = new IdentityHashMap<>();

@@ -391,6 +391,133 @@ def test_batch_visit_interleaves_built_ins_with_bundle_owned_visitors_in_order()
         ("batch", "A", ["edit:a"]), ("batch", "B", ["edit:b"])]
 
 
+def _parse_python(source: str):
+    import ast
+    from rewrite.python._parser_visitor import ParserVisitor
+    return ParserVisitor(source, None, None).visit_Module(ast.parse(source))
+
+
+def _print_python(cu) -> str:
+    from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+    return PythonPrinter().print(cu, PrintOutputCapture(None))
+
+
+def _isolated_hub(monkeypatch, server):
+    """Fresh hub state so this test neither sees nor leaves module-global tables."""
+    for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_send_next",
+                 "_hub_send_checkpoint", "local_objects"):
+        monkeypatch.setattr(server, name, {})
+
+
+def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_child(monkeypatch):
+    """A built-in visitor runs against the facade's own tree, so the only way its edit reaches a
+    child is the next _hub_serve_child diff. That works because _hub_local_visit advances _hub_tree
+    but deliberately leaves _hub_served alone: _hub_served is the "before" each child's diff is
+    generated against, so keeping it at the pre-edit tree is what makes the delta include the edit.
+    If it were updated here the facade would think the child already had this tree and serve a
+    no-op, and the child would visit a stale file."""
+    import rewrite.rpc.server as server
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft, bundle = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+
+    # The facade fetches the tree from Java once and owns it from then on.
+    assert server._hub_acquire(tree_id, sft) is cu
+
+    # The child is served the pre-edit tree in full.
+    full = server._hub_serve_child(bundle, tree_id, sft)
+    assert server._hub_served[(bundle, tree_id)] is cu
+
+    results = server._hub_local_visit(
+        [{"visitor": _ADD_IMPORT,
+          "visitorOptions": {"module": "collections.abc", "name": "Iterable",
+                             "only_if_referenced": False}}],
+        {"treeId": tree_id, "sourceFileType": sft})
+
+    assert results == [{"modified": True, "deleted": False,
+                        "hasNewMessages": False, "searchResultIds": []}]
+
+    # The facade's tree advanced...
+    edited = server._hub_tree[tree_id]
+    assert edited is not cu
+    assert _print_python(edited) == "from collections.abc import Iterable\nx = 1\n"
+    assert server.local_objects[tree_id] is edited
+    # ...while what the child was last served did not, so the next diff still has an edit to carry.
+    assert server._hub_served[(bundle, tree_id)] is cu
+
+    delta = server._hub_serve_child(bundle, tree_id, sft)
+    # A diff against what the child already holds (CHANGE at the root, not a second full ADD)
+    # carrying the added import and nothing else.
+    assert full[0]["state"] == "ADD" and delta[0]["state"] == "CHANGE"
+    added = [d.get("valueType") for d in delta if d["state"] == "ADD"]
+    assert "org.openrewrite.python.tree.Py$MultiImport" in added
+    values = [d.get("value") for d in delta]
+    assert "collections" in values and "abc" in values and "Iterable" in values
+    assert server._hub_served[(bundle, tree_id)] is edited
+
+    # And with nothing further edited, the same child is served a pure no-op — which is what the
+    # assertions above would degrade into if _hub_served were advanced by the local visit.
+    noop = server._hub_serve_child(bundle, tree_id, sft)
+    assert {d["state"] for d in noop} == {"NO_CHANGE", "END_OF_OBJECT"}
+
+
+def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
+    """A built-in visitor may delete the file outright. The facade has to let go of it the same way
+    a broadcast Evict would: drop the tree, forget what each child was served, and rewind that
+    child's send-ref numbering — otherwise the next file reuses ref numbers the child no longer
+    holds. Nothing after the delete may run, and the child must be told DELETE, not served a
+    resurrected tree."""
+    import rewrite.rpc.server as server
+    from rewrite.python.visitor import PythonVisitor
+
+    ran_after = []
+
+    class _Delete(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            return None
+
+    class _Later(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            ran_after.append(cu)
+            return cu
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft, bundle = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+    monkeypatch.setattr(server, "_VISITOR_REGISTRY",
+                        {"Delete": lambda options: _Delete(), "Later": lambda options: _Later()})
+
+    server._hub_acquire(tree_id, sft)
+    server._hub_serve_child(bundle, tree_id, sft)      # child now holds this file and its refs
+    assert server._hub_send_next[bundle] > 0
+
+    results = server._hub_local_visit([{"visitor": "Delete"}, {"visitor": "Later"}],
+                                      {"treeId": tree_id, "sourceFileType": sft})
+
+    # The delete is reported, and it short-circuits the rest of the batch.
+    assert results == [{"modified": True, "deleted": True,
+                        "hasNewMessages": False, "searchResultIds": []}]
+    assert ran_after == []
+
+    # The facade no longer owns the file, and every per-child table it seeded is rolled back.
+    assert tree_id not in server._hub_tree
+    assert (bundle, tree_id) not in server._hub_served
+    assert (bundle, tree_id) not in server._hub_send_checkpoint
+    assert server._hub_send_refs[bundle] == {}
+    assert server._hub_send_next[bundle] == 0
+
+    # So a child asking for it again is told the file is gone rather than served a stale tree.
+    assert server._hub_serve_child(bundle, tree_id, sft) == [
+        {"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+
 def test_an_unknown_visitor_is_still_an_error():
     f = _local_facade(_EditingChildren(), [])
     try:

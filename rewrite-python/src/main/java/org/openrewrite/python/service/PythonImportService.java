@@ -54,6 +54,14 @@ public class PythonImportService extends ImportService {
     }
 
     /**
+     * Python imports are {@code Py.MultiImport} statements, so {@code getImports()} is always empty.
+     */
+    @Override
+    public boolean usesStatementBasedImports() {
+        return true;
+    }
+
+    /**
      * Splits a fully-qualified name into Python's (module, name) pair, e.g. {@code collections.abc}
      * + {@code Iterable}; a name with no dot becomes a plain {@code import <name>} with a null name.
      */
