@@ -1,0 +1,175 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
+import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class PnpmLockPatcherTest {
+
+    private static final String MS_213 =
+            "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==";
+    private static final String IS_NUMBER_700 =
+            "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==";
+
+    private static String bump(String scenario, PackageEdit edit) {
+        LockEditSet edits = new LockEditSet(
+                read("/lock/pnpm/" + scenario + "/before"),
+                Paths.get("pnpm-lock.yaml"),
+                PackageManager.Pnpm,
+                read("/lock/pnpm/" + scenario + "/pkg-after"),
+                singletonList(edit));
+        return new PnpmLockPatcher().patch(edits);
+    }
+
+    @Test
+    void v9MetadataBump() {
+        String patched = bump("v9", PackageEdit.builder()
+                .name("ms").oldVersion("2.1.2").newVersion("2.1.3")
+                .newIntegrity(MS_213).scope("dependencies").build());
+        assertThat(patched).isEqualTo(read("/lock/pnpm/v9/after"));
+    }
+
+    @Test
+    void v9EnginesWriteThroughBump() {
+        Map<String, String> engines = new LinkedHashMap<>();
+        engines.put("node", ">=0.12.0");
+        String patched = bump("v9-engines", PackageEdit.builder()
+                .name("is-number").oldVersion("6.0.0").newVersion("7.0.0")
+                .newIntegrity(IS_NUMBER_700).scope("dependencies")
+                .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines).build())
+                .build());
+        assertThat(patched).isEqualTo(read("/lock/pnpm/v9-engines/after"));
+    }
+
+    @Test
+    void v6MetadataBump() {
+        String patched = bump("v6", PackageEdit.builder()
+                .name("ms").oldVersion("2.1.2").newVersion("2.1.3")
+                .newIntegrity(MS_213).scope("dependencies").build());
+        assertThat(patched).isEqualTo(read("/lock/pnpm/v6/after"));
+    }
+
+    @Test
+    void v9WorkspaceMemberBump() {
+        LockEditSet edits = new LockEditSet(
+                read("/lock/pnpm/v9-ws/before"),
+                Paths.get("packages/app/pnpm-lock.yaml"),
+                PackageManager.Pnpm,
+                read("/lock/pnpm/v9-ws/pkg-app-after"),
+                singletonList(PackageEdit.builder()
+                        .name("ms").oldVersion("2.1.2").newVersion("2.1.3")
+                        .newIntegrity(MS_213).scope("dependencies").importerDir("packages/app").build()));
+        assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/v9-ws/after"));
+    }
+
+    @Test
+    void v9OrphanRemoval() {
+        String patched = bump("v9-rm", PackageEdit.builder()
+                .name("ms").oldVersion("2.1.2").newVersion(null).scope("dependencies").build());
+        assertThat(patched).isEqualTo(read("/lock/pnpm/v9-rm/after"));
+    }
+
+    @Test
+    void roundTripV9PreservesBytes() {
+        LockEditSet edits = new LockEditSet(read("/lock/pnpm/v9/before"), Paths.get("pnpm-lock.yaml"),
+                PackageManager.Pnpm, "{}", Collections.<PackageEdit>emptyList());
+        assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/v9/before"));
+    }
+
+    @Test
+    void roundTripV6PreservesBytes() {
+        LockEditSet edits = new LockEditSet(read("/lock/pnpm/v6/before"), Paths.get("pnpm-lock.yaml"),
+                PackageManager.Pnpm, "{}", Collections.<PackageEdit>emptyList());
+        assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/v6/before"));
+    }
+
+    @Test
+    void v5_4FailsLoud() {
+        assertThatThrownBy(() -> patchOnly("v5_4", PackageEdit.builder()
+                .name("ms").oldVersion("2.1.2").newVersion("2.1.3").scope("dependencies").build()))
+                .isInstanceOfSatisfying(EngineFailure.class,
+                        e -> assertThat(e.failure.getReason()).isEqualTo(Reason.UNSUPPORTED_LOCKFILE_VERSION));
+    }
+
+    @Test
+    void peerProviderFailsLoud() {
+        assertThatThrownBy(() -> patchOnly("v9-peer", PackageEdit.builder()
+                .name("react").oldVersion("18.2.0").newVersion("18.3.1")
+                .newIntegrity("sha512-fake").scope("dependencies").build()))
+                .isInstanceOfSatisfying(EngineFailure.class,
+                        e -> assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED));
+    }
+
+    @Test
+    void transitivelyReferencedBumpFailsLoud() {
+        assertThatThrownBy(() -> patchOnly("v9-transitive", PackageEdit.builder()
+                .name("is-number").oldVersion("6.0.0").newVersion("7.0.0")
+                .newIntegrity(IS_NUMBER_700).scope("dependencies").build()))
+                .isInstanceOfSatisfying(EngineFailure.class,
+                        e -> assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED));
+    }
+
+    @Test
+    void linkEntryUnsupported() {
+        LockEditSet edits = new LockEditSet(read("/lock/pnpm/v9-link/before"), Paths.get("pnpm-lock.yaml"),
+                PackageManager.Pnpm, "{}", singletonList(PackageEdit.builder()
+                        .name("@ws/lib").oldVersion("link:../lib").newVersion("1.0.1")
+                        .scope("dependencies").importerDir("packages/app").build()));
+        assertThatThrownBy(() -> new PnpmLockPatcher().patch(edits))
+                .isInstanceOfSatisfying(EngineFailure.class,
+                        e -> assertThat(e.failure.getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE));
+    }
+
+    private static String patchOnly(String scenario, PackageEdit edit) {
+        return new PnpmLockPatcher().patch(new LockEditSet(read("/lock/pnpm/" + scenario + "/before"),
+                Paths.get("pnpm-lock.yaml"), PackageManager.Pnpm, "{}", singletonList(edit)));
+    }
+
+    private static String read(String resource) {
+        try (InputStream in = PnpmLockPatcherTest.class.getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IllegalStateException("missing test resource " + resource);
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) != -1) {
+                out.write(buffer, 0, n);
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+}
