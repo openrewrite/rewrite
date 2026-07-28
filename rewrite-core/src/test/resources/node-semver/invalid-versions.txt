@@ -1,0 +1,25 @@
+# Strings that are NOT valid strict node-semver versions (SemVer.parse -> null).
+# Drawn from npm/node-semver test cases and semver.org grammar (MIT), tag v7.6.3.
+# node is strictly major.minor.patch: no missing/extra numeric components, no leading zeros,
+# no empty prerelease identifiers, no bare x/*. Fields are tab-separated; \t \n \r \\ escaped.
+1
+1.2
+1.2.3.4
+1.2.3-
+1.2.3+
+a.b.c
+1.2.x
+1.2.*
+01.2.3
+1.02.3
+1.2.03
+1.2.3-01
+1.2.3-.alpha
+1.2.3-alpha..1
+1.2.3-alpha.
+=1.2.3
+>1.2.3
+1.2.3 4.5.6
+x.y.z
+1.
+.1.2

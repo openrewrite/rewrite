@@ -1,0 +1,34 @@
+# Transcribed from npm/node-semver test/fixtures/range-exclude.js (MIT), tag v7.6.3.
+# Rows where satisfies(version, range[, includePrerelease]) is FALSE. Many exercise node's
+# prerelease-inclusion guard: a prerelease is rejected unless a comparator names its exact
+# major.minor.patch tuple AND itself carries a prerelease.
+# Column 3 options tag: empty = strict, `loose` = skipped (out of Phase-A scope).
+# Each row: range<TAB>version<TAB>options. Fields are tab-separated; \t \n \r \\ escaped.
+1.0.0 - 2.0.0	2.2.3
+^1.2.3	2.0.0
+^1.2.3	1.2.2
+^1.2.3	2.0.0-pre
+^1.2.3	1.2.3-pre
+^1.2.3	1.2.4-pre
+^1.2.3	2.0.0-alpha
+^1.0.0	2.0.0-pre
+>=1.2.3	1.2.4-beta.1
+>=1.2.3	1.2.4-pre
+>1.2	1.2.8
+~1.2.3	1.3.0
+~1.2.3	1.2.2
+~0.2.3	0.3.0
+1.0.0	1.0.1
+>=1.0.0	0.0.0
+>1.0.0	1.0.0
+<=2.0.0	2.0.1
+<2.0.0	2.0.0
+0.1.20 || 1.2.4	1.2.3
+2.x.x	1.1.3
+2.x.x	3.1.3
+1.2.x	1.3.3
+^0.2.3	0.3.0
+^0.0.3	0.0.4
+1.2.3+asdf - 2.4.3+asdf	1.2.3-pre.2
+1.2.3+asdf - 2.4.3+asdf	2.4.3-alpha
+1.1.x	1.0.0-a	loose

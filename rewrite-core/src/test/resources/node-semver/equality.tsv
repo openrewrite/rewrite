@@ -1,0 +1,11 @@
+# Transcribed from npm/node-semver test/fixtures/equality.js (MIT), tag v7.6.3.
+# These pairs must compare equal (compareTo == 0), notably across build-metadata differences,
+# which node-semver ignores in precedence. Loose-only rows ('=', internal spaces) are omitted.
+# Each row: versionA<TAB>versionB. Fields are tab-separated; \t \n \r \\ escaped.
+1.2.3	1.2.3
+1.2.3-beta+build	1.2.3-beta+otherbuild
+1.2.3+build	1.2.3+otherbuild
+v1.2.3+build	1.2.3+otherbuild
+1.0.0+a	1.0.0+b
+1.2.3-alpha+1	1.2.3-alpha+2
+1.2.3-0	v1.2.3-0
