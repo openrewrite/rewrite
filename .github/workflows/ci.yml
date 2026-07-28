@@ -36,3 +36,45 @@ jobs:
       OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
+
+  # The rewrite-javascript `integTest` source set is not part of `check`, so the
+  # shared ci-gradle.yml build above never runs it. It also needs a JavaScript
+  # toolchain the reusable workflow does not provide: the tests perform real
+  # package-manager installs (npm, plus Yarn 4 / pnpm resolved through corepack),
+  # so this dedicated job sets up Node and enables corepack before running it.
+  javascript-integ-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+        shell: bash
+
+      - run: ./gradlew --no-daemon --console=plain --stacktrace :rewrite-javascript:integTest
+        shell: bash
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: javascript-integ-test-report
+          path: |
+            rewrite-javascript/build/reports/tests/integTest/
+            rewrite-javascript/build/rpc-logs/
+          if-no-files-found: ignore
