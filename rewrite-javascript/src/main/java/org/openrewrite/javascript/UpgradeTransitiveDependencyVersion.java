@@ -75,7 +75,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     static class ProjectState {
         @Nullable SourceFile capturedPackageJson;
         @Nullable String capturedLockContent;
-        @Nullable Map<String, String> configFiles;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
     }
@@ -106,7 +105,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     if (marker == null) return tree;
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
-                    ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
                 }
                 return tree;
             }
@@ -130,7 +128,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (canApply(sf)) {
-                        ensureComputed(ps, sf);
+                        ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -151,7 +149,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
                     if (pkg != null && canApply(pkg)) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -163,7 +161,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                 if (marker == null || marker.getPackageManager() == null) return;
@@ -176,7 +174,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         pkg,
                         doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

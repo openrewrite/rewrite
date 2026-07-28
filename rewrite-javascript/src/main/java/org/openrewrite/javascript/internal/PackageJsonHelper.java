@@ -22,8 +22,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
-import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
-import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -71,40 +69,6 @@ public class PackageJsonHelper {
     public static void putLiveTree(ExecutionContext ctx, Path packageJsonPath, SourceFile tree) {
         Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_PACKAGE_JSON_TREES, k -> new HashMap<>());
         map.put(packageJsonPath, tree);
-    }
-
-    // --- .npmrc serialization -------------------------------------------
-
-    /**
-     * Serialize the marker's npmrc configs into a {@code Map<filename, content>}
-     * suitable to seed a temp directory before running the package manager.
-     * Returns {@code null} if there are no configs.
-     */
-    public static @Nullable Map<String, String> serializeConfigFiles(NodeResolutionResult marker) {
-        List<Npmrc> configs = marker.getNpmrcConfigs();
-        if (configs == null || configs.isEmpty()) {
-            return null;
-        }
-        // Merge configs in scope priority (Global → User → Project; later overrides earlier).
-        Map<String, String> merged = new LinkedHashMap<>();
-        List<NpmrcScope> order = Arrays.asList(NpmrcScope.Global, NpmrcScope.User, NpmrcScope.Project);
-        for (NpmrcScope scope : order) {
-            for (Npmrc cfg : configs) {
-                if (cfg.getScope() == scope && cfg.getProperties() != null) {
-                    merged.putAll(cfg.getProperties());
-                }
-            }
-        }
-        if (merged.isEmpty()) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, String> e : merged.entrySet()) {
-            sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
-        }
-        Map<String, String> out = new LinkedHashMap<>();
-        out.put(".npmrc", sb.toString());
-        return out;
     }
 
     // --- Reparse helpers (preserve identity + markers) ------------------
@@ -745,7 +709,7 @@ public class PackageJsonHelper {
             SourceFile packageJson,
             java.util.function.Function<Json.Document, Json.Document> editFn,
             @Nullable String capturedLockContent,
-            @Nullable Map<String, String> configFiles) {
+            ExecutionContext ctx) {
         if (!(packageJson instanceof Json.Document)) {
             return EditAndRegenerateResult.unchanged();
         }
@@ -755,8 +719,9 @@ public class PackageJsonHelper {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile refreshed = refreshMarker(after);
+        String originalPackageJsonContent = before.printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(refreshed, capturedLockContent, configFiles);
+                : regenerateLockContent(refreshed, originalPackageJsonContent, capturedLockContent, ctx);
         SourceFile finalSource = refreshed;
         if (regen != null && regen.isSuccess()) {
             NodeResolutionResult marker = refreshed.getMarkers()
@@ -775,9 +740,15 @@ public class PackageJsonHelper {
     }
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile packageJson, @Nullable String capturedLockContent, ExecutionContext ctx) {
+        return regenerateLockContent(packageJson, null, capturedLockContent, ctx);
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile packageJson,
+            @Nullable String originalPackageJsonContent,
             @Nullable String capturedLockContent,
-            @Nullable Map<String, String> configFiles) {
+            ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null || marker.getPackageManager() == null) {
@@ -787,6 +758,7 @@ public class PackageJsonHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(packageJson.printAll(), capturedLockContent, configFiles);
+        return regen.regenerate(packageJson.printAll(), originalPackageJsonContent,
+                capturedLockContent, marker, packageJson.getSourcePath(), ctx);
     }
 }

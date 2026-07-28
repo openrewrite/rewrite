@@ -86,7 +86,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     static class ProjectState {
         @Nullable SourceFile capturedPackageJson;
         @Nullable String capturedLockContent;
-        @Nullable Map<String, String> configFiles;
         @Nullable List<MatchedDependency> matchedDeps;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
@@ -118,7 +117,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (marker == null) return tree;
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
-                    ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
                     ps.matchedDeps = findMatches(sf);
                 }
                 return tree;
@@ -186,7 +184,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (liveTree != null) {
                             effectiveSf = liveTree;
                         }
-                        ensureComputed(ps, effectiveSf);
+                        ensureComputed(ps, effectiveSf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -211,7 +209,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         lockPs.matchedDeps = findMatches(pkg);
                     }
                     if (pkg != null && lockPs.matchedDeps != null && !lockPs.matchedDeps.isEmpty()) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -223,7 +221,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
                 List<MatchedDependency> matches = ps.matchedDeps;
@@ -231,7 +229,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         pkg,
                         doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

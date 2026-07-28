@@ -17,48 +17,27 @@ package org.openrewrite.javascript.internal;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.javascript.internal.lock.NativeLockEngine;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Map;
-import java.util.stream.Stream;
 
 /**
- * Regenerate a JavaScript project's lock file by running the package manager
- * in a temp directory seeded with the package.json and (optionally) the existing
- * lock file plus config files such as {@code .npmrc}.
- *
- * <p>Pre-configured instances are provided for each
- * {@link PackageManager}; {@link #forPackageManager(PackageManager)} dispatches
- * to the right one. The install args are preserved verbatim from the TypeScript
- * implementation in {@code rewrite-javascript/rewrite/src/javascript/package-manager.ts}.
+ * Regenerate a JavaScript project's lock file natively — without executing the package manager — by
+ * dispatching to the shared {@link NativeLockEngine}. Pre-configured instances are provided for each
+ * {@link PackageManager}; {@link #forPackageManager(PackageManager)} dispatches to the right one and
+ * {@link #getLockFile()} names its lock file.
  */
 public final class LockFileRegeneration {
 
-    public static final LockFileRegeneration NPM = new LockFileRegeneration(
-            PackageManagerExecutor.NPM, "package-lock.json",
-            new String[]{"install", "--package-lock-only", "--ignore-scripts", "--legacy-peer-deps"});
-
-    public static final LockFileRegeneration YARN_CLASSIC = new LockFileRegeneration(
-            PackageManagerExecutor.YARN, "yarn.lock",
-            new String[]{"install", "--ignore-scripts"});
-
-    public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(
-            PackageManagerExecutor.YARN, "yarn.lock",
-            new String[]{"install", "--mode", "skip-build"});
-
-    public static final LockFileRegeneration PNPM = new LockFileRegeneration(
-            PackageManagerExecutor.PNPM, "pnpm-lock.yaml",
-            new String[]{"install", "--lockfile-only", "--ignore-scripts", "--no-strict-peer-dependencies"});
-
-    public static final LockFileRegeneration BUN = new LockFileRegeneration(
-            PackageManagerExecutor.BUN, "bun.lock",
-            new String[]{"install", "--ignore-scripts"});
+    public static final LockFileRegeneration NPM = new LockFileRegeneration(PackageManager.Npm, "package-lock.json");
+    public static final LockFileRegeneration YARN_CLASSIC = new LockFileRegeneration(PackageManager.YarnClassic, "yarn.lock");
+    public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lock");
+    public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml");
+    public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun, "bun.lock");
 
     public static @Nullable LockFileRegeneration forPackageManager(@Nullable PackageManager pm) {
         if (pm == null) {
@@ -74,124 +53,105 @@ public final class LockFileRegeneration {
         }
     }
 
+    public enum Reason {
+        REGISTRY_UNREACHABLE,
+        AUTH_FAILED,
+        PACKAGE_NOT_FOUND,
+        VERSION_NOT_FOUND,
+        CHECKSUM_UNAVAILABLE,
+        RESOLUTION_REQUIRED,
+        UNSUPPORTED_LOCKFILE_VERSION,
+        UNSUPPORTED_ENTRY_TYPE,
+        MALFORMED_LOCK,
+        MALFORMED_MANIFEST
+    }
+
+    @Value
+    public static class Failure {
+        Reason reason;
+        @Nullable String packageName;
+        String detail;
+    }
+
     @Value
     public static class Result {
         boolean success;
         @Nullable String lockFileContent;
         @Nullable String errorMessage;
+        @Nullable Failure failure;
+
+        /**
+         * Notes accompanying a successful regeneration, e.g. orphaned entries retained after a removal.
+         */
+        @Nullable String detail;
 
         public static Result success(String lockFileContent) {
-            return new Result(true, lockFileContent, null);
+            return new Result(true, lockFileContent, null, null, null);
+        }
+
+        public static Result success(String lockFileContent, @Nullable String detail) {
+            return new Result(true, lockFileContent, null, null, detail);
         }
 
         public static Result failure(String errorMessage) {
-            return new Result(false, null, errorMessage);
+            return new Result(false, null, errorMessage, null, null);
+        }
+
+        public static Result failure(Failure failure) {
+            StringBuilder message = new StringBuilder(failure.getReason().toString());
+            if (failure.getPackageName() != null) {
+                message.append(" [").append(failure.getPackageName()).append(']');
+            }
+            message.append(": ").append(failure.getDetail());
+            return new Result(false, null, message.toString(), failure, null);
         }
     }
 
-    private final PackageManagerExecutor executor;
-    private final String lockFile;
-    private final String[] installArgs;
+    /**
+     * Insert a data-table row describing a failed regeneration, mapping the structured {@link Failure}
+     * when present and falling back to the plain error message (and the recipe's target package) otherwise.
+     */
+    public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
+                                        Path packageJsonPath, Result result, @Nullable String fallbackPackageName) {
+        Failure failure = result.getFailure();
+        table.insertRow(ctx, new NodeLockRegenerationFailures.Row(
+                packageJsonPath.toString(),
+                failure != null && failure.getPackageName() != null ? failure.getPackageName() : fallbackPackageName,
+                failure != null ? failure.getReason().toString() : null,
+                failure != null ? failure.getDetail() : String.valueOf(result.getErrorMessage())));
+    }
 
-    private LockFileRegeneration(PackageManagerExecutor executor, String lockFile, String[] installArgs) {
-        this.executor = executor;
+    private final PackageManager pm;
+    private final String lockFile;
+
+    private LockFileRegeneration(PackageManager pm, String lockFile) {
+        this.pm = pm;
         this.lockFile = lockFile;
-        this.installArgs = installArgs;
     }
 
     public String getLockFile() {
         return lockFile;
     }
 
-    public Result regenerate(String packageJsonContent) {
-        return regenerate(packageJsonContent, null, null);
-    }
-
-    public Result regenerate(String packageJsonContent, @Nullable String existingLockContent) {
-        return regenerate(packageJsonContent, existingLockContent, null);
-    }
-
     /**
-     * Regenerate the lock file. Optional inputs:
-     * <ul>
-     *   <li>{@code existingLockContent} — when present, seeded into the temp dir so
-     *       the package manager performs a minimal update rather than a full
-     *       re-resolve.</li>
-     *   <li>{@code configFiles} — extra files to seed into the temp dir
-     *       (typically {@code {".npmrc": "..."}}).</li>
-     * </ul>
+     * Regenerate the lock file natively via {@link NativeLockEngine}.
+     *
+     * @param packageJsonContent         the post-edit package.json content to lock
+     * @param originalPackageJsonContent the pre-edit package.json, used to scope the edit to the
+     *                                   dependencies the recipe actually changed; {@code null} whole-manifest reconcile
+     * @param existingLockContent        the current lock content for the minimal update, or {@code null}
+     * @param marker                     carries npmrc/registry config, engines, and package manager
+     * @param packageJsonPath            the manifest path, for failure attribution and lock-path derivation
+     * @param ctx                        supplies the {@code HttpSender} and host-configured registries/credentials
+     * @return the new lock content, or a structured failure
      */
     public Result regenerate(String packageJsonContent,
+                             @Nullable String originalPackageJsonContent,
                              @Nullable String existingLockContent,
-                             @Nullable Map<String, String> configFiles) {
-        String executablePath = executor.find();
-        if (executablePath == null) {
-            return Result.failure(executor.getName() + " is not installed or not on PATH");
-        }
-
-        Path tempDir = null;
-        try {
-            tempDir = Files.createTempDirectory("openrewrite-pm-lock-");
-
-            Files.write(tempDir.resolve("package.json"),
-                    packageJsonContent.getBytes(StandardCharsets.UTF_8));
-
-            if (existingLockContent != null) {
-                Files.write(tempDir.resolve(lockFile),
-                        existingLockContent.getBytes(StandardCharsets.UTF_8));
-            }
-            if (configFiles != null) {
-                for (Map.Entry<String, String> entry : configFiles.entrySet()) {
-                    Files.write(tempDir.resolve(entry.getKey()),
-                            entry.getValue().getBytes(StandardCharsets.UTF_8));
-                }
-            }
-
-            PackageManagerExecutor.RunResult runResult = executor.run(tempDir, executablePath,
-                    Collections.<String, String>emptyMap(), installArgs);
-            if (!runResult.isSuccess()) {
-                String stderr = runResult.getStderr();
-                if (stderr != null && stderr.length() > 2000) {
-                    stderr = stderr.substring(0, 2000) + "...";
-                }
-                return Result.failure(executor.getName() + " install failed (exit "
-                        + runResult.getExitCode() + "): " + stderr);
-            }
-
-            Path lockPath = tempDir.resolve(lockFile);
-            if (!Files.exists(lockPath)) {
-                return Result.failure(executor.getName() + " install did not produce a "
-                        + lockFile + " file");
-            }
-            return Result.success(new String(Files.readAllBytes(lockPath), StandardCharsets.UTF_8));
-
-        } catch (IOException e) {
-            return Result.failure("IO error during " + executor.getName() + " install: " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Result.failure(executor.getName() + " install was interrupted");
-        } finally {
-            if (tempDir != null) {
-                cleanupDirectory(tempDir);
-            }
-        }
-    }
-
-    private static void cleanupDirectory(Path dir) {
-        if (!Files.exists(dir)) {
-            return;
-        }
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            // Ignore
-                        }
-                    });
-        } catch (IOException e) {
-            // Ignore
-        }
+                             @Nullable NodeResolutionResult marker,
+                             @Nullable Path packageJsonPath,
+                             ExecutionContext ctx) {
+        return NativeLockEngine.regenerate(pm, packageJsonContent, originalPackageJsonContent,
+                existingLockContent, marker, packageJsonPath, ctx);
     }
 }

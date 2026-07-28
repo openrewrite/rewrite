@@ -75,7 +75,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     static class ProjectState {
         @Nullable SourceFile capturedPackageJson;
         @Nullable String capturedLockContent;
-        @Nullable Map<String, String> configFiles;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
     }
@@ -106,7 +105,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     if (marker == null) return tree;
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
-                    ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
                 }
                 return tree;
             }
@@ -139,7 +137,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (matchesAdd(sf)) {
-                        ensureComputed(ps, sf);
+                        ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -160,7 +158,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
                     if (pkg != null && matchesAdd(pkg)) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -172,13 +170,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,
                         doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope()),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

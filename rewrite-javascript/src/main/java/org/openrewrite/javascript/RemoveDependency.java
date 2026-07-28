@@ -69,7 +69,6 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     static class ProjectState {
         @Nullable SourceFile capturedPackageJson;
         @Nullable String capturedLockContent;
-        @Nullable Map<String, String> configFiles;
         @Nullable SourceFile modifiedPackageJson;
         @Nullable Set<String> scopesContainingPackage;
         LockFileRegeneration.@Nullable Result regenResult;
@@ -101,7 +100,6 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     if (marker == null) return tree;
                     ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
                     ps.capturedPackageJson = sf;
-                    ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
                 }
                 return tree;
             }
@@ -137,7 +135,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if ((ps.scopesContainingPackage = findContainingScopes(sf)) != null) {
-                        ensureComputed(ps, sf);
+                        ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -158,7 +156,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
                     if (pkg != null && (lockPs.scopesContainingPackage = findContainingScopes(pkg)) != null) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -170,7 +168,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.scopesContainingPackage == null) return;
                 Set<String> scopes = ps.scopesContainingPackage;
@@ -178,7 +176,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                         pkg,
                         doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
