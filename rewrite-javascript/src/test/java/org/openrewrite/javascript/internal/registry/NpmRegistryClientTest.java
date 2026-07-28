@@ -105,7 +105,7 @@ class NpmRegistryClientTest {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
         var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "http://registry.test/", "tok123", null, null, null,
+        var authed = new NodeRegistry(null, "https://registry.test/", "tok123", null, null, null,
                 true, null, true, false);
 
         client.getPackument(authed, "lodash");
@@ -118,7 +118,7 @@ class NpmRegistryClientTest {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
         var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "http://registry.test/", null, "user", "secret", null,
+        var authed = new NodeRegistry(null, "https://registry.test/", null, "user", "secret", null,
                 false, null, true, false);
 
         client.getPackument(authed, "lodash");
@@ -132,12 +132,40 @@ class NpmRegistryClientTest {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
         var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "http://registry.test/", null, null, null, "dXNlcjpwYXNz",
+        var authed = new NodeRegistry(null, "https://registry.test/", null, null, null, "dXNlcjpwYXNz",
                 false, null, true, false);
 
         client.getPackument(authed, "lodash");
 
         assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Basic dXNlcjpwYXNz");
+    }
+
+    @Test
+    void authNotSentOverHttp() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(200, "{\"versions\":{}}");
+        var client = new NpmRegistryClient(sender);
+        var authed = new NodeRegistry(null, "http://registry.test/", "tok123", null, null, null,
+                true, null, true, false);
+
+        client.getPackument(authed, "lodash");
+
+        assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
+    }
+
+    @Test
+    void urlUserinfoNeverLeaksIntoFailureDetail() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueStatus(404);
+        var client = new NpmRegistryClient(sender);
+        var authed = new NodeRegistry(null, "https://user:s3cr3ttoken@registry.test/", null, null, null, null,
+                false, null, true, false);
+
+        assertThatThrownBy(() -> client.getPackument(authed, "lodash"))
+                .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
+                    assertThat(e.getMessage()).doesNotContain("s3cr3ttoken");
+                    assertThat(e.getRegistryUrl()).doesNotContain("s3cr3ttoken");
+                });
     }
 
     @Test

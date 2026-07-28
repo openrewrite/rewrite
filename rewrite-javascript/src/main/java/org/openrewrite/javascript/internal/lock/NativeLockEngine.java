@@ -15,8 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.NodeExecutionContextView;
@@ -67,11 +69,19 @@ import java.util.Set;
  */
 public final class NativeLockEngine {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    // Bun's lock is JSONC (trailing commas, // comments); npm's is strict JSON — this mapper reads both.
+    private static final ObjectMapper JSON = JsonMapper.builder()
+            .enable(JsonReadFeature.ALLOW_TRAILING_COMMA)
+            .enable(JsonReadFeature.ALLOW_JAVA_COMMENTS)
+            .build();
 
     /** Constraint protocols the native engine cannot re-pin without repo/filesystem access. */
     private static final List<String> UNSUPPORTED_PROTOCOLS = Arrays.asList(
             "git:", "git+", "github:", "file:", "link:", "portal:", "workspace:", "http://", "https://");
+
+    /** Manifest dependency scopes an importer entry can declare a dependency under. */
+    private static final List<String> DECLARED_SCOPES = Arrays.asList(
+            "dependencies", "devDependencies", "peerDependencies", "optionalDependencies");
 
     private NativeLockEngine() {
     }
@@ -149,6 +159,7 @@ public final class NativeLockEngine {
         }
 
         Set<String> lockedVersions = findLockedVersions(pm, existingLock, name);
+        String importerDir = findImporterDir(pm, existingLock, name, change.scope, change.oldConstraint);
 
         if (change.newConstraint == null) {
             // Removal — the patcher drops the entry and its orphans; keystone has no patcher yet.
@@ -159,6 +170,7 @@ public final class NativeLockEngine {
                     .newVersion(null)
                     .scope(change.scope)
                     .oldConstraint(change.oldConstraint)
+                    .importerDir(importerDir)
                     .build();
         }
 
@@ -183,13 +195,16 @@ public final class NativeLockEngine {
                 .oldVersion(oldVersion)
                 .newVersion(targetVersion)
                 .scope(change.scope)
-                .oldConstraint(change.oldConstraint);
+                .oldConstraint(change.oldConstraint)
+                .importerDir(importerDir);
 
         if (targetVersion.equals(oldVersion)) {
             // Constraint-only widening: the resolved version does not move, so the package entry keeps
             // its resolved/integrity and only the importer's declared constraint is re-pinned.
             return edit.build();
         }
+
+        proveReverseDependentsAccept(pm, name, oldVersion, targetVersion, existingLock);
 
         NodeRegistry registry = registries.registryFor(name);
         VersionManifest oldManifest = client.getManifest(registry, name, oldVersion);
@@ -249,6 +264,147 @@ public final class NativeLockEngine {
         if (!Objects.equals(normalize(a), normalize(b))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " " + surface + " changed");
         }
+    }
+
+    /**
+     * A closure-unchanged proof only inspects the moving package's own manifest; it says nothing about the
+     * OTHER locked entries that depend on it. If a reverse-dependent's recorded constraint excludes the new
+     * version, re-pinning would emit a lock a real install rejects — fail loud instead.
+     */
+    private static void proveReverseDependentsAccept(PackageManager pm, String name, String oldVersion,
+                                                     String targetVersion, String lock) {
+        switch (pm) {
+            case Npm:
+                proveReverseDependentsNpm(name, targetVersion, lock);
+                break;
+            case Bun:
+                proveReverseDependentsBun(name, targetVersion, lock);
+                break;
+            case Pnpm:
+                proveReverseDependentsPnpm(name, oldVersion, targetVersion, lock);
+                break;
+            default:
+                // yarn merges selectors into shared headers; the single-locked-version guard covers the common case.
+                break;
+        }
+    }
+
+    private static void proveReverseDependentsNpm(String name, String targetVersion, String lock) {
+        Map<String, Object> root = parseJsonObject(lock, false);
+        Object packages = root.get("packages");
+        if (packages instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+                String key = String.valueOf(e.getKey());
+                // Only true transitive reverse-dependents (installed packages), never importer manifests
+                // (those constraints are the user's package.json, re-pinned by the patcher).
+                if (!key.contains("node_modules/") || !(e.getValue() instanceof Map)) {
+                    continue;
+                }
+                Map<?, ?> entry = (Map<?, ?>) e.getValue();
+                checkReverseConstraint(name, targetVersion, key, entry.get("dependencies"));
+                checkReverseConstraint(name, targetVersion, key, entry.get("optionalDependencies"));
+                checkReverseConstraint(name, targetVersion, key, entry.get("peerDependencies"));
+            }
+        }
+        checkLegacyRequires(root.get("dependencies"), name, targetVersion);
+    }
+
+    private static void checkLegacyRequires(@Nullable Object node, String name, String targetVersion) {
+        if (!(node instanceof Map)) {
+            return;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) node).entrySet()) {
+            if (e.getValue() instanceof Map) {
+                Map<?, ?> entry = (Map<?, ?>) e.getValue();
+                checkReverseConstraint(name, targetVersion, String.valueOf(e.getKey()), entry.get("requires"));
+                checkLegacyRequires(entry.get("dependencies"), name, targetVersion);
+            }
+        }
+    }
+
+    private static void proveReverseDependentsBun(String name, String targetVersion, String lock) {
+        Map<String, Object> root = parseJsonObject(lock, false);
+        Object packages = root.get("packages");
+        if (!(packages instanceof Map)) {
+            return;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+            if (!(e.getValue() instanceof List)) {
+                continue;
+            }
+            List<?> tuple = (List<?>) e.getValue();
+            if (tuple.size() >= 3 && tuple.get(2) instanceof Map) {
+                Map<?, ?> meta = (Map<?, ?>) tuple.get(2);
+                String dependent = String.valueOf(e.getKey());
+                checkReverseConstraint(name, targetVersion, dependent, meta.get("dependencies"));
+                checkReverseConstraint(name, targetVersion, dependent, meta.get("optionalDependencies"));
+                checkReverseConstraint(name, targetVersion, dependent, meta.get("peerDependencies"));
+            }
+        }
+    }
+
+    private static void checkReverseConstraint(String name, String targetVersion, String dependent,
+                                               @Nullable Object constraintMap) {
+        if (!(constraintMap instanceof Map)) {
+            return;
+        }
+        Object constraint = ((Map<?, ?>) constraintMap).get(name);
+        if (constraint instanceof String && NodeSemver.validRange((String) constraint) &&
+                !NodeSemver.satisfies(targetVersion, (String) constraint)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is required by " + dependent + " at " + constraint + " which excludes " + targetVersion);
+        }
+    }
+
+    /**
+     * pnpm's {@code snapshots.*.dependencies} record RESOLVED versions, not constraints, so a reverse-dependent's
+     * acceptance of the new version cannot be proven. Conservatively fail loud when the moving package is a
+     * transitive dependency of another entry (not only a direct/importer dep).
+     */
+    private static void proveReverseDependentsPnpm(String name, String oldVersion, String targetVersion, String lock) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return;
+        }
+        Map<?, ?> root = (Map<?, ?>) loaded;
+        if (referencedAsTransitivePnpm(root.get("snapshots"), name, oldVersion) ||
+                referencedAsTransitivePnpm(root.get("packages"), name, oldVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is a transitive dependency of another package; pnpm records resolved versions, so " +
+                            "accepting " + targetVersion + " cannot be proven");
+        }
+    }
+
+    private static boolean referencedAsTransitivePnpm(@Nullable Object graph, String name, String oldVersion) {
+        if (!(graph instanceof Map)) {
+            return false;
+        }
+        String ownBase = name + "@" + oldVersion;
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) graph).entrySet()) {
+            if (stripPnpmKey(String.valueOf(e.getKey())).equals(ownBase) || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> body = (Map<?, ?>) e.getValue();
+            for (String scope : Arrays.asList("dependencies", "optionalDependencies")) {
+                Object deps = body.get(scope);
+                if (deps instanceof Map) {
+                    Object v = ((Map<?, ?>) deps).get(name);
+                    if (v != null) {
+                        String vs = String.valueOf(v);
+                        if (vs.equals(oldVersion) || vs.startsWith(oldVersion + "(")) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String stripPnpmKey(String key) {
+        String k = key.startsWith("/") ? key.substring(1) : key;
+        int paren = k.indexOf('(');
+        return paren >= 0 ? k.substring(0, paren) : k;
     }
 
     private static LockEditSet.@Nullable WriteThroughMetadata writeThrough(VersionManifest oldM, VersionManifest newM) {
@@ -312,6 +468,127 @@ public final class NativeLockEngine {
             }
         }
         return out;
+    }
+
+    // --- workspace importer resolution -----------------------------------
+
+    /**
+     * The workspace importer that declares this dependency, expressed as its directory relative to the lock
+     * (e.g. {@code packages/app}), or {@code null} for the root importer. Matched off the raw lock's importer
+     * entries so a workspace-member edit re-pins the member's importer, not the root's.
+     */
+    private static @Nullable String findImporterDir(PackageManager pm, String lock, String name, String scope,
+                                                    @Nullable String oldConstraint) {
+        switch (pm) {
+            case Npm:
+            case Bun:
+                return findImporterDirJson(pm, lock, name, oldConstraint);
+            case Pnpm:
+                return findImporterDirPnpm(lock, name, oldConstraint);
+            default:
+                return null; // yarn has no importer concept in its lock
+        }
+    }
+
+    private static @Nullable String findImporterDirJson(PackageManager pm, String lock, String name,
+                                                        @Nullable String oldConstraint) {
+        Map<String, Object> root = parseJsonObject(lock, false);
+        String unique = null;
+        if (pm == PackageManager.Npm) {
+            Object packages = root.get("packages");
+            if (packages instanceof Map) {
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+                    String key = String.valueOf(e.getKey());
+                    if (key.contains("node_modules/") || !(e.getValue() instanceof Map)) {
+                        continue; // only importer entries
+                    }
+                    String c = declaredConstraintIn((Map<?, ?>) e.getValue(), name, DECLARED_SCOPES);
+                    if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
+                        if (key.isEmpty()) {
+                            return null; // the root importer owns it
+                        }
+                        if (unique != null) {
+                            return null; // ambiguous — fall back to the root importer
+                        }
+                        unique = key;
+                    }
+                }
+            }
+            return unique;
+        }
+        // bun: workspaces.<dir>.<scope>.<name>
+        Object workspaces = root.get("workspaces");
+        if (workspaces instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) workspaces).entrySet()) {
+                String key = String.valueOf(e.getKey());
+                if (!(e.getValue() instanceof Map)) {
+                    continue;
+                }
+                String c = declaredConstraintIn((Map<?, ?>) e.getValue(), name, DECLARED_SCOPES);
+                if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
+                    if (key.isEmpty()) {
+                        return null;
+                    }
+                    if (unique != null) {
+                        return null;
+                    }
+                    unique = key;
+                }
+            }
+        }
+        return unique;
+    }
+
+    private static @Nullable String declaredConstraintIn(Map<?, ?> importer, String name, List<String> scopes) {
+        for (String scope : scopes) {
+            Object scopeMap = importer.get(scope);
+            if (scopeMap instanceof Map && ((Map<?, ?>) scopeMap).get(name) != null) {
+                return String.valueOf(((Map<?, ?>) scopeMap).get(name));
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable String findImporterDirPnpm(String lock, String name, @Nullable String oldConstraint) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return null;
+        }
+        Object importers = ((Map<?, ?>) loaded).get("importers");
+        if (!(importers instanceof Map)) {
+            return null; // single-package lock: only the root importer
+        }
+        String unique = null;
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) importers).entrySet()) {
+            String dir = String.valueOf(e.getKey());
+            if (!(e.getValue() instanceof Map)) {
+                continue;
+            }
+            String specifier = pnpmSpecifier((Map<?, ?>) e.getValue(), name);
+            if (specifier != null && (oldConstraint == null || oldConstraint.equals(specifier))) {
+                if (".".equals(dir)) {
+                    return null;
+                }
+                if (unique != null) {
+                    return null;
+                }
+                unique = dir;
+            }
+        }
+        return unique;
+    }
+
+    private static @Nullable String pnpmSpecifier(Map<?, ?> importer, String name) {
+        for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies")) {
+            Object scopeMap = importer.get(scope);
+            if (scopeMap instanceof Map) {
+                Object dep = ((Map<?, ?>) scopeMap).get(name);
+                if (dep instanceof Map && ((Map<?, ?>) dep).get("specifier") != null) {
+                    return String.valueOf(((Map<?, ?>) dep).get("specifier"));
+                }
+            }
+        }
+        return null;
     }
 
     // --- raw lock inspection (read-only) ---------------------------------

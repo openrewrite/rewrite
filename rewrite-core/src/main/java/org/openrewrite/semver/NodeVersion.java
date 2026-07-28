@@ -49,14 +49,14 @@ public final class NodeVersion implements Comparable<NodeVersion> {
     private static final NodeVersion INVALID = new NodeVersion("", 0, 0, 0, new ArrayList<>(), new ArrayList<>());
 
     private final String raw;
-    private final int major;
-    private final int minor;
-    private final int patch;
+    private final long major;
+    private final long minor;
+    private final long patch;
     // Each element is a Long (numeric identifier) or a String (alphanumeric identifier).
     private final List<Object> prerelease;
     private final List<String> build;
 
-    private NodeVersion(String raw, int major, int minor, int patch, List<Object> prerelease, List<String> build) {
+    private NodeVersion(String raw, long major, long minor, long patch, List<Object> prerelease, List<String> build) {
         this.raw = raw;
         this.major = major;
         this.minor = minor;
@@ -83,22 +83,28 @@ public final class NodeVersion implements Comparable<NodeVersion> {
         if (!m.matches()) {
             return null;
         }
-        int major = Integer.parseInt(m.group(1));
-        int minor = Integer.parseInt(m.group(2));
-        int patch = Integer.parseInt(m.group(3));
-        List<Object> prerelease = new ArrayList<>();
-        if (m.group(4) != null) {
-            for (String id : m.group(4).split("\\.")) {
-                prerelease.add(isNumeric(id) ? (Object) Long.parseLong(id) : id);
+        // node-semver permits large numerics; anything overflowing a long is treated as unparseable
+        // (invalid) rather than crashing the caller.
+        try {
+            long major = Long.parseLong(m.group(1));
+            long minor = Long.parseLong(m.group(2));
+            long patch = Long.parseLong(m.group(3));
+            List<Object> prerelease = new ArrayList<>();
+            if (m.group(4) != null) {
+                for (String id : m.group(4).split("\\.")) {
+                    prerelease.add(isNumeric(id) ? (Object) Long.parseLong(id) : id);
+                }
             }
-        }
-        List<String> build = new ArrayList<>();
-        if (m.group(5) != null) {
-            for (String id : m.group(5).split("\\.")) {
-                build.add(id);
+            List<String> build = new ArrayList<>();
+            if (m.group(5) != null) {
+                for (String id : m.group(5).split("\\.")) {
+                    build.add(id);
+                }
             }
+            return new NodeVersion(version, major, minor, patch, prerelease, build);
+        } catch (NumberFormatException overflow) {
+            return null;
         }
-        return new NodeVersion(version, major, minor, patch, prerelease, build);
     }
 
     private static boolean isNumeric(String s) {
@@ -115,15 +121,15 @@ public final class NodeVersion implements Comparable<NodeVersion> {
         return raw;
     }
 
-    public int getMajor() {
+    public long getMajor() {
         return major;
     }
 
-    public int getMinor() {
+    public long getMinor() {
         return minor;
     }
 
-    public int getPatch() {
+    public long getPatch() {
         return patch;
     }
 
@@ -137,15 +143,15 @@ public final class NodeVersion implements Comparable<NodeVersion> {
 
     @Override
     public int compareTo(NodeVersion o) {
-        int c = Integer.compare(major, o.major);
+        int c = Long.compare(major, o.major);
         if (c != 0) {
             return c;
         }
-        c = Integer.compare(minor, o.minor);
+        c = Long.compare(minor, o.minor);
         if (c != 0) {
             return c;
         }
-        c = Integer.compare(patch, o.patch);
+        c = Long.compare(patch, o.patch);
         if (c != 0) {
             return c;
         }
@@ -197,9 +203,9 @@ public final class NodeVersion implements Comparable<NodeVersion> {
 
     @Override
     public int hashCode() {
-        int result = major;
-        result = 31 * result + minor;
-        result = 31 * result + patch;
+        int result = Long.hashCode(major);
+        result = 31 * result + Long.hashCode(minor);
+        result = 31 * result + Long.hashCode(patch);
         for (Object id : prerelease) {
             result = 31 * result + id.hashCode();
         }

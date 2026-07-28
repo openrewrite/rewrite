@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
@@ -324,6 +325,7 @@ public final class NpmLockPatcher implements LockPatcher {
             }
             enqueueNames(getObjectMember(entry, "dependencies"), reachable, queue);
             enqueueNames(getObjectMember(entry, "optionalDependencies"), reachable, queue);
+            enqueueNames(getObjectMember(entry, "peerDependencies"), reachable, queue);
         }
         return reachable;
     }
@@ -423,8 +425,17 @@ public final class NpmLockPatcher implements LockPatcher {
             return obj;
         }
         Space prefix = member.getValue().getPrefix();
-        Json.Literal literal = new Json.Literal(Tree.randomId(), prefix, Markers.EMPTY, "\"" + value + "\"", value);
+        Json.Literal literal = new Json.Literal(Tree.randomId(), prefix, Markers.EMPTY, jsonEncode(value), value);
         return putMember(obj, field, literal);
+    }
+
+    /** Jackson-escaped quoted JSON string literal — registry {@code license}/{@code deprecated} may contain {@code "}/{@code \}/newlines. */
+    private static String jsonEncode(String value) {
+        try {
+            return JSON.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not JSON-encode value: " + value);
+        }
     }
 
     /** Replace the value of member {@code key} in place, keeping its position and surrounding padding. */

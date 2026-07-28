@@ -112,6 +112,21 @@ class NodeVersionTest {
     }
 
     @Test
+    void largeNumericComponentsParseWithoutOverflow() {
+        NodeVersion v = NodeVersion.parse("2147483648.0.0");
+        assertThat(v).isNotNull();
+        assertThat(v.getMajor()).isEqualTo(2147483648L);
+        assertThat(v).isGreaterThan(NodeVersion.parse("2147483647.999.999"));
+    }
+
+    @Test
+    void numericComponentsOverflowingLongAreInvalidNotCrashing() {
+        // Beyond Long.MAX_VALUE — must be reported as invalid (null), never throw.
+        assertThat(NodeVersion.parse("99999999999999999999.0.0")).isNull();
+        assertThat(NodeSemver.satisfies("99999999999999999999.0.0", "^1.0.0")).isFalse();
+    }
+
+    @Test
     void semverOrgPrecedenceChain() {
         String[] ascending = {
           "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta",

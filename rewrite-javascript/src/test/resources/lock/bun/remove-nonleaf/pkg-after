@@ -1,0 +1,7 @@
+{
+  "name": "bun-rm-nonleaf",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-buffer": "1.1.6"
+  }
+}

@@ -109,43 +109,48 @@ public class NpmRegistryClient {
         try (HttpSender.Response response = httpSender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
-                throw new NodeRegistryException(Reason.AUTH_FAILED, registry.getUrl(), name, version,
+                throw new NodeRegistryException(Reason.AUTH_FAILED, safeUrl(registry), name, version,
                         "HTTP " + code + " from " + url, null);
             }
             if (code == 404) {
                 Reason reason = packument ? Reason.PACKAGE_NOT_FOUND : Reason.VERSION_NOT_FOUND;
-                throw new NodeRegistryException(reason, registry.getUrl(), name, version,
+                throw new NodeRegistryException(reason, safeUrl(registry), name, version,
                         "HTTP 404 from " + url, null);
             }
             if (!response.isSuccessful()) {
-                throw new NodeRegistryException(Reason.UNREACHABLE, registry.getUrl(), name, version,
+                throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
                         "HTTP " + code + " from " + url, null);
             }
             return response.getBodyAsBytes();
         } catch (NodeRegistryException e) {
             throw e;
         } catch (Exception e) {
-            throw new NodeRegistryException(Reason.UNREACHABLE, registry.getUrl(), name, version,
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
                     "Failed to fetch " + url + ": " + e, e);
         }
     }
 
     private void guard(NodeRegistry registry) {
         if (registry.isUnresolvedPlaceholders()) {
-            throw new NodeRegistryException(Reason.UNREACHABLE, registry.getUrl(),
-                    "Registry URL or credentials contain unresolved environment placeholders: " + registry.getUrl());
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
+                    "Registry URL or credentials contain unresolved environment placeholders: " + safeUrl(registry));
         }
         // The default sender cannot load a custom CA or disable strict SSL; fail loud rather than
         // ignore the config and later throw an opaque handshake error.
         if ((registry.getCafile() != null || !registry.isStrictSsl()) &&
                 httpSender.getClass() == HttpUrlConnectionSender.class) {
-            throw new NodeRegistryException(Reason.UNREACHABLE, registry.getUrl(),
-                    "Registry " + registry.getUrl() + " requires a custom CA (cafile/strict-ssl) but no " +
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
+                    "Registry " + safeUrl(registry) + " requires a custom CA (cafile/strict-ssl) but no " +
                             "TLS-capable HttpSender was injected");
         }
     }
 
     private static void applyAuth(HttpSender.Request.Builder builder, NodeRegistry registry) {
+        // Never send credentials over a non-TLS scheme — a cleartext (or unknown-scheme) registry could
+        // exfiltrate the token. npm's own default is to refuse auth over http.
+        if (!isHttps(registry.getUrl())) {
+            return;
+        }
         if (registry.getAuthToken() != null) {
             builder.withAuthentication("Bearer", registry.getAuthToken());
         } else if (registry.getAuthBase64() != null) {
@@ -155,9 +160,18 @@ public class NpmRegistryClient {
         }
     }
 
+    private static boolean isHttps(String url) {
+        return url.regionMatches(true, 0, "https://", 0, "https://".length());
+    }
+
     private static String base(NodeRegistry registry) {
-        String url = registry.getUrl();
+        String url = safeUrl(registry);
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    /** The registry URL with any userinfo stripped, so a {@code user:token@host} credential never reaches a failure detail. */
+    private static String safeUrl(NodeRegistry registry) {
+        return Urls.stripUserinfo(registry.getUrl());
     }
 
     private static AbbreviatedPackument parsePackument(String name, byte[] body) throws Exception {

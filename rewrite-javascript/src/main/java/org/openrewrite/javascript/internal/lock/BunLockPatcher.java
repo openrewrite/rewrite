@@ -26,13 +26,21 @@ import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonKey;
+import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 
 /**
@@ -52,9 +60,158 @@ public final class BunLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no bun lock content");
         }
         Json.Document document = parse(content, edits.getLockPath());
+        if (!(document.getValue() instanceof Json.JsonObject)) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock root is not an object");
+        }
+
+        boolean anyRemoval = false;
+        for (PackageEdit edit : edits.getEdits()) {
+            anyRemoval |= edit.getNewVersion() == null;
+        }
+        if (anyRemoval) {
+            // Drop the removed roots and their orphaned transitives from `packages` structurally (with a
+            // first-member prefix fixup) — a visitor null-return would leave a stray blank line behind.
+            Json.JsonObject root = (Json.JsonObject) document.getValue();
+            Set<String> orphanKeys = orphanPackageKeys(root, edits.getEdits());
+            if (!orphanKeys.isEmpty()) {
+                document = document.withValue(dropPackagesMembers(root, orphanKeys));
+            }
+        }
+
         Json.Document patched = (Json.Document) new BunVisitor(edits.getEdits(), edits.getEditedPackageJson())
                 .visitNonNull(document, 0);
         return patched.printAll();
+    }
+
+    /** Rewrite the top-level {@code packages} object, dropping {@code dropKeys} and preserving bun's blank-line layout. */
+    private static Json.JsonObject dropPackagesMembers(Json.JsonObject root, Set<String> dropKeys) {
+        List<JsonRightPadded<Json>> top = new ArrayList<>(root.getPadding().getMembers());
+        for (int i = 0; i < top.size(); i++) {
+            Json el = top.get(i).getElement();
+            if (el instanceof Json.Member && "packages".equals(literalKey(((Json.Member) el).getKey())) &&
+                    ((Json.Member) el).getValue() instanceof Json.JsonObject) {
+                Json.JsonObject trimmed = dropMembersWithFixup((Json.JsonObject) ((Json.Member) el).getValue(), dropKeys);
+                top.set(i, top.get(i).withElement(((Json.Member) el).withValue(trimmed)));
+                return root.getPadding().withMembers(top);
+            }
+        }
+        return root;
+    }
+
+    private static Json.JsonObject dropMembersWithFixup(Json.JsonObject obj, Set<String> dropKeys) {
+        List<JsonRightPadded<Json>> original = obj.getPadding().getMembers();
+        Space firstPrefix = null;
+        for (JsonRightPadded<Json> rp : original) {
+            if (rp.getElement() instanceof Json.Member) {
+                firstPrefix = rp.getElement().getPrefix();
+                break;
+            }
+        }
+        List<JsonRightPadded<Json>> kept = new ArrayList<>();
+        boolean removed = false;
+        for (JsonRightPadded<Json> rp : original) {
+            Json el = rp.getElement();
+            if (el instanceof Json.Member && dropKeys.contains(literalKey(((Json.Member) el).getKey()))) {
+                removed = true;
+                continue;
+            }
+            kept.add(rp);
+        }
+        if (!removed) {
+            return obj;
+        }
+        // The new first entry inherits the original first entry's prefix, so a removed leading entry doesn't
+        // leave its successor carrying an extra blank line.
+        if (firstPrefix != null) {
+            for (int i = 0; i < kept.size(); i++) {
+                Json el = kept.get(i).getElement();
+                if (el instanceof Json.Member) {
+                    if (!el.getPrefix().equals(firstPrefix)) {
+                        kept.set(i, kept.get(i).withElement(el.withPrefix(firstPrefix)));
+                    }
+                    break;
+                }
+            }
+        }
+        return obj.getPadding().withMembers(kept);
+    }
+
+    /**
+     * The package-map keys to drop for a removal: the removed roots plus every transitive no longer reachable
+     * from a surviving workspace dependency (mirrors what a real {@code bun install} produces for a non-leaf
+     * removal). Nested placements ({@code parent/name} keys) need the hoisting model — fail loud instead.
+     */
+    private static Set<String> orphanPackageKeys(Json.JsonObject root, List<PackageEdit> edits) {
+        Json.JsonObject packages = objectMember(root, "packages");
+        if (packages == null) {
+            return emptySet();
+        }
+        for (Json member : packages.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = literalKey(((Json.Member) member).getKey());
+                if (key != null && key.indexOf('/') >= 0) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "cannot remove from a bun.lock with nested placements: " + key);
+                }
+            }
+        }
+        Set<String> removedNames = new LinkedHashSet<>();
+        for (PackageEdit edit : edits) {
+            if (edit.getNewVersion() == null) {
+                removedNames.add(edit.getName());
+            }
+        }
+        Set<String> reachable = reachableNames(root, packages, removedNames);
+        Set<String> drop = new LinkedHashSet<>();
+        for (Json member : packages.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = literalKey(((Json.Member) member).getKey());
+                if (key != null && !reachable.contains(key)) {
+                    drop.add(key);
+                }
+            }
+        }
+        return drop;
+    }
+
+    private static Set<String> reachableNames(Json.JsonObject root, Json.JsonObject packages, Set<String> removedNames) {
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>();
+        Json.JsonObject workspaces = objectMember(root, "workspaces");
+        if (workspaces != null) {
+            for (Json member : workspaces.getMembers()) {
+                if (!(member instanceof Json.Member) || !(((Json.Member) member).getValue() instanceof Json.JsonObject)) {
+                    continue;
+                }
+                Json.JsonObject importer = (Json.JsonObject) ((Json.Member) member).getValue();
+                for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")) {
+                    for (String name : memberKeys(objectMember(importer, scope))) {
+                        if (!removedNames.contains(name) && reachable.add(name)) {
+                            queue.add(name);
+                        }
+                    }
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            Json.JsonObject metadata = tupleMetadata(arrayMember(packages, queue.poll()));
+            for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
+                for (String name : memberKeys(objectMember(metadata, scope))) {
+                    if (reachable.add(name)) {
+                        queue.add(name);
+                    }
+                }
+            }
+        }
+        return reachable;
+    }
+
+    /** The metadata object (tuple element 2) of a {@code packages} entry's {@code ["name@ver", "", {…}, "sri"]} array. */
+    private static Json.@Nullable JsonObject tupleMetadata(Json.@Nullable Array tuple) {
+        if (tuple == null || tuple.getValues().size() < 3 || !(tuple.getValues().get(2) instanceof Json.JsonObject)) {
+            return null;
+        }
+        return (Json.JsonObject) tuple.getValues().get(2);
     }
 
     private static Json.Document parse(String content, @Nullable Path lockPath) {
@@ -100,14 +257,6 @@ public final class BunLockPatcher implements LockPatcher {
                     }
                 }
             }
-            // Removal of a packages entry: drop the whole tuple member.
-            if (m.getValue() instanceof Json.Array && hasAncestorMemberKey(getCursor(), "packages")) {
-                for (PackageEdit edit : edits) {
-                    if (edit.getNewVersion() == null && locatorMatches((Json.Array) m.getValue(), locator(edit, edit.getOldVersion()))) {
-                        return null;
-                    }
-                }
-            }
             return m;
         }
 
@@ -141,15 +290,47 @@ public final class BunLockPatcher implements LockPatcher {
             return edit.getName() + "@" + version;
         }
 
-        private static boolean locatorMatches(Json.Array array, String locator) {
-            List<JsonValue> values = array.getValues();
-            return !values.isEmpty() && values.get(0) instanceof Json.Literal &&
-                    locator.equals(((Json.Literal) values.get(0)).getValue());
-        }
-
         private static String importerKey(PackageEdit edit) {
             return edit.getImporterDir() == null ? "" : edit.getImporterDir();
         }
+    }
+
+    private static Json.@Nullable JsonObject objectMember(Json.@Nullable JsonObject obj, String key) {
+        if (obj == null) {
+            return null;
+        }
+        for (Json member : obj.getMembers()) {
+            if (member instanceof Json.Member && key.equals(literalKey(((Json.Member) member).getKey())) &&
+                    ((Json.Member) member).getValue() instanceof Json.JsonObject) {
+                return (Json.JsonObject) ((Json.Member) member).getValue();
+            }
+        }
+        return null;
+    }
+
+    private static Json.@Nullable Array arrayMember(Json.JsonObject obj, String key) {
+        for (Json member : obj.getMembers()) {
+            if (member instanceof Json.Member && key.equals(literalKey(((Json.Member) member).getKey())) &&
+                    ((Json.Member) member).getValue() instanceof Json.Array) {
+                return (Json.Array) ((Json.Member) member).getValue();
+            }
+        }
+        return null;
+    }
+
+    private static List<String> memberKeys(Json.@Nullable JsonObject obj) {
+        List<String> keys = new ArrayList<>();
+        if (obj != null) {
+            for (Json member : obj.getMembers()) {
+                if (member instanceof Json.Member) {
+                    String key = literalKey(((Json.Member) member).getKey());
+                    if (key != null) {
+                        keys.add(key);
+                    }
+                }
+            }
+        }
+        return keys;
     }
 
     private static @Nullable String literalKey(JsonKey key) {

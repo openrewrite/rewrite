@@ -30,12 +30,16 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 
 import static java.util.Collections.singletonList;
@@ -84,9 +88,14 @@ public final class PnpmLockPatcher implements LockPatcher {
 
         Map<String, String> newConstraints = declaredConstraints(edits.getEditedPackageJson());
 
+        boolean anyRemoval = false;
         for (PackageEdit edit : edits.getEdits()) {
             preCheck(root, edit, major);
             root = applyEdit(root, edit, major, newConstraints);
+            anyRemoval |= edit.getNewVersion() == null;
+        }
+        if (anyRemoval) {
+            root = gcOrphans(root, major);
         }
 
         List<Yaml.Document> newDocuments = new ArrayList<>(documents);
@@ -229,6 +238,9 @@ public final class PnpmLockPatcher implements LockPatcher {
 
     private Yaml.Mapping applyEdit(Yaml.Mapping root, PackageEdit edit, int major, Map<String, String> newConstraints) {
         boolean removal = edit.getNewVersion() == null;
+        if (!removal) {
+            requireSupportedWriteThrough(edit);
+        }
         root = patchImporter(root, edit, removal, newConstraints);
         root = patchPackages(root, edit, major, removal);
         if (major >= 9) {
@@ -341,7 +353,10 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         Yaml.Mapping.Entry entry = findEntry(body, "resolution");
         if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
-            return body;
+            // A block-style resolution map is not the flow-scalar this patcher rewrites integrity inside;
+            // silently keeping the OLD integrity would emit a lock a real install rejects.
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(),
+                    edit.getName() + " resolution is not a flow-scalar; cannot rewrite integrity");
         }
         Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
         String value = replaceToken(scalar.getValue(), "integrity", edit.getNewIntegrity());
@@ -362,6 +377,137 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
         return replaceEntry(body, "engines", entry.withValue(scalar.withValue(renderEngines(metadata.getEngines()))));
+    }
+
+    /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled — fail loud rather than silently drop them. */
+    private void requireSupportedWriteThrough(PackageEdit edit) {
+        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        if (wt == null) {
+            return;
+        }
+        String changed = wt.getLicense() != null ? "license" :
+                wt.getDeprecated() != null ? "deprecated" :
+                        wt.getBin() != null ? "bin" : null;
+        if (changed != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    edit.getName() + " " + changed + " metadata changed; native write-through is not supported for pnpm");
+        }
+    }
+
+    // --- orphan GC after removals ----------------------------------------
+
+    /**
+     * Drop every {@code packages}/{@code snapshots} entry no longer reachable from an importer root after a
+     * removal, mirroring what a real {@code pnpm install} produces (a removed non-leaf takes its private
+     * transitives with it). Runs only when the edit set contains a removal, so a pure bump is byte-identical.
+     */
+    private Yaml.Mapping gcOrphans(Yaml.Mapping root, int major) {
+        if (major >= 9) {
+            Yaml.Mapping snapshots = section(root, "snapshots");
+            if (snapshots == null) {
+                return root;
+            }
+            Set<String> reachable = reachableKeys(root, snapshots, "");
+            root = replaceEntryValue(root, "snapshots", retainEntries(snapshots, reachable, false));
+            Yaml.Mapping packages = section(root, "packages");
+            if (packages != null) {
+                Set<String> reachableBases = new LinkedHashSet<>();
+                for (String key : reachable) {
+                    reachableBases.add(stripSuffix(key));
+                }
+                root = replaceEntryValue(root, "packages", retainEntries(packages, reachableBases, true));
+            }
+            return root;
+        }
+        Yaml.Mapping packages = section(root, "packages");
+        if (packages == null) {
+            return root;
+        }
+        Set<String> reachable = reachableKeys(root, packages, "/");
+        return replaceEntryValue(root, "packages", retainEntries(packages, reachable, false));
+    }
+
+    private Set<String> reachableKeys(Yaml.Mapping root, Yaml.Mapping graph, String prefix) {
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>();
+        Yaml.Mapping importers = section(root, "importers");
+        List<Yaml.Block> roots = new ArrayList<>();
+        if (importers != null) {
+            for (Yaml.Mapping.Entry importer : importers.getEntries()) {
+                roots.add(importer.getValue());
+            }
+        } else {
+            roots.add(root);
+        }
+        for (Yaml.Block scopes : roots) {
+            for (String key : importerDepKeys(scopes, prefix)) {
+                if (reachable.add(key)) {
+                    queue.add(key);
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            Yaml.Mapping.Entry entry = findEntry(graph, queue.poll());
+            if (entry == null || !(entry.getValue() instanceof Yaml.Mapping)) {
+                continue;
+            }
+            for (String childKey : graphDepKeys((Yaml.Mapping) entry.getValue(), prefix)) {
+                if (reachable.add(childKey)) {
+                    queue.add(childKey);
+                }
+            }
+        }
+        return reachable;
+    }
+
+    private static List<String> importerDepKeys(Yaml.Block scopesBlock, String prefix) {
+        List<String> out = new ArrayList<>();
+        if (!(scopesBlock instanceof Yaml.Mapping)) {
+            return out;
+        }
+        for (String scope : LOCK_SCOPES) {
+            Yaml.Mapping.Entry scopeEntry = findEntry((Yaml.Mapping) scopesBlock, scope);
+            if (scopeEntry != null && scopeEntry.getValue() instanceof Yaml.Mapping) {
+                for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
+                    String name = keyOf(dep);
+                    if (name != null && dep.getValue() instanceof Yaml.Mapping) {
+                        Yaml.Mapping.Entry version = findEntry((Yaml.Mapping) dep.getValue(), "version");
+                        if (version != null && version.getValue() instanceof Yaml.Scalar) {
+                            out.add(prefix + name + "@" + ((Yaml.Scalar) version.getValue()).getValue());
+                        }
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static List<String> graphDepKeys(Yaml.Mapping body, String prefix) {
+        List<String> out = new ArrayList<>();
+        for (String depScope : Arrays.asList("dependencies", "optionalDependencies")) {
+            Yaml.Mapping.Entry scope = findEntry(body, depScope);
+            if (scope != null && scope.getValue() instanceof Yaml.Mapping) {
+                for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scope.getValue()).getEntries()) {
+                    String name = keyOf(dep);
+                    if (name != null && dep.getValue() instanceof Yaml.Scalar) {
+                        out.add(prefix + name + "@" + ((Yaml.Scalar) dep.getValue()).getValue());
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static Yaml.Mapping retainEntries(Yaml.Mapping mapping, Set<String> keep, boolean byBase) {
+        List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+            String key = keyOf(entry);
+            String probe = key == null ? null : (byBase ? stripSuffix(key) : key);
+            if (probe != null && keep.contains(probe)) {
+                entries.add(entry);
+            }
+        }
+        return mapping.withEntries(entries);
     }
 
     // --- reads over importer mappings ------------------------------------

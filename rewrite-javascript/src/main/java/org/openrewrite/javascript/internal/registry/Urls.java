@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.registry;
 
 import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
+
 final class Urls {
 
     private Urls() {
@@ -109,15 +111,49 @@ final class Urls {
     }
 
     /**
-     * Registry path encoding of a package name: a scoped name's {@code /} separator becomes
-     * {@code %2F} ({@code @angular/core} → {@code @angular%2Fcore}); unscoped names are unchanged.
+     * Registry path encoding of a package name: a scoped name's single {@code /} separator becomes
+     * {@code %2F} ({@code @angular/core} → {@code @angular%2Fcore}) and every other path-significant
+     * character is percent-encoded, so a crafted name cannot escape the registry path. A {@code ..}
+     * segment or a stray {@code /} in the (single-segment) remainder is rejected outright.
      */
     static String encodeName(String packageName) {
-        String scope = scopeOf(packageName);
-        if (scope != null) {
-            return scope + "%2F" + packageName.substring(scope.length() + 1);
+        if (packageName.isEmpty() || packageName.startsWith("/") || hasDotDotSegment(packageName)) {
+            throw new IllegalArgumentException("unsafe package name: " + packageName);
         }
-        return packageName;
+        String scope = scopeOf(packageName);
+        String remainder = scope == null ? packageName : packageName.substring(scope.length() + 1);
+        if (remainder.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("unsafe package name: " + packageName);
+        }
+        String prefix = scope == null ? "" : scope + "%2F";
+        return prefix + percentEncodeSegment(remainder);
+    }
+
+    private static boolean hasDotDotSegment(String name) {
+        for (String segment : name.split("/", -1)) {
+            if ("..".equals(segment)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String percentEncodeSegment(String segment) {
+        StringBuilder sb = new StringBuilder(segment.length());
+        for (byte b : segment.getBytes(StandardCharsets.UTF_8)) {
+            int c = b & 0xFF;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                    c == '-' || c == '.' || c == '_' || c == '~') {
+                sb.append((char) c);
+            } else {
+                sb.append('%').append(hex(c >> 4)).append(hex(c & 0xF));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static char hex(int nibble) {
+        return (char) (nibble < 10 ? '0' + nibble : 'A' + (nibble - 10));
     }
 
     private static int authorityEnd(String url, int start) {

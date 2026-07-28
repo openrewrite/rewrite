@@ -28,6 +28,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -200,5 +204,228 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.VERSION_NOT_FOUND);
+    }
+
+    // --- C1: reverse-dependent guard -------------------------------------
+
+    @Test
+    void reverseDependentConstraintExcludingTargetFailsLoud() {
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
+                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
+        assertThat(result.getFailure().getDetail())
+                .contains("node_modules/needs-exact").contains("excludes 4.17.21");
+    }
+
+    @Test
+    void reverseDependentConstraintAcceptingTargetSucceeds() {
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\"\n" +
+                "    },\n" +
+                "    \"node_modules/tolerant\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^4.0.0\"}}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("4.17.21");
+    }
+
+    // --- closure surfaces (each fails loud individually) -----------------
+
+    @Test
+    void osChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "os changed");
+    }
+
+    @Test
+    void cpuChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "cpu changed");
+    }
+
+    @Test
+    void libcChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "libc changed");
+    }
+
+    @Test
+    void bundleDependenciesChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud("", ",\"bundleDependencies\":[\"x\"]", "bundleDependencies changed");
+    }
+
+    @Test
+    void optionalDependenciesChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "optionalDependencies changed");
+    }
+
+    @Test
+    void peerDependenciesMetaChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud("", ",\"peerDependenciesMeta\":{\"x\":{\"optional\":true}}",
+                "peerDependenciesMeta changed");
+    }
+
+    @Test
+    void hasInstallScriptChangeFailsLoud() {
+        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "hasInstallScript changed");
+    }
+
+    private void assertClosureSurfaceFailsLoud(String oldExtra, String newExtra, String expectedDetail) {
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}" + oldExtra + "}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}" + newExtra + "}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains(expectedDetail);
+    }
+
+    // --- other fail-loud guards ------------------------------------------
+
+    @Test
+    void forkedMultipleLockedVersionsFailsLoud() {
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
+                "    \"node_modules/x/node_modules/lodash\": {\"version\": \"3.10.1\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("multiple versions");
+    }
+
+    @Test
+    void overridesOutsideDeclaredDependenciesFailsLoud() {
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"1.0.0\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"2.0.0\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
+    }
+
+    @Test
+    void nullLockFailsLoud() {
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                null, null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    @Test
+    void nullOriginalManifestFailsLoud() {
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                null, npmLock("4.17.20"), null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("pre-edit package.json");
+    }
+
+    // --- C7: workspace importer targeting --------------------------------
+
+    @Test
+    void workspaceMemberBumpTargetsMemberImporterByteExact() {
+        routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                resource("lock/npm/workspace/pkg-after"),
+                resource("lock/npm/workspace/pkg-before"),
+                resource("lock/npm/workspace/before"),
+                null, Paths.get("packages/foo/package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/workspace/after"));
+    }
+
+    // --- C4: credentials never leak into a failure detail ----------------
+
+    @Test
+    void registryTokenInUrlNeverAppearsInFailureDetail() {
+        NodeExecutionContextView.view(ctx).setRegistries(singletonList(new NodeRegistry(
+                null, "https://user:s3cr3ttoken@registry.example.com/", null, null, null, null, false, null, true, false)));
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).doesNotContain("s3cr3ttoken");
+        assertThat(result.getErrorMessage()).doesNotContain("s3cr3ttoken");
+    }
+
+    private static String resource(String path) {
+        try (InputStream in = NativeLockEngineTest.class.getClassLoader().getResourceAsStream(path)) {
+            if (in == null) {
+                throw new IllegalStateException("missing test resource " + path);
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) >= 0) {
+                out.write(buf, 0, n);
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

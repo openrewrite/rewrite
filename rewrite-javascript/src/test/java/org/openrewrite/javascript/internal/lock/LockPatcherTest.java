@@ -95,6 +95,32 @@ class LockPatcherTest {
     }
 
     @Test
+    void yarnInPlaceBumpKeepsNpmjsHost() {
+        // A lock already on registry.npmjs.org must stay there — the host is mirrored from the siblings,
+        // not force-rewritten to yarnpkg.com.
+        PackageEdit edit = PackageEdit.builder()
+                .name("left-pad")
+                .oldVersion("1.2.0")
+                .newVersion("1.3.0")
+                .oldConstraint("1.2.0")
+                .newResolved("https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz")
+                .newShasum("5b8a3a7765dfe001261dde915589e782f8c94d1e")
+                .newIntegrity("sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==")
+                .scope("dependencies")
+                .build();
+
+        LockEditSet edits = new LockEditSet(
+                resource("/lock/yarn-classic/inplace-npmjs/before"),
+                Paths.get("yarn.lock"),
+                PackageManager.YarnClassic,
+                resource("/lock/yarn-classic/inplace-npmjs/pkg-after"),
+                singletonList(edit));
+
+        assertThat(new YarnClassicLockPatcher().patch(edits))
+                .isEqualTo(resource("/lock/yarn-classic/inplace-npmjs/after"));
+    }
+
+    @Test
     void yarnRemoveLeaf() {
         PackageEdit edit = PackageEdit.builder()
                 .name("left-pad")
@@ -169,6 +195,29 @@ class LockPatcherTest {
 
         assertThat(new BunLockPatcher().patch(edits))
                 .isEqualTo(resource("/lock/bun/remove/after"));
+    }
+
+    @Test
+    void bunNonLeafRemovalGCsPrivateTransitiveByteExact() {
+        // Removing debug (non-leaf) must also drop its now-orphaned private transitive ms; golden recorded
+        // from a real `bun install --lockfile-only` (bun 1.3.10).
+        PackageEdit edit = PackageEdit.builder()
+                .name("debug")
+                .oldVersion("4.3.4")
+                .newVersion(null)
+                .oldConstraint("4.3.4")
+                .scope("dependencies")
+                .build();
+
+        LockEditSet edits = new LockEditSet(
+                resource("/lock/bun/remove-nonleaf/before"),
+                Paths.get("bun.lock"),
+                PackageManager.Bun,
+                resource("/lock/bun/remove-nonleaf/pkg-after"),
+                singletonList(edit));
+
+        assertThat(new BunLockPatcher().patch(edits))
+                .isEqualTo(resource("/lock/bun/remove-nonleaf/after"));
     }
 
     // --- yarn berry (parse-only, fail loud) ----------------------------------

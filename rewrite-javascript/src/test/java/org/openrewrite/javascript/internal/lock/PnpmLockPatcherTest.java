@@ -101,6 +101,62 @@ class PnpmLockPatcherTest {
     }
 
     @Test
+    void v9NonLeafRemovalGCsPrivateTransitiveByteExact() {
+        // Removing debug (non-leaf) must also drop its now-orphaned private transitive ms; golden recorded
+        // from a real `pnpm install --lockfile-only` (pnpm 11.2.2).
+        String patched = bump("v9-rm-nonleaf", PackageEdit.builder()
+                .name("debug").oldVersion("4.3.4").newVersion(null).scope("dependencies").build());
+        assertThat(patched).isEqualTo(read("/lock/pnpm/v9-rm-nonleaf/after"));
+    }
+
+    @Test
+    void licenseWriteThroughFailsLoud() {
+        assertThatThrownBy(() -> bump("v9", PackageEdit.builder()
+                .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213).scope("dependencies")
+                .writeThroughMetadata(WriteThroughMetadata.builder().license("MIT").build()).build()))
+                .isInstanceOfSatisfying(EngineFailure.class, e -> {
+                    assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+                    assertThat(e.failure.getDetail()).contains("license");
+                });
+    }
+
+    @Test
+    void deprecatedWriteThroughFailsLoud() {
+        assertThatThrownBy(() -> bump("v9", PackageEdit.builder()
+                .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213).scope("dependencies")
+                .writeThroughMetadata(WriteThroughMetadata.builder().deprecated("no longer maintained").build()).build()))
+                .isInstanceOfSatisfying(EngineFailure.class,
+                        e -> assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED));
+    }
+
+    @Test
+    void blockStyleResolutionFailsLoud() {
+        String before = "lockfileVersion: '9.0'\n\n" +
+                "importers:\n\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      ms:\n" +
+                "        specifier: 2.1.2\n" +
+                "        version: 2.1.2\n\n" +
+                "packages:\n\n" +
+                "  ms@2.1.2:\n" +
+                "    resolution:\n" +
+                "      integrity: sha512-OLD\n\n" +
+                "snapshots:\n\n" +
+                "  ms@2.1.2: {}\n";
+        LockEditSet edits = new LockEditSet(before, Paths.get("pnpm-lock.yaml"), PackageManager.Pnpm,
+                "{\"dependencies\":{\"ms\":\"2.1.3\"}}",
+                singletonList(PackageEdit.builder()
+                        .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213)
+                        .scope("dependencies").build()));
+        assertThatThrownBy(() -> new PnpmLockPatcher().patch(edits))
+                .isInstanceOfSatisfying(EngineFailure.class, e -> {
+                    assertThat(e.failure.getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+                    assertThat(e.failure.getDetail()).contains("flow-scalar");
+                });
+    }
+
+    @Test
     void roundTripV9PreservesBytes() {
         LockEditSet edits = new LockEditSet(read("/lock/pnpm/v9/before"), Paths.get("pnpm-lock.yaml"),
                 PackageManager.Pnpm, "{}", Collections.<PackageEdit>emptyList());

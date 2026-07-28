@@ -42,12 +42,18 @@ public final class YarnClassicLockPatcher implements LockPatcher {
     private static final String NPM_REGISTRY = "https://registry.npmjs.org/";
     private static final String YARN_REGISTRY = "https://registry.yarnpkg.com/";
 
+    /** True when the existing lock's sibling {@code resolved} entries use the yarnpkg mirror. */
+    private boolean mirrorToYarnpkg;
+
     @Override
     public String patch(LockEditSet edits) {
         String content = edits.getExistingLockContent();
         if (content == null || !content.contains(YARN_HEADER)) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "not a yarn v1 lockfile");
         }
+        // Mirror the host the siblings use rather than force-rewriting to yarnpkg: a lock already on
+        // registry.npmjs.org must stay there, or the new entry's host won't match a real yarn install.
+        mirrorToYarnpkg = content.contains(YARN_REGISTRY);
         for (PackageEdit edit : edits.getEdits()) {
             content = applyEdit(content, edit, edits.getEditedPackageJson());
         }
@@ -143,7 +149,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "missing resolved metadata for " + edit.getName());
         }
-        if (url.startsWith(NPM_REGISTRY)) {
+        if (mirrorToYarnpkg && url.startsWith(NPM_REGISTRY)) {
             url = YARN_REGISTRY + url.substring(NPM_REGISTRY.length());
         }
         if (edit.getNewShasum() != null) {
