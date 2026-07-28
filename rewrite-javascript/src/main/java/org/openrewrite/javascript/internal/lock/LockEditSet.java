@@ -113,6 +113,8 @@ public class LockEditSet {
     /**
      * The metadata tier a real {@code npm}/{@code pnpm} bump patches cleanly without reshaping the tree, so the
      * engine writes the new values through instead of failing loud. Only fields that actually changed are non-null.
+     * For a leaf add (Phase B I1-follow) the object/array fields below carry the leaf's serialized metadata; the
+     * engine has already normalized/vetted them, so the patcher renders each value as-is at npm's indentation.
      */
     @Value
     @Builder
@@ -126,8 +128,24 @@ public class LockEditSet {
         @Nullable
         String deprecated;
 
-        /** Raw {@code bin} node (a String or a {@code {name: path}} object). */
+        /** {@code bin} object ({@code {name: path}}); the engine fails loud on the string form npm would normalize. */
         @Nullable
         JsonNode bin;
+
+        @Nullable
+        List<String> os;
+
+        @Nullable
+        List<String> cpu;
+
+        @Nullable
+        List<String> libc;
+
+        @Nullable
+        Boolean hasInstallScript;
+
+        /** {@code funding} node, already normalized by the engine to npm's object form ({@code {url: ...}}). */
+        @Nullable
+        JsonNode funding;
     }
 }

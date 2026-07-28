@@ -90,6 +90,27 @@ class AddDependencyLockRegenTest implements RewriteTest {
     }
 
     @Test
+    void metadataLeafAddRegeneratesLockByteExact() {
+        // A leaf carrying object metadata (engines) is now written byte-exact end-to-end (I1-follow).
+        routes.put("https://registry.npmjs.org/is-number", resource("lock/npm/add-meta-engines/http/is-number"));
+        routes.put("https://registry.npmjs.org/is-number/7.0.0",
+                resource("lock/npm/add-meta-engines/http/is-number-7.0.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("is-number", "^7.0.0", "dependencies"))
+                        .executionContext(ctx),
+                packageJson(resource("lock/npm/add-meta-engines/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("left-pad", "1.3.0")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-number\": \"^7.0.0\"");
+                            return actual;
+                        })),
+                packageLock(resource("lock/npm/add-meta-engines/before"), resource("lock/npm/add-meta-engines/after"),
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
     void closureAddFailsLoudWarnsAndRecordsDataTableRow() {
         // A package whose resolved version pulls a transitive is a closure add (Phase B I2), not a leaf.
         routes.put("https://registry.npmjs.org/needs-transitive", "{\"versions\":{\"1.0.0\":{}}}");

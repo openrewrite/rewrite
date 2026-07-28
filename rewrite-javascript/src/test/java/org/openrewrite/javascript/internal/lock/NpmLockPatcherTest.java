@@ -15,10 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
+import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.IOException;
@@ -30,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -152,6 +156,101 @@ class NpmLockPatcherTest {
     void leafAddDevScopeIsByteExact() {
         String out = new NpmLockPatcher().patch(editSet("add-leaf-dev", leafAdd("devDependencies")));
         assertThat(out).isEqualTo(golden("add-leaf-dev/after"));
+    }
+
+    // --- object/array metadata leaf add (Phase B increment 1-follow) -----
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static JsonNode json(String source) {
+        try {
+            return MAPPER.readTree(source);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static PackageEdit.PackageEditBuilder metaAdd(String name, String version, String resolved,
+                                                          String integrity) {
+        return PackageEdit.builder()
+                .name(name)
+                .oldVersion("")
+                .newVersion(version)
+                .newResolved(resolved)
+                .newIntegrity(integrity)
+                .scope("dependencies")
+                .importerDir(null)
+                .added(true);
+    }
+
+    @Test
+    void enginesLeafAddIsByteExact() {
+        PackageEdit add = metaAdd("is-number", "7.0.0",
+                "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz",
+                "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==")
+                .writeThroughMetadata(WriteThroughMetadata.builder()
+                        .license("MIT")
+                        .engines(singletonMap("node", ">=0.12.0"))
+                        .build())
+                .build();
+        assertThat(new NpmLockPatcher().patch(editSet("add-meta-engines", add)))
+                .isEqualTo(golden("add-meta-engines/after"));
+    }
+
+    @Test
+    void binObjectLeafAddIsByteExact() {
+        PackageEdit add = metaAdd("he", "1.2.0",
+                "https://registry.npmjs.org/he/-/he-1.2.0.tgz",
+                "sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==")
+                .writeThroughMetadata(WriteThroughMetadata.builder()
+                        .license("MIT")
+                        .bin(json("{\"he\": \"bin/he\"}"))
+                        .build())
+                .build();
+        assertThat(new NpmLockPatcher().patch(editSet("add-meta-bin", add)))
+                .isEqualTo(golden("add-meta-bin/after"));
+    }
+
+    /** os (array, groups with scalars) + hasInstallScript + license before engines (object, groups last). */
+    @Test
+    void richMetadataLeafAddV3IsByteExact() {
+        assertThat(new NpmLockPatcher().patch(editSet("add-meta-rich", fseventsAdd())))
+                .isEqualTo(golden("add-meta-rich/after"));
+    }
+
+    @Test
+    void richMetadataLeafAddV2LegacyTreeStaysMinimal() {
+        assertThat(new NpmLockPatcher().patch(editSet("add-meta-rich-v2", fseventsAdd())))
+                .isEqualTo(golden("add-meta-rich-v2/after"));
+    }
+
+    private static PackageEdit fseventsAdd() {
+        return metaAdd("fsevents", "2.3.3",
+                "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+                "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==")
+                .writeThroughMetadata(WriteThroughMetadata.builder()
+                        .license("MIT")
+                        .hasInstallScript(true)
+                        .os(singletonList("darwin"))
+                        .engines(singletonMap("node", "^8.16.0 || ^10.6.0 || >=11.0.0"))
+                        .build())
+                .build();
+    }
+
+    /** npm records a string {@code funding} as the normalized object {@code {url}}, sorted after engines. */
+    @Test
+    void fundingLeafAddIsByteExact() {
+        PackageEdit add = metaAdd("escape-string-regexp", "5.0.0",
+                "https://registry.npmjs.org/escape-string-regexp/-/escape-string-regexp-5.0.0.tgz",
+                "sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==")
+                .writeThroughMetadata(WriteThroughMetadata.builder()
+                        .license("MIT")
+                        .engines(singletonMap("node", ">=12"))
+                        .funding(json("{\"url\": \"https://github.com/sponsors/sindresorhus\"}"))
+                        .build())
+                .build();
+        assertThat(new NpmLockPatcher().patch(editSet("add-meta-funding", add)))
+                .isEqualTo(golden("add-meta-funding/after"));
     }
 
     @Test

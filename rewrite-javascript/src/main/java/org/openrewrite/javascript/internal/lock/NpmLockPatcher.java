@@ -194,9 +194,11 @@ public final class NpmLockPatcher implements LockPatcher {
     // --- leaf add (Phase B increment 1) ----------------------------------
 
     /**
-     * Insert a brand-new scalar-only leaf: a {@code packages} entry, the importer's declared constraint
-     * (creating the scope object when absent), and — for lockfileVersion 2 — the minimal legacy tree
-     * entry. Each insert lands at npm's own sort position ({@link NpmKeyOrder}) with byte-exact whitespace.
+     * Insert a brand-new leaf (its object/array metadata already vetted by the engine): a {@code packages}
+     * entry, the importer's declared constraint (creating the scope object when absent), and — for
+     * lockfileVersion 2 — the minimal legacy tree entry (still {@code version}/{@code resolved}/{@code
+     * integrity} only). Each insert lands at npm's own sort position ({@link NpmKeyOrder}) with byte-exact
+     * whitespace.
      */
     private Json.JsonObject applyAdd(Json.JsonObject root, int lockfileVersion,
                                      @Nullable JsonNode editedManifest, PackageEdit edit) {
@@ -227,33 +229,123 @@ public final class NpmLockPatcher implements LockPatcher {
         return root;
     }
 
-    /** The scalar-only leaf entry object source, fields in npm's serialization order. */
+    /**
+     * The leaf entry object source, members in npm's serialization order: object-valued members after
+     * scalar/array-valued ones, {@code swKeyOrder} keys first within a group, then ICU {@code localeCompare}.
+     * Object/array metadata values are pretty-printed at npm's indentation ({@link #renderNode}).
+     */
     private String leafEntryText(Json.JsonObject packages, PackageEdit edit) {
         String fieldWs = nestedMemberWhitespace(packages);
         String closeWs = memberWhitespace(packages);
-        if (fieldWs == null) {
+        if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive entry indentation");
         }
-        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
-        String deprecated = wt == null ? null : wt.getDeprecated();
-        String license = wt == null ? null : wt.getLicense();
-        boolean dev = "devDependencies".equals(edit.getScope());
+        String keyIndent = indentOf(fieldWs);
+        String unit = keyIndent.length() > indentOf(closeWs).length() ?
+                keyIndent.substring(indentOf(closeWs).length()) : "  ";
 
-        List<String> fields = new ArrayList<>();
-        fields.add(field(fieldWs, "version", jsonEncode(edit.getNewVersion())));
-        fields.add(field(fieldWs, "resolved", jsonEncode(edit.getNewResolved())));
-        fields.add(field(fieldWs, "integrity", jsonEncode(edit.getNewIntegrity())));
-        // Scalars after the preference keys sort alphabetically: deprecated < dev < license.
-        if (deprecated != null) {
-            fields.add(field(fieldWs, "deprecated", jsonEncode(deprecated)));
+        List<EntryField> fields = new ArrayList<>();
+        fields.add(new EntryField("version", jsonEncode(edit.getNewVersion()), false));
+        fields.add(new EntryField("resolved", jsonEncode(edit.getNewResolved()), false));
+        fields.add(new EntryField("integrity", jsonEncode(edit.getNewIntegrity()), false));
+        if ("devDependencies".equals(edit.getScope())) {
+            fields.add(new EntryField("dev", "true", false));
         }
-        if (dev) {
-            fields.add(field(fieldWs, "dev", "true"));
+        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        if (wt != null) {
+            if (wt.getDeprecated() != null) {
+                fields.add(new EntryField("deprecated", jsonEncode(wt.getDeprecated()), false));
+            }
+            if (Boolean.TRUE.equals(wt.getHasInstallScript())) {
+                fields.add(new EntryField("hasInstallScript", "true", false));
+            }
+            if (wt.getLicense() != null) {
+                fields.add(new EntryField("license", jsonEncode(wt.getLicense()), false));
+            }
+            addMetadataField(fields, "os", wt.getOs(), keyIndent, unit);
+            addMetadataField(fields, "cpu", wt.getCpu(), keyIndent, unit);
+            addMetadataField(fields, "libc", wt.getLibc(), keyIndent, unit);
+            addMetadataField(fields, "engines", wt.getEngines(), keyIndent, unit);
+            addMetadataField(fields, "bin", wt.getBin(), keyIndent, unit);
+            addMetadataField(fields, "funding", wt.getFunding(), keyIndent, unit);
         }
-        if (license != null) {
-            fields.add(field(fieldWs, "license", jsonEncode(license)));
+        fields.sort((a, b) -> a.object != b.object ? (a.object ? 1 : -1) : NpmKeyOrder.compareKeys(a.key, b.key));
+
+        List<String> rendered = new ArrayList<>();
+        for (EntryField f : fields) {
+            rendered.add(field(fieldWs, f.key, f.value));
         }
-        return "{" + String.join(",", fields) + closeWs + "}";
+        return "{" + String.join(",", rendered) + closeWs + "}";
+    }
+
+    private void addMetadataField(List<EntryField> fields, String key, @Nullable Object value,
+                                  String keyIndent, String unit) {
+        if (value == null) {
+            return;
+        }
+        JsonNode node = value instanceof JsonNode ? (JsonNode) value : JSON.valueToTree(value);
+        fields.add(new EntryField(key, renderNode(node, keyIndent, unit), node.isObject()));
+    }
+
+    /** Pretty-print a JSON value exactly as npm's {@code json-stringify-nice} does at {@code indent}. */
+    private static String renderNode(JsonNode node, String indent, String unit) {
+        if (node.isObject()) {
+            if (node.size() == 0) {
+                return "{}";
+            }
+            String inner = indent + unit;
+            List<String> keys = new ArrayList<>();
+            node.fieldNames().forEachRemaining(keys::add);
+            keys.sort((a, b) -> {
+                boolean ao = node.get(a).isObject();
+                boolean bo = node.get(b).isObject();
+                return ao != bo ? (ao ? 1 : -1) : NpmKeyOrder.compareKeys(a, b);
+            });
+            List<String> members = new ArrayList<>();
+            for (String k : keys) {
+                members.add("\n" + inner + jsonEncode(k) + ": " + renderNode(node.get(k), inner, unit));
+            }
+            return "{" + String.join(",", members) + "\n" + indent + "}";
+        }
+        if (node.isArray()) {
+            if (node.size() == 0) {
+                return "[]";
+            }
+            String inner = indent + unit;
+            List<String> elements = new ArrayList<>();
+            for (JsonNode el : node) {
+                elements.add("\n" + inner + renderNode(el, inner, unit));
+            }
+            return "[" + String.join(",", elements) + "\n" + indent + "]";
+        }
+        return scalarSource(node);
+    }
+
+    /** The indentation (no newline) of an object member's prefix whitespace. */
+    private static String indentOf(String ws) {
+        int nl = ws.lastIndexOf('\n');
+        return nl < 0 ? ws : ws.substring(nl + 1);
+    }
+
+    private static String scalarSource(JsonNode node) {
+        try {
+            return JSON.writeValueAsString(node);
+        } catch (JsonProcessingException e) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not JSON-encode value: " + node);
+        }
+    }
+
+    /** A pending entry member: its key, source value, and whether the value is a JSON object (sorts last). */
+    private static final class EntryField {
+        final String key;
+        final String value;
+        final boolean object;
+
+        EntryField(String key, String value, boolean object) {
+            this.key = key;
+            this.value = value;
+            this.object = object;
+        }
     }
 
     private Json.JsonObject insertImporterConstraint(Json.JsonObject root, @Nullable JsonNode editedManifest,

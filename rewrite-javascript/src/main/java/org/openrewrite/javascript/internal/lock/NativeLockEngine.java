@@ -254,7 +254,7 @@ public final class NativeLockEngine {
         String targetVersion = resolveAddedVersion(client, registry, name, constraint);
         VersionManifest manifest = client.getManifest(registry, name, targetVersion);
 
-        requireScalarOnlyLeaf(name, manifest);
+        requireEmittableLeaf(name, manifest);
 
         // A stray reverse-dependent whose recorded constraint excludes the resolved version → fail loud.
         proveReverseDependentsAccept(pm, name, targetVersion, targetVersion, existingLock);
@@ -297,47 +297,65 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A leaf whose lock entry the npm patcher can insert byte-exactly today: no runtime closure, and no
-     * object/array metadata (engines/os/cpu/bin/…) that would need a nested byte-exact insert. Only
-     * {@code version}/{@code resolved}/{@code integrity} plus the scalar {@code dev}/{@code deprecated}/
-     * {@code license} appear in the emitted entry.
+     * A leaf whose lock entry the npm patcher can insert byte-exactly: no runtime closure, and only the
+     * metadata whose serialization is grounded in a real {@code npm install} golden — the scalar
+     * {@code dev}/{@code deprecated}/{@code license}/{@code hasInstallScript}, the {@code os}/{@code cpu}/
+     * {@code libc} arrays, an {@code engines} object, an object-form {@code bin}, and a string-form
+     * {@code funding} (which npm normalizes to {@code {url}}). Anything whose npm serialization is
+     * un-verified — a package with transitives, a string {@code bin} or non-string {@code funding} npm
+     * would reshape, or the bundled/peer/shrinkwrap/accept/workspaces surfaces — fails loud
+     * (exhaustive-or-fail) rather than emit a maybe-wrong entry.
      */
-    private static void requireScalarOnlyLeaf(String name, VersionManifest m) {
+    private static void requireEmittableLeaf(String name, VersionManifest m) {
         if (notEmpty(m.getDependencies()) || notEmpty(m.getOptionalDependencies()) || notEmpty(m.getPeerDependencies())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     "adding " + name + " pulls in transitive dependencies; closure resolution required");
         }
-        String metadata = firstNonScalarMetadata(m);
+        String metadata = unserializableMetadata(m);
         if (metadata != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     "adding " + name + " carries " + metadata + " metadata not yet supported for native adds");
         }
     }
 
-    private static @Nullable String firstNonScalarMetadata(VersionManifest m) {
-        if (notEmpty(m.getEngines())) return "engines";
-        if (notEmpty(m.getOs())) return "os";
-        if (notEmpty(m.getCpu())) return "cpu";
-        if (notEmpty(m.getLibc())) return "libc";
-        if (m.getBin() != null) return "bin";
-        if (bool(m.getHasInstallScript())) return "hasInstallScript";
+    /** The metadata surfaces whose byte-exact npm serialization is not yet verified; each defers the add. */
+    private static @Nullable String unserializableMetadata(VersionManifest m) {
+        if (m.getBin() != null && !m.getBin().isObject()) return "non-object bin";
+        if (m.getFunding() != null && !m.getFunding().isTextual()) return "non-string funding";
         if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
         if (notEmpty(m.getPeerDependenciesMeta())) return "peerDependenciesMeta";
         if (bool(m.getHasShrinkwrap())) return "hasShrinkwrap";
-        if (m.getFunding() != null) return "funding";
         if (notEmpty(m.getAcceptDependencies())) return "acceptDependencies";
         if (m.getWorkspaces() != null) return "workspaces";
         return null;
     }
 
     private static LockEditSet.@Nullable WriteThroughMetadata leafMetadata(VersionManifest m) {
-        if (m.getLicenseString() == null && m.getDeprecated() == null) {
+        boolean any = m.getLicenseString() != null || m.getDeprecated() != null || notEmpty(m.getEngines()) ||
+                notEmpty(m.getOs()) || notEmpty(m.getCpu()) || notEmpty(m.getLibc()) ||
+                bool(m.getHasInstallScript()) || m.getBin() != null || m.getFunding() != null;
+        if (!any) {
             return null;
         }
         return LockEditSet.WriteThroughMetadata.builder()
                 .license(m.getLicenseString())
                 .deprecated(m.getDeprecated())
+                .engines(notEmpty(m.getEngines()) ? m.getEngines() : null)
+                .os(notEmpty(m.getOs()) ? m.getOs() : null)
+                .cpu(notEmpty(m.getCpu()) ? m.getCpu() : null)
+                .libc(notEmpty(m.getLibc()) ? m.getLibc() : null)
+                .hasInstallScript(bool(m.getHasInstallScript()) ? Boolean.TRUE : null)
+                .bin(m.getBin())
+                .funding(normalizeFunding(m.getFunding()))
                 .build();
+    }
+
+    /** npm records a string {@code funding} as {@code {url: <string>}}; object/array forms are gated out upstream. */
+    private static @Nullable JsonNode normalizeFunding(@Nullable JsonNode funding) {
+        if (funding == null) {
+            return null;
+        }
+        return JSON.createObjectNode().set("url", funding);
     }
 
     private static boolean notEmpty(@Nullable Map<String, ?> map) {
