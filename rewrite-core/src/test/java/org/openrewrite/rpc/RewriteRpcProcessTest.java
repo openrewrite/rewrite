@@ -21,6 +21,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -164,6 +165,111 @@ class RewriteRpcProcessTest {
                 assertThatThrownBy(process::start)
                         .isInstanceOf(UncheckedIOException.class)
                         .hasMessageContaining(missing));
+    }
+
+    /**
+     * When the subprocess dies, its stderr is the only thing that explains why. The drain
+     * thread has to consume stderr eagerly to keep the subprocess off a full pipe, so
+     * unless a tail is retained the diagnostic is read and discarded and the failure
+     * surfaces as a bare exit code — see the recurring {@code RPC process shut down early
+     * with exit code 217/1/127} failures in rewrite-static-analysis CI, which had no
+     * attributable cause for exactly this reason.
+     */
+    @Test
+    void livenessCheckReportsSubprocessStderr() throws Exception {
+        // given: a subprocess that reports a startup failure on stderr and exits non-zero
+        RewriteRpcProcess process = new RewriteRpcProcess(
+                System.getProperty("java.home") + "/bin/java",
+                "-cp", System.getProperty("java.class.path"),
+                StderrThenExitEntryPoint.class.getName());
+        try {
+            process.start();
+
+            // when: it has exited
+            assertThat(underlyingProcess(process).waitFor(30, TimeUnit.SECONDS))
+                    .as("subprocess should exit on its own")
+                    .isTrue();
+
+            // then: the liveness check explains why, not just that
+            assertThat(process.getLivenessCheck())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("exit code 217")
+                    .hasMessageContaining(StderrThenExitEntryPoint.MESSAGE);
+        } finally {
+            process.shutdown();
+        }
+    }
+
+    /**
+     * The retained stderr is bounded, so a subprocess that logs steadily can't be held in
+     * memory in full. The bytes worth keeping are the last ones — a stack trace or fatal
+     * error lands at the end — so eviction must drop the head, not truncate the tail.
+     */
+    @Test
+    void livenessCheckRetainsTailOfOversizeStderr() throws Exception {
+        // given: a subprocess emitting far more stderr than the retained tail holds
+        RewriteRpcProcess process = new RewriteRpcProcess(
+                System.getProperty("java.home") + "/bin/java",
+                "-cp", System.getProperty("java.class.path"),
+                OversizeStderrEntryPoint.class.getName());
+        try {
+            process.start();
+
+            // when: it has exited
+            assertThat(underlyingProcess(process).waitFor(30, TimeUnit.SECONDS))
+                    .as("subprocess should exit on its own")
+                    .isTrue();
+
+            // then: the last thing it said survives, and the first thing was evicted
+            assertThat(process.getLivenessCheck())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining(OversizeStderrEntryPoint.TAIL)
+                    .hasMessageNotContaining(OversizeStderrEntryPoint.HEAD);
+        } finally {
+            process.shutdown();
+        }
+    }
+
+    private static Process underlyingProcess(RewriteRpcProcess process) throws Exception {
+        Field f = RewriteRpcProcess.class.getDeclaredField("process");
+        f.setAccessible(true);
+        return (Process) f.get(process);
+    }
+
+    /**
+     * Forked entry point that writes a diagnostic to stderr and exits with the same code
+     * observed in CI. Uses {@code halt} so no shutdown hook can add output after it.
+     */
+    public static class StderrThenExitEntryPoint {
+        static final String MESSAGE = "rpc-server: failed to start, ENOENT";
+
+        public static void main(String[] args) {
+            System.err.println(MESSAGE);
+            System.err.flush();
+            Runtime.getRuntime().halt(217);
+        }
+    }
+
+    /**
+     * Forked entry point that brackets far more than the retained tail of filler between
+     * two markers, so the test can tell which end of the buffer survived eviction.
+     */
+    public static class OversizeStderrEntryPoint {
+        static final String HEAD = "HEAD-MARKER-should-be-evicted";
+        static final String TAIL = "TAIL-MARKER-should-survive";
+
+        public static void main(String[] args) {
+            System.err.println(HEAD);
+            byte[] junk = new byte[8192];
+            Arrays.fill(junk, (byte) 'x');
+            String filler = new String(junk, StandardCharsets.UTF_8);
+            for (int i = 0; i < 8; i++) {
+                System.err.print(filler);
+            }
+            System.err.println(TAIL);
+            System.err.flush();
+            Runtime.getRuntime().halt(1);
+        }
     }
 
     /**

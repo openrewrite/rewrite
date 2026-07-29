@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,6 +53,8 @@ import static org.openrewrite.internal.StringUtils.readFully;
  * A client for spawning and communicating with a subprocess that implements Rewrite RPC.
  */
 public class RewriteRpcProcess extends Thread {
+    private static final int STDERR_TAIL_BYTES = 8 * 1024;
+
     private final String[] command;
 
     @Setter
@@ -79,6 +82,8 @@ public class RewriteRpcProcess extends Thread {
 
     @Nullable
     private Thread stderrDrainThread;
+
+    private final StderrTail stderrTail = new StderrTail();
 
     @Nullable
     private Thread rssSamplerThread;
@@ -127,7 +132,7 @@ public class RewriteRpcProcess extends Thread {
             // parent-side file handle after process termination, preventing deletion
             // of the log file.  Instead we drain stderr in a daemon thread.
             process = pb.start();
-            stderrDrainThread = drainStderr(process, stderrRedirect);
+            stderrDrainThread = drainStderr(process, stderrRedirect, stderrTail);
         } catch (IOException e) {
             // Record the failure so start() can surface it instead of busy-waiting forever
             // on `process == null`. Throwing here would just kill this thread silently.
@@ -135,22 +140,23 @@ public class RewriteRpcProcess extends Thread {
         }
     }
 
-    private static Thread drainStderr(Process process, @Nullable Path stderrRedirect) {
+    private static Thread drainStderr(Process process, @Nullable Path stderrRedirect, StderrTail stderrTail) {
         Thread thread = new Thread(() -> {
             byte[] buf = new byte[8192];
             try (InputStream stderr = process.getErrorStream()) {
-                if (stderrRedirect != null) {
-                    try (OutputStream out = Files.newOutputStream(stderrRedirect,
-                            StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-                        int n;
-                        while ((n = stderr.read(buf)) != -1) {
+                OutputStream out = stderrRedirect == null ? null : Files.newOutputStream(stderrRedirect,
+                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                try {
+                    int n;
+                    while ((n = stderr.read(buf)) != -1) {
+                        stderrTail.append(buf, n);
+                        if (out != null) {
                             out.write(buf, 0, n);
                         }
                     }
-                } else {
-                    //noinspection StatementWithEmptyBody
-                    while (stderr.read(buf) != -1) {
-                        // discard
+                } finally {
+                    if (out != null) {
+                        out.close();
                     }
                 }
             } catch (IOException ignored) {
@@ -178,9 +184,26 @@ public class RewriteRpcProcess extends Thread {
                 // Ignore errors reading final stdout
             }
 
+            // The subprocess is already dead, so stderr is at (or about to reach) EOF.
+            // Give the drain thread a moment to observe it, otherwise the very output
+            // that explains the exit code can still be in flight.
+            Thread drainThread = stderrDrainThread;
+            if (drainThread != null) {
+                try {
+                    drainThread.join(TimeUnit.SECONDS.toMillis(1));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            String stdError = stderrTail.toString();
+
             String message = "RPC process shut down early with exit code " + exitCode;
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
+            }
+            if (!stdError.isEmpty()) {
+                message += "\nStandard error (last " + STDERR_TAIL_BYTES + " bytes):\n  " +
+                           stdError.replace("\n", "\n  ");
             }
             if (stderrRedirect != null) {
                 message += "\nSee stderr log: " + stderrRedirect;
@@ -188,6 +211,43 @@ public class RewriteRpcProcess extends Thread {
             return new IllegalStateException(message.trim());
         }
         return null;
+    }
+
+    /**
+     * A fixed-size ring buffer over the tail of the subprocess's stderr. The drain
+     * thread has to consume stderr eagerly to keep the subprocess from blocking on a
+     * full pipe, so without retaining some of it here a crash surfaces as nothing but
+     * an exit code — the diagnostic is read and thrown away. Bounded because stderr is
+     * unbounded and a server that logs steadily would otherwise be retained in full.
+     */
+    private static class StderrTail {
+        private final byte[] buffer = new byte[STDERR_TAIL_BYTES];
+        private int size;
+        private int next;
+
+        synchronized void append(byte[] b, int len) {
+            // Anything before this was already overwritten by the tail of the same chunk.
+            for (int i = Math.max(0, len - buffer.length); i < len; i++) {
+                buffer[next] = b[i];
+                next = (next + 1) % buffer.length;
+                if (size < buffer.length) {
+                    size++;
+                }
+            }
+        }
+
+        @Override
+        public synchronized String toString() {
+            if (size == 0) {
+                return "";
+            }
+            byte[] ordered = new byte[size];
+            int start = size < buffer.length ? 0 : next;
+            for (int i = 0; i < size; i++) {
+                ordered[i] = buffer[(start + i) % buffer.length];
+            }
+            return new String(ordered, StandardCharsets.UTF_8);
+        }
     }
 
     @Override
