@@ -61,13 +61,13 @@ class MigrateToMaven4Test implements RewriteTest {
                       <plugins>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <artifactId>maven-assembly-plugin</artifactId>
+                              <version>3.7.1</version>
                           </plugin>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <artifactId>maven-assembly-plugin</artifactId>
+                              <version>3.7.1</version>
                           </plugin>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
@@ -126,8 +126,8 @@ class MigrateToMaven4Test implements RewriteTest {
                       <plugins>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <artifactId>maven-assembly-plugin</artifactId>
+                              <version>3.7.1</version>
                           </plugin>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
@@ -299,8 +299,8 @@ class MigrateToMaven4Test implements RewriteTest {
                       <plugins>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <artifactId>maven-assembly-plugin</artifactId>
+                              <version>3.7.1</version>
                           </plugin>
                       </plugins>
                   </build>
