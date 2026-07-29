@@ -1,0 +1,178 @@
+1.0.0 - 2.0.0	1.2.3	true
+^1.2.3+build	1.2.3	true
+^1.2.3+build	1.3.0	true
+1.2.3-pre+asdf - 2.4.3-pre+asdf	1.2.3	true
+1.2.3-pre+asdf - 2.4.3-pre+asdf	1.2.3-pre.2	true
+1.2.3-pre+asdf - 2.4.3-pre+asdf	2.4.3-alpha	true
+1.2.3+asdf - 2.4.3+asdf	1.2.3	true
+1.0.0	1.0.0	true
+>=*	0.2.4	true
+	1.0.0	true
+*	1.2.3	true
+>=1.0.0	1.0.0	true
+>=1.0.0	1.0.1	true
+>=1.0.0	1.1.0	true
+>1.0.0	1.0.1	true
+>1.0.0	1.1.0	true
+<=2.0.0	2.0.0	true
+<=2.0.0	1.9999.9999	true
+<=2.0.0	0.2.9	true
+<2.0.0	1.9999.9999	true
+<2.0.0	0.2.9	true
+>= 1.0.0	1.0.0	true
+>=  1.0.0	1.0.1	true
+>=   1.0.0	1.1.0	true
+> 1.0.0	1.0.1	true
+>  1.0.0	1.1.0	true
+<=   2.0.0	2.0.0	true
+<= 2.0.0	1.9999.9999	true
+<=  2.0.0	0.2.9	true
+<    2.0.0	1.9999.9999	true
+<	2.0.0	0.2.9	true
+>=0.1.97	0.1.97	true
+0.1.20 || 1.2.4	1.2.4	true
+>=0.2.3 || <0.0.1	0.0.0	true
+>=0.2.3 || <0.0.1	0.2.3	true
+>=0.2.3 || <0.0.1	0.2.4	true
+||	1.3.4	true
+2.x.x	2.1.3	true
+1.2.x	1.2.3	true
+1.2.x || 2.x	2.1.3	true
+1.2.x || 2.x	1.2.3	true
+x	1.2.3	true
+2.*.*	2.1.3	true
+1.2.*	1.2.3	true
+1.2.* || 2.*	2.1.3	true
+1.2.* || 2.*	1.2.3	true
+*	1.2.3	true
+2	2.1.2	true
+2.3	2.3.1	true
+~0.0.1	0.0.1	true
+~0.0.1	0.0.2	true
+~x	0.0.9	true
+~2	2.0.9	true
+~2.4	2.4.0	true
+~2.4	2.4.5	true
+~>3.2.1	3.2.2	true
+~1	1.2.3	true
+~>1	1.2.3	true
+~> 1	1.2.3	true
+~1.0	1.0.2	true
+~ 1.0	1.0.2	true
+~ 1.0.3	1.0.12	true
+>=1	1.0.0	true
+>= 1	1.0.0	true
+<1.2	1.1.1	true
+< 1.2	1.1.1	true
+~v0.5.4-pre	0.5.5	true
+~v0.5.4-pre	0.5.4	true
+=0.7.x	0.7.2	true
+<=0.7.x	0.7.2	true
+>=0.7.x	0.7.2	true
+<=0.7.x	0.6.2	true
+~1.2.1 >=1.2.3	1.2.3	true
+~1.2.1 =1.2.3	1.2.3	true
+~1.2.1 1.2.3	1.2.3	true
+~1.2.1 >=1.2.3 1.2.3	1.2.3	true
+~1.2.1 1.2.3 >=1.2.3	1.2.3	true
+>=1.2.1 1.2.3	1.2.3	true
+1.2.3 >=1.2.1	1.2.3	true
+>=1.2.3 >=1.2.1	1.2.3	true
+>=1.2.1 >=1.2.3	1.2.3	true
+>=1.2	1.2.8	true
+^1.2.3	1.8.1	true
+^0.1.2	0.1.2	true
+^0.1	0.1.2	true
+^0.0.1	0.0.1	true
+^1.2	1.4.2	true
+^1.2 ^1	1.4.2	true
+^1.2.3-alpha	1.2.3-pre	true
+^1.2.0-alpha	1.2.0-pre	true
+^0.0.1-alpha	0.0.1-beta	true
+^0.0.1-alpha	0.0.1	true
+^0.1.1-alpha	0.1.1-beta	true
+^x	1.2.3	true
+x - 1.0.0	0.9.7	true
+x - 1.x	0.9.7	true
+1.0.0 - x	1.9.7	true
+1.x - x	1.9.7	true
+<=7.x	7.9.9	true
+1.0.0 - 2.0.0	2.2.3	false
+1.2.3+asdf - 2.4.3+asdf	1.2.3-pre.2	false
+1.2.3+asdf - 2.4.3+asdf	2.4.3-alpha	false
+^1.2.3+build	2.0.0	false
+^1.2.3+build	1.2.0	false
+^1.2.3	1.2.3-pre	false
+^1.2	1.2.0-pre	false
+>1.2	1.3.0-beta	false
+<=1.2.3	1.2.3-beta	false
+^1.2.3	1.2.3-beta	false
+=0.7.x	0.7.0-asdf	false
+>=0.7.x	0.7.0-asdf	false
+<=0.7.x	0.7.0-asdf	false
+1.0.0	1.0.1	false
+>=1.0.0	0.0.0	false
+>=1.0.0	0.0.1	false
+>=1.0.0	0.1.0	false
+>1.0.0	0.0.1	false
+>1.0.0	0.1.0	false
+<=2.0.0	3.0.0	false
+<=2.0.0	2.9999.9999	false
+<=2.0.0	2.2.9	false
+<2.0.0	2.9999.9999	false
+<2.0.0	2.2.9	false
+>=0.1.97	0.1.93	false
+0.1.20 || 1.2.4	1.2.3	false
+>=0.2.3 || <0.0.1	0.0.3	false
+>=0.2.3 || <0.0.1	0.2.2	false
+2.x.x	1.1.3	false
+2.x.x	3.1.3	false
+1.2.x	1.3.3	false
+1.2.x || 2.x	3.1.3	false
+1.2.x || 2.x	1.1.3	false
+2.*.*	1.1.3	false
+2.*.*	3.1.3	false
+1.2.*	1.3.3	false
+1.2.* || 2.*	3.1.3	false
+1.2.* || 2.*	1.1.3	false
+2	1.1.2	false
+2.3	2.4.1	false
+~0.0.1	0.1.0-alpha	false
+~0.0.1	0.1.0	false
+~2.4	2.5.0	false
+~2.4	2.3.9	false
+~>3.2.1	3.3.2	false
+~>3.2.1	3.2.0	false
+~1	0.2.3	false
+~>1	2.2.3	false
+~1.0	1.1.0	false
+<1	1.0.0	false
+>=1.2	1.1.1	false
+~v0.5.4-beta	0.5.4-alpha	false
+=0.7.x	0.8.2	false
+>=0.7.x	0.6.2	false
+<0.7.x	0.7.2	false
+<1.2.3	1.2.3-beta	false
+=1.2.3	1.2.3-beta	false
+>1.2	1.2.8	false
+^0.0.1	0.0.2-alpha	false
+^0.0.1	0.0.2	false
+^1.2.3	2.0.0-alpha	false
+^1.2.3	1.2.2	false
+^1.2	1.1.9	false
+*	not a version	false
+>=2	glorp	false
+>=2	false	false
+^1.0.0	2.0.0-rc1	false
+1 - 2	2.0.0-pre	false
+1 - 2	1.0.0-pre	false
+1.0 - 2	1.0.0-pre	false
+1.1.x	1.0.0-a	false
+1.1.x	1.1.0-a	false
+1.1.x	1.2.0-a	false
+1.x	1.0.0-a	false
+1.x	1.1.0-a	false
+1.x	1.2.0-a	false
+>=1.0.0 <1.1.0	1.1.0	false
+>=1.0.0 <1.1.0	1.1.0-pre	false
+>=1.0.0 <1.1.0-pre	1.1.0-pre	false
