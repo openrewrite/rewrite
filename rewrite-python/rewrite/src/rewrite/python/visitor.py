@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar, cast, Optional
+from uuid import UUID
 
 from rewrite.java import tree as j
 from rewrite.java.support_types import (
@@ -26,6 +27,7 @@ from rewrite.java.support_types import (
 )
 from rewrite.java.visitor import JavaVisitor
 from rewrite.python.support_types import Py
+from rewrite.python.tree import ExpressionStatement, StatementExpression
 from rewrite.tree import SourceFile
 from rewrite.utils import list_map
 from rewrite.visitor import TreeVisitor
@@ -43,7 +45,6 @@ if TYPE_CHECKING:
         DictLiteral,
         ErrorFrom,
         ExceptionType,
-        ExpressionStatement,
         ExpressionTypeTree,
         FormattedString,
         KeyValue,
@@ -55,7 +56,6 @@ if TYPE_CHECKING:
         Slice,
         SpecialParameter,
         Star,
-        StatementExpression,
         TrailingElseWrapper,
         TypeAlias,
         TypeHint,
@@ -67,6 +67,23 @@ if TYPE_CHECKING:
 
 P = TypeVar("P")
 T = TypeVar("T")
+
+
+def _expression_statement_kinds(node: J) -> tuple[bool, bool]:
+    """Which of the two roles `node` already fills, deciding the wrapper it still needs."""
+    return isinstance(node, Expression), isinstance(node, Statement)
+
+
+def _minimal_expression_statement_wrapper(wrapper_id: UUID, child: J) -> J:
+    """The least wrapping that makes `child` usable as both an expression and a statement.
+
+    Both wrappers are themselves expression and statement, so an already wrapped
+    child needs nothing further and cannot become doubly wrapped.
+    """
+    is_expression, is_statement = _expression_statement_kinds(child)
+    if is_expression:
+        return child if is_statement else ExpressionStatement(wrapper_id, child)
+    return StatementExpression(wrapper_id, child) if is_statement else child
 
 
 class PythonVisitor(JavaVisitor[P]):
@@ -310,7 +327,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         return exc_type
 
-    def visit_expression_statement(self, expr_stmt: ExpressionStatement, p: P) -> J:
+    def visit_expression_statement(self, expr_stmt: ExpressionStatement, p: P) -> Optional[J]:
         """Visit an expression used as a statement."""
         temp_stmt = cast(Statement, self.visit_statement(expr_stmt, p))
         if not isinstance(temp_stmt, type(expr_stmt)):
@@ -321,11 +338,10 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_expr
         expr_stmt = temp_expr
         expression = self.visit_and_cast(expr_stmt.expression, Expression, p)
-        if isinstance(expression, Statement) and not isinstance(expression, Expression):
-            # The wrapped expression was replaced with a statement-only node;
-            # swap to the matching wrapper to keep the tree type-correct.
-            from rewrite.python.tree import StatementExpression
-            return StatementExpression(expr_stmt.id, expression)
+        if expression is None:
+            return None
+        if _expression_statement_kinds(expression) != _expression_statement_kinds(expr_stmt.expression):
+            return _minimal_expression_statement_wrapper(expr_stmt.id, expression)
         expr_stmt = expr_stmt.replace(expression=expression)
         return expr_stmt
 
@@ -540,7 +556,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         return star
 
-    def visit_statement_expression(self, stmt_expr: StatementExpression, p: P) -> J:
+    def visit_statement_expression(self, stmt_expr: StatementExpression, p: P) -> Optional[J]:
         """Visit a statement used as an expression."""
         temp_stmt = cast(Statement, self.visit_statement(stmt_expr, p))
         if not isinstance(temp_stmt, type(stmt_expr)):
@@ -551,12 +567,10 @@ class PythonVisitor(JavaVisitor[P]):
             return temp_expr
         stmt_expr = temp_expr
         statement = self.visit_and_cast(stmt_expr.statement, Statement, p)
-        if isinstance(statement, Expression) and not isinstance(statement, Statement):
-            # The wrapped statement was replaced with an expression-only node
-            # (e.g. a recipe migrating `yield from x` to `await x`); swap to
-            # the matching wrapper to keep the tree type-correct.
-            from rewrite.python.tree import ExpressionStatement
-            return ExpressionStatement(stmt_expr.id, statement)
+        if statement is None:
+            return None
+        if _expression_statement_kinds(statement) != _expression_statement_kinds(stmt_expr.statement):
+            return _minimal_expression_statement_wrapper(stmt_expr.id, statement)
         stmt_expr = stmt_expr.replace(statement=statement)
         return stmt_expr
 
