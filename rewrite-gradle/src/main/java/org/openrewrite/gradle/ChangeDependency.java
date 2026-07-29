@@ -35,8 +35,11 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
@@ -156,7 +159,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     private boolean isGlobPattern() {
         return oldGroupId.contains("*") || oldGroupId.contains("?") ||
-               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+                oldArtifactId.contains("*") || oldArtifactId.contains("?");
     }
 
     public static class Accumulator {
@@ -284,7 +287,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()){
+                if (!maybeGp.isPresent()) {
                     return sourceFile;
                 }
                 for (GradleDependencyConfiguration c : maybeGp.get().getConfigurations()) {
@@ -321,11 +324,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         .artifactId(oldArtifactId);
 
                 Optional<GradleDependency> maybeDep = gradleDependencyMatcher.get(getCursor());
-                if (!maybeDep.isPresent()) {
-                    return m;
-                }
-
-                return updateDependency(m, maybeDep.get(), ctx);
+                return maybeDep.map(gradleDependency -> updateDependency(m, gradleDependency, ctx)).orElse(m);
             }
 
             @Override
@@ -395,33 +394,33 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
                 return gp.mapConfigurations(configuration ->
-                        configuration.mapDependencies(requested -> {
-                            if (!depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                                return requested;
-                            }
-
-                            GroupArtifactVersion gav = requested.getGav();
-                            if (newGroupId != null) {
-                                gav = gav.withGroupId(newGroupId);
-                            }
-                            if (newArtifactId != null) {
-                                gav = gav.withArtifactId(newArtifactId);
-                            }
-                            if (!StringUtils.isBlank(newVersion) &&
-                                (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                try {
-                                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), configuration.getName(),
-                                                    newVersion, versionPattern, ctx);
-                                    if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                        gav = gav.withVersion(resolvedVersion);
+                                configuration.mapDependencies(requested -> {
+                                    if (!depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                                        return requested;
                                     }
-                                } catch (MavenDownloadingException ignored) {
-                                    // Failure is already recorded in metadataFailures.
-                                }
-                            }
-                            return gav == requested.getGav() ? requested : requested.withGav(gav);
-                        }, gp.getMavenRepositories(), ctx),
+
+                                    GroupArtifactVersion gav = requested.getGav();
+                                    if (newGroupId != null) {
+                                        gav = gav.withGroupId(newGroupId);
+                                    }
+                                    if (newArtifactId != null) {
+                                        gav = gav.withArtifactId(newArtifactId);
+                                    }
+                                    if (!StringUtils.isBlank(newVersion) &&
+                                            (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                                        try {
+                                            String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                                    .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), configuration.getName(),
+                                                            newVersion, versionPattern, ctx);
+                                            if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
+                                                gav = gav.withVersion(resolvedVersion);
+                                            }
+                                        } catch (MavenDownloadingException ignored) {
+                                            // Failure is already recorded in metadataFailures.
+                                        }
+                                    }
+                                    return gav == requested.getGav() ? requested : requested.withGav(gav);
+                                }, gp.getMavenRepositories(), ctx),
                         ctx
                 );
             }
