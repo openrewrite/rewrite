@@ -309,4 +309,65 @@ class MigrateToMaven4Test implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6869")
+    @Test
+    void doesNotApplyParentInference() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.1.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <subprojects>
+                      <subproject>child</subproject>
+                  </subprojects>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>..</relativePath>
+                  </parent>
+                  <artifactId>child</artifactId>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.1.0</modelVersion>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>..</relativePath>
+                  </parent>
+                  <artifactId>child</artifactId>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
 }

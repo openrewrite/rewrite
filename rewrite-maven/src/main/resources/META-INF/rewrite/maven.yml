@@ -70,7 +70,6 @@ recipeList:
   - org.openrewrite.maven.RemoveDuplicatePluginDeclarations
   - org.openrewrite.maven.UpgradeToModelVersion410
   - org.openrewrite.maven.ReplaceModulesWithSubprojects
-  - org.openrewrite.maven.UseParentInference
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.ReplaceRemovedRootDirectoryProperties
