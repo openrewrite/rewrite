@@ -33,6 +33,7 @@ import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -87,9 +88,14 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
 
         Map<String, String> newConstraints = declaredConstraints(edits.getEditedPackageJson());
+        Map<String, String> addedVersions = addedVersions(edits.getEdits());
 
         boolean anyRemoval = false;
         for (PackageEdit edit : edits.getEdits()) {
+            if (edit.isAdded()) {
+                root = applyAdd(root, edit, major, newConstraints, addedVersions);
+                continue;
+            }
             preCheck(root, edit, major);
             root = applyEdit(root, edit, major, newConstraints);
             anyRemoval |= edit.getNewVersion() == null;
@@ -392,6 +398,206 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     edit.getName() + " " + changed + " metadata changed; native write-through is not supported for pnpm");
         }
+    }
+
+    // --- leaf / clean-closure add (Phase B increment 4) ------------------
+
+    /**
+     * Insert a brand-new closure member (v9 only): a {@code packages} entry
+     * ({@code resolution.integrity} + optional {@code engines}), an empty or dependency-carrying
+     * {@code snapshots} entry keyed by resolved version, and — for the direct dependency the recipe
+     * declared — the importer edge ({@code specifier}/{@code version}). Each lands at pnpm's lexicographic
+     * sort position with byte-exact whitespace; a collision or any surface not modeled fails loud.
+     */
+    private Yaml.Mapping applyAdd(Yaml.Mapping root, PackageEdit edit, int major,
+                                  Map<String, String> newConstraints, Map<String, String> addedVersions) {
+        if (major < 9) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "adding to a pnpm lockfileVersion below 9 is not yet supported");
+        }
+        if (edit.getNewIntegrity() == null) {
+            throw fail(Reason.UNSUPPORTED_ENTRY_TYPE, edit.getName(), edit.getName() + " has no registry integrity");
+        }
+        String key = edit.getName() + "@" + edit.getNewVersion();
+
+        Yaml.Mapping packages = section(root, "packages");
+        if (packages == null) {
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no packages section");
+        }
+        if (findEntry(packages, key) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
+        }
+        packages = insertEntrySorted(packages, buildPackagesEntry(edit, key), key);
+        root = replaceEntryValue(root, "packages", packages);
+
+        Yaml.Mapping snapshots = section(root, "snapshots");
+        if (snapshots == null) {
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no snapshots section");
+        }
+        if (findEntry(snapshots, key) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present in snapshots; dedupe required");
+        }
+        snapshots = insertEntrySorted(snapshots, buildSnapshotEntry(edit, key, addedVersions), key);
+        root = replaceEntryValue(root, "snapshots", snapshots);
+
+        String specifier = newConstraints.get(edit.getName());
+        if (specifier != null) {
+            root = insertImporterEdge(root, edit, specifier);
+        }
+        return root;
+    }
+
+    private Yaml.Mapping.Entry buildPackagesEntry(PackageEdit edit, String key) {
+        StringBuilder body = new StringBuilder("packages:\n  ").append(key).append(":\n")
+                .append("    resolution: {integrity: ").append(edit.getNewIntegrity()).append('}');
+        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        if (wt != null && wt.getEngines() != null) {
+            requireQuotableEngines(edit.getName(), wt.getEngines());
+            body.append("\n    engines: ").append(renderEngines(wt.getEngines()));
+        }
+        body.append('\n');
+        return parseGraftEntry(body.toString(), "packages", key);
+    }
+
+    private Yaml.Mapping.Entry buildSnapshotEntry(PackageEdit edit, String key, Map<String, String> addedVersions) {
+        Map<String, String> deps = edit.getNewDependencies();
+        if (deps == null || deps.isEmpty()) {
+            return parseGraftEntry("snapshots:\n  " + key + ": {}\n", "snapshots", key);
+        }
+        List<String> names = new ArrayList<>(deps.keySet());
+        Collections.sort(names);
+        StringBuilder body = new StringBuilder("snapshots:\n  ").append(key).append(":\n    dependencies:");
+        for (String dep : names) {
+            String resolved = addedVersions.get(dep);
+            if (resolved == null) {
+                throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                        edit.getName() + " depends on " + dep + " which is not part of the added closure");
+            }
+            body.append("\n      ").append(dep).append(": ").append(resolved);
+        }
+        body.append('\n');
+        return parseGraftEntry(body.toString(), "snapshots", key);
+    }
+
+    private Yaml.Mapping insertImporterEdge(Yaml.Mapping root, PackageEdit edit, String specifier) {
+        requirePlainSpecifier(edit.getName(), specifier);
+        Yaml.Mapping importers = section(root, "importers");
+        if (importers == null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), "cannot add an importer edge to a single-package lock");
+        }
+        String dir = importerDir(edit);
+        Yaml.Mapping.Entry importer = findEntry(importers, dir);
+        if (importer == null || !(importer.getValue() instanceof Yaml.Mapping)) {
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no importer '" + dir + "'");
+        }
+        Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
+        String scope = edit.getScope();
+        Yaml.Mapping.Entry scopeEntry = findEntry(importerBody, scope);
+        if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "adding the first " + scope + " to importer '" + dir + "' is not yet supported");
+        }
+        Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
+        if (findEntry(deps, edit.getName()) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), edit.getName() + " is already declared in " + scope);
+        }
+        String body = "importers:\n  " + dir + ":\n    " + scope + ":\n      " + edit.getName() +
+                ":\n        specifier: " + specifier + "\n        version: " + edit.getNewVersion() + '\n';
+        Yaml.Mapping.Entry depEntry = parseGraftEntry(body, "importers", dir, scope, edit.getName());
+        deps = insertEntrySorted(deps, depEntry, edit.getName());
+        importerBody = replaceEntryValue(importerBody, scope, deps);
+        return replaceEntryValue(root, "importers", replaceEntryValue(importers, dir, importerBody));
+    }
+
+    /** Build an entry from a synthetic mini-lock so its internal formatting round-trips byte-exact. */
+    private Yaml.Mapping.Entry parseGraftEntry(String synthetic, String... path) {
+        Yaml.Documents docs = parse(synthetic, null);
+        if (docs.getDocuments().isEmpty() || !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Mapping)) {
+            throw fail(Reason.MALFORMED_LOCK, null, "could not construct pnpm lock entry");
+        }
+        Yaml.Mapping mapping = (Yaml.Mapping) docs.getDocuments().get(0).getBlock();
+        for (int i = 0; i < path.length - 1; i++) {
+            Yaml.Mapping.Entry entry = findEntry(mapping, path[i]);
+            if (entry == null || !(entry.getValue() instanceof Yaml.Mapping)) {
+                throw fail(Reason.MALFORMED_LOCK, null, "could not navigate synthetic lock entry at " + path[i]);
+            }
+            mapping = (Yaml.Mapping) entry.getValue();
+        }
+        Yaml.Mapping.Entry leaf = findEntry(mapping, path[path.length - 1]);
+        if (leaf == null) {
+            throw fail(Reason.MALFORMED_LOCK, null, "could not construct pnpm lock entry " + path[path.length - 1]);
+        }
+        return leaf;
+    }
+
+    /**
+     * Splice {@code newEntry} into {@code mapping} at its lexicographic key position, reusing an existing
+     * sibling's prefix (pnpm's entries share a uniform blank-line/indent prefix).
+     */
+    private static Yaml.Mapping insertEntrySorted(Yaml.Mapping mapping, Yaml.Mapping.Entry newEntry, String newKey) {
+        List<Yaml.Mapping.Entry> entries = mapping.getEntries();
+        if (entries.isEmpty()) {
+            throw fail(Reason.MALFORMED_LOCK, null, "cannot derive entry indentation for insert");
+        }
+        Yaml.Mapping.Entry placed = newEntry.withPrefix(entries.get(0).getPrefix());
+        int idx = 0;
+        while (idx < entries.size()) {
+            String k = keyOf(entries.get(idx));
+            if (k != null && k.compareTo(newKey) > 0) {
+                break;
+            }
+            idx++;
+        }
+        List<Yaml.Mapping.Entry> out = new ArrayList<>(entries.size() + 1);
+        out.addAll(entries.subList(0, idx));
+        out.add(placed);
+        out.addAll(entries.subList(idx, entries.size()));
+        return mapping.withEntries(out);
+    }
+
+    private static Map<String, String> addedVersions(List<PackageEdit> edits) {
+        Map<String, String> versions = new LinkedHashMap<>();
+        for (PackageEdit edit : edits) {
+            if (edit.isAdded() && edit.getNewVersion() != null) {
+                versions.put(edit.getName(), edit.getNewVersion());
+            }
+        }
+        return versions;
+    }
+
+    /** A specifier pnpm leaves unquoted (caret/tilde/exact/plain ranges); a quote-requiring range defers. */
+    private static void requirePlainSpecifier(String name, String specifier) {
+        if (!isPlainYamlScalar(specifier)) {
+            throw fail(Reason.RESOLUTION_REQUIRED, name,
+                    name + " specifier '" + specifier + "' needs YAML quoting; native pnpm add is not yet supported");
+        }
+    }
+
+    /** pnpm single-quotes engine ranges; a value it would leave bare would be over-quoted by the renderer. */
+    private static void requireQuotableEngines(String name, Map<String, String> engines) {
+        for (String value : engines.values()) {
+            if (isPlainYamlScalar(value)) {
+                throw fail(Reason.RESOLUTION_REQUIRED, name,
+                        name + " engine constraint '" + value + "' is not single-quoted by pnpm; native add deferred");
+            }
+        }
+    }
+
+    /** Whether {@code s} is a YAML plain scalar pnpm would emit unquoted (no leading indicator, no {@code :}/{@code #}). */
+    private static boolean isPlainYamlScalar(String s) {
+        if (s.isEmpty()) {
+            return false;
+        }
+        if ("!&*?|>%@`\"'#,[]{}:- ".indexOf(s.charAt(0)) >= 0) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == ':' || c == '#' || c == '\n' || c == '\t') {
+                return false;
+            }
+        }
+        return true;
     }
 
     // --- orphan GC after removals ----------------------------------------

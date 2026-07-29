@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,6 +42,16 @@ class PnpmLockPatcherTest {
             "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==";
     private static final String IS_NUMBER_700 =
             "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==";
+    private static final String IS_NUMBER_600 =
+            "sha512-Wu1VHeILBK8KAWJUAiSZQX94GmOE45Rg6/538fKwiloUu21KncEkYGPqob2oSZ5mUT73vLGrHQjKw3KMPwfDzg==";
+    private static final String IS_ODD_301 =
+            "sha512-CQpnWPrDwmP1+SMHXZhtLtJv90yiyVfluGsX5iNCVkrhQtU3TQHsUWPG9wkdk9Lgd5yNpAg9jQEo90CBaXgWMA==";
+
+    private static Map<String, String> engines(String value) {
+        Map<String, String> engines = new LinkedHashMap<>();
+        engines.put("node", value);
+        return engines;
+    }
 
     private static String bump(String scenario, PackageEdit edit) {
         LockEditSet edits = new LockEditSet(
@@ -107,6 +118,50 @@ class PnpmLockPatcherTest {
         String patched = bump("v9-rm-nonleaf", PackageEdit.builder()
                 .name("debug").oldVersion("4.3.4").newVersion(null).scope("dependencies").build());
         assertThat(patched).isEqualTo(read("/lock/pnpm/v9-rm-nonleaf/after"));
+    }
+
+    @Test
+    void v9LeafAddByteExact() {
+        LockEditSet edits = new LockEditSet(read("/lock/pnpm/add-leaf/before"), Paths.get("pnpm-lock.yaml"),
+                PackageManager.Pnpm, read("/lock/pnpm/add-leaf/pkg-after"),
+                singletonList(PackageEdit.builder()
+                        .name("is-number").oldVersion("").newVersion("7.0.0").newIntegrity(IS_NUMBER_700)
+                        .scope("dependencies").added(true)
+                        .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=0.12.0")).build())
+                        .build()));
+        assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/add-leaf/after"));
+    }
+
+    @Test
+    void v9CleanClosureAddByteExact() {
+        LockEditSet edits = new LockEditSet(read("/lock/pnpm/add-closure/before"), Paths.get("pnpm-lock.yaml"),
+                PackageManager.Pnpm, read("/lock/pnpm/add-closure/pkg-after"),
+                Arrays.asList(
+                        PackageEdit.builder()
+                                .name("is-odd").oldVersion("").newVersion("3.0.1").newIntegrity(IS_ODD_301)
+                                .newDependencies(Collections.singletonMap("is-number", "^6.0.0"))
+                                .scope("dependencies").added(true)
+                                .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=4")).build())
+                                .build(),
+                        PackageEdit.builder()
+                                .name("is-number").oldVersion("").newVersion("6.0.0").newIntegrity(IS_NUMBER_600)
+                                .scope("dependencies").added(true)
+                                .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=0.10.0")).build())
+                                .build()));
+        assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/add-closure/after"));
+    }
+
+    @Test
+    void v6AddFailsLoud() {
+        assertThatThrownBy(() -> {
+            LockEditSet edits = new LockEditSet(read("/lock/pnpm/v6/before"), Paths.get("pnpm-lock.yaml"),
+                    PackageManager.Pnpm, "{\"dependencies\":{\"is-number\":\"^7.0.0\"}}",
+                    singletonList(PackageEdit.builder()
+                            .name("is-number").oldVersion("").newVersion("7.0.0").newIntegrity(IS_NUMBER_700)
+                            .scope("dependencies").added(true).build()));
+            new PnpmLockPatcher().patch(edits);
+        }).isInstanceOfSatisfying(EngineFailure.class,
+                e -> assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED));
     }
 
     @Test

@@ -41,6 +41,7 @@ import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
+import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
  * PM-free end-to-end tests for {@link AddDependency} lock regeneration: a scalar-only leaf add is
@@ -130,6 +131,50 @@ class AddDependencyLockRegenTest implements RewriteTest {
                             return actual;
                         })),
                 packageLock(resource("lock/npm/closure-basic/before"), resource("lock/npm/closure-basic/after"),
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
+    void pnpmLeafAddRegeneratesLockByteExact() {
+        // pnpm is content-addressed: is-number@7.0.0 (a scalar-only leaf) inserts one packages+snapshots entry
+        // plus the importer edge, byte-exact end-to-end (Phase B I4).
+        routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-leaf/http/is-number"));
+        routes.put("https://registry.npmjs.org/is-number/7.0.0", resource("lock/pnpm/add-leaf/http/is-number-7.0.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("is-number", "^7.0.0", "dependencies"))
+                        .executionContext(ctx),
+                packageJson(resource("lock/pnpm/add-leaf/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.3")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-number\": \"^7.0.0\"");
+                            return actual;
+                        })),
+                pnpmLock(resource("lock/pnpm/add-leaf/before"), resource("lock/pnpm/add-leaf/after"),
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
+    void pnpmCleanClosureAddRegeneratesLockByteExact() {
+        // is-odd@3.0.1 -> is-number@6.0.0: a clean closure with no peers, one packages+snapshots entry per
+        // member, snapshot referencing the resolved transitive — byte-exact end-to-end (Phase B I4).
+        routes.put("https://registry.npmjs.org/is-odd", resource("lock/pnpm/add-closure/http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/pnpm/add-closure/http/is-odd-3.0.1"));
+        routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-closure/http/is-number"));
+        routes.put("https://registry.npmjs.org/is-number/6.0.0", resource("lock/pnpm/add-closure/http/is-number-6.0.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("is-odd", "^3.0.1", "dependencies"))
+                        .executionContext(ctx),
+                packageJson(resource("lock/pnpm/add-closure/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.3")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-odd\": \"^3.0.1\"");
+                            return actual;
+                        })),
+                pnpmLock(resource("lock/pnpm/add-closure/before"), resource("lock/pnpm/add-closure/after"),
                         s -> s.noTrim())
         );
     }

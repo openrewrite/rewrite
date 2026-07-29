@@ -442,13 +442,18 @@ public final class NativeLockEngine {
         String rootName = change.name;
         String rootConstraint = Objects.requireNonNull(change.newConstraint);
 
-        // Only the npm patcher can insert closure entries so far; other formats defer.
-        if (pm != PackageManager.Npm) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
-        }
         if (isUnsupportedProtocol(rootConstraint)) {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, rootName,
                     rootName + " uses an unsupported entry type: " + rootConstraint);
+        }
+        if (pm == PackageManager.Pnpm) {
+            // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
+            // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
+            return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, registries, client);
+        }
+        // Only the npm patcher can insert closure entries so far; other formats defer.
+        if (pm != PackageManager.Npm) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
         }
 
         Map<String, String> existingTopLevel = topLevelVersionsNpm(existingLock);
@@ -524,6 +529,160 @@ public final class NativeLockEngine {
                     .build());
         }
         return edits;
+    }
+
+    /**
+     * Phase B increment 4 (pnpm): a direct dependency the recipe added, plus its runtime closure, into a
+     * pnpm-lock.yaml v9. pnpm is non-hoisted/content-addressed, so placement is mechanical — one
+     * {@code packages}+{@code snapshots} entry per closure member keyed by its resolved version. The version
+     * resolution reuses the shared worklist ({@code resolveAddedVersion} over the packument, transitive walk).
+     * <p>
+     * The pnpm-specific contract, tighter than npm's: every closure member must be <b>brand-new</b> (its name
+     * absent from the lock) so no snapshot references an existing entry and no dedupe/fork decision opens, and
+     * <b>no member may declare peers or optionalDependencies</b> — pnpm encodes those as peer-suffix keys the
+     * mechanical placement does not model. Any collision, peer, optional, or unsupported metadata fails loud.
+     */
+    private static List<LockEditSet.PackageEdit> resolveClosureAddPnpm(DepChange change, String rootName,
+                                                                       String rootConstraint, String existingLock,
+                                                                       NodeRegistries registries, NpmRegistryClient client) {
+        if (pnpmLockMajor(existingLock) < 9) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
+                    "adding to a pnpm lockfileVersion below 9 is not yet supported");
+        }
+
+        Set<String> existingNames = existingPnpmNames(existingLock);
+        boolean dev = "devDependencies".equals(change.scope);
+
+        Map<String, Placement> placed = new LinkedHashMap<>();
+        Deque<Requirement> queue = new ArrayDeque<>();
+        queue.add(new Requirement(rootName, rootConstraint, dev));
+
+        while (!queue.isEmpty()) {
+            Requirement req = queue.poll();
+            if (existingNames.contains(req.name)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
+                        " is already present in the lock; pnpm dedupe/conflict for adds is deferred");
+            }
+            Placement already = placed.get(req.name);
+            if (already != null) {
+                if (existingSatisfies(already.version, req.constraint)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
+                        " is required at two incompatible versions within the added closure (" +
+                        already.version + " vs " + req.constraint + "); deferred");
+            }
+
+            NodeRegistry registry = registries.registryFor(req.name);
+            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
+            VersionManifest manifest = client.getManifest(registry, req.name, version);
+            requireEmittablePnpmClosureMember(req.name, manifest);
+
+            VersionManifest.Dist dist = manifest.getDist();
+            if (dist == null || dist.getIntegrity() == null) {
+                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
+                        req.name + "@" + version + " has no registry integrity");
+            }
+
+            placed.put(req.name, new Placement(version, manifest, req.dev));
+            enqueueDeps(queue, manifest.getDependencies(), req.dev);
+        }
+
+        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
+        for (Map.Entry<String, Placement> e : placed.entrySet()) {
+            Placement p = e.getValue();
+            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
+            // Only the root (declared in package.json) writes an importer edge; the patcher no-ops the
+            // transitives because they are absent from the edited manifest. Scope carries the dev-ness.
+            edits.add(LockEditSet.PackageEdit.builder()
+                    .name(e.getKey())
+                    .oldVersion("")
+                    .newVersion(p.version)
+                    .newIntegrity(dist.getIntegrity())
+                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
+                    .scope(p.dev ? "devDependencies" : "dependencies")
+                    .importerDir(null)
+                    .added(true)
+                    .writeThroughMetadata(pnpmLeafMetadata(p.manifest))
+                    .build());
+        }
+        return edits;
+    }
+
+    /** The only packages-entry metadata the pnpm add patcher renders is {@code engines}; carry it, drop the rest. */
+    private static LockEditSet.@Nullable WriteThroughMetadata pnpmLeafMetadata(VersionManifest m) {
+        if (!notEmpty(m.getEngines())) {
+            return null;
+        }
+        return LockEditSet.WriteThroughMetadata.builder().engines(m.getEngines()).build();
+    }
+
+    /**
+     * A closure member the pnpm add patcher can insert byte-exactly: {@code resolution} + optional
+     * {@code engines} only. Any peer (pnpm's suffix-key surface), optionalDependencies, or object/array
+     * metadata not yet verified byte-exact defers the whole add.
+     */
+    private static void requireEmittablePnpmClosureMember(String name, VersionManifest m) {
+        if (notEmpty(m.getOptionalDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " pulls in optionalDependencies not yet supported for pnpm adds");
+        }
+        if (notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " declares peerDependencies (pnpm suffix keys) not yet supported for pnpm adds");
+        }
+        String metadata = unsupportedPnpmMetadata(m);
+        if (metadata != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " carries " + metadata + " metadata not yet supported for pnpm adds");
+        }
+    }
+
+    private static @Nullable String unsupportedPnpmMetadata(VersionManifest m) {
+        if (notEmpty(m.getOs())) return "os";
+        if (notEmpty(m.getCpu())) return "cpu";
+        if (notEmpty(m.getLibc())) return "libc";
+        if (m.getDeprecated() != null) return "deprecated";
+        if (m.getBin() != null) return "bin";
+        if (bool(m.getHasInstallScript())) return "hasInstallScript";
+        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
+        return null;
+    }
+
+    /** Every package name present in the pnpm lock's {@code packages}/{@code snapshots} sections. */
+    private static Set<String> existingPnpmNames(String lock) {
+        Set<String> names = new LinkedHashSet<>();
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            Map<?, ?> root = (Map<?, ?>) loaded;
+            collectPnpmNames(root.get("packages"), names);
+            collectPnpmNames(root.get("snapshots"), names);
+        }
+        return names;
+    }
+
+    private static void collectPnpmNames(@Nullable Object node, Set<String> names) {
+        if (!(node instanceof Map)) {
+            return;
+        }
+        for (Object key : ((Map<?, ?>) node).keySet()) {
+            String k = stripPnpmKey(String.valueOf(key));
+            int at = k.lastIndexOf('@');
+            if (at > 0) {
+                names.add(k.substring(0, at));
+            }
+        }
+    }
+
+    private static int pnpmLockMajor(String lock) {
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            Object v = ((Map<?, ?>) loaded).get("lockfileVersion");
+            if (v != null) {
+                return majorOf(String.valueOf(v));
+            }
+        }
+        return 0;
     }
 
     private static void enqueueDeps(Deque<Requirement> queue, @Nullable Map<String, String> deps, boolean dev) {
