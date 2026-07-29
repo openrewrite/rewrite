@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
@@ -37,6 +38,8 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTransitiveDependencyVersion.Accumulator> {
+
+    transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "The name of the transitive npm dependency to upgrade.",
@@ -78,6 +81,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         @Nullable Map<String, String> configFiles;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
@@ -130,7 +134,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (canApply(sf)) {
-                        ensureComputed(ps, sf);
+                        ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -151,7 +155,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
                     if (pkg != null && canApply(pkg)) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -160,10 +164,16 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
                     return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
                 }
+                if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
+                    lockPs.failureRecorded = true;
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    return Markup.warn(sf, new RuntimeException(
+                            "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                }
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                 if (marker == null || marker.getPackageManager() == null) return;
@@ -176,7 +186,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         pkg,
                         doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ps.configFiles,
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

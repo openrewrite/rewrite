@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -39,6 +40,8 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulator> {
+
+    transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "The name of the npm package to remove (e.g., `lodash`, `@types/node`).",
@@ -73,6 +76,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         @Nullable SourceFile modifiedPackageJson;
         @Nullable Set<String> scopesContainingPackage;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
@@ -137,7 +141,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if ((ps.scopesContainingPackage = findContainingScopes(sf)) != null) {
-                        ensureComputed(ps, sf);
+                        ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -158,7 +162,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
                     if (pkg != null && (lockPs.scopesContainingPackage = findContainingScopes(pkg)) != null) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -167,10 +171,16 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
                     return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
                 }
+                if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
+                    lockPs.failureRecorded = true;
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    return Markup.warn(sf, new RuntimeException(
+                            "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                }
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.scopesContainingPackage == null) return;
                 Set<String> scopes = ps.scopesContainingPackage;
@@ -178,7 +188,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                         pkg,
                         doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ps.configFiles,
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

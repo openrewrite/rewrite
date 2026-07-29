@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -36,6 +37,8 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
+
+    transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "The name of the npm package to add (e.g., `lodash`, `@types/node`).",
@@ -59,7 +62,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     @Override public String getInstanceNameSuffix() { return String.format("`%s`", packageName); }
 
     @Override public String getDescription() {
-        return "Add an npm dependency to `package.json` and regenerate the lock file by running the " +
+        return "Add an npm dependency to `package.json` and regenerate the lock file (natively for npm, " +
                 "package manager. If the dependency already exists in any scope, the recipe is a no-op. " +
                 "Not safe to use as a precondition: invokes the package manager and publishes per-project " +
                 "state shared with other dependency recipes.";
@@ -78,6 +81,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
         @Nullable Map<String, String> configFiles;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
@@ -139,7 +143,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (matchesAdd(sf)) {
-                        ensureComputed(ps, sf);
+                        ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -160,7 +164,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
                     if (pkg != null && matchesAdd(pkg)) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -169,16 +173,23 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
                     return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
                 }
+                if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
+                    lockPs.failureRecorded = true;
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    return Markup.warn(sf, new RuntimeException(
+                            "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                }
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,
                         doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope()),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ps.configFiles,
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

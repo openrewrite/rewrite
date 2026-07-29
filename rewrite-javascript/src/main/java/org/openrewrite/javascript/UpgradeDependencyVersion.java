@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.MatchedDependency;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
@@ -37,6 +38,8 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.Accumulator> {
+
+    transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "Exact package name to match. Mutually exclusive with `packagePattern`; " +
@@ -61,7 +64,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override public String getDescription() {
         return "Upgrades the version constraint of matching npm dependencies in `package.json` and " +
-                "regenerates the lock file by running the package manager. Matching is by exact package " +
+                "regenerates the lock file (natively for npm, by running the package manager otherwise). " +
+                "Matching is by exact package " +
                 "name or glob pattern. " +
                 "v1 uses simple string inequality for the upgrade check (always overwrites). A future " +
                 "version will use semver to skip already-up-to-date constraints. " +
@@ -90,6 +94,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Nullable List<MatchedDependency> matchedDeps;
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
@@ -186,7 +191,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (liveTree != null) {
                             effectiveSf = liveTree;
                         }
-                        ensureComputed(ps, effectiveSf);
+                        ensureComputed(ps, effectiveSf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -211,7 +216,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         lockPs.matchedDeps = findMatches(pkg);
                     }
                     if (pkg != null && lockPs.matchedDeps != null && !lockPs.matchedDeps.isEmpty()) {
-                        ensureComputed(lockPs, pkg);
+                        ensureComputed(lockPs, pkg, ctx);
                         if (lockPs.modifiedPackageJson != null) {
                             PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
                         }
@@ -220,10 +225,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
                     return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
                 }
+                if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
+                    lockPs.failureRecorded = true;
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    return Markup.warn(sf, new RuntimeException(
+                            "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                }
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
                 List<MatchedDependency> matches = ps.matchedDeps;
@@ -231,7 +242,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         pkg,
                         doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ps.configFiles,
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

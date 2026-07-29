@@ -331,6 +331,9 @@ val generateTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
+    // Recorded npm registry/lock fixtures and conformance corpora must stay byte-exact.
+    exclude("**/npmlock/**")
+    exclude("**/npm-semver/**")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

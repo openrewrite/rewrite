@@ -1,0 +1,8 @@
+{
+  "name": "fixture",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-buffer": "^2.0.5",
+    "is-odd": "^3.0.1"
+  }
+}

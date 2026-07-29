@@ -1,0 +1,7 @@
+{
+  "name": "fixture",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-even": "^1.0.0"
+  }
+}

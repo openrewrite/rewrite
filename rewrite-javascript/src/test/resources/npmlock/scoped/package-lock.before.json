@@ -1,0 +1,21 @@
+{
+  "name": "fixture",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "fixture",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/string-locale-compare": "1.0.1"
+      }
+    },
+    "node_modules/@isaacs/string-locale-compare": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/@isaacs/string-locale-compare/-/string-locale-compare-1.0.1.tgz",
+      "integrity": "sha512-AknEkBKSyAcIpl7SIUp12bs1rOmTDp9ojfDI9hvXl6qHqUCcaswkZOslbfdEbzI+8OPatiixY9AFKaUUpgGoBw==",
+      "license": "ISC"
+    }
+  }
+}

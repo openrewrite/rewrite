@@ -1,0 +1,10 @@
+{
+  "name": "fixture",
+  "version": "1.0.0",
+  "dependencies": {
+    "kind-of": "^3.2.2"
+  },
+  "devDependencies": {
+    "is-number": "^3.0.0"
+  }
+}

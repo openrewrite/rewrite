@@ -745,7 +745,8 @@ public class PackageJsonHelper {
             SourceFile packageJson,
             java.util.function.Function<Json.Document, Json.Document> editFn,
             @Nullable String capturedLockContent,
-            @Nullable Map<String, String> configFiles) {
+            @Nullable Map<String, String> configFiles,
+            ExecutionContext ctx) {
         if (!(packageJson instanceof Json.Document)) {
             return EditAndRegenerateResult.unchanged();
         }
@@ -756,7 +757,7 @@ public class PackageJsonHelper {
         }
         SourceFile refreshed = refreshMarker(after);
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(refreshed, capturedLockContent, configFiles);
+                : regenerateLockContent(refreshed, before.printAll(), capturedLockContent, configFiles, ctx);
         SourceFile finalSource = refreshed;
         if (regen != null && regen.isSuccess()) {
             NodeResolutionResult marker = refreshed.getMarkers()
@@ -776,8 +777,10 @@ public class PackageJsonHelper {
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile packageJson,
+            @Nullable String originalPackageJsonContent,
             @Nullable String capturedLockContent,
-            @Nullable Map<String, String> configFiles) {
+            @Nullable Map<String, String> configFiles,
+            ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null || marker.getPackageManager() == null) {
@@ -787,6 +790,7 @@ public class PackageJsonHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(packageJson.printAll(), capturedLockContent, configFiles);
+        return regen.regenerate(packageJson.printAll(), originalPackageJsonContent,
+                capturedLockContent, configFiles, ctx);
     }
 }
