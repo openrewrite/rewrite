@@ -63,7 +63,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
     @Override public String getDescription() {
         return "Add an npm dependency to `package.json` and regenerate the lock file (natively for npm, " +
-                "package manager. If the dependency already exists in any scope, the recipe is a no-op. " +
+                "by running the package manager otherwise). " +
+                "If the dependency already exists in any scope, the recipe is a no-op. " +
                 "Not safe to use as a precondition: invokes the package manager and publishes per-project " +
                 "state shared with other dependency recipes.";
     }
@@ -100,7 +101,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
                         ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
-                        ps.capturedLockContent = sf.printAll();
+                        if (ps.capturedLockContent == null) {
+                            ps.capturedLockContent = sf.printAll();
+                        }
                         acc.lockToPackage.put(p, packagePath);
                     }
                     return tree;
@@ -175,7 +178,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
                 if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
                     lockPs.failureRecorded = true;
-                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult,
+                            packageName);
                     return Markup.warn(sf, new RuntimeException(
                             "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
                 }

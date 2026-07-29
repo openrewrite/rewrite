@@ -112,6 +112,15 @@ class NpmSemverConformanceTest {
     }
 
     @Test
+    void componentsAboveMaxSafeIntegerAreInvalid() {
+        assertThat(NpmVersion.parse("9007199254740992.0.0")).isNull();
+        assertThat(NpmVersion.parse("99999999999999999999.0.0")).isNull();
+        assertThat(NpmVersion.parse("9007199254740991.0.0")).isNotNull();
+        assertThat(NpmRange.parse("^99999999999999999999.0.0")).isNull();
+        assertThat(NpmRange.parse(">=1.0.0 <99999999999999999999.0.0")).isNull();
+    }
+
+    @Test
     void nonRegistrySpecsDoNotParse() {
         assertThat(NpmRange.parse("github:user/repo")).isNull();
         assertThat(NpmRange.parse("file:../local")).isNull();

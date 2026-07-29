@@ -121,3 +121,15 @@ pure-JVM.
 - We own a semver port, a registry client, and an emitter that track npm. The tracked
   surfaces are small and slow-moving, and the fixture corpus pins them per npm version —
   the same maintenance posture as rewrite-python's engines.
+
+## Addendum: behavior changes surfaced in review
+
+- The deleted shell-out ran npm with `--legacy-peer-deps`, tolerating peer conflicts
+  (lagging third-party libraries during major framework bumps). The native engine
+  enforces peers strictly and defers those edits to CI — a coverage regression the
+  failures table will quantify.
+- npm's environment-variable configuration (`npm_config_registry`, `NPM_CONFIG_*`,
+  `npm_config_//host/:_authToken`) is not consulted: registry discovery reads only the
+  captured `.npmrc` files (with `${VAR}` expansion) and
+  `JavaScriptExecutionContextView`. Hosts injecting registries via environment
+  variables must configure the view instead.

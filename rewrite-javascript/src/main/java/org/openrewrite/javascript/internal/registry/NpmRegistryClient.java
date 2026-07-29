@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.internal.registry;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -33,8 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * only fetches metadata for packages an edit actually moves.
  */
 public class NpmRegistryClient {
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final HttpSender httpSender;
     private final NpmRegistryConfig config;
@@ -43,10 +41,6 @@ public class NpmRegistryClient {
     public NpmRegistryClient(HttpSender httpSender, NpmRegistryConfig config) {
         this.httpSender = httpSender;
         this.config = config;
-    }
-
-    public NpmRegistryConfig getConfig() {
-        return config;
     }
 
     public Packument packument(String packageName) {

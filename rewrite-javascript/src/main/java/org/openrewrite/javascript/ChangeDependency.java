@@ -106,7 +106,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
                         ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
-                        ps.capturedLockContent = sf.printAll();
+                        if (ps.capturedLockContent == null) {
+                            ps.capturedLockContent = sf.printAll();
+                        }
                         acc.lockToPackage.put(p, packagePath);
                     }
                     return tree;
@@ -195,7 +197,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
                 if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
                     lockPs.failureRecorded = true;
-                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult,
+                            oldPackageName);
                     return Markup.warn(sf, new RuntimeException(
                             "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
                 }

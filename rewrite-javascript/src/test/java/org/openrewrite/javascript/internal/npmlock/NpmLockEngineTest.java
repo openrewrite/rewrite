@@ -187,6 +187,19 @@ public class NpmLockEngineTest {
         assertThat(http.requests).isEmpty();
     }
 
+    /**
+     * Recorded from real npm: a root declaring the same package in both
+     * devDependencies and peerDependencies gets a dev edge (arborist loads peer
+     * first and lets dev replace it), so npm writes the entry with "dev": true.
+     * The replay would fail with a flag-drift MALFORMED_LOCK if the engine's edge
+     * precedence disagreed with npm's.
+     */
+    @Test
+    void devEdgeWinsOverPeerEdgeAtTheRoot() {
+        Result result = replay("dev-peer-overlap", "is-number");
+        assertGolden("dev-peer-overlap", result);
+    }
+
     @Test
     void scopedPackagesEncodeTheRegistryPath() {
         Result result = replay("scoped", "@isaacs/string-locale-compare");
@@ -265,6 +278,62 @@ public class NpmLockEngineTest {
         Result result = NpmLockEngine.regenerate(manifest, null, lock, null, ctx);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.VERSION_NOT_FOUND);
+    }
+
+    @Test
+    void malformedShasumFailsLoud() {
+        ExecutionContext ctx = ctx();
+        http.routeBody("tiny-sha1", "{\n" +
+          "  \"name\": \"tiny-sha1\",\n" +
+          "  \"dist-tags\": { \"latest\": \"1.0.1\" },\n" +
+          "  \"versions\": {\n" +
+          "    \"1.0.1\": {\n" +
+          "      \"name\": \"tiny-sha1\",\n" +
+          "      \"version\": \"1.0.1\",\n" +
+          "      \"dist\": {\n" +
+          "        \"tarball\": \"https://registry.npmjs.org/tiny-sha1/-/tiny-sha1-1.0.1.tgz\",\n" +
+          "        \"shasum\": \"xyz\"\n" +
+          "      }\n" +
+          "    }\n" +
+          "  }\n" +
+          "}");
+        String manifest = "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n" +
+          "  \"dependencies\": {\n    \"tiny-sha1\": \"^1.0.0\"\n  }\n}\n";
+        String lock = "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"lockfileVersion\": 3,\n" +
+          "  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"fixture\",\n" +
+          "      \"version\": \"1.0.0\"\n    }\n  }\n}\n";
+        Result result = NpmLockEngine.regenerate(manifest, null, lock, null, ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.INTEGRITY_UNAVAILABLE);
+    }
+
+    @Test
+    void stringBinNormalizesToBasenamedObject() {
+        ExecutionContext ctx = ctx();
+        http.routeBody("@scope/tiny-bin", "{\n" +
+          "  \"name\": \"@scope/tiny-bin\",\n" +
+          "  \"dist-tags\": { \"latest\": \"1.0.0\" },\n" +
+          "  \"versions\": {\n" +
+          "    \"1.0.0\": {\n" +
+          "      \"name\": \"@scope/tiny-bin\",\n" +
+          "      \"version\": \"1.0.0\",\n" +
+          "      \"bin\": \"./cli.js\",\n" +
+          "      \"dist\": {\n" +
+          "        \"tarball\": \"https://registry.npmjs.org/@scope/tiny-bin/-/tiny-bin-1.0.0.tgz\",\n" +
+          "        \"integrity\": \"sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"\n" +
+          "      }\n" +
+          "    }\n" +
+          "  }\n" +
+          "}");
+        String manifest = "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n" +
+          "  \"dependencies\": {\n    \"@scope/tiny-bin\": \"^1.0.0\"\n  }\n}\n";
+        String lock = "{\n  \"name\": \"fixture\",\n  \"version\": \"1.0.0\",\n  \"lockfileVersion\": 3,\n" +
+          "  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"fixture\",\n" +
+          "      \"version\": \"1.0.0\"\n    }\n  }\n}\n";
+        Result result = NpmLockEngine.regenerate(manifest, null, lock, null, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("\"bin\": {\n        \"tiny-bin\": \"cli.js\"\n      }");
     }
 
     @Test

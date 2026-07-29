@@ -20,6 +20,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,8 +32,16 @@ import java.util.regex.Pattern;
  * (hyphen → trims → caret → tilde → x-range → star → GTE0) is ported line-for-line from
  * npm/node-semver {@code classes/range.js} in strict (non-loose) mode, and validated
  * against node-semver's range-include/range-exclude fixture corpus.
+ * <p>
+ * Deliberately not built on {@link org.openrewrite.semver.Semver}: that package is a
+ * recipe-facing version selector (four-part Maven-style versions, metadata patterns, no
+ * {@code ||} unions or compound comparator sets, no prerelease-exclusion rule), while
+ * lock regeneration needs bit-exact node-semver {@code satisfies} semantics.
  */
 public final class NpmRange {
+
+    private static final int PARSE_CACHE_LIMIT = 1000;
+    private static final Map<String, Optional<NpmRange>> PARSE_CACHE = new ConcurrentHashMap<>();
 
     private static final String XRANGE_ID = "[0-9]+|x|X|\\*";
     private static final String XRANGE_PLAIN = "[v=\\s]*(" + XRANGE_ID + ")" +
@@ -67,9 +78,26 @@ public final class NpmRange {
         if (range == null) {
             return null;
         }
+        Optional<NpmRange> cached = PARSE_CACHE.get(range);
+        if (cached == null) {
+            if (PARSE_CACHE.size() >= PARSE_CACHE_LIMIT) {
+                PARSE_CACHE.clear();
+            }
+            cached = Optional.ofNullable(parseUncached(range));
+            PARSE_CACHE.put(range, cached);
+        }
+        return cached.orElse(null);
+    }
+
+    private static @Nullable NpmRange parseUncached(String range) {
         List<List<NpmComparator>> sets = new ArrayList<>();
         for (String set : range.trim().split("\\|\\|", -1)) {
-            List<NpmComparator> comparators = parseComparatorSet(set.trim());
+            List<NpmComparator> comparators;
+            try {
+                comparators = parseComparatorSet(set.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
             if (comparators == null) {
                 return null;
             }

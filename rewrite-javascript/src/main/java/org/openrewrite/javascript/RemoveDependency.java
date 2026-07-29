@@ -95,7 +95,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
                         ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
-                        ps.capturedLockContent = sf.printAll();
+                        if (ps.capturedLockContent == null) {
+                            ps.capturedLockContent = sf.printAll();
+                        }
                         acc.lockToPackage.put(p, packagePath);
                     }
                     return tree;
@@ -173,7 +175,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 }
                 if (lockPs.regenResult != null && !lockPs.regenResult.isSuccess() && !lockPs.failureRecorded) {
                     lockPs.failureRecorded = true;
-                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult);
+                    LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, p, lockPs.regenResult,
+                            packageName);
                     return Markup.warn(sf, new RuntimeException(
                             "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
                 }

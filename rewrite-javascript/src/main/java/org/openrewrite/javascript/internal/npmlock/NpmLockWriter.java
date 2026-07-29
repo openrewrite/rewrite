@@ -34,8 +34,15 @@ import java.util.Map;
  */
 public final class NpmLockWriter {
 
-    private static final List<String> SW_KEY_ORDER = java.util.Arrays.asList(
-            "name", "version", "lockfileVersion", "resolved", "integrity", "requires", "packages", "dependencies");
+    private static final Map<String, Integer> SW_KEY_ORDER = new java.util.HashMap<>();
+
+    static {
+        String[] keys = {"name", "version", "lockfileVersion", "resolved", "integrity",
+                "requires", "packages", "dependencies"};
+        for (int i = 0; i < keys.length; i++) {
+            SW_KEY_ORDER.put(keys[i], i);
+        }
+    }
 
     /**
      * Primary collation weights: characters in ascending {@code localeCompare('en')}
@@ -137,16 +144,16 @@ public final class NpmLockWriter {
     }
 
     static int compareKeys(String a, String b) {
-        int prefA = SW_KEY_ORDER.indexOf(a);
-        int prefB = SW_KEY_ORDER.indexOf(b);
-        if (prefA >= 0 || prefB >= 0) {
-            if (prefA < 0) {
+        Integer prefA = SW_KEY_ORDER.get(a);
+        Integer prefB = SW_KEY_ORDER.get(b);
+        if (prefA != null || prefB != null) {
+            if (prefA == null) {
                 return 1;
             }
-            if (prefB < 0) {
+            if (prefB == null) {
                 return -1;
             }
-            return Integer.compare(prefA, prefB);
+            return prefA.compareTo(prefB);
         }
         return localeCompareEn(a, b);
     }
@@ -218,9 +225,11 @@ public final class NpmLockWriter {
                     sb.append("\\r");
                     break;
                 default:
-                    if (c < 0x20 ||
-                            (Character.isHighSurrogate(c) && (i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1)))) ||
-                            (Character.isLowSurrogate(c) && (i == 0 || !Character.isHighSurrogate(s.charAt(i - 1))))) {
+                    boolean loneHigh = Character.isHighSurrogate(c) &&
+                            (i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1)));
+                    boolean loneLow = Character.isLowSurrogate(c) &&
+                            (i == 0 || !Character.isHighSurrogate(s.charAt(i - 1)));
+                    if (c < 0x20 || loneHigh || loneLow) {
                         sb.append(String.format("\\u%04x", (int) c));
                     } else {
                         sb.append(c);

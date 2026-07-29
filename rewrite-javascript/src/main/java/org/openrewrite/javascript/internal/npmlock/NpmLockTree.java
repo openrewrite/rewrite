@@ -96,10 +96,12 @@ final class NpmLockTree {
     }
 
     /**
-     * Outgoing edges of the entry at {@code pathKey}: {@code dependencies} (prod),
-     * {@code optionalDependencies} (optional, overriding a same-name prod edge),
-     * {@code peerDependencies} (peer; optional too when flagged in
-     * {@code peerDependenciesMeta}), and {@code devDependencies} for the root only.
+     * Outgoing edges of the entry at {@code pathKey}, in arborist's load order —
+     * peer first, then prod, optional, and (root only) dev, with a later scope
+     * replacing an earlier same-name edge, so the effective precedence is
+     * dev &gt; optional &gt; prod &gt; peer. A root declaring the same package in both
+     * {@code peerDependencies} and {@code devDependencies} gets a dev edge, which
+     * is why npm records such entries as {@code "dev": true}.
      */
     List<Edge> edges(String pathKey) {
         ObjectNode entry = entry(pathKey);
@@ -107,20 +109,20 @@ final class NpmLockTree {
             return new ArrayList<>();
         }
         Map<String, Edge> byName = new LinkedHashMap<>();
-        forEachDep(entry, "dependencies", (name, range) ->
-                byName.put(name, new Edge(name, range, false, false, false)));
-        if (pathKey.isEmpty()) {
-            forEachDep(entry, "devDependencies", (name, range) ->
-                    byName.put(name, new Edge(name, range, true, false, false)));
-        }
-        forEachDep(entry, "optionalDependencies", (name, range) ->
-                byName.put(name, new Edge(name, range, false, true, false)));
         JsonNode peerMeta = entry.get("peerDependenciesMeta");
         forEachDep(entry, "peerDependencies", (name, range) -> {
             boolean peerOptional = peerMeta != null &&
                     peerMeta.path(name).path("optional").asBoolean(false);
             byName.put(name, new Edge(name, range, false, peerOptional, true));
         });
+        forEachDep(entry, "dependencies", (name, range) ->
+                byName.put(name, new Edge(name, range, false, false, false)));
+        forEachDep(entry, "optionalDependencies", (name, range) ->
+                byName.put(name, new Edge(name, range, false, true, false)));
+        if (pathKey.isEmpty()) {
+            forEachDep(entry, "devDependencies", (name, range) ->
+                    byName.put(name, new Edge(name, range, true, false, false)));
+        }
         return new ArrayList<>(byName.values());
     }
 

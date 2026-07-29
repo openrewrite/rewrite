@@ -205,6 +205,29 @@ record dev-recolor \
   }
 }'
 
+record dev-peer-overlap \
+  '{
+  "name": "fixture",
+  "version": "1.0.0",
+  "devDependencies": {
+    "is-number": "^4.0.0"
+  },
+  "peerDependencies": {
+    "is-number": ">=4"
+  }
+}' \
+  '{
+  "name": "fixture",
+  "version": "1.0.0",
+  "devDependencies": {
+    "is-number": "^6.0.0"
+  },
+  "peerDependencies": {
+    "is-number": ">=4"
+  }
+}' \
+  is-number
+
 record scoped \
   '{
   "name": "fixture",

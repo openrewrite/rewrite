@@ -75,18 +75,13 @@ class UpgradeDependencyVersionNpmLockTest implements RewriteTest {
             s -> {
                 s.path("package.json");
                 s.markers(npmMarker(new Dependency("is-number", "^4.0.0", null)));
-                s.noTrim().after(actual -> {
-                    assertThat(actual).isEqualTo(resource("/npmlock/upgrade-leaf/package.json"));
-                    return actual;
-                });
+                s.noTrim().after(actual -> resource("/npmlock/upgrade-leaf/package.json"));
             }
           ),
           json(
             resource("/npmlock/upgrade-leaf/package-lock.before.json"),
-            s -> s.path("package-lock.json").noTrim().after(actual -> {
-                assertThat(actual).isEqualTo(resource("/npmlock/upgrade-leaf/package-lock.after.json"));
-                return actual;
-            })
+            s -> s.path("package-lock.json").noTrim()
+              .after(actual -> resource("/npmlock/upgrade-leaf/package-lock.after.json"))
           )
         );
     }

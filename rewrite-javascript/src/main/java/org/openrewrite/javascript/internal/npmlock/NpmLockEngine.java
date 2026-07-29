@@ -91,7 +91,7 @@ public final class NpmLockEngine {
             case NOT_FOUND:
                 return Reason.PACKAGE_NOT_FOUND;
             case CONFIG:
-                return Reason.MALFORMED_MANIFEST;
+                return Reason.REGISTRY_CONFIG;
             default:
                 return Reason.REGISTRY_UNREACHABLE;
         }
@@ -166,8 +166,6 @@ public final class NpmLockEngine {
             return Result.success(out);
         }
 
-        // --- Guards --------------------------------------------------------
-
         private void guardSupported() {
             int lockfileVersion = lock.path("lockfileVersion").asInt(-1);
             if (lockfileVersion != 3) {
@@ -203,8 +201,6 @@ public final class NpmLockEngine {
             return root;
         }
 
-        // --- Edit-set computation ------------------------------------------
-
         /**
          * Names whose manifest declaration disagrees with the lock's recorded root
          * entry. The lock root is the baseline (not the pre-edit manifest) because
@@ -218,16 +214,14 @@ public final class NpmLockEngine {
             for (String scope : DEP_SCOPES) {
                 JsonNode before = baseline.path(scope);
                 JsonNode after = manifest.path(scope);
-                before.fieldNames().forEachRemaining(n -> {
+                Set<String> scopeNames = new LinkedHashSet<>();
+                before.fieldNames().forEachRemaining(scopeNames::add);
+                after.fieldNames().forEachRemaining(scopeNames::add);
+                for (String n : scopeNames) {
                     if (!Objects.equals(before.path(n).asText(null), after.path(n).asText(null))) {
                         names.add(n);
                     }
-                });
-                after.fieldNames().forEachRemaining(n -> {
-                    if (!Objects.equals(before.path(n).asText(null), after.path(n).asText(null))) {
-                        names.add(n);
-                    }
-                });
+                }
             }
             return names;
         }
@@ -267,13 +261,12 @@ public final class NpmLockEngine {
          * refuses to guess.
          */
         private void applyOverrideEdits() {
-            JsonNode before = originalManifest != null ? originalManifest.path("overrides")
-                    : MAPPER.createObjectNode();
+            JsonNode before = originalManifest == null ? MAPPER.createObjectNode()
+                    : originalManifest.path("overrides");
             for (Map.Entry<String, NpmRange> override : overrides.entrySet()) {
                 String name = override.getKey();
-                if (originalManifest != null &&
-                        Objects.equals(before.path(name).asText(null),
-                                manifest.path("overrides").path(name).asText(null))) {
+                if (Objects.equals(before.path(name).asText(null),
+                        manifest.path("overrides").path(name).asText(null))) {
                     continue;
                 }
                 for (String path : tree.paths()) {
@@ -291,8 +284,6 @@ public final class NpmLockEngine {
                 }
             }
         }
-
-        // --- Edit application ----------------------------------------------
 
         private void applyDependencyEdit(String name) {
             String newRange = declaredRange(manifest, name);
@@ -325,8 +316,12 @@ public final class NpmLockEngine {
             moveEntry(location, name, range);
         }
 
+        /** Scope priority mirrors arborist's edge precedence: dev &gt; optional &gt; prod &gt; peer. */
+        private static final String[] DECLARATION_PRIORITY = {
+                "devDependencies", "optionalDependencies", "dependencies", "peerDependencies"};
+
         private @Nullable String declaredRange(ObjectNode source, String name) {
-            for (String scope : DEP_SCOPES) {
+            for (String scope : DECLARATION_PRIORITY) {
                 JsonNode range = source.path(scope).get(name);
                 if (range != null) {
                     return range.asText();
@@ -343,43 +338,38 @@ public final class NpmLockEngine {
         /** Re-resolve the entry at {@code location} to the best version for {@code range}. */
         private void moveEntry(String location, String name, NpmRange range) {
             guardNoBundledChildren(location, name);
-            Packument packument = registry.packument(name);
-            String chosen = NpmRange.pickVersion(packument.versions().keySet(), packument.latestTag(), range);
-            if (chosen == null) {
-                throw new EngineFailure(Reason.VERSION_NOT_FOUND, name,
-                        "no published version of " + name + " satisfies `" + range + "`");
-            }
             ObjectNode current = tree.entry(location);
-            if (current != null && chosen.equals(current.path("version").asText(null))) {
-                return;
+            String chosen = placeEntry(location, name, range,
+                    current == null ? null : current.path("version").asText(null));
+            if (chosen != null) {
+                verifyDependents(location, name, chosen);
             }
-            ObjectNode versionManifest = packument.version(chosen);
-            if (versionManifest == null) {
-                throw new EngineFailure(Reason.VERSION_NOT_FOUND, name, name + "@" + chosen + " has no manifest");
-            }
-            ObjectNode entry = buildEntry(name, versionManifest);
-            packages.set(location, entry);
-            rebuiltPaths.add(location);
-            verifyClosure(location, name, chosen);
-            verifyDependents(location, name, chosen);
         }
 
         /** Add {@code name} as a new top-level entry, npm's maximally-hoisted placement. */
         private void addEntry(String name, NpmRange range) {
+            placeEntry("node_modules/" + name, name, range, null);
+        }
+
+        private @Nullable String placeEntry(String location, String name, NpmRange range,
+                                            @Nullable String currentVersion) {
             Packument packument = registry.packument(name);
             String chosen = NpmRange.pickVersion(packument.versions().keySet(), packument.latestTag(), range);
             if (chosen == null) {
                 throw new EngineFailure(Reason.VERSION_NOT_FOUND, name,
                         "no published version of " + name + " satisfies `" + range + "`");
             }
+            if (chosen.equals(currentVersion)) {
+                return null;
+            }
             ObjectNode versionManifest = packument.version(chosen);
             if (versionManifest == null) {
                 throw new EngineFailure(Reason.VERSION_NOT_FOUND, name, name + "@" + chosen + " has no manifest");
             }
-            String location = "node_modules/" + name;
             packages.set(location, buildEntry(name, versionManifest));
             rebuiltPaths.add(location);
             verifyClosure(location, name, chosen);
+            return chosen;
         }
 
         private void guardNoBundledChildren(String location, String name) {
@@ -461,8 +451,6 @@ public final class NpmLockEngine {
             }
         }
 
-        // --- Entry construction --------------------------------------------
-
         /**
          * The manifest fields npm copies into a lock entry ({@code pkgMetaKeys} in
          * arborist's shrinkwrap.js), with its quirks: falsy values and empty objects
@@ -488,9 +476,11 @@ public final class NpmLockEngine {
                     entry.set("license", value.get("type"));
                 } else if ("funding".equals(key) && value.isTextual()) {
                     entry.putObject("funding").put("url", value.textValue());
-                } else if ("bin".equals(key) && value.isTextual()) {
-                    String binName = versionManifest.path("name").asText(name);
-                    entry.putObject("bin").put(binName, value.textValue());
+                } else if ("bin".equals(key)) {
+                    ObjectNode bin = normalizeBin(value, versionManifest.path("name").asText(name));
+                    if (bin != null) {
+                        entry.set("bin", bin);
+                    }
                 } else {
                     entry.set(key, value.deepCopy());
                 }
@@ -510,14 +500,69 @@ public final class NpmLockEngine {
             String integrity = dist.path("integrity").asText(null);
             if (integrity == null) {
                 String shasum = dist.path("shasum").asText(null);
-                if (shasum == null) {
+                if (shasum == null || !shasum.matches("(?:[0-9a-fA-F]{2})+")) {
                     throw new EngineFailure(Reason.INTEGRITY_UNAVAILABLE, name,
-                            "registry supplies neither integrity nor shasum for " + name);
+                            "registry supplies neither integrity nor a well-formed shasum for " + name);
                 }
                 integrity = "sha1-" + Base64.getEncoder().encodeToString(hexToBytes(shasum));
             }
             entry.put("integrity", integrity);
             return entry;
+        }
+
+        /**
+         * npm-normalize-package-bin: a string bin keys on the package name, an array
+         * keys each path on its basename, keys collapse to their basename (dropping
+         * any scope), and targets are resolved as rooted paths (stripping {@code ./}
+         * and {@code ../} escapes). No surviving entries means no {@code bin} field.
+         */
+        private static @Nullable ObjectNode normalizeBin(JsonNode value, String packageName) {
+            ObjectNode raw = MAPPER.createObjectNode();
+            if (value.isTextual()) {
+                raw.set(packageName, value);
+            } else if (value.isArray()) {
+                for (JsonNode element : value) {
+                    if (element.isTextual()) {
+                        raw.set(basename(element.textValue().replace('\\', '/')), element);
+                    }
+                }
+            } else if (value.isObject()) {
+                raw = (ObjectNode) value;
+            } else {
+                return null;
+            }
+            ObjectNode clean = MAPPER.createObjectNode();
+            raw.fields().forEachRemaining(e -> {
+                if (!e.getValue().isTextual()) {
+                    return;
+                }
+                String base = resolveRooted(basename(e.getKey().replaceAll("[\\\\:]", "/")));
+                String target = resolveRooted(e.getValue().textValue().replace('\\', '/'));
+                if (!base.isEmpty() && !target.isEmpty()) {
+                    clean.put(base, target);
+                }
+            });
+            return clean.isEmpty() ? null : clean;
+        }
+
+        private static String basename(String path) {
+            return path.substring(path.lastIndexOf('/') + 1);
+        }
+
+        /** {@code path.join('/', p).slice(1)}: resolve {@code .}/{@code ..} against a root, then drop it. */
+        private static String resolveRooted(String path) {
+            java.util.Deque<String> stack = new java.util.ArrayDeque<>();
+            for (String segment : path.split("/")) {
+                if (segment.isEmpty() || ".".equals(segment)) {
+                    continue;
+                }
+                if ("..".equals(segment)) {
+                    stack.pollLast();
+                } else {
+                    stack.addLast(segment);
+                }
+            }
+            return String.join("/", stack);
         }
 
         private static boolean truthy(@Nullable JsonNode node) {
@@ -543,8 +588,6 @@ public final class NpmLockEngine {
             }
             return out;
         }
-
-        // --- Root entry and top-level sync ---------------------------------
 
         /**
          * Mirror the manifest's declaration of each edited name into the root entry's
@@ -583,8 +626,6 @@ public final class NpmLockEngine {
                 root().set("version", version.deepCopy());
             }
         }
-
-        // --- Sweep and flags -----------------------------------------------
 
         /**
          * Remove entries the edit orphaned. Entries that were already unreachable

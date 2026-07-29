@@ -52,6 +52,9 @@ public final class NpmVersion implements Comparable<NpmVersion> {
         this.raw = raw;
     }
 
+    // node-semver rejects components above Number.MAX_SAFE_INTEGER as invalid.
+    static final long MAX_SAFE_COMPONENT = 9007199254740991L;
+
     public static @Nullable NpmVersion parse(@Nullable String version) {
         if (version == null) {
             return null;
@@ -60,26 +63,20 @@ public final class NpmVersion implements Comparable<NpmVersion> {
         if (!m.matches()) {
             return null;
         }
+        long major, minor, patch;
+        try {
+            major = Long.parseLong(m.group(1));
+            minor = Long.parseLong(m.group(2));
+            patch = Long.parseLong(m.group(3));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (major > MAX_SAFE_COMPONENT || minor > MAX_SAFE_COMPONENT || patch > MAX_SAFE_COMPONENT) {
+            return null;
+        }
         String pre = m.group(4);
         String[] preIds = pre == null ? new String[0] : pre.split("\\.");
-        return new NpmVersion(
-                Long.parseLong(m.group(1)),
-                Long.parseLong(m.group(2)),
-                Long.parseLong(m.group(3)),
-                preIds,
-                version.trim());
-    }
-
-    public long getMajor() {
-        return major;
-    }
-
-    public long getMinor() {
-        return minor;
-    }
-
-    public long getPatch() {
-        return patch;
+        return new NpmVersion(major, minor, patch, preIds, version.trim());
     }
 
     public boolean hasPrerelease() {

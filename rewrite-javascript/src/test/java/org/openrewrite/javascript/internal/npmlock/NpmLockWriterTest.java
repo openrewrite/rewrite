@@ -19,11 +19,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.internal.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,13 +36,7 @@ public class NpmLockWriterTest {
     public static String resource(String name) {
         try (InputStream is = NpmLockWriterTest.class.getResourceAsStream(name)) {
             assertThat(is).as(name).isNotNull();
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) > 0) {
-                out.write(buf, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+            return StringUtils.readFully(is);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -69,6 +63,8 @@ public class NpmLockWriterTest {
       "/npmlock/override/package-lock.after.json",
       "/npmlock/dev-recolor/package-lock.before.json",
       "/npmlock/dev-recolor/package-lock.after.json",
+      "/npmlock/dev-peer-overlap/package-lock.before.json",
+      "/npmlock/dev-peer-overlap/package-lock.after.json",
       "/npmlock/scoped/package-lock.before.json",
       "/npmlock/scoped/package-lock.after.json"
     })

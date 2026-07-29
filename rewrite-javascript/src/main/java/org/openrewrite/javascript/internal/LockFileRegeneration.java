@@ -81,6 +81,7 @@ public abstract class LockFileRegeneration {
 
     public enum Reason {
         REGISTRY_UNREACHABLE,
+        REGISTRY_CONFIG,
         AUTH_FAILED,
         PACKAGE_NOT_FOUND,
         VERSION_NOT_FOUND,
@@ -106,33 +107,42 @@ public abstract class LockFileRegeneration {
     public static class Result {
         boolean success;
         @Nullable String lockFileContent;
-        @Nullable String errorMessage;
         @Nullable Failure failure;
 
         public static Result success(String lockFileContent) {
-            return new Result(true, lockFileContent, null, null);
+            return new Result(true, lockFileContent, null);
         }
 
         public static Result failure(Failure failure) {
-            return new Result(false, null, failure.getReason() + ": " + failure.getDetail(), failure);
+            return new Result(false, null, failure);
         }
 
         public static Result failure(Reason reason, String detail) {
             return failure(new Failure(reason, null, null, detail));
         }
+
+        public @Nullable String getErrorMessage() {
+            return failure == null ? null : failure.getReason() + ": " + failure.getDetail();
+        }
     }
 
     /**
-     * Record a failed regeneration in the data table, once per project.
+     * Record a failed regeneration in the data table, once per project. The
+     * fallback package name attributes rows whose failure carries no package of
+     * its own (shell-out failures, unreachable registries) to the package the
+     * recipe targeted.
      */
     public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
-                                        Path lockPath, Result result) {
+                                        Path lockPath, Result result, @Nullable String fallbackPackageName) {
         Failure failure = result.getFailure();
+        if (failure == null) {
+            failure = new Failure(Reason.PACKAGE_MANAGER_FAILED, null, null, "");
+        }
         table.insertRow(ctx, new NodeLockRegenerationFailures.Row(
                 lockPath.toString(),
-                failure == null ? null : failure.getPackageName(),
-                failure == null ? Reason.PACKAGE_MANAGER_FAILED.toString() : failure.getReason().toString(),
-                failure == null ? (result.getErrorMessage() == null ? "" : result.getErrorMessage()) : failure.getDetail()));
+                failure.getPackageName() != null ? failure.getPackageName() : fallbackPackageName,
+                failure.getReason().toString(),
+                failure.getDetail()));
     }
 
     public abstract String getLockFile();
@@ -270,11 +280,11 @@ public abstract class LockFileRegeneration {
                             try {
                                 Files.delete(path);
                             } catch (IOException e) {
-                                // Ignore
+                                // best-effort temp-dir cleanup
                             }
                         });
             } catch (IOException e) {
-                // Ignore
+                // best-effort temp-dir cleanup
             }
         }
     }
