@@ -85,7 +85,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "[3.11.0,)")))
+              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "[3.11.0,4.0.0)")))
           )
         );
     }
@@ -125,7 +125,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "(3.11.0,)")))
+              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "(3.11.0,4.0.0)")))
           )
         );
     }
@@ -192,7 +192,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                       </pluginManagement>
                   </build>
               </project>
-              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "[3.5.2,)")))
+              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "[3.5.2,4.0.0)")))
           )
         );
     }
@@ -238,7 +238,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """.formatted(selectedVersion(actual, "<enforcer.version>(3\\.\\d+\\.\\d+)</enforcer.version>", "[3.5.0,)")))
+              """.formatted(selectedVersion(actual, "<enforcer.version>(3\\.\\d+\\.\\d+)</enforcer.version>", "[3.5.0,4.0.0)")))
           )
         );
     }
@@ -278,7 +278,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """.formatted(selectedVersion(actual, "<version>(4\\.\\d+\\.\\d+)</version>", "[4.9.5,)")))
+              """.formatted(selectedVersion(actual, "<version>(4\\.\\d+\\.\\d+)</version>", "[4.9.5,5.0.0)")))
           )
         );
     }

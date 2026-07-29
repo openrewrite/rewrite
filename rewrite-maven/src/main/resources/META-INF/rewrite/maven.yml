@@ -142,9 +142,10 @@ name: org.openrewrite.maven.UpgradePluginsForMaven4
 displayName: Upgrade plugins that are incompatible with Maven 4
 description: >-
   Upgrades plugins that are known to fail under Maven 4, using the minimum working versions applied by Apache's own
-  [`mvnup upgrade --plugins`](https://maven.apache.org/tools/mvnup.html) as a floor while accepting any newer release.
-  Plugins already at or above that floor are upgraded to the latest release; plugins that declare no version are left
-  alone. `quarkus-maven-plugin` is held at its floor, as its version is coupled to the Quarkus platform BOM.
+  [`mvnup upgrade --plugins`](https://maven.apache.org/tools/mvnup.html) as a floor while accepting any newer release
+  within the same major version. Plugins already at or above that floor are upgraded to the latest such release;
+  plugins that declare no version are left alone. `quarkus-maven-plugin` is held at its floor, as its version is
+  coupled to the Quarkus platform BOM.
 recipeList:
   - org.openrewrite.maven.ChangePluginGroupIdAndArtifactId:
       oldGroupId: org.scala-tools
@@ -155,71 +156,71 @@ recipeList:
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-clean-plugin
-      newVersion: "[3.5.0,)"
+      newVersion: "[3.5.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-compiler-plugin
-      newVersion: "[3.11.0,)"
+      newVersion: "[3.11.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-deploy-plugin
-      newVersion: "[3.1.4,)"
+      newVersion: "[3.1.4,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-enforcer-plugin
-      newVersion: "[3.5.0,)"
+      newVersion: "[3.5.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-failsafe-plugin
-      newVersion: "[3.5.2,)"
+      newVersion: "[3.5.2,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-install-plugin
-      newVersion: "[3.1.4,)"
+      newVersion: "[3.1.4,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-jar-plugin
-      newVersion: "[3.5.0,)"
+      newVersion: "[3.5.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-remote-resources-plugin
-      newVersion: "[3.0.0,)"
+      newVersion: "[3.0.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-resources-plugin
-      newVersion: "[3.3.1,)"
+      newVersion: "[3.3.1,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-shade-plugin
-      newVersion: "[3.5.0,)"
+      newVersion: "[3.5.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-surefire-plugin
-      newVersion: "[3.5.2,)"
+      newVersion: "[3.5.2,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.apache.maven.plugins
       artifactId: maven-surefire-report-plugin
-      newVersion: "[3.5.2,)"
+      newVersion: "[3.5.2,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.codehaus.gmavenplus
       artifactId: gmavenplus-plugin
-      newVersion: "[4.2.0,)"
+      newVersion: "[4.2.0,5.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.codehaus.mojo
       artifactId: exec-maven-plugin
-      newVersion: "[3.5.0,)"
+      newVersion: "[3.5.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.codehaus.mojo
       artifactId: flatten-maven-plugin
-      newVersion: "[1.2.7,)"
+      newVersion: "[1.2.7,2.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: org.codehaus.mojo
       artifactId: jaxb2-maven-plugin
-      newVersion: "[3.2.0,)"
+      newVersion: "[3.2.0,4.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: net.alchim31.maven
       artifactId: scala-maven-plugin
-      newVersion: "[4.9.5,)"
+      newVersion: "[4.9.5,5.0.0)"
   - org.openrewrite.maven.UpgradePluginVersion:
       groupId: io.quarkus
       artifactId: quarkus-maven-plugin
