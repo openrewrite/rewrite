@@ -320,9 +320,13 @@ class PythonVisitor(JavaVisitor[P]):
         if not isinstance(temp_expr, type(expr_stmt)):
             return temp_expr
         expr_stmt = temp_expr
-        expr_stmt = expr_stmt.replace(
-            expression=self.visit_and_cast(expr_stmt.expression, Expression, p)
-        )
+        expression = self.visit_and_cast(expr_stmt.expression, Expression, p)
+        if expression is not None and not isinstance(expression, Expression) and isinstance(expression, Statement):
+            # The wrapped expression was replaced with a statement-only node;
+            # swap to the matching wrapper to keep the tree type-correct.
+            from rewrite.python.tree import StatementExpression
+            return StatementExpression(expr_stmt.id, expression)
+        expr_stmt = expr_stmt.replace(expression=expression)
         return expr_stmt
 
     def visit_expression_type_tree(self, expr_tree: ExpressionTypeTree, p: P) -> J:
@@ -546,9 +550,14 @@ class PythonVisitor(JavaVisitor[P]):
         if not isinstance(temp_expr, type(stmt_expr)):
             return temp_expr
         stmt_expr = temp_expr
-        stmt_expr = stmt_expr.replace(
-            statement=self.visit_and_cast(stmt_expr.statement, Statement, p)
-        )
+        statement = self.visit_and_cast(stmt_expr.statement, Statement, p)
+        if statement is not None and not isinstance(statement, Statement) and isinstance(statement, Expression):
+            # The wrapped statement was replaced with an expression-only node
+            # (e.g. a recipe migrating `yield from x` to `await x`); swap to
+            # the matching wrapper to keep the tree type-correct.
+            from rewrite.python.tree import ExpressionStatement
+            return ExpressionStatement(stmt_expr.id, statement)
+        stmt_expr = stmt_expr.replace(statement=statement)
         return stmt_expr
 
     def visit_trailing_else_wrapper(self, wrapper: TrailingElseWrapper, p: P) -> J:
