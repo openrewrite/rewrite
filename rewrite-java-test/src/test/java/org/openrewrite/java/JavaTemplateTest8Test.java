@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -695,5 +696,38 @@ class JavaTemplateTest8Test implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8327")
+    @Test
+    void unreachableCoordinatesFailLoudly() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void test() {
+                      System.out.println(hashCode());
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("println".equals(method.getSimpleName())) {
+                    // The argument is nested inside `method`, which the template visitor never descends into
+                    return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("JavaTemplate coordinates were never matched")
+          .hasMessageContaining(J.MethodInvocation.class.getName());
     }
 }

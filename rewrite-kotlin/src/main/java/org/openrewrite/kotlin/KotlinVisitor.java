@@ -147,6 +147,23 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), KContainer.Location.DESTRUCT_ASSIGNMENTS, p));
     }
 
+    public J visitExpressionStatement(K.ExpressionStatement expressionStatement, P p) {
+        K.ExpressionStatement e = expressionStatement;
+        Statement temp = (Statement) visitStatement(e, p);
+        if (!(temp instanceof K.ExpressionStatement)) {
+            return temp;
+        } else {
+            e = (K.ExpressionStatement) temp;
+        }
+        J expression = visit(e.getExpression(), p);
+        if (expression instanceof K.ExpressionStatement) {
+            return expression;
+        } else if (expression instanceof Expression) {
+            return e.withExpression((Expression) expression);
+        }
+        return expression;
+    }
+
     public J visitFunctionType(K.FunctionType functionType, P p) {
         K.FunctionType f = functionType;
         f = f.withPrefix(visitSpace(f.getPrefix(), KSpace.Location.FUNCTION_TYPE_PREFIX, p));
@@ -253,6 +270,23 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             s = (K.SpreadArgument) temp;
         }
         return s.withExpression(visitAndCast(s.getExpression(), p));
+    }
+
+    public J visitStatementExpression(K.StatementExpression statementExpression, P p) {
+        K.StatementExpression s = statementExpression;
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof K.StatementExpression)) {
+            return temp;
+        } else {
+            s = (K.StatementExpression) temp;
+        }
+        J statement = visit(s.getStatement(), p);
+        if (statement instanceof K.StatementExpression) {
+            return statement;
+        } else if (statement instanceof Statement) {
+            return s.withStatement((Statement) statement);
+        }
+        return statement;
     }
 
     public J visitStringTemplate(K.StringTemplate stringTemplate, P p) {
