@@ -19,6 +19,20 @@ from rewrite.java import (
 )
 from rewrite.python.support_types import Py, P
 
+
+def _delegating_prefix_and_markers(child: J, child_key: str, kwargs: dict) -> dict:
+    """Redirect prefix/markers onto the wrapped child.
+
+    `ExpressionStatement` and `StatementExpression` store neither of their own,
+    exposing the child's instead, so a plain `replace` would silently drop them.
+    """
+    if 'prefix' in kwargs:
+        kwargs[child_key] = child.replace(prefix=kwargs.pop('prefix'))
+    if 'markers' in kwargs:
+        kwargs[child_key] = kwargs.get(child_key, child).replace(markers=kwargs.pop('markers'))
+    return kwargs
+
+
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False, slots=True)
 class Async(Py, Statement):
@@ -505,6 +519,9 @@ class ExpressionStatement(Py, Expression, Statement):
         return self._expression
 
 
+    def replace(self, **kwargs) -> 'ExpressionStatement':
+        return replace_if_changed(self, **_delegating_prefix_and_markers(self._expression, 'expression', kwargs))
+
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_expression_statement(self, p)
 
@@ -560,15 +577,7 @@ class StatementExpression(Py, Expression, Statement):
 
 
     def replace(self, **kwargs) -> 'StatementExpression':
-        """Replace fields, handling delegated prefix/markers specially."""
-        # Handle delegated properties by modifying the inner statement
-        if 'prefix' in kwargs:
-            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))  # Statement base class doesn't have replace
-            kwargs['statement'] = new_statement
-        if 'markers' in kwargs:
-            new_statement = kwargs.get('statement', self._statement).replace(markers=kwargs.pop('markers'))
-            kwargs['statement'] = new_statement
-        return replace_if_changed(self, **kwargs)
+        return replace_if_changed(self, **_delegating_prefix_and_markers(self._statement, 'statement', kwargs))
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_statement_expression(self, p)
