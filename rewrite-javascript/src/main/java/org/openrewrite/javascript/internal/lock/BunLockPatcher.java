@@ -29,6 +29,7 @@ import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +39,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
@@ -65,9 +67,19 @@ public final class BunLockPatcher implements LockPatcher {
         }
 
         boolean anyRemoval = false;
+        List<PackageEdit> adds = new ArrayList<>();
+        List<PackageEdit> rewrites = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            anyRemoval |= edit.getNewVersion() == null;
+            if (edit.getNewVersion() == null) {
+                anyRemoval = true;
+                rewrites.add(edit);
+            } else if (edit.isAdded()) {
+                adds.add(edit);
+            } else {
+                rewrites.add(edit);
+            }
         }
+
         if (anyRemoval) {
             // Drop the removed roots and their orphaned transitives from `packages` structurally (with a
             // first-member prefix fixup) — a visitor null-return would leave a stray blank line behind.
@@ -78,9 +90,209 @@ public final class BunLockPatcher implements LockPatcher {
             }
         }
 
-        Json.Document patched = (Json.Document) new BunVisitor(edits.getEdits(), edits.getEditedPackageJson())
+        if (!adds.isEmpty()) {
+            document = document.withValue(
+                    applyAdds((Json.JsonObject) document.getValue(), adds, edits.getEditedPackageJson()));
+        }
+
+        Json.Document patched = (Json.Document) new BunVisitor(rewrites, edits.getEditedPackageJson())
                 .visitNonNull(document, 0);
         return patched.printAll();
+    }
+
+    // --- leaf / clean-closure add (Phase B) ----------------------------------
+
+    /**
+     * Insert each added package's {@code packages} tuple (ASCII-sorted, blank-line-separated as bun writes them)
+     * and, for a member the edited {@code package.json} declares, its {@code workspaces[dir].<scope>} constraint
+     * (ASCII-sorted). Transitive members carry no importer edge, so only a declared root re-pins a constraint.
+     */
+    private static Json.JsonObject applyAdds(Json.JsonObject root, List<PackageEdit> adds,
+                                             @Nullable String editedPackageJson) {
+        root = insertPackageTuples(root, adds);
+        return insertWorkspaceConstraints(root, adds, editedPackageJson);
+    }
+
+    private static Json.JsonObject insertPackageTuples(Json.JsonObject root, List<PackageEdit> adds) {
+        Json.JsonObject packages = objectMember(root, "packages");
+        if (packages == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no packages map");
+        }
+        String firstWs = firstMemberWhitespace(packages);
+        if (firstWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock packages map is empty");
+        }
+        // A nested placement (parent/name) needs the hoisting model; the flat sorted insert cannot honour it.
+        for (Json member : packages.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = literalKey(((Json.Member) member).getKey());
+                if (key != null && key.indexOf('/') >= 0) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "cannot add into a bun.lock with nested placements: " + key);
+                }
+            }
+        }
+
+        List<JsonRightPadded<Json>> members = new ArrayList<>(packages.getPadding().getMembers());
+        for (PackageEdit add : adds) {
+            members = insertSorted(members, buildPackageMember(add));
+        }
+        // bun separates entries with a blank line: the first keeps its newline+indent, the rest gain one.
+        members = normalizePrefixes(members, firstWs, "\n" + firstWs);
+        return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+    }
+
+    private static Json.JsonObject insertWorkspaceConstraints(Json.JsonObject root, List<PackageEdit> adds,
+                                                              @Nullable String editedPackageJson) {
+        Json.JsonObject workspaces = objectMember(root, "workspaces");
+        if (workspaces == null) {
+            return root;
+        }
+        for (PackageEdit add : adds) {
+            String constraint = LockManifests.declaredConstraint(editedPackageJson, add.getScope(), add.getName());
+            if (constraint == null) {
+                continue; // a transitive: absent from the edited package.json, so no importer edge
+            }
+            String importerKey = add.getImporterDir() == null ? "" : add.getImporterDir();
+            Json.JsonObject importer = objectMember(workspaces, importerKey);
+            if (importer == null) {
+                continue;
+            }
+            Json.JsonObject scope = objectMember(importer, add.getScope());
+            if (scope == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, add.getName(),
+                        "adding a new " + add.getScope() + " scope to bun.lock is not yet supported");
+            }
+            String ws = firstMemberWhitespace(scope);
+            if (ws == null) {
+                throw new EngineFailure(Reason.MALFORMED_LOCK, add.getName(), "cannot derive workspace indentation");
+            }
+            List<JsonRightPadded<Json>> members =
+                    insertSorted(new ArrayList<>(scope.getPadding().getMembers()), buildLiteralMember(add.getName(), constraint));
+            members = normalizePrefixes(members, ws, ws);
+            scope = scope.getPadding().withMembers(members);
+            importer = replaceMemberValue(importer, add.getScope(), scope);
+            workspaces = replaceMemberValue(workspaces, importerKey, importer);
+        }
+        return replaceMemberValue(root, "workspaces", workspaces);
+    }
+
+    /** Build the {@code "<name>": ["<name>@<ver>", "", <metadata>, "<sri>"]} tuple member from exact source text. */
+    private static Json.Member buildPackageMember(PackageEdit add) {
+        String integrity = add.getNewIntegrity();
+        if (integrity == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, add.getName(), add.getName() + " has no integrity");
+        }
+        String locator = add.getName() + "@" + add.getNewVersion();
+        String tuple = "[" + quote(locator) + ", " + quote("") + ", " +
+                renderMetadata(add.getNewDependencies()) + ", " + quote(integrity) + "]";
+        return parseMember(quote(add.getName()) + ": " + tuple);
+    }
+
+    private static Json.Member buildLiteralMember(String name, String value) {
+        return parseMember(quote(name) + ": " + quote(value));
+    }
+
+    /** bun's compact single-line metadata: {@code {}} or {@code { "dependencies": { "<dep>": "<range>", … } }}. */
+    private static String renderMetadata(@Nullable Map<String, String> deps) {
+        if (deps == null || deps.isEmpty()) {
+            return "{}";
+        }
+        return "{ " + quote("dependencies") + ": " + renderInlineMap(deps) + " }";
+    }
+
+    private static String renderInlineMap(Map<String, String> map) {
+        List<String> keys = new ArrayList<>(map.keySet());
+        keys.sort(null); // bun sorts the dependency map by name (ASCII)
+        StringBuilder sb = new StringBuilder("{ ");
+        for (int i = 0; i < keys.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(quote(keys.get(i))).append(": ").append(quote(map.get(keys.get(i))));
+        }
+        return sb.append(" }").toString();
+    }
+
+    /** Splice {@code member} at its ASCII-sorted key position, before any trailing comma placeholder ({@link Json.Empty}). */
+    private static List<JsonRightPadded<Json>> insertSorted(List<JsonRightPadded<Json>> members, Json.Member member) {
+        String newKey = literalKey(member.getKey());
+        int idx = members.size();
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            if (!(el instanceof Json.Member)) {
+                idx = i; // insert a real member before the trailing comma placeholder
+                break;
+            }
+            String k = literalKey(((Json.Member) el).getKey());
+            if (k != null && newKey != null && k.compareTo(newKey) > 0) {
+                idx = i;
+                break;
+            }
+        }
+        members.add(idx, new JsonRightPadded<>(member, Space.EMPTY, Markers.EMPTY));
+        return members;
+    }
+
+    /** Set the first real member's prefix to {@code firstWs} and every following one to {@code restWs} (byte-exact whitespace). */
+    private static List<JsonRightPadded<Json>> normalizePrefixes(List<JsonRightPadded<Json>> members,
+                                                                 String firstWs, String restWs) {
+        boolean first = true;
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            if (!(el instanceof Json.Member)) {
+                continue; // the trailing comma placeholder keeps its own prefix
+            }
+            if (!el.getPrefix().getComments().isEmpty()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "bun.lock has comments; add not supported");
+            }
+            String target = first ? firstWs : restWs;
+            if (!el.getPrefix().getWhitespace().equals(target)) {
+                members.set(i, members.get(i).withElement(el.withPrefix(el.getPrefix().withWhitespace(target))));
+            }
+            first = false;
+        }
+        return members;
+    }
+
+    private static @Nullable String firstMemberWhitespace(Json.JsonObject obj) {
+        for (Json member : obj.getMembers()) {
+            if (member instanceof Json.Member) {
+                return member.getPrefix().getWhitespace();
+            }
+        }
+        return null;
+    }
+
+    /** Replace the value of member {@code key} in place, preserving its position and surrounding padding. */
+    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key, JsonValue newValue) {
+        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            if (el instanceof Json.Member && key.equals(literalKey(((Json.Member) el).getKey()))) {
+                members.set(i, members.get(i).withElement(((Json.Member) el).withValue(newValue)));
+                return obj.getPadding().withMembers(members);
+            }
+        }
+        return obj;
+    }
+
+    /** Parse a single member from a throwaway wrapper so its hand-crafted inner bytes round-trip exactly. */
+    private static Json.Member parseMember(String memberSource) {
+        Json.Document doc = parse("{" + memberSource + "}", null);
+        if (doc.getValue() instanceof Json.JsonObject) {
+            for (Json member : ((Json.JsonObject) doc.getValue()).getMembers()) {
+                if (member instanceof Json.Member) {
+                    return (Json.Member) member;
+                }
+            }
+        }
+        throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct bun lock member");
+    }
+
+    /** bun package names, versions, ranges and SRI integrity never contain {@code "}/{@code \\}, so a plain quote suffices. */
+    private static String quote(String value) {
+        return "\"" + value + "\"";
     }
 
     /** Rewrite the top-level {@code packages} object, dropping {@code dropKeys} and preserving bun's blank-line layout. */

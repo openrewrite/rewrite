@@ -656,6 +656,11 @@ public final class NativeLockEngine {
             // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
             return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, registries, client);
         }
+        if (pm == PackageManager.Bun) {
+            // bun hoists like npm: the closure resolves identically, one packages tuple per member, failing
+            // loud on any conflict/nest (bun's parent/name fork keys).
+            return resolveClosureAddBun(change, rootName, rootConstraint, existingLock, registries, client);
+        }
         // Only the npm patcher can insert closure entries so far; other formats defer.
         if (pm != PackageManager.Npm) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
@@ -812,6 +817,153 @@ public final class NativeLockEngine {
                     .build());
         }
         return edits;
+    }
+
+    /**
+     * Phase B (bun): a direct dependency the recipe added, plus its runtime closure, into a {@code bun.lock}.
+     * bun hoists like npm, so the closure resolution is identical to {@link #resolveClosureAdd} — every member
+     * hoists to a fresh top-level {@code packages["<name>"]} tuple or dedups to an already-satisfying pin, and
+     * any placement that would move/nest/fork an existing entry (bun's {@code parent/name} keys) fails loud.
+     * <p>
+     * bun records only the integrity in the tuple (no tarball URL), and the emittable gate is tighter than
+     * npm's: only a deps-or-empty tuple ({@code {}} / {@code { "dependencies": {…} }}) is byte-verified, so any
+     * {@code bin}/{@code os}/{@code cpu}/{@code peer}/{@code optional} metadata or scoped name defers.
+     */
+    private static List<LockEditSet.PackageEdit> resolveClosureAddBun(DepChange change, String rootName,
+                                                                      String rootConstraint, String existingLock,
+                                                                      NodeRegistries registries, NpmRegistryClient client) {
+        Map<String, String> existingTopLevel = topLevelVersionsBun(existingLock);
+        boolean dev = "devDependencies".equals(change.scope);
+
+        Map<String, Placement> placed = new LinkedHashMap<>();
+        Deque<Requirement> queue = new ArrayDeque<>();
+        queue.add(new Requirement(rootName, rootConstraint, dev));
+
+        while (!queue.isEmpty()) {
+            Requirement req = queue.poll();
+
+            String existingVersion = existingTopLevel.get(req.name);
+            if (existingVersion != null) {
+                if (existingSatisfies(existingVersion, req.constraint)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
+                        existingVersion + " which does not satisfy " + req.constraint +
+                        " (bun would nest/move it; deferred)");
+            }
+            Placement already = placed.get(req.name);
+            if (already != null) {
+                if (existingSatisfies(already.version, req.constraint)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
+                        " is required at two incompatible versions within the added closure (" +
+                        already.version + " vs " + req.constraint + "); deferred");
+            }
+
+            NodeRegistry registry = registries.registryFor(req.name);
+            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
+            VersionManifest manifest = client.getManifest(registry, req.name, version);
+            requireEmittableBunClosureMember(req.name, manifest);
+
+            VersionManifest.Dist dist = manifest.getDist();
+            if (dist == null || dist.getIntegrity() == null) {
+                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
+                        req.name + "@" + version + " has no registry integrity");
+            }
+
+            // A stray reverse-dependent whose recorded constraint excludes the resolved version → fail loud.
+            proveReverseDependentsAccept(PackageManager.Bun, req.name, version, version, existingLock);
+
+            placed.put(req.name, new Placement(version, manifest, req.dev));
+            enqueueDeps(queue, manifest.getDependencies(), req.dev);
+        }
+
+        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
+        for (Map.Entry<String, Placement> e : placed.entrySet()) {
+            Placement p = e.getValue();
+            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
+            // Only the root (declared in package.json) writes a workspace constraint; the patcher no-ops the
+            // transitives because they are absent from the edited manifest. Scope carries the dev-ness.
+            edits.add(LockEditSet.PackageEdit.builder()
+                    .name(e.getKey())
+                    .oldVersion("")
+                    .newVersion(p.version)
+                    .newIntegrity(dist.getIntegrity())
+                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
+                    .scope(p.dev ? "devDependencies" : "dependencies")
+                    .importerDir(null)
+                    .added(true)
+                    .build());
+        }
+        return edits;
+    }
+
+    /** The single top-level version of each hoisted bun package ({@code packages["<name>"]} tuple, non-nested key). */
+    private static Map<String, String> topLevelVersionsBun(String lock) {
+        Map<String, String> versions = new LinkedHashMap<>();
+        Map<String, Object> root = parseJsonObject(lock, false);
+        Object packages = root.get("packages");
+        if (packages instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+                String key = String.valueOf(e.getKey());
+                if (isNestedBunKey(key)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "cannot add into a bun.lock with nested placements: " + key);
+                }
+                if (e.getValue() instanceof List && !((List<?>) e.getValue()).isEmpty()) {
+                    String locator = String.valueOf(((List<?>) e.getValue()).get(0));
+                    int at = locator.lastIndexOf('@');
+                    if (at > 0) {
+                        versions.put(key, locator.substring(at + 1));
+                    }
+                }
+            }
+        }
+        return versions;
+    }
+
+    /** A bun {@code packages} key nests a second copy under a dependent ({@code parent/name}); a leading {@code @scope/} is not a nest. */
+    private static boolean isNestedBunKey(String key) {
+        int scopeEnd = key.startsWith("@") ? key.indexOf('/') : -1;
+        return key.indexOf('/', scopeEnd + 1) >= 0;
+    }
+
+    /**
+     * A closure member whose bun tuple the patcher can insert byte-exactly: a metadata object of {@code {}} or
+     * {@code { "dependencies": {…} }} only. bun records {@code optionalDependencies}/{@code peerDependencies}/
+     * {@code bin}/{@code os}/{@code cpu}/{@code libc} into that object and auto-installs non-optional peers,
+     * none of which the deps-or-empty placement models — so any of them, a scoped name, or unverified metadata
+     * defers the whole add.
+     */
+    private static void requireEmittableBunClosureMember(String name, VersionManifest m) {
+        if (name.indexOf('/') >= 0 || name.startsWith("@")) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding scoped package " + name + " is not yet supported for bun adds");
+        }
+        if (notEmpty(m.getOptionalDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " pulls in optionalDependencies not yet supported for bun adds");
+        }
+        if (notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " declares peerDependencies not yet supported for bun adds");
+        }
+        String metadata = unsupportedBunMetadata(m);
+        if (metadata != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " carries " + metadata + " metadata not yet supported for bun adds");
+        }
+    }
+
+    private static @Nullable String unsupportedBunMetadata(VersionManifest m) {
+        if (m.getBin() != null) return "bin";
+        if (notEmpty(m.getOs())) return "os";
+        if (notEmpty(m.getCpu())) return "cpu";
+        if (notEmpty(m.getLibc())) return "libc";
+        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
+        if (bool(m.getHasInstallScript())) return "hasInstallScript";
+        return null;
     }
 
     /** The only packages-entry metadata the pnpm add patcher renders is {@code engines}; carry it, drop the rest. */
