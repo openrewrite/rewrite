@@ -132,7 +132,7 @@ public class RewriteRpcProcess extends Thread {
             // parent-side file handle after process termination, preventing deletion
             // of the log file.  Instead we drain stderr in a daemon thread.
             process = pb.start();
-            stderrDrainThread = drainStderr(process, stderrRedirect, stderrTail);
+            stderrDrainThread = drainStderr(process, stderrRedirect, stderrTail, mirrorStderrToConsole());
         } catch (IOException e) {
             // Record the failure so start() can surface it instead of busy-waiting forever
             // on `process == null`. Throwing here would just kill this thread silently.
@@ -140,7 +140,21 @@ public class RewriteRpcProcess extends Thread {
         }
     }
 
-    private static Thread drainStderr(Process process, @Nullable Path stderrRedirect, StderrTail stderrTail) {
+    /**
+     * Opt-in stderr mirroring ({@code REWRITE_RPC_STDERR=console}): forward everything the
+     * subprocess writes to stderr on to the parent's own stderr, on top of the bounded tail
+     * {@link #getLivenessCheck()} always retains. Use when the tail isn't enough — a server
+     * that fails after logging heavily, or one that misbehaves without ever exiting, so
+     * there is no liveness check to attach the tail to. Set it in CI to capture the full
+     * stream without a code change in the repo under test.
+     */
+    private static boolean mirrorStderrToConsole() {
+        String stderrEnv = System.getenv("REWRITE_RPC_STDERR");
+        return stderrEnv != null && "console".equalsIgnoreCase(stderrEnv.trim());
+    }
+
+    private static Thread drainStderr(Process process, @Nullable Path stderrRedirect, StderrTail stderrTail,
+                                      boolean mirrorToConsole) {
         Thread thread = new Thread(() -> {
             byte[] buf = new byte[8192];
             try (InputStream stderr = process.getErrorStream()) {
@@ -150,6 +164,12 @@ public class RewriteRpcProcess extends Thread {
                     int n;
                     while ((n = stderr.read(buf)) != -1) {
                         stderrTail.append(buf, n);
+                        if (mirrorToConsole) {
+                            // Flush per chunk; an unflushed buffer is lost if the JVM is killed,
+                            // which is exactly when this output matters most.
+                            System.err.write(buf, 0, n);
+                            System.err.flush();
+                        }
                         if (out != null) {
                             out.write(buf, 0, n);
                         }

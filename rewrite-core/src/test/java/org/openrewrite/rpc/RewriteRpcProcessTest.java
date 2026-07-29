@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedReader;
@@ -227,6 +228,82 @@ class RewriteRpcProcessTest {
                     .hasMessageNotContaining(OversizeStderrEntryPoint.HEAD);
         } finally {
             process.shutdown();
+        }
+    }
+
+    /**
+     * The retained tail only reaches the caller through {@link RewriteRpcProcess#getLivenessCheck()},
+     * so it is no help when the subprocess logs heavily before dying, or misbehaves without exiting
+     * at all. {@code REWRITE_RPC_STDERR=console} mirrors the whole stream to the parent's stderr,
+     * which is settable in CI without touching the repo under test.
+     */
+    @Test
+    void mirrorsSubprocessStderrToConsoleWhenEnvVarSet() throws Exception {
+        assertThat(runForkedSpawner("console"))
+                .as("REWRITE_RPC_STDERR=console should mirror the subprocess's stderr")
+                .contains(StderrThenExitEntryPoint.MESSAGE);
+    }
+
+    /**
+     * Negative control for {@link #mirrorsSubprocessStderrToConsoleWhenEnvVarSet()} — mirroring is
+     * strictly opt-in, so an unset variable must leave the parent's stderr untouched. Without this
+     * the positive test would still pass if stderr were mirrored unconditionally.
+     */
+    @Test
+    void doesNotMirrorSubprocessStderrByDefault() throws Exception {
+        assertThat(runForkedSpawner(null))
+                .as("stderr mirroring should be opt-in")
+                .doesNotContain(StderrThenExitEntryPoint.MESSAGE);
+    }
+
+    /**
+     * Runs {@link SpawnerEntryPoint} in a forked JVM, optionally with {@code REWRITE_RPC_STDERR}
+     * set, and returns everything that JVM wrote to stdout and stderr.
+     */
+    private static String runForkedSpawner(@Nullable String stderrEnv) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(
+                System.getProperty("java.home") + "/bin/java",
+                "-cp", System.getProperty("java.class.path"),
+                SpawnerEntryPoint.class.getName());
+        if (stderrEnv == null) {
+            pb.environment().remove("REWRITE_RPC_STDERR");
+        } else {
+            pb.environment().put("REWRITE_RPC_STDERR", stderrEnv);
+        }
+        pb.redirectErrorStream(true);
+        Process forked = pb.start();
+
+        StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(forked.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append('\n');
+            }
+        }
+        assertThat(forked.waitFor(30, TimeUnit.SECONDS))
+                .as("forked JVM should exit on its own")
+                .isTrue();
+        return output.toString();
+    }
+
+    /**
+     * Runs in the forked JVM. Spawns {@link StderrThenExitEntryPoint} via
+     * {@link RewriteRpcProcess} and waits for it to exit, so whatever the drain thread
+     * did with its stderr has landed by the time the forked JVM exits.
+     */
+    public static class SpawnerEntryPoint {
+        public static void main(String[] args) throws Exception {
+            RewriteRpcProcess proc = new RewriteRpcProcess(
+                    System.getProperty("java.home") + "/bin/java",
+                    "-cp", System.getProperty("java.class.path"),
+                    StderrThenExitEntryPoint.class.getName());
+            proc.start();
+
+            Field f = RewriteRpcProcess.class.getDeclaredField("process");
+            f.setAccessible(true);
+            ((Process) f.get(proc)).waitFor(20, TimeUnit.SECONDS);
+
+            proc.shutdown();
         }
     }
 
