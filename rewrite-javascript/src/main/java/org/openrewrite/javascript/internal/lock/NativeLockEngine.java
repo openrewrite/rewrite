@@ -214,17 +214,212 @@ public final class NativeLockEngine {
         VersionManifest oldManifest = client.getManifest(registry, name, oldVersion);
         VersionManifest newManifest = client.getManifest(registry, name, targetVersion);
 
-        proveClosureUnchanged(name, oldManifest, newManifest);
+        // Every closure surface but `dependencies` must be unchanged; a `dependencies` delta no longer
+        // fails loud outright — it seeds the Phase B I3 greedy-forward cascade below.
+        proveNonDependencySurfacesUnchanged(name, oldManifest, newManifest);
 
         VersionManifest.Dist dist = newManifest.getDist();
-        return Collections.singletonList(edit
+        LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
                 .newIntegrity(dist == null ? null : dist.getIntegrity())
                 .newShasum(dist == null ? null : dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
                 .writeThroughMetadata(writeThrough(oldManifest, newManifest))
-                .build());
+                .build();
+
+        if (dependenciesEqual(oldManifest, newManifest)) {
+            return Collections.singletonList(rootEdit); // closure unchanged (Phase A whitelist)
+        }
+        if (pm != PackageManager.Npm) {
+            // Only the npm patcher can reshape a changed closure so far; other formats defer.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
+        }
+
+        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
+        edits.add(rootEdit);
+        edits.addAll(cascadeForcedMoves(name, oldManifest, newManifest, existingLock, registries, client));
+        return edits;
+    }
+
+    /**
+     * Phase B increment 3: a direct-dependency bump whose new version's {@code dependencies} edges changed
+     * such that a currently-locked transitive no longer satisfies and must move. It runs the same
+     * greedy-forward, keep-pins contract as the closure add: seed from the bumped dep's changed edges,
+     * resolve each forced transitive over the <b>union of all live constraints</b> on it (substituting the
+     * bumped dep's new constraint for its stale lock entry), and <b>fail loud the instant a move would
+     * reshape</b> — a sibling/reverse-dependent that rejects the new version (union unsatisfiable → npm
+     * would fork/nest), a mover whose own dependencies also change (a second cascade wave / backtrack), a
+     * brand-new transitive the bump introduces (add-during-bump), or a dropped edge (orphan pruning).
+     */
+    private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootOld,
+                                                                    VersionManifest rootNew, String existingLock,
+                                                                    NodeRegistries registries, NpmRegistryClient client) {
+        Map<String, String> oldDeps = rootOld.getDependencies() == null ?
+                Collections.emptyMap() : rootOld.getDependencies();
+        Map<String, String> newDeps = rootNew.getDependencies() == null ?
+                Collections.emptyMap() : rootNew.getDependencies();
+
+        for (String dep : oldDeps.keySet()) {
+            if (!newDeps.containsKey(dep)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
+                        "upgrading " + rootName + " drops the dependency edge to " + dep +
+                                " (orphan pruning) not yet supported");
+            }
+        }
+
+        Map<String, String> topLevel = topLevelVersionsNpm(existingLock);
+        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
+        for (Map.Entry<String, String> e : newDeps.entrySet()) {
+            String dep = e.getKey();
+            String constraint = e.getValue();
+            String cur = topLevel.get(dep);
+            if (cur == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        "upgrading " + rootName + " introduces new transitive " + dep +
+                                " (add-during-bump) not yet supported");
+            }
+            if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        dep + " is constrained by an unresolvable range: " + constraint);
+            }
+            if (!NodeSemver.satisfies(cur, constraint)) {
+                moves.add(resolveForcedMove(rootName, dep, cur, newDeps, existingLock, registries, client));
+            }
+        }
+        return moves;
+    }
+
+    /** Resolve and emit the move of a single forced transitive, failing loud on any reshape. */
+    private static LockEditSet.PackageEdit resolveForcedMove(String rootName, String dep, String oldVersion,
+                                                             Map<String, String> rootNewDeps, String existingLock,
+                                                             NodeRegistries registries, NpmRegistryClient client) {
+        // A transitive that is also directly declared would need its importer declaration reconciled too.
+        if (importerDeclaresNpm(existingLock, dep)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " is directly declared; moving it via cascade is not yet supported");
+        }
+
+        Set<String> union = liveConstraintsNpm(existingLock, dep, rootName, rootNewDeps);
+        NodeRegistry registry = registries.registryFor(dep);
+        Set<String> published = client.getPackument(registry, dep).getVersions();
+        String target = maxSatisfyingAll(published, union);
+        if (target == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    "no single version of " + dep + " satisfies all requirers " + union +
+                            " (npm would fork/nest; deferred)");
+        }
+        if (target.equals(oldVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " resolves back to its locked version under the union; deferred");
+        }
+
+        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
+        VersionManifest newManifest = client.getManifest(registry, dep, target);
+        // A mover must itself be a clean-closure bump; a change to its own edges is a deeper wave.
+        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
+        if (!dependenciesEqual(oldManifest, newManifest)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    "moving " + dep + " to " + target + " changes its own dependencies " +
+                            "(multi-level cascade) not yet supported");
+        }
+
+        VersionManifest.Dist dist = newManifest.getDist();
+        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep,
+                    dep + "@" + target + " has no registry tarball/integrity");
+        }
+        return LockEditSet.PackageEdit.builder()
+                .name(dep)
+                .oldVersion(oldVersion)
+                .newVersion(target)
+                .newResolved(dist.getTarball())
+                .newIntegrity(dist.getIntegrity())
+                .newShasum(dist.getShasum())
+                .newDependencies(newManifest.getDependencies())
+                .newOptionalDependencies(newManifest.getOptionalDependencies())
+                .writeThroughMetadata(writeThrough(oldManifest, newManifest))
+                .scope("dependencies")
+                .importerDir(null)
+                .build();
+    }
+
+    /**
+     * Every recorded constraint on {@code dep} across the lock's installed entries, substituting the
+     * bumped root's <b>new</b> constraint for its stale lock entry. The intersection over this set is the
+     * reverse-edge safety check: if no version satisfies all, npm would fork/nest rather than move.
+     */
+    private static Set<String> liveConstraintsNpm(String lock, String dep, String rootName,
+                                                  Map<String, String> rootNewDeps) {
+        Set<String> constraints = new LinkedHashSet<>();
+        Map<String, Object> root = parseJsonObject(lock, false);
+        Object packages = root.get("packages");
+        if (packages instanceof Map) {
+            String prefix = "node_modules/";
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+                String key = String.valueOf(e.getKey());
+                int nm = key.lastIndexOf(prefix);
+                if (nm < 0 || !(e.getValue() instanceof Map)) {
+                    continue; // importer entries: dep is not importer-declared (guarded above)
+                }
+                if (key.substring(nm + prefix.length()).equals(rootName)) {
+                    continue; // the bumped root: substituted with its new constraint below
+                }
+                Map<?, ?> entry = (Map<?, ?>) e.getValue();
+                addConstraintOn(constraints, entry.get("dependencies"), dep);
+                addConstraintOn(constraints, entry.get("optionalDependencies"), dep);
+                addConstraintOn(constraints, entry.get("peerDependencies"), dep);
+            }
+        }
+        String rootConstraint = rootNewDeps.get(dep);
+        if (rootConstraint != null) {
+            constraints.add(rootConstraint);
+        }
+        return constraints;
+    }
+
+    private static void addConstraintOn(Set<String> constraints, @Nullable Object scopeMap, String dep) {
+        if (scopeMap instanceof Map) {
+            Object c = ((Map<?, ?>) scopeMap).get(dep);
+            if (c instanceof String) {
+                constraints.add((String) c);
+            }
+        }
+    }
+
+    /** The highest published version satisfying every constraint, or {@code null} if none does. */
+    private static @Nullable String maxSatisfyingAll(Set<String> published, Set<String> constraints) {
+        String best = null;
+        for (String candidate : published) {
+            boolean ok = true;
+            for (String c : constraints) {
+                if (!NodeSemver.satisfies(candidate, c)) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok && (best == null || NodeSemver.compare(candidate, best) > 0)) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private static boolean importerDeclaresNpm(String lock, String dep) {
+        Map<String, Object> root = parseJsonObject(lock, false);
+        Object packages = root.get("packages");
+        if (packages instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+                String key = String.valueOf(e.getKey());
+                if (key.contains("node_modules/") || !(e.getValue() instanceof Map)) {
+                    continue; // importer entries only
+                }
+                if (declaredConstraintIn((Map<?, ?>) e.getValue(), dep, DECLARED_SCOPES) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -503,11 +698,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * The strict layout whitelist. The two manifests must agree on every closure-affecting surface;
-     * only the write-through tier (engines/license/deprecated/bin) may differ.
+     * The strict layout whitelist for a bump, minus the {@code dependencies} surface (which I3's cascade
+     * handles). The two manifests must agree on every OTHER closure-affecting surface; only the
+     * write-through tier (engines/license/deprecated/bin) may differ.
      */
-    private static void proveClosureUnchanged(String name, VersionManifest oldM, VersionManifest newM) {
-        requireEqual(name, "dependencies", oldM.getDependencies(), newM.getDependencies());
+    private static void proveNonDependencySurfacesUnchanged(String name, VersionManifest oldM, VersionManifest newM) {
         requireEqual(name, "peerDependencies", oldM.getPeerDependencies(), newM.getPeerDependencies());
         requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
         requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
@@ -519,8 +714,11 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " hasInstallScript changed");
         }
         // Note: peer-provider and dedupe-reshuffle detection require the full hoisting model (Phase B).
-        // The single-locked-version guard plus the dependency-set-unchanged requirement above reject the
-        // common triggers; a full check lands with the hoisting-aware resolver.
+        // The single-locked-version guard plus the cascade's reverse-edge check reject the common triggers.
+    }
+
+    private static boolean dependenciesEqual(VersionManifest oldM, VersionManifest newM) {
+        return Objects.equals(normalize(oldM.getDependencies()), normalize(newM.getDependencies()));
     }
 
     private static void requireEqual(String name, String surface, @Nullable Object a, @Nullable Object b) {

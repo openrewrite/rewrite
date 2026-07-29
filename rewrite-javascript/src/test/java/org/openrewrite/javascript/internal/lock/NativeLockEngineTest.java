@@ -79,7 +79,10 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void closureChangingUpgradeFailsLoud() {
+    void bumpIntroducingNewTransitiveFailsLoud() {
+        // lodash 4.18.0 pulls a brand-new transitive (tslib) not in the lock — a closure add seeded by a
+        // bump (I2+I3), still deferred rather than resolved. A changed edge that MOVES an existing
+        // transitive is the supported I3 cascade (see NpmCascadeLockRegenTest).
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.18.0\":{}}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.20",
@@ -95,8 +98,8 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
-        assertThat(result.getFailure().getDetail()).contains("dependencies changed");
+        assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
+        assertThat(result.getFailure().getDetail()).contains("introduces new transitive");
     }
 
     @Test

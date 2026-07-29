@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -126,6 +127,9 @@ public final class NpmLockPatcher implements LockPatcher {
             entry = setStringField(entry, "resolved", edit.getNewResolved());
             entry = setStringField(entry, "integrity", edit.getNewIntegrity());
             entry = applyWriteThrough(name, entry, edit.getWriteThroughMetadata());
+            // A cascade bump changes the entry's own dependency edge constraints (unchanged edges are
+            // left byte-identical). Edge add/remove reshapes and fails loud.
+            entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies());
             packages = putMember(packages, "node_modules/" + name, entry);
             root = putMember(root, "packages", packages);
         }
@@ -187,8 +191,52 @@ public final class NpmLockPatcher implements LockPatcher {
         entry = setStringField(entry, "version", edit.getNewVersion());
         entry = setStringField(entry, "resolved", edit.getNewResolved());
         entry = setStringField(entry, "integrity", edit.getNewIntegrity());
+        // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them too.
+        entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies());
         legacy = putMember(legacy, name, entry);
         return putMember(root, "dependencies", legacy);
+    }
+
+    /**
+     * Re-pin the constraint values of an entry's {@code dependencies}/{@code requires} map to a moved
+     * version's edges. Only changed values are rewritten (unchanged edges stay byte-identical); an edge
+     * added or removed by the upgrade reshapes the tree and fails loud (deferred).
+     */
+    private Json.JsonObject reconcileConstraintMap(String name, Json.JsonObject entry, String mapKey,
+                                                   @Nullable Map<String, String> newDeps) {
+        if (newDeps == null || newDeps.isEmpty()) {
+            return entry; // no constraint reconciliation requested (Phase A bump / leaf mover)
+        }
+        Json.JsonObject map = getObjectMember(entry, mapKey);
+        if (map == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " gained a " + mapKey + " map on upgrade (not yet supported)");
+        }
+        if (!memberKeys(map).equals(newDeps.keySet())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " added/removed a " + mapKey + " edge on upgrade (not yet supported)");
+        }
+        boolean changed = false;
+        for (Map.Entry<String, String> e : newDeps.entrySet()) {
+            if (!e.getValue().equals(stringField(map, e.getKey()))) {
+                map = setStringField(map, e.getKey(), e.getValue());
+                changed = true;
+            }
+        }
+        return changed ? putMember(entry, mapKey, map) : entry;
+    }
+
+    private static Set<String> memberKeys(Json.JsonObject obj) {
+        Set<String> keys = new LinkedHashSet<>();
+        for (Json member : obj.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = memberKey((Json.Member) member);
+                if (key != null) {
+                    keys.add(key);
+                }
+            }
+        }
+        return keys;
     }
 
     // --- leaf add (Phase B increment 1) ----------------------------------
