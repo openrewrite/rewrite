@@ -787,6 +787,8 @@ public class PackageJsonHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(packageJson.printAll(), capturedLockContent, configFiles);
+        String content = packageJson.printAll(
+                new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        return regen.regenerate(content, capturedLockContent, configFiles);
     }
 }
