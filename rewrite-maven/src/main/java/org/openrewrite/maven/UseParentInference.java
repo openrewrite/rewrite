@@ -33,9 +33,7 @@ public class UseParentInference extends Recipe {
         "This recipe simplifies parent declarations by using the shorthand `<parent/>` form " +
         "when the parent is in the default location (`..`), removing the explicit `<relativePath>`, " +
         "`<groupId>`, `<artifactId>`, and `<version>` elements. Maven automatically infers these " +
-        "values from the parent POM. " +
-        "Note that OpenRewrite's own Maven parser cannot yet read the POMs this recipe produces, so " +
-        "applying it prevents the module from being parsed on subsequent runs until that is addressed.";
+        "values from the parent POM.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
