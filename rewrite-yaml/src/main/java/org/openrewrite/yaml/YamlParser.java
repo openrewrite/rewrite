@@ -447,17 +447,31 @@ public class YamlParser implements org.openrewrite.Parser {
                         }
                         Yaml.Tag tag = null;
                         if (sse.getTag() != null && startBracketPrefix == null) {
-                            String prefixAfterColon = fullPrefix.substring(startIndex);
+                            // When the sequence is not the value of a mapping entry the delimiter found above is the sequence's
+                            // own first dash, which comes after the tag, so the tag search must begin at the start of the prefix
+                            int tagIndex = fullPrefix.indexOf('!');
+                            String prefixAfterColon = fullPrefix.substring(tagIndex != -1 && tagIndex < startIndex ? 0 : startIndex);
                             final int tagStartIndex = prefixAfterColon.indexOf('!');
-                            String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
-                            int i = tagStartIndex;
-                            while (i < prefixAfterColon.length() && !Character.isWhitespace(prefixAfterColon.charAt(i))) {
-                                i++;
+                            if (tagStartIndex != -1) {
+                                String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
+                                int i = tagStartIndex;
+                                while (i < prefixAfterColon.length() && !Character.isWhitespace(prefixAfterColon.charAt(i))) {
+                                    i++;
+                                }
+                                // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
+                                String tagName = prefixAfterColon.substring(tagStartIndex, i);
+                                // Everything between the tag and the first dash of the sequence belongs to the tag's suffix.
+                                // The dash itself is not always included in `fullPrefix`, depending on where SnakeYAML places
+                                // the sequence's end mark, in which case all remaining whitespace is the suffix.
+                                String afterTagName = prefixAfterColon.substring(i);
+                                int dashIndex = commentAwareIndexOf('-', afterTagName);
+                                String tagSuffix = dashIndex == -1 ? afterTagName : afterTagName.substring(0, dashIndex);
+                                tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
+                                // The whitespace preceding the tag is already accounted for by the tag's own prefix. Since the
+                                // sequence's prefix is transferred onto its first entry, which is printed after the tag, retain
+                                // only the part up to and including the delimiter to avoid printing that whitespace twice.
+                                fmt = fmt.substring(0, commentAwareIndexOf(Arrays.asList(':', '-'), fmt) + 1);
                             }
-                            // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
-                            String tagName = prefixAfterColon.substring(tagStartIndex, i);
-                            String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
-                            tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
                         lastEnd = nextLastEnd;
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor, tag));
@@ -586,7 +600,7 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         int startChar = event.getStartMark().getBuffer()[startCharIndex];
         int endChar = event.getEndMark().getBuffer()[endCharIndex];
-        if (startChar == '&') { // anchor
+        if (startChar == '&' || startChar == '!') { // anchor or tag
             return event.getEndMark().getBuffer()[endCharIndex - 1] == '-' && endChar != '-';
         }
         return startChar == '-' && endChar != '-';
