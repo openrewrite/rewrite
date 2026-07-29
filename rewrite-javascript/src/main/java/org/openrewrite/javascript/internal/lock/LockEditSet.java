@@ -108,6 +108,13 @@ public class LockEditSet {
          * rewriting an existing one; {@code oldVersion} is empty. Only a scalar-only leaf is emitted so far.
          */
         boolean added;
+
+        /**
+         * A transitive forced to move by a direct-dependency bump whose changed edges no longer satisfy its
+         * pinned version (Phase B cascade). pnpm keys by resolved version, so the patcher renames the moved
+         * entry and retargets every snapshot reference; other formats update the placement in place.
+         */
+        boolean forcedMove;
     }
 
     /**

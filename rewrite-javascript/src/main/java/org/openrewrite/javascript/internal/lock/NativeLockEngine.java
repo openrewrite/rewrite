@@ -231,14 +231,17 @@ public final class NativeLockEngine {
         if (dependenciesEqual(oldManifest, newManifest)) {
             return Collections.singletonList(rootEdit); // closure unchanged (Phase A whitelist)
         }
-        if (pm != PackageManager.Npm) {
-            // Only the npm patcher can reshape a changed closure so far; other formats defer.
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
-        }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
         edits.add(rootEdit);
-        edits.addAll(cascadeForcedMoves(name, oldManifest, newManifest, existingLock, registries, client));
+        if (pm == PackageManager.Npm) {
+            edits.addAll(cascadeForcedMoves(name, oldManifest, newManifest, existingLock, registries, client));
+        } else if (pm == PackageManager.Pnpm) {
+            edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, oldManifest, newManifest, existingLock, registries, client));
+        } else {
+            // Only the npm and pnpm patchers can reshape a changed closure so far; other formats defer.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
+        }
         return edits;
     }
 
@@ -341,6 +344,7 @@ public final class NativeLockEngine {
                 .writeThroughMetadata(writeThrough(oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
+                .forcedMove(true)
                 .build();
     }
 
@@ -420,6 +424,207 @@ public final class NativeLockEngine {
             }
         }
         return false;
+    }
+
+    /**
+     * Phase B cascade for pnpm: the same greedy-forward, keep-pins contract as {@link #cascadeForcedMoves}
+     * (npm), seeded from the bumped dep's changed {@code dependencies} edges. pnpm's lock records resolved
+     * versions in {@code snapshots.<root>@<v>.dependencies}, not constraints — so the transitive's current
+     * version is read from the bumped root's own snapshot, and the reverse-edge safety is a
+     * <b>single-requirer</b> check (a shared transitive, whose other requirers' ranges are not in the lock,
+     * fails loud rather than risk a fork). The version resolution ({@link #maxSatisfyingAll}) is PM-agnostic;
+     * only the lock reads differ from npm.
+     */
+    private static List<LockEditSet.PackageEdit> cascadeForcedMovesPnpm(String rootName, String rootOldVersion,
+                                                                        VersionManifest rootOld, VersionManifest rootNew,
+                                                                        String existingLock, NodeRegistries registries,
+                                                                        NpmRegistryClient client) {
+        Map<String, String> oldDeps = rootOld.getDependencies() == null ?
+                Collections.emptyMap() : rootOld.getDependencies();
+        Map<String, String> newDeps = rootNew.getDependencies() == null ?
+                Collections.emptyMap() : rootNew.getDependencies();
+
+        for (String dep : oldDeps.keySet()) {
+            if (!newDeps.containsKey(dep)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
+                        "upgrading " + rootName + " drops the dependency edge to " + dep +
+                                " (orphan pruning) not yet supported");
+            }
+        }
+
+        Map<String, String> rootSnapshotDeps = snapshotDependenciesPnpm(existingLock, rootName + "@" + rootOldVersion);
+        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
+        for (Map.Entry<String, String> e : newDeps.entrySet()) {
+            String dep = e.getKey();
+            String constraint = e.getValue();
+            String cur = rootSnapshotDeps.get(dep);
+            if (cur == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        "upgrading " + rootName + " introduces new transitive " + dep +
+                                " (add-during-bump) not yet supported");
+            }
+            if (cur.indexOf('(') >= 0) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        dep + " is resolved with a peer suffix (" + cur + "); resolution required");
+            }
+            if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        dep + " is constrained by an unresolvable range: " + constraint);
+            }
+            if (!NodeSemver.satisfies(cur, constraint)) {
+                moves.add(resolveForcedMovePnpm(rootName, rootOldVersion, dep, cur, constraint,
+                        existingLock, registries, client));
+            }
+        }
+        return moves;
+    }
+
+    private static LockEditSet.PackageEdit resolveForcedMovePnpm(String rootName, String rootOldVersion, String dep,
+                                                                 String oldVersion, String newConstraint,
+                                                                 String existingLock, NodeRegistries registries,
+                                                                 NpmRegistryClient client) {
+        if (importerDeclaresPnpm(existingLock, dep)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " is directly declared; moving it via cascade is not yet supported");
+        }
+        // Reverse-edge safety: pnpm records resolved versions, not ranges, so a shared transitive's other
+        // requirers cannot be proven to accept the new version from the lock alone. Only a transitive private
+        // to the bumped root moves; any other referrer defers (npm would dedupe/fork against that range).
+        Set<String> otherReferrers = referrersPnpm(existingLock, dep, oldVersion, rootName + "@" + rootOldVersion);
+        if (!otherReferrers.isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + "@" + oldVersion + " is shared by " + otherReferrers +
+                            "; the union of its requirers is not recorded in a pnpm lock, so the move defers");
+        }
+
+        NodeRegistry registry = registries.registryFor(dep);
+        Set<String> published = client.getPackument(registry, dep).getVersions();
+        String target = maxSatisfyingAll(published, Collections.singleton(newConstraint));
+        if (target == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    "no single version of " + dep + " satisfies " + newConstraint + " (deferred)");
+        }
+        if (target.equals(oldVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " resolves back to its locked version under the new constraint; deferred");
+        }
+
+        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
+        VersionManifest newManifest = client.getManifest(registry, dep, target);
+        // A mover must itself be a clean-closure bump; a change to its own edges is a deeper wave.
+        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
+        if (notEmpty(newManifest.getPeerDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " declares peerDependencies (pnpm suffix keys) not yet supported for cascade moves");
+        }
+        if (!dependenciesEqual(oldManifest, newManifest)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    "moving " + dep + " to " + target + " changes its own dependencies " +
+                            "(multi-level cascade) not yet supported");
+        }
+
+        VersionManifest.Dist dist = newManifest.getDist();
+        if (dist == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep, dep + "@" + target + " has no registry integrity");
+        }
+        return LockEditSet.PackageEdit.builder()
+                .name(dep)
+                .oldVersion(oldVersion)
+                .newVersion(target)
+                .newIntegrity(dist.getIntegrity())
+                .newDependencies(newManifest.getDependencies())
+                .writeThroughMetadata(writeThrough(oldManifest, newManifest))
+                .scope("dependencies")
+                .importerDir(null)
+                .forcedMove(true)
+                .build();
+    }
+
+    /** The resolved versions the given pnpm snapshot depends on (its {@code dependencies} map values). */
+    private static Map<String, String> snapshotDependenciesPnpm(String lock, String snapshotKey) {
+        Map<String, String> out = new LinkedHashMap<>();
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return out;
+        }
+        Object snapshots = ((Map<?, ?>) loaded).get("snapshots");
+        if (!(snapshots instanceof Map)) {
+            return out;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) snapshots).entrySet()) {
+            if (!stripPnpmKey(String.valueOf(e.getKey())).equals(snapshotKey) || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> body = (Map<?, ?>) e.getValue();
+            for (String scope : Arrays.asList("dependencies", "optionalDependencies")) {
+                Object deps = body.get(scope);
+                if (deps instanceof Map) {
+                    for (Map.Entry<?, ?> d : ((Map<?, ?>) deps).entrySet()) {
+                        out.putIfAbsent(String.valueOf(d.getKey()), String.valueOf(d.getValue()));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static boolean importerDeclaresPnpm(String lock, String dep) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return false;
+        }
+        Object importers = ((Map<?, ?>) loaded).get("importers");
+        List<Object> roots = new ArrayList<>();
+        if (importers instanceof Map) {
+            roots.addAll(((Map<?, ?>) importers).values());
+        } else {
+            roots.add(loaded); // single-package v6: the root mapping is the sole importer
+        }
+        for (Object importer : roots) {
+            if (!(importer instanceof Map)) {
+                continue;
+            }
+            for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies")) {
+                Object deps = ((Map<?, ?>) importer).get(scope);
+                if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** The snapshot keys — other than {@code ownerKey} — that reference {@code dep@oldVersion} as a resolved dep. */
+    private static Set<String> referrersPnpm(String lock, String dep, String oldVersion, String ownerKey) {
+        Set<String> referrers = new LinkedHashSet<>();
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return referrers;
+        }
+        Object snapshots = ((Map<?, ?>) loaded).get("snapshots");
+        if (!(snapshots instanceof Map)) {
+            return referrers;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) snapshots).entrySet()) {
+            String key = stripPnpmKey(String.valueOf(e.getKey()));
+            if (key.equals(ownerKey) || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> body = (Map<?, ?>) e.getValue();
+            for (String scope : Arrays.asList("dependencies", "optionalDependencies")) {
+                Object deps = body.get(scope);
+                if (deps instanceof Map) {
+                    Object v = ((Map<?, ?>) deps).get(dep);
+                    if (v != null) {
+                        String vs = String.valueOf(v);
+                        if (vs.equals(oldVersion) || vs.startsWith(oldVersion + "(")) {
+                            referrers.add(key);
+                        }
+                    }
+                }
+            }
+        }
+        return referrers;
     }
 
     /**

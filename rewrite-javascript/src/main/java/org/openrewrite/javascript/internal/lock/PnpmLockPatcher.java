@@ -96,6 +96,10 @@ public final class PnpmLockPatcher implements LockPatcher {
                 root = applyAdd(root, edit, major, newConstraints, addedVersions);
                 continue;
             }
+            if (edit.isForcedMove()) {
+                root = applyForcedMove(root, edit, major);
+                continue;
+            }
             preCheck(root, edit, major);
             root = applyEdit(root, edit, major, newConstraints);
             anyRemoval |= edit.getNewVersion() == null;
@@ -398,6 +402,68 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     edit.getName() + " " + changed + " metadata changed; native write-through is not supported for pnpm");
         }
+    }
+
+    // --- cascade move (Phase B) ------------------------------------------
+
+    /**
+     * Apply a transitive forced to move by a direct-dependency bump (v9 only). pnpm keys by resolved version
+     * and records references as resolved versions, so the move is: rename {@code packages.<dep>@<old>} and
+     * {@code snapshots.<dep>@<old>} to {@code @<new>} (new integrity/engines), then retarget every snapshot's
+     * {@code dependencies.<dep>: <old>} to {@code <new>}. The engine has already proven the move is private to
+     * the bumped root and closure-clean, so no importer edge and no other package needs reconciling.
+     */
+    private Yaml.Mapping applyForcedMove(Yaml.Mapping root, PackageEdit edit, int major) {
+        if (major < 9) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "a pnpm cascade move below lockfileVersion 9 is not yet supported");
+        }
+        requireSupportedWriteThrough(edit);
+        root = patchPackages(root, edit, major, false);
+        root = patchSnapshots(root, edit, false);
+        return retargetSnapshotReferences(root, edit.getName(), edit.getOldVersion(), edit.getNewVersion());
+    }
+
+    /** Rewrite every snapshot's resolved reference to {@code dep@oldVersion} so it points at {@code newVersion}. */
+    private Yaml.Mapping retargetSnapshotReferences(Yaml.Mapping root, String dep, String oldVersion, String newVersion) {
+        Yaml.Mapping snapshots = section(root, "snapshots");
+        if (snapshots == null) {
+            return root;
+        }
+        List<Yaml.Mapping.Entry> entries = new ArrayList<>(snapshots.getEntries());
+        boolean changed = false;
+        for (int i = 0; i < entries.size(); i++) {
+            Yaml.Mapping.Entry entry = entries.get(i);
+            if (!(entry.getValue() instanceof Yaml.Mapping)) {
+                continue;
+            }
+            Yaml.Mapping body = (Yaml.Mapping) entry.getValue();
+            Yaml.Mapping retargeted = retargetDepReference(body, dep, oldVersion, newVersion);
+            if (retargeted != body) {
+                entries.set(i, entry.withValue(retargeted));
+                changed = true;
+            }
+        }
+        return changed ? replaceEntryValue(root, "snapshots", snapshots.withEntries(entries)) : root;
+    }
+
+    private Yaml.Mapping retargetDepReference(Yaml.Mapping body, String dep, String oldVersion, String newVersion) {
+        Yaml.Mapping result = body;
+        for (String scope : Arrays.asList("dependencies", "optionalDependencies")) {
+            Yaml.Mapping.Entry scopeEntry = findEntry(result, scope);
+            if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
+                continue;
+            }
+            Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
+            Yaml.Mapping.Entry ref = findEntry(deps, dep);
+            if (ref == null || !(ref.getValue() instanceof Yaml.Scalar) ||
+                    !oldVersion.equals(((Yaml.Scalar) ref.getValue()).getValue())) {
+                continue;
+            }
+            Yaml.Mapping patchedDeps = setScalar(deps, dep, newVersion);
+            result = replaceEntryValue(result, scope, patchedDeps);
+        }
+        return result;
     }
 
     // --- leaf / clean-closure add (Phase B increment 4) ------------------

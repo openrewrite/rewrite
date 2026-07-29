@@ -1,0 +1,7 @@
+{
+  "name": "pnpm-cascade-v9",
+  "version": "1.0.0",
+  "dependencies": {
+    "debug": "^3.0.0"
+  }
+}
