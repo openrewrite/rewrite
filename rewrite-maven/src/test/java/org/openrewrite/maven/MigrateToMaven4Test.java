@@ -127,7 +127,7 @@ class MigrateToMaven4Test implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <version>3.11.0</version>
                           </plugin>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
@@ -300,7 +300,7 @@ class MigrateToMaven4Test implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <version>3.13.0</version>
                           </plugin>
                       </plugins>
                   </build>
