@@ -268,6 +268,8 @@ public final class NpmLockPatcher implements LockPatcher {
             addMetadataField(fields, "engines", wt.getEngines(), keyIndent, unit);
             addMetadataField(fields, "bin", wt.getBin(), keyIndent, unit);
             addMetadataField(fields, "funding", wt.getFunding(), keyIndent, unit);
+            addMetadataField(fields, "peerDependencies", wt.getPeerDependencies(), keyIndent, unit);
+            addMetadataField(fields, "peerDependenciesMeta", wt.getPeerDependenciesMeta(), keyIndent, unit);
         }
         // A closure member records its dependency edges as constraints (the resolved versions live
         // implicitly via placement); npm keeps them under the entry's `dependencies` map.

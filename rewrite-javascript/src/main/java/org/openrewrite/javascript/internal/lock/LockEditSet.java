@@ -147,5 +147,13 @@ public class LockEditSet {
         /** {@code funding} node, already normalized by the engine to npm's object form ({@code {url: ...}}). */
         @Nullable
         JsonNode funding;
+
+        /** A closure member's {@code peerDependencies} map, copied verbatim into the lock entry (object group). */
+        @Nullable
+        Map<String, String> peerDependencies;
+
+        /** Raw {@code peerDependenciesMeta} node ({@code {name: {optional: bool}}}), copied verbatim (object group). */
+        @Nullable
+        JsonNode peerDependenciesMeta;
     }
 }

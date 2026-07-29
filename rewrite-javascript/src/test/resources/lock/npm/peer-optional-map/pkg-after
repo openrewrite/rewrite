@@ -1,0 +1,8 @@
+{
+  "name": "peer-rollup-utils",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-number": "^6.0.0",
+    "@rollup/pluginutils": "^5.4.0"
+  }
+}

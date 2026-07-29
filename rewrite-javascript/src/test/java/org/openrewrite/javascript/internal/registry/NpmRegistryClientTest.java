@@ -91,7 +91,7 @@ class NpmRegistryClientTest {
         assertThat(manifest.getDependencies()).containsEntry("a", "^1.0.0");
         assertThat(manifest.getOptionalDependencies()).containsEntry("b", "^2.0.0");
         assertThat(manifest.getPeerDependencies()).containsEntry("react", ">=17");
-        assertThat(manifest.getPeerDependenciesMeta().get("react").getOptional()).isTrue();
+        assertThat(manifest.getPeerDependenciesMeta().get("react").get("optional").asBoolean()).isTrue();
         assertThat(manifest.getOs()).containsExactly("linux");
         assertThat(manifest.getCpu()).containsExactly("x64");
         assertThat(manifest.getEngines()).containsEntry("node", ">=18");

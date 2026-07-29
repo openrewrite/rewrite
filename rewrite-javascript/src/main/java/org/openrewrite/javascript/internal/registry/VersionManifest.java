@@ -50,8 +50,9 @@ public class VersionManifest {
     @Nullable
     Map<String, String> peerDependencies;
 
+    /** Raw {@code peerDependenciesMeta} node ({@code {name: {optional: bool}}}); npm copies it verbatim into the lock entry. */
     @Nullable
-    Map<String, PeerMeta> peerDependenciesMeta;
+    JsonNode peerDependenciesMeta;
 
     /**
      * Raw {@code bin} node: a String or a {@code {name: path}} object.
@@ -116,11 +117,5 @@ public class VersionManifest {
 
         @Nullable
         String integrity;
-    }
-
-    @Value
-    public static class PeerMeta {
-        @Nullable
-        Boolean optional;
     }
 }

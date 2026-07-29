@@ -210,16 +210,9 @@ public class NpmRegistryClient {
                     text(distNode, "integrity"));
         }
 
-        Map<String, VersionManifest.PeerMeta> peerMeta = null;
         JsonNode peerMetaNode = root.get("peerDependenciesMeta");
-        if (peerMetaNode != null && peerMetaNode.isObject()) {
-            peerMeta = new LinkedHashMap<>();
-            for (Iterator<Map.Entry<String, JsonNode>> it = peerMetaNode.fields(); it.hasNext(); ) {
-                Map.Entry<String, JsonNode> entry = it.next();
-                JsonNode optional = entry.getValue().get("optional");
-                peerMeta.put(entry.getKey(),
-                        new VersionManifest.PeerMeta(optional == null ? null : optional.asBoolean()));
-            }
+        if (peerMetaNode != null && !peerMetaNode.isObject()) {
+            peerMetaNode = null;
         }
 
         Map<String, String> scripts = stringMap(root.get("scripts"));
@@ -238,7 +231,7 @@ public class NpmRegistryClient {
                 stringMap(root.get("dependencies")),
                 stringMap(root.get("optionalDependencies")),
                 stringMap(root.get("peerDependencies")),
-                peerMeta,
+                peerMetaNode,
                 root.get("bin"),
                 stringMap(root.get("engines")),
                 stringList(root.get("os")),

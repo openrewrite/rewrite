@@ -24,6 +24,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
@@ -132,6 +133,56 @@ class NpmClosureAddLockRegenTest {
                 new String[][]{{"supports-color", "7.2.0"}, {"has-flag", "4.0.0"}});
     }
 
+    // --- peer dependencies (optional peers skip, non-optional defers) -----
+
+    @Test
+    void optionalPeerSkippedV3() {
+        // debug's only peer (supports-color) is optional -> not installed; the entry records
+        // peerDependenciesMeta verbatim. The regular dep ms hoists top-level.
+        assertClosureByteExact("lock/npm/peer-optional",
+                new String[][]{{"debug", "4.4.3"}, {"ms", "2.1.3"}});
+    }
+
+    @Test
+    void optionalPeerSkippedV2() {
+        // The same optional-peer add into a lockfileVersion 2 lock: the packages entry records
+        // peerDependenciesMeta; the legacy `dependencies` tree stays minimal (no peer fields).
+        assertClosureByteExact("lock/npm/peer-optional-v2",
+                new String[][]{{"debug", "4.4.3"}, {"ms", "2.1.3"}});
+    }
+
+    @Test
+    void optionalPeerWithDeclaredMapV3() {
+        // @rollup/pluginutils declares a real peerDependencies map (rollup) marked optional -> rollup is
+        // skipped, both peerDependencies + peerDependenciesMeta record verbatim (object group, after engines),
+        // and the regular closure (scoped @types/estree, estree-walker, picomatch) hoists top-level.
+        assertClosureByteExact("lock/npm/peer-optional-map",
+                new String[][]{{"@rollup/pluginutils", "5.4.0"}, {"@types/estree", "1.0.9"},
+                        {"estree-walker", "2.0.2"}, {"picomatch", "4.0.5"}});
+    }
+
+    @Test
+    void nonOptionalPeerFailsLoud() {
+        // A non-optional peer npm auto-installs (placed top-level with a `peer: true` marker whose
+        // reachability propagation needs the full hoisting model) is deferred rather than guessed.
+        routes.put(REG + "has-peer", "{\"name\":\"has-peer\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put(REG + "has-peer/1.0.0",
+                "{\"name\":\"has-peer\",\"version\":\"1.0.0\",\"dependencies\":{}," +
+                        "\"peerDependencies\":{\"react\":\">=17\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/has-peer/-/has-peer-1.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-PEER\"}}");
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}",
+                "{\"dependencies\":{}}",
+                "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}",
+                null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("non-optional peerDependencies").contains("react");
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the engine output equals {@code dir/after} byte-for-byte.
      * Each {@code {name, version}} maps to two recorded routes: {@code http/<name>} (packument) and
@@ -139,8 +190,11 @@ class NpmClosureAddLockRegenTest {
      */
     private void assertClosureByteExact(String dir, String[][] packages) {
         for (String[] pkg : packages) {
-            routes.put(REG + pkg[0], resource(dir + "/http/" + pkg[0]));
-            routes.put(REG + pkg[0] + "/" + pkg[1], resource(dir + "/http/" + pkg[0] + "-" + pkg[1]));
+            // The registry client URL-encodes a scope slash (@scope/name -> @scope%2Fname); the resource
+            // path keeps the literal slash (a nested http/@scope/ directory).
+            String route = REG + pkg[0].replace("/", "%2F");
+            routes.put(route, resource(dir + "/http/" + pkg[0]));
+            routes.put(route + "/" + pkg[1], resource(dir + "/http/" + pkg[0] + "-" + pkg[1]));
         }
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
                 resource(dir + "/pkg-after"),
@@ -165,6 +219,9 @@ class NpmClosureAddLockRegenTest {
                 {"lock/npm/closure-deep", "3"},
                 {"lock/npm/closure-dedup", "3"},
                 {"lock/npm/closure-dev", "3"},
+                {"lock/npm/peer-optional", "3"},
+                {"lock/npm/peer-optional-v2", "2"},
+                {"lock/npm/peer-optional-map", "3"},
         };
         for (String[] fixture : fixtures) {
             assertNpmReproduces(fixture[0] + "/pkg-before", fixture[0] + "/before", fixture[1]);

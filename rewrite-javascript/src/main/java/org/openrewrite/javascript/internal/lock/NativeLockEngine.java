@@ -387,20 +387,26 @@ public final class NativeLockEngine {
      * are handled (walked + recorded as the entry's dependency map / v2 {@code requires}); the byte-exact
      * metadata tier — the scalar {@code dev}/{@code deprecated}/{@code license}/{@code hasInstallScript},
      * the {@code os}/{@code cpu}/{@code libc} arrays, an {@code engines} object, an object-form {@code bin},
-     * and a string-form {@code funding} — is written through. Surfaces whose closure effect or npm
-     * serialization is not yet verified — {@code optionalDependencies} (installed + {@code optional}-marked),
-     * {@code peerDependencies}/{@code peerDependenciesMeta} (npm 7 peer auto-install), a string {@code bin}
-     * or non-string {@code funding} npm reshapes, or bundled/shrinkwrap/accept/workspaces — fail loud
-     * (exhaustive-or-fail) rather than emit a maybe-wrong entry.
+     * a string-form {@code funding}, and now the {@code peerDependencies}/{@code peerDependenciesMeta} maps
+     * (recorded verbatim) — is written through.
+     * <p>
+     * A peer marked optional (via {@code peerDependenciesMeta[x].optional}) is <b>skipped</b>: npm does not
+     * auto-install it, so the closure walk never enqueues it; the entry still records the maps verbatim.
+     * A <b>non-optional</b> peer npm auto-installs (placed top-level with a {@code peer: true} marker whose
+     * reachability propagation needs the full hoisting model) fails loud — the I5-adjacent boundary. So do
+     * {@code optionalDependencies} (installed + {@code optional}-marked), a string {@code bin} or non-string
+     * {@code funding} npm reshapes, or bundled/shrinkwrap/accept/workspaces (exhaustive-or-fail).
      */
     private static void requireEmittableClosureMember(String name, VersionManifest m) {
         if (notEmpty(m.getOptionalDependencies())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     "adding " + name + " pulls in optionalDependencies not yet supported for native adds");
         }
-        if (notEmpty(m.getPeerDependencies())) {
+        Set<String> autoInstalled = nonOptionalPeers(m);
+        if (!autoInstalled.isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " declares peerDependencies (peer auto-install) not yet supported for native adds");
+                    "adding " + name + " declares non-optional peerDependencies " + autoInstalled +
+                            " (peer auto-install) not yet supported for native adds");
         }
         String metadata = unserializableMetadata(m);
         if (metadata != null) {
@@ -409,12 +415,28 @@ public final class NativeLockEngine {
         }
     }
 
+    /** The peers npm would auto-install: declared in {@code peerDependencies} and not marked optional. */
+    private static Set<String> nonOptionalPeers(VersionManifest m) {
+        Map<String, String> peers = m.getPeerDependencies();
+        if (peers == null || peers.isEmpty()) {
+            return Collections.emptySet();
+        }
+        JsonNode meta = m.getPeerDependenciesMeta();
+        Set<String> result = new LinkedHashSet<>();
+        for (String peer : peers.keySet()) {
+            JsonNode entry = meta == null ? null : meta.get(peer);
+            if (entry == null || !entry.path("optional").asBoolean(false)) {
+                result.add(peer);
+            }
+        }
+        return result;
+    }
+
     /** The metadata surfaces whose byte-exact npm serialization is not yet verified; each defers the add. */
     private static @Nullable String unserializableMetadata(VersionManifest m) {
         if (m.getBin() != null && !m.getBin().isObject()) return "non-object bin";
         if (m.getFunding() != null && !m.getFunding().isTextual()) return "non-string funding";
         if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
-        if (notEmpty(m.getPeerDependenciesMeta())) return "peerDependenciesMeta";
         if (bool(m.getHasShrinkwrap())) return "hasShrinkwrap";
         if (notEmpty(m.getAcceptDependencies())) return "acceptDependencies";
         if (m.getWorkspaces() != null) return "workspaces";
@@ -422,9 +444,10 @@ public final class NativeLockEngine {
     }
 
     private static LockEditSet.@Nullable WriteThroughMetadata leafMetadata(VersionManifest m) {
+        boolean peers = notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta());
         boolean any = m.getLicenseString() != null || m.getDeprecated() != null || notEmpty(m.getEngines()) ||
                 notEmpty(m.getOs()) || notEmpty(m.getCpu()) || notEmpty(m.getLibc()) ||
-                bool(m.getHasInstallScript()) || m.getBin() != null || m.getFunding() != null;
+                bool(m.getHasInstallScript()) || m.getBin() != null || m.getFunding() != null || peers;
         if (!any) {
             return null;
         }
@@ -438,7 +461,13 @@ public final class NativeLockEngine {
                 .hasInstallScript(bool(m.getHasInstallScript()) ? Boolean.TRUE : null)
                 .bin(m.getBin())
                 .funding(normalizeFunding(m.getFunding()))
+                .peerDependencies(notEmpty(m.getPeerDependencies()) ? m.getPeerDependencies() : null)
+                .peerDependenciesMeta(nonEmptyObject(m.getPeerDependenciesMeta()) ? m.getPeerDependenciesMeta() : null)
                 .build();
+    }
+
+    private static boolean nonEmptyObject(@Nullable JsonNode node) {
+        return node != null && node.isObject() && node.size() > 0;
     }
 
     /** npm records a string {@code funding} as {@code {url: <string>}}; object/array forms are gated out upstream. */
@@ -1029,6 +1058,9 @@ public final class NativeLockEngine {
             return null;
         }
         if (value instanceof List && ((List<?>) value).isEmpty()) {
+            return null;
+        }
+        if (value instanceof JsonNode && ((JsonNode) value).isEmpty()) {
             return null;
         }
         return value;

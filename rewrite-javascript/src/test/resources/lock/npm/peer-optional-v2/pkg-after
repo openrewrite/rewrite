@@ -1,0 +1,8 @@
+{
+  "name": "peer-debug-v3",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-number": "^6.0.0",
+    "debug": "^4.3.4"
+  }
+}
