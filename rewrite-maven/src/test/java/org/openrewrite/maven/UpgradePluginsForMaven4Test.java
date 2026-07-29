@@ -17,9 +17,15 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.semver.Semver;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradePluginsForMaven4Test implements RewriteTest {
@@ -29,9 +35,23 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
         spec.recipeFromResource("/META-INF/rewrite/maven.yml", "org.openrewrite.maven.UpgradePluginsForMaven4");
     }
 
+    /**
+     * The selected version tracks the latest release, so tests capture whatever was chosen and assert only that it
+     * satisfies the range the recipe asks for.
+     */
+    private static String selectedVersion(String actual, String regex, String expectedRange) {
+        Matcher matcher = Pattern.compile(regex).matcher(actual);
+        assertThat(matcher.find()).as("no version matched %s in:%n%s", regex, actual).isTrue();
+        String version = matcher.group(1);
+        assertThat(requireNonNull(Semver.validate(expectedRange, null).getValue()).isValid(null, version))
+          .as("%s does not satisfy %s", version, expectedRange)
+          .isTrue();
+        return version;
+    }
+
     @DocumentExample
     @Test
-    void upgradeIncompatiblePluginToLowestWorkingVersion() {
+    void upgradeIncompatiblePlugin() {
         rewriteRun(
           pomXml(
             """
@@ -46,16 +66,11 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                               <artifactId>maven-compiler-plugin</artifactId>
                               <version>3.8.1</version>
                           </plugin>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-shade-plugin</artifactId>
-                              <version>3.2.4</version>
-                          </plugin>
                       </plugins>
                   </build>
               </project>
               """,
-            """
+            spec -> spec.after(actual -> """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>app</artifactId>
@@ -65,23 +80,18 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.11.0</version>
-                          </plugin>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-shade-plugin</artifactId>
-                              <version>3.5.0</version>
+                              <version>%s</version>
                           </plugin>
                       </plugins>
                   </build>
               </project>
-              """
+              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "[3.11.0,)")))
           )
         );
     }
 
     @Test
-    void retainVersionAlreadyAboveTheMinimum() {
+    void upgradePluginAlreadyAtTheFloorToTheLatestRelease() {
         rewriteRun(
           pomXml(
             """
@@ -94,12 +104,28 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.14.0</version>
+                              <version>3.11.0</version>
                           </plugin>
                       </plugins>
                   </build>
               </project>
-              """
+              """,
+            spec -> spec.after(actual -> """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>%s</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "(3.11.0,)")))
           )
         );
     }
@@ -149,7 +175,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+            spec -> spec.after(actual -> """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>app</artifactId>
@@ -160,13 +186,13 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                               <plugin>
                                   <groupId>org.apache.maven.plugins</groupId>
                                   <artifactId>maven-surefire-plugin</artifactId>
-                                  <version>3.5.2</version>
+                                  <version>%s</version>
                               </plugin>
                           </plugins>
                       </pluginManagement>
                   </build>
               </project>
-              """
+              """.formatted(selectedVersion(actual, "<version>(3\\.\\d+\\.\\d+)</version>", "[3.5.2,)")))
           )
         );
     }
@@ -194,13 +220,13 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+            spec -> spec.after(actual -> """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>app</artifactId>
                   <version>1.0.0</version>
                   <properties>
-                      <enforcer.version>3.5.0</enforcer.version>
+                      <enforcer.version>%s</enforcer.version>
                   </properties>
                   <build>
                       <plugins>
@@ -212,7 +238,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                       </plugins>
                   </build>
               </project>
-              """
+              """.formatted(selectedVersion(actual, "<enforcer.version>(3\\.\\d+\\.\\d+)</enforcer.version>", "[3.5.0,)")))
           )
         );
     }
@@ -237,7 +263,7 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+            spec -> spec.after(actual -> """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>app</artifactId>
@@ -247,7 +273,71 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
                           <plugin>
                               <groupId>net.alchim31.maven</groupId>
                               <artifactId>scala-maven-plugin</artifactId>
-                              <version>4.9.5</version>
+                              <version>%s</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """.formatted(selectedVersion(actual, "<version>(4\\.\\d+\\.\\d+)</version>", "[4.9.5,)")))
+          )
+        );
+    }
+
+    @Test
+    void upgradeQuarkusPluginOnlyToItsFloor() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-maven-plugin</artifactId>
+                              <version>3.20.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-maven-plugin</artifactId>
+                              <version>3.26.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainQuarkusPluginAboveItsFloor() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-maven-plugin</artifactId>
+                              <version>3.28.0</version>
                           </plugin>
                       </plugins>
                   </build>
