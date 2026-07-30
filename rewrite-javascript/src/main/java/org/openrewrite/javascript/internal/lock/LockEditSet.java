@@ -115,6 +115,15 @@ public class LockEditSet {
          * entry and retargets every snapshot reference; other formats update the placement in place.
          */
         boolean forcedMove;
+
+        /**
+         * The dependent package a second, nested copy of this package is placed under (Phase B I5). A direct
+         * bump takes the top-level slot; a reverse-dependent whose recorded constraint excludes the new version
+         * keeps the old version nested at {@code node_modules/<nestedUnder>/node_modules/<name>} (v2 also under
+         * the legacy tree). The patcher relocates the pre-edit entry byte-for-byte — {@code oldVersion} names it.
+         */
+        @Nullable
+        String nestedUnder;
     }
 
     /**

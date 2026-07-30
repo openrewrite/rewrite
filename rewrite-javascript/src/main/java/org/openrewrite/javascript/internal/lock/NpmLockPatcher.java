@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -27,6 +28,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
 import org.openrewrite.json.JsonParser;
+import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -88,8 +90,24 @@ public final class NpmLockPatcher implements LockPatcher {
 
         JsonNode editedManifest = parseManifest(edits.getEditedPackageJson());
 
+        // Nests relocate the pre-edit entries they copy, so they run before the bumps mutate those entries.
+        // The v2 legacy nested tree is captured now but inserted after the bumps, so the bump's own fork
+        // guard (applyLegacyTree) still sees a flat legacy tree.
+        List<LegacyNest> legacyNests = new ArrayList<>();
+        for (PackageEdit edit : edits.getEdits()) {
+            if (edit.getNestedUnder() != null) {
+                if (lockfileVersion == 2) {
+                    legacyNests.add(captureLegacyNest(root, edit));
+                }
+                root = relocatePackagesEntry(root, edit);
+            }
+        }
+
         List<PackageEdit> removals = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
+            if (edit.getNestedUnder() != null) {
+                continue;
+            }
             if (edit.getNewVersion() == null) {
                 removals.add(edit);
                 continue;
@@ -102,6 +120,9 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         if (!removals.isEmpty()) {
             root = applyRemovals(root, lockfileVersion, removals);
+        }
+        for (LegacyNest nest : legacyNests) {
+            root = insertLegacyNest(root, nest);
         }
 
         return doc.withValue(root).printAll();
@@ -465,6 +486,110 @@ public final class NpmLockPatcher implements LockPatcher {
         String entryText = "{" + String.join(",", fields) + closeWs + "}";
         legacy = graftSorted(legacy, edit.getName(), entryText, true);
         return putMember(root, "dependencies", legacy);
+    }
+
+    // --- reverse-dependent nest (Phase B I5) -----------------------------
+
+    /**
+     * Relocate the pre-edit {@code node_modules/<name>} entry to {@code node_modules/<dependent>/node_modules/
+     * <name>} byte-for-byte — npm nests the old version there when the top-level slot goes to the new one. The
+     * value sits at the same depth, so its bytes are reused verbatim; only the key and sort position change.
+     */
+    private Json.JsonObject relocatePackagesEntry(Json.JsonObject root, PackageEdit edit) {
+        String name = edit.getName();
+        Json.JsonObject packages = requirePackages(root);
+        Json.Member top = getMember(packages, "node_modules/" + name);
+        if (top == null || !(top.getValue() instanceof Json.JsonObject)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no node_modules/" + name + " entry to nest");
+        }
+        String nestedKey = "node_modules/" + edit.getNestedUnder() + "/node_modules/" + name;
+        if (getMember(packages, nestedKey) != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, nestedKey + " already present (fork exists)");
+        }
+        packages = graftSorted(packages, nestedKey, objectSource(top.getValue()), true);
+        return putMember(root, "packages", packages);
+    }
+
+    /** A member value printed as source with its leading prefix stripped, ready to re-graft under a fresh key. */
+    private static String objectSource(JsonValue value) {
+        String printed = value.print(new JsonPrinter<Integer>());
+        int i = 0;
+        while (i < printed.length() && Character.isWhitespace(printed.charAt(i))) {
+            i++;
+        }
+        return printed.substring(i);
+    }
+
+    /**
+     * Insert the v2 legacy nested entry {@code dependencies.<dependent>.dependencies.<name>} (minimal
+     * {@code version}/{@code resolved}/{@code integrity}) at its deeper indentation. Captured from the pre-bump
+     * top-level legacy entry so it holds the old version even though it lands after the bump has moved it.
+     */
+    private LegacyNest captureLegacyNest(Json.JsonObject root, PackageEdit edit) {
+        Json.JsonObject legacy = getObjectMember(root, "dependencies");
+        Json.JsonObject entry = legacy == null ? null : getObjectMember(legacy, edit.getName());
+        if (entry == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "no legacy dependencies entry to nest for " + edit.getName());
+        }
+        String version = stringField(entry, "version");
+        String resolved = stringField(entry, "resolved");
+        String integrity = stringField(entry, "integrity");
+        if (version == null || resolved == null || integrity == null ||
+                !LEGACY_MINIMAL_KEYS.containsAll(memberKeys(entry))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    edit.getName() + " legacy entry is not a minimal version/resolved/integrity leaf; nesting deferred");
+        }
+        return new LegacyNest(edit.getNestedUnder(), edit.getName(), version, resolved, integrity);
+    }
+
+    private Json.JsonObject insertLegacyNest(Json.JsonObject root, LegacyNest nest) {
+        Json.JsonObject legacy = getObjectMember(root, "dependencies");
+        Json.JsonObject dependent = legacy == null ? null : getObjectMember(legacy, nest.dependent);
+        if (dependent == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.name,
+                    "no legacy entry for " + nest.dependent + " to nest under");
+        }
+        if (getObjectMember(dependent, "dependencies") != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.name,
+                    nest.dependent + " already has a nested legacy dependencies tree; merge not yet supported");
+        }
+        String fieldWs = nestedMemberWhitespace(legacy);
+        String closeWs = memberWhitespace(legacy);
+        if (fieldWs == null || closeWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, nest.name, "cannot derive legacy nest indentation");
+        }
+        String keyIndent = indentOf(fieldWs);
+        String unit = keyIndent.length() > indentOf(closeWs).length() ?
+                keyIndent.substring(indentOf(closeWs).length()) : "  ";
+        ObjectNode child = JSON.createObjectNode();
+        ObjectNode inner = child.putObject(nest.name);
+        inner.put("version", nest.version);
+        inner.put("resolved", nest.resolved);
+        inner.put("integrity", nest.integrity);
+        dependent = graftSorted(dependent, "dependencies", renderNode(child, keyIndent, unit), true);
+        legacy = putMember(legacy, nest.dependent, dependent);
+        return putMember(root, "dependencies", legacy);
+    }
+
+    private static final Set<String> LEGACY_MINIMAL_KEYS =
+            new LinkedHashSet<>(Arrays.asList("version", "resolved", "integrity"));
+
+    /** The captured old-version values for a v2 legacy nested entry, rendered after the bump moves its sibling. */
+    private static final class LegacyNest {
+        final String dependent;
+        final String name;
+        final String version;
+        final String resolved;
+        final String integrity;
+
+        LegacyNest(String dependent, String name, String version, String resolved, String integrity) {
+            this.dependent = dependent;
+            this.name = name;
+            this.version = version;
+            this.resolved = resolved;
+            this.integrity = integrity;
+        }
     }
 
     /** Reject a lock with any nested {@code node_modules} placement; a flat tree is required to insert soundly. */

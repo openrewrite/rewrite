@@ -208,7 +208,15 @@ public final class NativeLockEngine {
             return Collections.singletonList(edit.build());
         }
 
-        proveReverseDependentsAccept(pm, name, oldVersion, targetVersion, existingLock);
+        // A reverse-dependent whose recorded constraint excludes the new version keeps the old version
+        // nested under itself (Phase B I5); the safe single-leaf slice resolves it, everything else defers.
+        List<LockEditSet.PackageEdit> nestEdits;
+        if (pm == PackageManager.Npm) {
+            nestEdits = planReverseDependentNestsNpm(name, oldVersion, targetVersion, existingLock, registries, client);
+        } else {
+            proveReverseDependentsAccept(pm, name, oldVersion, targetVersion, existingLock);
+            nestEdits = Collections.emptyList();
+        }
 
         NodeRegistry registry = registries.registryFor(name);
         VersionManifest oldManifest = client.getManifest(registry, name, oldVersion);
@@ -228,19 +236,18 @@ public final class NativeLockEngine {
                 .writeThroughMetadata(writeThrough(oldManifest, newManifest))
                 .build();
 
-        if (dependenciesEqual(oldManifest, newManifest)) {
-            return Collections.singletonList(rootEdit); // closure unchanged (Phase A whitelist)
-        }
-
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
         edits.add(rootEdit);
-        if (pm == PackageManager.Npm) {
-            edits.addAll(cascadeForcedMoves(name, oldManifest, newManifest, existingLock, registries, client));
-        } else if (pm == PackageManager.Pnpm) {
-            edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, oldManifest, newManifest, existingLock, registries, client));
-        } else {
-            // Only the npm and pnpm patchers can reshape a changed closure so far; other formats defer.
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
+        edits.addAll(nestEdits);
+        if (!dependenciesEqual(oldManifest, newManifest)) {
+            if (pm == PackageManager.Npm) {
+                edits.addAll(cascadeForcedMoves(name, oldManifest, newManifest, existingLock, registries, client));
+            } else if (pm == PackageManager.Pnpm) {
+                edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, oldManifest, newManifest, existingLock, registries, client));
+            } else {
+                // Only the npm and pnpm patchers can reshape a changed closure so far; other formats defer.
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
+            }
         }
         return edits;
     }
@@ -1359,6 +1366,138 @@ public final class NativeLockEngine {
         if (!Objects.equals(normalize(a), normalize(b))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " " + surface + " changed");
         }
+    }
+
+    /**
+     * Phase B increment 5: a direct-dependency bump whose new version a reverse-dependent's recorded
+     * constraint excludes. npm keeps the new version at the top-level slot (the direct dep wins) and nests
+     * the old version under the reverse-dependent ({@code node_modules/<dependent>/node_modules/<name>}, plus
+     * the v2 legacy tree). This plans only the accuracy-safe slice — a single top-level reverse-dependent, a
+     * constraint still resolving to the currently-locked version, and a leaf being nested — so the patcher
+     * relocates the pre-edit entry byte-for-byte. Anything wider (multiple nesters, a newer in-range nested
+     * version, a non-leaf, a dev/link entry) is where npm reshapes further, so it fails loud.
+     *
+     * @return one nest edit when the safe slice applies, or an empty list when no reverse-dependent conflicts.
+     */
+    private static List<LockEditSet.PackageEdit> planReverseDependentNestsNpm(String name, String oldVersion,
+                                                                              String targetVersion, String lock,
+                                                                              NodeRegistries registries,
+                                                                              NpmRegistryClient client) {
+        Map<String, String> conflicts = conflictingReverseDependentsNpm(lock, name, targetVersion);
+        if (conflicts.isEmpty()) {
+            return Collections.emptyList();
+        }
+        if (conflicts.size() > 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is required at excluding versions by " + conflicts.keySet() +
+                            "; nesting more than one reverse-dependent is not yet supported");
+        }
+        Map.Entry<String, String> only = conflicts.entrySet().iterator().next();
+        String dependentKey = only.getKey();
+        String constraint = only.getValue();
+
+        // The dependent must be a plain top-level install; a nested/forked dependent reshapes further.
+        if (dependentKey.indexOf("node_modules/", 1) >= 0) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + "'s reverse-dependent " + dependentKey + " is itself nested; not yet supported");
+        }
+        String dependentName = dependentKey.substring("node_modules/".length());
+
+        // The moved package's existing entry must be a plain registry leaf so relocating it byte-for-byte is
+        // sound: no own dependencies to re-nest, a real registry locator, not a workspace link or dev-only.
+        Map<String, Object> packages = packagesMap(lock);
+        requireNestableLeaf(name, entryMap(packages.get("node_modules/" + name)), "nested copy of " + name);
+        Map<?, ?> dependentEntry = entryMap(packages.get(dependentKey));
+        if (dependentEntry != null && bool(asBoolean(dependentEntry.get("dev")))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + "'s reverse-dependent " +
+                    dependentName + " is a devDependency; dev nesting is not yet supported");
+        }
+
+        // The nested version must be exactly the currently-locked one, so the relocation reuses its bytes; a
+        // newer in-range version would be a fresh resolve npm serializes into a new entry instead.
+        NodeRegistry registry = registries.registryFor(name);
+        Set<String> published = client.getPackument(registry, name).getVersions();
+        String nested = maxSatisfyingAll(published, Collections.singleton(constraint));
+        if (!oldVersion.equals(nested)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, dependentName + " requires " + name + "@" +
+                    constraint + " which resolves to " + nested + ", not the locked " + oldVersion +
+                    "; nesting a re-resolved version is not yet supported");
+        }
+
+        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+                .name(name)
+                .oldVersion(oldVersion)
+                .newVersion(oldVersion)
+                .scope("dependencies")
+                .nestedUnder(dependentName)
+                .build());
+    }
+
+    /** Installed lock entries whose recorded constraint on {@code name} excludes {@code target}, keyed by their packages key. */
+    private static Map<String, String> conflictingReverseDependentsNpm(String lock, String name, String target) {
+        Map<String, String> conflicts = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
+            // Importer entries are the user's package.json, re-pinned by the patcher — never a nest trigger.
+            if (!e.getKey().contains("node_modules/") || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            String c = firstExcludingConstraint((Map<?, ?>) e.getValue(), name, target);
+            if (c != null) {
+                conflicts.put(e.getKey(), c);
+            }
+        }
+        return conflicts;
+    }
+
+    private static @Nullable String firstExcludingConstraint(Map<?, ?> entry, String name, String target) {
+        for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
+            Object scopeMap = entry.get(scope);
+            if (scopeMap instanceof Map) {
+                Object c = ((Map<?, ?>) scopeMap).get(name);
+                if (c instanceof String && NodeSemver.validRange((String) c) && !NodeSemver.satisfies(target, (String) c)) {
+                    return (String) c;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The moving package's existing entry must be a plain registry leaf to relocate byte-for-byte. */
+    private static void requireNestableLeaf(String name, @Nullable Map<?, ?> entry, String desc) {
+        if (entry == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no lock entry to relocate for the " + desc);
+        }
+        if (bool(asBoolean(entry.get("dev")))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, desc + " is a dev entry; dev nesting is not yet supported");
+        }
+        if (bool(asBoolean(entry.get("link")))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, desc + " is a workspace link; not yet supported");
+        }
+        if (!(entry.get("resolved") instanceof String) || !(entry.get("integrity") instanceof String)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, desc + " has no registry locator to relocate");
+        }
+        if (notEmptyMapValue(entry.get("dependencies")) || notEmptyMapValue(entry.get("optionalDependencies"))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    desc + " has its own dependencies; nesting a non-leaf is not yet supported");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> packagesMap(String lock) {
+        Object packages = parseJsonObject(lock, false).get("packages");
+        return packages instanceof Map ? (Map<String, Object>) packages : Collections.emptyMap();
+    }
+
+    private static @Nullable Map<?, ?> entryMap(@Nullable Object value) {
+        return value instanceof Map ? (Map<?, ?>) value : null;
+    }
+
+    private static boolean notEmptyMapValue(@Nullable Object value) {
+        return value instanceof Map && !((Map<?, ?>) value).isEmpty();
+    }
+
+    private static @Nullable Boolean asBoolean(@Nullable Object value) {
+        return value instanceof Boolean ? (Boolean) value : null;
     }
 
     /**

@@ -324,10 +324,49 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.VERSION_NOT_FOUND);
     }
 
-    // --- C1: reverse-dependent guard -------------------------------------
+    // --- C1 / I5: reverse-dependent nesting ------------------------------
 
     @Test
-    void reverseDependentConstraintExcludingTargetFailsLoud() {
+    void singleReverseDependentExactPinNestsUnderDependent() {
+        // needs-exact pins lodash 4.17.20 (excludes the bumped 4.17.21) -> npm keeps 4.17.21 top-level and
+        // nests 4.17.20 under needs-exact (I5). The engine emits the nest; the patcher relocates it.
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\"\n" +
+                "    },\n" +
+                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent())
+                .contains("\"node_modules/needs-exact/node_modules/lodash\"")
+                .contains("sha512-OLD")   // the nested copy keeps the old integrity
+                .contains("sha512-NEW");  // the top-level slot takes the bumped one
+    }
+
+    @Test
+    void multipleReverseDependentsExcludingTargetFailLoud() {
+        // Two locked packages each exclude the new version -> npm would nest a copy under each; nesting more
+        // than one reverse-dependent reshapes further and is deferred.
         routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
 
         String lock = "{\n" +
@@ -335,7 +374,8 @@ class NativeLockEngineTest {
                 "  \"packages\": {\n" +
                 "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
                 "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
+                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}},\n" +
+                "    \"node_modules/also-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
                 "  }\n" +
                 "}\n";
 
@@ -348,7 +388,37 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
         assertThat(result.getFailure().getDetail())
-                .contains("node_modules/needs-exact").contains("excludes 4.17.21");
+                .contains("more than one reverse-dependent");
+    }
+
+    @Test
+    void reverseDependentNestingANonLeafFailsLoud() {
+        // The excluded old version is not a leaf (its lock entry carries its own dependencies), so relocating
+        // it could force a further nest — deferred rather than guessed.
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\",\n" +
+                "      \"dependencies\": {\"tiny\": \"^1.0.0\"}\n" +
+                "    },\n" +
+                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("non-leaf");
     }
 
     @Test
