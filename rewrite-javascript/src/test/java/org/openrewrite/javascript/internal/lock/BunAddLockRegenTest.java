@@ -110,6 +110,13 @@ class BunAddLockRegenTest {
         assertAddByteExact("lock/bun/nest-basic", new String[][]{{"ms", "2.0.0"}, {"ms", "2.1.3"}});
     }
 
+    @Test
+    void addNestsConflictingTransitiveUnderParent() {
+        // Lock has ms@2.1.3 top-level (root pins it exactly). Adding debug@2.6.9 (needs ms@2.0.0) builds a
+        // fresh "debug/ms" tuple for ms@2.0.0, leaving the top-level ms@2.1.3 untouched.
+        assertAddByteExact("lock/bun/add-nest", new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}});
+    }
+
     // --- fail loud (a peer in the closure, or a transitive conflict, defers) ---
 
     @Test
@@ -185,7 +192,7 @@ class BunAddLockRegenTest {
     @Test
     @Disabled("live: runs real bun 1.3.10 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealBun() throws Exception {
-        String[] fixtures = {"lock/bun/add-leaf", "lock/bun/add-closure", "lock/bun/nest-basic"};
+        String[] fixtures = {"lock/bun/add-leaf", "lock/bun/add-closure", "lock/bun/nest-basic", "lock/bun/add-nest"};
         for (String fixture : fixtures) {
             assertBunReproduces(fixture + "/pkg-before", fixture + "/before");
             assertBunReproduces(fixture + "/pkg-after", fixture + "/after");

@@ -910,6 +910,7 @@ public final class NativeLockEngine {
         boolean dev = "devDependencies".equals(change.scope);
 
         Map<String, Placement> placed = new LinkedHashMap<>();
+        Map<String, NestedPlacement> nested = new LinkedHashMap<>();
         Deque<Requirement> queue = new ArrayDeque<>();
         queue.add(new Requirement(rootName, rootConstraint, dev));
 
@@ -921,9 +922,8 @@ public final class NativeLockEngine {
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
-                        existingVersion + " which does not satisfy " + req.constraint +
-                        " (bun would nest/move it; deferred)");
+                nestUnderParentBun(req, existingVersion, placed, nested, existingLock, registries, client);
+                continue;
             }
             Placement already = placed.get(req.name);
             if (already != null) {
@@ -970,7 +970,87 @@ public final class NativeLockEngine {
                     .added(true)
                     .build());
         }
+        for (NestedPlacement np : nested.values()) {
+            VersionManifest.Dist dist = Objects.requireNonNull(np.manifest.getDist());
+            edits.add(LockEditSet.PackageEdit.builder()
+                    .name(np.name)
+                    .oldVersion("")
+                    .newVersion(np.version)
+                    .newIntegrity(dist.getIntegrity())
+                    .scope(np.dev ? "devDependencies" : "dependencies")
+                    .importerDir(null)
+                    .added(true)
+                    .nestedUnder(np.parent)
+                    .build());
+        }
         return edits;
+    }
+
+    /** The bun analogue of {@link #nestUnderParent}: a fresh leaf nests at {@code "<parent>/<name>"} when a frozen top pin excludes it. */
+    private static void nestUnderParentBun(Requirement req, String existingVersion, Map<String, Placement> placed,
+                                           Map<String, NestedPlacement> nested, String existingLock,
+                                           NodeRegistries registries, NpmRegistryClient client) {
+        if (req.parent == null || !placed.containsKey(req.parent) ||
+                !topLevelPinnedBun(existingLock, req.name, existingVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
+                    existingVersion + " which does not satisfy " + req.constraint + " (bun would nest/move it; deferred)");
+        }
+        String nestKey = req.parent + "/" + req.name;
+        NestedPlacement already = nested.get(nestKey);
+        if (already != null) {
+            if (existingSatisfies(already.version, req.constraint)) {
+                return;
+            }
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
+                    req.name + " is required at two incompatible versions under " + req.parent + "; deferred");
+        }
+        NodeRegistry registry = registries.registryFor(req.name);
+        String version = resolveAddedVersion(client, registry, req.name, req.constraint);
+        VersionManifest manifest = client.getManifest(registry, req.name, version);
+        if (notEmpty(manifest.getDependencies()) || notEmpty(manifest.getOptionalDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
+                    "nesting " + req.name + " under " + req.parent + " pulls its own transitives (non-leaf); deferred");
+        }
+        requireEmittableBunClosureMember(req.name, manifest);
+        VersionManifest.Dist dist = manifest.getDist();
+        if (dist == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name, req.name + "@" + version + " has no registry integrity");
+        }
+        nested.put(nestKey, new NestedPlacement(req.parent, req.name, version, manifest, req.dev));
+    }
+
+    /** Whether a bun workspace edge or installed tuple pins {@code name} at exactly {@code version}. */
+    private static boolean topLevelPinnedBun(String lock, String name, String version) {
+        Map<String, Object> root = parseJsonObject(lock, false);
+        Object workspaces = root.get("workspaces");
+        if (workspaces instanceof Map) {
+            for (Object importer : ((Map<?, ?>) workspaces).values()) {
+                if (importer instanceof Map && pinsExactly((Map<?, ?>) importer, name, version)) {
+                    return true;
+                }
+            }
+        }
+        for (Object value : packagesMap(lock).values()) {
+            List<?> tuple = tupleOf(value);
+            if (tuple != null && tuple.size() >= 3 && tuple.get(2) instanceof Map &&
+                    pinsExactly((Map<?, ?>) tuple.get(2), name, version)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean pinsExactly(Map<?, ?> scopes, String name, String version) {
+        for (String scope : DECLARED_SCOPES) {
+            Object scopeMap = scopes.get(scope);
+            if (scopeMap instanceof Map) {
+                Object c = ((Map<?, ?>) scopeMap).get(name);
+                if (c instanceof String && version.equals(((String) c).trim())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

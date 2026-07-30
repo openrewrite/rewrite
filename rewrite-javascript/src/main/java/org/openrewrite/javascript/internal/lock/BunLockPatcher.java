@@ -71,10 +71,11 @@ public final class BunLockPatcher implements LockPatcher {
         boolean anyRemoval = false;
         List<PackageEdit> adds = new ArrayList<>();
         List<PackageEdit> rewrites = new ArrayList<>();
-        List<PackageEdit> nests = new ArrayList<>();
+        List<PackageEdit> relocateNests = new ArrayList<>();
+        List<PackageEdit> freshNests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getNestedUnder() != null) {
-                nests.add(edit);
+                (edit.isAdded() ? freshNests : relocateNests).add(edit);
             } else if (edit.getNewVersion() == null) {
                 anyRemoval = true;
                 rewrites.add(edit);
@@ -85,10 +86,10 @@ public final class BunLockPatcher implements LockPatcher {
             }
         }
 
-        // A nested copy relocates the moving package's pre-bump tuple, so capture it before the visitor
-        // rewrites that tuple to the new version.
+        // A relocate-nest (an upgrade pushing the old version down) copies the moving package's pre-bump
+        // tuple, so capture it before the visitor rewrites that tuple to the new version.
         Map<PackageEdit, Json.Array> nestedTuples = new LinkedHashMap<>();
-        for (PackageEdit nest : nests) {
+        for (PackageEdit nest : relocateNests) {
             Json.Array tuple = arrayMember(objectMember((Json.JsonObject) document.getValue(), "packages"), nest.getName());
             if (tuple == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.getName(),
@@ -115,8 +116,11 @@ public final class BunLockPatcher implements LockPatcher {
         Json.Document patched = (Json.Document) new BunVisitor(rewrites, edits.getEditedPackageJson())
                 .visitNonNull(document, 0);
 
-        if (!nests.isEmpty()) {
-            patched = patched.withValue(applyNests((Json.JsonObject) patched.getValue(), nests, nestedTuples));
+        if (!relocateNests.isEmpty()) {
+            patched = patched.withValue(applyNests((Json.JsonObject) patched.getValue(), relocateNests, nestedTuples));
+        }
+        if (!freshNests.isEmpty()) {
+            patched = patched.withValue(applyFreshNests((Json.JsonObject) patched.getValue(), freshNests));
         }
         return patched.printAll();
     }
@@ -226,6 +230,43 @@ public final class BunLockPatcher implements LockPatcher {
         }
         members = normalizePrefixes(members, firstWs, "\n" + firstWs);
         return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+    }
+
+    /**
+     * Insert each fresh nested add (a new closure member a frozen top-level pin excludes) as a
+     * {@code "<dependent>/<name>"} tuple built from the resolved leaf, after all top-level entries.
+     */
+    private static Json.JsonObject applyFreshNests(Json.JsonObject root, List<PackageEdit> nests) {
+        Json.JsonObject packages = objectMember(root, "packages");
+        if (packages == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no packages map");
+        }
+        String firstWs = firstMemberWhitespace(packages);
+        if (firstWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock packages map is empty");
+        }
+        List<JsonRightPadded<Json>> members = new ArrayList<>(packages.getPadding().getMembers());
+        for (PackageEdit nest : nests) {
+            String key = nest.getNestedUnder() + "/" + nest.getName();
+            if (hasMemberKey(members, key)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.getName(), key + " already present (fork exists)");
+            }
+            members = insertNestedLast(members, buildNestedPackageMember(key, nest));
+        }
+        members = normalizePrefixes(members, firstWs, "\n" + firstWs);
+        return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+    }
+
+    /** Build a nested {@code "<parent>/<name>": ["<name>@<ver>", "", <metadata>, "<sri>"]} tuple member from source text. */
+    private static Json.Member buildNestedPackageMember(String key, PackageEdit add) {
+        String integrity = add.getNewIntegrity();
+        if (integrity == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, add.getName(), add.getName() + " has no integrity");
+        }
+        String locator = add.getName() + "@" + add.getNewVersion();
+        String tuple = "[" + quote(locator) + ", " + quote("") + ", " +
+                renderMetadata(add.getNewDependencies()) + ", " + quote(integrity) + "]";
+        return parseMember(quote(key) + ": " + tuple);
     }
 
     /** A tuple printed as source with its leading prefix stripped, so it re-grafts cleanly under a fresh key. */
