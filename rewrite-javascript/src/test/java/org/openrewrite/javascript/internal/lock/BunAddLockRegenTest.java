@@ -101,6 +101,15 @@ class BunAddLockRegenTest {
                 new String[][]{{"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
     }
 
+    // --- reverse-dependent nest (Phase B I5) -----------------------------
+
+    @Test
+    void nestOldVersionUnderReverseDependent() {
+        // Root deps debug@2.6.9 (which pins ms@2.0.0) + ms. Bumping ms -> 2.1.3 keeps ms@2.1.3 top-level and
+        // relocates ms@2.0.0 to the "debug/ms" tuple (appended after the top-level entries) — debug's copy.
+        assertAddByteExact("lock/bun/nest-basic", new String[][]{{"ms", "2.0.0"}, {"ms", "2.1.3"}});
+    }
+
     // --- fail loud (a peer in the closure, or a transitive conflict, defers) ---
 
     @Test
@@ -176,7 +185,7 @@ class BunAddLockRegenTest {
     @Test
     @Disabled("live: runs real bun 1.3.10 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealBun() throws Exception {
-        String[] fixtures = {"lock/bun/add-leaf", "lock/bun/add-closure"};
+        String[] fixtures = {"lock/bun/add-leaf", "lock/bun/add-closure", "lock/bun/nest-basic"};
         for (String fixture : fixtures) {
             assertBunReproduces(fixture + "/pkg-before", fixture + "/before");
             assertBunReproduces(fixture + "/pkg-after", fixture + "/after");

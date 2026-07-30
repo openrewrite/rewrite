@@ -213,6 +213,8 @@ public final class NativeLockEngine {
         List<LockEditSet.PackageEdit> nestEdits;
         if (pm == PackageManager.Npm) {
             nestEdits = planReverseDependentNestsNpm(name, oldVersion, targetVersion, existingLock, registries, client);
+        } else if (pm == PackageManager.Bun) {
+            nestEdits = planReverseDependentNestsBun(name, oldVersion, targetVersion, existingLock, registries, client);
         } else {
             proveReverseDependentsAccept(pm, name, oldVersion, targetVersion, existingLock);
             nestEdits = Collections.emptyList();
@@ -1501,6 +1503,86 @@ public final class NativeLockEngine {
     }
 
     /**
+     * The bun analogue of {@link #planReverseDependentNestsNpm}: bun hoists like npm, so the same single-leaf
+     * slice applies — the old version relocates to a {@code "<dependent>/<name>"} tuple. The reads differ (bun's
+     * {@code packages} is keyed by name with {@code ["name@ver", "", metadata, sri]} tuples).
+     */
+    private static List<LockEditSet.PackageEdit> planReverseDependentNestsBun(String name, String oldVersion,
+                                                                              String targetVersion, String lock,
+                                                                              NodeRegistries registries,
+                                                                              NpmRegistryClient client) {
+        Map<String, String> conflicts = conflictingReverseDependentsBun(lock, name, targetVersion);
+        if (conflicts.isEmpty()) {
+            return Collections.emptyList();
+        }
+        if (conflicts.size() > 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is required at excluding versions by " + conflicts.keySet() +
+                            "; nesting more than one reverse-dependent is not yet supported");
+        }
+        Map.Entry<String, String> only = conflicts.entrySet().iterator().next();
+        String dependent = only.getKey();
+        requireNestableBunLeaf(name, tupleOf(packagesMap(lock).get(name)));
+
+        NodeRegistry registry = registries.registryFor(name);
+        Set<String> published = client.getPackument(registry, name).getVersions();
+        String nested = maxSatisfyingAll(published, Collections.singleton(only.getValue()));
+        if (!oldVersion.equals(nested)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, dependent + " requires " + name + "@" +
+                    only.getValue() + " which resolves to " + nested + ", not the locked " + oldVersion +
+                    "; nesting a re-resolved version is not yet supported");
+        }
+
+        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+                .name(name)
+                .oldVersion(oldVersion)
+                .newVersion(oldVersion)
+                .scope("dependencies")
+                .nestedUnder(dependent)
+                .build());
+    }
+
+    /** Top-level bun tuples whose metadata records a constraint on {@code name} that excludes {@code target}. */
+    private static Map<String, String> conflictingReverseDependentsBun(String lock, String name, String target) {
+        Map<String, String> conflicts = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
+            if (isNestedBunKey(e.getKey())) {
+                continue; // only plain top-level dependents can gain a nested copy
+            }
+            List<?> tuple = tupleOf(e.getValue());
+            if (tuple != null && tuple.size() >= 3 && tuple.get(2) instanceof Map) {
+                String c = firstExcludingConstraint((Map<?, ?>) tuple.get(2), name, target);
+                if (c != null) {
+                    conflicts.put(e.getKey(), c);
+                }
+            }
+        }
+        return conflicts;
+    }
+
+    /** The moving bun package's tuple must be a plain registry leaf (empty metadata deps, an integrity) to relocate. */
+    private static void requireNestableBunLeaf(String name, @Nullable List<?> tuple) {
+        if (tuple == null || tuple.size() < 4) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no bun tuple to relocate for " + name);
+        }
+        if (tuple.get(2) instanceof Map) {
+            Map<?, ?> meta = (Map<?, ?>) tuple.get(2);
+            if (notEmptyMapValue(meta.get("dependencies")) || notEmptyMapValue(meta.get("optionalDependencies")) ||
+                    notEmptyMapValue(meta.get("peerDependencies"))) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + " has its own dependencies; nesting a non-leaf is not yet supported");
+            }
+        }
+        if (!(tuple.get(3) instanceof String)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " has no integrity to relocate");
+        }
+    }
+
+    private static @Nullable List<?> tupleOf(@Nullable Object value) {
+        return value instanceof List ? (List<?>) value : null;
+    }
+
+    /**
      * A closure-unchanged proof only inspects the moving package's own manifest; it says nothing about the
      * OTHER locked entries that depend on it. If a reverse-dependent's recorded constraint excludes the new
      * version, re-pinning would emit a lock a real install rejects — fail loud instead.
@@ -1830,8 +1912,9 @@ public final class NativeLockEngine {
     private static Set<String> findLockedVersions(PackageManager pm, String lock, String name) {
         switch (pm) {
             case Npm:
-            case Bun:
                 return findLockedVersionsJson(lock, name);
+            case Bun:
+                return findLockedVersionsBun(lock, name);
             case Pnpm:
                 return findLockedVersionsPnpm(lock, name);
             case YarnClassic:
@@ -1860,6 +1943,22 @@ public final class NativeLockEngine {
         }
         // package-lock v1 (and the v2 legacy tree) keep resolved versions under `dependencies`.
         collectJsonDependencyTree(root.get("dependencies"), name, versions);
+        return versions;
+    }
+
+    /** bun keys its {@code packages} by name (or {@code parent/name} when nested), so read the version off each tuple's locator. */
+    private static Set<String> findLockedVersionsBun(String lock, String name) {
+        Set<String> versions = new LinkedHashSet<>();
+        for (Object value : packagesMap(lock).values()) {
+            List<?> tuple = tupleOf(value);
+            if (tuple != null && !tuple.isEmpty() && tuple.get(0) instanceof String) {
+                String locator = (String) tuple.get(0);
+                int at = locator.lastIndexOf('@');
+                if (at > 0 && locator.substring(0, at).equals(name)) {
+                    versions.add(locator.substring(at + 1));
+                }
+            }
+        }
         return versions;
     }
 

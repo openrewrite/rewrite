@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.JsonParser;
+import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -37,6 +38,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -69,8 +71,11 @@ public final class BunLockPatcher implements LockPatcher {
         boolean anyRemoval = false;
         List<PackageEdit> adds = new ArrayList<>();
         List<PackageEdit> rewrites = new ArrayList<>();
+        List<PackageEdit> nests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.getNewVersion() == null) {
+            if (edit.getNestedUnder() != null) {
+                nests.add(edit);
+            } else if (edit.getNewVersion() == null) {
                 anyRemoval = true;
                 rewrites.add(edit);
             } else if (edit.isAdded()) {
@@ -78,6 +83,18 @@ public final class BunLockPatcher implements LockPatcher {
             } else {
                 rewrites.add(edit);
             }
+        }
+
+        // A nested copy relocates the moving package's pre-bump tuple, so capture it before the visitor
+        // rewrites that tuple to the new version.
+        Map<PackageEdit, Json.Array> nestedTuples = new LinkedHashMap<>();
+        for (PackageEdit nest : nests) {
+            Json.Array tuple = arrayMember(objectMember((Json.JsonObject) document.getValue(), "packages"), nest.getName());
+            if (tuple == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.getName(),
+                        "no bun tuple to nest for " + nest.getName());
+            }
+            nestedTuples.put(nest, tuple);
         }
 
         if (anyRemoval) {
@@ -97,6 +114,10 @@ public final class BunLockPatcher implements LockPatcher {
 
         Json.Document patched = (Json.Document) new BunVisitor(rewrites, edits.getEditedPackageJson())
                 .visitNonNull(document, 0);
+
+        if (!nests.isEmpty()) {
+            patched = patched.withValue(applyNests((Json.JsonObject) patched.getValue(), nests, nestedTuples));
+        }
         return patched.printAll();
     }
 
@@ -175,6 +196,68 @@ public final class BunLockPatcher implements LockPatcher {
             workspaces = replaceMemberValue(workspaces, importerKey, importer);
         }
         return replaceMemberValue(root, "workspaces", workspaces);
+    }
+
+    // --- reverse-dependent nest (Phase B I5) ---------------------------------
+
+    /**
+     * Insert each nested copy as a {@code "<dependent>/<name>"} tuple relocated byte-for-byte from the pre-bump
+     * top-level entry (bun places nested entries after all top-level ones). The relocated tuple keeps the old
+     * locator/integrity — the copy the reverse-dependent's excluding constraint still needs.
+     */
+    private static Json.JsonObject applyNests(Json.JsonObject root, List<PackageEdit> nests,
+                                              Map<PackageEdit, Json.Array> nestedTuples) {
+        Json.JsonObject packages = objectMember(root, "packages");
+        if (packages == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no packages map");
+        }
+        String firstWs = firstMemberWhitespace(packages);
+        if (firstWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock packages map is empty");
+        }
+        List<JsonRightPadded<Json>> members = new ArrayList<>(packages.getPadding().getMembers());
+        for (PackageEdit nest : nests) {
+            String key = nest.getNestedUnder() + "/" + nest.getName();
+            if (hasMemberKey(members, key)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.getName(), key + " already present (fork exists)");
+            }
+            Json.Member member = parseMember(quote(key) + ": " + tupleSource(nestedTuples.get(nest)));
+            members = insertNestedLast(members, member);
+        }
+        members = normalizePrefixes(members, firstWs, "\n" + firstWs);
+        return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+    }
+
+    /** A tuple printed as source with its leading prefix stripped, so it re-grafts cleanly under a fresh key. */
+    private static String tupleSource(Json.Array tuple) {
+        String printed = tuple.print(new JsonPrinter<Integer>());
+        int i = 0;
+        while (i < printed.length() && Character.isWhitespace(printed.charAt(i))) {
+            i++;
+        }
+        return printed.substring(i);
+    }
+
+    /** Append after the last real member (bun places nested {@code parent/name} entries after all top-level ones). */
+    private static List<JsonRightPadded<Json>> insertNestedLast(List<JsonRightPadded<Json>> members, Json.Member member) {
+        int idx = members.size();
+        for (int i = members.size() - 1; i >= 0; i--) {
+            if (members.get(i).getElement() instanceof Json.Member) {
+                idx = i + 1;
+                break;
+            }
+        }
+        members.add(idx, new JsonRightPadded<>(member, Space.EMPTY, Markers.EMPTY));
+        return members;
+    }
+
+    private static boolean hasMemberKey(List<JsonRightPadded<Json>> members, String key) {
+        for (JsonRightPadded<Json> rp : members) {
+            if (rp.getElement() instanceof Json.Member && key.equals(literalKey(((Json.Member) rp.getElement()).getKey()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Build the {@code "<name>": ["<name>@<ver>", "", <metadata>, "<sri>"]} tuple member from exact source text. */
