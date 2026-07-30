@@ -684,6 +684,7 @@ public final class NativeLockEngine {
         boolean dev = "devDependencies".equals(change.scope);
 
         Map<String, Placement> placed = new LinkedHashMap<>();
+        Map<String, NestedPlacement> nested = new LinkedHashMap<>();
         Deque<Requirement> queue = new ArrayDeque<>();
         queue.add(new Requirement(rootName, rootConstraint, dev));
 
@@ -692,13 +693,13 @@ public final class NativeLockEngine {
 
             String existingVersion = existingTopLevel.get(req.name);
             if (existingVersion != null) {
-                // Dedup to the already-placed pin, or fail loud where npm would nest/move it (I3/I5).
+                // Dedup to the already-placed pin, or nest the required version under its parent where an
+                // incompatible version holds the top slot (I5 add-nest, leaf-under-a-fresh-top-level slice).
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
-                        existingVersion + " which does not satisfy " + req.constraint +
-                        " (npm would nest/move it; deferred)");
+                nestUnderParent(req, existingVersion, placed, nested, existingLock, registries, client);
+                continue;
             }
 
             Placement already = placed.get(req.name);
@@ -727,8 +728,8 @@ public final class NativeLockEngine {
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
 
-            enqueueDeps(queue, manifest.getDependencies(), req.dev);
-            enqueueDeps(queue, manifest.getOptionalDependencies(), req.dev);
+            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
+            enqueueDeps(queue, manifest.getOptionalDependencies(), req.dev, req.name);
         }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -752,7 +753,66 @@ public final class NativeLockEngine {
                     .writeThroughMetadata(leafMetadata(p.manifest))
                     .build());
         }
+        for (NestedPlacement np : nested.values()) {
+            VersionManifest.Dist dist = Objects.requireNonNull(np.manifest.getDist());
+            edits.add(LockEditSet.PackageEdit.builder()
+                    .name(np.name)
+                    .oldVersion("")
+                    .newVersion(np.version)
+                    .newResolved(dist.getTarball())
+                    .newIntegrity(dist.getIntegrity())
+                    .newShasum(dist.getShasum())
+                    .scope(np.dev ? "devDependencies" : "dependencies")
+                    .importerDir(null)
+                    .added(true)
+                    .nestedUnder(np.parent)
+                    .writeThroughMetadata(leafMetadata(np.manifest))
+                    .build());
+        }
         return edits;
+    }
+
+    /**
+     * A closure member whose required version an incompatible top-level pin excludes: npm nests it at
+     * {@code node_modules/<parent>/node_modules/<name>} (I5 add-nest). Only the safe slice resolves — the
+     * requiring package is a freshly-placed top-level entry, some requirer pins the top-level version
+     * <b>exactly</b> (so it provably cannot move up to satisfy the new edge — otherwise npm cascades rather
+     * than forks), and the nested version is itself a leaf. Anything else fails loud (npm would reshape).
+     */
+    private static void nestUnderParent(Requirement req, String existingVersion, Map<String, Placement> placed,
+                                        Map<String, NestedPlacement> nested, String existingLock,
+                                        NodeRegistries registries, NpmRegistryClient client) {
+        // A cascade (the top-level entry moves up to satisfy the new edge) is a different, deferred class;
+        // only an exact pin on the current version proves the top slot is frozen, forcing the fork.
+        if (req.parent == null || !placed.containsKey(req.parent) ||
+                !topLevelPinnedNpm(existingLock, req.name, existingVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
+                    existingVersion + " which does not satisfy " + req.constraint + " (npm would nest/move it; deferred)");
+        }
+        String nestKey = req.parent + "/" + req.name;
+        NestedPlacement already = nested.get(nestKey);
+        if (already != null) {
+            if (existingSatisfies(already.version, req.constraint)) {
+                return;
+            }
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
+                    req.name + " is required at two incompatible versions under " + req.parent + "; deferred");
+        }
+
+        NodeRegistry registry = registries.registryFor(req.name);
+        String version = resolveAddedVersion(client, registry, req.name, req.constraint);
+        VersionManifest manifest = client.getManifest(registry, req.name, version);
+        if (notEmpty(manifest.getDependencies()) || notEmpty(manifest.getOptionalDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
+                    "nesting " + req.name + " under " + req.parent + " pulls its own transitives (non-leaf); deferred");
+        }
+        requireEmittableClosureMember(req.name, manifest);
+        VersionManifest.Dist dist = manifest.getDist();
+        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
+                    req.name + "@" + version + " has no registry tarball/integrity");
+        }
+        nested.put(nestKey, new NestedPlacement(req.parent, req.name, version, manifest, req.dev));
     }
 
     /**
@@ -809,7 +869,7 @@ public final class NativeLockEngine {
             }
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev);
+            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
         }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -890,7 +950,7 @@ public final class NativeLockEngine {
             proveReverseDependentsAccept(PackageManager.Bun, req.name, version, version, existingLock);
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev);
+            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
         }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -965,7 +1025,7 @@ public final class NativeLockEngine {
             }
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev);
+            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
         }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -1169,12 +1229,13 @@ public final class NativeLockEngine {
         return 0;
     }
 
-    private static void enqueueDeps(Deque<Requirement> queue, @Nullable Map<String, String> deps, boolean dev) {
+    private static void enqueueDeps(Deque<Requirement> queue, @Nullable Map<String, String> deps, boolean dev,
+                                    String parent) {
         if (deps == null) {
             return;
         }
         for (Map.Entry<String, String> e : deps.entrySet()) {
-            queue.add(new Requirement(e.getKey(), e.getValue(), dev));
+            queue.add(new Requirement(e.getKey(), e.getValue(), dev, parent));
         }
     }
 
@@ -1449,6 +1510,24 @@ public final class NativeLockEngine {
             }
         }
         return conflicts;
+    }
+
+    /** Whether some importer or installed entry pins {@code name} at exactly {@code version} (so its top slot cannot move). */
+    private static boolean topLevelPinnedNpm(String lock, String name, String version) {
+        for (Object value : packagesMap(lock).values()) {
+            if (value instanceof Map) {
+                for (String scope : DECLARED_SCOPES) {
+                    Object scopeMap = ((Map<?, ?>) value).get(scope);
+                    if (scopeMap instanceof Map) {
+                        Object c = ((Map<?, ?>) scopeMap).get(name);
+                        if (c instanceof String && version.equals(((String) c).trim())) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static @Nullable String firstExcludingConstraint(Map<?, ?> entry, String name, String target) {
@@ -2181,15 +2260,38 @@ public final class NativeLockEngine {
         }
     }
 
-    /** A pending edge in the closure walk: a package name, the requiring constraint, and dev-reachability. */
+    /** A pending edge in the closure walk: a package name, the requiring constraint, dev-reachability, and requirer. */
     private static final class Requirement {
         final String name;
         final String constraint;
         final boolean dev;
+        final @Nullable String parent;
 
         Requirement(String name, String constraint, boolean dev) {
+            this(name, constraint, dev, null);
+        }
+
+        Requirement(String name, String constraint, boolean dev, @Nullable String parent) {
             this.name = name;
             this.constraint = constraint;
+            this.dev = dev;
+            this.parent = parent;
+        }
+    }
+
+    /** A closure member npm nests under a freshly-placed parent because an incompatible version holds the top slot. */
+    private static final class NestedPlacement {
+        final String parent;
+        final String name;
+        final String version;
+        final VersionManifest manifest;
+        final boolean dev;
+
+        NestedPlacement(String parent, String name, String version, VersionManifest manifest, boolean dev) {
+            this.parent = parent;
+            this.name = name;
+            this.version = version;
+            this.manifest = manifest;
             this.dev = dev;
         }
     }

@@ -174,8 +174,9 @@ class NativeLockEngineTest {
 
     @Test
     void closureAddTransitiveConflictFailsLoud() {
-        // is-odd pulls is-number ^7.0.0, but is-number is already pinned at 6.0.0 top-level — npm would
-        // nest a second copy (fork). The greedy-forward resolver refuses rather than reshape (I3/I5).
+        // is-odd pulls is-number ^7.0.0, but is-number is locked at 6.0.0 top-level under a *ranged* pin
+        // (^6.0.0). Nesting requires proof the top slot is frozen (an exact pin); a ranged pin might move
+        // (cascade), so the resolver conservatively defers rather than fork. (Exact-pin nesting: I5 add-nest.)
         routes.put("https://registry.npmjs.org/is-odd", "{\"versions\":{\"3.0.1\":{}}}");
         routes.put("https://registry.npmjs.org/is-odd/3.0.1",
                 "{\"name\":\"is-odd\",\"version\":\"3.0.1\",\"dependencies\":{\"is-number\":\"^7.0.0\"}," +
@@ -185,20 +186,52 @@ class NativeLockEngineTest {
         String lock = "{\n" +
                 "  \"lockfileVersion\": 3,\n" +
                 "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"is-number\": \"6.0.0\"}},\n" +
+                "    \"\": {\"dependencies\": {\"is-number\": \"^6.0.0\"}},\n" +
                 "    \"node_modules/is-number\": {\"version\": \"6.0.0\"}\n" +
                 "  }\n" +
                 "}\n";
 
         Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"is-number\":\"6.0.0\"}}",
-                "{\"dependencies\":{\"is-number\":\"6.0.0\",\"is-odd\":\"^3.0.1\"}}",
+                "{\"dependencies\":{\"is-number\":\"^6.0.0\"}}",
+                "{\"dependencies\":{\"is-number\":\"^6.0.0\",\"is-odd\":\"^3.0.1\"}}",
                 lock);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("is-number");
         assertThat(result.getFailure().getDetail()).contains("does not satisfy");
+    }
+
+    @Test
+    void addNestOfNonLeafMemberFailsLoud() {
+        // wrapper needs tool ^2.0.0, but root pins tool 1.0.0 exact (frozen top). tool@2.0.0 would nest under
+        // wrapper — but it carries its own dependency (sub), so nesting it would cascade further: deferred.
+        routes.put("https://registry.npmjs.org/wrapper", "{\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/wrapper/1.0.0",
+                "{\"name\":\"wrapper\",\"version\":\"1.0.0\",\"dependencies\":{\"tool\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/wrapper/-/wrapper-1.0.0.tgz\",\"integrity\":\"sha512-W\"}}");
+        routes.put("https://registry.npmjs.org/tool", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tool/2.0.0",
+                "{\"name\":\"tool\",\"version\":\"2.0.0\",\"dependencies\":{\"sub\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tool/-/tool-2.0.0.tgz\",\"integrity\":\"sha512-T\"}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"tool\": \"1.0.0\"}},\n" +
+                "    \"node_modules/tool\": {\"version\": \"1.0.0\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"tool\":\"1.0.0\"}}",
+                "{\"dependencies\":{\"tool\":\"1.0.0\",\"wrapper\":\"^1.0.0\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("tool");
+        assertThat(result.getFailure().getDetail()).contains("non-leaf");
     }
 
     @Test

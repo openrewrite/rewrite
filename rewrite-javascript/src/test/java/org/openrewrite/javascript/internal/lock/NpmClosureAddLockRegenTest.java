@@ -133,6 +133,16 @@ class NpmClosureAddLockRegenTest {
                 new String[][]{{"supports-color", "7.2.0"}, {"has-flag", "4.0.0"}});
     }
 
+    // --- reverse-dependent nest on add (Phase B I5) ----------------------
+
+    @Test
+    void addNestsConflictingTransitiveUnderParent() {
+        // The lock already has ms@2.1.3 top-level (a direct dep). Adding debug@2.6.9 (which needs ms@2.0.0)
+        // nests ms@2.0.0 under node_modules/debug, leaving the top-level ms@2.1.3 untouched.
+        assertClosureByteExact("lock/npm/add-nest",
+                new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}});
+    }
+
     // --- peer dependencies (optional peers skip, non-optional defers) -----
 
     @Test
@@ -219,6 +229,7 @@ class NpmClosureAddLockRegenTest {
                 {"lock/npm/closure-deep", "3"},
                 {"lock/npm/closure-dedup", "3"},
                 {"lock/npm/closure-dev", "3"},
+                {"lock/npm/add-nest", "3"},
                 {"lock/npm/peer-optional", "3"},
                 {"lock/npm/peer-optional-v2", "2"},
                 {"lock/npm/peer-optional-map", "3"},

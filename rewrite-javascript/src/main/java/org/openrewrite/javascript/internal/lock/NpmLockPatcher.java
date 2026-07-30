@@ -90,12 +90,12 @@ public final class NpmLockPatcher implements LockPatcher {
 
         JsonNode editedManifest = parseManifest(edits.getEditedPackageJson());
 
-        // Nests relocate the pre-edit entries they copy, so they run before the bumps mutate those entries.
-        // The v2 legacy nested tree is captured now but inserted after the bumps, so the bump's own fork
-        // guard (applyLegacyTree) still sees a flat legacy tree.
+        // A relocate-nest (an upgrade that pushes the old version down) copies a pre-edit entry, so it runs
+        // before the bumps mutate it. The v2 legacy nested tree is captured now but inserted after the bumps,
+        // so the bump's own fork guard (applyLegacyTree) still sees a flat legacy tree.
         List<LegacyNest> legacyNests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.getNestedUnder() != null) {
+            if (edit.getNestedUnder() != null && !edit.isAdded()) {
                 if (lockfileVersion == 2) {
                     legacyNests.add(captureLegacyNest(root, edit));
                 }
@@ -106,7 +106,7 @@ public final class NpmLockPatcher implements LockPatcher {
         List<PackageEdit> removals = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getNestedUnder() != null) {
-                continue;
+                continue; // both nest kinds run in their own pass
             }
             if (edit.getNewVersion() == null) {
                 removals.add(edit);
@@ -120,6 +120,13 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         if (!removals.isEmpty()) {
             root = applyRemovals(root, lockfileVersion, removals);
+        }
+        // A fresh nested add (a new closure member an incompatible top-level pin excludes) inserts after the
+        // top-level adds, so applyAdd's flat-placement check never sees the nest being created.
+        for (PackageEdit edit : edits.getEdits()) {
+            if (edit.getNestedUnder() != null && edit.isAdded()) {
+                root = applyNestedAdd(root, lockfileVersion, edit);
+            }
         }
         for (LegacyNest nest : legacyNests) {
             root = insertLegacyNest(root, nest);
@@ -507,6 +514,30 @@ public final class NpmLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, nestedKey + " already present (fork exists)");
         }
         packages = graftSorted(packages, nestedKey, objectSource(top.getValue()), true);
+        return putMember(root, "packages", packages);
+    }
+
+    /**
+     * Insert a brand-new nested leaf at {@code node_modules/<dependent>/node_modules/<name>} (I5 add-nest):
+     * a closure member an incompatible top-level pin excludes. Serialized like a top-level leaf add
+     * ({@link #leafEntryText}) but at the nested key and with no importer edge. v2's deeper legacy nesting is
+     * not yet verified, so it defers.
+     */
+    private Json.JsonObject applyNestedAdd(Json.JsonObject root, int lockfileVersion, PackageEdit edit) {
+        if (lockfileVersion == 2) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "nesting an added dependency into a lockfileVersion 2 lock is not yet supported");
+        }
+        String name = edit.getName();
+        if (edit.getNewResolved() == null || edit.getNewIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name, name + " has no registry locator");
+        }
+        Json.JsonObject packages = requirePackages(root);
+        String nestedKey = "node_modules/" + edit.getNestedUnder() + "/node_modules/" + name;
+        if (getMember(packages, nestedKey) != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, nestedKey + " already present (fork exists)");
+        }
+        packages = graftSorted(packages, nestedKey, leafEntryText(packages, edit), true);
         return putMember(root, "packages", packages);
     }
 
