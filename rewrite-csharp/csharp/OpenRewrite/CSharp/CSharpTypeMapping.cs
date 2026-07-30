@@ -238,12 +238,101 @@ internal class CSharpTypeMapping
             ? symbol.Interfaces.Select(i => (JavaType.FullyQualified)MapType(i)!).ToList()
             : null;
 
-        // For now, skip members and methods to avoid excessive traversal
-        // These can be populated lazily or in a future enhancement
         cls.UnsafeSet(flags, kind, fqn, typeParameters, supertype, owningClass,
             null, interfaces, null, null);
 
+        // Members/methods are populated only once the shell above is in the cache, so a member
+        // whose signature refers back to the declaring type resolves to that shell instead of
+        // recursing forever. Population itself is queued rather than nested (see DrainMemberQueue)
+        // so that the transitive member -> signature type -> its members walk stays iterative.
+        _memberQueue.Enqueue((symbol, cls));
+        DrainMemberQueue();
+
         return cls;
+    }
+
+    /// <summary>
+    /// Types whose <see cref="JavaType.Class.Members"/>/<see cref="JavaType.Class.Methods"/>
+    /// still need filling in. Populating a type's members maps the member signature types, which
+    /// in turn queues those types; draining iteratively keeps the recursion depth bounded by the
+    /// supertype/interface/type-argument graph rather than by the member graph.
+    /// </summary>
+    private readonly Queue<(INamedTypeSymbol Symbol, JavaType.Class Class)> _memberQueue = new();
+
+    private bool _draining;
+
+    private void DrainMemberQueue()
+    {
+        if (_draining) return;
+        _draining = true;
+        try
+        {
+            while (_memberQueue.Count > 0)
+            {
+                var (symbol, cls) = _memberQueue.Dequeue();
+                PopulateMembers(symbol, cls);
+            }
+        }
+        finally
+        {
+            _draining = false;
+        }
+    }
+
+    /// <summary>
+    /// Maps the members a type <em>declares</em> (inherited members stay reachable through
+    /// <see cref="JavaType.Class.Supertype"/>/<see cref="JavaType.Class.Interfaces"/>, matching
+    /// the Java type mapping). Compiler-generated members (auto-property backing fields, property
+    /// and event accessors, static initializers, and anything with a mangled name) are skipped.
+    /// </summary>
+    private void PopulateMembers(INamedTypeSymbol symbol, JavaType.Class cls)
+    {
+        List<JavaType.Variable>? members = null;
+        List<JavaType.Method>? methods = null;
+
+        foreach (var member in symbol.GetMembers())
+        {
+            if (IsCompilerGenerated(member)) continue;
+
+            switch (member)
+            {
+                case IFieldSymbol field:
+                    (members ??= []).Add(MapVariable(field, field.Name, cls, MapType(field.Type)));
+                    break;
+                case IPropertySymbol property:
+                    (members ??= []).Add(MapVariable(property, property.Name, cls, MapType(property.Type)));
+                    break;
+                case IEventSymbol evt:
+                    (members ??= []).Add(MapVariable(evt, evt.Name, cls, MapType(evt.Type)));
+                    break;
+                case IMethodSymbol method:
+                    (methods ??= []).Add(MapMethod(method));
+                    break;
+            }
+        }
+
+        cls.Members = members;
+        cls.Methods = methods;
+    }
+
+    private static bool IsCompilerGenerated(ISymbol member)
+    {
+        // Mangled names: auto-property backing fields (`<Prop>k__BackingField`), record `<Clone>$`,
+        // iterator/async state machines, etc.
+        if (member.Name.Length == 0 || member.Name[0] == '<') return true;
+
+        return member switch
+        {
+            // Backing field of an auto-property or field-like event.
+            IFieldSymbol field => field.AssociatedSymbol != null,
+            // get_/set_/init_/add_/remove_ accessors; the property/event itself is already listed.
+            // Static constructors mirror Java's skipping of static initializer blocks.
+            IMethodSymbol method => method.AssociatedSymbol != null ||
+                                    method.MethodKind == MethodKind.StaticConstructor,
+            // Nested types are reachable via their own mapping, not through Members/Methods.
+            INamedTypeSymbol => true,
+            _ => false
+        };
     }
 
     private JavaType MapArrayType(IArrayTypeSymbol symbol)

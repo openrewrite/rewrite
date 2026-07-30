@@ -8554,6 +8554,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 );
             }
 
+            // Attribute the outermost ArrayType with the whole array type, so `typeof(int[])` and
+            // an array-typed declaration carry a resolvable type like every other TypeTree does.
+            // Inner levels of a jagged/multi-rank type stay unattributed: the syntax nests the
+            // ranks in the opposite order from the symbol, so there is no per-level type to hand out.
+            if (result is ArrayType outermost)
+            {
+                result = outermost.WithType(_typeMapping?.Type(arrayType));
+            }
+
             return result;
         }
         else if (type is TupleTypeSyntax tupleType)

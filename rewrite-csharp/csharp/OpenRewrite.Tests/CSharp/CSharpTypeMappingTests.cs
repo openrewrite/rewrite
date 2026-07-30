@@ -15,6 +15,7 @@
  */
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
@@ -41,9 +42,11 @@ public class CSharpTypeMappingTests : RewriteTest
         """,
         path: "__GlobalUsings__.g.cs");
 
-    private static CompilationUnit ParseWithSemanticModel(string code)
+    private static CompilationUnit ParseWithSemanticModel(string code,
+        ReferenceAssemblies? referenceAssemblies = null)
     {
-        var refs = Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
+        var refs = (referenceAssemblies ?? Assemblies.Net90)
+            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
             .GetAwaiter().GetResult();
         var syntaxTree = CSharpSyntaxTree.ParseText(code, path: "source.cs");
         var compilation = CSharpCompilation.Create("TestCompilation")
@@ -452,5 +455,115 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.NotNull(typeA);
         Assert.NotNull(typeB);
         Assert.Same(typeA, typeB);
+    }
+
+    [Fact]
+    public void SourceClass_DeclaredMembersAndMethodsArePopulated()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System.Collections.Generic;
+            class Holder
+            {
+                private int _count;
+                public string Name { get; set; } = "";
+                public event System.EventHandler? Changed;
+                public List<string> Items() => new();
+                public void Reset(int to) { _count = to; }
+            }
+            class Test
+            {
+                void M() { Holder holder = new Holder(); }
+            }
+            """);
+
+        var holderType = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "holder")!.TypeExpression?.Type);
+
+        Assert.NotNull(holderType.Members);
+        Assert.NotNull(holderType.Methods);
+
+        // Fields, properties and events are all reachable by name.
+        var count = Assert.Single(holderType.Members!, v => v.Name == "_count");
+        Assert.Equal(JavaType.Primitive.Of(JavaType.PrimitiveKind.Int), count.Type);
+        Assert.Same(holderType, count.Owner);
+
+        var name = Assert.Single(holderType.Members!, v => v.Name == "Name");
+        Assert.Equal("System.String", Assert.IsType<JavaType.Class>(name.Type).FullyQualifiedName);
+        Assert.Contains(holderType.Members!, v => v.Name == "Changed");
+
+        // The auto-property backing field and the get_/set_/add_/remove_ accessors are
+        // compiler-generated and must not leak into the model.
+        Assert.DoesNotContain(holderType.Members!, v => v.Name.StartsWith('<'));
+        Assert.DoesNotContain(holderType.Methods!, m => m.Name is "get_Name" or "set_Name"
+            or "add_Changed" or "remove_Changed");
+
+        var items = Assert.Single(holderType.Methods!, m => m.Name == "Items");
+        Assert.Equal("System.Collections.Generic.List",
+            Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Parameterized>(items.ReturnType).Type)
+                .FullyQualifiedName);
+
+        var reset = Assert.Single(holderType.Methods!, m => m.Name == "Reset");
+        Assert.Equal(["to"], reset.ParameterNames);
+        Assert.Same(holderType, reset.DeclaringType);
+
+        // The implicit parameterless constructor is a real member of the type.
+        Assert.Contains(holderType.Methods!, m => m.Name == ".ctor");
+
+        // Only declared members: `ToString` is inherited from System.Object and is reachable
+        // through the supertype chain, not through Holder's own member list.
+        Assert.DoesNotContain(holderType.Methods!, m => m.Name == "ToString");
+        var objectType = Assert.IsType<JavaType.Class>(holderType.Supertype);
+        Assert.Equal("System.Object", objectType.FullyQualifiedName);
+        Assert.Contains(objectType.Methods!, m => m.Name == "ToString");
+    }
+
+    [Fact]
+    public void MetadataClass_DeclaredMembersAndMethodsArePopulated()
+    {
+        // WPF types come from a reference assembly with no source, so they exercise the
+        // metadata path of the member mapping. Several WPF recipes need to answer
+        // "does ItemsControl declare a member named ItemsSource, and of what type?".
+        var cu = ParseWithSemanticModel("""
+            using System.Windows.Controls;
+            class Test
+            {
+                void M() { ItemsControl control = new ItemsControl(); }
+            }
+            """, Assemblies.Net90.AddPackage("Microsoft.WindowsDesktop.App.Ref", "9.0.16"));
+
+        var itemsControl = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "control")!.TypeExpression?.Type);
+        Assert.Equal("System.Windows.Controls.ItemsControl", itemsControl.FullyQualifiedName);
+
+        Assert.NotNull(itemsControl.Members);
+        Assert.NotNull(itemsControl.Methods);
+
+        // Instance property declared on ItemsControl.
+        var itemsSource = Assert.Single(itemsControl.Members!, v => v.Name == "ItemsSource");
+        Assert.Equal("System.Collections.IEnumerable",
+            Assert.IsType<JavaType.Class>(itemsSource.Type).FullyQualifiedName);
+
+        // Static dependency-property field declared on ItemsControl.
+        var itemsSourceProperty = Assert.Single(itemsControl.Members!,
+            v => v.Name == "ItemsSourceProperty");
+        Assert.Equal("System.Windows.DependencyProperty",
+            Assert.IsType<JavaType.Class>(itemsSourceProperty.Type).FullyQualifiedName);
+
+        Assert.Contains(itemsControl.Methods!, m => m.Name == "GetItemsOwner");
+
+        // Members declared by a base class are found on that base class, not on ItemsControl.
+        Assert.DoesNotContain(itemsControl.Members!, v => v.Name == "Visibility");
+        var uiElement = Walk(itemsControl, "System.Windows.UIElement");
+        Assert.Contains(uiElement.Members!, v => v.Name == "Visibility");
+    }
+
+    private static JavaType.Class Walk(JavaType.Class from, string fullyQualifiedName)
+    {
+        for (JavaType.Class? c = from; c != null; c = c.Supertype as JavaType.Class)
+        {
+            if (c.FullyQualifiedName == fullyQualifiedName) return c;
+        }
+        throw new Xunit.Sdk.XunitException(
+            $"{fullyQualifiedName} not found in the supertype chain of {from.FullyQualifiedName}");
     }
 }
