@@ -123,8 +123,8 @@ class AutoFormatTest implements RewriteTest {
               <?xml version="1.0" encoding="UTF-8"?>
               <project>
                 <excludes>
-                  <exclude>com.bol.fin.profit.ProfitFactory.processProfit.1</exclude> <!--tmp logic, test by cucumber-->
-                  <exclude>com.bol.fin.profit.io.ProfitUtils</exclude><!--tmp logic, test by cucumber-->
+                  <exclude>com.example.profit.ProfitFactory.processProfit.1</exclude> <!--tmp logic, tested elsewhere-->
+                  <exclude>com.example.profit.io.ProfitUtils</exclude><!--tmp logic, tested elsewhere-->
                 </excludes>
               </project>
               """
