@@ -132,6 +132,13 @@ public class LockEditSet {
          * retargets only the importer edge. The old {@code oldVersion} content is left byte-for-byte untouched.
          */
         boolean contentFork;
+
+        /**
+         * The bumped version's {@code dependencies} dropped one or more edges (Phase B orphan-prune). The patcher
+         * removes the dropped keys from this entry's {@code dependencies}/{@code requires} map and, after applying
+         * the bump, garbage-collects every installed entry the dropped edges leave unreachable.
+         */
+        boolean prunesOrphans;
     }
 
     /**
@@ -145,6 +152,13 @@ public class LockEditSet {
     public static class WriteThroughMetadata {
         @Nullable
         Map<String, String> engines;
+
+        /**
+         * The bump changed the {@code engines} surface (added, changed, or removed it). Distinguishes an
+         * engines-removal ({@link #engines} {@code null} but a real delta) from "no engines change" so the npm
+         * patcher removes a stale {@code engines} member instead of silently keeping it.
+         */
+        boolean enginesChanged;
 
         @Nullable
         String license;

@@ -238,6 +238,9 @@ public final class NativeLockEngine {
         proveNonDependencySurfacesUnchanged(name, oldManifest, newManifest);
 
         VersionManifest.Dist dist = newManifest.getDist();
+        // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable. npm only so far.
+        boolean prunesOrphans = pm == PackageManager.Npm && dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
                 .newIntegrity(dist == null ? null : dist.getIntegrity())
@@ -245,6 +248,7 @@ public final class NativeLockEngine {
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
                 .writeThroughMetadata(writeThrough(oldManifest, newManifest))
+                .prunesOrphans(prunesOrphans)
                 .build();
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -276,19 +280,11 @@ public final class NativeLockEngine {
     private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootOld,
                                                                     VersionManifest rootNew, String existingLock,
                                                                     NodeRegistries registries, NpmRegistryClient client) {
-        Map<String, String> oldDeps = rootOld.getDependencies() == null ?
-                Collections.emptyMap() : rootOld.getDependencies();
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
                 Collections.emptyMap() : rootNew.getDependencies();
 
-        for (String dep : oldDeps.keySet()) {
-            if (!newDeps.containsKey(dep)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
-                        "upgrading " + rootName + " drops the dependency edge to " + dep +
-                                " (orphan pruning) not yet supported");
-            }
-        }
-
+        // A dropped edge (present in oldDeps, gone from newDeps) is handled by the patcher's orphan GC, flagged
+        // on the root edit via prunesOrphans — not here. This loop only re-resolves edges the new version keeps.
         Map<String, String> topLevel = topLevelVersionsNpm(existingLock);
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
@@ -1581,6 +1577,22 @@ public final class NativeLockEngine {
         return Objects.equals(normalize(oldM.getDependencies()), normalize(newM.getDependencies()));
     }
 
+    /** Whether the new version removes a {@code dependencies} edge the old version declared (orphan-prune). */
+    private static boolean dropsDependencyEdge(VersionManifest oldM, VersionManifest newM) {
+        Map<String, String> oldDeps = oldM.getDependencies();
+        if (oldDeps == null || oldDeps.isEmpty()) {
+            return false;
+        }
+        Map<String, String> newDeps = newM.getDependencies() == null ?
+                Collections.emptyMap() : newM.getDependencies();
+        for (String dep : oldDeps.keySet()) {
+            if (!newDeps.containsKey(dep)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void requireEqual(String name, String surface, @Nullable Object a, @Nullable Object b) {
         if (!Objects.equals(normalize(a), normalize(b))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " " + surface + " changed");
@@ -1963,6 +1975,7 @@ public final class NativeLockEngine {
         boolean any = false;
         if (!Objects.equals(normalize(oldM.getEngines()), normalize(newM.getEngines()))) {
             b.engines(newM.getEngines());
+            b.enginesChanged(true);
             any = true;
         }
         if (!Objects.equals(oldM.getLicenseString(), newM.getLicenseString())) {

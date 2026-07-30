@@ -41,6 +41,7 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +122,17 @@ public final class NpmLockPatcher implements LockPatcher {
         if (!removals.isEmpty()) {
             root = applyRemovals(root, lockfileVersion, removals);
         }
+        // An orphan-prune bump dropped a dependency edge; GC every installed entry it left unreachable.
+        boolean prunes = false;
+        for (PackageEdit edit : edits.getEdits()) {
+            if (edit.isPrunesOrphans()) {
+                prunes = true;
+                break;
+            }
+        }
+        if (prunes) {
+            root = gcOrphansAfterBump(root, lockfileVersion);
+        }
         // A fresh nested add (a new closure member an incompatible top-level pin excludes) inserts after the
         // top-level adds, so applyAdd's flat-placement check never sees the nest being created.
         for (PackageEdit edit : edits.getEdits()) {
@@ -154,10 +166,11 @@ public final class NpmLockPatcher implements LockPatcher {
             entry = setStringField(entry, "version", edit.getNewVersion());
             entry = setStringField(entry, "resolved", edit.getNewResolved());
             entry = setStringField(entry, "integrity", edit.getNewIntegrity());
-            entry = applyWriteThrough(name, entry, edit.getWriteThroughMetadata());
-            // A cascade bump changes the entry's own dependency edge constraints (unchanged edges are
-            // left byte-identical). Edge add/remove reshapes and fails loud.
-            entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies());
+            entry = applyWriteThrough(name, packages, entry, edit.getWriteThroughMetadata());
+            // A cascade bump changes the entry's own dependency edge constraints (unchanged edges are left
+            // byte-identical). An added edge reshapes and fails loud; a dropped edge orphan-prunes when the
+            // edit allows it (the GC pass below drops whatever it leaves unreachable).
+            entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
             packages = putMember(packages, "node_modules/" + name, entry);
             root = putMember(root, "packages", packages);
         }
@@ -219,8 +232,9 @@ public final class NpmLockPatcher implements LockPatcher {
         entry = setStringField(entry, "version", edit.getNewVersion());
         entry = setStringField(entry, "resolved", edit.getNewResolved());
         entry = setStringField(entry, "integrity", edit.getNewIntegrity());
-        // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them too.
-        entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies());
+        // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them, an
+        // orphan-prune drops them.
+        entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies(), edit.isPrunesOrphans());
         legacy = putMember(legacy, name, entry);
         return putMember(root, "dependencies", legacy);
     }
@@ -231,27 +245,53 @@ public final class NpmLockPatcher implements LockPatcher {
      * added or removed by the upgrade reshapes the tree and fails loud (deferred).
      */
     private Json.JsonObject reconcileConstraintMap(String name, Json.JsonObject entry, String mapKey,
-                                                   @Nullable Map<String, String> newDeps) {
-        if (newDeps == null || newDeps.isEmpty()) {
+                                                   @Nullable Map<String, String> newDeps, boolean allowDrops) {
+        Map<String, String> deps = newDeps == null ? Collections.emptyMap() : newDeps;
+        if (deps.isEmpty() && !allowDrops) {
             return entry; // no constraint reconciliation requested (Phase A bump / leaf mover)
         }
         Json.JsonObject map = getObjectMember(entry, mapKey);
         if (map == null) {
+            if (deps.isEmpty()) {
+                return entry; // orphan-prune of an entry with no such map to begin with
+            }
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " gained a " + mapKey + " map on upgrade (not yet supported)");
         }
-        if (!memberKeys(map).equals(newDeps.keySet())) {
+        Set<String> mapKeys = memberKeys(map);
+        if (allowDrops) {
+            // An orphan-prune may only DROP edges the new version no longer declares; a fresh edge is an
+            // add-during-bump (deferred, fail loud).
+            for (String k : deps.keySet()) {
+                if (!mapKeys.contains(k)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            name + " added a " + mapKey + " edge to " + k + " on upgrade (not yet supported)");
+                }
+            }
+            Set<String> dropped = new LinkedHashSet<>();
+            for (String k : mapKeys) {
+                if (!deps.containsKey(k)) {
+                    dropped.add(k);
+                }
+            }
+            if (dropped.equals(mapKeys)) {
+                return removeMembers(entry, Collections.singleton(mapKey)); // every edge dropped: drop the map
+            }
+            if (!dropped.isEmpty()) {
+                map = removeMembers(map, dropped);
+            }
+        } else if (!mapKeys.equals(deps.keySet())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " added/removed a " + mapKey + " edge on upgrade (not yet supported)");
         }
         boolean changed = false;
-        for (Map.Entry<String, String> e : newDeps.entrySet()) {
+        for (Map.Entry<String, String> e : deps.entrySet()) {
             if (!e.getValue().equals(stringField(map, e.getKey()))) {
                 map = setStringField(map, e.getKey(), e.getValue());
                 changed = true;
             }
         }
-        return changed ? putMember(entry, mapKey, map) : entry;
+        return changed || allowDrops ? putMember(entry, mapKey, map) : entry;
     }
 
     private static Set<String> memberKeys(Json.JsonObject obj) {
@@ -734,13 +774,17 @@ public final class NpmLockPatcher implements LockPatcher {
         throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct new lock member");
     }
 
-    private Json.JsonObject applyWriteThrough(String name, Json.JsonObject entry, @Nullable WriteThroughMetadata wt) {
+    private Json.JsonObject applyWriteThrough(String name, Json.JsonObject packages, Json.JsonObject entry,
+                                              @Nullable WriteThroughMetadata wt) {
         if (wt == null) {
             return entry;
         }
-        if (wt.getEngines() != null || wt.getBin() != null) {
+        if (wt.getBin() != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " engines/bin metadata changed; native write-through is not supported");
+                    name + " bin metadata changed; native write-through is not supported");
+        }
+        if (wt.isEnginesChanged()) {
+            entry = writeThroughEngines(name, packages, entry, wt.getEngines());
         }
         if (wt.getLicense() != null) {
             if (getMember(entry, "license") == null) {
@@ -755,6 +799,25 @@ public final class NpmLockPatcher implements LockPatcher {
             entry = setStringField(entry, "deprecated", wt.getDeprecated());
         }
         return entry;
+    }
+
+    /** Add, replace, or remove the entry's {@code engines} object at npm's field position (byte-exact). */
+    private Json.JsonObject writeThroughEngines(String name, Json.JsonObject packages, Json.JsonObject entry,
+                                                @Nullable Map<String, String> engines) {
+        entry = removeMembers(entry, Collections.singleton("engines"));
+        if (engines == null || engines.isEmpty()) {
+            return entry; // engines removed on upgrade
+        }
+        String fieldWs = nestedMemberWhitespace(packages);
+        String closeWs = memberWhitespace(packages);
+        if (fieldWs == null || closeWs == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "cannot derive entry indentation for engines");
+        }
+        String keyIndent = indentOf(fieldWs);
+        String unit = keyIndent.length() > indentOf(closeWs).length() ?
+                keyIndent.substring(indentOf(closeWs).length()) : "  ";
+        String rendered = renderNode(JSON.valueToTree(engines), keyIndent, unit);
+        return graftSorted(entry, "engines", rendered, true);
     }
 
     private void requireRegistryEntry(String name, PackageEdit edit, Json.JsonObject entry) {
@@ -888,6 +951,157 @@ public final class NpmLockPatcher implements LockPatcher {
                     queue.add(name);
                 }
             }
+        }
+    }
+
+    // --- orphan GC after an edge-dropping bump ---------------------------
+
+    /**
+     * Drop every installed {@code packages} entry the bump left unreachable. Reachability is npm's own
+     * hoisting resolution ({@link #resolveFrom}) over the full tree — importer roots seed it, and each
+     * reachable entry's dependency edges resolve against its own install path — so a transitive still
+     * required elsewhere (top-level or nested) survives. A pruned name that also lives at another placement
+     * could re-hoist on removal, so it fails loud rather than risk a non-byte-exact tree.
+     */
+    private Json.JsonObject gcOrphansAfterBump(Json.JsonObject root, int lockfileVersion) {
+        Json.JsonObject packages = requirePackages(root);
+        Set<String> reachable = reachableInstalledKeys(packages);
+
+        Map<String, Integer> placements = new LinkedHashMap<>();
+        for (Json member : packages.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = memberKey((Json.Member) member);
+                if (key != null && key.contains("node_modules/")) {
+                    placements.merge(installedName(key), 1, Integer::sum);
+                }
+            }
+        }
+
+        Set<String> orphanKeys = new LinkedHashSet<>();
+        Set<String> orphanNames = new LinkedHashSet<>();
+        for (Json member : packages.getMembers()) {
+            if (!(member instanceof Json.Member)) {
+                continue;
+            }
+            String key = memberKey((Json.Member) member);
+            if (key == null || !key.contains("node_modules/")) {
+                continue; // importer entry
+            }
+            Json.JsonObject entry = (Json.JsonObject) ((Json.Member) member).getValue();
+            if (isLink(entry) || reachable.contains(key)) {
+                continue;
+            }
+            String name = installedName(key);
+            if (placements.getOrDefault(name, 0) > 1) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        "orphan-pruning " + name + " with a duplicate placement may re-hoist; deferred");
+            }
+            orphanKeys.add(key);
+            orphanNames.add(name);
+        }
+        if (orphanKeys.isEmpty()) {
+            return root;
+        }
+        packages = removeMembers(packages, orphanKeys);
+        root = putMember(root, "packages", packages);
+
+        if (lockfileVersion == 2) {
+            Json.JsonObject legacy = getObjectMember(root, "dependencies");
+            if (legacy != null) {
+                for (String name : orphanNames) {
+                    if (hasNestedOccurrence(legacy, name)) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                                "orphan-pruning " + name + " from a nested v2 legacy tree is not yet supported");
+                    }
+                }
+                root = putMember(root, "dependencies", removeMembers(legacy, orphanNames));
+            }
+        }
+        return root;
+    }
+
+    /** The bare package name of an installed {@code node_modules/...} key (its last path segment). */
+    private static String installedName(String key) {
+        return key.substring(key.lastIndexOf("node_modules/") + "node_modules/".length());
+    }
+
+    /** Installed entry keys reachable from an importer root via npm's hoisting resolution. */
+    private Set<String> reachableInstalledKeys(Json.JsonObject packages) {
+        Set<String> keys = new LinkedHashSet<>();
+        for (Json member : packages.getMembers()) {
+            if (member instanceof Json.Member) {
+                String key = memberKey((Json.Member) member);
+                if (key != null) {
+                    keys.add(key);
+                }
+            }
+        }
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>();
+        for (Json member : packages.getMembers()) {
+            if (!(member instanceof Json.Member)) {
+                continue;
+            }
+            String key = memberKey((Json.Member) member);
+            if (key == null || key.contains("node_modules/")) {
+                continue; // only importer roots seed the walk
+            }
+            Json.JsonObject importer = (Json.JsonObject) ((Json.Member) member).getValue();
+            for (String scope : IMPORTER_SCOPES) {
+                enqueueResolved(keys, key, getObjectMember(importer, scope), reachable, queue);
+            }
+        }
+        while (!queue.isEmpty()) {
+            String key = queue.poll();
+            Json.JsonObject entry = getObjectMember(packages, key);
+            if (entry == null) {
+                continue;
+            }
+            enqueueResolved(keys, key, getObjectMember(entry, "dependencies"), reachable, queue);
+            enqueueResolved(keys, key, getObjectMember(entry, "optionalDependencies"), reachable, queue);
+            enqueueResolved(keys, key, getObjectMember(entry, "peerDependencies"), reachable, queue);
+        }
+        return reachable;
+    }
+
+    private void enqueueResolved(Set<String> keys, String fromKey, Json.@Nullable JsonObject scope,
+                                 Set<String> reachable, Deque<String> queue) {
+        if (scope == null) {
+            return;
+        }
+        for (Json member : scope.getMembers()) {
+            if (!(member instanceof Json.Member)) {
+                continue;
+            }
+            String name = memberKey((Json.Member) member);
+            if (name == null) {
+                continue;
+            }
+            String resolved = resolveFrom(keys, fromKey, name);
+            if (resolved != null && reachable.add(resolved)) {
+                queue.add(resolved);
+            }
+        }
+    }
+
+    /**
+     * npm's hoisting resolution: from the package installed at {@code fromKey}, resolve {@code name} by
+     * checking its own {@code node_modules} then walking up each ancestor's, returning the matching entry
+     * key (or {@code null} when unresolved — e.g. an optional/peer edge left unplaced).
+     */
+    private static @Nullable String resolveFrom(Set<String> keys, String fromKey, String name) {
+        String prefix = fromKey.isEmpty() ? "" : fromKey + "/";
+        while (true) {
+            String candidate = prefix + "node_modules/" + name;
+            if (keys.contains(candidate)) {
+                return candidate;
+            }
+            if (prefix.isEmpty()) {
+                return null;
+            }
+            String trimmed = prefix.substring(0, prefix.length() - 1);
+            int nm = trimmed.lastIndexOf("node_modules/");
+            prefix = nm < 0 ? "" : trimmed.substring(0, nm);
         }
     }
 

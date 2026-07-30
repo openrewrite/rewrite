@@ -123,11 +123,10 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void npmEnginesWriteThroughNotYetSupported() {
-        // The engine's proof PASSES an engines-only delta (write-through tier), then dispatches to the npm
-        // patcher — which applies license/deprecated write-through but defers engines/bin (nested objects
-        // need a real golden to pin byte-exact npm output), failing loud SAFELY. The engine and the pnpm
-        // patcher fully support write-through; npm engines/bin is a tracked follow-up.
+    void npmEnginesWriteThrough() {
+        // An engines-only delta (write-through tier) is patched, not failed loud: the npm patcher rewrites the
+        // entry's `engines` object to the new value at npm's field position. (Byte-exact goldens for engines
+        // live in NpmOrphanPruneLockRegenTest#enginesChangeV3.)
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.20",
@@ -156,9 +155,46 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
                 lock);
 
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("\"version\": \"4.17.21\"");
+        assertThat(result.getLockFileContent()).contains("\">=14\"");
+        assertThat(result.getLockFileContent()).doesNotContain("\">=12\"");
+    }
+
+    @Test
+    void npmBinWriteThroughNotYetSupported() {
+        // A `bin` delta still fails loud (npm normalizes string/object bin; needs a real golden to pin bytes).
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{},\"bin\":{\"lodash\":\"old.js\"}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{},\"bin\":{\"lodash\":\"new.js\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
+
+        String lock = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"name\": \"x\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\",\n" +
+                "      \"bin\": {\"lodash\": \"old.js\"}\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("write-through is not supported");
+        assertThat(result.getFailure().getDetail()).contains("bin metadata changed");
     }
 
     @Test
