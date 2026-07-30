@@ -101,6 +101,46 @@ class PnpmAddLockRegenTest {
                 new String[][]{{"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
     }
 
+    // --- reverse-dependent content-fork (Phase B I5) ---------------------
+
+    @Test
+    void forkReverseDependentKeepsOldVersion() {
+        // Root deps debug@2.6.9 (which pins ms@2.0.0) + ms. Bumping ms -> 2.1.3: pnpm never nests, so it adds
+        // ms@2.1.3 content (packages+snapshots) and keeps ms@2.0.0 for debug, retargeting only the importer.
+        // The engine reads debug's ms constraint from its manifest to prove debug excludes 2.1.3 (a fork, not
+        // a dedupe). Routes: ms packument, debug@2.6.9 manifest (constraint), ms@2.1.3 manifest (new content).
+        assertAddByteExact("lock/pnpm/fork", new String[][]{{"ms", "2.1.3"}, {"debug", "2.6.9"}});
+    }
+
+    @Test
+    void forkWhenReverseDependentAcceptsNewVersionDefersAsDedupe() {
+        // widget's snapshot resolves ms to 2.0.0, but its manifest range (^2.0.0) ACCEPTS the bumped 2.1.3 —
+        // so pnpm would dedupe widget up to 2.1.3 (dropping ms@2.0.0), not fork. The engine reads the range
+        // from widget's manifest and defers rather than emit a wrong content-fork.
+        routes.put(REG + "ms", "{\"name\":\"ms\",\"dist-tags\":{},\"versions\":{\"2.0.0\":{},\"2.1.3\":{}}}");
+        routes.put(REG + "widget/1.0.0",
+                "{\"name\":\"widget\",\"version\":\"1.0.0\",\"dependencies\":{\"ms\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/widget/-/widget-1.0.0.tgz\",\"integrity\":\"sha512-W\"}}");
+
+        String lock = "lockfileVersion: '9.0'\n\n" +
+                "importers:\n\n  .:\n    dependencies:\n" +
+                "      widget:\n        specifier: 1.0.0\n        version: 1.0.0\n" +
+                "      ms:\n        specifier: 2.0.0\n        version: 2.0.0\n\n" +
+                "packages:\n\n  widget@1.0.0:\n    resolution: {integrity: sha512-W}\n\n" +
+                "  ms@2.0.0:\n    resolution: {integrity: sha512-M}\n\n" +
+                "snapshots:\n\n  widget@1.0.0:\n    dependencies:\n      ms: 2.0.0\n\n  ms@2.0.0: {}\n";
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Pnpm,
+                "{\"dependencies\":{\"widget\":\"1.0.0\",\"ms\":\"2.1.3\"}}",
+                "{\"dependencies\":{\"widget\":\"1.0.0\",\"ms\":\"2.0.0\"}}",
+                lock, null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("ms");
+        assertThat(result.getFailure().getDetail()).contains("dedupe");
+    }
+
     // --- fail loud (any peer in the closure defers) -----------------------
 
     @Test
@@ -155,7 +195,7 @@ class PnpmAddLockRegenTest {
     @Test
     @Disabled("live: runs real pnpm 11.2.2 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealPnpm() throws Exception {
-        String[] fixtures = {"lock/pnpm/add-leaf", "lock/pnpm/add-closure"};
+        String[] fixtures = {"lock/pnpm/add-leaf", "lock/pnpm/add-closure", "lock/pnpm/fork"};
         for (String fixture : fixtures) {
             assertPnpmReproduces(fixture + "/pkg-before", fixture + "/before");
             assertPnpmReproduces(fixture + "/pkg-after", fixture + "/after");

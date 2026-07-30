@@ -96,6 +96,10 @@ public final class PnpmLockPatcher implements LockPatcher {
                 root = applyAdd(root, edit, major, newConstraints, addedVersions);
                 continue;
             }
+            if (edit.isContentFork()) {
+                root = applyContentFork(root, edit, major, newConstraints);
+                continue;
+            }
             if (edit.isForcedMove()) {
                 root = applyForcedMove(root, edit, major);
                 continue;
@@ -464,6 +468,48 @@ public final class PnpmLockPatcher implements LockPatcher {
             result = replaceEntryValue(result, scope, patchedDeps);
         }
         return result;
+    }
+
+    // --- content-fork (Phase B I5) ---------------------------------------
+
+    /**
+     * pnpm's reverse-dependent fork (v9 only): add the new version's {@code packages}+{@code snapshots} content
+     * (a leaf) and retarget only the importer edge, leaving the old version's entries byte-for-byte in place for
+     * the reverse-dependent that still resolves to it. Reuses the add path's content builders; unlike a normal
+     * bump it renames nothing.
+     */
+    private Yaml.Mapping applyContentFork(Yaml.Mapping root, PackageEdit edit, int major, Map<String, String> newConstraints) {
+        if (major < 9) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    "a pnpm content-fork below lockfileVersion 9 is not yet supported");
+        }
+        if (edit.getNewIntegrity() == null) {
+            throw fail(Reason.UNSUPPORTED_ENTRY_TYPE, edit.getName(), edit.getName() + " has no registry integrity");
+        }
+        requireSupportedWriteThrough(edit);
+        String key = edit.getName() + "@" + edit.getNewVersion();
+
+        Yaml.Mapping packages = section(root, "packages");
+        if (packages == null) {
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no packages section");
+        }
+        if (findEntry(packages, key) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
+        }
+        packages = insertEntrySorted(packages, buildPackagesEntry(edit, key), key);
+        root = replaceEntryValue(root, "packages", packages);
+
+        Yaml.Mapping snapshots = section(root, "snapshots");
+        if (snapshots == null) {
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no snapshots section");
+        }
+        if (findEntry(snapshots, key) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present in snapshots; dedupe required");
+        }
+        snapshots = insertEntrySorted(snapshots, buildSnapshotEntry(edit, key, Collections.emptyMap()), key);
+        root = replaceEntryValue(root, "snapshots", snapshots);
+
+        return patchImporter(root, edit, false, newConstraints);
     }
 
     // --- leaf / clean-closure add (Phase B increment 4) ------------------

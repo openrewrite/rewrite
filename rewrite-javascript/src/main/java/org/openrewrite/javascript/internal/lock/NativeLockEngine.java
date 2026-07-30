@@ -215,6 +215,15 @@ public final class NativeLockEngine {
             nestEdits = planReverseDependentNestsNpm(name, oldVersion, targetVersion, existingLock, registries, client);
         } else if (pm == PackageManager.Bun) {
             nestEdits = planReverseDependentNestsBun(name, oldVersion, targetVersion, existingLock, registries, client);
+        } else if (pm == PackageManager.Pnpm) {
+            // pnpm never nests; a reverse-dependent that keeps the old version becomes a content-fork that
+            // replaces the whole bump (add the new content, retain the old), so it returns early when it fires.
+            List<LockEditSet.PackageEdit> fork =
+                    planContentForkPnpm(name, oldVersion, targetVersion, change, existingLock, registries, client);
+            if (fork != null) {
+                return fork;
+            }
+            nestEdits = Collections.emptyList();
         } else {
             proveReverseDependentsAccept(pm, name, oldVersion, targetVersion, existingLock);
             nestEdits = Collections.emptyList();
@@ -547,6 +556,73 @@ public final class NativeLockEngine {
                 .importerDir(null)
                 .forcedMove(true)
                 .build();
+    }
+
+    /**
+     * Phase B increment 5 (pnpm): a direct-dependency bump a reverse-dependent excludes. pnpm is
+     * content-addressed and never nests, so it <b>content-forks</b> — the old version stays for the
+     * reverse-dependent and the new version is added as fresh {@code packages}+{@code snapshots} content, with
+     * only the importer edge retargeted. Because a pnpm lock records resolved versions (not ranges), the
+     * reverse-dependent's acceptance of the new version cannot be read from the lock; its manifest is fetched to
+     * prove its constraint <b>excludes</b> the target (else pnpm would dedupe it up, not fork). The safe slice is
+     * a single referrer keeping a leaf; anything else fails loud.
+     *
+     * @return the one content-fork edit when it applies, or {@code null} when the moved dep is not kept by any
+     * reverse-dependent (a plain rename bump proceeds instead).
+     */
+    private static @Nullable List<LockEditSet.PackageEdit> planContentForkPnpm(String name, String oldVersion,
+                                                                               String targetVersion, DepChange change,
+                                                                               String lock, NodeRegistries registries,
+                                                                               NpmRegistryClient client) {
+        Set<String> referrers = referrersPnpm(lock, name, oldVersion, " ");
+        if (referrers.isEmpty()) {
+            return null; // not retained by any reverse-dependent — a normal rename bump, not a fork
+        }
+        if (referrers.size() > 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + "@" + oldVersion + " is shared by " +
+                    referrers + "; forking more than one reverse-dependent is not yet supported");
+        }
+        String referrerKey = referrers.iterator().next();
+        int at = referrerKey.lastIndexOf('@');
+        if (at <= 0) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "unparseable referrer key " + referrerKey);
+        }
+        String refName = referrerKey.substring(0, at);
+        String refVersion = referrerKey.substring(at + 1);
+
+        // The referrer must genuinely EXCLUDE the new version — otherwise pnpm dedupes it up rather than forking.
+        // Its range is not in the lock (resolved versions only), so read it from the referrer's own manifest.
+        VersionManifest refManifest = client.getManifest(registries.registryFor(refName), refName, refVersion);
+        Map<String, String> refDeps = refManifest.getDependencies();
+        String refConstraint = refDeps == null ? null : refDeps.get(name);
+        if (refConstraint == null || !NodeSemver.validRange(refConstraint) ||
+                NodeSemver.satisfies(targetVersion, refConstraint)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, refName + " accepts " + name + "@" +
+                    targetVersion + " (constraint " + refConstraint + "); pnpm would dedupe, not fork; deferred");
+        }
+
+        // The added version's content must be a clean leaf (no deps/peers/unsupported metadata to place).
+        VersionManifest newManifest = client.getManifest(registries.registryFor(name), name, targetVersion);
+        requireEmittablePnpmClosureMember(name, newManifest);
+        if (notEmpty(newManifest.getDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + "@" + targetVersion +
+                    " has its own dependencies; a pnpm fork of a non-leaf is not yet supported");
+        }
+        VersionManifest.Dist dist = newManifest.getDist();
+        if (dist == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name, name + "@" + targetVersion + " has no registry integrity");
+        }
+
+        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+                .name(name)
+                .oldVersion(oldVersion)
+                .newVersion(targetVersion)
+                .newIntegrity(dist.getIntegrity())
+                .writeThroughMetadata(pnpmLeafMetadata(newManifest))
+                .scope(change.scope)
+                .importerDir(findImporterDir(PackageManager.Pnpm, lock, name, change.scope, change.oldConstraint))
+                .contentFork(true)
+                .build());
     }
 
     /** The resolved versions the given pnpm snapshot depends on (its {@code dependencies} map values). */

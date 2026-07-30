@@ -124,6 +124,14 @@ public class LockEditSet {
          */
         @Nullable
         String nestedUnder;
+
+        /**
+         * pnpm's answer to reverse-dependent nesting (Phase B I5): pnpm is content-addressed and never nests, so
+         * instead of renaming the moved entry the patcher <b>adds</b> the new version's content
+         * ({@code packages}+{@code snapshots}) and <b>retains</b> the old one for the reverse-dependent, then
+         * retargets only the importer edge. The old {@code oldVersion} content is left byte-for-byte untouched.
+         */
+        boolean contentFork;
     }
 
     /**
