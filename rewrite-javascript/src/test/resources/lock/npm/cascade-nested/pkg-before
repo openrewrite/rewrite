@@ -1,0 +1,8 @@
+{
+  "name": "npm-nested-cascade",
+  "version": "1.0.0",
+  "dependencies": {
+    "@rollup/plugin-node-resolve": "15.2.3",
+    "@types/resolve": "1.20.6"
+  }
+}

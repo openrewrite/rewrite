@@ -285,12 +285,16 @@ public final class NativeLockEngine {
 
         // A dropped edge (present in oldDeps, gone from newDeps) is handled by the patcher's orphan GC, flagged
         // on the root edit via prunesOrphans — not here. This loop only re-resolves edges the new version keeps.
-        Map<String, String> topLevel = topLevelVersionsNpm(existingLock);
+        // Each edge resolves over the ACTUAL installed tree via npm's hoisting walk (the bumped package's own
+        // node_modules first, then up), so an edge already satisfied by a nested copy is a no-op — not a new add.
+        Map<String, Object> installed = installedPackagesNpm(existingLock);
+        String rootKey = "node_modules/" + rootName;
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
             String dep = e.getKey();
             String constraint = e.getValue();
-            String cur = topLevel.get(dep);
+            String resolvedKey = NpmLockPatcher.resolveFrom(installed.keySet(), rootKey, dep);
+            String cur = installedVersion(installed, resolvedKey);
             if (cur == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                         "upgrading " + rootName + " introduces new transitive " + dep +
@@ -301,6 +305,13 @@ public final class NativeLockEngine {
                         dep + " is constrained by an unresolvable range: " + constraint);
             }
             if (!NodeSemver.satisfies(cur, constraint)) {
+                if (!resolvedKey.equals("node_modules/" + dep)) {
+                    // A nested copy that no longer satisfies would move within its own subtree; the mover path
+                    // assumes a top-level entry, so defer rather than risk a non-byte-exact tree.
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                            "moving nested " + dep + " to satisfy the upgraded " + rootName +
+                                    " constraint is not yet supported");
+                }
                 moves.add(resolveForcedMove(rootName, dep, cur, newDeps, existingLock, registries, client));
             }
         }
@@ -1394,6 +1405,30 @@ public final class NativeLockEngine {
     /** Whether an already-placed {@code version} satisfies a new {@code constraint} (proven dedup only). */
     private static boolean existingSatisfies(String version, String constraint) {
         return NodeSemver.validRange(constraint) && NodeSemver.satisfies(version, constraint);
+    }
+
+    /** Every installed {@code node_modules/...} entry (keyed by full path), the candidate set for hoisting resolution. */
+    private static Map<String, Object> installedPackagesNpm(String lock) {
+        Map<String, Object> installed = new LinkedHashMap<>();
+        Object packages = parseJsonObject(lock, false).get("packages");
+        if (packages instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
+                String key = String.valueOf(e.getKey());
+                if (key.contains("node_modules/")) {
+                    installed.put(key, e.getValue());
+                }
+            }
+        }
+        return installed;
+    }
+
+    private static @Nullable String installedVersion(Map<String, Object> installed, @Nullable String key) {
+        Object entry = key == null ? null : installed.get(key);
+        if (!(entry instanceof Map)) {
+            return null;
+        }
+        Object v = ((Map<?, ?>) entry).get("version");
+        return v == null ? null : String.valueOf(v);
     }
 
     /** The single top-level version of each hoisted package ({@code packages["node_modules/<name>"]}). */

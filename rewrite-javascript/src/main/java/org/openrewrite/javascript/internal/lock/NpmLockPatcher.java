@@ -1089,7 +1089,7 @@ public final class NpmLockPatcher implements LockPatcher {
      * checking its own {@code node_modules} then walking up each ancestor's, returning the matching entry
      * key (or {@code null} when unresolved — e.g. an optional/peer edge left unplaced).
      */
-    private static @Nullable String resolveFrom(Set<String> keys, String fromKey, String name) {
+    static @Nullable String resolveFrom(Set<String> keys, String fromKey, String name) {
         String prefix = fromKey.isEmpty() ? "" : fromKey + "/";
         while (true) {
             String candidate = prefix + "node_modules/" + name;
