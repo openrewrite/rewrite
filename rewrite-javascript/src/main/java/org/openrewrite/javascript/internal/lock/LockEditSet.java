@@ -139,6 +139,19 @@ public class LockEditSet {
          * the bump, garbage-collects every installed entry the dropped edges leave unreachable.
          */
         boolean prunesOrphans;
+
+        /**
+         * The added dependency was already installed as a satisfying transitive (Phase B). npm keeps the existing
+         * {@code node_modules/<name>} entry untouched and only writes the importer's declared constraint; the
+         * patcher inserts that edge (creating the scope object when absent) and rewrites nothing else.
+         */
+        boolean promoted;
+
+        /**
+         * A {@link #promoted} dev-only transitive is now production-reachable, so npm clears {@code "dev": true}
+         * on its install entry. Only set for a leaf (no subtree dev flags to propagate); v2 legacy trees fail loud.
+         */
+        boolean clearDev;
     }
 
     /**

@@ -768,6 +768,7 @@ public final class NativeLockEngine {
 
         Map<String, Placement> placed = new LinkedHashMap<>();
         Map<String, NestedPlacement> nested = new LinkedHashMap<>();
+        LockEditSet.PackageEdit promotion = null;
         Deque<Requirement> queue = new ArrayDeque<>();
         queue.add(new Requirement(rootName, rootConstraint, dev));
 
@@ -776,6 +777,20 @@ public final class NativeLockEngine {
 
             String existingVersion = existingTopLevel.get(req.name);
             if (existingVersion != null) {
+                if (req.name.equals(rootName)) {
+                    // The added dep is already installed as a transitive. npm reuses that install (writing only
+                    // the importer edge, and clearing "dev" on a dev→prod promotion) exactly when its version is
+                    // what the added constraint resolves to; a version change would upgrade/fork and is deferred.
+                    NodeRegistry registry = registries.registryFor(rootName);
+                    String resolved = resolveAddedVersion(client, registry, rootName, rootConstraint);
+                    if (!resolved.equals(existingVersion)) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is installed at " +
+                                existingVersion + " but the added " + rootConstraint + " resolves to " + resolved +
+                                " (promotion would change the version); deferred");
+                    }
+                    promotion = promotionEdit(rootName, change.scope, dev, existingLock);
+                    continue;
+                }
                 // Dedup to the already-placed pin, or nest the required version under its parent where an
                 // incompatible version holds the top slot (I5 add-nest, leaf-under-a-fresh-top-level slice).
                 if (existingSatisfies(existingVersion, req.constraint)) {
@@ -852,7 +867,42 @@ public final class NativeLockEngine {
                     .writeThroughMetadata(leafMetadata(np.manifest))
                     .build());
         }
+        if (promotion != null) {
+            edits.add(promotion);
+        }
         return edits;
+    }
+
+    /**
+     * Build the edit for promoting an already-installed transitive to a declared dependency: the install entry
+     * stays, only the importer edge is written, and a dev→prod promotion clears the top-level entry's
+     * {@code "dev": true}. A non-leaf dev→prod promotion (its subtree's dev flags would need propagating) fails
+     * loud. A nested copy of the same name under another parent is left untouched — it is an independent
+     * placement (a reverse-dependent's pin) that promoting the hoisted entry does not reshape.
+     */
+    private static LockEditSet.PackageEdit promotionEdit(String rootName, String scope, boolean dev, String existingLock) {
+        Map<String, Object> installed = installedPackagesNpm(existingLock);
+        String entryKey = "node_modules/" + rootName;
+        Object entry = installed.get(entryKey);
+        boolean existingDev = entry instanceof Map && Boolean.TRUE.equals(((Map<?, ?>) entry).get("dev"));
+        boolean clearDev = existingDev && !dev;
+        if (clearDev && entry instanceof Map) {
+            Object deps = ((Map<?, ?>) entry).get("dependencies");
+            if (deps instanceof Map && !((Map<?, ?>) deps).isEmpty()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
+                        "promoting non-leaf dev transitive " + rootName + " to production needs dev-flag propagation; deferred");
+            }
+        }
+        String version = installedVersion(installed, entryKey);
+        return LockEditSet.PackageEdit.builder()
+                .name(rootName)
+                .oldVersion(version == null ? "" : version)
+                .newVersion(version)
+                .scope(scope)
+                .importerDir(null)
+                .promoted(true)
+                .clearDev(clearDev)
+                .build();
     }
 
     /**
@@ -1002,6 +1052,13 @@ public final class NativeLockEngine {
 
             String existingVersion = existingTopLevel.get(req.name);
             if (existingVersion != null) {
+                if (req.name.equals(rootName)) {
+                    // The added dep is already installed as a transitive: bun rewrites the importer edge (and
+                    // clears any dev marker on a dev→prod promotion). The npm-verified promotion is not yet
+                    // ported to bun's tuple format, so fail loud rather than emit a lock missing the edge.
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
+                            "promoting already-installed " + rootName + " to a declared dependency is not yet supported for bun");
+                }
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }

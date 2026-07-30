@@ -109,6 +109,10 @@ public final class NpmLockPatcher implements LockPatcher {
             if (edit.getNestedUnder() != null) {
                 continue; // both nest kinds run in their own pass
             }
+            if (edit.isPromoted()) {
+                root = applyPromotion(root, lockfileVersion, editedManifest, edit);
+                continue;
+            }
             if (edit.getNewVersion() == null) {
                 removals.add(edit);
                 continue;
@@ -341,6 +345,32 @@ public final class NpmLockPatcher implements LockPatcher {
         // Site (3): the v2 legacy dependencies tree.
         if (lockfileVersion == 2) {
             root = insertLegacyEntry(root, edit);
+        }
+        return root;
+    }
+
+    /**
+     * Promote an already-installed transitive to a declared dependency: the {@code node_modules/<name>} entry
+     * stays, so only the importer edge is written (creating the scope object when absent). A dev→prod promotion
+     * additionally clears {@code "dev": true} on the leaf entry; the v2 legacy tree marks dev in two places, so
+     * clearing it there is not yet verified and fails loud.
+     */
+    private Json.JsonObject applyPromotion(Json.JsonObject root, int lockfileVersion,
+                                           @Nullable JsonNode editedManifest, PackageEdit edit) {
+        root = insertImporterConstraint(root, editedManifest, edit);
+        if (edit.isClearDev()) {
+            if (lockfileVersion == 2) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                        "clearing dev on a lockfileVersion 2 promotion (legacy tree) is not yet supported");
+            }
+            Json.JsonObject packages = requirePackages(root);
+            String entryKey = "node_modules/" + edit.getName();
+            Json.JsonObject entry = getObjectMember(packages, entryKey);
+            if (entry != null) {
+                entry = removeMembers(entry, Collections.singleton("dev"));
+                packages = putMember(packages, entryKey, entry);
+                root = putMember(root, "packages", packages);
+            }
         }
         return root;
     }
