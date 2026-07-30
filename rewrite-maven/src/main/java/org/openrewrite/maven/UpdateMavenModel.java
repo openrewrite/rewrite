@@ -181,24 +181,26 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static void storeModuleResults(ExecutionContext ctx, MavenResolutionResult result) {
+        Map<Path, MavenResolutionResult> map = getOrCreateUpdatedModules(ctx);
+        for (MavenResolutionResult module : result.getModules()) {
+            Path modulePath = module.getPom().getRequested().getSourcePath();
+            if (modulePath != null) {
+                // putIfAbsent: don't overwrite a fresher entry from storeSelfResult (see updateResult catch)
+                map.putIfAbsent(modulePath, module);
+            }
+            storeModuleResults(ctx, module);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<Path, MavenResolutionResult> getOrCreateUpdatedModules(ExecutionContext ctx) {
         Map<Path, MavenResolutionResult> map = ctx.getMessage(UPDATED_MODULES_KEY);
         if (map == null) {
             map = new HashMap<>();
             ctx.putMessage(UPDATED_MODULES_KEY, map);
         }
-        for (MavenResolutionResult module : result.getModules()) {
-            Path modulePath = module.getPom().getRequested().getSourcePath();
-            if (modulePath != null) {
-                // Don't clobber a fresher model recorded by storeSelfResult: when a child module's
-                // dependency resolution failed transiently, the best-effort re-resolution above returns the
-                // child's *stale* model here, but storeSelfResult already captured the child's updated POM
-                // (with the parent's new dependency management) during recursion. Prefer that one.
-                map.putIfAbsent(modulePath, module);
-            }
-            storeModuleResults(ctx, module);
-        }
+        return map;
     }
 
     private @Nullable List<GroupArtifact> mapExclusions(Xml.Tag tag) {
@@ -239,10 +241,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 mrr = mrr.resolveDependencies(downloader, ctx);
             } catch (MavenDownloadingExceptions e) {
                 if (isChildModule) {
-                    // Store the resolved POM model (with updated dependency management inherited from the
-                    // parent) before rethrowing so that this child module's model update can still be picked
-                    // up when the recipe visits the child's document, even though full dependency resolution
-                    // failed on a transiently inconsistent coordinate mid-recipe.
+                    // Preserve the child's updated POM (with parent's new management) even when
+                    // full dependency resolution fails on a transiently inconsistent coordinate.
                     storeSelfResult(ctx, mrr);
                 }
                 throw e;
@@ -256,13 +256,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     private static void storeSelfResult(ExecutionContext ctx, MavenResolutionResult result) {
         Path path = result.getPom().getRequested().getSourcePath();
         if (path != null) {
-            @SuppressWarnings("unchecked")
-            Map<Path, MavenResolutionResult> map = ctx.getMessage(UPDATED_MODULES_KEY);
-            if (map == null) {
-                map = new HashMap<>();
-                ctx.putMessage(UPDATED_MODULES_KEY, map);
-            }
-            map.put(path, result);
+            getOrCreateUpdatedModules(ctx).put(path, result);
         }
     }
 }

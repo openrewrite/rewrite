@@ -143,11 +143,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             @Override
             @SuppressWarnings("unchecked")
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                // Apply pending model updates from parent POM processing.
-                // When a parent POM's managed dependency is changed, UpdateMavenModel re-resolves
-                // the parent and its modules, storing updated module results in the execution context.
-                // Child modules that don't have XML changes still need their resolved model updated.
-                // Only apply if this recipe actually changed a managed dependency (tracked via MANAGED_DEP_CHANGED_KEY).
+                // Pick up any updated resolution for this document produced when a sibling parent POM was visited.
                 Set<Path> changedPoms = ctx.getMessage(MANAGED_DEP_CHANGED_KEY);
                 if (changedPoms != null && !changedPoms.isEmpty()) {
                     Map<Path, MavenResolutionResult> updatedModules = ctx.getMessage(UpdateMavenModel.UPDATED_MODULES_KEY);
