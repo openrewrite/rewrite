@@ -173,4 +173,53 @@ class AutoFormatTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentAfterRootElementIsRetained() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project>
+              <!--why project-->
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentTrailingRootElementIsRetained() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project> <!--why project-->
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingWhitespaceAfterRootElementIsRemoved() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project>   \s
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project>
+              """
+          )
+        );
+    }
 }
