@@ -38,3 +38,5 @@ jobs:
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
       cgp_aws_access_key_id: ${{ secrets.CGP_AWS_ACCESS_KEY_ID }}
       cgp_aws_secret_access_key: ${{ secrets.CGP_AWS_SECRET_ACCESS_KEY }}
+      cgp_artifacts_maven_username: ${{ secrets.CGP_ARTIFACTS_MAVEN_USERNAME }}
+      cgp_artifacts_maven_token: ${{ secrets.CGP_ARTIFACTS_MAVEN_TOKEN }}
