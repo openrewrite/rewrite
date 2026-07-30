@@ -661,6 +661,11 @@ public final class NativeLockEngine {
             // loud on any conflict/nest (bun's parent/name fork keys).
             return resolveClosureAddBun(change, rootName, rootConstraint, existingLock, registries, client);
         }
+        if (pm == PackageManager.YarnClassic) {
+            // yarn.lock lists one block per resolved (name, version); placement is not hoisted, so every
+            // closure member must be brand-new (no merge/second-block for an existing name).
+            return resolveClosureAddYarn(change, rootName, rootConstraint, existingLock, registries, client);
+        }
         // Only the npm patcher can insert closure entries so far; other formats defer.
         if (pm != PackageManager.Npm) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
@@ -897,6 +902,119 @@ public final class NativeLockEngine {
                     .build());
         }
         return edits;
+    }
+
+    /**
+     * Phase B (yarn-classic): a direct dependency the recipe added, plus its runtime closure, into a
+     * {@code yarn.lock} v1. yarn is not hoisted — it lists one {@code name@range:} block per resolved
+     * {@code (name, version)} — so placement is mechanical (the patcher inserts each block at its
+     * {@code sortAlpha} position), but the block header is the set of every declared/transitive range that
+     * resolves to the version. The version resolution reuses the shared worklist ({@code resolveAddedVersion}
+     * over the packument, transitive walk).
+     * <p>
+     * The yarn-specific contract: every closure member must be <b>brand-new</b> (its name absent from every
+     * existing block) so no header merge or second-version block opens, and <b>no member may declare peers or
+     * optionalDependencies</b> — yarn resolves those into further blocks the clean placement does not model.
+     * Any collision, peer, or optional fails loud; other block-irrelevant metadata (engines/os/cpu/bin) is not
+     * recorded in a yarn.lock block, so it needs no gate.
+     */
+    private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(DepChange change, String rootName,
+                                                                       String rootConstraint, String existingLock,
+                                                                       NodeRegistries registries, NpmRegistryClient client) {
+        Set<String> existingNames = existingYarnNames(existingLock);
+        boolean dev = "devDependencies".equals(change.scope);
+
+        Map<String, Placement> placed = new LinkedHashMap<>();
+        Deque<Requirement> queue = new ArrayDeque<>();
+        queue.add(new Requirement(rootName, rootConstraint, dev));
+
+        while (!queue.isEmpty()) {
+            Requirement req = queue.poll();
+            if (existingNames.contains(req.name)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
+                        " is already present in the lock; yarn would merge a selector or fork a second block (deferred)");
+            }
+            Placement already = placed.get(req.name);
+            if (already != null) {
+                if (existingSatisfies(already.version, req.constraint)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
+                        " is required at two incompatible versions within the added closure (" +
+                        already.version + " vs " + req.constraint + "); deferred");
+            }
+
+            NodeRegistry registry = registries.registryFor(req.name);
+            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
+            VersionManifest manifest = client.getManifest(registry, req.name, version);
+            requireEmittableYarnClosureMember(req.name, manifest);
+
+            VersionManifest.Dist dist = manifest.getDist();
+            if (dist == null || dist.getTarball() == null || dist.getShasum() == null || dist.getIntegrity() == null) {
+                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
+                        req.name + "@" + version + " has no registry tarball/shasum/integrity");
+            }
+
+            placed.put(req.name, new Placement(version, manifest, req.dev));
+            enqueueDeps(queue, manifest.getDependencies(), req.dev);
+        }
+
+        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
+        for (Map.Entry<String, Placement> e : placed.entrySet()) {
+            Placement p = e.getValue();
+            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
+            // Only the root writes an importer edge in package.json; the patcher derives each block header's
+            // selector ranges from the added edits' dependency maps plus the root's declared constraint.
+            edits.add(LockEditSet.PackageEdit.builder()
+                    .name(e.getKey())
+                    .oldVersion("")
+                    .newVersion(p.version)
+                    .newResolved(dist.getTarball())
+                    .newShasum(dist.getShasum())
+                    .newIntegrity(dist.getIntegrity())
+                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
+                    .scope(p.dev ? "devDependencies" : "dependencies")
+                    .importerDir(null)
+                    .added(true)
+                    .build());
+        }
+        return edits;
+    }
+
+    /**
+     * A closure member the yarn add patcher can insert byte-exactly. A yarn.lock block carries only
+     * {@code version}/{@code resolved}/{@code integrity}/{@code dependencies}, so engines/os/cpu/bin never
+     * appear and need no gate; a peer or optionalDependency, however, resolves into further blocks the clean
+     * placement does not model — so either defers the whole add.
+     */
+    private static void requireEmittableYarnClosureMember(String name, VersionManifest m) {
+        if (notEmpty(m.getOptionalDependencies())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " pulls in optionalDependencies not yet supported for yarn adds");
+        }
+        if (notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding " + name + " declares peerDependencies not yet supported for yarn adds");
+        }
+    }
+
+    /** Every package name that heads a block in the yarn.lock (across all merged selectors). */
+    private static Set<String> existingYarnNames(String lock) {
+        Set<String> names = new LinkedHashSet<>();
+        for (String line : lock.split("\n")) {
+            if (line.isEmpty() || Character.isWhitespace(line.charAt(0)) || line.charAt(0) == '#' || !line.endsWith(":")) {
+                continue;
+            }
+            String header = line.substring(0, line.length() - 1);
+            for (String selector : header.split(",")) {
+                String s = unquote(selector.trim());
+                int at = s.lastIndexOf('@');
+                if (at > 0) {
+                    names.add(s.substring(0, at));
+                }
+            }
+        }
+        return names;
     }
 
     /** The single top-level version of each hoisted bun package ({@code packages["<name>"]} tuple, non-nested key). */

@@ -20,8 +20,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -54,10 +56,63 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         // Mirror the host the siblings use rather than force-rewriting to yarnpkg: a lock already on
         // registry.npmjs.org must stay there, or the new entry's host won't match a real yarn install.
         mirrorToYarnpkg = content.contains(YARN_REGISTRY);
+        List<PackageEdit> adds = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            content = applyEdit(content, edit, edits.getEditedPackageJson());
+            if (edit.isAdded()) {
+                adds.add(edit);
+            } else {
+                content = applyEdit(content, edit, edits.getEditedPackageJson());
+            }
+        }
+        if (!adds.isEmpty()) {
+            content = applyAdds(content, adds, edits.getEditedPackageJson());
         }
         return content;
+    }
+
+    /** Insert each added closure member as a new, {@code sortAlpha}-positioned block (blank-line separated). */
+    private String applyAdds(String content, List<PackageEdit> adds, @Nullable String editedPackageJson) {
+        Blocks blocks = Blocks.parse(content);
+        for (PackageEdit edit : adds) {
+            blocks.insertSorted(synthesizeBlock(mergedHeader(edit, adds, editedPackageJson), edit));
+        }
+        return blocks.reconstruct();
+    }
+
+    /**
+     * The block header for an added member: the sorted, {@code shouldWrapKey}-quoted set of every
+     * {@code name@range} selector that resolves to it — the root's declared range plus every added sibling's
+     * dependency range on it.
+     */
+    private static String mergedHeader(PackageEdit edit, List<PackageEdit> adds, @Nullable String editedPackageJson) {
+        String name = edit.getName();
+        Set<String> ranges = new LinkedHashSet<>();
+        String declared = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
+        if (declared != null) {
+            ranges.add(declared);
+        }
+        for (PackageEdit other : adds) {
+            Map<String, String> deps = other.getNewDependencies();
+            if (deps != null && deps.containsKey(name)) {
+                ranges.add(deps.get(name));
+            }
+        }
+        if (ranges.isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no declaring range found for added " + name);
+        }
+        List<String> selectors = new ArrayList<>();
+        for (String range : ranges) {
+            selectors.add(name + "@" + range);
+        }
+        selectors.sort(YarnClassicLockPatcher::sortAlpha);
+        StringBuilder header = new StringBuilder();
+        for (int i = 0; i < selectors.size(); i++) {
+            if (i > 0) {
+                header.append(", ");
+            }
+            header.append(maybeWrap(selectors.get(i)));
+        }
+        return header.toString();
     }
 
     private String applyEdit(String content, PackageEdit edit, @Nullable String editedPackageJson) {
@@ -123,8 +178,13 @@ public final class YarnClassicLockPatcher implements LockPatcher {
     }
 
     private String synthesize(String descriptor, PackageEdit edit) {
+        return synthesizeBlock(maybeWrap(descriptor), edit);
+    }
+
+    /** Emit a block from an already-quoted, possibly-merged header selector list and the edit's resolution. */
+    private String synthesizeBlock(String header, PackageEdit edit) {
         StringBuilder sb = new StringBuilder();
-        sb.append(maybeWrap(descriptor)).append(":\n");
+        sb.append(header).append(":\n");
         sb.append("  version ").append(maybeWrap(nonNull(edit.getNewVersion(), edit))).append('\n');
         sb.append("  resolved ").append(maybeWrap(resolved(edit))).append('\n');
         sb.append("  integrity ").append(maybeWrap(nonNull(edit.getNewIntegrity(), edit)));
