@@ -2886,8 +2886,20 @@ export class JavaScriptParserVisitor {
     visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
         const prefix = this.prefix(node);
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
+            // visitVariableDeclarationList attaches leading whitespace (e.g. before `let`) to the
+            // declaration. Statement-level modifiers such as `export` sit before that keyword, so
+            // any whitespace that ended up on the declaration is really the gap after those
+            // modifiers and must move onto the first declaration-list modifier.
+            const afterStatementModifiers = draft.prefix;
+            const statementModifiers = this.mapModifiers(node);
             draft.prefix = prefix;
-            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            if (statementModifiers.length > 0 && draft.modifiers.length > 0) {
+                draft.modifiers = statementModifiers.concat(
+                    draft.modifiers.map((mod, i) => i === 0 ? {...mod, prefix: afterStatementModifiers} : mod)
+                );
+            } else {
+                draft.modifiers = statementModifiers.concat(draft.modifiers);
+            }
         });
     }
 
@@ -3291,13 +3303,20 @@ export class JavaScriptParserVisitor {
     visitVariableDeclarationList(node: ts.VariableDeclarationList): J.VariableDeclarations | JS.ScopedVariableDeclarations {
         let kind = node.getFirstToken();
 
+        // Leading whitespace before let/const/var/await belongs on the VariableDeclarations
+        // (or ScopedVariableDeclarations), not on the first modifier. This matters for multi-line
+        // for-loop inits such as `for (\n  let i = 0; ...) {}` where there is no VariableStatement
+        // parent to claim that prefix.
+        const listPrefix = kind ? this.prefix(kind) : emptySpace;
+
         // to parse the declaration case: await using db = ...
         let modifiers: J.Modifier[] = [];
         if (kind?.kind === ts.SyntaxKind.AwaitKeyword) {
             modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
-                prefix: this.prefix(kind),
+                // Leading whitespace already attached to listPrefix
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 keyword: 'await',
                 type: J.ModifierType.LanguageExtension,
@@ -3313,7 +3332,9 @@ export class JavaScriptParserVisitor {
             modifiers.push({
                 kind: J.Kind.Modifier,
                 id: randomId(),
-                prefix: modifiers.length === 0 ? this.prefix(kind) : this.prefix(kind),
+                // First keyword's leading whitespace is on listPrefix; later keywords (e.g. `using`
+                // after `await`) keep the inter-keyword gap on their own prefix.
+                prefix: modifiers.length === 0 ? emptySpace : this.prefix(kind),
                 markers: emptyMarkers,
                 annotations: [],
                 keyword: kind.kind === ts.SyntaxKind.VarKeyword ? 'var' :
@@ -3362,12 +3383,14 @@ export class JavaScriptParserVisitor {
         });
 
         if (varDecls.length === 1) {
-            return varDecls[0].element;
+            return produce(varDecls[0].element, draft => {
+                draft.prefix = listPrefix;
+            });
         } else {
             return {
                 kind: JS.Kind.ScopedVariableDeclarations,
                 id: randomId(),
-                prefix: emptySpace,
+                prefix: listPrefix,
                 markers: emptyMarkers,
                 modifiers: modifiers,
                 variables: varDecls
