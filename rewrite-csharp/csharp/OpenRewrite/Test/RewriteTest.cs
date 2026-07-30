@@ -83,6 +83,35 @@ public abstract class RewriteTest
             csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
         }
 
+        // Compile every C# source into ONE compilation, so a type declared in one file is
+        // attributed in another. This mirrors how a real run parses a whole project, and is what
+        // makes multi-file ScanningRecipe tests meaningful — with one compilation per file a
+        // cross-file reference resolves to nothing and the recipe silently sees no type.
+        var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
+        CSharpCompilation? sharedCompilation = null;
+        if (metadataReferences != null)
+        {
+            foreach (var spec in specs)
+            {
+                var isCsproj = spec.SourcePath != null && IsCsprojPath(spec.SourcePath);
+                var isCs = spec.SourcePath == null ||
+                           spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+                if (isCs && !isCsproj)
+                {
+                    sharedTrees[spec] = CSharpSyntaxTree.ParseText(
+                        spec.Before, path: spec.SourcePath ?? "source.cs");
+                }
+            }
+
+            if (sharedTrees.Count > 0)
+            {
+                sharedCompilation = CSharpCompilation.Create("TestCompilation")
+                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                    .AddReferences(metadataReferences)
+                    .AddSyntaxTrees(sharedTrees.Values);
+            }
+        }
+
         foreach (var spec in specs)
         {
             SourceFile source;
@@ -109,14 +138,9 @@ public abstract class RewriteTest
                 // Local C# parsing
                 var localSourcePath = spec.SourcePath ?? "source.cs";
                 SemanticModel? semanticModel = null;
-                if (metadataReferences != null)
+                if (sharedCompilation != null && sharedTrees.TryGetValue(spec, out var syntaxTree))
                 {
-                    var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: localSourcePath);
-                    var compilation = CSharpCompilation.Create("TestCompilation")
-                        .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-                        .AddReferences(metadataReferences)
-                        .AddSyntaxTrees(syntaxTree);
-                    semanticModel = compilation.GetSemanticModel(syntaxTree);
+                    semanticModel = sharedCompilation.GetSemanticModel(syntaxTree);
                 }
 
                 source = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);

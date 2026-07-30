@@ -2155,6 +2155,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
+
         // Parse modifiers
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
@@ -2225,9 +2232,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.SemicolonToken.Span.End;
         }
 
-        return new PropertyDeclaration(
+        var propertyDecl = new PropertyDeclaration(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -2238,6 +2245,22 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             expressionBody,
             initializer
         );
+
+        // C# attributes are modelled as an AnnotatedStatement wrapper, matching fields, methods
+        // and type declarations. The wrapper owns the declaration's leading whitespace; the space
+        // between the attribute list and the declaration is already held by the first modifier.
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                propertyDecl
+            );
+        }
+
+        return propertyDecl;
     }
 
     private new Block VisitAccessorList(AccessorListSyntax node)
@@ -8746,17 +8769,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             rightText,
-            null,
+            _typeMapping?.Type(qualified.Right),
             null
         );
 
+        // Attribute the qualified name itself, so a type written in fully qualified form
+        // (`System.Windows.DependencyProperty x = ...`) carries the same type as the simple
+        // form. Resolves to null for the namespace segments of a qualified name, which is
+        // correct — only the full name denotes a type.
         return new FieldAccess(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
             left,
             new JLeftPadded<Identifier>(dotSpace, right),
-            null
+            _typeMapping?.Type(qualified)
         );
     }
 
