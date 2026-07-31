@@ -23,9 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Reads the declared constraint a recipe re-pinned for a dependency out of the edited {@code package.json},
- * so the yarn-classic and bun patchers can mirror the new range into the descriptor/importer surface the
- * {@link LockEditSet.PackageEdit} does not itself carry.
+ * Reads the range a recipe re-pinned for a dependency out of the edited {@code package.json}, for the
+ * yarn-classic and bun patchers whose descriptor/importer surface {@link LockEditSet.PackageEdit} does not carry.
  */
 final class LockManifests {
     private static final ObjectMapper JSON = new ObjectMapper();

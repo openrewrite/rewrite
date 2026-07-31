@@ -50,12 +50,10 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 
 /**
- * Patches a {@code bun.lock} (JSONC). Bun's text lock round-trips byte-for-byte through the rewrite-json LST
- * (trailing commas, blank lines between entries, compact tuple arrays all preserved), so the patch is surgical
- * {@link Json.Literal} replacement: for each moving package the {@code packages} tuple's locator
- * ({@code "name@ver"}, element 0) and integrity (element 3) are rewritten and the {@code workspaces[dir]}
- * declared constraint re-pinned. Bun stores integrity only — no {@code resolved} URL — so element 1 and the
- * dependency metadata (element 2) are left untouched.
+ * Patches a {@code bun.lock} (JSONC). Bun's text lock round-trips byte-for-byte through the rewrite-json LST,
+ * so the patch is surgical {@link Json.Literal} replacement: each moving package's {@code packages} tuple
+ * locator ({@code "name@ver"}, element 0) and integrity (element 3) are rewritten and its {@code workspaces[dir]}
+ * constraint re-pinned. Bun stores integrity only (no {@code resolved} URL), so element 1 and the metadata (2) stay.
  */
 public final class BunLockPatcher implements LockPatcher {
 
@@ -127,12 +125,11 @@ public final class BunLockPatcher implements LockPatcher {
         return patched.printAll();
     }
 
-    // --- leaf / clean-closure add (Phase B) ----------------------------------
+    // --- leaf / clean-closure add ----------------------------------
 
     /**
-     * Insert each added package's {@code packages} tuple (ASCII-sorted, blank-line-separated as bun writes them)
-     * and, for a member the edited {@code package.json} declares, its {@code workspaces[dir].<scope>} constraint
-     * (ASCII-sorted). Transitive members carry no importer edge, so only a declared root re-pins a constraint.
+     * Insert each add's {@code packages} tuple and, for a declared root, its {@code workspaces[dir].<scope>}
+     * constraint (both ASCII-sorted). A transitive has no importer edge, so only a declared root re-pins.
      */
     private static Json.JsonObject applyAdds(Json.JsonObject root, List<PackageEdit> adds,
                                              @Nullable String editedPackageJson) {
@@ -204,12 +201,12 @@ public final class BunLockPatcher implements LockPatcher {
         return replaceMemberValue(root, "workspaces", workspaces);
     }
 
-    // --- reverse-dependent nest (Phase B I5) ---------------------------------
+    // --- reverse-dependent nest ---------------------------------
 
     /**
      * Insert each nested copy as a {@code "<dependent>/<name>"} tuple relocated byte-for-byte from the pre-bump
-     * top-level entry (bun places nested entries after all top-level ones). The relocated tuple keeps the old
-     * locator/integrity — the copy the reverse-dependent's excluding constraint still needs.
+     * top-level entry (kept for the reverse-dependent whose constraint excludes the new version); bun places
+     * nested entries after all top-level ones.
      */
     private static Json.JsonObject applyNests(Json.JsonObject root, List<PackageEdit> nests,
                                               Map<PackageEdit, Json.Array> nestedTuples) {

@@ -48,15 +48,12 @@ import java.util.regex.Matcher;
 import static java.util.Collections.singletonList;
 
 /**
- * Byte-exact patcher for {@code pnpm-lock.yaml} (lockfileVersion 6 and 9, single-package and
- * workspaces). Edits the raw rewrite-yaml LST in place — the file round-trips byte-identical, so
- * rewriting only the named entries preserves every other byte.
- * <p>
- * pnpm formats {@code resolution: {integrity: …}} and {@code engines: {…}} as single opaque flow-map
- * scalars in this parser, so integrity/engines are rewritten as substrings inside that one scalar
- * rather than as nested fields. lockfileVersion &lt; 6 fails loud; so does any edit that would move a
- * peer suffix, retarget a by-version reference, or fork a version shared across importers — those are
- * closure-changing and belong to the hoisting-aware resolver.
+ * Byte-exact patcher for {@code pnpm-lock.yaml} (lockfileVersion 6 and 9). The file round-trips
+ * byte-identical through the rewrite-yaml LST, so rewriting only the named entries preserves every other
+ * byte. This parser sees {@code resolution: {integrity: …}} and {@code engines: {…}} as single opaque
+ * flow-map scalars, so integrity/engines are rewritten as substrings inside that one scalar. Any edit that
+ * would move a peer suffix, retarget a by-version reference, or fork a version shared across importers is
+ * closure-changing and fails loud, as does lockfileVersion &lt; 6.
  */
 public final class PnpmLockPatcher implements LockPatcher {
 
@@ -125,7 +122,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         return docs.withDocuments(newDocuments).printAll();
     }
 
-    // --- fail-loud structural pre-checks (§4) ----------------------------
+    // --- fail-loud structural pre-checks ----------------------------
 
     private void preCheck(Yaml.Mapping root, PackageEdit edit, int major) {
         if (edit.getNewVersion() == null) {
@@ -141,7 +138,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             }
         }
 
-        // Trigger #1 — peer suffix (provider or dependent).
+        // Peer suffix (provider or dependent).
         String peerToken = "(" + name + "@";
         for (String key : allKeysAndVersions(root, major)) {
             if (key.contains(peerToken)) {
@@ -153,7 +150,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, name, name + " is peer-dependent; resolution required");
         }
 
-        // Trigger #3 — dedupe collision / shared fork.
+        // Dedupe collision / shared fork.
         String newVersion = edit.getNewVersion();
         if (keys(section(root, "packages")).contains(packageKey(name, newVersion, major)) ||
                 (major >= 9 && keys(section(root, "snapshots")).contains(name + "@" + newVersion))) {
@@ -165,7 +162,7 @@ public final class PnpmLockPatcher implements LockPatcher {
                     name + "@" + oldV + " is shared by another importer; resolution required");
         }
 
-        // Trigger #2 — by-version reference from another package's dependency block.
+        // By-version reference from another package's dependency block.
         if (referencedByOther(root, edit, major)) {
             throw fail(Reason.RESOLUTION_REQUIRED, name,
                     name + "@" + oldV + " is referenced by another package; resolution required");
@@ -256,7 +253,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         return false;
     }
 
-    // --- edit application (§3) -------------------------------------------
+    // --- edit application -------------------------------------------
 
     private Yaml.Mapping applyEdit(Yaml.Mapping root, PackageEdit edit, int major, Map<String, String> newConstraints) {
         boolean removal = edit.getNewVersion() == null;
@@ -373,10 +370,8 @@ public final class PnpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * Drop the {@code dependencies}/{@code optionalDependencies} edges the bumped version no longer declares
-     * (orphan-prune); the surviving edges keep their bytes, and a snapshot emptied of all edges becomes
-     * {@code {}}. A snapshot carrying any other field (e.g. {@code transitivePeerDependencies}) is not modeled
-     * here and fails loud.
+     * Drop the {@code dependencies}/{@code optionalDependencies} edges the bumped version no longer declares; a
+     * snapshot emptied of all edges becomes {@code {}}, and one carrying any other field fails loud.
      */
     private Yaml.Mapping.Entry pruneSnapshotEdges(Yaml.Mapping.Entry snapshot, PackageEdit edit) {
         if (!(snapshot.getValue() instanceof Yaml.Mapping)) {
@@ -446,7 +441,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         return replaceEntry(body, "engines", entry.withValue(scalar.withValue(renderEngines(metadata.getEngines()))));
     }
 
-    /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled — fail loud rather than silently drop them. */
+    /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled, so fail loud rather than silently drop them. */
     private void requireSupportedWriteThrough(PackageEdit edit) {
         WriteThroughMetadata wt = edit.getWriteThroughMetadata();
         if (wt == null) {
@@ -461,14 +456,13 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
     }
 
-    // --- cascade move (Phase B) ------------------------------------------
+    // --- cascade move ------------------------------------------
 
     /**
-     * Apply a transitive forced to move by a direct-dependency bump (v9 only). pnpm keys by resolved version
-     * and records references as resolved versions, so the move is: rename {@code packages.<dep>@<old>} and
-     * {@code snapshots.<dep>@<old>} to {@code @<new>} (new integrity/engines), then retarget every snapshot's
-     * {@code dependencies.<dep>: <old>} to {@code <new>}. The engine has already proven the move is private to
-     * the bumped root and closure-clean, so no importer edge and no other package needs reconciling.
+     * Apply a transitive forced to move by a direct-dependency bump (v9 only). pnpm keys by resolved version,
+     * so the move renames {@code packages}/{@code snapshots} entries {@code <dep>@<old>} to {@code @<new>} and
+     * retargets every snapshot reference. The engine has already proven the move is private to the bumped root,
+     * so no importer edge or other package needs reconciling.
      */
     private Yaml.Mapping applyForcedMove(Yaml.Mapping root, PackageEdit edit, int major) {
         if (major < 9) {
@@ -523,13 +517,12 @@ public final class PnpmLockPatcher implements LockPatcher {
         return result;
     }
 
-    // --- content-fork (Phase B I5) ---------------------------------------
+    // --- content-fork ---------------------------------------
 
     /**
      * pnpm's reverse-dependent fork (v9 only): add the new version's {@code packages}+{@code snapshots} content
-     * (a leaf) and retarget only the importer edge, leaving the old version's entries byte-for-byte in place for
-     * the reverse-dependent that still resolves to it. Reuses the add path's content builders; unlike a normal
-     * bump it renames nothing.
+     * and retarget only the importer edge, leaving the old version's entries in place for the reverse-dependent
+     * that still resolves to it. Unlike a normal bump it renames nothing.
      */
     private Yaml.Mapping applyContentFork(Yaml.Mapping root, PackageEdit edit, int major, Map<String, String> newConstraints) {
         if (major < 9) {
@@ -565,14 +558,12 @@ public final class PnpmLockPatcher implements LockPatcher {
         return patchImporter(root, edit, false, newConstraints);
     }
 
-    // --- leaf / clean-closure add (Phase B increment 4) ------------------
+    // --- leaf / clean-closure add ------------------
 
     /**
-     * Insert a brand-new closure member (v9 only): a {@code packages} entry
-     * ({@code resolution.integrity} + optional {@code engines}), an empty or dependency-carrying
-     * {@code snapshots} entry keyed by resolved version, and — for the direct dependency the recipe
-     * declared — the importer edge ({@code specifier}/{@code version}). Each lands at pnpm's lexicographic
-     * sort position with byte-exact whitespace; a collision or any surface not modeled fails loud.
+     * Insert a brand-new closure member (v9 only): a {@code packages} entry, a {@code snapshots} entry keyed by
+     * resolved version, and (for a declared direct dependency) the importer edge. Each lands at pnpm's
+     * lexicographic sort position with byte-exact whitespace; a collision or unmodeled surface fails loud.
      */
     private Yaml.Mapping applyAdd(Yaml.Mapping root, PackageEdit edit, int major,
                                   Map<String, String> newConstraints, Map<String, String> addedVersions) {
@@ -769,8 +760,8 @@ public final class PnpmLockPatcher implements LockPatcher {
 
     /**
      * Drop every {@code packages}/{@code snapshots} entry no longer reachable from an importer root after a
-     * removal, mirroring what a real {@code pnpm install} produces (a removed non-leaf takes its private
-     * transitives with it). Runs only when the edit set contains a removal, so a pure bump is byte-identical.
+     * removal (a removed non-leaf takes its private transitives with it). Runs only for a removal, so a pure
+     * bump stays byte-identical.
      */
     private Yaml.Mapping gcOrphans(Yaml.Mapping root, int major) {
         if (major >= 9) {

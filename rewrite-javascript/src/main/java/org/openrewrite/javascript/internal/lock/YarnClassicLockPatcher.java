@@ -29,16 +29,10 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Patches a classic {@code yarn.lock} (v1). The file is not valid YAML, so this is a targeted text edit
- * over the raw string: the moving package's block header {@code name@<oldRange>} is re-pinned to the new
- * declared range and its {@code version}/{@code resolved}/{@code integrity} lines rewritten, while every
- * other byte is preserved.
- * <p>
- * When a header merges several selectors that resolved to one version ({@code "a@^1, a@~1.2:"}) the moving
- * selector is <em>split</em> out — removed from the merged header (the de-merged remainder kept byte-identical)
- * and re-emitted as a new, {@code sortAlpha}-positioned block — rather than renaming the whole header, which
- * would silently move the other ranges. Serialization mirrors yarn's own {@code _stringify}: {@code sortAlpha}
- * ordering, {@code shouldWrapKey} quoting, and the priority field order.
+ * Patches a classic {@code yarn.lock} (v1). Not valid YAML, so this is a targeted text edit over the raw
+ * string, preserving every byte outside the moving block. A merged header ({@code "a@^1, a@~1.2:"}) has its
+ * moving selector <em>split</em> out rather than renamed, which would silently move the other ranges;
+ * serialization mirrors yarn's own {@code _stringify} ({@code sortAlpha} ordering, {@code shouldWrapKey} quoting).
  */
 public final class YarnClassicLockPatcher implements LockPatcher {
 

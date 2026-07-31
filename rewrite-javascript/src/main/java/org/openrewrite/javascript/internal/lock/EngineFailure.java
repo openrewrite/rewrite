@@ -20,10 +20,8 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
 /**
- * Carries a structured {@link Failure} out of the deep resolution call stack so
- * {@link NativeLockEngine} (and the per-format patchers) can abort loud and the top
- * frame can turn it into a fail-loud {@code Result}. Public because the engine
- * ({@code internal}) and the patchers ({@code internal.lock}) both throw it.
+ * Carries a structured {@link Failure} out of the deep resolution stack so the top frame can turn it into a
+ * fail-loud {@code Result}. Public because {@link NativeLockEngine} and the patchers both throw it.
  */
 public final class EngineFailure extends RuntimeException {
     public final Failure failure;

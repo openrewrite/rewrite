@@ -50,21 +50,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Byte-exact {@link LockPatcher} for npm {@code package-lock.json} (lockfileVersion 2 and 3, full
- * workspace support). It parses the captured lock with the byte-lossless rewrite-json LST and rewrites
- * only the entries the {@link LockEditSet} names, preserving every other byte.
- * <p>
- * Per {@link PackageEdit} the edit sites are:
- * <ol>
- *   <li>{@code packages["node_modules/<name>"]} — {@code version}/{@code resolved}/{@code integrity}
- *       (plus write-through {@code license}/{@code deprecated}) on a resolved bump;</li>
- *   <li>the importer's declared constraint at {@code packages["<importerDir or ''>"].<scope>["<name>"]},
- *       taken verbatim from the edited {@code package.json};</li>
- *   <li>for lockfileVersion 2 only, the legacy {@code dependencies["<name>"]} tree entry
- *       ({@code version}/{@code resolved}/{@code integrity}; {@code requires} is closure-unchanged).</li>
- * </ol>
- * A removal drops the {@code node_modules} entry, its importer scope member, the v2 legacy entry, and
- * any transitive entry that becomes orphaned. Anything the format cannot express byte-exactly fails loud.
+ * Byte-exact {@link LockPatcher} for npm {@code package-lock.json} (lockfileVersion 2 and 3, full workspace
+ * support). It parses the captured lock with the byte-lossless rewrite-json LST and rewrites only the entries
+ * the {@link LockEditSet} names: the {@code packages} entry, the importer's declared constraint, and (v2 only)
+ * the legacy {@code dependencies} tree. A removal also drops orphaned transitives; anything the format cannot
+ * express byte-exactly fails loud.
  */
 public final class NpmLockPatcher implements LockPatcher {
 
@@ -93,9 +83,8 @@ public final class NpmLockPatcher implements LockPatcher {
 
         JsonNode editedManifest = parseManifest(edits.getEditedPackageJson());
 
-        // A relocate-nest (an upgrade that pushes the old version down) copies a pre-edit entry, so it runs
-        // before the bumps mutate it. The v2 legacy nested tree is captured now but inserted after the bumps,
-        // so the bump's own fork guard (applyLegacyTree) still sees a flat legacy tree.
+        // A relocate-nest copies a pre-edit entry, so it runs before the bumps mutate it; the v2 legacy nest is
+        // captured now but inserted after the bumps, so applyLegacyTree's fork guard still sees a flat tree.
         List<LegacyNest> legacyNests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == REVERSE_NEST) {
@@ -173,9 +162,8 @@ public final class NpmLockPatcher implements LockPatcher {
             entry = setStringField(entry, "resolved", edit.getNewResolved());
             entry = setStringField(entry, "integrity", edit.getNewIntegrity());
             entry = applyWriteThrough(name, packages, entry, edit.getWriteThroughMetadata());
-            // A cascade bump changes the entry's own dependency edge constraints (unchanged edges are left
-            // byte-identical). An added edge reshapes and fails loud; a dropped edge orphan-prunes when the
-            // edit allows it (the GC pass below drops whatever it leaves unreachable).
+            // A cascade bump re-pins the entry's own dependency edges (unchanged ones stay byte-identical); an
+            // added edge fails loud, a dropped edge orphan-prunes when the edit allows it.
             entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
             packages = putMember(packages, "node_modules/" + name, entry);
             root = putMember(root, "packages", packages);
@@ -246,15 +234,14 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * Re-pin the constraint values of an entry's {@code dependencies}/{@code requires} map to a moved
-     * version's edges. Only changed values are rewritten (unchanged edges stay byte-identical); an edge
-     * added or removed by the upgrade reshapes the tree and fails loud (deferred).
+     * Re-pin an entry's {@code dependencies}/{@code requires} constraint values to a moved version's edges; only
+     * changed values are rewritten, and an edge added or removed by the upgrade reshapes the tree and fails loud.
      */
     private Json.JsonObject reconcileConstraintMap(String name, Json.JsonObject entry, String mapKey,
                                                    @Nullable Map<String, String> newDeps, boolean allowDrops) {
         Map<String, String> deps = newDeps == null ? Collections.emptyMap() : newDeps;
         if (deps.isEmpty() && !allowDrops) {
-            return entry; // no constraint reconciliation requested (Phase A bump / leaf mover)
+            return entry; // no constraint reconciliation requested (plain bump / leaf mover)
         }
         Json.JsonObject map = getObjectMember(entry, mapKey);
         if (map == null) {
@@ -313,14 +300,12 @@ public final class NpmLockPatcher implements LockPatcher {
         return keys;
     }
 
-    // --- leaf add (Phase B increment 1) ----------------------------------
+    // --- leaf add ----------------------------------
 
     /**
-     * Insert a brand-new leaf (its object/array metadata already vetted by the engine): a {@code packages}
-     * entry, the importer's declared constraint (creating the scope object when absent), and — for
-     * lockfileVersion 2 — the minimal legacy tree entry (still {@code version}/{@code resolved}/{@code
-     * integrity} only). Each insert lands at npm's own sort position ({@link NpmKeyOrder}) with byte-exact
-     * whitespace.
+     * Insert a brand-new leaf: a {@code packages} entry, the importer's declared constraint (creating the scope
+     * object when absent), and (v2 only) the minimal legacy tree entry. Each insert lands at npm's own sort
+     * position ({@link NpmKeyOrder}) with byte-exact whitespace.
      */
     private Json.JsonObject applyAdd(Json.JsonObject root, int lockfileVersion,
                                      @Nullable JsonNode editedManifest, PackageEdit edit) {
@@ -353,9 +338,8 @@ public final class NpmLockPatcher implements LockPatcher {
 
     /**
      * Promote an already-installed transitive to a declared dependency: the {@code node_modules/<name>} entry
-     * stays, so only the importer edge is written (creating the scope object when absent). A dev→prod promotion
-     * additionally clears {@code "dev": true} on the leaf entry; the v2 legacy tree marks dev in two places, so
-     * clearing it there is not yet verified and fails loud.
+     * stays, so only the importer edge is written. A dev→prod promotion also clears {@code "dev": true} on the
+     * leaf; the v2 legacy tree marks dev in two places, so clearing it there fails loud.
      */
     private Json.JsonObject applyPromotion(Json.JsonObject root, int lockfileVersion,
                                            @Nullable JsonNode editedManifest, PackageEdit edit) {
@@ -378,9 +362,8 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * The leaf entry object source, members in npm's serialization order: object-valued members after
-     * scalar/array-valued ones, {@code swKeyOrder} keys first within a group, then ICU {@code localeCompare}.
-     * Object/array metadata values are pretty-printed at npm's indentation ({@link #renderNode}).
+     * The leaf entry object source in npm's serialization order: object-valued members after scalar/array-valued
+     * ones, then {@link NpmKeyOrder} within a group. Metadata values are pretty-printed via {@link #renderNode}.
      */
     private String leafEntryText(Json.JsonObject packages, PackageEdit edit) {
         String fieldWs = nestedMemberWhitespace(packages);
@@ -567,12 +550,12 @@ public final class NpmLockPatcher implements LockPatcher {
         return putMember(root, "dependencies", legacy);
     }
 
-    // --- reverse-dependent nest (Phase B I5) -----------------------------
+    // --- reverse-dependent nest -----------------------------
 
     /**
-     * Relocate the pre-edit {@code node_modules/<name>} entry to {@code node_modules/<dependent>/node_modules/
-     * <name>} byte-for-byte — npm nests the old version there when the top-level slot goes to the new one. The
-     * value sits at the same depth, so its bytes are reused verbatim; only the key and sort position change.
+     * Relocate the pre-edit {@code node_modules/<name>} entry to {@code node_modules/<dependent>/node_modules/<name>}
+     * byte-for-byte; npm nests the old version there when the top-level slot goes to the new one. The value sits at
+     * the same depth, so only the key and sort position change.
      */
     private Json.JsonObject relocatePackagesEntry(Json.JsonObject root, PackageEdit edit) {
         String name = edit.getName();
@@ -590,10 +573,9 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * Insert a brand-new nested leaf at {@code node_modules/<dependent>/node_modules/<name>} (I5 add-nest):
-     * a closure member an incompatible top-level pin excludes. Serialized like a top-level leaf add
-     * ({@link #leafEntryText}) but at the nested key and with no importer edge. v2's deeper legacy nesting is
-     * not yet verified, so it defers.
+     * Insert a brand-new nested leaf at {@code node_modules/<dependent>/node_modules/<name>}: a closure member an
+     * incompatible top-level pin excludes. Serialized like a top-level leaf add ({@link #leafEntryText}) but at the
+     * nested key with no importer edge; v2's deeper legacy nesting fails loud.
      */
     private Json.JsonObject applyNestedAdd(Json.JsonObject root, int lockfileVersion, PackageEdit edit) {
         if (lockfileVersion == 2) {
@@ -624,9 +606,9 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * Insert the v2 legacy nested entry {@code dependencies.<dependent>.dependencies.<name>} (minimal
-     * {@code version}/{@code resolved}/{@code integrity}) at its deeper indentation. Captured from the pre-bump
-     * top-level legacy entry so it holds the old version even though it lands after the bump has moved it.
+     * Capture the pre-bump top-level legacy entry (minimal {@code version}/{@code resolved}/{@code integrity}) so
+     * the v2 nested entry {@code dependencies.<dependent>.dependencies.<name>} holds the old version even though it
+     * lands after the bump has moved its sibling.
      */
     private LegacyNest captureLegacyNest(Json.JsonObject root, PackageEdit edit) {
         Json.JsonObject legacy = getObjectMember(root, "dependencies");
@@ -696,10 +678,9 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * A brand-new top-level add is byte-exact only when its name is disjoint from every existing fork: adding a
-     * name that already participates in a nested placement (as a fork parent or a nested child) could make npm
-     * re-hoist or reshape that fork. An add disjoint from the lock's nested keys leaves them untouched — npm
-     * places the new entry independently — so only a name collision fails loud.
+     * A brand-new top-level add is byte-exact only when its name is disjoint from every existing fork; a name that
+     * already participates in a nested placement could make npm re-hoist or reshape that fork, so only such a name
+     * collision fails loud.
      */
     private void requireAddNotEntangled(Json.JsonObject packages, String name) {
         for (Json member : packages.getMembers()) {
@@ -727,9 +708,9 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * Splice a new member (built from source text so its inner whitespace is exact) into {@code obj} at
-     * npm's sort position. The new member reuses a sibling's newline+indent prefix; when it becomes the
-     * new last member it inherits the previous last member's pre-brace {@code after}.
+     * Splice a new member (built from source text so its inner whitespace is exact) into {@code obj} at npm's sort
+     * position, reusing a sibling's newline+indent prefix; a new last member inherits the previous last member's
+     * pre-brace {@code after}.
      */
     private Json.JsonObject graftSorted(Json.JsonObject obj, String key, String valueSource, boolean valueIsObject) {
         String prefixWs = memberWhitespace(obj);
@@ -1012,11 +993,9 @@ public final class NpmLockPatcher implements LockPatcher {
     // --- orphan GC after an edge-dropping bump ---------------------------
 
     /**
-     * Drop every installed {@code packages} entry the bump left unreachable. Reachability is npm's own
-     * hoisting resolution ({@link #resolveFrom}) over the full tree — importer roots seed it, and each
-     * reachable entry's dependency edges resolve against its own install path — so a transitive still
-     * required elsewhere (top-level or nested) survives. A pruned name that also lives at another placement
-     * could re-hoist on removal, so it fails loud rather than risk a non-byte-exact tree.
+     * Drop every installed {@code packages} entry the bump left unreachable, reachability being npm's own hoisting
+     * resolution ({@link #resolveFrom}) so a transitive still required elsewhere survives. A pruned name that also
+     * lives at another placement could re-hoist on removal, so it fails loud.
      */
     private Json.JsonObject gcOrphansAfterBump(Json.JsonObject root, int lockfileVersion) {
         Json.JsonObject packages = requirePackages(root);
@@ -1140,9 +1119,9 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * npm's hoisting resolution: from the package installed at {@code fromKey}, resolve {@code name} by
-     * checking its own {@code node_modules} then walking up each ancestor's, returning the matching entry
-     * key (or {@code null} when unresolved — e.g. an optional/peer edge left unplaced).
+     * npm's hoisting resolution: from the package at {@code fromKey}, resolve {@code name} by checking its own
+     * {@code node_modules} then walking up each ancestor's, returning the matching entry key (or {@code null} when
+     * unresolved, e.g. an optional/peer edge left unplaced).
      */
     static @Nullable String resolveFrom(Set<String> keys, String fromKey, String name) {
         String prefix = fromKey.isEmpty() ? "" : fromKey + "/";

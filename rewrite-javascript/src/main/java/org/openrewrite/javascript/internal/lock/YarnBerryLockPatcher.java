@@ -20,10 +20,9 @@ import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
 /**
  * Yarn Berry ({@code yarn.lock} carrying {@code __metadata:}) records a non-derivable {@code checksum} for
- * every registry dependency — yarn's normalized-zip hash, not {@code dist.integrity} — so any resolution
- * change requires a checksum this native engine cannot reproduce in Phase A. The patcher therefore fails
- * loud with {@link Reason#CHECKSUM_UNAVAILABLE} rather than emitting a lock a real {@code yarn install} would
- * reject. Real Berry regeneration (tarball fetch → normalized-zip hash) is the deferred follow-up.
+ * every registry dependency (yarn's normalized-zip hash, not {@code dist.integrity}) that this engine cannot
+ * reproduce, so the patcher fails loud with {@link Reason#CHECKSUM_UNAVAILABLE} rather than emit a lock a
+ * real {@code yarn install} would reject.
  */
 public final class YarnBerryLockPatcher implements LockPatcher {
 

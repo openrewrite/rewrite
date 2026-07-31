@@ -19,20 +19,12 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Reproduces the key ordering npm applies when it serializes {@code package-lock.json}, so an inserted
- * entry lands byte-exactly where a real {@code npm install} would place it.
- * <p>
- * npm serializes through {@code json-stringify-nice} with the preference list {@link #SW_KEY_ORDER}. That
- * library orders keys by: (1) keys in the preference list first, by list index; (2) the rest by
- * JavaScript {@code String.localeCompare(_, 'en')} — ICU collation, which differs from both Java's
- * {@code String.compareTo} and {@code Collator}. For the npm package-name domain
- * ({@code [a-z0-9._-]} plus {@code @scope/}) that collation reduces to a stable per-character weight
- * ({@code _ < - < .} below digits below letters, letters case-insensitive with lowercase before
- * uppercase, {@code @}/{@code /} low), validated byte-identical against V8 {@code localeCompare('en')}.
- * <p>
- * The value-kind partition {@code json-stringify-nice} also applies — object-valued members sort after
- * scalar/array-valued members — is handled by the patcher at the insertion site, which knows the LST
- * value kind; this class orders keys within a partition.
+ * Reproduces the key ordering npm applies when it serializes {@code package-lock.json}, so an inserted entry
+ * lands byte-exactly where {@code npm install} would place it. npm sorts through {@code json-stringify-nice}:
+ * the preference list {@link #SW_KEY_ORDER} first, then the rest by JS {@code localeCompare(_, 'en')} (ICU
+ * collation, unlike Java's {@code compareTo}/{@code Collator}), which over the npm name domain reduces to the
+ * per-character weights below, validated byte-identical against V8. The value-kind partition (objects after
+ * scalars) is handled by the patcher at the insertion site; this class orders keys within a partition.
  */
 final class NpmKeyOrder {
 

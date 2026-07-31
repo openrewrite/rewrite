@@ -16,13 +16,9 @@
 package org.openrewrite.javascript.internal.lock;
 
 /**
- * Turns a proven-safe {@link LockEditSet} into the byte-exact new lock-file content, one
- * implementation per package-manager format (npm v2/v3, pnpm v9/v6, yarn-classic, bun).
- * Implementations are format-faithful: they read the raw lock the {@link NativeLockEngine}
- * captured and patch only the entries the edit set names, preserving all other bytes.
- * <p>
- * A patcher may still {@link EngineFailure fail loud} when the raw lock cannot be parsed into
- * its format model or the edit touches a surface the format cannot express byte-exactly.
+ * Turns a proven-safe {@link LockEditSet} into byte-exact new lock content, one implementation per format:
+ * it patches only the entries the edit set names and preserves all other bytes, or {@link EngineFailure
+ * fails loud} when the format cannot express the edit byte-exactly.
  */
 public interface LockPatcher {
 

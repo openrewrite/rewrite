@@ -56,25 +56,19 @@ import java.util.Set;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
- * The shared, package-manager-agnostic orchestrator for native lock regeneration. It diffs the
- * pre-edit and post-edit {@code package.json} to scope the change to the declared dependencies the
- * recipe actually touched, proves each moving dependency leaves the resolved closure unchanged (the
- * strict layout whitelist), resolves the target version with minimal-update semantics against the
- * registry, and hands a proven {@link LockEditSet} to the format's {@link LockPatcher}.
+ * The shared, package-manager-agnostic orchestrator for native lock regeneration. It diffs the pre-edit and
+ * post-edit {@code package.json} to scope the change to the declared dependencies the recipe touched, proves
+ * each moving dependency leaves the resolved closure unchanged (the strict layout whitelist), resolves the
+ * target version against the registry, and hands a proven {@link LockEditSet} to the format's {@link LockPatcher}.
  * <p>
- * Everything outside the whitelist fails loud (emitting no lock and a structured {@link Failure}); a
- * shell-out fallback is deliberately absent (it would lose registry credentials — the failure this
- * initiative exists to kill). The only non-fail-loud tolerance is the write-through metadata tier
- * ({@code engines}/{@code license}/{@code deprecated}/{@code bin}), which a real bump patches without
- * reshaping the tree.
- * <p>
- * Reads over the raw lock and the two manifests are read-only inspection (Jackson for JSON, SnakeYAML
- * for pnpm's YAML) — never the lossy {@code LockFileParser}/adapter normalization, which the proof
- * must not trust.
+ * Everything outside the whitelist fails loud with a structured {@link Failure} and no lock; there is no
+ * shell-out fallback (it would leak registry credentials). The one tolerance is the write-through metadata tier
+ * ({@code engines}/{@code license}/{@code deprecated}/{@code bin}) a real bump patches without reshaping the tree.
+ * Reads over the raw lock and manifests use Jackson/SnakeYAML directly, never the lossy adapter normalization.
  */
 public final class NativeLockEngine {
 
-    // Bun's lock is JSONC (trailing commas, // comments); npm's is strict JSON — this mapper reads both.
+    // Bun's lock is JSONC (trailing commas, // comments); npm's is strict JSON, so this mapper reads both.
     private static final ObjectMapper JSON = JsonMapper.builder()
             .enable(JsonReadFeature.ALLOW_TRAILING_COMMA)
             .enable(JsonReadFeature.ALLOW_JAVA_COMMENTS)
@@ -129,7 +123,7 @@ public final class NativeLockEngine {
 
         List<DepChange> changes = diffDeclaredDeps(originalPackageJson, editedPackageJson);
         if (changes.isEmpty()) {
-            // The manifest changed but no declared dependency did — the edit is an override/resolution
+            // The manifest changed but no declared dependency did; the edit is an override/resolution
             // or some other field the native engine cannot prove leaves the closure unchanged.
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "change is outside declared dependencies (e.g. overrides/resolutions) and requires resolution");
@@ -159,8 +153,8 @@ public final class NativeLockEngine {
         String name = change.name;
 
         if (change.oldConstraint == null) {
-            // Added dependency (Phase B). The added direct dep plus its resolved runtime closure is
-            // hoisted against the existing tree; any placement that would move/nest/fork fails loud.
+            // The added direct dep plus its resolved runtime closure is hoisted against the existing tree;
+            // any placement that would move/nest/fork fails loud.
             return resolveClosureAdd(pm, change, existingLock, registries, client);
         }
 
@@ -168,7 +162,7 @@ public final class NativeLockEngine {
         String importerDir = findImporterDir(pm, existingLock, name, change.oldConstraint);
 
         if (change.newConstraint == null) {
-            // Removal — the patcher drops the entry and its orphans; keystone has no patcher yet.
+            // Removal: the patcher drops the entry and its orphans.
             String oldVersion = lockedVersions.isEmpty() ? "" : lockedVersions.iterator().next();
             return Collections.singletonList(LockEditSet.PackageEdit.builder()
                     .name(name)
@@ -210,8 +204,8 @@ public final class NativeLockEngine {
             return Collections.singletonList(edit.build());
         }
 
-        // A reverse-dependent whose recorded constraint excludes the new version keeps the old version
-        // nested under itself (Phase B I5); the safe single-leaf slice resolves it, everything else defers.
+        // A reverse-dependent whose recorded constraint excludes the new version keeps the old version nested
+        // under itself; the safe single-leaf slice resolves it, everything else defers.
         List<LockEditSet.PackageEdit> nestEdits;
         if (pm == PackageManager.Npm) {
             nestEdits = planReverseDependentNestsNpm(name, oldVersion, targetVersion, existingLock, registries, client);
@@ -235,8 +229,8 @@ public final class NativeLockEngine {
         VersionManifest oldManifest = client.getManifest(registry, name, oldVersion);
         VersionManifest newManifest = client.getManifest(registry, name, targetVersion);
 
-        // Every closure surface but `dependencies` must be unchanged; a `dependencies` delta no longer
-        // fails loud outright — it seeds the Phase B I3 greedy-forward cascade below.
+        // Every closure surface but `dependencies` must be unchanged; a `dependencies` delta no longer fails
+        // loud outright, it seeds the greedy-forward cascade below.
         proveNonDependencySurfacesUnchanged(name, oldManifest, newManifest);
 
         VersionManifest.Dist dist = newManifest.getDist();
@@ -271,14 +265,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B increment 3: a direct-dependency bump whose new version's {@code dependencies} edges changed
-     * such that a currently-locked transitive no longer satisfies and must move. It runs the same
-     * greedy-forward, keep-pins contract as the closure add: seed from the bumped dep's changed edges,
-     * resolve each forced transitive over the <b>union of all live constraints</b> on it (substituting the
-     * bumped dep's new constraint for its stale lock entry), and <b>fail loud the instant a move would
-     * reshape</b> — a sibling/reverse-dependent that rejects the new version (union unsatisfiable → npm
-     * would fork/nest), a mover whose own dependencies also change (a second cascade wave / backtrack), a
-     * brand-new transitive the bump introduces (add-during-bump), or a dropped edge (orphan pruning).
+     * A direct-dependency bump whose new {@code dependencies} edges force a currently-locked transitive to move.
+     * Each forced transitive resolves over the union of all live constraints on it (the bumped dep's new
+     * constraint substituted for its stale lock entry), and any move that would reshape fails loud: union
+     * unsatisfiable (npm would fork/nest), a mover whose own dependencies also change, a brand-new transitive, or
+     * a dropped edge.
      */
     private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootNew,
                                                                     String existingLock, NodeRegistries registries,
@@ -286,10 +277,9 @@ public final class NativeLockEngine {
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
                 Collections.emptyMap() : rootNew.getDependencies();
 
-        // A dropped edge (present in oldDeps, gone from newDeps) is handled by the patcher's orphan GC, flagged
-        // on the root edit via prunesOrphans — not here. This loop only re-resolves edges the new version keeps.
-        // Each edge resolves over the ACTUAL installed tree via npm's hoisting walk (the bumped package's own
-        // node_modules first, then up), so an edge already satisfied by a nested copy is a no-op — not a new add.
+        // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop only
+        // re-resolves kept edges. Each resolves over the actual installed tree via npm's hoisting walk, so an
+        // edge already satisfied by a nested copy is a no-op.
         Map<String, Object> installed = installedPackagesNpm(existingLock);
         String rootKey = "node_modules/" + rootName;
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
@@ -377,9 +367,8 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Every recorded constraint on {@code dep} across the lock's installed entries, substituting the
-     * bumped root's <b>new</b> constraint for its stale lock entry. The intersection over this set is the
-     * reverse-edge safety check: if no version satisfies all, npm would fork/nest rather than move.
+     * Every recorded constraint on {@code dep} across the lock's installed entries, with the bumped root's new
+     * constraint substituted for its stale lock entry. If no version satisfies all of them, npm would fork/nest.
      */
     private static Set<String> liveConstraintsNpm(String lock, String dep, String rootName,
                                                   Map<String, String> rootNewDeps) {
@@ -455,13 +444,10 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B cascade for pnpm: the same greedy-forward, keep-pins contract as {@link #cascadeForcedMoves}
-     * (npm), seeded from the bumped dep's changed {@code dependencies} edges. pnpm's lock records resolved
-     * versions in {@code snapshots.<root>@<v>.dependencies}, not constraints — so the transitive's current
-     * version is read from the bumped root's own snapshot, and the reverse-edge safety is a
-     * <b>single-requirer</b> check (a shared transitive, whose other requirers' ranges are not in the lock,
-     * fails loud rather than risk a fork). The version resolution ({@link #maxSatisfyingAll}) is PM-agnostic;
-     * only the lock reads differ from npm.
+     * The pnpm counterpart of {@link #cascadeForcedMoves}. pnpm records resolved versions in
+     * {@code snapshots.<root>@<v>.dependencies}, not constraints, so the transitive's current version is read
+     * from the bumped root's own snapshot and the reverse-edge safety is a single-requirer check: a shared
+     * transitive, whose other requirers' ranges are not in the lock, fails loud rather than risk a fork.
      */
     private static List<LockEditSet.PackageEdit> cascadeForcedMovesPnpm(String rootName, String rootOldVersion,
                                                                         VersionManifest rootNew, String existingLock,
@@ -469,8 +455,8 @@ public final class NativeLockEngine {
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
                 Collections.emptyMap() : rootNew.getDependencies();
 
-        // A dropped edge (in the old manifest, gone from the new) is handled by the patcher's snapshot prune +
-        // orphan GC, flagged on the root edit via prunesOrphans — not here. This loop only re-resolves kept edges.
+        // A dropped edge is handled by the patcher's snapshot prune + orphan GC (flagged via prunesOrphans);
+        // this loop only re-resolves kept edges.
         Map<String, String> rootSnapshotDeps = snapshotDependenciesPnpm(existingLock, rootName + "@" + rootOldVersion);
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
@@ -506,9 +492,8 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                     dep + " is directly declared; moving it via cascade is not yet supported");
         }
-        // Reverse-edge safety: pnpm records resolved versions, not ranges, so a shared transitive's other
-        // requirers cannot be proven to accept the new version from the lock alone. Only a transitive private
-        // to the bumped root moves; any other referrer defers (npm would dedupe/fork against that range).
+        // pnpm records resolved versions, not ranges, so a shared transitive's other requirers cannot be proven
+        // to accept the new version from the lock; only a transitive private to the bumped root moves.
         Set<String> otherReferrers = referrersPnpm(existingLock, dep, oldVersion, rootName + "@" + rootOldVersion);
         if (!otherReferrers.isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
@@ -560,13 +545,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B increment 5 (pnpm): a direct-dependency bump a reverse-dependent excludes. pnpm is
-     * content-addressed and never nests, so it <b>content-forks</b> — the old version stays for the
-     * reverse-dependent and the new version is added as fresh {@code packages}+{@code snapshots} content, with
-     * only the importer edge retargeted. Because a pnpm lock records resolved versions (not ranges), the
-     * reverse-dependent's acceptance of the new version cannot be read from the lock; its manifest is fetched to
-     * prove its constraint <b>excludes</b> the target (else pnpm would dedupe it up, not fork). The safe slice is
-     * a single referrer keeping a leaf; anything else fails loud.
+     * A direct-dependency bump a reverse-dependent excludes. pnpm is content-addressed and never nests, so it
+     * content-forks: the old version stays for the reverse-dependent and the new version is added as fresh
+     * {@code packages}+{@code snapshots} content, with only the importer edge retargeted. The reverse-dependent's
+     * range is not in the lock, so its manifest is fetched to prove it excludes the target (else pnpm would dedupe
+     * it up, not fork). The safe slice is a single referrer keeping a leaf; anything else fails loud.
      *
      * @return the one content-fork edit when it applies, or {@code null} when the moved dep is not kept by any
      * reverse-dependent (a plain rename bump proceeds instead).
@@ -577,7 +560,7 @@ public final class NativeLockEngine {
                                                                                NpmRegistryClient client) {
         Set<String> referrers = referrersPnpm(lock, name, oldVersion, " ");
         if (referrers.isEmpty()) {
-            return null; // not retained by any reverse-dependent — a normal rename bump, not a fork
+            return null; // not retained by any reverse-dependent: a normal rename bump, not a fork
         }
         if (referrers.size() > 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + "@" + oldVersion + " is shared by " +
@@ -591,7 +574,7 @@ public final class NativeLockEngine {
         String refName = referrerKey.substring(0, at);
         String refVersion = referrerKey.substring(at + 1);
 
-        // The referrer must genuinely EXCLUDE the new version — otherwise pnpm dedupes it up rather than forking.
+        // The referrer must genuinely EXCLUDE the new version, else pnpm dedupes it up rather than forking.
         // Its range is not in the lock (resolved versions only), so read it from the referrer's own manifest.
         VersionManifest refManifest = client.getManifest(registries.registryFor(refName), refName, refVersion);
         Map<String, String> refDeps = refManifest.getDependencies();
@@ -680,7 +663,7 @@ public final class NativeLockEngine {
         return false;
     }
 
-    /** The snapshot keys — other than {@code ownerKey} — that reference {@code dep@oldVersion} as a resolved dep. */
+    /** The snapshot keys (other than {@code ownerKey}) that reference {@code dep@oldVersion} as a resolved dep. */
     private static Set<String> referrersPnpm(String lock, String dep, String oldVersion, String ownerKey) {
         Set<String> referrers = new LinkedHashSet<>();
         Object loaded = new Yaml().load(lock);
@@ -714,18 +697,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B increment 2: a direct dependency the recipe added, plus its runtime closure. The added
-     * dep is resolved ({@code maxSatisfying}/dist-tag over the packument), then its
-     * {@code dependencies}/{@code optionalDependencies} are walked transitively; each package in the
-     * closure either hoists to a fresh top-level {@code node_modules/<name>} entry (absent from the lock)
-     * or dedups to an already-satisfying top-level pin.
-     * <p>
-     * This keeps Phase A/B's accuracy-by-construction contract: every existing pin stays fixed, a
-     * decision opens only for a genuinely-new package, and the resolver <b>fails loud the instant a
-     * placement would move, nest, or fork an already-placed package</b> — a top-level pin the new
-     * requirement cannot satisfy (npm would nest → fork/cascade, deferred to I3/I5), a closure member
-     * needed at two incompatible versions, a reverse-dependent whose recorded constraint excludes it, or
-     * any object-metadata surface not yet verified byte-exact. Non-npm formats still defer.
+     * A direct dependency the recipe added, plus its runtime closure. The added dep is resolved over the
+     * packument, then its dependencies are walked transitively; each closure member either hoists to a fresh
+     * top-level {@code node_modules/<name>} entry or dedups to an already-satisfying pin. Any placement that
+     * would move, nest, or fork an already-placed package fails loud (an incompatible top-level pin, a member
+     * needed at two versions, an excluding reverse-dependent, or an unverified metadata surface).
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAdd(PackageManager pm, DepChange change,
                                                                    String existingLock, NodeRegistries registries,
@@ -772,9 +748,8 @@ public final class NativeLockEngine {
             String existingVersion = existingTopLevel.get(req.name);
             if (existingVersion != null) {
                 if (req.name.equals(rootName)) {
-                    // The added dep is already installed as a transitive. npm reuses that install (writing only
-                    // the importer edge, and clearing "dev" on a dev→prod promotion) exactly when its version is
-                    // what the added constraint resolves to; a version change would upgrade/fork and is deferred.
+                    // Already installed as a transitive: npm reuses that install (writing only the importer edge,
+                    // clearing "dev" on a dev->prod promotion) when its version equals what the constraint resolves to.
                     NodeRegistry registry = registries.registryFor(rootName);
                     String resolved = resolveAddedVersion(client, registry, rootName, rootConstraint);
                     if (!resolved.equals(existingVersion)) {
@@ -786,7 +761,7 @@ public final class NativeLockEngine {
                     continue;
                 }
                 // Dedup to the already-placed pin, or nest the required version under its parent where an
-                // incompatible version holds the top slot (I5 add-nest, leaf-under-a-fresh-top-level slice).
+                // incompatible version holds the top slot.
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
@@ -815,7 +790,7 @@ public final class NativeLockEngine {
                         req.name + "@" + version + " has no registry tarball/integrity");
             }
 
-            // A stray reverse-dependent whose recorded constraint excludes the resolved version → fail loud.
+            // A stray reverse-dependent whose recorded constraint excludes the resolved version fails loud.
             proveReverseDependentsAccept(pm, req.name, version, version, existingLock);
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
@@ -828,9 +803,8 @@ public final class NativeLockEngine {
         for (Map.Entry<String, Placement> e : placed.entrySet()) {
             Placement p = e.getValue();
             VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
-            // Only the root (the declared dependency) writes an importer constraint; the patcher no-ops
-            // the transitives because they are absent from the edited package.json. Scope carries the
-            // dev-ness so a dev-rooted closure emits "dev": true on every fresh entry.
+            // Only the root writes an importer constraint; the patcher no-ops the transitives, absent from the
+            // edited package.json. Scope carries dev-ness so a dev-rooted closure marks every fresh entry.
             edits.add(LockEditSet.PackageEdit.builder()
                     .name(e.getKey())
                     .oldVersion("")
@@ -868,11 +842,10 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Build the edit for promoting an already-installed transitive to a declared dependency: the install entry
-     * stays, only the importer edge is written, and a dev→prod promotion clears the top-level entry's
-     * {@code "dev": true}. A non-leaf dev→prod promotion (its subtree's dev flags would need propagating) fails
-     * loud. A nested copy of the same name under another parent is left untouched — it is an independent
-     * placement (a reverse-dependent's pin) that promoting the hoisted entry does not reshape.
+     * Build the promotion edit for an already-installed transitive: the install entry stays, only the importer
+     * edge is written, and a dev->prod promotion clears the top-level {@code "dev": true}. A non-leaf dev->prod
+     * promotion needs subtree dev-flag propagation and fails loud; a nested copy under another parent is an
+     * independent placement and is left untouched.
      */
     private static LockEditSet.PackageEdit promotionEdit(String rootName, String scope, boolean dev, String existingLock) {
         Map<String, Object> installed = installedPackagesNpm(existingLock);
@@ -900,9 +873,9 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A closure member an incompatible top-level pin excludes: nest it at {@code node_modules/<parent>/node_modules/
-     * <name>}. Safe slice only — the requirer is a freshly-placed top-level entry, some requirer pins the top-level
-     * version exactly (so it can't move up: npm/bun fork rather than cascade), and the nested version is a leaf.
+     * A closure member an incompatible top-level pin excludes: nest it at
+     * {@code node_modules/<parent>/node_modules/<name>}. Safe slice only: the requirer is freshly placed, some
+     * requirer pins the top-level version exactly (so npm/bun fork rather than cascade), and the nested version is a leaf.
      */
     private static void nestUnderParent(PackageManager pm, Requirement req, String existingVersion,
                                         Map<String, Placement> placed, Map<String, NestedPlacement> nested,
@@ -946,15 +919,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B increment 4 (pnpm): a direct dependency the recipe added, plus its runtime closure, into a
-     * pnpm-lock.yaml v9. pnpm is non-hoisted/content-addressed, so placement is mechanical — one
-     * {@code packages}+{@code snapshots} entry per closure member keyed by its resolved version. The version
-     * resolution reuses the shared worklist ({@code resolveAddedVersion} over the packument, transitive walk).
-     * <p>
-     * The pnpm-specific contract, tighter than npm's: every closure member must be <b>brand-new</b> (its name
-     * absent from the lock) so no snapshot references an existing entry and no dedupe/fork decision opens, and
-     * <b>no member may declare peers or optionalDependencies</b> — pnpm encodes those as peer-suffix keys the
-     * mechanical placement does not model. Any collision, peer, optional, or unsupported metadata fails loud.
+     * A direct dependency the recipe added, plus its runtime closure, into a pnpm-lock.yaml v9. pnpm is
+     * content-addressed, so placement is mechanical: one {@code packages}+{@code snapshots} entry per closure
+     * member keyed by its resolved version. Tighter than npm's contract: every member must be brand-new (its name
+     * absent from the lock) so no dedupe/fork opens, and none may declare peers or optionalDependencies (pnpm
+     * encodes those as peer-suffix keys the mechanical placement does not model). Any such case fails loud.
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAddPnpm(DepChange change, String rootName,
                                                                        String rootConstraint, String existingLock,
@@ -1024,14 +993,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B (bun): a direct dependency the recipe added, plus its runtime closure, into a {@code bun.lock}.
-     * bun hoists like npm, so the closure resolution is identical to {@link #resolveClosureAdd} — every member
-     * hoists to a fresh top-level {@code packages["<name>"]} tuple or dedups to an already-satisfying pin, and
-     * any placement that would move/nest/fork an existing entry (bun's {@code parent/name} keys) fails loud.
-     * <p>
-     * bun records only the integrity in the tuple (no tarball URL), and the emittable gate is tighter than
-     * npm's: only a deps-or-empty tuple ({@code {}} / {@code { "dependencies": {…} }}) is byte-verified, so any
-     * {@code bin}/{@code os}/{@code cpu}/{@code peer}/{@code optional} metadata or scoped name defers.
+     * A direct dependency the recipe added, plus its runtime closure, into a {@code bun.lock}. bun hoists like
+     * npm, so the closure resolution matches {@link #resolveClosureAdd}, failing loud on any placement that would
+     * move/nest/fork an existing entry. bun records only the integrity (no tarball URL), and the emittable gate is
+     * tighter than npm's: only a deps-or-empty tuple is byte-verified, so any bin/os/cpu/peer/optional metadata or
+     * scoped name defers.
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAddBun(DepChange change, String rootName,
                                                                       String rootConstraint, String existingLock,
@@ -1050,9 +1016,8 @@ public final class NativeLockEngine {
             String existingVersion = existingTopLevel.get(req.name);
             if (existingVersion != null) {
                 if (req.name.equals(rootName)) {
-                    // The added dep is already installed as a transitive: bun rewrites the importer edge (and
-                    // clears any dev marker on a dev→prod promotion). The npm-verified promotion is not yet
-                    // ported to bun's tuple format, so fail loud rather than emit a lock missing the edge.
+                    // Already installed as a transitive: bun's promotion (rewrite importer edge, clear dev) is not
+                    // yet ported to its tuple format, so fail loud rather than emit a lock missing the edge.
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
                             "promoting already-installed " + rootName + " to a declared dependency is not yet supported for bun");
                 }
@@ -1083,7 +1048,7 @@ public final class NativeLockEngine {
                         req.name + "@" + version + " has no registry integrity");
             }
 
-            // A stray reverse-dependent whose recorded constraint excludes the resolved version → fail loud.
+            // A stray reverse-dependent whose recorded constraint excludes the resolved version fails loud.
             proveReverseDependentsAccept(PackageManager.Bun, req.name, version, version, existingLock);
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
@@ -1159,18 +1124,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B (yarn-classic): a direct dependency the recipe added, plus its runtime closure, into a
-     * {@code yarn.lock} v1. yarn is not hoisted — it lists one {@code name@range:} block per resolved
-     * {@code (name, version)} — so placement is mechanical (the patcher inserts each block at its
-     * {@code sortAlpha} position), but the block header is the set of every declared/transitive range that
-     * resolves to the version. The version resolution reuses the shared worklist ({@code resolveAddedVersion}
-     * over the packument, transitive walk).
-     * <p>
-     * The yarn-specific contract: every closure member must be <b>brand-new</b> (its name absent from every
-     * existing block) so no header merge or second-version block opens, and <b>no member may declare peers or
-     * optionalDependencies</b> — yarn resolves those into further blocks the clean placement does not model.
-     * Any collision, peer, or optional fails loud; other block-irrelevant metadata (engines/os/cpu/bin) is not
-     * recorded in a yarn.lock block, so it needs no gate.
+     * A direct dependency the recipe added, plus its runtime closure, into a {@code yarn.lock} v1. yarn lists one
+     * {@code name@range:} block per resolved {@code (name, version)}, so placement is mechanical (each block at its
+     * {@code sortAlpha} position) with a header of every range that resolves to the version. Every closure member
+     * must be brand-new (no header merge or second-version block) and none may declare peers or optionalDependencies
+     * (yarn resolves those into further blocks the clean placement does not model); anything else fails loud.
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(DepChange change, String rootName,
                                                                        String rootConstraint, String existingLock,
@@ -1235,12 +1193,6 @@ public final class NativeLockEngine {
         return edits;
     }
 
-    /**
-     * A closure member the yarn add patcher can insert byte-exactly. A yarn.lock block carries only
-     * {@code version}/{@code resolved}/{@code integrity}/{@code dependencies}, so engines/os/cpu/bin never
-     * appear and need no gate; a peer or optionalDependency, however, resolves into further blocks the clean
-     * placement does not model — so either defers the whole add.
-     */
     /** The pnpm/bun/yarn add gates reject any optional or peer dependency (only npm models the optional-peer skip). */
     private static void requireNoOptionalOrPeer(String name, VersionManifest m, String pm) {
         if (notEmpty(m.getOptionalDependencies())) {
@@ -1307,11 +1259,9 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A closure member whose bun tuple the patcher can insert byte-exactly: a metadata object of {@code {}} or
-     * {@code { "dependencies": {…} }} only. bun records {@code optionalDependencies}/{@code peerDependencies}/
-     * {@code bin}/{@code os}/{@code cpu}/{@code libc} into that object and auto-installs non-optional peers,
-     * none of which the deps-or-empty placement models — so any of them, a scoped name, or unverified metadata
-     * defers the whole add.
+     * A closure member whose bun tuple the patcher can insert byte-exactly: metadata of {@code {}} or
+     * {@code { "dependencies": {...} }} only. bun records optional/peer/bin/os/cpu/libc into that object and
+     * auto-installs non-optional peers, none of which the placement models, so any of them defers the add.
      */
     private static void requireEmittableBunClosureMember(String name, VersionManifest m) {
         if (name.indexOf('/') >= 0 || name.startsWith("@")) {
@@ -1482,19 +1432,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A closure member whose lock entry the npm patcher can insert byte-exactly. Its {@code dependencies}
-     * are handled (walked + recorded as the entry's dependency map / v2 {@code requires}); the byte-exact
-     * metadata tier — the scalar {@code dev}/{@code deprecated}/{@code license}/{@code hasInstallScript},
-     * the {@code os}/{@code cpu}/{@code libc} arrays, an {@code engines} object, an object-form {@code bin},
-     * a string-form {@code funding}, and now the {@code peerDependencies}/{@code peerDependenciesMeta} maps
-     * (recorded verbatim) — is written through.
-     * <p>
-     * A peer marked optional (via {@code peerDependenciesMeta[x].optional}) is <b>skipped</b>: npm does not
-     * auto-install it, so the closure walk never enqueues it; the entry still records the maps verbatim.
-     * A <b>non-optional</b> peer npm auto-installs (placed top-level with a {@code peer: true} marker whose
-     * reachability propagation needs the full hoisting model) fails loud — the I5-adjacent boundary. So do
-     * {@code optionalDependencies} (installed + {@code optional}-marked), a string {@code bin} or non-string
-     * {@code funding} npm reshapes, or bundled/shrinkwrap/accept/workspaces (exhaustive-or-fail).
+     * A closure member whose lock entry the npm patcher can insert byte-exactly. Its dependencies are recorded as
+     * the entry's dependency map (v2 {@code requires}), and the scalar/array metadata tier plus
+     * {@code peerDependencies}/{@code peerDependenciesMeta} is written through verbatim. An optional peer is
+     * skipped (npm does not auto-install it); a non-optional peer npm auto-installs, {@code optionalDependencies},
+     * a string {@code bin} or non-string {@code funding}, or bundled/shrinkwrap/accept/workspaces all fail loud.
      */
     private static void requireEmittableClosureMember(String name, VersionManifest m) {
         if (notEmpty(m.getOptionalDependencies())) {
@@ -1602,9 +1544,9 @@ public final class NativeLockEngine {
     }
 
     /**
-     * The strict layout whitelist for a bump, minus the {@code dependencies} surface (which I3's cascade
-     * handles). The two manifests must agree on every OTHER closure-affecting surface; only the
-     * write-through tier (engines/license/deprecated/bin) may differ.
+     * The strict layout whitelist for a bump, minus the {@code dependencies} surface (the cascade handles that):
+     * the two manifests must agree on every other closure-affecting surface; only the write-through tier
+     * (engines/license/deprecated/bin) may differ.
      */
     private static void proveNonDependencySurfacesUnchanged(String name, VersionManifest oldM, VersionManifest newM) {
         requireEqual(name, "peerDependencies", oldM.getPeerDependencies(), newM.getPeerDependencies());
@@ -1617,8 +1559,8 @@ public final class NativeLockEngine {
         if (!Objects.equals(bool(oldM.getHasInstallScript()), bool(newM.getHasInstallScript()))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " hasInstallScript changed");
         }
-        // Note: peer-provider and dedupe-reshuffle detection require the full hoisting model (Phase B).
-        // The single-locked-version guard plus the cascade's reverse-edge check reject the common triggers.
+        // Peer-provider and dedupe-reshuffle detection need the full hoisting model; the single-locked-version
+        // guard plus the cascade's reverse-edge check reject the common triggers.
     }
 
     private static boolean dependenciesEqual(VersionManifest oldM, VersionManifest newM) {
@@ -1648,13 +1590,11 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Phase B increment 5: a direct-dependency bump whose new version a reverse-dependent's recorded
-     * constraint excludes. npm keeps the new version at the top-level slot (the direct dep wins) and nests
-     * the old version under the reverse-dependent ({@code node_modules/<dependent>/node_modules/<name>}, plus
-     * the v2 legacy tree). This plans only the accuracy-safe slice — a single top-level reverse-dependent, a
-     * constraint still resolving to the currently-locked version, and a leaf being nested — so the patcher
-     * relocates the pre-edit entry byte-for-byte. Anything wider (multiple nesters, a newer in-range nested
-     * version, a non-leaf, a dev/link entry) is where npm reshapes further, so it fails loud.
+     * A direct-dependency bump whose new version a reverse-dependent's recorded constraint excludes. npm keeps the
+     * new version at the top-level slot and nests the old version under the reverse-dependent
+     * ({@code node_modules/<dependent>/node_modules/<name>}, plus the v2 legacy tree). Only the accuracy-safe slice
+     * is planned (a single top-level reverse-dependent, the constraint still resolving to the locked version, a leaf
+     * nested), so the patcher relocates the pre-edit entry byte-for-byte; anything wider fails loud.
      *
      * @return one nest edit when the safe slice applies, or an empty list when no reverse-dependent conflicts.
      */
@@ -1717,7 +1657,7 @@ public final class NativeLockEngine {
     private static Map<String, String> conflictingReverseDependentsNpm(String lock, String name, String target) {
         Map<String, String> conflicts = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
-            // Importer entries are the user's package.json, re-pinned by the patcher — never a nest trigger.
+            // Importer entries are the user's package.json, re-pinned by the patcher; never a nest trigger.
             if (!e.getKey().contains("node_modules/") || !(e.getValue() instanceof Map)) {
                 continue;
             }
@@ -1799,9 +1739,8 @@ public final class NativeLockEngine {
     }
 
     /**
-     * The bun analogue of {@link #planReverseDependentNestsNpm}: bun hoists like npm, so the same single-leaf
-     * slice applies — the old version relocates to a {@code "<dependent>/<name>"} tuple. The reads differ (bun's
-     * {@code packages} is keyed by name with {@code ["name@ver", "", metadata, sri]} tuples).
+     * The bun analogue of {@link #planReverseDependentNestsNpm}: the same single-leaf slice, relocating the old
+     * version to a {@code "<dependent>/<name>"} tuple. Only the lock reads differ (bun keys {@code packages} by name).
      */
     private static List<LockEditSet.PackageEdit> planReverseDependentNestsBun(String name, String oldVersion,
                                                                               String targetVersion, String lock,
@@ -1880,9 +1819,9 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A closure-unchanged proof only inspects the moving package's own manifest; it says nothing about the
-     * OTHER locked entries that depend on it. If a reverse-dependent's recorded constraint excludes the new
-     * version, re-pinning would emit a lock a real install rejects — fail loud instead.
+     * A closure-unchanged proof only inspects the moving package's own manifest, not the other entries that depend
+     * on it. If a reverse-dependent's recorded constraint excludes the new version, re-pinning would emit a lock a
+     * real install rejects, so fail loud instead.
      */
     private static void proveReverseDependentsAccept(PackageManager pm, String name, String oldVersion,
                                                      String targetVersion, String lock) {
@@ -2134,7 +2073,7 @@ public final class NativeLockEngine {
                             return null; // the root importer owns it
                         }
                         if (unique != null) {
-                            return null; // ambiguous — fall back to the root importer
+                            return null; // ambiguous, fall back to the root importer
                         }
                         unique = key;
                     }
