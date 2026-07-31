@@ -296,13 +296,13 @@ public final class PnpmLockPatcher implements LockPatcher {
                 continue;
             }
             Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
-            if (findEntry(deps, edit.getName()) == null) {
+            Yaml.Mapping.Entry dep = findEntry(deps, edit.getName());
+            if (dep == null) {
                 continue;
             }
             if (removal) {
                 return replaceEntryValue(scopes, scope, removeEntries(deps, edit.getName()));
             }
-            Yaml.Mapping.Entry dep = findEntry(deps, edit.getName());
             if (!(dep.getValue() instanceof Yaml.Mapping)) {
                 throw fail(Reason.MALFORMED_LOCK, edit.getName(), "importer entry is not a mapping");
             }

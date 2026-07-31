@@ -163,7 +163,7 @@ public final class NativeLockEngine {
         }
 
         Set<String> lockedVersions = findLockedVersions(pm, existingLock, name);
-        String importerDir = findImporterDir(pm, existingLock, name, change.scope, change.oldConstraint);
+        String importerDir = findImporterDir(pm, existingLock, name, change.oldConstraint);
 
         if (change.newConstraint == null) {
             // Removal — the patcher drops the entry and its orphans; keystone has no patcher yet.
@@ -257,9 +257,9 @@ public final class NativeLockEngine {
         edits.addAll(nestEdits);
         if (!dependenciesEqual(oldManifest, newManifest)) {
             if (pm == PackageManager.Npm) {
-                edits.addAll(cascadeForcedMoves(name, oldManifest, newManifest, existingLock, registries, client));
+                edits.addAll(cascadeForcedMoves(name, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.Pnpm) {
-                edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, oldManifest, newManifest, existingLock, registries, client));
+                edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
             } else {
                 // Only the npm and pnpm patchers can reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
@@ -278,9 +278,9 @@ public final class NativeLockEngine {
      * would fork/nest), a mover whose own dependencies also change (a second cascade wave / backtrack), a
      * brand-new transitive the bump introduces (add-during-bump), or a dropped edge (orphan pruning).
      */
-    private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootOld,
-                                                                    VersionManifest rootNew, String existingLock,
-                                                                    NodeRegistries registries, NpmRegistryClient client) {
+    private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootNew,
+                                                                    String existingLock, NodeRegistries registries,
+                                                                    NpmRegistryClient client) {
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
                 Collections.emptyMap() : rootNew.getDependencies();
 
@@ -462,9 +462,8 @@ public final class NativeLockEngine {
      * only the lock reads differ from npm.
      */
     private static List<LockEditSet.PackageEdit> cascadeForcedMovesPnpm(String rootName, String rootOldVersion,
-                                                                        VersionManifest rootOld, VersionManifest rootNew,
-                                                                        String existingLock, NodeRegistries registries,
-                                                                        NpmRegistryClient client) {
+                                                                        VersionManifest rootNew, String existingLock,
+                                                                        NodeRegistries registries, NpmRegistryClient client) {
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
                 Collections.emptyMap() : rootNew.getDependencies();
 
@@ -620,7 +619,7 @@ public final class NativeLockEngine {
                 .newIntegrity(dist.getIntegrity())
                 .writeThroughMetadata(pnpmLeafMetadata(newManifest))
                 .scope(change.scope)
-                .importerDir(findImporterDir(PackageManager.Pnpm, lock, name, change.scope, change.oldConstraint))
+                .importerDir(findImporterDir(PackageManager.Pnpm, lock, name, change.oldConstraint))
                 .contentFork(true)
                 .build());
     }
@@ -2138,7 +2137,7 @@ public final class NativeLockEngine {
      * (e.g. {@code packages/app}), or {@code null} for the root importer. Matched off the raw lock's importer
      * entries so a workspace-member edit re-pins the member's importer, not the root's.
      */
-    private static @Nullable String findImporterDir(PackageManager pm, String lock, String name, String scope,
+    private static @Nullable String findImporterDir(PackageManager pm, String lock, String name,
                                                     @Nullable String oldConstraint) {
         switch (pm) {
             case Npm:
