@@ -1142,10 +1142,10 @@ public final class NativeLockEngine {
                 existingBerryNames(existingLock) : existingYarnNames(existingLock);
         boolean dev = "devDependencies".equals(change.scope);
 
-        // Promoting a transitive to a direct dep: if it is already present at a satisfying version, yarn-classic
-        // just merges the new selector into its block header (no new blocks). A non-satisfying version forks.
-        if (pm == PackageManager.YarnClassic && existingNames.contains(rootName)) {
-            return promoteYarnClassic(change, rootName, rootConstraint, existingLock);
+        // Promoting a transitive to a direct dep: if it is already present at a satisfying version, yarn merges the
+        // new selector/descriptor into the existing entry (no new blocks). A non-satisfying version forks.
+        if ((pm == PackageManager.YarnClassic || pm == PackageManager.YarnBerry) && existingNames.contains(rootName)) {
+            return promoteYarn(pm, change, rootName, rootConstraint, existingLock);
         }
 
         Map<String, Placement> placed = new LinkedHashMap<>();
@@ -1205,10 +1205,10 @@ public final class NativeLockEngine {
         return edits;
     }
 
-    /** A yarn-classic promotion: merge the declared selector into the existing block if its version satisfies. */
-    private static List<LockEditSet.PackageEdit> promoteYarnClassic(DepChange change, String rootName,
-                                                                    String rootConstraint, String existingLock) {
-        Set<String> locked = findLockedVersionsYarn(existingLock, rootName);
+    /** A yarn promotion: merge the declared selector/descriptor into the existing entry if its version satisfies. */
+    private static List<LockEditSet.PackageEdit> promoteYarn(PackageManager pm, DepChange change, String rootName,
+                                                             String rootConstraint, String existingLock) {
+        Set<String> locked = findLockedVersions(pm, existingLock, rootName);
         if (locked.size() != 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
                     rootName + " is present at multiple versions; promoting it may fork (deferred)");

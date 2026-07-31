@@ -68,6 +68,8 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                 anyPrune |= edit.isPrunesOrphans();
             } else if (edit.getKind() == PackageEdit.Kind.FORCED_MOVE) {
                 root = applyForcedMove(root, edit);
+            } else if (edit.getKind() == PackageEdit.Kind.PROMOTION) {
+                root = applyPromotion(root, edit);
             } else {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                         "yarn berry does not support " + edit.getKind() + " yet");
@@ -285,6 +287,40 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         String first = key.split(",")[0].trim();
         int at = first.indexOf("@npm:");
         return at > 0 ? first.substring(0, at) : first;
+    }
+
+    /** Promote an already-present transitive: merge its declared descriptor into the entry key and add the importer edge. */
+    private Yaml.Mapping applyPromotion(Yaml.Mapping root, PackageEdit edit) {
+        String name = edit.getName();
+        String constraint = edit.getNewConstraint();
+        if (constraint == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no declared constraint for promoted " + name);
+        }
+        Yaml.Mapping.Entry entry = registryEntry(root, name);
+        if (entry == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no berry entry for " + name);
+        }
+        String key = LockYaml.keyOf(entry);
+        Set<String> descriptors = new TreeSet<>();
+        for (String descriptor : key.split(",")) {
+            descriptors.add(descriptor.trim());
+        }
+        if (descriptors.add(name + "@npm:" + constraint)) {
+            root = LockYaml.replaceEntry(root, key,
+                    LockYaml.renameKey(entry, String.join(", ", descriptors)).withValue(entry.getValue()));
+        }
+        return insertImporterEdge(root, edit, constraint);
+    }
+
+    /** The lone registry entry heading {@code name} (its key holds an {@code @npm:} descriptor for it). */
+    private static Yaml.Mapping.@Nullable Entry registryEntry(Yaml.Mapping root, String name) {
+        for (Yaml.Mapping.Entry e : root.getEntries()) {
+            String key = LockYaml.keyOf(e);
+            if (key != null && key.contains("@npm:") && berryEntryName(key).equals(name)) {
+                return e;
+            }
+        }
+        return null;
     }
 
     /** Re-head a cascade-forced transitive's descriptor to its new range and rewrite its resolution triple. */

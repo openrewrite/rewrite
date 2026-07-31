@@ -93,6 +93,13 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void promoteMerge() {
+        // ms is a transitive of debug at ms@npm:^2.1.3; declaring ms@^2.0.0 (satisfied by 2.1.3) merges the
+        // descriptor key and adds the importer edge. No new entries, so no registry access.
+        assertRegenEquals("lock/yarn-berry/promote-merge");
+    }
+
+    @Test
     void unsupportedCacheKeyFailsLoud() {
         // Only the 10c0 zip format is validated; any other cacheKey cannot be reproduced, so refuse.
         String dir = "lock/yarn-berry/leaf-bump";
@@ -131,7 +138,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }
