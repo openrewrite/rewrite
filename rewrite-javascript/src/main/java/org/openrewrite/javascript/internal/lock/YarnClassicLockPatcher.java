@@ -31,6 +31,7 @@ import java.util.TreeMap;
 
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.FORCED_MOVE;
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.PROMOTION;
 
 /**
  * Patches a classic {@code yarn.lock} (v1). Not valid YAML, so this is a targeted text edit over the raw
@@ -63,6 +64,8 @@ public final class YarnClassicLockPatcher implements LockPatcher {
                 adds.add(edit);
             } else if (edit.getKind() == FORCED_MOVE) {
                 content = applyForcedMove(content, edit);
+            } else if (edit.getKind() == PROMOTION) {
+                content = applyPromotion(content, edit, edits.getEditedPackageJson());
             } else {
                 content = applyEdit(content, edit, edits.getEditedPackageJson());
                 anyPrune |= edit.isPrunesOrphans();
@@ -263,6 +266,48 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             }
         }
         return String.join("\n", lines);
+    }
+
+    /** Promote an already-present transitive to a direct dep by merging its declared selector into the header. */
+    private String applyPromotion(String content, PackageEdit edit, @Nullable String editedPackageJson) {
+        String name = edit.getName();
+        String constraint = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
+        if (constraint == null) {
+            constraint = edit.getNewConstraint();
+        }
+        if (constraint == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no declared constraint for promoted " + name);
+        }
+        Blocks blocks = Blocks.parse(content);
+        int bi = blocks.indexOfName(name);
+        if (bi < 0) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no yarn block for " + name);
+        }
+        blocks.set(bi, mergeSelector(blocks.get(bi), name + "@" + constraint));
+        return blocks.reconstruct();
+    }
+
+    /** Add {@code selector} to a block's {@code sortAlpha}-ordered header; a no-op (byte-identical) if already present. */
+    private static String mergeSelector(String block, String selector) {
+        int nl = block.indexOf('\n');
+        String body = block.substring(nl);
+        Set<String> selectors = new LinkedHashSet<>();
+        for (String token : headerTokens(block)) {
+            selectors.add(unwrap(token));
+        }
+        if (!selectors.add(selector)) {
+            return block;
+        }
+        List<String> sorted = new ArrayList<>(selectors);
+        sorted.sort(YarnClassicLockPatcher::sortAlpha);
+        StringBuilder header = new StringBuilder();
+        for (int i = 0; i < sorted.size(); i++) {
+            if (i > 0) {
+                header.append(", ");
+            }
+            header.append(maybeWrap(sorted.get(i)));
+        }
+        return header + ":" + body;
     }
 
     /** A cascade-forced transitive: re-head its single-selector block to the requirer's new range and re-resolve. */

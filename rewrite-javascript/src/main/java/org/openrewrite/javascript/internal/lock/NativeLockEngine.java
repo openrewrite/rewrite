@@ -1143,6 +1143,12 @@ public final class NativeLockEngine {
                 existingBerryNames(existingLock) : existingYarnNames(existingLock);
         boolean dev = "devDependencies".equals(change.scope);
 
+        // Promoting a transitive to a direct dep: if it is already present at a satisfying version, yarn-classic
+        // just merges the new selector into its block header (no new blocks). A non-satisfying version forks.
+        if (pm == PackageManager.YarnClassic && existingNames.contains(rootName)) {
+            return promoteYarnClassic(change, rootName, rootConstraint, existingLock);
+        }
+
         Map<String, Placement> placed = new LinkedHashMap<>();
         Deque<Requirement> queue = new ArrayDeque<>();
         queue.add(new Requirement(rootName, rootConstraint, dev));
@@ -1198,6 +1204,26 @@ public final class NativeLockEngine {
                     .build());
         }
         return edits;
+    }
+
+    /** A yarn-classic promotion: merge the declared selector into the existing block if its version satisfies. */
+    private static List<LockEditSet.PackageEdit> promoteYarnClassic(DepChange change, String rootName,
+                                                                    String rootConstraint, String existingLock) {
+        Set<String> locked = findLockedVersionsYarn(existingLock, rootName);
+        if (locked.size() != 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
+                    rootName + " is present at multiple versions; promoting it may fork (deferred)");
+        }
+        if (!NodeSemver.satisfies(locked.iterator().next(), rootConstraint)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
+                    locked.iterator().next() + " which excludes " + rootConstraint + " (yarn would fork); deferred");
+        }
+        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+                .name(rootName)
+                .newConstraint(rootConstraint)
+                .scope(change.scope)
+                .kind(PROMOTION)
+                .build());
     }
 
     /** The pnpm/bun/yarn add gates reject any optional or peer dependency (only npm models the optional-peer skip). */
