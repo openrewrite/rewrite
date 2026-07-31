@@ -558,7 +558,7 @@ public final class NativeLockEngine {
                                                                                String targetVersion, DepChange change,
                                                                                String lock, NodeRegistries registries,
                                                                                NpmRegistryClient client) {
-        Set<String> referrers = referrersPnpm(lock, name, oldVersion, " ");
+        Set<String> referrers = referrersPnpm(lock, name, oldVersion, null);
         if (referrers.isEmpty()) {
             return null; // not retained by any reverse-dependent: a normal rename bump, not a fork
         }
@@ -664,7 +664,7 @@ public final class NativeLockEngine {
     }
 
     /** The snapshot keys (other than {@code ownerKey}) that reference {@code dep@oldVersion} as a resolved dep. */
-    private static Set<String> referrersPnpm(String lock, String dep, String oldVersion, String ownerKey) {
+    private static Set<String> referrersPnpm(String lock, String dep, String oldVersion, @Nullable String ownerKey) {
         Set<String> referrers = new LinkedHashSet<>();
         Object loaded = new Yaml().load(lock);
         if (!(loaded instanceof Map)) {
@@ -676,7 +676,7 @@ public final class NativeLockEngine {
         }
         for (Map.Entry<?, ?> e : ((Map<?, ?>) snapshots).entrySet()) {
             String key = stripPnpmKey(String.valueOf(e.getKey()));
-            if (key.equals(ownerKey) || !(e.getValue() instanceof Map)) {
+            if ((ownerKey != null && key.equals(ownerKey)) || !(e.getValue() instanceof Map)) {
                 continue;
             }
             Map<?, ?> body = (Map<?, ?>) e.getValue();
