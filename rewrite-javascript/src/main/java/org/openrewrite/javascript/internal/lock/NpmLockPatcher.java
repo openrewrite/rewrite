@@ -816,6 +816,9 @@ public final class NpmLockPatcher implements LockPatcher {
         if (wt.isEnginesChanged()) {
             entry = writeThroughEngines(name, packages, entry, wt.getEngines());
         }
+        if (wt.isFundingChanged()) {
+            entry = writeThroughObjectMember(name, packages, entry, "funding", wt.getFunding());
+        }
         if (wt.getLicense() != null) {
             if (getMember(entry, "license") == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gained a license field");
@@ -834,20 +837,26 @@ public final class NpmLockPatcher implements LockPatcher {
     /** Add, replace, or remove the entry's {@code engines} object at npm's field position (byte-exact). */
     private Json.JsonObject writeThroughEngines(String name, Json.JsonObject packages, Json.JsonObject entry,
                                                 @Nullable Map<String, String> engines) {
-        entry = removeMembers(entry, Collections.singleton("engines"));
-        if (engines == null || engines.isEmpty()) {
-            return entry; // engines removed on upgrade
+        JsonNode value = (engines == null || engines.isEmpty()) ? null : JSON.valueToTree(engines);
+        return writeThroughObjectMember(name, packages, entry, "engines", value);
+    }
+
+    /** Add, replace, or remove an object-valued entry member at npm's field position (byte-exact). */
+    private Json.JsonObject writeThroughObjectMember(String name, Json.JsonObject packages, Json.JsonObject entry,
+                                                     String key, @Nullable JsonNode value) {
+        entry = removeMembers(entry, Collections.singleton(key));
+        if (value == null) {
+            return entry; // member removed on upgrade
         }
         String fieldWs = nestedMemberWhitespace(packages);
         String closeWs = memberWhitespace(packages);
         if (fieldWs == null || closeWs == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "cannot derive entry indentation for engines");
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "cannot derive entry indentation for " + key);
         }
         String keyIndent = indentOf(fieldWs);
         String unit = keyIndent.length() > indentOf(closeWs).length() ?
                 keyIndent.substring(indentOf(closeWs).length()) : "  ";
-        String rendered = renderNode(JSON.valueToTree(engines), keyIndent, unit);
-        return graftSorted(entry, "engines", rendered, true);
+        return graftSorted(entry, key, renderNode(value, keyIndent, unit), true);
     }
 
     private void requireRegistryEntry(String name, PackageEdit edit, Json.JsonObject entry) {

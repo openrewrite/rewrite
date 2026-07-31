@@ -1,0 +1,24 @@
+{
+  "name": "funding-change",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "funding-change",
+      "version": "1.0.0",
+      "dependencies": {
+        "is-stream": "2.0.0"
+      }
+    },
+    "node_modules/is-stream": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/is-stream/-/is-stream-2.0.0.tgz",
+      "integrity": "sha512-XCoy+WlUr7d1+Z8GgSuXmpuUFC9fOhRXglJMx+dwLKTkL44Cjd4W1Z5P+BQZpr+cR93aGP4S/s7Ftw6Nd/kiEw==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=8"
+      }
+    }
+  }
+}

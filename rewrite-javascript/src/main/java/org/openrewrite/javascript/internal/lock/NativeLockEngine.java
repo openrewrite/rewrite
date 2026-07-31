@@ -247,7 +247,7 @@ public final class NativeLockEngine {
                 .newShasum(dist == null ? null : dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .writeThroughMetadata(writeThrough(oldManifest, newManifest))
+                .writeThroughMetadata(writeThrough(pm, oldManifest, newManifest))
                 .prunesOrphans(prunesOrphans)
                 .build();
 
@@ -366,7 +366,7 @@ public final class NativeLockEngine {
                 .newShasum(dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .writeThroughMetadata(writeThrough(oldManifest, newManifest))
+                .writeThroughMetadata(writeThrough(PackageManager.Npm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .forcedMove(true)
@@ -558,7 +558,7 @@ public final class NativeLockEngine {
                 .newVersion(target)
                 .newIntegrity(dist.getIntegrity())
                 .newDependencies(newManifest.getDependencies())
-                .writeThroughMetadata(writeThrough(oldManifest, newManifest))
+                .writeThroughMetadata(writeThrough(PackageManager.Pnpm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .forcedMove(true)
@@ -2062,7 +2062,7 @@ public final class NativeLockEngine {
         return paren >= 0 ? k.substring(0, paren) : k;
     }
 
-    private static LockEditSet.@Nullable WriteThroughMetadata writeThrough(VersionManifest oldM, VersionManifest newM) {
+    private static LockEditSet.@Nullable WriteThroughMetadata writeThrough(PackageManager pm, VersionManifest oldM, VersionManifest newM) {
         LockEditSet.WriteThroughMetadata.WriteThroughMetadataBuilder b = LockEditSet.WriteThroughMetadata.builder();
         boolean any = false;
         if (!Objects.equals(normalize(oldM.getEngines()), normalize(newM.getEngines()))) {
@@ -2080,6 +2080,18 @@ public final class NativeLockEngine {
         }
         if (!Objects.equals(oldM.getBin(), newM.getBin())) {
             b.bin(newM.getBin());
+            any = true;
+        }
+        // Only npm records funding in its lock; pnpm/bun/yarn omit it, so a funding delta is a no-op there.
+        if (pm == PackageManager.Npm && !Objects.equals(oldM.getFunding(), newM.getFunding())) {
+            JsonNode funding = newM.getFunding();
+            if (funding != null && !funding.isTextual()) {
+                // npm reshapes object/array funding; only the string form is byte-reproducible (as leaf adds gate).
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newM.getName(),
+                        newM.getName() + " funding changed to a non-string form; native write-through is not supported");
+            }
+            b.funding(normalizeFunding(funding));
+            b.fundingChanged(true);
             any = true;
         }
         return any ? b.build() : null;

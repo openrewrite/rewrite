@@ -1,0 +1,4 @@
+{
+  "name": "funding-change","version":"1.0.0",
+  "dependencies": { "is-stream": "2.0.1" }
+}

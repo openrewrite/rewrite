@@ -199,6 +199,13 @@ public class LockEditSet {
         @Nullable
         JsonNode funding;
 
+        /**
+         * The bump changed the {@code funding} surface (added, changed, or removed it). Distinguishes a
+         * funding-removal ({@link #funding} {@code null} but a real delta) from "no funding change" so the npm
+         * patcher removes a stale {@code funding} member instead of silently keeping it (mirrors {@link #enginesChanged}).
+         */
+        boolean fundingChanged;
+
         /** A closure member's {@code peerDependencies} map, copied verbatim into the lock entry (object group). */
         @Nullable
         Map<String, String> peerDependencies;
