@@ -91,6 +91,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         Map<String, String> addedVersions = addedVersions(edits.getEdits());
 
         boolean anyRemoval = false;
+        boolean anyPrune = false;
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.isAdded()) {
                 root = applyAdd(root, edit, major, newConstraints, addedVersions);
@@ -104,11 +105,16 @@ public final class PnpmLockPatcher implements LockPatcher {
                 root = applyForcedMove(root, edit, major);
                 continue;
             }
+            if (edit.isPrunesOrphans() && major < 9) {
+                throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                        "orphan-prune on a pnpm bump below lockfileVersion 9 is not yet supported");
+            }
             preCheck(root, edit, major);
             root = applyEdit(root, edit, major, newConstraints);
             anyRemoval |= edit.getNewVersion() == null;
+            anyPrune |= edit.isPrunesOrphans();
         }
-        if (anyRemoval) {
+        if (anyRemoval || anyPrune) {
             root = gcOrphans(root, major);
         }
 
@@ -358,7 +364,52 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no snapshots entry " + oldKey);
         }
         Yaml.Mapping.Entry renamed = renameKey(snapshot, edit.getName() + "@" + edit.getNewVersion());
+        if (edit.isPrunesOrphans()) {
+            renamed = pruneSnapshotEdges(renamed, edit);
+        }
         return replaceEntryValue(root, "snapshots", replaceEntry(snapshots, oldKey, renamed));
+    }
+
+    /**
+     * Drop the {@code dependencies}/{@code optionalDependencies} edges the bumped version no longer declares
+     * (orphan-prune); the surviving edges keep their bytes, and a snapshot emptied of all edges becomes
+     * {@code {}}. A snapshot carrying any other field (e.g. {@code transitivePeerDependencies}) is not modeled
+     * here and fails loud.
+     */
+    private Yaml.Mapping.Entry pruneSnapshotEdges(Yaml.Mapping.Entry snapshot, PackageEdit edit) {
+        if (!(snapshot.getValue() instanceof Yaml.Mapping)) {
+            return snapshot;
+        }
+        Set<String> keep = edit.getNewDependencies() == null ?
+                Collections.emptySet() : edit.getNewDependencies().keySet();
+        String newKey = edit.getName() + "@" + edit.getNewVersion();
+        List<Yaml.Mapping.Entry> scopes = new ArrayList<>();
+        for (Yaml.Mapping.Entry scopeEntry : ((Yaml.Mapping) snapshot.getValue()).getEntries()) {
+            String scope = keyOf(scopeEntry);
+            if (!"dependencies".equals(scope) && !"optionalDependencies".equals(scope)) {
+                throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                        edit.getName() + " snapshot carries " + scope + "; orphan-prune not yet supported");
+            }
+            if (!(scopeEntry.getValue() instanceof Yaml.Mapping)) {
+                scopes.add(scopeEntry);
+                continue;
+            }
+            List<Yaml.Mapping.Entry> survivors = new ArrayList<>();
+            for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
+                if (keep.contains(keyOf(dep))) {
+                    survivors.add(dep);
+                }
+            }
+            if (!survivors.isEmpty()) {
+                scopes.add(scopeEntry.withValue(((Yaml.Mapping) scopeEntry.getValue()).withEntries(survivors)));
+            }
+        }
+        if (scopes.isEmpty()) {
+            // Keep the renamed entry (its key prefix carries the blank-line separator) and swap only the value
+            // to an empty flow mapping {}, borrowed from a parsed template.
+            return snapshot.withValue(parseGraftEntry("snapshots:\n  " + newKey + ": {}\n", "snapshots", newKey).getValue());
+        }
+        return snapshot.withValue(((Yaml.Mapping) snapshot.getValue()).withEntries(scopes));
     }
 
     private Yaml.Mapping editResolution(Yaml.Mapping body, PackageEdit edit) {

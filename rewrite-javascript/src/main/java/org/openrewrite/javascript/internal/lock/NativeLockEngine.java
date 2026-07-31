@@ -239,8 +239,9 @@ public final class NativeLockEngine {
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable. npm only so far.
-        boolean prunesOrphans = pm == PackageManager.Npm && dropsDependencyEdge(oldManifest, newManifest);
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (npm + pnpm v9).
+        boolean prunesOrphans = (pm == PackageManager.Npm || pm == PackageManager.Pnpm) &&
+                dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
                 .newIntegrity(dist == null ? null : dist.getIntegrity())
@@ -464,19 +465,11 @@ public final class NativeLockEngine {
                                                                         VersionManifest rootOld, VersionManifest rootNew,
                                                                         String existingLock, NodeRegistries registries,
                                                                         NpmRegistryClient client) {
-        Map<String, String> oldDeps = rootOld.getDependencies() == null ?
-                Collections.emptyMap() : rootOld.getDependencies();
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
                 Collections.emptyMap() : rootNew.getDependencies();
 
-        for (String dep : oldDeps.keySet()) {
-            if (!newDeps.containsKey(dep)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
-                        "upgrading " + rootName + " drops the dependency edge to " + dep +
-                                " (orphan pruning) not yet supported");
-            }
-        }
-
+        // A dropped edge (in the old manifest, gone from the new) is handled by the patcher's snapshot prune +
+        // orphan GC, flagged on the root edit via prunesOrphans — not here. This loop only re-resolves kept edges.
         Map<String, String> rootSnapshotDeps = snapshotDependenciesPnpm(existingLock, rootName + "@" + rootOldVersion);
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
