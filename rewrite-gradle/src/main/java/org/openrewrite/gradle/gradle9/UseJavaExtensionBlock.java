@@ -77,8 +77,11 @@ public class UseJavaExtensionBlock extends Recipe {
                 // Top-level `sourceCompatibility` / `targetCompatibility` assignments delegate to the removed
                 // `JavaPluginConvention`; move them into a `java { }` block at the root of the build script.
                 G.CompilationUnit cu = (G.CompilationUnit) visited;
-                List<Statement> mapped = moveCompatibility(cu.getStatements(), ctx);
-                return mapped == cu.getStatements() ? cu : cu.withStatements(mapped);
+                // Hold onto the list; each `getStatements()` call builds a new one, so comparing
+                // against a second call would never detect the unchanged case.
+                List<Statement> statements = cu.getStatements();
+                List<Statement> mapped = moveCompatibility(statements, ctx);
+                return mapped == statements ? cu : cu.withStatements(mapped);
             }
 
             @Override
@@ -92,8 +95,9 @@ public class UseJavaExtensionBlock extends Recipe {
                 }
                 J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
                 J.Block body = (J.Block) lambda.getBody();
-                List<Statement> mapped = moveCompatibility(body.getStatements(), ctx);
-                if (mapped == body.getStatements()) {
+                List<Statement> statements = body.getStatements();
+                List<Statement> mapped = moveCompatibility(statements, ctx);
+                if (mapped == statements) {
                     return m;
                 }
                 return autoFormat(m.withArguments(singletonList(lambda.withBody(body.withStatements(mapped)))),

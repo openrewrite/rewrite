@@ -95,6 +95,12 @@ public class OneDependencyDeclarationPerStatement extends Recipe {
                     if (m.getSelect() != null) {
                         return s;
                     }
+                    // `DependencyHandler.add(configuration, notation)` and its provider variants take the
+                    // configuration name as their first argument, so their arguments are not all coordinates
+                    String methodName = m.getSimpleName();
+                    if ("add".equals(methodName) || "addProvider".equals(methodName) || "addProviderConvertible".equals(methodName)) {
+                        return s;
+                    }
                     List<Expression> args = m.getArguments();
                     if (args.size() < 2) {
                         return s;
@@ -122,13 +128,15 @@ public class OneDependencyDeclarationPerStatement extends Recipe {
                     List<Statement> split = new ArrayList<>(args.size());
                     for (int i = 0; i < args.size(); i++) {
                         Expression coord = args.get(i).withPrefix(Space.format(" "));
+                        // Every split beyond the first needs its own id; reusing the original invocation's
+                        // id leaves duplicate ids in the enclosing block, which later recipes choke on.
+                        J.MethodInvocation mi = (i == 0 ? m : m.withId(Tree.randomId()))
+                                .withArguments(singletonList(coord));
                         boolean isLast = i == args.size() - 1;
                         if (isLast && wrappedInReturn) {
-                            J.MethodInvocation innerMi = m.withArguments(singletonList(coord));
-                            split.add(((J.Return) s).withPrefix(subsequentPrefix).withExpression(innerMi));
+                            split.add(((J.Return) s).withPrefix(subsequentPrefix).withExpression(mi));
                         } else {
-                            Space prefix = i == 0 ? stmtPrefix : subsequentPrefix;
-                            split.add(m.withPrefix(prefix).withArguments(singletonList(coord)));
+                            split.add(mi.withPrefix(i == 0 ? stmtPrefix : subsequentPrefix));
                         }
                     }
                     return split;

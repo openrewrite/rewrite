@@ -152,6 +152,24 @@ class OneDependencyDeclarationPerStatementTest implements RewriteTest {
     }
 
     @Test
+    void leavesDependencyHandlerAddAlone() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                 plugins.withId('java') {
+                     dependencies {
+                         add('testImplementation', platform("org.junit:junit-bom:6.1.2"))
+                         add('testImplementation', platform("org.mockito:mockito-bom:5.23.0"))
+                     }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void leavesCallWithTrailingClosureAlone() {
         rewriteRun(
           buildGradle(

@@ -195,4 +195,32 @@ class GradleBestPracticesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noChangeToDependencyHandlerAddCalls() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                 plugins.withId('java') {
+                     dependencies {
+                         add('testImplementation', platform("org.junit:junit-bom:6.1.2"))
+                         add('testImplementation', platform("org.mockito:mockito-bom:5.23.0"))
+                     }
+                  }
+              }
+              """),
+          properties(
+            //language=properties
+            """
+              """,
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
 }
