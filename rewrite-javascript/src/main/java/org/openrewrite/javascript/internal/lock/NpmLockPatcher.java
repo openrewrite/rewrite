@@ -20,19 +20,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
-
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
-import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
@@ -48,6 +41,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
  * Byte-exact {@link LockPatcher} for npm {@code package-lock.json} (lockfileVersion 2 and 3, full workspace
@@ -65,7 +60,7 @@ public final class NpmLockPatcher implements LockPatcher {
 
     @Override
     public String patch(LockEditSet edits) {
-        Json.Document doc = parse(edits.getExistingLockContent());
+        Json.Document doc = LockJson.parse(edits.getExistingLockContent(), null);
         if (!(doc.getValue() instanceof Json.JsonObject)) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "package-lock.json root is not an object");
         }
@@ -76,7 +71,7 @@ public final class NpmLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.UNSUPPORTED_LOCKFILE_VERSION, null,
                     "package-lock.json lockfileVersion " + lockfileVersion + " is not supported (need 2 or 3)");
         }
-        if (getObjectMember(root, "packages") == null) {
+        if (LockJson.objectMember(root, "packages") == null) {
             throw new EngineFailure(Reason.UNSUPPORTED_LOCKFILE_VERSION, null,
                     "package-lock.json has no packages map (v1 is not supported)");
         }
@@ -152,7 +147,7 @@ public final class NpmLockPatcher implements LockPatcher {
         // Site (1): the hoisted package placement, only when the resolved version actually moves.
         if (placementMoves) {
             Json.JsonObject packages = requirePackages(root);
-            Json.JsonObject entry = getObjectMember(packages, "node_modules/" + name);
+            Json.JsonObject entry = LockJson.objectMember(packages, "node_modules/" + name);
             if (entry == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                         "no packages entry for node_modules/" + name);
@@ -165,8 +160,8 @@ public final class NpmLockPatcher implements LockPatcher {
             // A cascade bump re-pins the entry's own dependency edges (unchanged ones stay byte-identical); an
             // added edge fails loud, a dropped edge orphan-prunes when the edit allows it.
             entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
-            packages = putMember(packages, "node_modules/" + name, entry);
-            root = putMember(root, "packages", packages);
+            packages = LockJson.replaceValue(packages, "node_modules/" + name, entry);
+            root = LockJson.replaceValue(root, "packages", packages);
         }
 
         // Site (2): the importer's declared constraint mirror.
@@ -187,23 +182,23 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         String importerKey = edit.getImporterDir() == null ? "" : edit.getImporterDir();
         Json.JsonObject packages = requirePackages(root);
-        Json.JsonObject importer = getObjectMember(packages, importerKey);
+        Json.JsonObject importer = LockJson.objectMember(packages, importerKey);
         if (importer == null) {
             return root;
         }
-        Json.JsonObject scope = getObjectMember(importer, edit.getScope());
-        if (scope == null || getMember(scope, edit.getName()) == null) {
+        Json.JsonObject scope = LockJson.objectMember(importer, edit.getScope());
+        if (scope == null || LockJson.member(scope, edit.getName()) == null) {
             return root;
         }
         scope = setStringField(scope, edit.getName(), newConstraint);
-        importer = putMember(importer, edit.getScope(), scope);
-        packages = putMember(packages, importerKey, importer);
-        return putMember(root, "packages", packages);
+        importer = LockJson.replaceValue(importer, edit.getScope(), scope);
+        packages = LockJson.replaceValue(packages, importerKey, importer);
+        return LockJson.replaceValue(root, "packages", packages);
     }
 
     private Json.JsonObject applyLegacyTree(Json.JsonObject root, PackageEdit edit) {
         String name = edit.getName();
-        Json.JsonObject legacy = getObjectMember(root, "dependencies");
+        Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
         if (legacy == null) {
             return root;
         }
@@ -211,7 +206,7 @@ public final class NpmLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " appears nested in the v2 legacy dependencies tree (fork/dedupe)");
         }
-        Json.JsonObject entry = getObjectMember(legacy, name);
+        Json.JsonObject entry = LockJson.objectMember(legacy, name);
         if (entry == null) {
             return root;
         }
@@ -229,8 +224,8 @@ public final class NpmLockPatcher implements LockPatcher {
         // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them, an
         // orphan-prune drops them.
         entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies(), edit.isPrunesOrphans());
-        legacy = putMember(legacy, name, entry);
-        return putMember(root, "dependencies", legacy);
+        legacy = LockJson.replaceValue(legacy, name, entry);
+        return LockJson.replaceValue(root, "dependencies", legacy);
     }
 
     /**
@@ -243,7 +238,7 @@ public final class NpmLockPatcher implements LockPatcher {
         if (deps.isEmpty() && !allowDrops) {
             return entry; // no constraint reconciliation requested (plain bump / leaf mover)
         }
-        Json.JsonObject map = getObjectMember(entry, mapKey);
+        Json.JsonObject map = LockJson.objectMember(entry, mapKey);
         if (map == null) {
             if (deps.isEmpty()) {
                 return entry; // orphan-prune of an entry with no such map to begin with
@@ -284,14 +279,14 @@ public final class NpmLockPatcher implements LockPatcher {
                 changed = true;
             }
         }
-        return changed || allowDrops ? putMember(entry, mapKey, map) : entry;
+        return changed || allowDrops ? LockJson.replaceValue(entry, mapKey, map) : entry;
     }
 
     private static Set<String> memberKeys(Json.JsonObject obj) {
         Set<String> keys = new LinkedHashSet<>();
         for (Json member : obj.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = memberKey((Json.Member) member);
+                String key = LockJson.memberKey((Json.Member) member);
                 if (key != null) {
                     keys.add(key);
                 }
@@ -314,7 +309,7 @@ public final class NpmLockPatcher implements LockPatcher {
         requireAddNotEntangled(packages, name);
 
         String entryKey = "node_modules/" + name;
-        if (getMember(packages, entryKey) != null) {
+        if (LockJson.member(packages, entryKey) != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " is already placed in node_modules");
         }
         if (edit.getNewResolved() == null || edit.getNewIntegrity() == null) {
@@ -324,7 +319,7 @@ public final class NpmLockPatcher implements LockPatcher {
         // Site (1): the hoisted package entry.
         String entryText = leafEntryText(packages, edit);
         packages = graftSorted(packages, entryKey, entryText, true);
-        root = putMember(root, "packages", packages);
+        root = LockJson.replaceValue(root, "packages", packages);
 
         // Site (2): the importer's declared constraint.
         root = insertImporterConstraint(root, editedManifest, edit);
@@ -351,11 +346,11 @@ public final class NpmLockPatcher implements LockPatcher {
             }
             Json.JsonObject packages = requirePackages(root);
             String entryKey = "node_modules/" + edit.getName();
-            Json.JsonObject entry = getObjectMember(packages, entryKey);
+            Json.JsonObject entry = LockJson.objectMember(packages, entryKey);
             if (entry != null) {
                 entry = removeMembers(entry, Collections.singleton("dev"));
-                packages = putMember(packages, entryKey, entry);
-                root = putMember(root, "packages", packages);
+                packages = LockJson.replaceValue(packages, entryKey, entry);
+                root = LockJson.replaceValue(root, "packages", packages);
             }
         }
         return root;
@@ -367,7 +362,7 @@ public final class NpmLockPatcher implements LockPatcher {
      */
     private String leafEntryText(Json.JsonObject packages, PackageEdit edit) {
         String fieldWs = nestedMemberWhitespace(packages);
-        String closeWs = memberWhitespace(packages);
+        String closeWs = LockJson.memberWhitespace(packages);
         if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive entry indentation");
         }
@@ -494,31 +489,31 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         String importerKey = edit.getImporterDir() == null ? "" : edit.getImporterDir();
         Json.JsonObject packages = requirePackages(root);
-        Json.JsonObject importer = getObjectMember(packages, importerKey);
+        Json.JsonObject importer = LockJson.objectMember(packages, importerKey);
         if (importer == null) {
             return root;
         }
-        Json.JsonObject scope = getObjectMember(importer, edit.getScope());
+        Json.JsonObject scope = LockJson.objectMember(importer, edit.getScope());
         if (scope != null) {
             // Existing scope: insert the single scalar constraint, sorted.
             scope = graftSorted(scope, edit.getName(), jsonEncode(newConstraint), false);
-            importer = putMember(importer, edit.getScope(), scope);
+            importer = LockJson.replaceValue(importer, edit.getScope(), scope);
         } else {
             // First dependency of this scope: create the whole scope object with one member.
             String fieldWs = nestedMemberWhitespace(importer);
-            String closeWs = memberWhitespace(importer);
+            String closeWs = LockJson.memberWhitespace(importer);
             if (fieldWs == null) {
                 throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive importer indentation");
             }
             String scopeText = "{" + field(fieldWs, edit.getName(), jsonEncode(newConstraint)) + closeWs + "}";
             importer = graftSorted(importer, edit.getScope(), scopeText, true);
         }
-        packages = putMember(packages, importerKey, importer);
-        return putMember(root, "packages", packages);
+        packages = LockJson.replaceValue(packages, importerKey, importer);
+        return LockJson.replaceValue(root, "packages", packages);
     }
 
     private Json.JsonObject insertLegacyEntry(Json.JsonObject root, PackageEdit edit) {
-        Json.JsonObject legacy = getObjectMember(root, "dependencies");
+        Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
         if (legacy == null) {
             return root;
         }
@@ -529,7 +524,7 @@ public final class NpmLockPatcher implements LockPatcher {
                     "adding a devDependency closure to a lockfileVersion 2 lock is not yet supported");
         }
         String fieldWs = nestedMemberWhitespace(legacy);
-        String closeWs = memberWhitespace(legacy);
+        String closeWs = LockJson.memberWhitespace(legacy);
         if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive legacy tree indentation");
         }
@@ -547,7 +542,7 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         String entryText = "{" + String.join(",", fields) + closeWs + "}";
         legacy = graftSorted(legacy, edit.getName(), entryText, true);
-        return putMember(root, "dependencies", legacy);
+        return LockJson.replaceValue(root, "dependencies", legacy);
     }
 
     // --- reverse-dependent nest -----------------------------
@@ -560,16 +555,16 @@ public final class NpmLockPatcher implements LockPatcher {
     private Json.JsonObject relocatePackagesEntry(Json.JsonObject root, PackageEdit edit) {
         String name = edit.getName();
         Json.JsonObject packages = requirePackages(root);
-        Json.Member top = getMember(packages, "node_modules/" + name);
+        Json.Member top = LockJson.member(packages, "node_modules/" + name);
         if (top == null || !(top.getValue() instanceof Json.JsonObject)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no node_modules/" + name + " entry to nest");
         }
         String nestedKey = "node_modules/" + edit.getNestedUnder() + "/node_modules/" + name;
-        if (getMember(packages, nestedKey) != null) {
+        if (LockJson.member(packages, nestedKey) != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, nestedKey + " already present (fork exists)");
         }
         packages = graftSorted(packages, nestedKey, objectSource(top.getValue()), true);
-        return putMember(root, "packages", packages);
+        return LockJson.replaceValue(root, "packages", packages);
     }
 
     /**
@@ -588,11 +583,11 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         Json.JsonObject packages = requirePackages(root);
         String nestedKey = "node_modules/" + edit.getNestedUnder() + "/node_modules/" + name;
-        if (getMember(packages, nestedKey) != null) {
+        if (LockJson.member(packages, nestedKey) != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, nestedKey + " already present (fork exists)");
         }
         packages = graftSorted(packages, nestedKey, leafEntryText(packages, edit), true);
-        return putMember(root, "packages", packages);
+        return LockJson.replaceValue(root, "packages", packages);
     }
 
     /** A member value printed as source with its leading prefix stripped, ready to re-graft under a fresh key. */
@@ -611,8 +606,8 @@ public final class NpmLockPatcher implements LockPatcher {
      * lands after the bump has moved its sibling.
      */
     private LegacyNest captureLegacyNest(Json.JsonObject root, PackageEdit edit) {
-        Json.JsonObject legacy = getObjectMember(root, "dependencies");
-        Json.JsonObject entry = legacy == null ? null : getObjectMember(legacy, edit.getName());
+        Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
+        Json.JsonObject entry = legacy == null ? null : LockJson.objectMember(legacy, edit.getName());
         if (entry == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "no legacy dependencies entry to nest for " + edit.getName());
@@ -629,18 +624,18 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     private Json.JsonObject insertLegacyNest(Json.JsonObject root, LegacyNest nest) {
-        Json.JsonObject legacy = getObjectMember(root, "dependencies");
-        Json.JsonObject dependent = legacy == null ? null : getObjectMember(legacy, nest.dependent);
+        Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
+        Json.JsonObject dependent = legacy == null ? null : LockJson.objectMember(legacy, nest.dependent);
         if (dependent == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.name,
                     "no legacy entry for " + nest.dependent + " to nest under");
         }
-        if (getObjectMember(dependent, "dependencies") != null) {
+        if (LockJson.objectMember(dependent, "dependencies") != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.name,
                     nest.dependent + " already has a nested legacy dependencies tree; merge not yet supported");
         }
         String fieldWs = nestedMemberWhitespace(legacy);
-        String closeWs = memberWhitespace(legacy);
+        String closeWs = LockJson.memberWhitespace(legacy);
         if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, nest.name, "cannot derive legacy nest indentation");
         }
@@ -653,8 +648,8 @@ public final class NpmLockPatcher implements LockPatcher {
         inner.put("resolved", nest.resolved);
         inner.put("integrity", nest.integrity);
         dependent = graftSorted(dependent, "dependencies", renderNode(child, keyIndent, unit), true);
-        legacy = putMember(legacy, nest.dependent, dependent);
-        return putMember(root, "dependencies", legacy);
+        legacy = LockJson.replaceValue(legacy, nest.dependent, dependent);
+        return LockJson.replaceValue(root, "dependencies", legacy);
     }
 
     private static final Set<String> LEGACY_MINIMAL_KEYS =
@@ -687,7 +682,7 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member)) {
                 continue;
             }
-            String key = memberKey((Json.Member) member);
+            String key = LockJson.memberKey((Json.Member) member);
             if (key == null || !key.startsWith("node_modules/") ||
                     key.indexOf("node_modules/") == key.lastIndexOf("node_modules/")) {
                 continue; // importer or flat placement
@@ -713,7 +708,7 @@ public final class NpmLockPatcher implements LockPatcher {
      * pre-brace {@code after}.
      */
     private Json.JsonObject graftSorted(Json.JsonObject obj, String key, String valueSource, boolean valueIsObject) {
-        String prefixWs = memberWhitespace(obj);
+        String prefixWs = LockJson.memberWhitespace(obj);
         if (prefixWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "cannot insert into an object with no members");
         }
@@ -744,7 +739,7 @@ public final class NpmLockPatcher implements LockPatcher {
                 continue;
             }
             Json.Member m = (Json.Member) el;
-            String k = memberKey(m);
+            String k = LockJson.memberKey(m);
             if (k == null) {
                 continue;
             }
@@ -766,20 +761,11 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /** The newline+indent prefix of {@code obj}'s first member, or {@code null} if it has none. */
-    private static @Nullable String memberWhitespace(Json.JsonObject obj) {
-        for (Json member : obj.getMembers()) {
-            if (member instanceof Json.Member) {
-                return ((Json.Member) member).getPrefix().getWhitespace();
-            }
-        }
-        return null;
-    }
-
     /** The newline+indent prefix one level deeper, read from a sibling's nested object member. */
     private static @Nullable String nestedMemberWhitespace(Json.JsonObject obj) {
         for (Json member : obj.getMembers()) {
             if (member instanceof Json.Member && ((Json.Member) member).getValue() instanceof Json.JsonObject) {
-                String ws = memberWhitespace((Json.JsonObject) ((Json.Member) member).getValue());
+                String ws = LockJson.memberWhitespace((Json.JsonObject) ((Json.Member) member).getValue());
                 if (ws != null) {
                     return ws;
                 }
@@ -790,7 +776,7 @@ public final class NpmLockPatcher implements LockPatcher {
 
     /** Parse a single member from a throwaway wrapper so its internal whitespace round-trips byte-exact. */
     private static Json.Member parseMember(String memberSource) {
-        Json.Document doc = parse("{" + memberSource + "\n}");
+        Json.Document doc = LockJson.parse("{" + memberSource + "\n}", null);
         if (doc.getValue() instanceof Json.JsonObject) {
             for (Json member : ((Json.JsonObject) doc.getValue()).getMembers()) {
                 if (member instanceof Json.Member) {
@@ -817,13 +803,13 @@ public final class NpmLockPatcher implements LockPatcher {
             entry = writeThroughObjectMember(name, packages, entry, "funding", wt.getFunding());
         }
         if (wt.getLicense() != null) {
-            if (getMember(entry, "license") == null) {
+            if (LockJson.member(entry, "license") == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gained a license field");
             }
             entry = setStringField(entry, "license", wt.getLicense());
         }
         if (wt.getDeprecated() != null) {
-            if (getMember(entry, "deprecated") == null) {
+            if (LockJson.member(entry, "deprecated") == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gained a deprecated field");
             }
             entry = setStringField(entry, "deprecated", wt.getDeprecated());
@@ -846,7 +832,7 @@ public final class NpmLockPatcher implements LockPatcher {
             return entry; // member removed on upgrade
         }
         String fieldWs = nestedMemberWhitespace(packages);
-        String closeWs = memberWhitespace(packages);
+        String closeWs = LockJson.memberWhitespace(packages);
         if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, name, "cannot derive entry indentation for " + key);
         }
@@ -857,11 +843,11 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     private void requireRegistryEntry(String name, PackageEdit edit, Json.JsonObject entry) {
-        Json.Member link = getMember(entry, "link");
+        Json.Member link = LockJson.member(entry, "link");
         if (link != null && "true".equals(literalSource(link.getValue()))) {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name, name + " is a workspace link entry");
         }
-        if (getMember(entry, "resolved") == null || getMember(entry, "integrity") == null) {
+        if (LockJson.member(entry, "resolved") == null || LockJson.member(entry, "integrity") == null) {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name,
                     name + " has no resolved/integrity (not a registry entry)");
         }
@@ -879,7 +865,7 @@ public final class NpmLockPatcher implements LockPatcher {
         // GC-by-name is only sound for a flat, hoisted tree; reject nested/forked placements.
         for (Json member : packages.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = memberKey((Json.Member) member);
+                String key = LockJson.memberKey((Json.Member) member);
                 if (key != null && key.indexOf("node_modules/") != key.lastIndexOf("node_modules/")) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                             "cannot remove from a lock with nested node_modules placements: " + key);
@@ -891,17 +877,17 @@ public final class NpmLockPatcher implements LockPatcher {
         for (PackageEdit removal : removals) {
             removedNames.add(removal.getName());
             String importerKey = removal.getImporterDir() == null ? "" : removal.getImporterDir();
-            Json.JsonObject importer = getObjectMember(packages, importerKey);
+            Json.JsonObject importer = LockJson.objectMember(packages, importerKey);
             if (importer != null) {
-                Json.JsonObject scope = getObjectMember(importer, removal.getScope());
-                if (scope != null && getMember(scope, removal.getName()) != null) {
+                Json.JsonObject scope = LockJson.objectMember(importer, removal.getScope());
+                if (scope != null && LockJson.member(scope, removal.getName()) != null) {
                     Json.JsonObject trimmed = removeMembers(scope, Collections.singleton(removal.getName()));
                     if (isEmptyObject(trimmed)) {
                         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, removal.getName(),
                                 "removing " + removal.getName() + " empties the " + removal.getScope() + " scope");
                     }
-                    importer = putMember(importer, removal.getScope(), trimmed);
-                    packages = putMember(packages, importerKey, importer);
+                    importer = LockJson.replaceValue(importer, removal.getScope(), trimmed);
+                    packages = LockJson.replaceValue(packages, importerKey, importer);
                 }
             }
         }
@@ -919,7 +905,7 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member)) {
                 continue;
             }
-            String key = memberKey((Json.Member) member);
+            String key = LockJson.memberKey((Json.Member) member);
             if (key == null || !key.startsWith("node_modules/")) {
                 continue; // importer entry
             }
@@ -932,16 +918,16 @@ public final class NpmLockPatcher implements LockPatcher {
             }
         }
         packages = removeMembers(packages, orphanKeys);
-        root = putMember(root, "packages", packages);
+        root = LockJson.replaceValue(root, "packages", packages);
 
         if (lockfileVersion == 2) {
-            Json.JsonObject legacy = getObjectMember(root, "dependencies");
+            Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
             if (legacy != null) {
                 Set<String> legacyDrop = new LinkedHashSet<>(removedNames);
                 for (String key : orphanKeys) {
                     legacyDrop.add(key.substring("node_modules/".length()));
                 }
-                root = putMember(root, "dependencies", removeMembers(legacy, legacyDrop));
+                root = LockJson.replaceValue(root, "dependencies", removeMembers(legacy, legacyDrop));
             }
         }
         return root;
@@ -954,24 +940,24 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member)) {
                 continue;
             }
-            String key = memberKey((Json.Member) member);
+            String key = LockJson.memberKey((Json.Member) member);
             if (key == null || key.contains("node_modules/")) {
                 continue; // only importer entries seed the roots
             }
             Json.JsonObject importer = (Json.JsonObject) ((Json.Member) member).getValue();
             for (String scope : IMPORTER_SCOPES) {
-                enqueueNames(getObjectMember(importer, scope), reachable, queue);
+                enqueueNames(LockJson.objectMember(importer, scope), reachable, queue);
             }
         }
         while (!queue.isEmpty()) {
             String name = queue.poll();
-            Json.JsonObject entry = getObjectMember(packages, "node_modules/" + name);
+            Json.JsonObject entry = LockJson.objectMember(packages, "node_modules/" + name);
             if (entry == null) {
                 continue;
             }
-            enqueueNames(getObjectMember(entry, "dependencies"), reachable, queue);
-            enqueueNames(getObjectMember(entry, "optionalDependencies"), reachable, queue);
-            enqueueNames(getObjectMember(entry, "peerDependencies"), reachable, queue);
+            enqueueNames(LockJson.objectMember(entry, "dependencies"), reachable, queue);
+            enqueueNames(LockJson.objectMember(entry, "optionalDependencies"), reachable, queue);
+            enqueueNames(LockJson.objectMember(entry, "peerDependencies"), reachable, queue);
         }
         return reachable;
     }
@@ -982,7 +968,7 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         for (Json member : scope.getMembers()) {
             if (member instanceof Json.Member) {
-                String name = memberKey((Json.Member) member);
+                String name = LockJson.memberKey((Json.Member) member);
                 if (name != null && reachable.add(name)) {
                     queue.add(name);
                 }
@@ -1004,7 +990,7 @@ public final class NpmLockPatcher implements LockPatcher {
         Map<String, Integer> placements = new LinkedHashMap<>();
         for (Json member : packages.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = memberKey((Json.Member) member);
+                String key = LockJson.memberKey((Json.Member) member);
                 if (key != null && key.contains("node_modules/")) {
                     placements.merge(installedName(key), 1, Integer::sum);
                 }
@@ -1017,7 +1003,7 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member)) {
                 continue;
             }
-            String key = memberKey((Json.Member) member);
+            String key = LockJson.memberKey((Json.Member) member);
             if (key == null || !key.contains("node_modules/")) {
                 continue; // importer entry
             }
@@ -1037,10 +1023,10 @@ public final class NpmLockPatcher implements LockPatcher {
             return root;
         }
         packages = removeMembers(packages, orphanKeys);
-        root = putMember(root, "packages", packages);
+        root = LockJson.replaceValue(root, "packages", packages);
 
         if (lockfileVersion == 2) {
-            Json.JsonObject legacy = getObjectMember(root, "dependencies");
+            Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
             if (legacy != null) {
                 for (String name : orphanNames) {
                     if (hasNestedOccurrence(legacy, name)) {
@@ -1048,7 +1034,7 @@ public final class NpmLockPatcher implements LockPatcher {
                                 "orphan-pruning " + name + " from a nested v2 legacy tree is not yet supported");
                     }
                 }
-                root = putMember(root, "dependencies", removeMembers(legacy, orphanNames));
+                root = LockJson.replaceValue(root, "dependencies", removeMembers(legacy, orphanNames));
             }
         }
         return root;
@@ -1064,7 +1050,7 @@ public final class NpmLockPatcher implements LockPatcher {
         Set<String> keys = new LinkedHashSet<>();
         for (Json member : packages.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = memberKey((Json.Member) member);
+                String key = LockJson.memberKey((Json.Member) member);
                 if (key != null) {
                     keys.add(key);
                 }
@@ -1076,24 +1062,24 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member)) {
                 continue;
             }
-            String key = memberKey((Json.Member) member);
+            String key = LockJson.memberKey((Json.Member) member);
             if (key == null || key.contains("node_modules/")) {
                 continue; // only importer roots seed the walk
             }
             Json.JsonObject importer = (Json.JsonObject) ((Json.Member) member).getValue();
             for (String scope : IMPORTER_SCOPES) {
-                enqueueResolved(keys, key, getObjectMember(importer, scope), reachable, queue);
+                enqueueResolved(keys, key, LockJson.objectMember(importer, scope), reachable, queue);
             }
         }
         while (!queue.isEmpty()) {
             String key = queue.poll();
-            Json.JsonObject entry = getObjectMember(packages, key);
+            Json.JsonObject entry = LockJson.objectMember(packages, key);
             if (entry == null) {
                 continue;
             }
-            enqueueResolved(keys, key, getObjectMember(entry, "dependencies"), reachable, queue);
-            enqueueResolved(keys, key, getObjectMember(entry, "optionalDependencies"), reachable, queue);
-            enqueueResolved(keys, key, getObjectMember(entry, "peerDependencies"), reachable, queue);
+            enqueueResolved(keys, key, LockJson.objectMember(entry, "dependencies"), reachable, queue);
+            enqueueResolved(keys, key, LockJson.objectMember(entry, "optionalDependencies"), reachable, queue);
+            enqueueResolved(keys, key, LockJson.objectMember(entry, "peerDependencies"), reachable, queue);
         }
         return reachable;
     }
@@ -1107,7 +1093,7 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member)) {
                 continue;
             }
-            String name = memberKey((Json.Member) member);
+            String name = LockJson.memberKey((Json.Member) member);
             if (name == null) {
                 continue;
             }
@@ -1142,23 +1128,11 @@ public final class NpmLockPatcher implements LockPatcher {
     // --- LST navigation + mutation ---------------------------------------
 
     private Json.JsonObject requirePackages(Json.JsonObject root) {
-        Json.JsonObject packages = getObjectMember(root, "packages");
+        Json.JsonObject packages = LockJson.objectMember(root, "packages");
         if (packages == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "package-lock.json has no packages map");
         }
         return packages;
-    }
-
-    private static Json.Document parse(String content) {
-        JsonParser parser = new JsonParser();
-        Parser.Input input = Parser.Input.fromString(content);
-        SourceFile parsed = parser.parseInputs(Collections.singletonList(input), null,
-                        new InMemoryExecutionContext())
-                .findFirst().orElse(null);
-        if (!(parsed instanceof Json.Document)) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "package-lock.json is not valid JSON");
-        }
-        return (Json.Document) parsed;
     }
 
     private @Nullable JsonNode parseManifest(@Nullable String manifest) {
@@ -1185,7 +1159,7 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     private int lockfileVersion(Json.JsonObject root) {
-        Json.Member member = getMember(root, "lockfileVersion");
+        Json.Member member = LockJson.member(root, "lockfileVersion");
         if (member == null || !(member.getValue() instanceof Json.Literal)) {
             throw new EngineFailure(Reason.UNSUPPORTED_LOCKFILE_VERSION, null,
                     "package-lock.json has no lockfileVersion");
@@ -1200,7 +1174,7 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     private static boolean isLink(Json.JsonObject entry) {
-        Json.Member link = getMember(entry, "link");
+        Json.Member link = LockJson.member(entry, "link");
         return link != null && "true".equals(literalSource(link.getValue()));
     }
 
@@ -1215,13 +1189,13 @@ public final class NpmLockPatcher implements LockPatcher {
 
     /** Replace the string value of member {@code field}, preserving the old value's prefix (byte-exact whitespace). */
     private static Json.JsonObject setStringField(Json.JsonObject obj, String field, String value) {
-        Json.Member member = getMember(obj, field);
+        Json.Member member = LockJson.member(obj, field);
         if (member == null) {
             return obj;
         }
         Space prefix = member.getValue().getPrefix();
         Json.Literal literal = new Json.Literal(Tree.randomId(), prefix, Markers.EMPTY, jsonEncode(value), value);
-        return putMember(obj, field, literal);
+        return LockJson.replaceValue(obj, field, literal);
     }
 
     /** Jackson-escaped quoted JSON string literal — registry {@code license}/{@code deprecated} may contain {@code "}/{@code \}/newlines. */
@@ -1234,19 +1208,6 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /** Replace the value of member {@code key} in place, keeping its position and surrounding padding. */
-    private static Json.JsonObject putMember(Json.JsonObject obj, String key, JsonValue newValue) {
-        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
-        for (int i = 0; i < members.size(); i++) {
-            Json element = members.get(i).getElement();
-            if (element instanceof Json.Member && key.equals(memberKey((Json.Member) element))) {
-                Json.Member updated = ((Json.Member) element).withValue(newValue);
-                members.set(i, members.get(i).withElement(updated));
-                return obj.getPadding().withMembers(members);
-            }
-        }
-        return obj;
-    }
-
     /** Drop the named members, moving the closing-brace whitespace onto the new last member (byte-exact). */
     private static Json.JsonObject removeMembers(Json.JsonObject obj, Set<String> keys) {
         List<JsonRightPadded<Json>> original = obj.getPadding().getMembers();
@@ -1254,7 +1215,7 @@ public final class NpmLockPatcher implements LockPatcher {
         boolean removed = false;
         for (JsonRightPadded<Json> rp : original) {
             Json element = rp.getElement();
-            if (element instanceof Json.Member && keys.contains(memberKey((Json.Member) element))) {
+            if (element instanceof Json.Member && keys.contains(LockJson.memberKey((Json.Member) element))) {
                 removed = true;
                 continue;
             }
@@ -1276,44 +1237,17 @@ public final class NpmLockPatcher implements LockPatcher {
             if (!(member instanceof Json.Member) || !(((Json.Member) member).getValue() instanceof Json.JsonObject)) {
                 continue;
             }
-            Json.JsonObject nested = getObjectMember((Json.JsonObject) ((Json.Member) member).getValue(), "dependencies");
-            if (nested != null && (getMember(nested, name) != null || hasNestedOccurrence(nested, name))) {
+            Json.JsonObject nested = LockJson.objectMember((Json.JsonObject) ((Json.Member) member).getValue(), "dependencies");
+            if (nested != null && (LockJson.member(nested, name) != null || hasNestedOccurrence(nested, name))) {
                 return true;
             }
         }
         return false;
     }
 
-    private static Json.@Nullable JsonObject getObjectMember(Json.JsonObject obj, String key) {
-        Json.Member member = getMember(obj, key);
-        return member != null && member.getValue() instanceof Json.JsonObject ? (Json.JsonObject) member.getValue() : null;
-    }
-
     private static @Nullable String stringField(Json.JsonObject obj, String key) {
-        Json.Member member = getMember(obj, key);
-        return member == null ? null : literalValue(member.getValue());
-    }
-
-    private static Json.@Nullable Member getMember(Json.JsonObject obj, String key) {
-        for (Json member : obj.getMembers()) {
-            if (member instanceof Json.Member && key.equals(memberKey((Json.Member) member))) {
-                return (Json.Member) member;
-            }
-        }
-        return null;
-    }
-
-    private static @Nullable String memberKey(Json.Member member) {
-        JsonKey key = member.getKey();
-        return key instanceof Json.Literal ? literalValue((Json.Literal) key) : null;
-    }
-
-    private static @Nullable String literalValue(@Nullable JsonValue value) {
-        if (value instanceof Json.Literal) {
-            Object v = ((Json.Literal) value).getValue();
-            return v == null ? null : v.toString();
-        }
-        return null;
+        Json.Member member = LockJson.member(obj, key);
+        return member == null ? null : LockJson.literal(member.getValue());
     }
 
     private static @Nullable String literalSource(@Nullable JsonValue value) {

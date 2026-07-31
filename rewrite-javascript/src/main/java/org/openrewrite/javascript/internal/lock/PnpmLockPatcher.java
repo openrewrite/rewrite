@@ -25,8 +25,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
-
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -46,6 +44,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 
 import static java.util.Collections.singletonList;
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
  * Byte-exact patcher for {@code pnpm-lock.yaml} (lockfileVersion 6 and 9). The file round-trips

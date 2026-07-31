@@ -17,25 +17,16 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 import org.openrewrite.json.JsonIsoVisitor;
-import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,7 +38,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
  * Patches a {@code bun.lock} (JSONC). Bun's text lock round-trips byte-for-byte through the rewrite-json LST,
@@ -63,7 +54,7 @@ public final class BunLockPatcher implements LockPatcher {
         if (content == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no bun lock content");
         }
-        Json.Document document = parse(content, edits.getLockPath());
+        Json.Document document = LockJson.parse(content, edits.getLockPath());
         if (!(document.getValue() instanceof Json.JsonObject)) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock root is not an object");
         }
@@ -90,7 +81,7 @@ public final class BunLockPatcher implements LockPatcher {
         // tuple, so capture it before the visitor rewrites that tuple to the new version.
         Map<PackageEdit, Json.Array> nestedTuples = new LinkedHashMap<>();
         for (PackageEdit nest : relocateNests) {
-            Json.Array tuple = arrayMember(objectMember((Json.JsonObject) document.getValue(), "packages"), nest.getName());
+            Json.Array tuple = LockJson.arrayMember(LockJson.objectMember((Json.JsonObject) document.getValue(), "packages"), nest.getName());
             if (tuple == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, nest.getName(),
                         "no bun tuple to nest for " + nest.getName());
@@ -138,18 +129,18 @@ public final class BunLockPatcher implements LockPatcher {
     }
 
     private static Json.JsonObject insertPackageTuples(Json.JsonObject root, List<PackageEdit> adds) {
-        Json.JsonObject packages = objectMember(root, "packages");
+        Json.JsonObject packages = LockJson.objectMember(root, "packages");
         if (packages == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no packages map");
         }
-        String firstWs = firstMemberWhitespace(packages);
+        String firstWs = LockJson.memberWhitespace(packages);
         if (firstWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock packages map is empty");
         }
         // A nested placement (parent/name) needs the hoisting model; the flat sorted insert cannot honour it.
         for (Json member : packages.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = literalKey(((Json.Member) member).getKey());
+                String key = LockJson.literal(((Json.Member) member).getKey());
                 if (key != null && key.indexOf('/') >= 0) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                             "cannot add into a bun.lock with nested placements: " + key);
@@ -163,12 +154,12 @@ public final class BunLockPatcher implements LockPatcher {
         }
         // bun separates entries with a blank line: the first keeps its newline+indent, the rest gain one.
         members = normalizePrefixes(members, firstWs, "\n" + firstWs);
-        return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+        return LockJson.replaceValue(root, "packages", packages.getPadding().withMembers(members));
     }
 
     private static Json.JsonObject insertWorkspaceConstraints(Json.JsonObject root, List<PackageEdit> adds,
                                                               @Nullable String editedPackageJson) {
-        Json.JsonObject workspaces = objectMember(root, "workspaces");
+        Json.JsonObject workspaces = LockJson.objectMember(root, "workspaces");
         if (workspaces == null) {
             return root;
         }
@@ -178,16 +169,16 @@ public final class BunLockPatcher implements LockPatcher {
                 continue; // a transitive: absent from the edited package.json, so no importer edge
             }
             String importerKey = add.getImporterDir() == null ? "" : add.getImporterDir();
-            Json.JsonObject importer = objectMember(workspaces, importerKey);
+            Json.JsonObject importer = LockJson.objectMember(workspaces, importerKey);
             if (importer == null) {
                 continue;
             }
-            Json.JsonObject scope = objectMember(importer, add.getScope());
+            Json.JsonObject scope = LockJson.objectMember(importer, add.getScope());
             if (scope == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, add.getName(),
                         "adding a new " + add.getScope() + " scope to bun.lock is not yet supported");
             }
-            String ws = firstMemberWhitespace(scope);
+            String ws = LockJson.memberWhitespace(scope);
             if (ws == null) {
                 throw new EngineFailure(Reason.MALFORMED_LOCK, add.getName(), "cannot derive workspace indentation");
             }
@@ -195,10 +186,10 @@ public final class BunLockPatcher implements LockPatcher {
                     insertSorted(new ArrayList<>(scope.getPadding().getMembers()), buildLiteralMember(add.getName(), constraint));
             members = normalizePrefixes(members, ws, ws);
             scope = scope.getPadding().withMembers(members);
-            importer = replaceMemberValue(importer, add.getScope(), scope);
-            workspaces = replaceMemberValue(workspaces, importerKey, importer);
+            importer = LockJson.replaceValue(importer, add.getScope(), scope);
+            workspaces = LockJson.replaceValue(workspaces, importerKey, importer);
         }
-        return replaceMemberValue(root, "workspaces", workspaces);
+        return LockJson.replaceValue(root, "workspaces", workspaces);
     }
 
     // --- reverse-dependent nest ---------------------------------
@@ -210,11 +201,11 @@ public final class BunLockPatcher implements LockPatcher {
      */
     private static Json.JsonObject applyNests(Json.JsonObject root, List<PackageEdit> nests,
                                               Map<PackageEdit, Json.Array> nestedTuples) {
-        Json.JsonObject packages = objectMember(root, "packages");
+        Json.JsonObject packages = LockJson.objectMember(root, "packages");
         if (packages == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no packages map");
         }
-        String firstWs = firstMemberWhitespace(packages);
+        String firstWs = LockJson.memberWhitespace(packages);
         if (firstWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock packages map is empty");
         }
@@ -228,7 +219,7 @@ public final class BunLockPatcher implements LockPatcher {
             members = insertNestedLast(members, member);
         }
         members = normalizePrefixes(members, firstWs, "\n" + firstWs);
-        return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+        return LockJson.replaceValue(root, "packages", packages.getPadding().withMembers(members));
     }
 
     /**
@@ -236,11 +227,11 @@ public final class BunLockPatcher implements LockPatcher {
      * {@code "<dependent>/<name>"} tuple built from the resolved leaf, after all top-level entries.
      */
     private static Json.JsonObject applyFreshNests(Json.JsonObject root, List<PackageEdit> nests) {
-        Json.JsonObject packages = objectMember(root, "packages");
+        Json.JsonObject packages = LockJson.objectMember(root, "packages");
         if (packages == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no packages map");
         }
-        String firstWs = firstMemberWhitespace(packages);
+        String firstWs = LockJson.memberWhitespace(packages);
         if (firstWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock packages map is empty");
         }
@@ -253,7 +244,7 @@ public final class BunLockPatcher implements LockPatcher {
             members = insertNestedLast(members, buildNestedPackageMember(key, nest));
         }
         members = normalizePrefixes(members, firstWs, "\n" + firstWs);
-        return replaceMemberValue(root, "packages", packages.getPadding().withMembers(members));
+        return LockJson.replaceValue(root, "packages", packages.getPadding().withMembers(members));
     }
 
     /** Build a nested {@code "<parent>/<name>": ["<name>@<ver>", "", <metadata>, "<sri>"]} tuple member from source text. */
@@ -293,7 +284,7 @@ public final class BunLockPatcher implements LockPatcher {
 
     private static boolean hasMemberKey(List<JsonRightPadded<Json>> members, String key) {
         for (JsonRightPadded<Json> rp : members) {
-            if (rp.getElement() instanceof Json.Member && key.equals(literalKey(((Json.Member) rp.getElement()).getKey()))) {
+            if (rp.getElement() instanceof Json.Member && key.equals(LockJson.literal(((Json.Member) rp.getElement()).getKey()))) {
                 return true;
             }
         }
@@ -339,7 +330,7 @@ public final class BunLockPatcher implements LockPatcher {
 
     /** Splice {@code member} at its ASCII-sorted key position, before any trailing comma placeholder ({@link Json.Empty}). */
     private static List<JsonRightPadded<Json>> insertSorted(List<JsonRightPadded<Json>> members, Json.Member member) {
-        String newKey = literalKey(member.getKey());
+        String newKey = LockJson.literal(member.getKey());
         int idx = members.size();
         for (int i = 0; i < members.size(); i++) {
             Json el = members.get(i).getElement();
@@ -347,7 +338,7 @@ public final class BunLockPatcher implements LockPatcher {
                 idx = i; // insert a real member before the trailing comma placeholder
                 break;
             }
-            String k = literalKey(((Json.Member) el).getKey());
+            String k = LockJson.literal(((Json.Member) el).getKey());
             if (k != null && newKey != null && k.compareTo(newKey) > 0) {
                 idx = i;
                 break;
@@ -378,31 +369,9 @@ public final class BunLockPatcher implements LockPatcher {
         return members;
     }
 
-    private static @Nullable String firstMemberWhitespace(Json.JsonObject obj) {
-        for (Json member : obj.getMembers()) {
-            if (member instanceof Json.Member) {
-                return member.getPrefix().getWhitespace();
-            }
-        }
-        return null;
-    }
-
-    /** Replace the value of member {@code key} in place, preserving its position and surrounding padding. */
-    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key, JsonValue newValue) {
-        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
-        for (int i = 0; i < members.size(); i++) {
-            Json el = members.get(i).getElement();
-            if (el instanceof Json.Member && key.equals(literalKey(((Json.Member) el).getKey()))) {
-                members.set(i, members.get(i).withElement(((Json.Member) el).withValue(newValue)));
-                return obj.getPadding().withMembers(members);
-            }
-        }
-        return obj;
-    }
-
     /** Parse a single member from a throwaway wrapper so its hand-crafted inner bytes round-trip exactly. */
     private static Json.Member parseMember(String memberSource) {
-        Json.Document doc = parse("{" + memberSource + "}", null);
+        Json.Document doc = LockJson.parse("{" + memberSource + "}", null);
         if (doc.getValue() instanceof Json.JsonObject) {
             for (Json member : ((Json.JsonObject) doc.getValue()).getMembers()) {
                 if (member instanceof Json.Member) {
@@ -423,7 +392,7 @@ public final class BunLockPatcher implements LockPatcher {
         List<JsonRightPadded<Json>> top = new ArrayList<>(root.getPadding().getMembers());
         for (int i = 0; i < top.size(); i++) {
             Json el = top.get(i).getElement();
-            if (el instanceof Json.Member && "packages".equals(literalKey(((Json.Member) el).getKey())) &&
+            if (el instanceof Json.Member && "packages".equals(LockJson.literal(((Json.Member) el).getKey())) &&
                     ((Json.Member) el).getValue() instanceof Json.JsonObject) {
                 Json.JsonObject trimmed = dropMembersWithFixup((Json.JsonObject) ((Json.Member) el).getValue(), dropKeys);
                 top.set(i, top.get(i).withElement(((Json.Member) el).withValue(trimmed)));
@@ -446,7 +415,7 @@ public final class BunLockPatcher implements LockPatcher {
         boolean removed = false;
         for (JsonRightPadded<Json> rp : original) {
             Json el = rp.getElement();
-            if (el instanceof Json.Member && dropKeys.contains(literalKey(((Json.Member) el).getKey()))) {
+            if (el instanceof Json.Member && dropKeys.contains(LockJson.literal(((Json.Member) el).getKey()))) {
                 removed = true;
                 continue;
             }
@@ -477,13 +446,13 @@ public final class BunLockPatcher implements LockPatcher {
      * removal). Nested placements ({@code parent/name} keys) need the hoisting model — fail loud instead.
      */
     private static Set<String> orphanPackageKeys(Json.JsonObject root, List<PackageEdit> edits) {
-        Json.JsonObject packages = objectMember(root, "packages");
+        Json.JsonObject packages = LockJson.objectMember(root, "packages");
         if (packages == null) {
             return emptySet();
         }
         for (Json member : packages.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = literalKey(((Json.Member) member).getKey());
+                String key = LockJson.literal(((Json.Member) member).getKey());
                 if (key != null && key.indexOf('/') >= 0) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                             "cannot remove from a bun.lock with nested placements: " + key);
@@ -500,7 +469,7 @@ public final class BunLockPatcher implements LockPatcher {
         Set<String> drop = new LinkedHashSet<>();
         for (Json member : packages.getMembers()) {
             if (member instanceof Json.Member) {
-                String key = literalKey(((Json.Member) member).getKey());
+                String key = LockJson.literal(((Json.Member) member).getKey());
                 if (key != null && !reachable.contains(key)) {
                     drop.add(key);
                 }
@@ -512,7 +481,7 @@ public final class BunLockPatcher implements LockPatcher {
     private static Set<String> reachableNames(Json.JsonObject root, Json.JsonObject packages, Set<String> removedNames) {
         Set<String> reachable = new LinkedHashSet<>();
         Deque<String> queue = new ArrayDeque<>();
-        Json.JsonObject workspaces = objectMember(root, "workspaces");
+        Json.JsonObject workspaces = LockJson.objectMember(root, "workspaces");
         if (workspaces != null) {
             for (Json member : workspaces.getMembers()) {
                 if (!(member instanceof Json.Member) || !(((Json.Member) member).getValue() instanceof Json.JsonObject)) {
@@ -520,7 +489,7 @@ public final class BunLockPatcher implements LockPatcher {
                 }
                 Json.JsonObject importer = (Json.JsonObject) ((Json.Member) member).getValue();
                 for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")) {
-                    for (String name : memberKeys(objectMember(importer, scope))) {
+                    for (String name : memberKeys(LockJson.objectMember(importer, scope))) {
                         if (!removedNames.contains(name) && reachable.add(name)) {
                             queue.add(name);
                         }
@@ -529,9 +498,9 @@ public final class BunLockPatcher implements LockPatcher {
             }
         }
         while (!queue.isEmpty()) {
-            Json.JsonObject metadata = tupleMetadata(arrayMember(packages, queue.poll()));
+            Json.JsonObject metadata = tupleMetadata(LockJson.arrayMember(packages, queue.poll()));
             for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
-                for (String name : memberKeys(objectMember(metadata, scope))) {
+                for (String name : memberKeys(LockJson.objectMember(metadata, scope))) {
                     if (reachable.add(name)) {
                         queue.add(name);
                     }
@@ -549,19 +518,6 @@ public final class BunLockPatcher implements LockPatcher {
         return (Json.JsonObject) tuple.getValues().get(2);
     }
 
-    private static Json.Document parse(String content, @Nullable Path lockPath) {
-        Path path = lockPath == null ? Paths.get("bun.lock") : lockPath;
-        Parser.Input input = Parser.Input.fromString(path, content);
-        SourceFile sf = JsonParser.builder().build()
-                .parseInputs(singletonList(input), null, new InMemoryExecutionContext())
-                .findFirst()
-                .orElseThrow(() -> new EngineFailure(Reason.MALFORMED_LOCK, null, "empty bun lock"));
-        if (!(sf instanceof Json.Document)) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock is not valid JSONC");
-        }
-        return (Json.Document) sf;
-    }
-
     private static final class BunVisitor extends JsonIsoVisitor<Integer> {
         private final List<PackageEdit> edits;
         private final @Nullable String editedPackageJson;
@@ -574,7 +530,7 @@ public final class BunLockPatcher implements LockPatcher {
         @Override
         public Json.@Nullable Member visitMember(Json.Member member, Integer p) {
             Json.Member m = super.visitMember(member, p);
-            String key = literalKey(m.getKey());
+            String key = LockJson.literal(m.getKey());
             if (key == null) {
                 return m;
             }
@@ -630,35 +586,12 @@ public final class BunLockPatcher implements LockPatcher {
         }
     }
 
-    private static Json.@Nullable JsonObject objectMember(Json.@Nullable JsonObject obj, String key) {
-        if (obj == null) {
-            return null;
-        }
-        for (Json member : obj.getMembers()) {
-            if (member instanceof Json.Member && key.equals(literalKey(((Json.Member) member).getKey())) &&
-                    ((Json.Member) member).getValue() instanceof Json.JsonObject) {
-                return (Json.JsonObject) ((Json.Member) member).getValue();
-            }
-        }
-        return null;
-    }
-
-    private static Json.@Nullable Array arrayMember(Json.JsonObject obj, String key) {
-        for (Json member : obj.getMembers()) {
-            if (member instanceof Json.Member && key.equals(literalKey(((Json.Member) member).getKey())) &&
-                    ((Json.Member) member).getValue() instanceof Json.Array) {
-                return (Json.Array) ((Json.Member) member).getValue();
-            }
-        }
-        return null;
-    }
-
     private static List<String> memberKeys(Json.@Nullable JsonObject obj) {
         List<String> keys = new ArrayList<>();
         if (obj != null) {
             for (Json member : obj.getMembers()) {
                 if (member instanceof Json.Member) {
-                    String key = literalKey(((Json.Member) member).getKey());
+                    String key = LockJson.literal(((Json.Member) member).getKey());
                     if (key != null) {
                         keys.add(key);
                     }
@@ -666,14 +599,6 @@ public final class BunLockPatcher implements LockPatcher {
             }
         }
         return keys;
-    }
-
-    private static @Nullable String literalKey(JsonKey key) {
-        if (key instanceof Json.Literal) {
-            Object v = ((Json.Literal) key).getValue();
-            return v == null ? null : v.toString();
-        }
-        return null;
     }
 
     /** True when the cursor's member sits at {@code workspaces.<importerKey>.<scope>.<name>}. */
@@ -685,7 +610,7 @@ public final class BunLockPatcher implements LockPatcher {
         Cursor c = cursor.getParent();
         while (c != null) {
             Object value = c.getValue();
-            if (value instanceof Json.Member && key.equals(literalKey(((Json.Member) value).getKey()))) {
+            if (value instanceof Json.Member && key.equals(LockJson.literal(((Json.Member) value).getKey()))) {
                 return true;
             }
             c = c.getParent();

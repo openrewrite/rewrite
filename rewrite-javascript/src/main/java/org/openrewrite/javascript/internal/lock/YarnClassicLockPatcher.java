@@ -19,14 +19,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
-
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
 
 /**
  * Patches a classic {@code yarn.lock} (v1). Not valid YAML, so this is a targeted text edit over the raw
