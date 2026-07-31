@@ -324,7 +324,7 @@ public final class NpmLockPatcher implements LockPatcher {
                                      @Nullable JsonNode editedManifest, PackageEdit edit) {
         String name = edit.getName();
         Json.JsonObject packages = requirePackages(root);
-        requireFlatPlacement(packages);
+        requireAddNotEntangled(packages, name);
 
         String entryKey = "node_modules/" + name;
         if (getMember(packages, entryKey) != null) {
@@ -693,14 +693,28 @@ public final class NpmLockPatcher implements LockPatcher {
         }
     }
 
-    /** Reject a lock with any nested {@code node_modules} placement; a flat tree is required to insert soundly. */
-    private void requireFlatPlacement(Json.JsonObject packages) {
+    /**
+     * A brand-new top-level add is byte-exact only when its name is disjoint from every existing fork: adding a
+     * name that already participates in a nested placement (as a fork parent or a nested child) could make npm
+     * re-hoist or reshape that fork. An add disjoint from the lock's nested keys leaves them untouched — npm
+     * places the new entry independently — so only a name collision fails loud.
+     */
+    private void requireAddNotEntangled(Json.JsonObject packages, String name) {
         for (Json member : packages.getMembers()) {
-            if (member instanceof Json.Member) {
-                String key = memberKey((Json.Member) member);
-                if (key != null && key.indexOf("node_modules/") != key.lastIndexOf("node_modules/")) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                            "cannot add into a lock with nested node_modules placements: " + key);
+            if (!(member instanceof Json.Member)) {
+                continue;
+            }
+            String key = memberKey((Json.Member) member);
+            if (key == null || !key.startsWith("node_modules/") ||
+                    key.indexOf("node_modules/") == key.lastIndexOf("node_modules/")) {
+                continue; // importer or flat placement
+            }
+            // A nested key node_modules/<a>/node_modules/<b>[/node_modules/<c>]: every embedded (possibly scoped)
+            // name is entangled with the fork. Split on the separator so scoped names stay intact.
+            for (String nestedName : key.substring("node_modules/".length()).split("/node_modules/")) {
+                if (nestedName.equals(name)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            "cannot add " + name + "; it participates in a nested placement (" + key + ")");
                 }
             }
         }
