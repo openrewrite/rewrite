@@ -47,7 +47,7 @@ public class LockEditSet {
 
     /** A single package moving to {@code newVersion}, or a removal when {@code newVersion == null}. */
     @Value
-    @Builder
+    @Builder(toBuilder = true)
     public static class PackageEdit {
         String name;
 
@@ -68,6 +68,10 @@ public class LockEditSet {
         /** {@code dist.shasum} (sha1) — yarn-classic records this in its {@code resolved} suffix. */
         @Nullable
         String newShasum;
+
+        /** Yarn Berry's {@code <cacheKey>/<hash>} checksum for the new version, derived from its tarball. */
+        @Nullable
+        String newBerryChecksum;
 
         /** The new version's {@code dependencies} (name → constraint). */
         @Nullable

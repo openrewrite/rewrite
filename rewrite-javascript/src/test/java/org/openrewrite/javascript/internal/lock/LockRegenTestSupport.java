@@ -51,12 +51,21 @@ abstract class LockRegenTestSupport {
 
     protected ExecutionContext ctx;
     protected final Map<String, String> routes = new HashMap<>();
+    /** Routes whose body is binary (e.g. a package tarball, served verbatim without UTF-8 mangling). */
+    protected final Map<String, byte[]> binaryRoutes = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         routes.clear();
+        binaryRoutes.clear();
         HttpSender http = request -> {
-            String body = routes.get(request.getUrl().toString());
+            String url = request.getUrl().toString();
+            byte[] binary = binaryRoutes.get(url);
+            if (binary != null) {
+                return new HttpSender.Response(200, new ByteArrayInputStream(binary), () -> {
+                });
+            }
+            String body = routes.get(url);
             return new HttpSender.Response(body == null ? 404 : 200,
                     new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
             });
@@ -180,6 +189,10 @@ abstract class LockRegenTestSupport {
     }
 
     protected static String resource(String path) {
+        return new String(bytesResource(path), StandardCharsets.UTF_8);
+    }
+
+    protected static byte[] bytesResource(String path) {
         try (InputStream in = LockRegenTestSupport.class.getClassLoader().getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalStateException("missing test resource " + path);
@@ -190,7 +203,7 @@ abstract class LockRegenTestSupport {
             while ((n = in.read(buf)) >= 0) {
                 out.write(buf, 0, n);
             }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+            return out.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

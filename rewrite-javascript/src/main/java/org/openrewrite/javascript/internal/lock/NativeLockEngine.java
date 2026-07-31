@@ -137,6 +137,9 @@ public final class NativeLockEngine {
         for (DepChange change : changes) {
             edits.addAll(resolveEdit(pm, change, existingLock, registries, client));
         }
+        if (pm == PackageManager.YarnBerry) {
+            edits = enrichBerryChecksums(edits, existingLock, registries, client);
+        }
 
         LockEditSet editSet = new LockEditSet(existingLock, lockPath, pm, editedPackageJson, edits);
 
@@ -1835,9 +1838,47 @@ public final class NativeLockEngine {
             case Pnpm:
                 proveReverseDependentsPnpm(name, oldVersion, targetVersion, lock);
                 break;
-            default:
-                // yarn merges selectors into shared headers; the single-locked-version guard covers the common case.
+            case YarnBerry:
+                proveReverseDependentsBerry(name, targetVersion, lock);
                 break;
+            default:
+                // yarn-classic merges selectors into shared headers; the single-locked-version guard covers the common case.
+                break;
+        }
+    }
+
+    /** A berry entry's {@code dependencies} map records the requirer's range; a range excluding the target forks. */
+    private static void proveReverseDependentsBerry(String name, String targetVersion, String lock) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+            String key = String.valueOf(e.getKey());
+            // Skip the importer (its constraint is the user's package.json, re-pinned by the patcher).
+            if ("__metadata".equals(key) || key.contains("@workspace:") || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> entry = (Map<?, ?>) e.getValue();
+            checkBerryReverseConstraint(name, targetVersion, key, entry.get("dependencies"));
+            checkBerryReverseConstraint(name, targetVersion, key, entry.get("optionalDependencies"));
+            checkBerryReverseConstraint(name, targetVersion, key, entry.get("peerDependencies"));
+        }
+    }
+
+    private static void checkBerryReverseConstraint(String name, String targetVersion, String dependent,
+                                                    @Nullable Object depMap) {
+        if (!(depMap instanceof Map)) {
+            return;
+        }
+        Object value = ((Map<?, ?>) depMap).get(name);
+        if (!(value instanceof String) || !((String) value).startsWith("npm:")) {
+            return;
+        }
+        String range = ((String) value).substring("npm:".length());
+        if (NodeSemver.validRange(range) && !NodeSemver.satisfies(targetVersion, range)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is required by " + dependent + " at " + value + " which excludes " + targetVersion);
         }
     }
 
@@ -2167,11 +2208,82 @@ public final class NativeLockEngine {
             case Pnpm:
                 return findLockedVersionsPnpm(lock, name);
             case YarnClassic:
-            case YarnBerry:
                 return findLockedVersionsYarn(lock, name);
+            case YarnBerry:
+                return findLockedVersionsBerry(lock, name);
             default:
                 return Collections.emptySet();
         }
+    }
+
+    /** Berry entries are keyed by {@code "<name>@<protocol>:<selector>"} (a valid YAML mapping); read their versions. */
+    private static Set<String> findLockedVersionsBerry(String lock, String name) {
+        Set<String> versions = new LinkedHashSet<>();
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return versions;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+            if (berryKeyDeclaresName(String.valueOf(e.getKey()), name) && e.getValue() instanceof Map) {
+                Object v = ((Map<?, ?>) e.getValue()).get("version");
+                if (v != null) {
+                    versions.add(String.valueOf(v));
+                }
+            }
+        }
+        return versions;
+    }
+
+    /** True when any comma-merged descriptor in {@code key} is {@code <name>@npm:…} (never {@code __metadata}/workspace). */
+    private static boolean berryKeyDeclaresName(String key, String name) {
+        if ("__metadata".equals(key)) {
+            return false;
+        }
+        for (String descriptor : key.split(",")) {
+            String d = descriptor.trim();
+            if (d.startsWith(name + "@npm:")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Fetch each new version's tarball and derive its berry checksum from the lock's cacheKey. */
+    private static List<LockEditSet.PackageEdit> enrichBerryChecksums(List<LockEditSet.PackageEdit> edits,
+                                                                      String lock, NodeRegistries registries,
+                                                                      NpmRegistryClient client) {
+        String cacheKey = berryCacheKey(lock);
+        List<LockEditSet.PackageEdit> out = new ArrayList<>(edits.size());
+        for (LockEditSet.PackageEdit edit : edits) {
+            if (edit.getNewVersion() == null || edit.getNewResolved() == null) {
+                out.add(edit);
+                continue;
+            }
+            NodeRegistry registry = registries.registryFor(edit.getName());
+            byte[] tarball = client.getTarball(registry, edit.getName(), edit.getNewVersion(), edit.getNewResolved());
+            out.add(edit.toBuilder()
+                    .newBerryChecksum(BerryZipChecksum.checksum(tarball, edit.getName(), cacheKey))
+                    .build());
+        }
+        return out;
+    }
+
+    /** The lock's {@code __metadata.cacheKey}; only the validated {@code 10c0} zip format is reproducible so far. */
+    private static String berryCacheKey(String lock) {
+        String cacheKey = null;
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            Object meta = ((Map<?, ?>) loaded).get("__metadata");
+            if (meta instanceof Map) {
+                Object value = ((Map<?, ?>) meta).get("cacheKey");
+                cacheKey = value == null ? null : String.valueOf(value);
+            }
+        }
+        if (!"10c0".equals(cacheKey)) {
+            throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, null,
+                    "yarn berry cacheKey " + cacheKey + " is not a validated checksum format (only 10c0 so far)");
+        }
+        return cacheKey;
     }
 
     private static Set<String> findLockedVersionsJson(String lock, String name) {

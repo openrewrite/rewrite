@@ -46,6 +46,7 @@ public class NpmRegistryClient {
     private final HttpSender httpSender;
     private final Map<String, AbbreviatedPackument> packumentCache = new ConcurrentHashMap<>();
     private final Map<String, VersionManifest> manifestCache = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> tarballCache = new ConcurrentHashMap<>();
 
     public NpmRegistryClient(HttpSender httpSender) {
         this.httpSender = httpSender;
@@ -67,6 +68,19 @@ public class NpmRegistryClient {
         if (cached == null) {
             cached = fetchManifest(registry, name, version);
             manifestCache.put(key, cached);
+        }
+        return cached;
+    }
+
+    /**
+     * The raw gzipped tarball bytes from {@code dist.tarball}, cached per (registry, url). Needed to reproduce
+     * a Yarn Berry checksum, which hashes the tarball's repacked contents.
+     */
+    public byte[] getTarball(NodeRegistry registry, String name, @Nullable String version, String tarballUrl) {
+        byte[] cached = tarballCache.get(tarballUrl);
+        if (cached == null) {
+            cached = send(registry, name, version, tarballUrl, HttpSender.Request.Builder.APPLICATION_JSON, false);
+            tarballCache.put(tarballUrl, cached);
         }
         return cached;
     }
