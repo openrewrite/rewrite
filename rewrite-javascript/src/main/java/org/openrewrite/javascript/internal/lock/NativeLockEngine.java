@@ -788,7 +788,7 @@ public final class NativeLockEngine {
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
-                nestUnderParent(req, existingVersion, placed, nested, existingLock, registries, client);
+                nestUnderParent(PackageManager.Npm, req, existingVersion, placed, nested, existingLock, registries, client);
                 continue;
             }
 
@@ -898,21 +898,20 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A closure member whose required version an incompatible top-level pin excludes: npm nests it at
-     * {@code node_modules/<parent>/node_modules/<name>} (I5 add-nest). Only the safe slice resolves — the
-     * requiring package is a freshly-placed top-level entry, some requirer pins the top-level version
-     * <b>exactly</b> (so it provably cannot move up to satisfy the new edge — otherwise npm cascades rather
-     * than forks), and the nested version is itself a leaf. Anything else fails loud (npm would reshape).
+     * A closure member an incompatible top-level pin excludes: nest it at {@code node_modules/<parent>/node_modules/
+     * <name>}. Safe slice only — the requirer is a freshly-placed top-level entry, some requirer pins the top-level
+     * version exactly (so it can't move up: npm/bun fork rather than cascade), and the nested version is a leaf.
      */
-    private static void nestUnderParent(Requirement req, String existingVersion, Map<String, Placement> placed,
-                                        Map<String, NestedPlacement> nested, String existingLock,
-                                        NodeRegistries registries, NpmRegistryClient client) {
-        // A cascade (the top-level entry moves up to satisfy the new edge) is a different, deferred class;
-        // only an exact pin on the current version proves the top slot is frozen, forcing the fork.
+    private static void nestUnderParent(PackageManager pm, Requirement req, String existingVersion,
+                                        Map<String, Placement> placed, Map<String, NestedPlacement> nested,
+                                        String existingLock, NodeRegistries registries, NpmRegistryClient client) {
+        boolean bun = pm == PackageManager.Bun;
         if (req.parent == null || !placed.containsKey(req.parent) ||
-                !topLevelPinnedNpm(existingLock, req.name, existingVersion)) {
+                !(bun ? topLevelPinnedBun(existingLock, req.name, existingVersion) :
+                        topLevelPinnedNpm(existingLock, req.name, existingVersion))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
-                    existingVersion + " which does not satisfy " + req.constraint + " (npm would nest/move it; deferred)");
+                    existingVersion + " which does not satisfy " + req.constraint +
+                    " (" + (bun ? "bun" : "npm") + " would nest/move it; deferred)");
         }
         String nestKey = req.parent + "/" + req.name;
         NestedPlacement already = nested.get(nestKey);
@@ -931,11 +930,15 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
                     "nesting " + req.name + " under " + req.parent + " pulls its own transitives (non-leaf); deferred");
         }
-        requireEmittableClosureMember(req.name, manifest);
+        if (bun) {
+            requireEmittableBunClosureMember(req.name, manifest);
+        } else {
+            requireEmittableClosureMember(req.name, manifest);
+        }
         VersionManifest.Dist dist = manifest.getDist();
-        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
+        if (dist == null || dist.getIntegrity() == null || (!bun && dist.getTarball() == null)) {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                    req.name + "@" + version + " has no registry tarball/integrity");
+                    req.name + "@" + version + " has no registry " + (bun ? "integrity" : "tarball/integrity"));
         }
         nested.put(nestKey, new NestedPlacement(req.parent, req.name, version, manifest, req.dev));
     }
@@ -1054,7 +1057,7 @@ public final class NativeLockEngine {
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
-                nestUnderParentBun(req, existingVersion, placed, nested, existingLock, registries, client);
+                nestUnderParent(PackageManager.Bun, req, existingVersion, placed, nested, existingLock, registries, client);
                 continue;
             }
             Placement already = placed.get(req.name);
@@ -1118,38 +1121,6 @@ public final class NativeLockEngine {
         return edits;
     }
 
-    /** The bun analogue of {@link #nestUnderParent}: a fresh leaf nests at {@code "<parent>/<name>"} when a frozen top pin excludes it. */
-    private static void nestUnderParentBun(Requirement req, String existingVersion, Map<String, Placement> placed,
-                                           Map<String, NestedPlacement> nested, String existingLock,
-                                           NodeRegistries registries, NpmRegistryClient client) {
-        if (req.parent == null || !placed.containsKey(req.parent) ||
-                !topLevelPinnedBun(existingLock, req.name, existingVersion)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
-                    existingVersion + " which does not satisfy " + req.constraint + " (bun would nest/move it; deferred)");
-        }
-        String nestKey = req.parent + "/" + req.name;
-        NestedPlacement already = nested.get(nestKey);
-        if (already != null) {
-            if (existingSatisfies(already.version, req.constraint)) {
-                return;
-            }
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
-                    req.name + " is required at two incompatible versions under " + req.parent + "; deferred");
-        }
-        NodeRegistry registry = registries.registryFor(req.name);
-        String version = resolveAddedVersion(client, registry, req.name, req.constraint);
-        VersionManifest manifest = client.getManifest(registry, req.name, version);
-        if (notEmpty(manifest.getDependencies()) || notEmpty(manifest.getOptionalDependencies())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
-                    "nesting " + req.name + " under " + req.parent + " pulls its own transitives (non-leaf); deferred");
-        }
-        requireEmittableBunClosureMember(req.name, manifest);
-        VersionManifest.Dist dist = manifest.getDist();
-        if (dist == null || dist.getIntegrity() == null) {
-            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name, req.name + "@" + version + " has no registry integrity");
-        }
-        nested.put(nestKey, new NestedPlacement(req.parent, req.name, version, manifest, req.dev));
-    }
 
     /** Whether a bun workspace edge or installed tuple pins {@code name} at exactly {@code version}. */
     private static boolean topLevelPinnedBun(String lock, String name, String version) {
@@ -1268,15 +1239,20 @@ public final class NativeLockEngine {
      * appear and need no gate; a peer or optionalDependency, however, resolves into further blocks the clean
      * placement does not model — so either defers the whole add.
      */
-    private static void requireEmittableYarnClosureMember(String name, VersionManifest m) {
+    /** The pnpm/bun/yarn add gates reject any optional or peer dependency (only npm models the optional-peer skip). */
+    private static void requireNoOptionalOrPeer(String name, VersionManifest m, String pm) {
         if (notEmpty(m.getOptionalDependencies())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " pulls in optionalDependencies not yet supported for yarn adds");
+                    "adding " + name + " pulls in optionalDependencies not yet supported for " + pm + " adds");
         }
         if (notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " declares peerDependencies not yet supported for yarn adds");
+                    "adding " + name + " declares peerDependencies not yet supported for " + pm + " adds");
         }
+    }
+
+    private static void requireEmittableYarnClosureMember(String name, VersionManifest m) {
+        requireNoOptionalOrPeer(name, m, "yarn");
     }
 
     /** Every package name that heads a block in the yarn.lock (across all merged selectors). */
@@ -1340,14 +1316,7 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     "adding scoped package " + name + " is not yet supported for bun adds");
         }
-        if (notEmpty(m.getOptionalDependencies())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " pulls in optionalDependencies not yet supported for bun adds");
-        }
-        if (notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " declares peerDependencies not yet supported for bun adds");
-        }
+        requireNoOptionalOrPeer(name, m, "bun");
         String metadata = unsupportedBunMetadata(m);
         if (metadata != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -1379,14 +1348,7 @@ public final class NativeLockEngine {
      * metadata not yet verified byte-exact defers the whole add.
      */
     private static void requireEmittablePnpmClosureMember(String name, VersionManifest m) {
-        if (notEmpty(m.getOptionalDependencies())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " pulls in optionalDependencies not yet supported for pnpm adds");
-        }
-        if (notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " declares peerDependencies (pnpm suffix keys) not yet supported for pnpm adds");
-        }
+        requireNoOptionalOrPeer(name, m, "pnpm");
         String metadata = unsupportedPnpmMetadata(m);
         if (metadata != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
