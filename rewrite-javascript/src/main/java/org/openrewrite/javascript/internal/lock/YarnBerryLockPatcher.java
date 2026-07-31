@@ -30,6 +30,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import static java.util.Collections.singletonList;
 
@@ -39,9 +43,10 @@ import static java.util.Collections.singletonList;
  * other byte. A registry dependency's {@code checksum} — long the blocker for berry — is reproduced by
  * {@link BerryZipChecksum} and threaded in on the edit; the engine derives it before this patcher runs.
  * <p>
- * Only an in-place version bump is supported so far: the package entry's descriptor key, {@code version},
- * {@code resolution} and {@code checksum} plus the importer's declared range. Anything that reshapes the
- * closure (a changed {@code dependencies} map, an add, a removal, a merged descriptor key, a fork) fails loud.
+ * Supported: an in-place version bump (rewrite the entry's descriptor key, {@code version}, {@code resolution}
+ * and {@code checksum} plus the importer range) and adding a dependency plus its runtime closure (a fresh entry
+ * per member at its sorted position). A cascade (changed {@code dependencies} map), removal, merged descriptor
+ * key, fork, scoped add, or workspaces all fail loud.
  */
 public final class YarnBerryLockPatcher implements LockPatcher {
 
@@ -58,17 +63,109 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         Yaml.Document document = documents.get(0);
         Yaml.Mapping root = (Yaml.Mapping) document.getBlock();
 
+        List<PackageEdit> adds = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.getKind() != PackageEdit.Kind.BUMP) {
+            if (edit.getKind() == PackageEdit.Kind.ADD) {
+                adds.add(edit);
+            } else if (edit.getKind() == PackageEdit.Kind.BUMP) {
+                root = applyBump(root, edit, edits.getEditedPackageJson());
+            } else {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                        "yarn berry only supports in-place version bumps so far (" + edit.getKind() + " deferred)");
+                        "yarn berry does not support " + edit.getKind() + " yet");
             }
-            root = applyBump(root, edit, edits.getEditedPackageJson());
+        }
+        if (!adds.isEmpty()) {
+            root = applyAdds(root, adds, edits.getEditedPackageJson());
         }
 
         List<Yaml.Document> newDocuments = new ArrayList<>(documents);
         newDocuments.set(0, document.withBlock(root));
         return docs.withDocuments(newDocuments).printAll();
+    }
+
+    private Yaml.Mapping applyAdds(Yaml.Mapping root, List<PackageEdit> adds, @Nullable String editedPackageJson) {
+        for (PackageEdit edit : adds) {
+            if (edit.getName().startsWith("@")) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                        "scoped berry adds defer until the sort comparator is validated");
+            }
+            if (edit.getNewBerryChecksum() == null) {
+                throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, edit.getName(),
+                        "no reproduced checksum for " + edit.getName());
+            }
+            String descriptor = descriptorFor(edit, adds, editedPackageJson);
+            root = insertEntrySorted(root, buildEntry(descriptor, edit), descriptor, 1);
+
+            // Only a package.json-declared member writes an importer edge; transitive closure members do not.
+            String declared = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), edit.getName());
+            if (declared != null) {
+                root = insertImporterEdge(root, edit, declared);
+            }
+        }
+        return root;
+    }
+
+    /** The merged {@code name@npm:range} descriptor: every range that resolves to this member, sorted. */
+    private static String descriptorFor(PackageEdit edit, List<PackageEdit> adds, @Nullable String editedPackageJson) {
+        String name = edit.getName();
+        Set<String> ranges = new TreeSet<>();
+        String declared = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
+        if (declared != null) {
+            ranges.add(declared);
+        }
+        for (PackageEdit other : adds) {
+            Map<String, String> deps = other.getNewDependencies();
+            if (deps != null && deps.containsKey(name)) {
+                ranges.add(deps.get(name));
+            }
+        }
+        if (ranges.isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no declaring range found for added " + name);
+        }
+        if (ranges.size() > 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is required at multiple ranges within the added closure; merged berry descriptors deferred");
+        }
+        return name + "@npm:" + ranges.iterator().next();
+    }
+
+    /** Build a fresh registry entry from a synthetic snippet, then graft it under its own descriptor key. */
+    private Yaml.Mapping.Entry buildEntry(String descriptor, PackageEdit edit) {
+        StringBuilder body = new StringBuilder();
+        body.append('"').append(descriptor).append("\":\n");
+        body.append("  version: ").append(edit.getNewVersion()).append('\n');
+        body.append("  resolution: \"").append(edit.getName()).append("@npm:").append(edit.getNewVersion()).append("\"\n");
+        Map<String, String> deps = edit.getNewDependencies();
+        if (deps != null && !deps.isEmpty()) {
+            body.append("  dependencies:\n");
+            for (Map.Entry<String, String> dep : new TreeMap<>(deps).entrySet()) {
+                body.append("    ").append(dep.getKey()).append(": \"npm:").append(dep.getValue()).append("\"\n");
+            }
+        }
+        body.append("  checksum: ").append(edit.getNewBerryChecksum()).append('\n');
+        body.append("  languageName: node\n");
+        body.append("  linkType: hard\n");
+        return parseGraftEntry(body.toString(), descriptor);
+    }
+
+    private Yaml.Mapping insertImporterEdge(Yaml.Mapping root, PackageEdit edit, String constraint) {
+        String name = edit.getName();
+        Yaml.Mapping.Entry importer = singleImporter(root, name);
+        if (importer == null) {
+            return root;
+        }
+        Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
+        Yaml.Mapping.Entry scopeEntry = findEntry(importerBody, edit.getScope());
+        if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    "adding the first " + edit.getScope() + " to a berry importer is deferred");
+        }
+        Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
+        Yaml.Mapping.Entry depEntry = parseGraftEntry(
+                edit.getScope() + ":\n  " + name + ": \"npm:" + constraint + "\"\n", edit.getScope(), name);
+        deps = insertEntrySorted(deps, depEntry, name, 0);
+        importerBody = replaceEntry(importerBody, edit.getScope(), scopeEntry.withValue(deps));
+        return replaceEntry(root, keyOf(importer), importer.withValue(importerBody));
     }
 
     private Yaml.Mapping applyBump(Yaml.Mapping root, PackageEdit edit, @Nullable String editedPackageJson) {
@@ -104,17 +201,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
 
     /** Re-pin the single workspace importer's declared range on {@code name} to {@code npm:<newConstraint>}. */
     private Yaml.Mapping repinImporter(Yaml.Mapping root, String name, String newConstraint) {
-        Yaml.Mapping.Entry importer = null;
-        for (Yaml.Mapping.Entry e : root.getEntries()) {
-            String key = keyOf(e);
-            if (key != null && key.contains("@workspace:") && e.getValue() instanceof Yaml.Mapping) {
-                if (importer != null) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                            "yarn berry workspaces (multiple importers) are deferred");
-                }
-                importer = e;
-            }
-        }
+        Yaml.Mapping.Entry importer = singleImporter(root, name);
         if (importer == null) {
             return root;
         }
@@ -128,6 +215,66 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             }
         }
         return replaceEntry(root, keyOf(importer), importer.withValue(importerBody));
+    }
+
+    /** The lone {@code @workspace:} importer entry, or {@code null} if none; multiple importers defer. */
+    private static Yaml.Mapping.@Nullable Entry singleImporter(Yaml.Mapping root, String name) {
+        Yaml.Mapping.Entry importer = null;
+        for (Yaml.Mapping.Entry e : root.getEntries()) {
+            String key = keyOf(e);
+            if (key != null && key.contains("@workspace:") && e.getValue() instanceof Yaml.Mapping) {
+                if (importer != null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            "yarn berry workspaces (multiple importers) are deferred");
+                }
+                importer = e;
+            }
+        }
+        return importer;
+    }
+
+    /**
+     * Splice {@code newEntry} at its plain-string key position, copying a sibling's prefix. {@code firstSortable}
+     * is 1 at the lock root (berry pins {@code __metadata} first) and 0 for a nested map. Scoped keys are already
+     * deferred, so a plain string compare holds.
+     */
+    private static Yaml.Mapping insertEntrySorted(Yaml.Mapping mapping, Yaml.Mapping.Entry newEntry, String newKey,
+                                                  int firstSortable) {
+        List<Yaml.Mapping.Entry> entries = mapping.getEntries();
+        Yaml.Mapping.Entry placed = newEntry.withPrefix(entries.get(entries.size() - 1).getPrefix());
+        int idx = entries.size();
+        for (int i = firstSortable; i < entries.size(); i++) {
+            String k = keyOf(entries.get(i));
+            if (k != null && k.compareTo(newKey) > 0) {
+                idx = i;
+                break;
+            }
+        }
+        List<Yaml.Mapping.Entry> out = new ArrayList<>(entries.size() + 1);
+        out.addAll(entries.subList(0, idx));
+        out.add(placed);
+        out.addAll(entries.subList(idx, entries.size()));
+        return mapping.withEntries(out);
+    }
+
+    private Yaml.Mapping.Entry parseGraftEntry(String synthetic, String... path) {
+        Yaml.Documents docs = parse(synthetic, null);
+        if (docs.getDocuments().isEmpty() || !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Mapping)) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct berry lock entry");
+        }
+        Yaml.Mapping mapping = (Yaml.Mapping) docs.getDocuments().get(0).getBlock();
+        for (int i = 0; i < path.length - 1; i++) {
+            Yaml.Mapping.Entry entry = findEntry(mapping, path[i]);
+            if (entry == null || !(entry.getValue() instanceof Yaml.Mapping)) {
+                throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not navigate synthetic entry at " + path[i]);
+            }
+            mapping = (Yaml.Mapping) entry.getValue();
+        }
+        Yaml.Mapping.Entry leaf = findEntry(mapping, path[path.length - 1]);
+        if (leaf == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct berry entry " + path[path.length - 1]);
+        }
+        return leaf;
     }
 
     /** Find the entry whose key is exactly {@code descriptor}; fail loud on a merged (comma-joined) key. */

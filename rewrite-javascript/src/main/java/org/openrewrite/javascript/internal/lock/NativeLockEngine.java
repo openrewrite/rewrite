@@ -726,10 +726,11 @@ public final class NativeLockEngine {
             // loud on any conflict/nest (bun's parent/name fork keys).
             return resolveClosureAddBun(change, rootName, rootConstraint, existingLock, registries, client);
         }
-        if (pm == PackageManager.YarnClassic) {
-            // yarn.lock lists one block per resolved (name, version); placement is not hoisted, so every
-            // closure member must be brand-new (no merge/second-block for an existing name).
-            return resolveClosureAddYarn(change, rootName, rootConstraint, existingLock, registries, client);
+        if (pm == PackageManager.YarnClassic || pm == PackageManager.YarnBerry) {
+            // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
+            // member must be brand-new (no merge/second entry for an existing name). Berry adds get their
+            // checksums enriched afterward, and scoped names defer until the sort comparator is validated.
+            return resolveClosureAddYarn(pm, change, rootName, rootConstraint, existingLock, registries, client);
         }
         // Only the npm patcher can insert closure entries so far; other formats defer.
         if (pm != PackageManager.Npm) {
@@ -1133,10 +1134,11 @@ public final class NativeLockEngine {
      * must be brand-new (no header merge or second-version block) and none may declare peers or optionalDependencies
      * (yarn resolves those into further blocks the clean placement does not model); anything else fails loud.
      */
-    private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(DepChange change, String rootName,
+    private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(PackageManager pm, DepChange change, String rootName,
                                                                        String rootConstraint, String existingLock,
                                                                        NodeRegistries registries, NpmRegistryClient client) {
-        Set<String> existingNames = existingYarnNames(existingLock);
+        Set<String> existingNames = pm == PackageManager.YarnBerry ?
+                existingBerryNames(existingLock) : existingYarnNames(existingLock);
         boolean dev = "devDependencies".equals(change.scope);
 
         Map<String, Placement> placed = new LinkedHashMap<>();
@@ -2246,6 +2248,23 @@ public final class NativeLockEngine {
             }
         }
         return false;
+    }
+
+    /** Every registry package name that heads a berry entry (across merged descriptors); ignores importer/metadata. */
+    private static Set<String> existingBerryNames(String lock) {
+        Set<String> names = new LinkedHashSet<>();
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            for (Object key : ((Map<?, ?>) loaded).keySet()) {
+                for (String descriptor : String.valueOf(key).split(",")) {
+                    int at = descriptor.trim().indexOf("@npm:");
+                    if (at > 0) {
+                        names.add(descriptor.trim().substring(0, at));
+                    }
+                }
+            }
+        }
+        return names;
     }
 
     /** Fetch each new version's tarball and derive its berry checksum from the lock's cacheKey. */

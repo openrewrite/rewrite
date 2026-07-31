@@ -48,27 +48,34 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
         // ms 2.1.2 -> 2.1.3: a leaf whose descriptor key, version, resolution and checksum all move, plus the
         // importer's declared range. The checksum is the reproduced 10c0/d924b57e... zip hash.
         String dir = "lock/yarn-berry/leaf-bump";
-        routes.put(REG + "ms", resource(dir + "/http/ms"));
-        routes.put(REG + "ms/2.1.2", resource(dir + "/http/ms-2.1.2"));
-        routes.put(REG + "ms/2.1.3", resource(dir + "/http/ms-2.1.3"));
-        binaryRoutes.put(REG + "ms/-/ms-2.1.3.tgz", bytesResource(dir + "/http/ms-2.1.3.tgz"));
+        route(dir, "ms", "2.1.2", false);
+        route(dir, "ms", "2.1.3", true);
+        assertRegenEquals(dir);
+    }
 
-        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry,
-                resource(dir + "/pkg-after"), resource(dir + "/pkg-before"), resource(dir + "/before"),
-                null, Paths.get("package.json"), ctx);
+    @Test
+    void leafAdd() {
+        // Add ms (a leaf) into a lock that has is-odd: a new entry appended at its sorted spot plus the importer edge.
+        String dir = "lock/yarn-berry/add-leaf";
+        route(dir, "ms", "2.1.3", true);
+        assertRegenEquals(dir);
+    }
 
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(resource(dir + "/after"));
+    @Test
+    void closureAdd() {
+        // Add is-odd (-> is-number ^6.0.0): two fresh entries inserted before ms, each with its reproduced checksum.
+        String dir = "lock/yarn-berry/add-closure";
+        route(dir, "is-odd", "3.0.1", true);
+        route(dir, "is-number", "6.0.0", true);
+        assertRegenEquals(dir);
     }
 
     @Test
     void unsupportedCacheKeyFailsLoud() {
         // Only the 10c0 zip format is validated; any other cacheKey cannot be reproduced, so refuse.
         String dir = "lock/yarn-berry/leaf-bump";
-        routes.put(REG + "ms", resource(dir + "/http/ms"));
-        routes.put(REG + "ms/2.1.2", resource(dir + "/http/ms-2.1.2"));
-        routes.put(REG + "ms/2.1.3", resource(dir + "/http/ms-2.1.3"));
-        binaryRoutes.put(REG + "ms/-/ms-2.1.3.tgz", bytesResource(dir + "/http/ms-2.1.3.tgz"));
+        route(dir, "ms", "2.1.2", false);
+        route(dir, "ms", "2.1.3", true);
         String before = resource(dir + "/before").replace("cacheKey: 10c0", "cacheKey: 9");
 
         Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry,
@@ -79,13 +86,33 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.CHECKSUM_UNAVAILABLE);
     }
 
+    /** Register a package's packument, one version's manifest, and (optionally) that version's tarball. */
+    private void route(String dir, String name, String version, boolean withTarball) {
+        routes.put(REG + name, resource(dir + "/http/" + name));
+        routes.put(REG + name + "/" + version, resource(dir + "/http/" + name + "-" + version));
+        if (withTarball) {
+            binaryRoutes.put(REG + name + "/-/" + name + "-" + version + ".tgz",
+                    bytesResource(dir + "/http/" + name + "-" + version + ".tgz"));
+        }
+    }
+
+    private void assertRegenEquals(String dir) {
+        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry,
+                resource(dir + "/pkg-after"), resource(dir + "/pkg-before"), resource(dir + "/before"),
+                null, Paths.get("package.json"), ctx);
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(dir + "/after"));
+    }
+
     // --- live re-record / provenance check (disabled: needs corepack + network) ---
 
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        assertBerryReproduces("lock/yarn-berry/leaf-bump/pkg-before", "lock/yarn-berry/leaf-bump/before");
-        assertBerryReproduces("lock/yarn-berry/leaf-bump/pkg-after", "lock/yarn-berry/leaf-bump/after");
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure"}) {
+            assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
+            assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
+        }
     }
 
     private void assertBerryReproduces(String pkgResource, String lockResource) throws Exception {
