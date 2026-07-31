@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
+import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
@@ -30,17 +31,14 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulator> {
+public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumulator> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
@@ -65,24 +63,10 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 "If the dependency does not exist in any scope, the recipe is a no-op.";
     }
 
-    static class Accumulator {
-        final Map<Path, ProjectState> projects = new HashMap<>();
-        final Map<Path, Path> lockToPackage = new HashMap<>();
-    }
-
-    static class ProjectState {
-        @Nullable SourceFile capturedPackageJson;
-        @Nullable String capturedLockContent;
-        @Nullable SourceFile modifiedPackageJson;
-        @Nullable Set<String> scopesContainingPackage;
-        LockFileRegeneration.@Nullable Result regenResult;
-        boolean failureRecorded;
-    }
-
-    @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
+    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -94,7 +78,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
-                        ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
+                        NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new NodeDependencyScan.ProjectState());
                         ps.capturedLockContent = sf.printAll();
                         acc.lockToPackage.put(p, packagePath);
                     }
@@ -103,7 +87,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
+                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
                 return tree;
@@ -129,8 +113,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        linkWorkspaceMembers(acc);
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
+        NodeDependencyScan.linkWorkspaceMembers(acc);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -138,7 +122,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
-                ProjectState ps = acc.projects.get(p);
+                NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if ((ps.scopesContainingPackage = findContainingScopes(sf)) != null) {
                         ensureComputed(ps, sf, ctx);
@@ -157,11 +141,11 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
                 Path packagePath = acc.lockToPackage.get(p);
                 if (packagePath == null) return tree;
-                ProjectState rootPs = acc.projects.get(packagePath);
+                NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
                 if (rootPs == null) return tree;
 
-                for (Path importer : lockImporters(acc, packagePath, rootPs)) {
-                    ProjectState ips = acc.projects.get(importer);
+                for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
+                    NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
                     if (ips == null) continue;
                     if (ips.modifiedPackageJson == null) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
@@ -185,7 +169,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
+            private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.scopesContainingPackage == null) return;
                 Set<String> scopes = ps.scopesContainingPackage;
@@ -202,44 +186,11 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         };
     }
 
-    private void recordFailure(ExecutionContext ctx, ProjectState ps, Path packageJsonPath) {
+    private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
         if (ps.failureRecorded || ps.regenResult == null) {
             return;
         }
         ps.failureRecorded = true;
         LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
-    }
-
-    /**
-     * Link each workspace-member {@code package.json} to the ancestor root lock, so editing a member
-     * regenerates that lock. A member with its own sibling lock keeps it.
-     */
-    private void linkWorkspaceMembers(Accumulator acc) {
-        for (Map.Entry<Path, Path> e : acc.lockToPackage.entrySet()) {
-            ProjectState root = acc.projects.get(e.getValue());
-            if (root == null || root.capturedPackageJson == null || root.capturedLockContent == null) {
-                continue;
-            }
-            for (Path member : PackageJsonHelper.workspaceMemberPaths(root.capturedPackageJson)) {
-                ProjectState memberPs = acc.projects.get(member);
-                if (memberPs != null && memberPs.capturedLockContent == null) {
-                    memberPs.capturedLockContent = root.capturedLockContent;
-                }
-            }
-        }
-    }
-
-    /** The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers. */
-    private List<Path> lockImporters(Accumulator acc, Path packagePath, ProjectState rootPs) {
-        List<Path> importers = new ArrayList<>();
-        importers.add(packagePath);
-        if (rootPs.capturedPackageJson != null) {
-            for (Path member : PackageJsonHelper.workspaceMemberPaths(rootPs.capturedPackageJson)) {
-                if (!member.equals(packagePath) && acc.projects.containsKey(member)) {
-                    importers.add(member);
-                }
-            }
-        }
-        return importers;
     }
 }
