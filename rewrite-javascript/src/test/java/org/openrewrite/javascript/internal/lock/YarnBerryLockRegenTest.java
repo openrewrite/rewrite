@@ -100,6 +100,13 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void removeDependency() {
+        // Removing debug drops its importer edge; debug and its private ms are then GC'd, while is-odd and its
+        // is-number survive. No registry access.
+        assertRegenEquals("lock/yarn-berry/remove");
+    }
+
+    @Test
     void unsupportedCacheKeyFailsLoud() {
         // Only the 10c0 zip format is validated; any other cacheKey cannot be reproduced, so refuse.
         String dir = "lock/yarn-berry/leaf-bump";
@@ -138,7 +145,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge", "remove"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }

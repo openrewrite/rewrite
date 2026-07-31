@@ -63,6 +63,9 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == PackageEdit.Kind.ADD) {
                 adds.add(edit);
+            } else if (edit.getKind() == PackageEdit.Kind.BUMP && edit.getNewVersion() == null) {
+                root = removeImporterEdge(root, edit);
+                anyPrune = true; // drop the removed dep's now-unreachable subtree
             } else if (edit.getKind() == PackageEdit.Kind.BUMP) {
                 root = applyBump(root, edit, edits.getEditedPackageJson());
                 anyPrune |= edit.isPrunesOrphans();
@@ -231,6 +234,36 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         }
         return LockYaml.replaceEntry(body, "dependencies",
                 depsEntry.withValue(((Yaml.Mapping) depsEntry.getValue()).withEntries(survivors)));
+    }
+
+    /** Drop the removed dependency's edge from the workspace importer; the GC then reaps its private subtree. */
+    private Yaml.Mapping removeImporterEdge(Yaml.Mapping root, PackageEdit edit) {
+        String name = edit.getName();
+        Yaml.Mapping.Entry importer = singleImporter(root, name);
+        if (importer == null) {
+            return root;
+        }
+        Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
+        for (String scope : IMPORTER_SCOPES) {
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(importerBody, scope);
+            if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping) ||
+                    LockYaml.findEntry((Yaml.Mapping) scopeEntry.getValue(), name) == null) {
+                continue;
+            }
+            List<Yaml.Mapping.Entry> survivors = new ArrayList<>();
+            for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
+                if (!name.equals(LockYaml.keyOf(dep))) {
+                    survivors.add(dep);
+                }
+            }
+            if (survivors.isEmpty()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        "removing the last " + scope + " from a berry importer is not yet supported");
+            }
+            importerBody = LockYaml.replaceEntry(importerBody, scope,
+                    scopeEntry.withValue(((Yaml.Mapping) scopeEntry.getValue()).withEntries(survivors)));
+        }
+        return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));
     }
 
     /** Remove every registry entry unreachable from the workspace importer's dependencies after an edge pruned. */
