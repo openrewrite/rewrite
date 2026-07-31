@@ -83,6 +83,16 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void orphanPrune() {
+        // semver 7.5.4 -> 7.6.3 drops its lru-cache edge; the semver entry loses its dependencies map and the now
+        // unreachable lru-cache + yallist entries are GC'd. semver's own checksum is reproduced from its tarball.
+        String dir = "lock/yarn-berry/orphan-prune";
+        route(dir, "semver", "7.5.4", false);
+        route(dir, "semver", "7.6.3", true);
+        assertRegenEquals(dir);
+    }
+
+    @Test
     void unsupportedCacheKeyFailsLoud() {
         // Only the 10c0 zip format is validated; any other cacheKey cannot be reproduced, so refuse.
         String dir = "lock/yarn-berry/leaf-bump";
@@ -121,7 +131,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }

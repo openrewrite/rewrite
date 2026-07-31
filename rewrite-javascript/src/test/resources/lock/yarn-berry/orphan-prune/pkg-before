@@ -1,0 +1,8 @@
+{
+  "name": "bo",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.5.3",
+  "dependencies": {
+    "semver": "7.5.4"
+  }
+}

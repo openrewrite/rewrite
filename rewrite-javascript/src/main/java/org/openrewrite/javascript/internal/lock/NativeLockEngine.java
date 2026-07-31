@@ -238,9 +238,8 @@ public final class NativeLockEngine {
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (npm, pnpm v9, yarn-classic).
-        boolean prunesOrphans = (pm == PackageManager.Npm || pm == PackageManager.Pnpm ||
-                pm == PackageManager.YarnClassic) && dropsDependencyEdge(oldManifest, newManifest);
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (npm, pnpm v9, both yarns).
+        boolean prunesOrphans = pm != PackageManager.Bun && dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
                 .newIntegrity(dist == null ? null : dist.getIntegrity())
@@ -2289,15 +2288,8 @@ public final class NativeLockEngine {
                                                                         String lock, NodeRegistries registries, NpmRegistryClient client) {
         Map<String, String> oldDeps = rootOld.getDependencies() == null ? Collections.emptyMap() : rootOld.getDependencies();
         Map<String, String> newDeps = rootNew.getDependencies() == null ? Collections.emptyMap() : rootNew.getDependencies();
-        // A dropped edge is the patcher's orphan GC for classic (flagged via prunesOrphans); berry has no GC yet.
-        if (pm == PackageManager.YarnBerry) {
-            for (String dep : oldDeps.keySet()) {
-                if (!newDeps.containsKey(dep)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            "upgrading " + rootName + " drops its edge to " + dep + " (orphan pruning) not yet supported for berry");
-                }
-            }
-        }
+        // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop re-resolves
+        // only kept edges.
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
             String dep = e.getKey();

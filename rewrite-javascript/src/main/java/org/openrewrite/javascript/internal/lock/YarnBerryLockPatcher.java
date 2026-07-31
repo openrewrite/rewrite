@@ -20,8 +20,12 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,11 +59,13 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         Yaml.Mapping root = (Yaml.Mapping) document.getBlock();
 
         List<PackageEdit> adds = new ArrayList<>();
+        boolean anyPrune = false;
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == PackageEdit.Kind.ADD) {
                 adds.add(edit);
             } else if (edit.getKind() == PackageEdit.Kind.BUMP) {
                 root = applyBump(root, edit, edits.getEditedPackageJson());
+                anyPrune |= edit.isPrunesOrphans();
             } else if (edit.getKind() == PackageEdit.Kind.FORCED_MOVE) {
                 root = applyForcedMove(root, edit);
             } else {
@@ -69,6 +75,9 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         }
         if (!adds.isEmpty()) {
             root = applyAdds(root, adds, edits.getEditedPackageJson());
+        }
+        if (anyPrune) {
+            root = gcOrphans(root);
         }
 
         List<Yaml.Document> newDocuments = new ArrayList<>(documents);
@@ -188,9 +197,94 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         body = LockYaml.setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion());
         body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
         body = rewriteDependencies(body, edit.getNewDependencies(), name);
+        if (edit.isPrunesOrphans()) {
+            body = pruneDependencies(body, edit.getNewDependencies());
+        }
         root = LockYaml.replaceEntry(root, oldDescriptor, LockYaml.renameKey(entry, newDescriptor).withValue(body));
 
         return repinImporter(root, name, newConstraint);
+    }
+
+    /** Drop the dropped edges from the bumped entry's {@code dependencies:} map, removing the map if it empties. */
+    private static Yaml.Mapping pruneDependencies(Yaml.Mapping body, @Nullable Map<String, String> newDeps) {
+        Yaml.Mapping.Entry depsEntry = LockYaml.findEntry(body, "dependencies");
+        if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
+            return body;
+        }
+        Set<String> keep = newDeps == null ? Collections.emptySet() : newDeps.keySet();
+        List<Yaml.Mapping.Entry> survivors = new ArrayList<>();
+        for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) depsEntry.getValue()).getEntries()) {
+            if (keep.contains(LockYaml.keyOf(dep))) {
+                survivors.add(dep);
+            }
+        }
+        if (survivors.isEmpty()) {
+            List<Yaml.Mapping.Entry> kept = new ArrayList<>();
+            for (Yaml.Mapping.Entry e : body.getEntries()) {
+                if (!"dependencies".equals(LockYaml.keyOf(e))) {
+                    kept.add(e);
+                }
+            }
+            return body.withEntries(kept);
+        }
+        return LockYaml.replaceEntry(body, "dependencies",
+                depsEntry.withValue(((Yaml.Mapping) depsEntry.getValue()).withEntries(survivors)));
+    }
+
+    /** Remove every registry entry unreachable from the workspace importer's dependencies after an edge pruned. */
+    private Yaml.Mapping gcOrphans(Yaml.Mapping root) {
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>(importerDepNames(root));
+        while (!queue.isEmpty()) {
+            String name = queue.poll();
+            if (!reachable.add(name)) {
+                continue;
+            }
+            for (Yaml.Mapping.Entry e : root.getEntries()) {
+                String key = LockYaml.keyOf(e);
+                if (key != null && berryEntryName(key).equals(name) && e.getValue() instanceof Yaml.Mapping) {
+                    queue.addAll(entryDepNames((Yaml.Mapping) e.getValue()));
+                }
+            }
+        }
+        List<Yaml.Mapping.Entry> kept = new ArrayList<>();
+        for (Yaml.Mapping.Entry e : root.getEntries()) {
+            String key = LockYaml.keyOf(e);
+            if (key == null || "__metadata".equals(key) || key.contains("@workspace:") ||
+                    reachable.contains(berryEntryName(key))) {
+                kept.add(e);
+            }
+        }
+        return root.withEntries(kept);
+    }
+
+    private static List<String> importerDepNames(Yaml.Mapping root) {
+        Yaml.Mapping.Entry importer = singleImporter(root, "");
+        return importer == null ? new ArrayList<>() : entryDepNames((Yaml.Mapping) importer.getValue());
+    }
+
+    /** The dependency names declared across an entry's dependency scopes. */
+    private static List<String> entryDepNames(Yaml.Mapping entry) {
+        List<String> names = new ArrayList<>();
+        for (String scope : IMPORTER_SCOPES) {
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(entry, scope);
+            if (scopeEntry != null && scopeEntry.getValue() instanceof Yaml.Mapping) {
+                for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
+                    String name = LockYaml.keyOf(dep);
+                    if (name != null) {
+                        names.add(name);
+                    }
+                }
+            }
+        }
+        return names;
+    }
+
+    /** The package name a descriptor key heads (before {@code @npm:}); the key itself for a non-registry entry. */
+    private static String berryEntryName(String key) {
+        String first = key.split(",")[0].trim();
+        int at = first.indexOf("@npm:");
+        return at > 0 ? first.substring(0, at) : first;
     }
 
     /** Re-head a cascade-forced transitive's descriptor to its new range and rewrite its resolution triple. */
