@@ -98,9 +98,7 @@ final class NpmConfig {
         return EnvExpansion.expand(defaultRegistryRaw, env);
     }
 
-    /**
-     * Per-scope registry URLs keyed by {@code @scope}, in configuration order.
-     */
+    /** Per-scope registry URLs keyed by {@code @scope}, in configuration order. */
     Map<String, EnvExpansion.Expansion> scopeRegistries() {
         Map<String, EnvExpansion.Expansion> resolved = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : scopeRegistriesRaw.entrySet()) {

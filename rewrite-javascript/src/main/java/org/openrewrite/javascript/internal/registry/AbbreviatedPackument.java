@@ -29,14 +29,9 @@ import java.util.Set;
 public class AbbreviatedPackument {
     String name;
 
-    /**
-     * {@code dist-tags} such as {@code latest}/{@code next}, so a package.json constraint that is a
-     * tag can be resolved to a concrete version.
-     */
+    /** {@code dist-tags} such as {@code latest}/{@code next}, for resolving a tag constraint to a concrete version. */
     Map<String, String> distTags;
 
-    /**
-     * The published version keys, in the registry's document order.
-     */
+    /** The published version keys, in the registry's document order. */
     Set<String> versions;
 }

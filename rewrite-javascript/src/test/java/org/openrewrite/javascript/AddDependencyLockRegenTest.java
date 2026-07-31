@@ -45,7 +45,7 @@ import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
  * PM-free end-to-end tests for {@link AddDependency} lock regeneration: a scalar-only leaf add is
- * resolved and written into the lock byte-exactly (Phase B increment 1), while a closure-changing add
+ * resolved and written into the lock byte-exactly, while a closure-changing add
  * (a package with transitives) still fails loud — the lock is left untouched, both files carry a
  * {@link Markup.Warn}, and a structured {@link NodeLockRegenerationFailures} row records the reason.
  */
@@ -92,7 +92,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
 
     @Test
     void metadataLeafAddRegeneratesLockByteExact() {
-        // A leaf carrying object metadata (engines) is now written byte-exact end-to-end (I1-follow).
+        // A leaf carrying object metadata (engines) is written byte-exact end-to-end.
         routes.put("https://registry.npmjs.org/is-number", resource("lock/npm/add-meta-engines/http/is-number"));
         routes.put("https://registry.npmjs.org/is-number/7.0.0",
                 resource("lock/npm/add-meta-engines/http/is-number-7.0.0"));
@@ -114,7 +114,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
     @Test
     void closureAddRegeneratesLockByteExact() {
         // supports-color pulls has-flag: both hoist top-level, no conflict — the whole closure is written
-        // byte-exact end-to-end (Phase B I2).
+        // byte-exact end-to-end.
         routes.put("https://registry.npmjs.org/supports-color", resource("lock/npm/closure-basic/http/supports-color"));
         routes.put("https://registry.npmjs.org/supports-color/7.2.0",
                 resource("lock/npm/closure-basic/http/supports-color-7.2.0"));
@@ -138,7 +138,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
     @Test
     void pnpmLeafAddRegeneratesLockByteExact() {
         // pnpm is content-addressed: is-number@7.0.0 (a scalar-only leaf) inserts one packages+snapshots entry
-        // plus the importer edge, byte-exact end-to-end (Phase B I4).
+        // plus the importer edge, byte-exact end-to-end.
         routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-leaf/http/is-number"));
         routes.put("https://registry.npmjs.org/is-number/7.0.0", resource("lock/pnpm/add-leaf/http/is-number-7.0.0"));
 
@@ -159,7 +159,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
     @Test
     void pnpmCleanClosureAddRegeneratesLockByteExact() {
         // is-odd@3.0.1 -> is-number@6.0.0: a clean closure with no peers, one packages+snapshots entry per
-        // member, snapshot referencing the resolved transitive — byte-exact end-to-end (Phase B I4).
+        // member, snapshot referencing the resolved transitive — byte-exact end-to-end.
         routes.put("https://registry.npmjs.org/is-odd", resource("lock/pnpm/add-closure/http/is-odd"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/pnpm/add-closure/http/is-odd-3.0.1"));
         routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-closure/http/is-number"));
@@ -182,7 +182,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
     @Test
     void closureAddFailsLoudWarnsAndRecordsDataTableRow() {
         // A package declaring a peerDependency triggers npm's peer auto-install, which the greedy-forward
-        // resolver does not model — it defers (Phase B I2+) rather than emit a maybe-wrong tree.
+        // resolver does not model — it defers rather than emit a maybe-wrong tree.
         routes.put("https://registry.npmjs.org/needs-transitive", "{\"versions\":{\"1.0.0\":{}}}");
         routes.put("https://registry.npmjs.org/needs-transitive/1.0.0",
                 "{\"name\":\"needs-transitive\",\"version\":\"1.0.0\",\"peerDependencies\":{\"react\":\">=17\"}}");

@@ -30,9 +30,7 @@ import java.util.Map;
 public class NodeRegistries {
     NodeRegistry defaultRegistry;
 
-    /**
-     * Scoped registries keyed by {@code @scope} (e.g. {@code @angular}).
-     */
+    /** Scoped registries keyed by {@code @scope} (e.g. {@code @angular}). */
     Map<String, NodeRegistry> byScope;
 
     @Nullable
@@ -44,9 +42,7 @@ public class NodeRegistries {
     @Nullable
     String noProxy;
 
-    /**
-     * The single registry a package name resolves against.
-     */
+    /** The single registry a package name resolves against. */
     public NodeRegistry registryFor(String packageName) {
         String scope = Urls.scopeOf(packageName);
         if (scope != null) {

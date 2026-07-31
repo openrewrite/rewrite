@@ -54,9 +54,7 @@ public class VersionManifest {
     @Nullable
     JsonNode peerDependenciesMeta;
 
-    /**
-     * Raw {@code bin} node: a String or a {@code {name: path}} object.
-     */
+    /** Raw {@code bin} node: a String or a {@code {name: path}} object. */
     @Nullable
     JsonNode bin;
 
@@ -72,18 +70,14 @@ public class VersionManifest {
     @Nullable
     List<String> libc;
 
-    /**
-     * {@code hasInstallScript}, derived from {@link #scripts} when the manifest omits it.
-     */
+    /** {@code hasInstallScript}, derived from {@link #scripts} when the manifest omits it. */
     @Nullable
     Boolean hasInstallScript;
 
     @Nullable
     Map<String, String> scripts;
 
-    /**
-     * Bundled dependencies (accepting both {@code bundleDependencies} and {@code bundledDependencies}).
-     */
+    /** Bundled dependencies (accepting both {@code bundleDependencies} and {@code bundledDependencies}). */
     @Nullable
     List<String> bundleDependencies;
 

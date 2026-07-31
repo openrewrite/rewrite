@@ -26,10 +26,9 @@ import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import java.nio.file.Path;
 
 /**
- * Regenerate a JavaScript project's lock file natively — without executing the package manager — by
- * dispatching to the shared {@link NativeLockEngine}. Pre-configured instances are provided for each
- * {@link PackageManager}; {@link #forPackageManager(PackageManager)} dispatches to the right one and
- * {@link #getLockFile()} names its lock file.
+ * Regenerate a JavaScript project's lock file natively — without executing the package manager — via
+ * the shared {@link NativeLockEngine}. A pre-configured instance exists per {@link PackageManager};
+ * {@link #forPackageManager(PackageManager)} selects one.
  */
 public final class LockFileRegeneration {
 
@@ -80,9 +79,7 @@ public final class LockFileRegeneration {
         @Nullable String errorMessage;
         @Nullable Failure failure;
 
-        /**
-         * Notes accompanying a successful regeneration, e.g. orphaned entries retained after a removal.
-         */
+        /** Notes accompanying a successful regeneration, e.g. orphaned entries retained after a removal. */
         @Nullable String detail;
 
         public static Result success(String lockFileContent) {
@@ -108,8 +105,8 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * Insert a data-table row describing a failed regeneration, mapping the structured {@link Failure}
-     * when present and falling back to the plain error message (and the recipe's target package) otherwise.
+     * Insert a data-table row for a failed regeneration, from the structured {@link Failure} when
+     * present, else the plain error message and the recipe's target package.
      */
     public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
                                         Path packageJsonPath, Result result, @Nullable String fallbackPackageName) {

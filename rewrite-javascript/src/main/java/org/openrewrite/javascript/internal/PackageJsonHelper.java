@@ -57,10 +57,8 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Resolve the source paths of a workspace root's member {@code package.json} files from its
-     * {@link NodeResolutionResult#getWorkspacePackagePaths()} (each relative to the root manifest's
-     * directory). Empty when the manifest is not a workspace root. Lets a recipe pair a root lock with
-     * the member manifests it covers, so an edit to a member regenerates the ancestor root lock.
+     * A workspace root's member {@code package.json} paths, from its
+     * {@link NodeResolutionResult#getWorkspacePackagePaths()}; empty when not a workspace root.
      */
     public static List<Path> workspaceMemberPaths(SourceFile rootPackageJson) {
         NodeResolutionResult marker = rootPackageJson.getMarkers()
@@ -122,10 +120,7 @@ public class PackageJsonHelper {
         return original.withText(newContent);
     }
 
-    /**
-     * Reparse a regenerated lock file's content, dispatching by the runtime type
-     * of the original SourceFile.
-     */
+    /** Reparse regenerated lock content, dispatching on the original's runtime type. */
     public static SourceFile reparseLock(SourceFile original, String newContent) {
         if (original instanceof Json.Document) {
             return reparseJson((Json.Document) original, newContent);
@@ -142,10 +137,8 @@ public class PackageJsonHelper {
     // --- Marker refresh ---------------------------------------------------
 
     /**
-     * Re-derive the {@code dependencies}/{@code devDependencies}/etc. lists on
-     * the marker by walking the modified document. {@code resolvedDependencies}
-     * and other fields carry over unchanged from the existing marker.
-     * Returns the source file unchanged when no marker is present.
+     * Re-derive the declared-dependency lists on the marker from the modified document;
+     * {@code resolvedDependencies} and other fields carry over unchanged.
      */
     public static SourceFile refreshMarker(SourceFile packageJson) {
         if (!(packageJson instanceof Json.Document)) {
@@ -231,11 +224,9 @@ public class PackageJsonHelper {
     // --- Overlay helpers -------------------------------------------------
 
     /**
-     * Re-derive {@code resolvedDependencies} on the marker by parsing the given
-     * lock-file content. Supports npm, Bun, yarn classic, yarn berry, and pnpm.
-     * For other PMs, returns the input unchanged. If parsing fails, throws — the
-     * caller (typically {@link #editAndRegenerate}) is expected to catch and
-     * surface the failure via {@link org.openrewrite.marker.Markup#warn}.
+     * Re-derive {@code resolvedDependencies} on the marker by parsing {@code lockContent} (npm, Bun,
+     * yarn classic/berry, pnpm; other PMs unchanged). Throws on a parse failure, which
+     * {@link #editAndRegenerate} surfaces via {@link org.openrewrite.marker.Markup#warn}.
      */
     public static SourceFile overlayResolvedDeps(SourceFile pkg,
                                                  String lockContent,
@@ -328,9 +319,8 @@ public class PackageJsonHelper {
     // --- JSON mutation helpers -------------------------------------------
 
     /**
-     * Add {@code name: version} to the given scope object inside {@code doc}.
-     * If the scope does not exist it is created. If {@code name} is already
-     * present the document is returned unchanged.
+     * Add {@code name: version} to {@code scope} in {@code doc}, creating the scope if absent;
+     * a no-op when {@code name} is already present.
      */
     public static Json.Document addDependency(Json.Document doc, String name, String version, String scope) {
         if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
@@ -342,8 +332,7 @@ public class PackageJsonHelper {
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
 
-            // The new dep member inside the scope gets prefix="\n" + innerIndent.
-            // Its after carries the closing-brace whitespace for the scope object: "\n" + outerIndent.
+            // New member owns its leading indent; its after carries the scope's closing-brace whitespace.
             Json.Member depMember = makeMember(name, makeStringLiteral(version),
                     Space.build("\n" + innerIndent, Collections.emptyList()));
             JsonRightPadded<Json> depRP = JsonRightPadded.build((Json) depMember)
@@ -367,14 +356,12 @@ public class PackageJsonHelper {
             }
         }
 
-        // Check if the existing scope is effectively empty (contains only Json.Empty placeholder).
         // The TypeScript JSON parser represents {} as a single Json.Empty member.
         boolean scopeEffectivelyEmpty = existingScope.getMembers().stream()
                 .allMatch(m -> m instanceof Json.Empty);
 
         Json.JsonObject updatedScope;
         if (scopeEffectivelyEmpty) {
-            // Replace the Json.Empty placeholder with a properly indented new member.
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
             Json.Member depMember = makeMember(name, makeStringLiteral(version),
@@ -390,9 +377,8 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Remove the named dependency from each given scope in {@code doc}.
-     * If a scope ends up empty after removal, the scope member itself is dropped.
-     * Returns the document unchanged if no matching member was found in any scope.
+     * Remove {@code name} from each of {@code scopes} in {@code doc}, dropping a scope that ends up
+     * empty; a no-op when no matching member is found.
      */
     public static Json.Document removeDependency(Json.Document doc, String name, Set<String> scopes) {
         if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
@@ -447,10 +433,7 @@ public class PackageJsonHelper {
         return doc.withValue(root.getPadding().withMembers(rootMembers));
     }
 
-    /**
-     * Return the indent unit detected from the first member of {@code obj}.
-     * Falls back to two spaces if no members exist or prefix has no newline.
-     */
+    /** The indent unit from {@code obj}'s first member, or two spaces when none can be detected. */
     private static String detectIndentUnit(Json.JsonObject obj) {
         List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
         if (!members.isEmpty()) {
@@ -465,11 +448,7 @@ public class PackageJsonHelper {
         return "  ";
     }
 
-    /**
-     * Append {@code newMember} to {@code obj}, transferring the trailing after-space
-     * from the previous last member to the new last member so that the closing brace
-     * keeps its indentation.
-     */
+    /** Append {@code newMember} to {@code obj}, moving the trailing space so the closing brace keeps its indent. */
     private static Json.JsonObject appendMember(Json.JsonObject obj, Json.Member newMember) {
         List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
         if (members.isEmpty()) {
@@ -479,10 +458,8 @@ public class PackageJsonHelper {
             int prevLastIdx = members.size() - 1;
             JsonRightPadded<Json> prevLast = members.get(prevLastIdx);
 
-            // The new member's prefix should match the existing members' indent.
-            // RPC-parsed JSON (from the TypeScript PackageJsonParser) stores whitespace on the
-            // key literal's prefix rather than on the member itself — fall back to the key prefix
-            // when the member prefix is empty.
+            // RPC-parsed JSON (the TypeScript PackageJsonParser) stores whitespace on the key literal's
+            // prefix, not the member — fall back to the key prefix when the member's is empty.
             Space memberPrefix = prevLast.getElement().getPrefix();
             if (memberPrefix.isEmpty() && prevLast.getElement() instanceof Json.Member) {
                 Json.Member prevMember = (Json.Member) prevLast.getElement();
@@ -682,11 +659,7 @@ public class PackageJsonHelper {
                 "\"" + value + "\"", value);
     }
 
-    /**
-     * Create a member with the given prefix on the member itself.
-     * If the value is a literal with no prefix whitespace, a single space is
-     * added so that the printed output reads {@code "key": "value"}.
-     */
+    /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
     private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
         // Ensure there's a space between ':' and the value (standard JSON formatting).
@@ -721,10 +694,9 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Apply a recipe-specific edit to a package.json, refresh its declared-deps
-     * marker, and (when the marker carries a {@link NodeResolutionResult#getPackageManager()
-     * package manager} and a lock was captured at scan time) regenerate the lock
-     * file content via {@link LockFileRegeneration}.
+     * Apply {@code editFn} to a package.json, refresh its declared-deps marker, and — when the marker
+     * carries a {@link NodeResolutionResult#getPackageManager() package manager} and a lock was
+     * captured — regenerate the lock via {@link LockFileRegeneration}.
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
