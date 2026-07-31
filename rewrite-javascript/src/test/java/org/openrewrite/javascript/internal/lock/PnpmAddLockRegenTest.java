@@ -15,41 +15,20 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.javascript.NodeExecutionContextView;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The differential harness for Phase B pnpm adds. Each test replays a fixture — a before
  * {@code package.json}, a before {@code pnpm-lock.yaml}, the recipe's add edit, and recorded registry HTTP —
- * through {@link NativeLockEngine} entirely OFFLINE (a stub {@link HttpSender} serves the captured
+ * through {@link NativeLockEngine} entirely OFFLINE (a stub {@code HttpSender} serves the captured
  * packuments/manifests), then asserts the emitted lock is BYTE-IDENTICAL to a golden {@code after} recorded
  * from a real {@code pnpm install --lockfile-only}. Byte-identity is the whole contract: the engine either
  * reproduces exactly what pnpm would write or fails loud.
@@ -61,29 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * packuments and verbatim single-version manifests under each fixture's {@code http/} were captured from the
  * registry (see {@code NpmClosureAddLockRegenTest} for the throwaway node script).
  */
-class PnpmAddLockRegenTest {
-
-    private static final String REG = "https://registry.npmjs.org/";
-
-    private ExecutionContext ctx;
-    private final Map<String, String> routes = new HashMap<>();
-
-    @BeforeEach
-    void setUp() {
-        routes.clear();
-        HttpSender http = request -> {
-            String body = routes.get(request.getUrl().toString());
-            return new HttpSender.Response(body == null ? 404 : 200,
-                    new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
-            });
-        };
-        ctx = new InMemoryExecutionContext(t -> {
-            throw new RuntimeException(t);
-        });
-        HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
-        NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
-    }
+class PnpmAddLockRegenTest extends LockRegenTestSupport {
 
     // --- byte-exact adds (goldens from real pnpm 11.2.2) ------------------
 
@@ -199,50 +156,6 @@ class PnpmAddLockRegenTest {
         for (String fixture : fixtures) {
             assertPnpmReproduces(fixture + "/pkg-before", fixture + "/before");
             assertPnpmReproduces(fixture + "/pkg-after", fixture + "/after");
-        }
-    }
-
-    private void assertPnpmReproduces(String pkgResource, String lockResource) throws Exception {
-        Path tmp = Files.createTempDirectory("pnpm-add-record");
-        try {
-            Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
-            Process process = new ProcessBuilder("pnpm", "install", "--lockfile-only", "--no-color")
-                    .directory(tmp.toFile())
-                    .redirectOutput(tmp.resolve("pnpm.log").toFile())
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("pnpm install timed out for " + pkgResource);
-            }
-            String generated = new String(Files.readAllBytes(tmp.resolve("pnpm-lock.yaml")), StandardCharsets.UTF_8);
-            assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
-        } finally {
-            try (Stream<Path> walk = Files.walk(tmp)) {
-                walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
-        }
-    }
-
-    private static String resource(String path) {
-        try (InputStream in = PnpmAddLockRegenTest.class.getClassLoader().getResourceAsStream(path)) {
-            if (in == null) {
-                throw new IllegalStateException("missing test resource " + path);
-            }
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) >= 0) {
-                out.write(buf, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
     }
 }

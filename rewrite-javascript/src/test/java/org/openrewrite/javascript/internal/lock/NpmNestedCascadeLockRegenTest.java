@@ -15,34 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.javascript.NodeExecutionContextView;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -52,34 +31,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * entry mistook the unchanged nested edge for one that must move (or a brand-new add-during-bump) and failed
  * loud on a tree real npm reshapes cleanly. The engine now resolves each edge over the actual installed tree
  * (npm's hoisting walk), so a nested-satisfied edge is a no-op. The byte-exact test replays the fixture
- * OFFLINE (a stub {@link HttpSender} serves captured packuments/manifests) through {@link NativeLockEngine}
+ * OFFLINE (a stub {@code HttpSender} serves captured packuments/manifests) through {@link NativeLockEngine}
  * and asserts the emitted lock is BYTE-IDENTICAL to a golden {@code after} recorded from a real
  * {@code npm install --package-lock-only} (npm 11.6.2). Enable {@link #recordGoldensWithRealNpm()} to
  * re-derive/verify the goldens.
  */
-class NpmNestedCascadeLockRegenTest {
-
-    private static final String REG = "https://registry.npmjs.org/";
-
-    private ExecutionContext ctx;
-    private final Map<String, String> routes = new HashMap<>();
-
-    @BeforeEach
-    void setUp() {
-        routes.clear();
-        HttpSender http = request -> {
-            String body = routes.get(request.getUrl().toString());
-            return new HttpSender.Response(body == null ? 404 : 200,
-                    new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
-            });
-        };
-        ctx = new InMemoryExecutionContext(t -> {
-            throw new RuntimeException(t);
-        });
-        HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
-        NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
-    }
+class NpmNestedCascadeLockRegenTest extends LockRegenTestSupport {
 
     // --- byte-exact nested-edge no-op bump (golden from real npm 11.6.2) --
 
@@ -122,51 +79,6 @@ class NpmNestedCascadeLockRegenTest {
         for (String[] fixture : fixtures) {
             assertNpmReproduces(fixture[0] + "/pkg-before", fixture[0] + "/before", fixture[1]);
             assertNpmReproduces(fixture[0] + "/pkg-after", fixture[0] + "/after", fixture[1]);
-        }
-    }
-
-    private void assertNpmReproduces(String pkgResource, String lockResource, String lockfileVersion) throws Exception {
-        Path tmp = Files.createTempDirectory("nested-cascade-record");
-        try {
-            Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
-            Process process = new ProcessBuilder("npm", "install", "--package-lock-only",
-                    "--lockfile-version", lockfileVersion, "--no-audit", "--no-fund")
-                    .directory(tmp.toFile())
-                    .redirectOutput(tmp.resolve("npm.log").toFile())
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("npm install timed out for " + pkgResource);
-            }
-            String generated = new String(Files.readAllBytes(tmp.resolve("package-lock.json")), StandardCharsets.UTF_8);
-            assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
-        } finally {
-            try (Stream<Path> walk = Files.walk(tmp)) {
-                walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
-        }
-    }
-
-    private static String resource(String path) {
-        try (InputStream in = NpmNestedCascadeLockRegenTest.class.getClassLoader().getResourceAsStream(path)) {
-            if (in == null) {
-                throw new IllegalStateException("missing test resource " + path);
-            }
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) >= 0) {
-                out.write(buf, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
     }
 }
