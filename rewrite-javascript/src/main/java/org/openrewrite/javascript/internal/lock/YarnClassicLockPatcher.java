@@ -19,7 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +57,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         // registry.npmjs.org must stay there, or the new entry's host won't match a real yarn install.
         mirrorToYarnpkg = content.contains(YARN_REGISTRY);
         List<PackageEdit> adds = new ArrayList<>();
+        boolean anyPrune = false;
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == ADD) {
                 adds.add(edit);
@@ -61,12 +65,58 @@ public final class YarnClassicLockPatcher implements LockPatcher {
                 content = applyForcedMove(content, edit);
             } else {
                 content = applyEdit(content, edit, edits.getEditedPackageJson());
+                anyPrune |= edit.isPrunesOrphans();
             }
         }
         if (!adds.isEmpty()) {
             content = applyAdds(content, adds, edits.getEditedPackageJson());
         }
+        if (anyPrune) {
+            content = gcOrphans(content, edits.getEditedPackageJson());
+        }
         return content;
+    }
+
+    /** Remove every block unreachable from the {@code package.json} roots after an edge was pruned. */
+    private String gcOrphans(String content, @Nullable String editedPackageJson) {
+        Blocks blocks = Blocks.parse(content);
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>(LockManifests.declaredNames(editedPackageJson));
+        while (!queue.isEmpty()) {
+            String name = queue.poll();
+            if (!reachable.add(name)) {
+                continue;
+            }
+            int bi = blocks.indexOfName(name);
+            if (bi >= 0) {
+                queue.addAll(blockDepNames(blocks.get(bi)));
+            }
+        }
+        blocks.retainNames(reachable);
+        return blocks.reconstruct();
+    }
+
+    /** The dependency names in a block's {@code dependencies:} section. */
+    private static List<String> blockDepNames(String block) {
+        List<String> names = new ArrayList<>();
+        boolean inDeps = false;
+        for (String line : block.split("\n", -1)) {
+            if (line.equals("  dependencies:")) {
+                inDeps = true;
+            } else if (inDeps && line.startsWith("    ")) {
+                names.add(unwrap(line.trim().split("\\s+", 2)[0]));
+            } else if (inDeps && line.startsWith("  ") && !line.startsWith("    ")) {
+                inDeps = false;
+            }
+        }
+        return names;
+    }
+
+    /** The package name a block heads (the identifier before the range in its first selector). */
+    private static String blockName(String block) {
+        String descriptor = representative(block);
+        int at = descriptor.lastIndexOf('@');
+        return at > 0 ? descriptor.substring(0, at) : descriptor;
     }
 
     /** Insert each added closure member as a new, {@code sortAlpha}-positioned block (blank-line separated). */
@@ -159,7 +209,36 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             body = replaceFieldLine(body, "  integrity ", "  integrity " + maybeWrap(nonNull(edit.getNewIntegrity(), edit)));
         }
         body = rewriteDepsSection(body, edit.getNewDependencies());
+        if (edit.isPrunesOrphans()) {
+            body = dropOrphanedDeps(body, edit.getNewDependencies());
+        }
         return newHeader + body;
+    }
+
+    /** Drop every {@code dependencies:} line whose edge the bump removed, and the section header if it empties. */
+    private static String dropOrphanedDeps(String body, @Nullable Map<String, String> newDeps) {
+        Set<String> keep = newDeps == null ? Collections.emptySet() : newDeps.keySet();
+        String[] lines = body.split("\n", -1);
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].equals("  dependencies:")) {
+                List<String> kept = new ArrayList<>();
+                int j = i + 1;
+                for (; j < lines.length && lines[j].startsWith("    "); j++) {
+                    if (keep.contains(unwrap(lines[j].trim().split("\\s+", 2)[0]))) {
+                        kept.add(lines[j]);
+                    }
+                }
+                if (!kept.isEmpty()) {
+                    out.add(lines[i]);
+                    out.addAll(kept);
+                }
+                i = j - 1;
+            } else {
+                out.add(lines[i]);
+            }
+        }
+        return String.join("\n", out);
     }
 
     /** A cascade re-pins the changed dependency constraints in the bumped block's {@code dependencies:} section. */
@@ -452,6 +531,19 @@ public final class YarnClassicLockPatcher implements LockPatcher {
                 }
             }
             return -1;
+        }
+
+        int indexOfName(String name) {
+            for (int i = 0; i < blocks.size(); i++) {
+                if (blockName(blocks.get(i)).equals(name)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        void retainNames(Set<String> reachable) {
+            blocks.removeIf(block -> !reachable.contains(blockName(block)));
         }
 
         void insertSorted(String block) {

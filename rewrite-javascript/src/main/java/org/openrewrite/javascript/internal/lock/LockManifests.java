@@ -20,7 +20,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Reads the range a recipe re-pinned for a dependency out of the edited {@code package.json}, for the
@@ -58,6 +61,31 @@ final class LockManifests {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** Every dependency name declared in {@code package.json} across all scopes — the roots for orphan GC. */
+    static Set<String> declaredNames(@Nullable String packageJson) {
+        Set<String> names = new LinkedHashSet<>();
+        if (packageJson == null) {
+            return names;
+        }
+        try {
+            JsonNode root = JSON.readTree(packageJson);
+            if (root == null || !root.isObject()) {
+                return names;
+            }
+            for (String scope : SCOPES) {
+                JsonNode s = root.get(scope);
+                if (s != null && s.isObject()) {
+                    for (Iterator<String> it = s.fieldNames(); it.hasNext(); ) {
+                        names.add(it.next());
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // A malformed manifest just yields no roots; the caller keeps every block.
+        }
+        return names;
     }
 
     private static @Nullable String read(JsonNode root, @Nullable String scope, String name) {
