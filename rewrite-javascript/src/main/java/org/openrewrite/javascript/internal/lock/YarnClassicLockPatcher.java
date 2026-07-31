@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -58,7 +60,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         mirrorToYarnpkg = content.contains(YARN_REGISTRY);
         List<PackageEdit> adds = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.isAdded()) {
+            if (edit.getKind() == ADD) {
                 adds.add(edit);
             } else {
                 content = applyEdit(content, edit, edits.getEditedPackageJson());

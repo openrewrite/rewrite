@@ -25,6 +25,8 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -93,15 +95,15 @@ public final class PnpmLockPatcher implements LockPatcher {
         boolean anyRemoval = false;
         boolean anyPrune = false;
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.isAdded()) {
+            if (edit.getKind() == ADD) {
                 root = applyAdd(root, edit, major, newConstraints, addedVersions);
                 continue;
             }
-            if (edit.isContentFork()) {
+            if (edit.getKind() == CONTENT_FORK) {
                 root = applyContentFork(root, edit, major, newConstraints);
                 continue;
             }
-            if (edit.isForcedMove()) {
+            if (edit.getKind() == FORCED_MOVE) {
                 root = applyForcedMove(root, edit, major);
                 continue;
             }
@@ -721,7 +723,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     private static Map<String, String> addedVersions(List<PackageEdit> edits) {
         Map<String, String> versions = new LinkedHashMap<>();
         for (PackageEdit edit : edits) {
-            if (edit.isAdded() && edit.getNewVersion() != null) {
+            if (edit.getKind() == ADD && edit.getNewVersion() != null) {
                 versions.put(edit.getName(), edit.getNewVersion());
             }
         }

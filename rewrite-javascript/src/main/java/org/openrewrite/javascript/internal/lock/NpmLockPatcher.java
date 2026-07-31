@@ -27,6 +27,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
@@ -96,7 +98,7 @@ public final class NpmLockPatcher implements LockPatcher {
         // so the bump's own fork guard (applyLegacyTree) still sees a flat legacy tree.
         List<LegacyNest> legacyNests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.getNestedUnder() != null && !edit.isAdded()) {
+            if (edit.getKind() == REVERSE_NEST) {
                 if (lockfileVersion == 2) {
                     legacyNests.add(captureLegacyNest(root, edit));
                 }
@@ -109,7 +111,7 @@ public final class NpmLockPatcher implements LockPatcher {
             if (edit.getNestedUnder() != null) {
                 continue; // both nest kinds run in their own pass
             }
-            if (edit.isPromoted()) {
+            if (edit.getKind() == PROMOTION) {
                 root = applyPromotion(root, lockfileVersion, editedManifest, edit);
                 continue;
             }
@@ -117,7 +119,7 @@ public final class NpmLockPatcher implements LockPatcher {
                 removals.add(edit);
                 continue;
             }
-            if (edit.isAdded()) {
+            if (edit.getKind() == ADD) {
                 root = applyAdd(root, lockfileVersion, editedManifest, edit);
                 continue;
             }
@@ -140,7 +142,7 @@ public final class NpmLockPatcher implements LockPatcher {
         // A fresh nested add (a new closure member an incompatible top-level pin excludes) inserts after the
         // top-level adds, so applyAdd's flat-placement check never sees the nest being created.
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.getNestedUnder() != null && edit.isAdded()) {
+            if (edit.getKind() == ADD && edit.getNestedUnder() != null) {
                 root = applyNestedAdd(root, lockfileVersion, edit);
             }
         }

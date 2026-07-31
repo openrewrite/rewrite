@@ -22,6 +22,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
+
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.internal.JsonPrinter;
@@ -75,11 +77,11 @@ public final class BunLockPatcher implements LockPatcher {
         List<PackageEdit> freshNests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getNestedUnder() != null) {
-                (edit.isAdded() ? freshNests : relocateNests).add(edit);
+                (edit.getKind() == ADD ? freshNests : relocateNests).add(edit);
             } else if (edit.getNewVersion() == null) {
                 anyRemoval = true;
                 rewrites.add(edit);
-            } else if (edit.isAdded()) {
+            } else if (edit.getKind() == ADD) {
                 adds.add(edit);
             } else {
                 rewrites.add(edit);

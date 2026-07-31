@@ -26,34 +26,26 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The proven-safe set of edits a {@link LockPatcher} applies to a lock file. The engine has already
- * run the closure-safe proof, so a patcher may apply these edits without re-resolving: it only rewrites
- * the named entries and leaves every other byte untouched.
- * <p>
- * Fields that only some formats need are nullable: {@code newShasum}/{@code oldConstraint} are yarn-classic
- * concerns, {@code importerDir} is a workspace concern, and {@code writeThroughMetadata} carries the
- * non-layout-affecting deltas (engines/license/deprecated/bin) the proof lets through instead of failing loud.
+ * The proven-safe edits a {@link LockPatcher} applies to a lock: it rewrites only the named entries and
+ * leaves every other byte untouched, without re-resolving (the engine already ran the closure-safe proof).
  */
 @Value
 public class LockEditSet {
 
-    /** The raw existing lock content, exactly as captured — the patcher's byte-preservation baseline. */
+    /** The raw existing lock, exactly as captured — the patcher's byte-preservation baseline. */
     String existingLockContent;
 
-    /** Path of the lock file, for failure attribution and workspace-member disambiguation. */
+    /** For failure attribution and workspace-member disambiguation. */
     Path lockPath;
 
     PackageManager packageManager;
 
-    /** The edited {@code package.json} content, for patchers that re-pin an importer's declared constraint. */
+    /** For patchers that re-pin an importer's declared constraint. */
     String editedPackageJson;
 
     List<PackageEdit> edits;
 
-    /**
-     * A single package moving from {@code oldVersion} to {@code newVersion}. A removal is expressed with
-     * {@code newVersion == null} (the entry and its byte-exact orphans are dropped by the patcher).
-     */
+    /** A single package moving to {@code newVersion}, or a removal when {@code newVersion == null}. */
     @Value
     @Builder
     public static class PackageEdit {
@@ -65,7 +57,7 @@ public class LockEditSet {
         @Nullable
         String newVersion;
 
-        /** Format-specific resolved locator (npm tarball URL, yarn {@code url#sha1}, …); may be omitted (pnpm default registry). */
+        /** Format-specific resolved locator (npm tarball URL, yarn {@code url#sha1}, …); omitted for pnpm's default registry. */
         @Nullable
         String newResolved;
 
@@ -73,11 +65,11 @@ public class LockEditSet {
         @Nullable
         String newIntegrity;
 
-        /** {@code dist.shasum} (sha1) for the new version — yarn-classic records this in its {@code resolved} suffix. */
+        /** {@code dist.shasum} (sha1) — yarn-classic records this in its {@code resolved} suffix. */
         @Nullable
         String newShasum;
 
-        /** The new version's {@code dependencies} (name → constraint). Unchanged from the old by construction of the proof. */
+        /** The new version's {@code dependencies} (name → constraint). */
         @Nullable
         Map<String, String> newDependencies;
 
@@ -85,14 +77,11 @@ public class LockEditSet {
         @Nullable
         Map<String, String> newOptionalDependencies;
 
-        /** Non-layout-affecting deltas the proof allows to be written through rather than failing loud. */
+        /** Non-layout deltas the proof writes through rather than failing loud. */
         @Nullable
         WriteThroughMetadata writeThroughMetadata;
 
-        /**
-         * The pre-edit declared constraint, so yarn-classic can split a moving selector out of a merged header
-         * ({@code "a@^1", "a@~1.2":}) instead of renaming the whole header.
-         */
+        /** Pre-edit constraint, so yarn-classic can split a moving selector out of a merged header rather than renaming it. */
         @Nullable
         String oldConstraint;
 
@@ -103,62 +92,31 @@ public class LockEditSet {
         @Nullable
         String importerDir;
 
-        /**
-         * A brand-new dependency the recipe added (Phase B). The patcher inserts a new entry rather than
-         * rewriting an existing one; {@code oldVersion} is empty. Only a scalar-only leaf is emitted so far.
-         */
-        boolean added;
+        /** What kind of edit this is; the patcher dispatches on it. A removal is a {@code BUMP} with {@code newVersion == null}. */
+        @Builder.Default
+        Kind kind = Kind.BUMP;
 
-        /**
-         * A transitive forced to move by a direct-dependency bump whose changed edges no longer satisfy its
-         * pinned version (Phase B cascade). pnpm keys by resolved version, so the patcher renames the moved
-         * entry and retargets every snapshot reference; other formats update the placement in place.
-         */
-        boolean forcedMove;
-
-        /**
-         * The dependent package a second, nested copy of this package is placed under (Phase B I5). A direct
-         * bump takes the top-level slot; a reverse-dependent whose recorded constraint excludes the new version
-         * keeps the old version nested at {@code node_modules/<nestedUnder>/node_modules/<name>} (v2 also under
-         * the legacy tree). The patcher relocates the pre-edit entry byte-for-byte — {@code oldVersion} names it.
-         */
+        /** The dependent a nested copy sits under; set for an {@code ADD}'s nested variant and for {@code REVERSE_NEST}. */
         @Nullable
         String nestedUnder;
 
-        /**
-         * pnpm's answer to reverse-dependent nesting (Phase B I5): pnpm is content-addressed and never nests, so
-         * instead of renaming the moved entry the patcher <b>adds</b> the new version's content
-         * ({@code packages}+{@code snapshots}) and <b>retains</b> the old one for the reverse-dependent, then
-         * retargets only the importer edge. The old {@code oldVersion} content is left byte-for-byte untouched.
-         */
-        boolean contentFork;
-
-        /**
-         * The bumped version's {@code dependencies} dropped one or more edges (Phase B orphan-prune). The patcher
-         * removes the dropped keys from this entry's {@code dependencies}/{@code requires} map and, after applying
-         * the bump, garbage-collects every installed entry the dropped edges leave unreachable.
-         */
+        /** The bump dropped one or more edges: drop them from this entry, then GC whatever they leave unreachable. */
         boolean prunesOrphans;
 
-        /**
-         * The added dependency was already installed as a satisfying transitive (Phase B). npm keeps the existing
-         * {@code node_modules/<name>} entry untouched and only writes the importer's declared constraint; the
-         * patcher inserts that edge (creating the scope object when absent) and rewrites nothing else.
-         */
-        boolean promoted;
+        /** A {@code PROMOTION} of a dev-only transitive now production-reachable clears {@code "dev": true} (leaf only). */
+        boolean clearDev;
 
         /**
-         * A {@link #promoted} dev-only transitive is now production-reachable, so npm clears {@code "dev": true}
-         * on its install entry. Only set for a leaf (no subtree dev flags to propagate); v2 legacy trees fail loud.
+         * ADD is a brand-new dependency; ADD with a {@link #nestedUnder} is a fresh nested add. FORCED_MOVE is a
+         * transitive a bump pushes to a new version; CONTENT_FORK is pnpm's non-nesting fork; PROMOTION reuses an
+         * already-installed transitive; REVERSE_NEST relocates a pre-edit entry under a dependent.
          */
-        boolean clearDev;
+        public enum Kind { BUMP, ADD, PROMOTION, FORCED_MOVE, CONTENT_FORK, REVERSE_NEST }
     }
 
     /**
-     * The metadata tier a real {@code npm}/{@code pnpm} bump patches cleanly without reshaping the tree, so the
-     * engine writes the new values through instead of failing loud. Only fields that actually changed are non-null.
-     * For a leaf add (Phase B I1-follow) the object/array fields below carry the leaf's serialized metadata; the
-     * engine has already normalized/vetted them, so the patcher renders each value as-is at npm's indentation.
+     * The metadata a bump patches cleanly without reshaping the tree (engines/license/deprecated/bin/funding, plus a
+     * leaf add's serialized metadata). Only changed fields are non-null; the engine has already normalized them.
      */
     @Value
     @Builder
@@ -166,11 +124,7 @@ public class LockEditSet {
         @Nullable
         Map<String, String> engines;
 
-        /**
-         * The bump changed the {@code engines} surface (added, changed, or removed it). Distinguishes an
-         * engines-removal ({@link #engines} {@code null} but a real delta) from "no engines change" so the npm
-         * patcher removes a stale {@code engines} member instead of silently keeping it.
-         */
+        /** Distinguishes an engines removal ({@link #engines} null but changed) from no change. */
         boolean enginesChanged;
 
         @Nullable
@@ -195,18 +149,14 @@ public class LockEditSet {
         @Nullable
         Boolean hasInstallScript;
 
-        /** {@code funding} node, already normalized by the engine to npm's object form ({@code {url: ...}}). */
+        /** {@code funding}, normalized to npm's object form ({@code {url: ...}}). */
         @Nullable
         JsonNode funding;
 
-        /**
-         * The bump changed the {@code funding} surface (added, changed, or removed it). Distinguishes a
-         * funding-removal ({@link #funding} {@code null} but a real delta) from "no funding change" so the npm
-         * patcher removes a stale {@code funding} member instead of silently keeping it (mirrors {@link #enginesChanged}).
-         */
+        /** Distinguishes a funding removal ({@link #funding} null but changed) from no change. */
         boolean fundingChanged;
 
-        /** A closure member's {@code peerDependencies} map, copied verbatim into the lock entry (object group). */
+        /** A closure member's {@code peerDependencies} map, copied verbatim (object group). */
         @Nullable
         Map<String, String> peerDependencies;
 

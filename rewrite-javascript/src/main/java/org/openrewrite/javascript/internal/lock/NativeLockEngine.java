@@ -53,6 +53,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
+
 /**
  * The shared, package-manager-agnostic orchestrator for native lock regeneration. It diffs the
  * pre-edit and post-edit {@code package.json} to scope the change to the declared dependencies the
@@ -370,7 +372,7 @@ public final class NativeLockEngine {
                 .writeThroughMetadata(writeThrough(PackageManager.Npm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
-                .forcedMove(true)
+                .kind(FORCED_MOVE)
                 .build();
     }
 
@@ -553,7 +555,7 @@ public final class NativeLockEngine {
                 .writeThroughMetadata(writeThrough(PackageManager.Pnpm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
-                .forcedMove(true)
+                .kind(FORCED_MOVE)
                 .build();
     }
 
@@ -620,7 +622,7 @@ public final class NativeLockEngine {
                 .writeThroughMetadata(pnpmLeafMetadata(newManifest))
                 .scope(change.scope)
                 .importerDir(findImporterDir(PackageManager.Pnpm, lock, name, change.oldConstraint))
-                .contentFork(true)
+                .kind(CONTENT_FORK)
                 .build());
     }
 
@@ -839,7 +841,7 @@ public final class NativeLockEngine {
                     .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
-                    .added(true)
+                    .kind(ADD)
                     .writeThroughMetadata(leafMetadata(p.manifest))
                     .build());
         }
@@ -854,7 +856,7 @@ public final class NativeLockEngine {
                     .newShasum(dist.getShasum())
                     .scope(np.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
-                    .added(true)
+                    .kind(ADD)
                     .nestedUnder(np.parent)
                     .writeThroughMetadata(leafMetadata(np.manifest))
                     .build());
@@ -892,7 +894,7 @@ public final class NativeLockEngine {
                 .newVersion(version)
                 .scope(scope)
                 .importerDir(null)
-                .promoted(true)
+                .kind(PROMOTION)
                 .clearDev(clearDev)
                 .build();
     }
@@ -1014,7 +1016,7 @@ public final class NativeLockEngine {
                     .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
-                    .added(true)
+                    .kind(ADD)
                     .writeThroughMetadata(pnpmLeafMetadata(p.manifest))
                     .build());
         }
@@ -1102,7 +1104,7 @@ public final class NativeLockEngine {
                     .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
-                    .added(true)
+                    .kind(ADD)
                     .build());
         }
         for (NestedPlacement np : nested.values()) {
@@ -1114,7 +1116,7 @@ public final class NativeLockEngine {
                     .newIntegrity(dist.getIntegrity())
                     .scope(np.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
-                    .added(true)
+                    .kind(ADD)
                     .nestedUnder(np.parent)
                     .build());
         }
@@ -1227,7 +1229,7 @@ public final class NativeLockEngine {
                     .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
-                    .added(true)
+                    .kind(ADD)
                     .build());
         }
         return edits;
@@ -1706,6 +1708,7 @@ public final class NativeLockEngine {
                 .oldVersion(oldVersion)
                 .newVersion(oldVersion)
                 .scope("dependencies")
+                .kind(REVERSE_NEST)
                 .nestedUnder(dependentName)
                 .build());
     }
@@ -1831,6 +1834,7 @@ public final class NativeLockEngine {
                 .oldVersion(oldVersion)
                 .newVersion(oldVersion)
                 .scope("dependencies")
+                .kind(REVERSE_NEST)
                 .nestedUnder(dependent)
                 .build());
     }

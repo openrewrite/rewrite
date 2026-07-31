@@ -126,7 +126,7 @@ class PnpmLockPatcherTest {
                 PackageManager.Pnpm, read("/lock/pnpm/add-leaf/pkg-after"),
                 singletonList(PackageEdit.builder()
                         .name("is-number").oldVersion("").newVersion("7.0.0").newIntegrity(IS_NUMBER_700)
-                        .scope("dependencies").added(true)
+                        .scope("dependencies").kind(PackageEdit.Kind.ADD)
                         .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=0.12.0")).build())
                         .build()));
         assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/add-leaf/after"));
@@ -140,12 +140,12 @@ class PnpmLockPatcherTest {
                         PackageEdit.builder()
                                 .name("is-odd").oldVersion("").newVersion("3.0.1").newIntegrity(IS_ODD_301)
                                 .newDependencies(Collections.singletonMap("is-number", "^6.0.0"))
-                                .scope("dependencies").added(true)
+                                .scope("dependencies").kind(PackageEdit.Kind.ADD)
                                 .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=4")).build())
                                 .build(),
                         PackageEdit.builder()
                                 .name("is-number").oldVersion("").newVersion("6.0.0").newIntegrity(IS_NUMBER_600)
-                                .scope("dependencies").added(true)
+                                .scope("dependencies").kind(PackageEdit.Kind.ADD)
                                 .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=0.10.0")).build())
                                 .build()));
         assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/add-closure/after"));
@@ -158,7 +158,7 @@ class PnpmLockPatcherTest {
                     PackageManager.Pnpm, "{\"dependencies\":{\"is-number\":\"^7.0.0\"}}",
                     singletonList(PackageEdit.builder()
                             .name("is-number").oldVersion("").newVersion("7.0.0").newIntegrity(IS_NUMBER_700)
-                            .scope("dependencies").added(true).build()));
+                            .scope("dependencies").kind(PackageEdit.Kind.ADD).build()));
             new PnpmLockPatcher().patch(edits);
         }).isInstanceOfSatisfying(EngineFailure.class,
                 e -> assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED));

@@ -132,7 +132,7 @@ class NpmLockPatcherTest {
                 .newIntegrity("sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==")
                 .scope(scope)
                 .importerDir(null)
-                .added(true)
+                .kind(PackageEdit.Kind.ADD)
                 .writeThroughMetadata(LockEditSet.WriteThroughMetadata.builder()
                         .license("WTFPL")
                         .deprecated("use String.prototype.padStart()")
@@ -180,7 +180,7 @@ class NpmLockPatcherTest {
                 .newIntegrity(integrity)
                 .scope("dependencies")
                 .importerDir(null)
-                .added(true);
+                .kind(PackageEdit.Kind.ADD);
     }
 
     @Test
