@@ -16,17 +16,10 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,8 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
-import static java.util.Collections.singletonList;
 
 /**
  * Byte-exact patcher for a Yarn Berry {@code yarn.lock} (the {@code __metadata:}-headed YAML format). The file
@@ -55,7 +46,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
 
     @Override
     public String patch(LockEditSet edits) {
-        Yaml.Documents docs = parse(edits.getExistingLockContent(), edits.getLockPath());
+        Yaml.Documents docs = LockYaml.parse(edits.getExistingLockContent(), edits.getLockPath());
         List<Yaml.Document> documents = docs.getDocuments();
         if (documents.isEmpty() || !(documents.get(0).getBlock() instanceof Yaml.Mapping)) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, firstName(edits), "yarn berry lock root is not a mapping");
@@ -147,7 +138,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         body.append("  checksum: ").append(edit.getNewBerryChecksum()).append('\n');
         body.append("  languageName: node\n");
         body.append("  linkType: hard\n");
-        return parseGraftEntry(body.toString(), descriptor);
+        return LockYaml.graft(body.toString(), descriptor);
     }
 
     private Yaml.Mapping insertImporterEdge(Yaml.Mapping root, PackageEdit edit, String constraint) {
@@ -157,17 +148,17 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             return root;
         }
         Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
-        Yaml.Mapping.Entry scopeEntry = findEntry(importerBody, edit.getScope());
+        Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(importerBody, edit.getScope());
         if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     "adding the first " + edit.getScope() + " to a berry importer is deferred");
         }
         Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
-        Yaml.Mapping.Entry depEntry = parseGraftEntry(
+        Yaml.Mapping.Entry depEntry = LockYaml.graft(
                 edit.getScope() + ":\n  " + name + ": \"npm:" + constraint + "\"\n", edit.getScope(), name);
         deps = insertEntrySorted(deps, depEntry, name, 0);
-        importerBody = replaceEntry(importerBody, edit.getScope(), scopeEntry.withValue(deps));
-        return replaceEntry(root, keyOf(importer), importer.withValue(importerBody));
+        importerBody = LockYaml.replaceEntry(importerBody, edit.getScope(), scopeEntry.withValue(deps));
+        return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));
     }
 
     private Yaml.Mapping applyBump(Yaml.Mapping root, PackageEdit edit, @Nullable String editedPackageJson) {
@@ -193,11 +184,11 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         Yaml.Mapping body = (Yaml.Mapping) entry.getValue();
         // The engine proved every non-dependency surface (peer/optional/engines/…) byte-identical, so rewrite only
         // the resolution triple, the importer range, and — for a cascade — the changed dependency constraints.
-        body = setScalar(body, "version", edit.getNewVersion(), name);
-        body = setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion(), name);
-        body = setScalar(body, "checksum", edit.getNewBerryChecksum(), name);
+        body = LockYaml.setScalar(body, "version", edit.getNewVersion());
+        body = LockYaml.setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion());
+        body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
         body = rewriteDependencies(body, edit.getNewDependencies(), name);
-        root = replaceEntry(root, oldDescriptor, renameKey(entry, newDescriptor).withValue(body));
+        root = LockYaml.replaceEntry(root, oldDescriptor, LockYaml.renameKey(entry, newDescriptor).withValue(body));
 
         return repinImporter(root, name, newConstraint);
     }
@@ -214,11 +205,11 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         String oldDescriptor = name + "@npm:" + edit.getOldConstraint();
         Yaml.Mapping.Entry entry = findSingleDescriptor(root, oldDescriptor, name);
         Yaml.Mapping body = (Yaml.Mapping) entry.getValue();
-        body = setScalar(body, "version", edit.getNewVersion(), name);
-        body = setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion(), name);
-        body = setScalar(body, "checksum", edit.getNewBerryChecksum(), name);
-        return replaceEntry(root, oldDescriptor,
-                renameKey(entry, name + "@npm:" + edit.getNewConstraint()).withValue(body));
+        body = LockYaml.setScalar(body, "version", edit.getNewVersion());
+        body = LockYaml.setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion());
+        body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
+        return LockYaml.replaceEntry(root, oldDescriptor,
+                LockYaml.renameKey(entry, name + "@npm:" + edit.getNewConstraint()).withValue(body));
     }
 
     /** Re-pin each already-present dependency constraint in the bumped entry to the new manifest's {@code npm:} range. */
@@ -226,7 +217,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (newDeps == null || newDeps.isEmpty()) {
             return body;
         }
-        Yaml.Mapping.Entry depsEntry = findEntry(body, "dependencies");
+        Yaml.Mapping.Entry depsEntry = LockYaml.findEntry(body, "dependencies");
         if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
             return body;
         }
@@ -237,15 +228,15 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                         name + " no longer depends on " + depName + " (orphan prune) not yet supported for berry");
             }
-            deps = setScalar(deps, depName, "npm:" + range, name);
+            deps = LockYaml.setScalar(deps, depName, "npm:" + range);
         }
-        return replaceEntry(body, "dependencies", depsEntry.withValue(deps));
+        return LockYaml.replaceEntry(body, "dependencies", depsEntry.withValue(deps));
     }
 
     private static List<String> depNames(Yaml.Mapping deps) {
         List<String> names = new ArrayList<>();
         for (Yaml.Mapping.Entry entry : deps.getEntries()) {
-            String key = keyOf(entry);
+            String key = LockYaml.keyOf(entry);
             if (key != null) {
                 names.add(key);
             }
@@ -261,21 +252,21 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         }
         Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
         for (String scope : IMPORTER_SCOPES) {
-            Yaml.Mapping.Entry scopeEntry = findEntry(importerBody, scope);
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(importerBody, scope);
             if (scopeEntry != null && scopeEntry.getValue() instanceof Yaml.Mapping &&
-                    findEntry((Yaml.Mapping) scopeEntry.getValue(), name) != null) {
-                Yaml.Mapping newScope = setScalar((Yaml.Mapping) scopeEntry.getValue(), name, "npm:" + newConstraint, name);
-                importerBody = replaceEntry(importerBody, scope, scopeEntry.withValue(newScope));
+                    LockYaml.findEntry((Yaml.Mapping) scopeEntry.getValue(), name) != null) {
+                Yaml.Mapping newScope = LockYaml.setScalar((Yaml.Mapping) scopeEntry.getValue(), name, "npm:" + newConstraint);
+                importerBody = LockYaml.replaceEntry(importerBody, scope, scopeEntry.withValue(newScope));
             }
         }
-        return replaceEntry(root, keyOf(importer), importer.withValue(importerBody));
+        return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));
     }
 
     /** The lone {@code @workspace:} importer entry, or {@code null} if none; multiple importers defer. */
     private static Yaml.Mapping.@Nullable Entry singleImporter(Yaml.Mapping root, String name) {
         Yaml.Mapping.Entry importer = null;
         for (Yaml.Mapping.Entry e : root.getEntries()) {
-            String key = keyOf(e);
+            String key = LockYaml.keyOf(e);
             if (key != null && key.contains("@workspace:") && e.getValue() instanceof Yaml.Mapping) {
                 if (importer != null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -298,7 +289,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         Yaml.Mapping.Entry placed = newEntry.withPrefix(entries.get(entries.size() - 1).getPrefix());
         int idx = entries.size();
         for (int i = firstSortable; i < entries.size(); i++) {
-            String k = keyOf(entries.get(i));
+            String k = LockYaml.keyOf(entries.get(i));
             if (k != null && k.compareTo(newKey) > 0) {
                 idx = i;
                 break;
@@ -311,30 +302,10 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         return mapping.withEntries(out);
     }
 
-    private Yaml.Mapping.Entry parseGraftEntry(String synthetic, String... path) {
-        Yaml.Documents docs = parse(synthetic, null);
-        if (docs.getDocuments().isEmpty() || !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Mapping)) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct berry lock entry");
-        }
-        Yaml.Mapping mapping = (Yaml.Mapping) docs.getDocuments().get(0).getBlock();
-        for (int i = 0; i < path.length - 1; i++) {
-            Yaml.Mapping.Entry entry = findEntry(mapping, path[i]);
-            if (entry == null || !(entry.getValue() instanceof Yaml.Mapping)) {
-                throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not navigate synthetic entry at " + path[i]);
-            }
-            mapping = (Yaml.Mapping) entry.getValue();
-        }
-        Yaml.Mapping.Entry leaf = findEntry(mapping, path[path.length - 1]);
-        if (leaf == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct berry entry " + path[path.length - 1]);
-        }
-        return leaf;
-    }
-
     /** Find the entry whose key is exactly {@code descriptor}; fail loud on a merged (comma-joined) key. */
     private static Yaml.Mapping.Entry findSingleDescriptor(Yaml.Mapping root, String descriptor, String name) {
         for (Yaml.Mapping.Entry entry : root.getEntries()) {
-            String key = keyOf(entry);
+            String key = LockYaml.keyOf(entry);
             if (key == null || !(entry.getValue() instanceof Yaml.Mapping)) {
                 continue;
             }
@@ -351,60 +322,6 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             }
         }
         throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no berry entry for " + descriptor);
-    }
-
-    // --- YAML LST helpers (mirror PnpmLockPatcher; a shared LockYaml can absorb these) ------------------
-
-    private static Yaml.Documents parse(String content, @Nullable Path lockPath) {
-        Path path = lockPath == null ? Paths.get("yarn.lock") : lockPath;
-        SourceFile source;
-        try {
-            ExecutionContext ctx = new InMemoryExecutionContext();
-            Parser.Input input = Parser.Input.fromString(path, content);
-            source = new YamlParser().parseInputs(singletonList(input), null, ctx).findFirst().orElse(null);
-        } catch (RuntimeException e) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "unparseable yarn.lock: " + e.getMessage());
-        }
-        if (!(source instanceof Yaml.Documents)) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "yarn.lock could not be parsed as YAML");
-        }
-        return (Yaml.Documents) source;
-    }
-
-    private static @Nullable String keyOf(Yaml.Mapping.Entry entry) {
-        return entry.getKey() instanceof Yaml.Scalar ? ((Yaml.Scalar) entry.getKey()).getValue() : null;
-    }
-
-    private static Yaml.Mapping.@Nullable Entry findEntry(Yaml.Mapping mapping, String key) {
-        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            if (key.equals(keyOf(entry))) {
-                return entry;
-            }
-        }
-        return null;
-    }
-
-    private static Yaml.Mapping replaceEntry(Yaml.Mapping mapping, @Nullable String key, Yaml.Mapping.Entry replacement) {
-        List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-        for (int i = 0; i < entries.size(); i++) {
-            if (key != null && key.equals(keyOf(entries.get(i)))) {
-                entries.set(i, replacement);
-                return mapping.withEntries(entries);
-            }
-        }
-        return mapping;
-    }
-
-    private static Yaml.Mapping.Entry renameKey(Yaml.Mapping.Entry entry, String newKey) {
-        return entry.withKey(((Yaml.Scalar) entry.getKey()).withValue(newKey));
-    }
-
-    private static Yaml.Mapping setScalar(Yaml.Mapping mapping, String key, String value, String name) {
-        Yaml.Mapping.Entry entry = findEntry(mapping, key);
-        if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "expected scalar entry '" + key + "' for " + name);
-        }
-        return replaceEntry(mapping, key, entry.withValue(((Yaml.Scalar) entry.getValue()).withValue(value)));
     }
 
     private static @Nullable String firstName(LockEditSet edits) {

@@ -18,18 +18,11 @@ package org.openrewrite.javascript.internal.lock;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
-import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 
-import static java.util.Collections.singletonList;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
@@ -71,7 +63,7 @@ public final class PnpmLockPatcher implements LockPatcher {
 
     @Override
     public String patch(LockEditSet edits) {
-        Yaml.Documents docs = parse(edits.getExistingLockContent(), edits.getLockPath());
+        Yaml.Documents docs = LockYaml.parse(edits.getExistingLockContent(), edits.getLockPath());
         List<Yaml.Document> documents = docs.getDocuments();
         if (documents.isEmpty() || !(documents.get(0).getBlock() instanceof Yaml.Mapping)) {
             throw fail(Reason.MALFORMED_LOCK, firstName(edits), "pnpm-lock.yaml root is not a mapping");
@@ -201,7 +193,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         String editedDir = importerDir(edit);
         for (Yaml.Mapping.Entry importer : importers.getEntries()) {
-            if (editedDir.equals(keyOf(importer)) || !(importer.getValue() instanceof Yaml.Mapping)) {
+            if (editedDir.equals(LockYaml.keyOf(importer)) || !(importer.getValue() instanceof Yaml.Mapping)) {
                 continue;
             }
             String version = depVersion((Yaml.Mapping) importer.getValue(), edit.getName());
@@ -221,7 +213,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         String ownKey = major >= 9 ? name + "@" + oldV : "/" + name + "@" + oldV;
         for (Yaml.Mapping.Entry entry : graph.getEntries()) {
-            String key = keyOf(entry);
+            String key = LockYaml.keyOf(entry);
             if (key == null || ownKey.equals(key) || key.startsWith(ownKey + "(")) {
                 continue;
             }
@@ -238,9 +230,9 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         Yaml.Mapping mapping = (Yaml.Mapping) body;
         for (String depScope : Arrays.asList("dependencies", "optionalDependencies")) {
-            Yaml.Mapping.Entry scope = findEntry(mapping, depScope);
+            Yaml.Mapping.Entry scope = LockYaml.findEntry(mapping, depScope);
             if (scope != null && scope.getValue() instanceof Yaml.Mapping) {
-                Yaml.Mapping.Entry dep = findEntry((Yaml.Mapping) scope.getValue(), name);
+                Yaml.Mapping.Entry dep = LockYaml.findEntry((Yaml.Mapping) scope.getValue(), name);
                 if (dep != null && dep.getValue() instanceof Yaml.Scalar) {
                     String version = ((Yaml.Scalar) dep.getValue()).getValue();
                     if (version.equals(oldV) || version.startsWith(oldV + "(")) {
@@ -274,7 +266,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             return patchScopes(root, edit, removal, newConstraints); // single-package v6
         }
         String dir = importerDir(edit);
-        Yaml.Mapping.Entry importer = findEntry(importers, dir);
+        Yaml.Mapping.Entry importer = LockYaml.findEntry(importers, dir);
         if (importer == null || !(importer.getValue() instanceof Yaml.Mapping)) {
             if (removal) {
                 return root;
@@ -289,12 +281,12 @@ public final class PnpmLockPatcher implements LockPatcher {
     private Yaml.Mapping patchScopes(Yaml.Mapping scopes, PackageEdit edit, boolean removal,
                                      Map<String, String> newConstraints) {
         for (String scope : LOCK_SCOPES) {
-            Yaml.Mapping.Entry scopeEntry = findEntry(scopes, scope);
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(scopes, scope);
             if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
                 continue;
             }
             Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
-            Yaml.Mapping.Entry dep = findEntry(deps, edit.getName());
+            Yaml.Mapping.Entry dep = LockYaml.findEntry(deps, edit.getName());
             if (dep == null) {
                 continue;
             }
@@ -307,9 +299,9 @@ public final class PnpmLockPatcher implements LockPatcher {
             Yaml.Mapping body = (Yaml.Mapping) dep.getValue();
             String newSpecifier = newConstraints.get(edit.getName());
             if (newSpecifier != null) {
-                body = setScalar(body, "specifier", newSpecifier);
+                body = LockYaml.setScalar(body, "specifier", newSpecifier);
             }
-            body = setScalar(body, "version", edit.getNewVersion());
+            body = LockYaml.setScalar(body, "version", edit.getNewVersion());
             Yaml.Mapping patchedDeps = replaceEntryValue(deps, edit.getName(), body);
             return replaceEntryValue(scopes, scope, patchedDeps);
         }
@@ -331,18 +323,18 @@ public final class PnpmLockPatcher implements LockPatcher {
             }
             return replaceEntryValue(root, "packages", removeEntries(packages, oldKey));
         }
-        Yaml.Mapping.Entry pkg = findEntry(packages, oldKey);
+        Yaml.Mapping.Entry pkg = LockYaml.findEntry(packages, oldKey);
         if (pkg == null) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no packages entry " + oldKey);
         }
-        Yaml.Mapping.Entry renamed = renameKey(pkg, packageKey(edit.getName(), edit.getNewVersion(), major));
+        Yaml.Mapping.Entry renamed = LockYaml.renameKey(pkg, packageKey(edit.getName(), edit.getNewVersion(), major));
         if (renamed.getValue() instanceof Yaml.Mapping) {
             Yaml.Mapping body = (Yaml.Mapping) renamed.getValue();
             body = editResolution(body, edit);
             body = editEngines(body, edit);
             renamed = renamed.withValue(body);
         }
-        return replaceEntryValue(root, "packages", replaceEntry(packages, oldKey, renamed));
+        return replaceEntryValue(root, "packages", LockYaml.replaceEntry(packages, oldKey, renamed));
     }
 
     private Yaml.Mapping patchSnapshots(Yaml.Mapping root, PackageEdit edit, boolean removal) {
@@ -357,15 +349,15 @@ public final class PnpmLockPatcher implements LockPatcher {
             }
             return replaceEntryValue(root, "snapshots", removeEntries(snapshots, oldKey));
         }
-        Yaml.Mapping.Entry snapshot = findEntry(snapshots, oldKey);
+        Yaml.Mapping.Entry snapshot = LockYaml.findEntry(snapshots, oldKey);
         if (snapshot == null) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no snapshots entry " + oldKey);
         }
-        Yaml.Mapping.Entry renamed = renameKey(snapshot, edit.getName() + "@" + edit.getNewVersion());
+        Yaml.Mapping.Entry renamed = LockYaml.renameKey(snapshot, edit.getName() + "@" + edit.getNewVersion());
         if (edit.isPrunesOrphans()) {
             renamed = pruneSnapshotEdges(renamed, edit);
         }
-        return replaceEntryValue(root, "snapshots", replaceEntry(snapshots, oldKey, renamed));
+        return replaceEntryValue(root, "snapshots", LockYaml.replaceEntry(snapshots, oldKey, renamed));
     }
 
     /**
@@ -381,7 +373,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         String newKey = edit.getName() + "@" + edit.getNewVersion();
         List<Yaml.Mapping.Entry> scopes = new ArrayList<>();
         for (Yaml.Mapping.Entry scopeEntry : ((Yaml.Mapping) snapshot.getValue()).getEntries()) {
-            String scope = keyOf(scopeEntry);
+            String scope = LockYaml.keyOf(scopeEntry);
             if (!"dependencies".equals(scope) && !"optionalDependencies".equals(scope)) {
                 throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                         edit.getName() + " snapshot carries " + scope + "; orphan-prune not yet supported");
@@ -392,7 +384,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             }
             List<Yaml.Mapping.Entry> survivors = new ArrayList<>();
             for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
-                if (keep.contains(keyOf(dep))) {
+                if (keep.contains(LockYaml.keyOf(dep))) {
                     survivors.add(dep);
                 }
             }
@@ -403,7 +395,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (scopes.isEmpty()) {
             // Keep the renamed entry (its key prefix carries the blank-line separator) and swap only the value
             // to an empty flow mapping {}, borrowed from a parsed template.
-            return snapshot.withValue(parseGraftEntry("snapshots:\n  " + newKey + ": {}\n", "snapshots", newKey).getValue());
+            return snapshot.withValue(LockYaml.graft("snapshots:\n  " + newKey + ": {}\n", "snapshots", newKey).getValue());
         }
         return snapshot.withValue(((Yaml.Mapping) snapshot.getValue()).withEntries(scopes));
     }
@@ -412,7 +404,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (edit.getNewIntegrity() == null) {
             return body;
         }
-        Yaml.Mapping.Entry entry = findEntry(body, "resolution");
+        Yaml.Mapping.Entry entry = LockYaml.findEntry(body, "resolution");
         if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
             // A block-style resolution map is not the flow-scalar this patcher rewrites integrity inside;
             // silently keeping the OLD integrity would emit a lock a real install rejects.
@@ -424,7 +416,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (edit.getNewResolved() != null && value.contains("tarball:")) {
             value = replaceToken(value, "tarball", edit.getNewResolved());
         }
-        return replaceEntry(body, "resolution", entry.withValue(scalar.withValue(value)));
+        return LockYaml.replaceEntry(body, "resolution", entry.withValue(scalar.withValue(value)));
     }
 
     private Yaml.Mapping editEngines(Yaml.Mapping body, PackageEdit edit) {
@@ -432,12 +424,12 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (metadata == null || metadata.getEngines() == null) {
             return body;
         }
-        Yaml.Mapping.Entry entry = findEntry(body, "engines");
+        Yaml.Mapping.Entry entry = LockYaml.findEntry(body, "engines");
         if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
             return body; // engines absent in the raw entry — cannot synthesize the flow map safely
         }
         Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
-        return replaceEntry(body, "engines", entry.withValue(scalar.withValue(renderEngines(metadata.getEngines()))));
+        return LockYaml.replaceEntry(body, "engines", entry.withValue(scalar.withValue(renderEngines(metadata.getEngines()))));
     }
 
     /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled, so fail loud rather than silently drop them. */
@@ -500,17 +492,17 @@ public final class PnpmLockPatcher implements LockPatcher {
     private Yaml.Mapping retargetDepReference(Yaml.Mapping body, String dep, String oldVersion, String newVersion) {
         Yaml.Mapping result = body;
         for (String scope : Arrays.asList("dependencies", "optionalDependencies")) {
-            Yaml.Mapping.Entry scopeEntry = findEntry(result, scope);
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(result, scope);
             if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
                 continue;
             }
             Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
-            Yaml.Mapping.Entry ref = findEntry(deps, dep);
+            Yaml.Mapping.Entry ref = LockYaml.findEntry(deps, dep);
             if (ref == null || !(ref.getValue() instanceof Yaml.Scalar) ||
                     !oldVersion.equals(((Yaml.Scalar) ref.getValue()).getValue())) {
                 continue;
             }
-            Yaml.Mapping patchedDeps = setScalar(deps, dep, newVersion);
+            Yaml.Mapping patchedDeps = LockYaml.setScalar(deps, dep, newVersion);
             result = replaceEntryValue(result, scope, patchedDeps);
         }
         return result;
@@ -538,7 +530,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (packages == null) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no packages section");
         }
-        if (findEntry(packages, key) != null) {
+        if (LockYaml.findEntry(packages, key) != null) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
         }
         packages = insertEntrySorted(packages, buildPackagesEntry(edit, key), key);
@@ -548,7 +540,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (snapshots == null) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no snapshots section");
         }
-        if (findEntry(snapshots, key) != null) {
+        if (LockYaml.findEntry(snapshots, key) != null) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present in snapshots; dedupe required");
         }
         snapshots = insertEntrySorted(snapshots, buildSnapshotEntry(edit, key, Collections.emptyMap()), key);
@@ -579,7 +571,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (packages == null) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no packages section");
         }
-        if (findEntry(packages, key) != null) {
+        if (LockYaml.findEntry(packages, key) != null) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
         }
         packages = insertEntrySorted(packages, buildPackagesEntry(edit, key), key);
@@ -589,7 +581,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (snapshots == null) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no snapshots section");
         }
-        if (findEntry(snapshots, key) != null) {
+        if (LockYaml.findEntry(snapshots, key) != null) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present in snapshots; dedupe required");
         }
         snapshots = insertEntrySorted(snapshots, buildSnapshotEntry(edit, key, addedVersions), key);
@@ -611,13 +603,13 @@ public final class PnpmLockPatcher implements LockPatcher {
             body.append("\n    engines: ").append(renderEngines(wt.getEngines()));
         }
         body.append('\n');
-        return parseGraftEntry(body.toString(), "packages", key);
+        return LockYaml.graft(body.toString(), "packages", key);
     }
 
     private Yaml.Mapping.Entry buildSnapshotEntry(PackageEdit edit, String key, Map<String, String> addedVersions) {
         Map<String, String> deps = edit.getNewDependencies();
         if (deps == null || deps.isEmpty()) {
-            return parseGraftEntry("snapshots:\n  " + key + ": {}\n", "snapshots", key);
+            return LockYaml.graft("snapshots:\n  " + key + ": {}\n", "snapshots", key);
         }
         List<String> names = new ArrayList<>(deps.keySet());
         Collections.sort(names);
@@ -631,7 +623,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             body.append("\n      ").append(dep).append(": ").append(resolved);
         }
         body.append('\n');
-        return parseGraftEntry(body.toString(), "snapshots", key);
+        return LockYaml.graft(body.toString(), "snapshots", key);
     }
 
     private Yaml.Mapping insertImporterEdge(Yaml.Mapping root, PackageEdit edit, String specifier) {
@@ -641,49 +633,29 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), "cannot add an importer edge to a single-package lock");
         }
         String dir = importerDir(edit);
-        Yaml.Mapping.Entry importer = findEntry(importers, dir);
+        Yaml.Mapping.Entry importer = LockYaml.findEntry(importers, dir);
         if (importer == null || !(importer.getValue() instanceof Yaml.Mapping)) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no importer '" + dir + "'");
         }
         Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
         String scope = edit.getScope();
-        Yaml.Mapping.Entry scopeEntry = findEntry(importerBody, scope);
+        Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(importerBody, scope);
         if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "adding the first " + scope + " to importer '" + dir + "' is not yet supported");
         }
         Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
-        if (findEntry(deps, edit.getName()) != null) {
+        if (LockYaml.findEntry(deps, edit.getName()) != null) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), edit.getName() + " is already declared in " + scope);
         }
         String body = "importers:\n  " + dir + ":\n    " + scope + ":\n      " + edit.getName() +
                 ":\n        specifier: " + specifier + "\n        version: " + edit.getNewVersion() + '\n';
-        Yaml.Mapping.Entry depEntry = parseGraftEntry(body, "importers", dir, scope, edit.getName());
+        Yaml.Mapping.Entry depEntry = LockYaml.graft(body, "importers", dir, scope, edit.getName());
         deps = insertEntrySorted(deps, depEntry, edit.getName());
         importerBody = replaceEntryValue(importerBody, scope, deps);
         return replaceEntryValue(root, "importers", replaceEntryValue(importers, dir, importerBody));
     }
 
-    /** Build an entry from a synthetic mini-lock so its internal formatting round-trips byte-exact. */
-    private Yaml.Mapping.Entry parseGraftEntry(String synthetic, String... path) {
-        Yaml.Documents docs = parse(synthetic, null);
-        if (docs.getDocuments().isEmpty() || !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Mapping)) {
-            throw fail(Reason.MALFORMED_LOCK, null, "could not construct pnpm lock entry");
-        }
-        Yaml.Mapping mapping = (Yaml.Mapping) docs.getDocuments().get(0).getBlock();
-        for (int i = 0; i < path.length - 1; i++) {
-            Yaml.Mapping.Entry entry = findEntry(mapping, path[i]);
-            if (entry == null || !(entry.getValue() instanceof Yaml.Mapping)) {
-                throw fail(Reason.MALFORMED_LOCK, null, "could not navigate synthetic lock entry at " + path[i]);
-            }
-            mapping = (Yaml.Mapping) entry.getValue();
-        }
-        Yaml.Mapping.Entry leaf = findEntry(mapping, path[path.length - 1]);
-        if (leaf == null) {
-            throw fail(Reason.MALFORMED_LOCK, null, "could not construct pnpm lock entry " + path[path.length - 1]);
-        }
-        return leaf;
-    }
 
     /**
      * Splice {@code newEntry} into {@code mapping} at its lexicographic key position, reusing an existing
@@ -697,7 +669,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         Yaml.Mapping.Entry placed = newEntry.withPrefix(entries.get(0).getPrefix());
         int idx = 0;
         while (idx < entries.size()) {
-            String k = keyOf(entries.get(idx));
+            String k = LockYaml.keyOf(entries.get(idx));
             if (k != null && k.compareTo(newKey) > 0) {
                 break;
             }
@@ -808,7 +780,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             }
         }
         while (!queue.isEmpty()) {
-            Yaml.Mapping.Entry entry = findEntry(graph, queue.poll());
+            Yaml.Mapping.Entry entry = LockYaml.findEntry(graph, queue.poll());
             if (entry == null || !(entry.getValue() instanceof Yaml.Mapping)) {
                 continue;
             }
@@ -827,12 +799,12 @@ public final class PnpmLockPatcher implements LockPatcher {
             return out;
         }
         for (String scope : LOCK_SCOPES) {
-            Yaml.Mapping.Entry scopeEntry = findEntry((Yaml.Mapping) scopesBlock, scope);
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry((Yaml.Mapping) scopesBlock, scope);
             if (scopeEntry != null && scopeEntry.getValue() instanceof Yaml.Mapping) {
                 for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
-                    String name = keyOf(dep);
+                    String name = LockYaml.keyOf(dep);
                     if (name != null && dep.getValue() instanceof Yaml.Mapping) {
-                        Yaml.Mapping.Entry version = findEntry((Yaml.Mapping) dep.getValue(), "version");
+                        Yaml.Mapping.Entry version = LockYaml.findEntry((Yaml.Mapping) dep.getValue(), "version");
                         if (version != null && version.getValue() instanceof Yaml.Scalar) {
                             out.add(prefix + name + "@" + ((Yaml.Scalar) version.getValue()).getValue());
                         }
@@ -846,10 +818,10 @@ public final class PnpmLockPatcher implements LockPatcher {
     private static List<String> graphDepKeys(Yaml.Mapping body, String prefix) {
         List<String> out = new ArrayList<>();
         for (String depScope : Arrays.asList("dependencies", "optionalDependencies")) {
-            Yaml.Mapping.Entry scope = findEntry(body, depScope);
+            Yaml.Mapping.Entry scope = LockYaml.findEntry(body, depScope);
             if (scope != null && scope.getValue() instanceof Yaml.Mapping) {
                 for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scope.getValue()).getEntries()) {
-                    String name = keyOf(dep);
+                    String name = LockYaml.keyOf(dep);
                     if (name != null && dep.getValue() instanceof Yaml.Scalar) {
                         out.add(prefix + name + "@" + ((Yaml.Scalar) dep.getValue()).getValue());
                     }
@@ -862,7 +834,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     private static Yaml.Mapping retainEntries(Yaml.Mapping mapping, Set<String> keep, boolean byBase) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>();
         for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            String key = keyOf(entry);
+            String key = LockYaml.keyOf(entry);
             String probe = key == null ? null : (byBase ? stripSuffix(key) : key);
             if (probe != null && keep.contains(probe)) {
                 entries.add(entry);
@@ -890,7 +862,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (importers == null) {
             return root;
         }
-        Yaml.Mapping.Entry importer = findEntry(importers, importerDir(edit));
+        Yaml.Mapping.Entry importer = LockYaml.findEntry(importers, importerDir(edit));
         return importer != null && importer.getValue() instanceof Yaml.Mapping ? (Yaml.Mapping) importer.getValue() : null;
     }
 
@@ -913,11 +885,11 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         Yaml.Mapping scopes = (Yaml.Mapping) scopesBlock;
         for (String scope : LOCK_SCOPES) {
-            Yaml.Mapping.Entry scopeEntry = findEntry(scopes, scope);
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(scopes, scope);
             if (scopeEntry != null && scopeEntry.getValue() instanceof Yaml.Mapping) {
                 for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) scopeEntry.getValue()).getEntries()) {
                     if (dep.getValue() instanceof Yaml.Mapping) {
-                        Yaml.Mapping.Entry version = findEntry((Yaml.Mapping) dep.getValue(), "version");
+                        Yaml.Mapping.Entry version = LockYaml.findEntry((Yaml.Mapping) dep.getValue(), "version");
                         if (version != null && version.getValue() instanceof Yaml.Scalar) {
                             out.add(((Yaml.Scalar) version.getValue()).getValue());
                         }
@@ -929,11 +901,11 @@ public final class PnpmLockPatcher implements LockPatcher {
 
     private static @Nullable String depVersion(Yaml.Mapping scopes, String name) {
         for (String scope : LOCK_SCOPES) {
-            Yaml.Mapping.Entry scopeEntry = findEntry(scopes, scope);
+            Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(scopes, scope);
             if (scopeEntry != null && scopeEntry.getValue() instanceof Yaml.Mapping) {
-                Yaml.Mapping.Entry dep = findEntry((Yaml.Mapping) scopeEntry.getValue(), name);
+                Yaml.Mapping.Entry dep = LockYaml.findEntry((Yaml.Mapping) scopeEntry.getValue(), name);
                 if (dep != null && dep.getValue() instanceof Yaml.Mapping) {
-                    Yaml.Mapping.Entry version = findEntry((Yaml.Mapping) dep.getValue(), "version");
+                    Yaml.Mapping.Entry version = LockYaml.findEntry((Yaml.Mapping) dep.getValue(), "version");
                     if (version != null && version.getValue() instanceof Yaml.Scalar) {
                         return ((Yaml.Scalar) version.getValue()).getValue();
                     }
@@ -946,7 +918,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     // --- LST mapping helpers ---------------------------------------------
 
     private static Yaml.@Nullable Mapping section(Yaml.Mapping root, String name) {
-        Yaml.Mapping.Entry entry = findEntry(root, name);
+        Yaml.Mapping.Entry entry = LockYaml.findEntry(root, name);
         return entry != null && entry.getValue() instanceof Yaml.Mapping ? (Yaml.Mapping) entry.getValue() : null;
     }
 
@@ -954,7 +926,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         List<String> out = new ArrayList<>();
         if (mapping != null) {
             for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                String key = keyOf(entry);
+                String key = LockYaml.keyOf(entry);
                 if (key != null) {
                     out.add(key);
                 }
@@ -963,35 +935,11 @@ public final class PnpmLockPatcher implements LockPatcher {
         return out;
     }
 
-    private static @Nullable String keyOf(Yaml.Mapping.Entry entry) {
-        return entry.getKey() instanceof Yaml.Scalar ? ((Yaml.Scalar) entry.getKey()).getValue() : null;
-    }
-
-    private static Yaml.Mapping.@Nullable Entry findEntry(Yaml.Mapping mapping, String key) {
-        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            if (key.equals(keyOf(entry))) {
-                return entry;
-            }
-        }
-        return null;
-    }
-
-    private static Yaml.Mapping replaceEntry(Yaml.Mapping mapping, String key, Yaml.Mapping.Entry replacement) {
-        List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-        for (int i = 0; i < entries.size(); i++) {
-            if (key.equals(keyOf(entries.get(i)))) {
-                entries.set(i, replacement);
-                return mapping.withEntries(entries);
-            }
-        }
-        return mapping;
-    }
-
     private static Yaml.Mapping replaceEntryValue(Yaml.Mapping mapping, String key, Yaml.Block value) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
         for (int i = 0; i < entries.size(); i++) {
             Yaml.Mapping.Entry entry = entries.get(i);
-            if (key.equals(keyOf(entry))) {
+            if (key.equals(LockYaml.keyOf(entry))) {
                 entries.set(i, entry.withValue(value));
                 return mapping.withEntries(entries);
             }
@@ -1002,26 +950,11 @@ public final class PnpmLockPatcher implements LockPatcher {
     private static Yaml.Mapping removeEntries(Yaml.Mapping mapping, String key) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>();
         for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            if (!key.equals(keyOf(entry))) {
+            if (!key.equals(LockYaml.keyOf(entry))) {
                 entries.add(entry);
             }
         }
         return mapping.withEntries(entries);
-    }
-
-    private static Yaml.Mapping.Entry renameKey(Yaml.Mapping.Entry entry, String newKey) {
-        if (!(entry.getKey() instanceof Yaml.Scalar)) {
-            throw fail(Reason.MALFORMED_LOCK, null, "cannot rename a non-scalar key");
-        }
-        return entry.withKey(((Yaml.Scalar) entry.getKey()).withValue(newKey));
-    }
-
-    private static Yaml.Mapping setScalar(Yaml.Mapping mapping, String key, String value) {
-        Yaml.Mapping.Entry entry = findEntry(mapping, key);
-        if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
-            throw fail(Reason.MALFORMED_LOCK, null, "expected scalar entry '" + key + "'");
-        }
-        return replaceEntry(mapping, key, entry.withValue(((Yaml.Scalar) entry.getValue()).withValue(value)));
     }
 
     // --- small utilities -------------------------------------------------
@@ -1094,7 +1027,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     }
 
     private static int lockfileMajor(Yaml.Mapping root, @Nullable String pkgForFailure) {
-        Yaml.Mapping.Entry entry = findEntry(root, "lockfileVersion");
+        Yaml.Mapping.Entry entry = LockYaml.findEntry(root, "lockfileVersion");
         if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
             throw fail(Reason.MALFORMED_LOCK, pkgForFailure, "pnpm-lock.yaml has no lockfileVersion");
         }
@@ -1106,22 +1039,6 @@ public final class PnpmLockPatcher implements LockPatcher {
         } catch (NumberFormatException nfe) {
             throw fail(Reason.MALFORMED_LOCK, pkgForFailure, "unrecognised lockfileVersion: " + raw);
         }
-    }
-
-    private Yaml.Documents parse(String content, @Nullable Path lockPath) {
-        Path path = lockPath == null ? Paths.get("pnpm-lock.yaml") : lockPath;
-        SourceFile source;
-        try {
-            ExecutionContext ctx = new InMemoryExecutionContext();
-            Parser.Input input = Parser.Input.fromString(path, content);
-            source = new YamlParser().parseInputs(singletonList(input), null, ctx).findFirst().orElse(null);
-        } catch (RuntimeException e) {
-            throw fail(Reason.MALFORMED_LOCK, null, "unparseable pnpm-lock.yaml: " + e.getMessage());
-        }
-        if (!(source instanceof Yaml.Documents)) {
-            throw fail(Reason.MALFORMED_LOCK, null, "pnpm-lock.yaml could not be parsed as YAML");
-        }
-        return (Yaml.Documents) source;
     }
 
     private static @Nullable String firstName(LockEditSet edits) {
