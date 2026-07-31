@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.FORCED_MOVE;
 
 /**
  * Patches a classic {@code yarn.lock} (v1). Not valid YAML, so this is a targeted text edit over the raw
@@ -56,6 +57,8 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == ADD) {
                 adds.add(edit);
+            } else if (edit.getKind() == FORCED_MOVE) {
+                content = applyForcedMove(content, edit);
             } else {
                 content = applyEdit(content, edit, edits.getEditedPackageJson());
             }
@@ -145,7 +148,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         return blocks.reconstruct();
     }
 
-    /** Single-selector block: rename the header and, when the version moved, rewrite the resolution lines. */
+    /** Single-selector block: rename the header, rewrite the resolution lines on a move, and re-pin changed deps. */
     private String inPlace(String block, String newDescriptor, PackageEdit edit) {
         int nl = block.indexOf('\n');
         String body = block.substring(nl);
@@ -155,7 +158,53 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             body = replaceFieldLine(body, "  resolved ", "  resolved " + maybeWrap(resolved(edit)));
             body = replaceFieldLine(body, "  integrity ", "  integrity " + maybeWrap(nonNull(edit.getNewIntegrity(), edit)));
         }
+        body = rewriteDepsSection(body, edit.getNewDependencies());
         return newHeader + body;
+    }
+
+    /** A cascade re-pins the changed dependency constraints in the bumped block's {@code dependencies:} section. */
+    private static String rewriteDepsSection(String body, @Nullable Map<String, String> newDeps) {
+        if (newDeps == null || newDeps.isEmpty() || !body.contains("\n  dependencies:")) {
+            return body;
+        }
+        String[] lines = body.split("\n", -1);
+        boolean inDeps = false;
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.equals("  dependencies:")) {
+                inDeps = true;
+            } else if (inDeps && line.startsWith("    ")) {
+                String depName = unwrap(line.trim().split("\\s+", 2)[0]);
+                String range = newDeps.get(depName);
+                if (range != null) {
+                    lines[i] = "    " + maybeWrap(depName) + " " + maybeWrap(range);
+                }
+            } else if (inDeps && !line.isEmpty()) {
+                inDeps = false; // a sibling field ends the dependencies section
+            }
+        }
+        return String.join("\n", lines);
+    }
+
+    /** A cascade-forced transitive: re-head its single-selector block to the requirer's new range and re-resolve. */
+    private String applyForcedMove(String content, PackageEdit edit) {
+        String name = edit.getName();
+        String oldConstraint = edit.getOldConstraint();
+        String newConstraint = edit.getNewConstraint();
+        if (oldConstraint == null || newConstraint == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing selector range for moved " + name);
+        }
+        String oldDescriptor = name + "@" + oldConstraint;
+        Blocks blocks = Blocks.parse(content);
+        int bi = blocks.indexOfSelector(oldDescriptor);
+        if (bi < 0) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no yarn block for " + oldDescriptor);
+        }
+        if (headerTokens(blocks.get(bi)).size() != 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " shares a merged selector; resolution required");
+        }
+        blocks.set(bi, inPlace(blocks.get(bi), name + "@" + newConstraint, edit));
+        return blocks.reconstruct();
     }
 
     /** Merged header: drop the moving selector (remainder unchanged) and insert a synthesized new block. */

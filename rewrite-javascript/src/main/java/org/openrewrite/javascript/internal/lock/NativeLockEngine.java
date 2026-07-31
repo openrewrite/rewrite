@@ -259,8 +259,8 @@ public final class NativeLockEngine {
                 edits.addAll(cascadeForcedMoves(name, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
-            } else if (pm == PackageManager.YarnBerry) {
-                edits.addAll(cascadeForcedMovesBerry(name, oldManifest, newManifest, existingLock, registries, client));
+            } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
+                edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
@@ -2253,26 +2253,27 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A berry direct-dep bump whose new {@code dependencies} force a currently-locked transitive to a new version.
-     * Each move re-heads the transitive's descriptor to the requirer's new range; a shared requirer (merged
-     * descriptor), a dropped edge, a constraint-only reshuffle, or a multi-level cascade all fail loud.
+     * A yarn direct-dep bump whose new {@code dependencies} force a currently-locked transitive to a new version.
+     * Both yarn formats are flat (the selector/descriptor is the requirer's range), so each move re-heads the
+     * transitive to the new range; a shared requirer, a dropped edge, a constraint-only reshuffle, or a multi-level
+     * cascade all fail loud. Only the format-specific lock reads differ between classic (text) and berry (YAML).
      */
-    private static List<LockEditSet.PackageEdit> cascadeForcedMovesBerry(String rootName, VersionManifest rootOld,
-                                                                         VersionManifest rootNew, String lock,
-                                                                         NodeRegistries registries, NpmRegistryClient client) {
+    private static List<LockEditSet.PackageEdit> cascadeForcedMovesYarn(PackageManager pm, String rootName,
+                                                                        VersionManifest rootOld, VersionManifest rootNew,
+                                                                        String lock, NodeRegistries registries, NpmRegistryClient client) {
         Map<String, String> oldDeps = rootOld.getDependencies() == null ? Collections.emptyMap() : rootOld.getDependencies();
         Map<String, String> newDeps = rootNew.getDependencies() == null ? Collections.emptyMap() : rootNew.getDependencies();
         for (String dep : oldDeps.keySet()) {
             if (!newDeps.containsKey(dep)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                        "upgrading " + rootName + " drops its edge to " + dep + " (orphan pruning) not yet supported for berry");
+                        "upgrading " + rootName + " drops its edge to " + dep + " (orphan pruning) not yet supported for yarn");
             }
         }
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
             String dep = e.getKey();
             String newConstraint = e.getValue();
-            Set<String> locked = findLockedVersionsBerry(lock, dep);
+            Set<String> locked = findLockedVersions(pm, lock, dep);
             if (locked.isEmpty()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                         "upgrading " + rootName + " introduces new transitive " + dep + " (add-during-bump) not yet supported");
@@ -2287,27 +2288,27 @@ public final class NativeLockEngine {
             if (NodeSemver.satisfies(cur, newConstraint)) {
                 if (!newConstraint.equals(oldDeps.get(dep))) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            dep + " constraint changed without a version move (berry descriptor reselect) not yet supported");
+                            dep + " constraint changed without a version move (selector reselect) not yet supported");
                 }
                 continue;
             }
-            moves.add(resolveForcedMoveBerry(rootName, dep, cur, oldDeps.get(dep), newConstraint, lock, registries, client));
+            moves.add(resolveForcedMoveYarn(pm, rootName, dep, cur, oldDeps.get(dep), newConstraint, lock, registries, client));
         }
         return moves;
     }
 
-    /** Resolve and emit one berry forced move, failing loud on a shared requirer or any deeper reshape. */
-    private static LockEditSet.PackageEdit resolveForcedMoveBerry(String rootName, String dep, String oldVersion,
-                                                                  @Nullable String oldConstraint, String newConstraint,
-                                                                  String lock, NodeRegistries registries, NpmRegistryClient client) {
+    /** Resolve and emit one yarn forced move, failing loud on a shared requirer or any deeper reshape. */
+    private static LockEditSet.PackageEdit resolveForcedMoveYarn(PackageManager pm, String rootName, String dep, String oldVersion,
+                                                                 @Nullable String oldConstraint, String newConstraint,
+                                                                 String lock, NodeRegistries registries, NpmRegistryClient client) {
         if (oldConstraint == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, dep, "no prior descriptor for moved " + dep);
+            throw new EngineFailure(Reason.MALFORMED_LOCK, dep, "no prior selector for moved " + dep);
         }
-        if (berryHasOtherRequirer(lock, dep, rootName)) {
+        if (yarnHasOtherRequirer(pm, lock, dep, rootName)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " is required by more than the upgraded " + rootName + "; merged berry descriptors deferred");
+                    dep + " is required by more than the upgraded " + rootName + "; a merged selector defers");
         }
-        if (importerDeclaresBerry(lock, dep)) {
+        if (pm == PackageManager.YarnBerry && importerDeclaresBerry(lock, dep)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                     dep + " is directly declared; moving it via cascade is not yet supported");
         }
@@ -2346,7 +2347,12 @@ public final class NativeLockEngine {
                 .build();
     }
 
-    /** True when any entry other than {@code rootName}'s (and not the importer) also depends on {@code dep}. */
+    /** True when any package other than {@code rootName} also requires {@code dep} (so moving it would fork). */
+    private static boolean yarnHasOtherRequirer(PackageManager pm, String lock, String dep, String rootName) {
+        return pm == PackageManager.YarnBerry ?
+                berryHasOtherRequirer(lock, dep, rootName) : yarnClassicHasOtherRequirer(lock, dep, rootName);
+    }
+
     private static boolean berryHasOtherRequirer(String lock, String dep, String rootName) {
         Object loaded = new Yaml().load(lock);
         if (!(loaded instanceof Map)) {
@@ -2362,6 +2368,34 @@ public final class NativeLockEngine {
             for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
                 Object deps = entry.get(scope);
                 if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Scan the flat {@code yarn.lock} for a {@code dependencies:} line naming {@code dep} under any block whose
+     * header is not {@code rootName}. yarn.lock is not valid YAML, so this is a header/indent line walk.
+     */
+    private static boolean yarnClassicHasOtherRequirer(String lock, String dep, String rootName) {
+        boolean rootBlock = false;
+        boolean inDependencies = false;
+        for (String line : lock.split("\n")) {
+            if (line.isEmpty() || line.charAt(0) == '#') {
+                continue;
+            }
+            if (!Character.isWhitespace(line.charAt(0)) && line.trim().endsWith(":")) {
+                rootBlock = headerMatchesName(line, rootName);
+                inDependencies = false;
+            } else if (line.startsWith("  dependencies:")) {
+                inDependencies = true;
+            } else if (line.startsWith("  ") && !line.startsWith("    ")) {
+                inDependencies = false; // a sibling field (version/resolved/…) ends the dependencies block
+            } else if (inDependencies && !rootBlock && line.startsWith("    ")) {
+                String depName = unquote(line.trim().split("\\s+", 2)[0]);
+                if (depName.equals(dep)) {
                     return true;
                 }
             }
