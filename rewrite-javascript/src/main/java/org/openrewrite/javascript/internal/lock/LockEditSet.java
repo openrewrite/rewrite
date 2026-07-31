@@ -89,6 +89,10 @@ public class LockEditSet {
         @Nullable
         String oldConstraint;
 
+        /** New declared range for a berry forced-move: the requirer's new constraint that re-heads the moved entry's descriptor. */
+        @Nullable
+        String newConstraint;
+
         /** The declared scope this dependency was matched in (e.g. {@code dependencies}, {@code devDependencies}). */
         String scope;
 

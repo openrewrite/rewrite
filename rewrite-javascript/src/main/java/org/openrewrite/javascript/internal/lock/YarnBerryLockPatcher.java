@@ -69,6 +69,8 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                 adds.add(edit);
             } else if (edit.getKind() == PackageEdit.Kind.BUMP) {
                 root = applyBump(root, edit, edits.getEditedPackageJson());
+            } else if (edit.getKind() == PackageEdit.Kind.FORCED_MOVE) {
+                root = applyForcedMove(root, edit);
             } else {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                         "yarn berry does not support " + edit.getKind() + " yet");
@@ -189,14 +191,66 @@ public final class YarnBerryLockPatcher implements LockPatcher {
 
         Yaml.Mapping.Entry entry = findSingleDescriptor(root, oldDescriptor, name);
         Yaml.Mapping body = (Yaml.Mapping) entry.getValue();
-        // A bump whose closure is unchanged rewrites only these four; the engine already proved everything else
-        // (dependencies, peer/optional surfaces) is byte-identical, so leave the rest of the entry alone.
+        // The engine proved every non-dependency surface (peer/optional/engines/…) byte-identical, so rewrite only
+        // the resolution triple, the importer range, and — for a cascade — the changed dependency constraints.
         body = setScalar(body, "version", edit.getNewVersion(), name);
         body = setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion(), name);
         body = setScalar(body, "checksum", edit.getNewBerryChecksum(), name);
+        body = rewriteDependencies(body, edit.getNewDependencies(), name);
         root = replaceEntry(root, oldDescriptor, renameKey(entry, newDescriptor).withValue(body));
 
         return repinImporter(root, name, newConstraint);
+    }
+
+    /** Re-head a cascade-forced transitive's descriptor to its new range and rewrite its resolution triple. */
+    private Yaml.Mapping applyForcedMove(Yaml.Mapping root, PackageEdit edit) {
+        String name = edit.getName();
+        if (edit.getNewBerryChecksum() == null) {
+            throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, name, "no reproduced checksum for " + name);
+        }
+        if (edit.getOldConstraint() == null || edit.getNewConstraint() == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing descriptor range for moved " + name);
+        }
+        String oldDescriptor = name + "@npm:" + edit.getOldConstraint();
+        Yaml.Mapping.Entry entry = findSingleDescriptor(root, oldDescriptor, name);
+        Yaml.Mapping body = (Yaml.Mapping) entry.getValue();
+        body = setScalar(body, "version", edit.getNewVersion(), name);
+        body = setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion(), name);
+        body = setScalar(body, "checksum", edit.getNewBerryChecksum(), name);
+        return replaceEntry(root, oldDescriptor,
+                renameKey(entry, name + "@npm:" + edit.getNewConstraint()).withValue(body));
+    }
+
+    /** Re-pin each already-present dependency constraint in the bumped entry to the new manifest's {@code npm:} range. */
+    private static Yaml.Mapping rewriteDependencies(Yaml.Mapping body, @Nullable Map<String, String> newDeps, String name) {
+        if (newDeps == null || newDeps.isEmpty()) {
+            return body;
+        }
+        Yaml.Mapping.Entry depsEntry = findEntry(body, "dependencies");
+        if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
+            return body;
+        }
+        Yaml.Mapping deps = (Yaml.Mapping) depsEntry.getValue();
+        for (String depName : depNames(deps)) {
+            String range = newDeps.get(depName);
+            if (range == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + " no longer depends on " + depName + " (orphan prune) not yet supported for berry");
+            }
+            deps = setScalar(deps, depName, "npm:" + range, name);
+        }
+        return replaceEntry(body, "dependencies", depsEntry.withValue(deps));
+    }
+
+    private static List<String> depNames(Yaml.Mapping deps) {
+        List<String> names = new ArrayList<>();
+        for (Yaml.Mapping.Entry entry : deps.getEntries()) {
+            String key = keyOf(entry);
+            if (key != null) {
+                names.add(key);
+            }
+        }
+        return names;
     }
 
     /** Re-pin the single workspace importer's declared range on {@code name} to {@code npm:<newConstraint>}. */

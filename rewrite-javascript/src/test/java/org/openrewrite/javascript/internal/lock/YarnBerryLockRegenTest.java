@@ -71,6 +71,18 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void cascade() {
+        // debug 4.3.4 -> 4.4.1 changes its ms constraint 2.1.2 -> ^2.1.3, forcing ms to move and its descriptor
+        // to re-head to ms@npm:^2.1.3. Both the bumped entry and the moved transitive get reproduced checksums.
+        String dir = "lock/yarn-berry/cascade";
+        route(dir, "debug", "4.3.4", false);
+        route(dir, "debug", "4.4.1", true);
+        route(dir, "ms", "2.1.2", false);
+        route(dir, "ms", "2.1.3", true);
+        assertRegenEquals(dir);
+    }
+
+    @Test
     void unsupportedCacheKeyFailsLoud() {
         // Only the 10c0 zip format is validated; any other cacheKey cannot be reproduced, so refuse.
         String dir = "lock/yarn-berry/leaf-bump";
@@ -109,7 +121,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }

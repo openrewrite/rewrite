@@ -259,8 +259,10 @@ public final class NativeLockEngine {
                 edits.addAll(cascadeForcedMoves(name, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
+            } else if (pm == PackageManager.YarnBerry) {
+                edits.addAll(cascadeForcedMovesBerry(name, oldManifest, newManifest, existingLock, registries, client));
             } else {
-                // Only the npm and pnpm patchers can reshape a changed closure so far; other formats defer.
+                // The remaining patchers cannot reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
             }
         }
@@ -2245,6 +2247,143 @@ public final class NativeLockEngine {
             String d = descriptor.trim();
             if (d.startsWith(name + "@npm:")) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A berry direct-dep bump whose new {@code dependencies} force a currently-locked transitive to a new version.
+     * Each move re-heads the transitive's descriptor to the requirer's new range; a shared requirer (merged
+     * descriptor), a dropped edge, a constraint-only reshuffle, or a multi-level cascade all fail loud.
+     */
+    private static List<LockEditSet.PackageEdit> cascadeForcedMovesBerry(String rootName, VersionManifest rootOld,
+                                                                         VersionManifest rootNew, String lock,
+                                                                         NodeRegistries registries, NpmRegistryClient client) {
+        Map<String, String> oldDeps = rootOld.getDependencies() == null ? Collections.emptyMap() : rootOld.getDependencies();
+        Map<String, String> newDeps = rootNew.getDependencies() == null ? Collections.emptyMap() : rootNew.getDependencies();
+        for (String dep : oldDeps.keySet()) {
+            if (!newDeps.containsKey(dep)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        "upgrading " + rootName + " drops its edge to " + dep + " (orphan pruning) not yet supported for berry");
+            }
+        }
+        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
+        for (Map.Entry<String, String> e : newDeps.entrySet()) {
+            String dep = e.getKey();
+            String newConstraint = e.getValue();
+            Set<String> locked = findLockedVersionsBerry(lock, dep);
+            if (locked.isEmpty()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        "upgrading " + rootName + " introduces new transitive " + dep + " (add-during-bump) not yet supported");
+            }
+            if (locked.size() > 1) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " is present at multiple versions; deferred");
+            }
+            if (isUnsupportedProtocol(newConstraint) || !NodeSemver.validRange(newConstraint)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " has an unresolvable range: " + newConstraint);
+            }
+            String cur = locked.iterator().next();
+            if (NodeSemver.satisfies(cur, newConstraint)) {
+                if (!newConstraint.equals(oldDeps.get(dep))) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                            dep + " constraint changed without a version move (berry descriptor reselect) not yet supported");
+                }
+                continue;
+            }
+            moves.add(resolveForcedMoveBerry(rootName, dep, cur, oldDeps.get(dep), newConstraint, lock, registries, client));
+        }
+        return moves;
+    }
+
+    /** Resolve and emit one berry forced move, failing loud on a shared requirer or any deeper reshape. */
+    private static LockEditSet.PackageEdit resolveForcedMoveBerry(String rootName, String dep, String oldVersion,
+                                                                  @Nullable String oldConstraint, String newConstraint,
+                                                                  String lock, NodeRegistries registries, NpmRegistryClient client) {
+        if (oldConstraint == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, dep, "no prior descriptor for moved " + dep);
+        }
+        if (berryHasOtherRequirer(lock, dep, rootName)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " is required by more than the upgraded " + rootName + "; merged berry descriptors deferred");
+        }
+        if (importerDeclaresBerry(lock, dep)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " is directly declared; moving it via cascade is not yet supported");
+        }
+        NodeRegistry registry = registries.registryFor(dep);
+        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), Collections.singleton(newConstraint));
+        if (target == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no version of " + dep + " satisfies " + newConstraint);
+        }
+        if (target.equals(oldVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " resolves back to its locked version; deferred");
+        }
+        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
+        VersionManifest newManifest = client.getManifest(registry, dep, target);
+        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
+        if (!dependenciesEqual(oldManifest, newManifest)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    "moving " + dep + " to " + target + " changes its own dependencies (multi-level cascade) not yet supported");
+        }
+        VersionManifest.Dist dist = newManifest.getDist();
+        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep, dep + "@" + target + " has no registry tarball/integrity");
+        }
+        return LockEditSet.PackageEdit.builder()
+                .name(dep)
+                .oldVersion(oldVersion)
+                .newVersion(target)
+                .oldConstraint(oldConstraint)
+                .newConstraint(newConstraint)
+                .newResolved(dist.getTarball())
+                .newIntegrity(dist.getIntegrity())
+                .newShasum(dist.getShasum())
+                .newDependencies(newManifest.getDependencies())
+                .scope("dependencies")
+                .importerDir(null)
+                .kind(FORCED_MOVE)
+                .build();
+    }
+
+    /** True when any entry other than {@code rootName}'s (and not the importer) also depends on {@code dep}. */
+    private static boolean berryHasOtherRequirer(String lock, String dep, String rootName) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return false;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+            String key = String.valueOf(e.getKey());
+            if ("__metadata".equals(key) || key.contains("@workspace:") ||
+                    berryKeyDeclaresName(key, rootName) || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> entry = (Map<?, ?>) e.getValue();
+            for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
+                Object deps = entry.get(scope);
+                if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** True when the workspace importer declares {@code dep} directly (so a cascade would touch its own range). */
+    private static boolean importerDeclaresBerry(String lock, String dep) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return false;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+            if (String.valueOf(e.getKey()).contains("@workspace:") && e.getValue() instanceof Map) {
+                Map<?, ?> importer = (Map<?, ?>) e.getValue();
+                for (String scope : DECLARED_SCOPES) {
+                    Object deps = importer.get(scope);
+                    if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
