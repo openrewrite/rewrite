@@ -104,11 +104,11 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         List<String> names = new ArrayList<>();
         boolean inDeps = false;
         for (String line : block.split("\n", -1)) {
-            if (line.equals("  dependencies:")) {
-                inDeps = true;
+            if (line.equals("  dependencies:") || line.equals("  optionalDependencies:")) {
+                inDeps = true; // reachability follows optional edges too — yarn installs and locks them
             } else if (inDeps && line.startsWith("    ")) {
                 names.add(unwrap(line.trim().split("\\s+", 2)[0]));
-            } else if (inDeps && line.startsWith("  ") && !line.startsWith("    ")) {
+            } else if (line.startsWith("  ") && !line.startsWith("    ")) {
                 inDeps = false;
             }
         }
