@@ -48,6 +48,9 @@ public final class YarnBerryLockPatcher implements LockPatcher {
     private static final List<String> IMPORTER_SCOPES =
             Arrays.asList("dependencies", "devDependencies", "optionalDependencies", "peerDependencies");
 
+    /** Package names that lost a requiring edge this patch (a dropped bump edge, or a removed importer dep). */
+    private final Set<String> droppedTargets = new LinkedHashSet<>();
+
     @Override
     public String patch(LockEditSet edits) {
         Yaml.Documents docs = LockYaml.parse(edits.getExistingLockContent(), edits.getLockPath());
@@ -58,17 +61,16 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         Yaml.Document document = documents.get(0);
         Yaml.Mapping root = (Yaml.Mapping) document.getBlock();
 
+        droppedTargets.clear();
         List<PackageEdit> adds = new ArrayList<>();
-        boolean anyPrune = false;
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == PackageEdit.Kind.ADD) {
                 adds.add(edit);
             } else if (edit.getKind() == PackageEdit.Kind.BUMP && edit.getNewVersion() == null) {
                 root = removeImporterEdge(root, edit);
-                anyPrune = true; // drop the removed dep's now-unreachable subtree
+                droppedTargets.add(edit.getName());
             } else if (edit.getKind() == PackageEdit.Kind.BUMP) {
                 root = applyBump(root, edit, edits.getEditedPackageJson());
-                anyPrune |= edit.isPrunesOrphans();
             } else if (edit.getKind() == PackageEdit.Kind.FORCED_MOVE) {
                 root = applyForcedMove(root, edit);
             } else if (edit.getKind() == PackageEdit.Kind.PROMOTION) {
@@ -81,7 +83,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (!adds.isEmpty()) {
             root = applyAdds(root, adds, edits.getEditedPackageJson());
         }
-        if (anyPrune) {
+        if (!droppedTargets.isEmpty()) {
             root = gcOrphans(root);
         }
 
@@ -203,11 +205,27 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
         body = rewriteDependencies(body, edit.getNewDependencies(), name);
         if (edit.isPrunesOrphans()) {
+            recordDroppedEdges(body, edit.getNewDependencies());
             body = pruneDependencies(body, edit.getNewDependencies());
         }
         root = LockYaml.replaceEntry(root, oldDescriptor, LockYaml.renameKey(entry, newDescriptor).withValue(body));
 
         return repinImporter(root, name, newConstraint);
+    }
+
+    /** Record which of the bumped entry's dependencies the new manifest dropped, as orphan candidates for the GC. */
+    private void recordDroppedEdges(Yaml.Mapping body, @Nullable Map<String, String> newDeps) {
+        Yaml.Mapping.Entry depsEntry = LockYaml.findEntry(body, "dependencies");
+        if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
+            return;
+        }
+        Set<String> keep = newDeps == null ? Collections.emptySet() : newDeps.keySet();
+        for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) depsEntry.getValue()).getEntries()) {
+            String name = LockYaml.keyOf(dep);
+            if (name != null && !keep.contains(name)) {
+                droppedTargets.add(name);
+            }
+        }
     }
 
     /** Drop the dropped edges from the bumped entry's {@code dependencies:} map, removing the map if it empties. */
@@ -266,31 +284,50 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));
     }
 
-    /** Remove every registry entry unreachable from the workspace importer's dependencies after an edge pruned. */
+    /**
+     * Reap only the subtree the dropped edges orphaned: from each dropped target, remove its entry iff no surviving
+     * entry still requires it and it is not an importer root, then recurse into its own dependencies. A full
+     * reachability sweep would wrongly reap peer-provided packages (yarn.lock records no peer-satisfaction edge).
+     */
     private Yaml.Mapping gcOrphans(Yaml.Mapping root) {
-        Set<String> reachable = new LinkedHashSet<>();
-        Deque<String> queue = new ArrayDeque<>(importerDepNames(root));
+        Set<String> roots = new LinkedHashSet<>(importerDepNames(root));
+        Set<String> removed = new LinkedHashSet<>();
+        Deque<String> queue = new ArrayDeque<>(droppedTargets);
+        Set<String> seen = new LinkedHashSet<>();
         while (!queue.isEmpty()) {
             String name = queue.poll();
-            if (!reachable.add(name)) {
+            if (!seen.add(name) || roots.contains(name)) {
                 continue;
             }
-            for (Yaml.Mapping.Entry e : root.getEntries()) {
-                String key = LockYaml.keyOf(e);
-                if (key != null && berryEntryName(key).equals(name) && e.getValue() instanceof Yaml.Mapping) {
-                    queue.addAll(entryDepNames((Yaml.Mapping) e.getValue()));
-                }
+            Yaml.Mapping.Entry entry = registryEntry(root, name);
+            if (entry == null || referencedByOther(root, name, removed)) {
+                continue;
             }
+            removed.add(LockYaml.keyOf(entry));
+            queue.addAll(entryDepNames((Yaml.Mapping) entry.getValue()));
         }
         List<Yaml.Mapping.Entry> kept = new ArrayList<>();
         for (Yaml.Mapping.Entry e : root.getEntries()) {
-            String key = LockYaml.keyOf(e);
-            if (key == null || "__metadata".equals(key) || key.contains("@workspace:") ||
-                    reachable.contains(berryEntryName(key))) {
+            if (!removed.contains(LockYaml.keyOf(e))) {
                 kept.add(e);
             }
         }
         return root.withEntries(kept);
+    }
+
+    /** True when an entry (not being removed, not {@code name}'s own) requires {@code name} in a dependency scope. */
+    private static boolean referencedByOther(Yaml.Mapping root, String name, Set<String> removedKeys) {
+        for (Yaml.Mapping.Entry e : root.getEntries()) {
+            String key = LockYaml.keyOf(e);
+            if (key == null || "__metadata".equals(key) || removedKeys.contains(key) ||
+                    berryEntryName(key).equals(name) || !(e.getValue() instanceof Yaml.Mapping)) {
+                continue;
+            }
+            if (entryDepNames((Yaml.Mapping) e.getValue()).contains(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<String> importerDepNames(Yaml.Mapping root) {

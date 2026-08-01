@@ -48,6 +48,9 @@ public final class YarnClassicLockPatcher implements LockPatcher {
     /** True when the existing lock's sibling {@code resolved} entries use the yarnpkg mirror. */
     private boolean mirrorToYarnpkg;
 
+    /** Package names that lost a requiring edge this patch (a dropped bump edge, or a removed block's deps). */
+    private final Set<String> droppedTargets = new LinkedHashSet<>();
+
     @Override
     public String patch(LockEditSet edits) {
         String content = edits.getExistingLockContent();
@@ -57,8 +60,8 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         // Mirror the host the siblings use rather than force-rewriting to yarnpkg: a lock already on
         // registry.npmjs.org must stay there, or the new entry's host won't match a real yarn install.
         mirrorToYarnpkg = content.contains(YARN_REGISTRY);
+        droppedTargets.clear();
         List<PackageEdit> adds = new ArrayList<>();
-        boolean anyPrune = false;
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == ADD) {
                 adds.add(edit);
@@ -68,34 +71,49 @@ public final class YarnClassicLockPatcher implements LockPatcher {
                 content = applyPromotion(content, edit, edits.getEditedPackageJson());
             } else {
                 content = applyEdit(content, edit, edits.getEditedPackageJson());
-                anyPrune |= edit.isPrunesOrphans();
             }
         }
         if (!adds.isEmpty()) {
             content = applyAdds(content, adds, edits.getEditedPackageJson());
         }
-        if (anyPrune) {
+        if (!droppedTargets.isEmpty()) {
             content = gcOrphans(content, edits.getEditedPackageJson());
         }
         return content;
     }
 
-    /** Remove every block unreachable from the {@code package.json} roots after an edge was pruned. */
+    /**
+     * Reap only the subtree the dropped edges orphaned: start from each dropped target and remove it iff no
+     * surviving block still requires it and it is not a {@code package.json} root, then recurse into its own
+     * dependencies. A full reachability sweep would wrongly reap peer-provided packages (whose satisfying edge
+     * yarn.lock does not record), so this stays scoped to what actually lost a requirer.
+     */
     private String gcOrphans(String content, @Nullable String editedPackageJson) {
         Blocks blocks = Blocks.parse(content);
-        Set<String> reachable = new LinkedHashSet<>();
-        Deque<String> queue = new ArrayDeque<>(LockManifests.declaredNames(editedPackageJson));
+        Set<String> roots = LockManifests.declaredNames(editedPackageJson);
+        Deque<String> queue = new ArrayDeque<>(droppedTargets);
+        Set<String> seen = new LinkedHashSet<>();
         while (!queue.isEmpty()) {
             String name = queue.poll();
-            if (!reachable.add(name)) {
+            if (!seen.add(name) || roots.contains(name)) {
                 continue;
             }
             int bi = blocks.indexOfName(name);
-            if (bi >= 0) {
-                queue.addAll(blockDepNames(blocks.get(bi)));
+            if (bi < 0) {
+                continue;
             }
+            if (blocks.referencedByOther(name)) {
+                // Still required elsewhere, so it stays — but a merged header means the dropped requirer's own
+                // selector should leave it, which the engine cannot pinpoint without every requirer's constraint.
+                if (headerTokens(blocks.get(bi)).size() > 1) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            name + " keeps a merged header after a dropped edge; resolution required");
+                }
+                continue;
+            }
+            queue.addAll(blockDepNames(blocks.get(bi)));
+            blocks.remove(bi);
         }
-        blocks.retainNames(reachable);
         return blocks.reconstruct();
     }
 
@@ -182,8 +200,21 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         }
 
         if (edit.getNewVersion() == null) {
+            // The removed block's own transitives lose a requirer and become orphan candidates.
+            if (headerTokens(blocks.get(bi)).size() == 1) {
+                droppedTargets.addAll(blockDepNames(blocks.get(bi)));
+            }
             removeSelector(blocks, bi, oldDescriptor);
             return blocks.reconstruct();
+        }
+
+        if (edit.isPrunesOrphans()) {
+            Set<String> kept = edit.getNewDependencies() == null ? Collections.emptySet() : edit.getNewDependencies().keySet();
+            for (String dep : blockDepNames(blocks.get(bi))) {
+                if (!kept.contains(dep)) {
+                    droppedTargets.add(dep);
+                }
+            }
         }
 
         String newConstraint = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
@@ -192,9 +223,22 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         }
         String newDescriptor = name + "@" + newConstraint;
 
+        // If a transitive also requires this dep at the old constraint, re-pinning the block's selector would
+        // drop the selector that transitive still needs (yarn keeps both). The engine can't merge it safely.
+        if (blocks.requiredByTransitive(name, oldConstraint)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + "@" + oldConstraint + " is also required transitively; re-pinning needs a merged selector");
+        }
+
         List<String> selectors = headerTokens(blocks.get(bi));
         if (selectors.size() == 1) {
             blocks.set(bi, inPlace(blocks.get(bi), newDescriptor, edit));
+        } else if (edit.getNewVersion().equals(edit.getOldVersion())) {
+            // Widening a constraint on a merged header: the moving selector may be one a transitive still
+            // requires (so it must stay) or the new descriptor may already be present. The engine cannot prove
+            // which selectors survive without every requirer's constraints, so defer rather than emit a guess.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " widens a constraint on a shared (merged-header) block; resolution required");
         } else {
             splitOut(blocks, bi, oldDescriptor, newDescriptor, edit);
         }
@@ -587,8 +631,34 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             return -1;
         }
 
-        void retainNames(Set<String> reachable) {
-            blocks.removeIf(block -> !reachable.contains(blockName(block)));
+        /** True when a block other than {@code name}'s own lists {@code name} in its dependency section. */
+        boolean referencedByOther(String name) {
+            for (String block : blocks) {
+                if (!blockName(block).equals(name) && blockDepNames(block).contains(name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** True when any block's dependency section requires {@code name} at exactly {@code constraint}. */
+        boolean requiredByTransitive(String name, String constraint) {
+            for (String block : blocks) {
+                boolean inDeps = false;
+                for (String line : block.split("\n", -1)) {
+                    if (line.equals("  dependencies:") || line.equals("  optionalDependencies:")) {
+                        inDeps = true;
+                    } else if (inDeps && line.startsWith("    ")) {
+                        String[] parts = line.trim().split("\\s+", 2);
+                        if (parts.length == 2 && unwrap(parts[0]).equals(name) && unwrap(parts[1]).equals(constraint)) {
+                            return true;
+                        }
+                    } else if (line.startsWith("  ") && !line.startsWith("    ")) {
+                        inDeps = false;
+                    }
+                }
+            }
+            return false;
         }
 
         void insertSorted(String block) {
