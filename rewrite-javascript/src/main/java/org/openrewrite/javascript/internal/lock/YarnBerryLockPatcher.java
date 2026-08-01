@@ -40,8 +40,8 @@ import java.util.TreeSet;
  * <p>
  * Supported: an in-place version bump (rewrite the entry's descriptor key, {@code version}, {@code resolution}
  * and {@code checksum} plus the importer range) and adding a dependency plus its runtime closure (a fresh entry
- * per member at its sorted position). A cascade (changed {@code dependencies} map), removal, merged descriptor
- * key, fork, scoped add, or workspaces all fail loud.
+ * per member at its sorted position; a scoped leaf add is supported, its {@code @scope/name} key sorting by plain
+ * string like any other). A merged descriptor key, fork, scoped closure add, or workspaces all fail loud.
  */
 public final class YarnBerryLockPatcher implements LockPatcher {
 
@@ -93,11 +93,14 @@ public final class YarnBerryLockPatcher implements LockPatcher {
     }
 
     private Yaml.Mapping applyAdds(Yaml.Mapping root, List<PackageEdit> adds, @Nullable String editedPackageJson) {
+        // A scoped key sorts by plain string like any other (@ < letters, __metadata pinned first), so a scoped
+        // leaf add is byte-exact. A scoped closure would also need its dependency-map keys quoted and its merged
+        // descriptors validated, so any scoped add carrying a runtime closure still defers.
+        if (isScopedClosure(adds)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, adds.get(0).getName(),
+                    "scoped berry closure adds defer until validated; only a scoped leaf add is byte-exact");
+        }
         for (PackageEdit edit : adds) {
-            if (edit.getName().startsWith("@")) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                        "scoped berry adds defer until the sort comparator is validated");
-            }
             if (edit.getNewBerryChecksum() == null) {
                 throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, edit.getName(),
                         "no reproduced checksum for " + edit.getName());
@@ -112,6 +115,18 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             }
         }
         return root;
+    }
+
+    /** True when any added member is scoped and the add pulls a runtime closure (multiple members or own deps). */
+    private static boolean isScopedClosure(List<PackageEdit> adds) {
+        boolean scoped = false;
+        for (PackageEdit e : adds) {
+            if (e.getName().startsWith("@")) {
+                scoped = true;
+                break;
+            }
+        }
+        return scoped && (adds.size() > 1 || adds.get(0).getNewDependencies() != null);
     }
 
     /** The merged {@code name@npm:range} descriptor: every range that resolves to this member, sorted. */
@@ -170,8 +185,10 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                     "adding the first " + edit.getScope() + " to a berry importer is deferred");
         }
         Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
+        // A scoped key must be quoted in YAML (@ is a reserved indicator); yarn quotes it too.
+        String depKey = name.startsWith("@") ? "\"" + name + "\"" : name;
         Yaml.Mapping.Entry depEntry = LockYaml.graft(
-                edit.getScope() + ":\n  " + name + ": \"npm:" + constraint + "\"\n", edit.getScope(), name);
+                edit.getScope() + ":\n  " + depKey + ": \"npm:" + constraint + "\"\n", edit.getScope(), name);
         deps = insertEntrySorted(deps, depEntry, name, 0);
         importerBody = LockYaml.replaceEntry(importerBody, edit.getScope(), scopeEntry.withValue(deps));
         return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));

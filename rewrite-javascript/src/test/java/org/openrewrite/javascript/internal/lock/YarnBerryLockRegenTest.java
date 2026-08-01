@@ -62,6 +62,15 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void scopedLeafAdd() {
+        // Add @types/ms (a scoped leaf) into a lock that has ms: its "@types/ms@npm:^2.1.0" entry sorts right
+        // after __metadata (@ < letters) and its importer edge key is quoted. Checksum reproduced from the tarball.
+        String dir = "lock/yarn-berry/add-scoped-leaf";
+        routeScoped(dir, "@types/ms", "2.1.0");
+        assertRegenEquals(dir);
+    }
+
+    @Test
     void closureAdd() {
         // Add is-odd (-> is-number ^6.0.0): two fresh entries inserted before ms, each with its reproduced checksum.
         String dir = "lock/yarn-berry/add-closure";
@@ -141,6 +150,16 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
         }
     }
 
+    /** A scoped package: URL-encode {@code /} as {@code %2F} for packument/manifest; the tarball path drops the scope. */
+    private void routeScoped(String dir, String name, String version) {
+        String encoded = name.replace("/", "%2F");
+        String file = name.substring(name.indexOf('/') + 1);
+        routes.put(REG + encoded, resource(dir + "/http/" + name));
+        routes.put(REG + encoded + "/" + version, resource(dir + "/http/" + name + "-" + version));
+        binaryRoutes.put(REG + name + "/-/" + file + "-" + version + ".tgz",
+                bytesResource(dir + "/http/" + name + "-" + version + ".tgz"));
+    }
+
     private void assertRegenEquals(String dir) {
         Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry,
                 resource(dir + "/pkg-after"), resource(dir + "/pkg-before"), resource(dir + "/before"),
@@ -154,7 +173,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge", "remove", "widen"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-scoped-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge", "remove", "widen"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }

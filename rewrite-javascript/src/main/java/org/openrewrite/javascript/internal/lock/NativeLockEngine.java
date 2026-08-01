@@ -786,7 +786,7 @@ public final class NativeLockEngine {
         if (pm == PackageManager.YarnClassic || pm == PackageManager.YarnBerry) {
             // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
             // member must be brand-new (no merge/second entry for an existing name). Berry adds get their
-            // checksums enriched afterward, and scoped names defer until the sort comparator is validated.
+            // checksums enriched afterward; a scoped leaf add is byte-exact, a scoped closure still defers.
             return resolveClosureAddYarn(pm, change, rootName, rootConstraint, existingLock, registries, client);
         }
         // Only the npm patcher can insert closure entries so far; other formats defer.
