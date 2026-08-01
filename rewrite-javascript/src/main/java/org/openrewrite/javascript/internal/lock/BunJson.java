@@ -25,9 +25,9 @@ import java.util.Map;
  * The byte-exact bun {@code bun.lock} (JSONC) serialization primitives, shared by the surgical
  * {@link BunLockPatcher} and the {@link org.openrewrite.javascript.internal.lock.resolve.BunLockWriter}. bun's
  * package entries are compact single-line tuples {@code ["name@ver", "", <metadata>, "<sri>"]} whose metadata is
- * {@code {}} or {@code { "dependencies": { … } }} with the dependency map ASCII-sorted. Both the patcher (splicing
- * one member into a captured LST) and the writer (emitting a whole file) reproduce that shape, so the rules live
- * here once.
+ * {@code {}} or an object carrying (in bun's order) {@code dependencies}, {@code peerDependencies} and
+ * {@code optionalPeers}, each map ASCII-sorted. Both the patcher (splicing one member into a captured LST) and the
+ * writer (emitting a whole file) reproduce that shape, so the rules live here once.
  */
 public final class BunJson {
 
@@ -36,16 +36,63 @@ public final class BunJson {
 
     /** A bun {@code packages} tuple: {@code ["<name>@<ver>", "", <metadata>, "<sri>"]}. */
     public static String renderTuple(String name, String version, @Nullable Map<String, String> deps, String integrity) {
+        return renderTuple(name, version, deps, null, null, integrity);
+    }
+
+    /** A bun {@code packages} tuple whose metadata may carry a peer surface. */
+    public static String renderTuple(String name, String version, @Nullable Map<String, String> deps,
+                                     @Nullable Map<String, String> peerDeps, @Nullable List<String> optionalPeers,
+                                     String integrity) {
         return "[" + quote(name + "@" + version) + ", " + quote("") + ", " +
-                renderMetadata(deps) + ", " + quote(integrity) + "]";
+                renderMetadata(deps, peerDeps, optionalPeers) + ", " + quote(integrity) + "]";
     }
 
     /** bun's compact single-line metadata: {@code {}} or {@code { "dependencies": { "<dep>": "<range>", … } }}. */
     public static String renderMetadata(@Nullable Map<String, String> deps) {
-        if (deps == null || deps.isEmpty()) {
+        return renderMetadata(deps, null, null);
+    }
+
+    /**
+     * bun's compact single-line metadata in bun's key order: {@code dependencies}, then {@code peerDependencies},
+     * then {@code optionalPeers}. Each map is ASCII-sorted; {@code optionalPeers} is bun's flattened form of
+     * {@code peerDependenciesMeta} (the optional peer names, not npm's verbatim object). An empty surface renders
+     * {@code {}}.
+     */
+    public static String renderMetadata(@Nullable Map<String, String> deps, @Nullable Map<String, String> peerDeps,
+                                        @Nullable List<String> optionalPeers) {
+        List<String> parts = new ArrayList<>();
+        if (deps != null && !deps.isEmpty()) {
+            parts.add(quote("dependencies") + ": " + renderInlineMap(deps));
+        }
+        if (peerDeps != null && !peerDeps.isEmpty()) {
+            parts.add(quote("peerDependencies") + ": " + renderInlineMap(peerDeps));
+        }
+        if (optionalPeers != null && !optionalPeers.isEmpty()) {
+            parts.add(quote("optionalPeers") + ": " + renderStringArray(optionalPeers));
+        }
+        if (parts.isEmpty()) {
             return "{}";
         }
-        return "{ " + quote("dependencies") + ": " + renderInlineMap(deps) + " }";
+        StringBuilder sb = new StringBuilder("{ ");
+        for (int i = 0; i < parts.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(parts.get(i));
+        }
+        return sb.append(" }").toString();
+    }
+
+    /** A compact single-line string array {@code ["<a>", "<b>", …]} (no inner padding, unlike bun's objects). */
+    public static String renderStringArray(List<String> values) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(quote(values.get(i)));
+        }
+        return sb.append("]").toString();
     }
 
     /** An ASCII-sorted single-line object {@code { "<k>": "<v>", … }}. */

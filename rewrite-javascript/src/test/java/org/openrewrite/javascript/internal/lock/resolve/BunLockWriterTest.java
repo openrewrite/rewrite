@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.resolve;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -117,14 +118,103 @@ class BunLockWriterTest {
     }
 
     @Test
-    void peerBearingManifestDefers() {
-        VersionManifest withPeer = new VersionManifest("uses-peer", "1.0.0", null, null,
+    void satisfiedPeerSurfaceEmitted() {
+        // uses-peer declares a react peer met by the top-level react; bun copies the peer range verbatim into the
+        // consumer's tuple metadata and leaves the provider's tuple untouched (no "peer" flag, unlike npm).
+        VersionManifest usesPeer = new VersionManifest("uses-peer", "1.0.0", null, null,
                 null, null, singletonMap("react", ">=17"), null, null, null, null, null, null, null, null, null, null,
+                null, new VersionManifest.Dist("https://r/uses-peer/-/uses-peer-1.0.0.tgz", null, "sha512-peer"), null, null, null);
+        VersionManifest react = new VersionManifest("react", "18.0.0", null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, new VersionManifest.Dist("https://r/react/-/react-18.0.0.tgz", null, "sha512-react"), null, null, null);
+        Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
+        nodes.put("react@18.0.0", new ResolvedNode(react, emptyMap()));
+        nodes.put("uses-peer@1.0.0", new ResolvedNode(usesPeer, emptyMap()));
+        Map<String, String> declared = new LinkedHashMap<>();
+        declared.put("react", "18.0.0");
+        declared.put("uses-peer", "^1.0.0");
+        Map<String, String> resolved = new LinkedHashMap<>();
+        resolved.put("react", "18.0.0");
+        resolved.put("uses-peer", "1.0.0");
+        ResolutionGraph graph = new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                        singletonMap("dependencies", declared), resolved)),
+                nodes);
+
+        assertThat(new BunLockWriter().write(graph, 1, 1)).isEqualTo(
+                "{\n" +
+                "  \"lockfileVersion\": 1,\n" +
+                "  \"configVersion\": 1,\n" +
+                "  \"workspaces\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"app\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"react\": \"18.0.0\",\n" +
+                "        \"uses-peer\": \"^1.0.0\",\n" +
+                "      },\n" +
+                "    },\n" +
+                "  },\n" +
+                "  \"packages\": {\n" +
+                "    \"react\": [\"react@18.0.0\", \"\", {}, \"sha512-react\"],\n" +
+                "\n" +
+                "    \"uses-peer\": [\"uses-peer@1.0.0\", \"\", { \"peerDependencies\": { \"react\": \">=17\" } }, \"sha512-peer\"],\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
+    void peerMetaFlattensToOptionalPeersSorted() {
+        // Mirrors bun's react-redux@9.2.0 shape: both the peerDependencies map and the optionalPeers array are
+        // ASCII-sorted regardless of manifest order, and the meta object is flattened to its optional peer names.
+        Map<String, String> peers = new LinkedHashMap<>();
+        peers.put("react", "^18.0 || ^19");
+        peers.put("redux", "^5.0.0");
+        peers.put("@types/react", "^18.2.25 || ^19");
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("redux").put("optional", true);
+        meta.putObject("@types/react").put("optional", true);
+        VersionManifest m = new VersionManifest("uses-peer", "1.0.0", null, null,
+                singletonMap("use-sync-external-store", "^1.4.0"), null, peers, meta, null, null, null, null, null,
+                null, null, null, null, null,
+                new VersionManifest.Dist("https://r/uses-peer/-/uses-peer-1.0.0.tgz", null, "sha512-peer"), null, null, null);
+        ResolutionGraph graph = new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                        singletonMap("dependencies", singletonMap("uses-peer", "^1.0.0")), singletonMap("uses-peer", "1.0.0"))),
+                singletonMap("uses-peer@1.0.0", new ResolvedNode(m, emptyMap())));
+
+        assertThat(new BunLockWriter().write(graph, 1, 1)).isEqualTo(
+                "{\n" +
+                "  \"lockfileVersion\": 1,\n" +
+                "  \"configVersion\": 1,\n" +
+                "  \"workspaces\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"app\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"uses-peer\": \"^1.0.0\",\n" +
+                "      },\n" +
+                "    },\n" +
+                "  },\n" +
+                "  \"packages\": {\n" +
+                "    \"uses-peer\": [\"uses-peer@1.0.0\", \"\", { \"dependencies\": { \"use-sync-external-store\": \"^1.4.0\" }, " +
+                "\"peerDependencies\": { \"@types/react\": \"^18.2.25 || ^19\", \"react\": \"^18.0 || ^19\", \"redux\": \"^5.0.0\" }, " +
+                "\"optionalPeers\": [\"@types/react\", \"redux\"] }, \"sha512-peer\"],\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
+    void optionalMetaWithoutPeerDeclarationDefers() {
+        // A meta entry that marks a name optional without declaring it a peer is a shape bun has not been verified
+        // on, so the writer fails loud rather than guess whether it lands in optionalPeers.
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("@types/react").put("optional", true);
+        VersionManifest m = new VersionManifest("uses-peer", "1.0.0", null, null,
+                null, null, singletonMap("react", ">=17"), meta, null, null, null, null, null, null, null, null, null,
                 null, new VersionManifest.Dist("https://r/uses-peer/-/uses-peer-1.0.0.tgz", null, "sha512-peer"), null, null, null);
         ResolutionGraph graph = new ResolutionGraph(
                 singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
                         singletonMap("dependencies", singletonMap("uses-peer", "^1.0.0")), singletonMap("uses-peer", "1.0.0"))),
-                singletonMap("uses-peer@1.0.0", new ResolvedNode(withPeer, emptyMap())));
+                singletonMap("uses-peer@1.0.0", new ResolvedNode(m, emptyMap())));
 
         assertThatExceptionOfType(EngineFailure.class)
                 .isThrownBy(() -> new BunLockWriter().write(graph, 1, 1));

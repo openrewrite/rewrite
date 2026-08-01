@@ -57,6 +57,22 @@ class BunResolverLockRegenTest extends LockRegenTestSupport {
                 new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}, {"ms", "2.1.3"}});
     }
 
+    @Test
+    void satisfiedPeer() {
+        // use-sync-external-store@1.4.0 declares a react peer, satisfied by the root's react@19.2.8: bun copies the
+        // peer range verbatim into the consumer's tuple metadata and leaves the provider (react) tuple untouched.
+        assertResolveByteExact("lock/bun/resolve-peer", "after", null,
+                new String[][]{{"react", "19.2.8"}, {"use-sync-external-store", "1.4.0"}});
+    }
+
+    @Test
+    void peerWithOptionalMeta() {
+        // use-callback-ref@1.3.3 carries dependencies (tslib), peerDependencies (@types/react + react) and marks
+        // @types/react optional; the optional peer is absent, and bun flattens the meta into an "optionalPeers" array.
+        assertResolveByteExact("lock/bun/resolve-peer-meta", "after", null,
+                new String[][]{{"react", "19.2.8"}, {"use-callback-ref", "1.3.3"}, {"tslib", "2.8.1"}});
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the resolver output equals {@code dir/golden} byte-for-byte.
      * Each distinct name maps to a packument route {@code http/<name>}; each {@code {name, version}} to a manifest
@@ -85,5 +101,7 @@ class BunResolverLockRegenTest extends LockRegenTestSupport {
     void recordGoldensWithRealBun() throws Exception {
         assertBunReproduces("lock/bun/resolve-clean/pkg", "lock/bun/resolve-clean/after");
         assertBunReproduces("lock/bun/resolve-fork/pkg", "lock/bun/resolve-fork/after");
+        assertBunReproduces("lock/bun/resolve-peer/pkg", "lock/bun/resolve-peer/after");
+        assertBunReproduces("lock/bun/resolve-peer-meta/pkg", "lock/bun/resolve-peer-meta/after");
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.resolve;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.BunJson;
@@ -27,9 +28,10 @@ import java.util.*;
  * Serializes a {@link ResolutionGraph} to {@code bun.lock} text (JSONC), byte-for-byte identical to what a real
  * {@code bun install --lockfile-only} would write. It computes bun's hoisted layout from the graph (every package
  * top-level for a clean closure; the conflicting version of a directly-declared fork nested under its requiring
- * parent as a {@code "parent/name"} tuple) and renders each entry through {@link BunJson}. Anything it cannot
- * reproduce byte-exact — a workspace, a dev/optional/peer surface, a manifest field bun surfaces into the tuple —
- * fails loud rather than emit a wrong lock.
+ * parent as a {@code "parent/name"} tuple) and renders each entry through {@link BunJson}. A satisfied
+ * {@code peerDependencies} surface is reproduced (its ranges verbatim, its optional peers flattened into bun's
+ * {@code optionalPeers} array). Anything else it cannot reproduce byte-exact — a workspace, a dev/optional surface,
+ * a manifest field bun surfaces into the tuple — fails loud rather than emit a wrong lock.
  */
 public final class BunLockWriter {
 
@@ -115,23 +117,50 @@ public final class BunLockWriter {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, m.getName(),
                     m.getName() + "@" + m.getVersion() + " has no integrity");
         }
-        return BunJson.renderTuple(m.getName(), m.getVersion(), m.getDependencies(), integrity);
+        return BunJson.renderTuple(m.getName(), m.getVersion(), m.getDependencies(),
+                m.getPeerDependencies(), optionalPeers(m), integrity);
     }
 
     /**
-     * bun's text tuple carries {@code dependencies} only. A manifest with any other field bun folds into the
-     * tuple metadata (peer/optional deps, a platform gate, a bin) reshapes the entry in a way not yet
-     * byte-verified, so it defers rather than guess. Fields bun keeps out of the text lock (engines, license,
-     * funding, deprecated, install scripts) are intentionally ignored.
+     * bun's text tuple carries {@code dependencies} and a satisfied {@code peerDependencies} surface (its ranges
+     * verbatim, its optional peers flattened into {@code optionalPeers}). A manifest with any other field bun folds
+     * into the tuple metadata (an optional-dependency surface, a platform gate, a bin) reshapes the entry in a way
+     * not yet byte-verified, so it defers rather than guess. Fields bun keeps out of the text lock (engines,
+     * license, funding, deprecated, install scripts) are intentionally ignored.
      */
     private static void requireEmittable(VersionManifest m) {
-        deferIf(m, "peerDependencies", notEmpty(m.getPeerDependencies()));
         deferIf(m, "optionalDependencies", notEmpty(m.getOptionalDependencies()));
         deferIf(m, "bin", m.getBin() != null);
         deferIf(m, "os", m.getOs() != null);
         deferIf(m, "cpu", m.getCpu() != null);
         deferIf(m, "libc", m.getLibc() != null);
         deferIf(m, "bundleDependencies", m.getBundleDependencies() != null);
+    }
+
+    /**
+     * bun records optional peers not as npm's verbatim {@code peerDependenciesMeta} object but as a flat
+     * {@code optionalPeers} array of the peer names flagged {@code optional: true}, ASCII-sorted. A meta entry that
+     * marks a name optional without declaring it a peer is a shape bun has not been byte-verified on, so it defers.
+     */
+    private static @Nullable List<String> optionalPeers(VersionManifest m) {
+        JsonNode meta = m.getPeerDependenciesMeta();
+        if (meta == null || !meta.isObject() || meta.size() == 0) {
+            return null;
+        }
+        Map<String, String> peers = m.getPeerDependencies();
+        List<String> optional = new ArrayList<>();
+        for (Iterator<Map.Entry<String, JsonNode>> it = meta.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> e = it.next();
+            if (e.getValue().path("optional").asBoolean(false)) {
+                if (peers == null || !peers.containsKey(e.getKey())) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, m.getName(),
+                            m.getName() + " marks " + e.getKey() + " optional but does not declare it as a peer");
+                }
+                optional.add(e.getKey());
+            }
+        }
+        optional.sort(null);
+        return optional.isEmpty() ? null : optional;
     }
 
     private static void deferIf(VersionManifest m, String field, boolean present) {
