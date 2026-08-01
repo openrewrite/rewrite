@@ -204,6 +204,14 @@ public final class NativeLockEngine {
         }
         String oldVersion = lockedVersions.iterator().next();
 
+        // A member-declared bump must own its registry entry alone: if a sibling workspace importer declares the
+        // same dependency at the same range, they share one lock entry, so re-heading it would break the sibling.
+        if ((pm == PackageManager.YarnBerry || pm == PackageManager.Bun) &&
+                importersDeclaring(pm, existingLock, name, change.oldConstraint) > 1) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is declared by multiple workspace importers; a per-member bump would fork (deferred)");
+        }
+
         String targetVersion = resolveTarget(client, registries, name, oldVersion, change.newConstraint);
 
         if (pm == PackageManager.Pnpm && !targetVersion.equals(oldVersion)) {
@@ -2206,9 +2214,85 @@ public final class NativeLockEngine {
                 return findImporterDirJson(pm, lock, name, oldConstraint);
             case Pnpm:
                 return findImporterDirPnpm(lock, name, oldConstraint);
+            case YarnBerry:
+                return findImporterDirBerry(lock, name, oldConstraint);
             default:
-                return null; // yarn has no importer concept in its lock
+                return null; // yarn-classic merges selectors into a flat file, with no importer keys
         }
+    }
+
+    /**
+     * The berry workspace importer ({@code <name>@workspace:<dir>}) that declares this dependency, as its directory
+     * relative to the lock, or {@code null} for the root importer ({@code @workspace:.}) or a single-package lock.
+     */
+    private static @Nullable String findImporterDirBerry(String lock, String name, @Nullable String oldConstraint) {
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return null;
+        }
+        String unique = null;
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+            String key = String.valueOf(e.getKey());
+            int idx = key.indexOf("@workspace:");
+            if (idx < 0 || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            String c = berryImporterConstraint((Map<?, ?>) e.getValue(), name);
+            if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
+                String dir = key.substring(idx + "@workspace:".length());
+                if (".".equals(dir)) {
+                    return null; // the root importer owns it
+                }
+                if (unique != null) {
+                    return null; // ambiguous; the shared-importer guard fails this loud
+                }
+                unique = dir;
+            }
+        }
+        return unique;
+    }
+
+    /** A berry importer records its declared range as {@code npm:<range>}; return the bare range. */
+    private static @Nullable String berryImporterConstraint(Map<?, ?> importer, String name) {
+        for (String scope : DECLARED_SCOPES) {
+            Object scopeMap = importer.get(scope);
+            if (scopeMap instanceof Map && ((Map<?, ?>) scopeMap).get(name) != null) {
+                String v = String.valueOf(((Map<?, ?>) scopeMap).get(name));
+                return v.startsWith("npm:") ? v.substring("npm:".length()) : v;
+            }
+        }
+        return null;
+    }
+
+    /** How many workspace importers declare {@code name} at exactly {@code constraint} (a shared entry when {@code > 1}). */
+    private static int importersDeclaring(PackageManager pm, String lock, String name, @Nullable String constraint) {
+        int count = 0;
+        if (pm == PackageManager.YarnBerry) {
+            Object loaded = new Yaml().load(lock);
+            if (loaded instanceof Map) {
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+                    if (String.valueOf(e.getKey()).contains("@workspace:") && e.getValue() instanceof Map) {
+                        String c = berryImporterConstraint((Map<?, ?>) e.getValue(), name);
+                        if (c != null && (constraint == null || constraint.equals(c))) {
+                            count++;
+                        }
+                    }
+                }
+            }
+        } else {
+            Object workspaces = parseJsonObject(lock, false).get("workspaces");
+            if (workspaces instanceof Map) {
+                for (Object importer : ((Map<?, ?>) workspaces).values()) {
+                    if (importer instanceof Map) {
+                        String c = declaredConstraintIn((Map<?, ?>) importer, name, DECLARED_SCOPES);
+                        if (c != null && (constraint == null || constraint.equals(c))) {
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+        return count;
     }
 
     private static @Nullable String findImporterDirJson(PackageManager pm, String lock, String name,

@@ -41,7 +41,8 @@ import java.util.TreeSet;
  * Supported: an in-place version bump (rewrite the entry's descriptor key, {@code version}, {@code resolution}
  * and {@code checksum} plus the importer range) and adding a dependency plus its runtime closure (a fresh entry
  * per member at its sorted position; scoped members are supported, their {@code @scope/name} keys sorting by
- * plain string like any other and quoted for YAML). A merged descriptor key, fork, or workspaces all fail loud.
+ * plain string like any other and quoted for YAML). A multi-importer workspace bump re-pins only the member
+ * importer the edit targets. A merged descriptor key or fork fails loud.
  */
 public final class YarnBerryLockPatcher implements LockPatcher {
 
@@ -217,7 +218,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         }
         root = LockYaml.replaceEntry(root, oldDescriptor, LockYaml.renameKey(entry, newDescriptor).withValue(body));
 
-        return repinImporter(root, name, newConstraint);
+        return repinImporter(root, edit.getImporterDir(), name, newConstraint);
     }
 
     /** Record which of the bumped entry's dependencies the new manifest dropped, as orphan candidates for the GC. */
@@ -451,9 +452,9 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         return names;
     }
 
-    /** Re-pin the single workspace importer's declared range on {@code name} to {@code npm:<newConstraint>}. */
-    private Yaml.Mapping repinImporter(Yaml.Mapping root, String name, String newConstraint) {
-        Yaml.Mapping.Entry importer = singleImporter(root, name);
+    /** Re-pin the declared range on {@code name} to {@code npm:<newConstraint>} in the edit's workspace importer. */
+    private Yaml.Mapping repinImporter(Yaml.Mapping root, @Nullable String importerDir, String name, String newConstraint) {
+        Yaml.Mapping.Entry importer = importerFor(root, importerDir);
         if (importer == null) {
             return root;
         }
@@ -467,6 +468,35 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             }
         }
         return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));
+    }
+
+    /**
+     * The workspace importer keyed {@code @workspace:<dir>} ({@code .} for the root), located by the edit's importer
+     * directory so a member-declared bump re-pins only that member. Falls back to the sole importer when unkeyed.
+     */
+    private static Yaml.Mapping.@Nullable Entry importerFor(Yaml.Mapping root, @Nullable String importerDir) {
+        String target = importerDir == null ? "." : importerDir;
+        Yaml.Mapping.Entry only = null;
+        int count = 0;
+        for (Yaml.Mapping.Entry e : root.getEntries()) {
+            String key = LockYaml.keyOf(e);
+            if (key == null || !key.contains("@workspace:") || !(e.getValue() instanceof Yaml.Mapping)) {
+                continue;
+            }
+            count++;
+            only = e;
+            if (target.equals(workspaceDir(key))) {
+                return e;
+            }
+        }
+        return (importerDir == null && count == 1) ? only : null;
+    }
+
+    /** The path after {@code @workspace:} in an importer descriptor key. */
+    private static String workspaceDir(String key) {
+        String first = key.split(",")[0].trim();
+        int idx = first.indexOf("@workspace:");
+        return idx < 0 ? first : first.substring(idx + "@workspace:".length());
     }
 
     /** The lone {@code @workspace:} importer entry, or {@code null} if none; multiple importers defer. */

@@ -1,0 +1,32 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "root",
+    },
+    "packages/app": {
+      "name": "app",
+      "version": "1.0.0",
+      "dependencies": {
+        "ms": "2.1.2",
+      },
+    },
+    "packages/lib": {
+      "name": "lib",
+      "version": "1.0.0",
+      "dependencies": {
+        "is-buffer": "2.0.5",
+      },
+    },
+  },
+  "packages": {
+    "app": ["app@workspace:packages/app"],
+
+    "is-buffer": ["is-buffer@2.0.5", "", {}, "sha512-i2R6zNFDwgEHJyQUtJEk0XFi1i0dPFn/oqjK3/vPCcDeJvW5NQ83V8QbicfF1SupOaB0h8ntgBC2YiE7dfyctQ=="],
+
+    "lib": ["lib@workspace:packages/lib"],
+
+    "ms": ["ms@2.1.2", "", {}, "sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w=="],
+  }
+}

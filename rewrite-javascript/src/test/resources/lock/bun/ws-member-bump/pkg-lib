@@ -1,0 +1,7 @@
+{
+  "name": "lib",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-buffer": "2.0.5"
+  }
+}
