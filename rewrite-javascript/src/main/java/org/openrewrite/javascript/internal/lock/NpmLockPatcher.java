@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -437,50 +436,13 @@ public final class NpmLockPatcher implements LockPatcher {
 
     /** Pretty-print a JSON value exactly as npm's {@code json-stringify-nice} does at {@code indent}. */
     private static String renderNode(JsonNode node, String indent, String unit) {
-        if (node.isObject()) {
-            if (node.size() == 0) {
-                return "{}";
-            }
-            String inner = indent + unit;
-            List<String> keys = new ArrayList<>();
-            node.fieldNames().forEachRemaining(keys::add);
-            keys.sort((a, b) -> {
-                boolean ao = node.get(a).isObject();
-                boolean bo = node.get(b).isObject();
-                return ao != bo ? (ao ? 1 : -1) : NpmKeyOrder.compareKeys(a, b);
-            });
-            List<String> members = new ArrayList<>();
-            for (String k : keys) {
-                members.add("\n" + inner + jsonEncode(k) + ": " + renderNode(node.get(k), inner, unit));
-            }
-            return "{" + String.join(",", members) + "\n" + indent + "}";
-        }
-        if (node.isArray()) {
-            if (node.size() == 0) {
-                return "[]";
-            }
-            String inner = indent + unit;
-            List<String> elements = new ArrayList<>();
-            for (JsonNode el : node) {
-                elements.add("\n" + inner + renderNode(el, inner, unit));
-            }
-            return "[" + String.join(",", elements) + "\n" + indent + "]";
-        }
-        return scalarSource(node);
+        return NpmJson.render(node, indent, unit);
     }
 
     /** The indentation (no newline) of an object member's prefix whitespace. */
     private static String indentOf(String ws) {
         int nl = ws.lastIndexOf('\n');
         return nl < 0 ? ws : ws.substring(nl + 1);
-    }
-
-    private static String scalarSource(JsonNode node) {
-        try {
-            return JSON.writeValueAsString(node);
-        } catch (JsonProcessingException e) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not JSON-encode value: " + node);
-        }
     }
 
     /** A pending entry member: its key, source value, and whether the value is a JSON object (sorts last). */
@@ -1220,11 +1182,7 @@ public final class NpmLockPatcher implements LockPatcher {
 
     /** Jackson-escaped quoted JSON string literal — registry {@code license}/{@code deprecated} may contain {@code "}/{@code \}/newlines. */
     private static String jsonEncode(String value) {
-        try {
-            return JSON.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not JSON-encode value: " + value);
-        }
+        return NpmJson.jsonEncode(value);
     }
 
     /** Replace the value of member {@code key} in place, keeping its position and surrounding padding. */
