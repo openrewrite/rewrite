@@ -83,6 +83,15 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void constraintWiden() {
+        // ms ^2.1.0 -> ^2.1.1, both resolve to the locked 2.1.3: only the descriptor key and importer range move;
+        // the version, resolution and checksum stay, so no tarball/checksum is needed.
+        String dir = "lock/yarn-berry/widen";
+        route(dir, "ms", "2.1.3", false);
+        assertRegenEquals(dir);
+    }
+
+    @Test
     void orphanPrune() {
         // semver 7.5.4 -> 7.6.3 drops its lru-cache edge; the semver entry loses its dependencies map and the now
         // unreachable lru-cache + yallist entries are GC'd. semver's own checksum is reproduced from its tarball.
@@ -145,7 +154,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge", "remove"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge", "remove", "widen"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }

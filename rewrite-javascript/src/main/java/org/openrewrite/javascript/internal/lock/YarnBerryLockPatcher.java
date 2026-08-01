@@ -185,7 +185,10 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (edit.getOldConstraint() == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing old constraint for " + name);
         }
-        if (edit.getNewBerryChecksum() == null) {
+        // A constraint-only widening keeps the resolved version (and its checksum); only the descriptor and the
+        // importer range move. A version move rewrites the resolution triple and needs a reproduced checksum.
+        boolean widening = edit.getNewVersion().equals(edit.getOldVersion());
+        if (!widening && edit.getNewBerryChecksum() == null) {
             throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, name, "no reproduced checksum for " + name);
         }
 
@@ -198,15 +201,17 @@ public final class YarnBerryLockPatcher implements LockPatcher {
 
         Yaml.Mapping.Entry entry = findSingleDescriptor(root, oldDescriptor, name);
         Yaml.Mapping body = (Yaml.Mapping) entry.getValue();
-        // The engine proved every non-dependency surface (peer/optional/engines/…) byte-identical, so rewrite only
-        // the resolution triple, the importer range, and — for a cascade — the changed dependency constraints.
-        body = LockYaml.setScalar(body, "version", edit.getNewVersion());
-        body = LockYaml.setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion());
-        body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
-        body = rewriteDependencies(body, edit.getNewDependencies(), name);
-        if (edit.isPrunesOrphans()) {
-            recordDroppedEdges(body, edit.getNewDependencies());
-            body = pruneDependencies(body, edit.getNewDependencies());
+        if (!widening) {
+            // The engine proved every non-dependency surface byte-identical, so rewrite only the resolution
+            // triple, and — for a cascade — the changed dependency constraints.
+            body = LockYaml.setScalar(body, "version", edit.getNewVersion());
+            body = LockYaml.setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion());
+            body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
+            body = rewriteDependencies(body, edit.getNewDependencies(), name);
+            if (edit.isPrunesOrphans()) {
+                recordDroppedEdges(body, edit.getNewDependencies());
+                body = pruneDependencies(body, edit.getNewDependencies());
+            }
         }
         root = LockYaml.replaceEntry(root, oldDescriptor, LockYaml.renameKey(entry, newDescriptor).withValue(body));
 
