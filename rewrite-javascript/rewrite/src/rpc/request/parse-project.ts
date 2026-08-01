@@ -21,6 +21,7 @@ import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
 import {replaceMarkerByKind} from "../../markers";
+import {setLastParsedProject} from "./last-parsed-project";
 
 /**
  * Response item with object ID and source file type for proper deserialization.
@@ -74,6 +75,7 @@ export class ParseProject {
                     const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
 
                     const projectPath = path.resolve(request.projectPath);
+                    setLastParsedProject(projectPath);
                     const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
                     // Use relativeTo if specified, otherwise default to projectPath
                     const relativeTo = request.relativeTo ? path.resolve(request.relativeTo) : projectPath;

@@ -328,7 +328,7 @@ internal class CSharpTypeMapping
         return variable;
     }
 
-    private static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
+    internal static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
     {
         // System.String is intentionally omitted: it is a reference type with interfaces
         // (IEnumerable<char>, IComparable<string>, etc.) that TypeUtils.IsAssignableTo needs
@@ -350,7 +350,7 @@ internal class CSharpTypeMapping
         };
     }
 
-    private static long MapFlags(ISymbol symbol)
+    internal static long MapFlags(ISymbol symbol)
     {
         long flags = 0;
         // Map accessibility
@@ -369,7 +369,7 @@ internal class CSharpTypeMapping
         return flags;
     }
 
-    private static JavaType.FullyQualified.FullyQualifiedKind MapClassKind(INamedTypeSymbol symbol)
+    internal static JavaType.FullyQualified.FullyQualifiedKind MapClassKind(INamedTypeSymbol symbol)
     {
         return symbol.TypeKind switch
         {
@@ -381,7 +381,7 @@ internal class CSharpTypeMapping
         };
     }
 
-    private static string GetFullyQualifiedName(INamedTypeSymbol symbol)
+    internal static string GetFullyQualifiedName(INamedTypeSymbol symbol)
     {
         if (symbol.ContainingType != null)
         {

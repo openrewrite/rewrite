@@ -31,6 +31,9 @@ type typeMapper struct {
 	// namedCache deduplicates by *types.Named pointer, preventing infinite recursion
 	// when types reference each other.
 	namedCache map[*types.Named]*java.JavaTypeClass
+	// ownPkg, when set (exported-types enumeration only), limits full class bodies
+	// to the enumerated modules; foreign named types become FQN-only ShallowClass refs.
+	ownPkg func(pkgPath string) bool
 }
 
 func newTypeMapper() *typeMapper {
@@ -60,6 +63,11 @@ func (m *typeMapper) doMapType(t types.Type) java.JavaType {
 	case *types.Basic:
 		return m.mapBasic(v)
 	case *types.Named:
+		if m.ownPkg != nil {
+			if pkg := v.Obj().Pkg(); pkg != nil && !m.ownPkg(pkg.Path()) {
+				return m.mapShallow(v)
+			}
+		}
 		return m.mapNamed(v)
 	case *types.Pointer:
 		// Go pointers are transparent for refactoring — unwrap to pointee type
@@ -128,6 +136,20 @@ func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
 	default:
 		return java.UnknownType
 	}
+}
+
+// mapShallow mints an FQN-only reference to a type the enumerated modules don't define.
+func (m *typeMapper) mapShallow(named *types.Named) *java.JavaTypeShallowClass {
+	obj := named.Obj()
+	kind := "Class"
+	if _, ok := named.Underlying().(*types.Interface); ok {
+		kind = "Interface"
+	}
+	return &java.JavaTypeShallowClass{JavaTypeClass: java.JavaTypeClass{
+		FullyQualifiedName: fullyQualifiedName(obj),
+		FlagsBitMap:        flagsForObject(obj),
+		Kind:               kind,
+	}}
 }
 
 // mapNamed maps a named type (struct, interface, etc.) to JavaTypeClass.

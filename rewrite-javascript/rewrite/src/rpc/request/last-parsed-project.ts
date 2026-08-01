@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-export * from "./dependency-types";
-export * from "./generate";
-export * from "./get-object";
-export * from "./get-marketplace";
-export * from "./parse";
-export * from "./parse-project";
-export * from "./prepare-recipe";
-export * from "./print";
-export * from "./visit";
-export * from "./batch-visit";
-export * from "./trace-get-object";
-export * from "./set-data-table-store";
+
+// ParseProject records the most recently parsed project here; DependencyTypes
+// resolves npm coordinates against its node_modules tree.
+let projectDir: string | undefined;
+
+export function setLastParsedProject(dir: string): void {
+    projectDir = dir;
+}
+
+export function lastParsedProject(): string | undefined {
+    return projectDir;
+}

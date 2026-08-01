@@ -197,6 +197,22 @@ export class JavaScriptTypeMapping {
         return classType;
     }
 
+    /**
+     * Map an exported symbol (type alias, namespace, function, ...) to its {@link Type} via the
+     * symbol's declared or value type. Enumerator-only entry point ({@code exportedTypes}) for
+     * exports that are not class/interface/enum declarations; those go through {@link declarationType}.
+     */
+    exportedType(symbol: ts.Symbol): Type | undefined {
+        const target = symbol.flags & ts.SymbolFlags.Alias ? this.checker.getAliasedSymbol(symbol) : symbol;
+        let type: ts.Type | undefined;
+        if (target.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.ValueModule)) {
+            type = this.checker.getDeclaredTypeOfSymbol(target);
+        } else if (target.valueDeclaration) {
+            type = this.checker.getTypeOfSymbolAtLocation(target, target.valueDeclaration);
+        }
+        return type ? this.getType(type) : undefined;
+    }
+
     private getType(type: ts.Type): Type {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
