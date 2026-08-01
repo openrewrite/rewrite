@@ -260,6 +260,12 @@ public final class NativeLockEngine {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
                 edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
+            } else if (pm == PackageManager.Bun) {
+                if (dropsDependencyEdge(oldManifest, newManifest)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            name + " drops a dependency edge (orphan-prune) not yet supported for bun");
+                }
+                edits.addAll(cascadeForcedMovesBun(name, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
@@ -2440,6 +2446,124 @@ public final class NativeLockEngine {
                     if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
                         return true;
                     }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A direct-dependency bump whose new {@code dependencies} edges force a currently-locked transitive to move,
+     * for bun. Each kept edge that the locked version no longer satisfies re-resolves and emits a forced move; a
+     * shared or directly-declared transitive, an added transitive, or a mover whose own dependencies also change
+     * fails loud. A dropped edge is guarded upstream (orphan-prune is separate).
+     */
+    private static List<LockEditSet.PackageEdit> cascadeForcedMovesBun(String rootName, VersionManifest rootNew,
+                                                                       String lock, NodeRegistries registries,
+                                                                       NpmRegistryClient client) {
+        Map<String, String> newDeps = rootNew.getDependencies() == null ? Collections.emptyMap() : rootNew.getDependencies();
+        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
+        for (Map.Entry<String, String> e : newDeps.entrySet()) {
+            String dep = e.getKey();
+            String newConstraint = e.getValue();
+            Set<String> locked = findLockedVersionsBun(lock, dep);
+            if (locked.isEmpty()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        "upgrading " + rootName + " introduces new transitive " + dep + " (add-during-bump) not yet supported");
+            }
+            if (locked.size() > 1) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " is present at multiple versions; deferred");
+            }
+            if (isUnsupportedProtocol(newConstraint) || !NodeSemver.validRange(newConstraint)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " has an unresolvable range: " + newConstraint);
+            }
+            String cur = locked.iterator().next();
+            // Still satisfied: the bumped parent's own metadata records the new range, so no separate move.
+            if (NodeSemver.satisfies(cur, newConstraint)) {
+                continue;
+            }
+            moves.add(resolveForcedMoveBun(rootName, dep, cur, newConstraint, lock, registries, client));
+        }
+        return moves;
+    }
+
+    /** Resolve and emit one bun forced move, failing loud on a shared/declared requirer or any deeper reshape. */
+    private static LockEditSet.PackageEdit resolveForcedMoveBun(String rootName, String dep, String oldVersion,
+                                                               String newConstraint, String lock,
+                                                               NodeRegistries registries, NpmRegistryClient client) {
+        if (bunHasOtherRequirer(lock, dep, rootName)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " is required by more than the upgraded " + rootName + "; a shared move defers");
+        }
+        if (bunImporterDeclares(lock, dep)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    dep + " is directly declared; moving it via cascade is not yet supported");
+        }
+        NodeRegistry registry = registries.registryFor(dep);
+        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), Collections.singleton(newConstraint));
+        if (target == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no version of " + dep + " satisfies " + newConstraint);
+        }
+        if (target.equals(oldVersion)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " resolves back to its locked version; deferred");
+        }
+        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
+        VersionManifest newManifest = client.getManifest(registry, dep, target);
+        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
+        if (!dependenciesEqual(oldManifest, newManifest)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                    "moving " + dep + " to " + target + " changes its own dependencies (multi-level cascade) not yet supported");
+        }
+        VersionManifest.Dist dist = newManifest.getDist();
+        if (dist == null || dist.getIntegrity() == null) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep, dep + "@" + target + " has no registry integrity");
+        }
+        return LockEditSet.PackageEdit.builder()
+                .name(dep)
+                .oldVersion(oldVersion)
+                .newVersion(target)
+                .newIntegrity(dist.getIntegrity())
+                .newDependencies(newManifest.getDependencies())
+                .scope("dependencies")
+                .importerDir(null)
+                .kind(FORCED_MOVE)
+                .build();
+    }
+
+    /** True when a package other than {@code rootName} (or a nested placement) records a constraint on {@code dep}. */
+    private static boolean bunHasOtherRequirer(String lock, String dep, String rootName) {
+        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
+            if (e.getKey().equals(rootName) || isNestedBunKey(e.getKey())) {
+                continue;
+            }
+            List<?> tuple = tupleOf(e.getValue());
+            if (tuple != null && tuple.size() >= 3 && tuple.get(2) instanceof Map) {
+                Map<?, ?> meta = (Map<?, ?>) tuple.get(2);
+                for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
+                    Object deps = meta.get(scope);
+                    if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /** True when a bun workspace importer declares {@code dep} directly (so a cascade would touch its own range). */
+    private static boolean bunImporterDeclares(String lock, String dep) {
+        Object workspaces = parseJsonObject(lock, false).get("workspaces");
+        if (!(workspaces instanceof Map)) {
+            return false;
+        }
+        for (Object importer : ((Map<?, ?>) workspaces).values()) {
+            if (!(importer instanceof Map)) {
+                continue;
+            }
+            for (String scope : DECLARED_SCOPES) {
+                Object deps = ((Map<?, ?>) importer).get(scope);
+                if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
+                    return true;
                 }
             }
         }

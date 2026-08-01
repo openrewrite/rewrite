@@ -307,6 +307,25 @@ public final class BunLockPatcher implements LockPatcher {
         return parseMember(quote(name) + ": " + quote(value));
     }
 
+    /**
+     * Rewrite the {@code dependencies} sub-map inside a package tuple's metadata (element 2) to the bump's new
+     * ranges, byte-exact. Sibling surfaces (optionalDependencies/peer/os/…) are proven unchanged upstream, so they
+     * stay. A null delta leaves the metadata alone (a leaf move / deps-unchanged bump); gaining a dependencies map
+     * is a reshape this slice does not do.
+     */
+    private static Json.JsonObject rewriteMetadataDeps(Json.JsonObject metadata, @Nullable Map<String, String> newDeps,
+                                                       String name) {
+        if (newDeps == null || newDeps.isEmpty()) {
+            return metadata;
+        }
+        Json.Member depsMember = LockJson.member(metadata, "dependencies");
+        if (depsMember == null || !(depsMember.getValue() instanceof Json.JsonObject)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gains a dependencies map; not yet supported");
+        }
+        Json.JsonObject rendered = (Json.JsonObject) LockJson.parse(renderInlineMap(newDeps), null).getValue();
+        return LockJson.replaceValue(metadata, "dependencies", rendered.withPrefix(depsMember.getValue().getPrefix()));
+    }
+
     /** bun's compact single-line metadata: {@code {}} or {@code { "dependencies": { "<dep>": "<range>", … } }}. */
     private static String renderMetadata(@Nullable Map<String, String> deps) {
         if (deps == null || deps.isEmpty()) {
@@ -567,6 +586,10 @@ public final class BunLockPatcher implements LockPatcher {
                     List<JsonValue> updated = new ArrayList<>(values);
                     String newLocator = locator(edit, edit.getNewVersion());
                     updated.set(0, ((Json.Literal) values.get(0)).withSource('"' + newLocator + '"').withValue(newLocator));
+                    // A closure-changing bump re-pins the package's own dependency ranges (tuple metadata, element 2).
+                    if (values.get(2) instanceof Json.JsonObject) {
+                        updated.set(2, rewriteMetadataDeps((Json.JsonObject) values.get(2), edit.getNewDependencies(), edit.getName()));
+                    }
                     if (edit.getNewIntegrity() != null && values.get(3) instanceof Json.Literal) {
                         String integrity = edit.getNewIntegrity();
                         updated.set(3, ((Json.Literal) values.get(3)).withSource('"' + integrity + '"').withValue(integrity));
