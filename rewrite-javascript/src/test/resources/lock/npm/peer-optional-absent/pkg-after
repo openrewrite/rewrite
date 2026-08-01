@@ -1,0 +1,7 @@
+{
+  "name": "peer-opt",
+  "version": "1.0.0",
+  "dependencies": {
+    "ws": "8.12.0"
+  }
+}

@@ -127,7 +127,7 @@ public class LockEditSet {
      * leaf add's serialized metadata). Only changed fields are non-null; the engine has already normalized them.
      */
     @Value
-    @Builder
+    @Builder(toBuilder = true)
     public static class WriteThroughMetadata {
         @Nullable
         Map<String, String> engines;
@@ -167,6 +167,9 @@ public class LockEditSet {
         /** A closure member's {@code peerDependencies} map, copied verbatim (object group). */
         @Nullable
         Map<String, String> peerDependencies;
+
+        /** A bump rewrote {@code peerDependencies} (add/widen), so the patcher replaces the entry's field in place. */
+        boolean peerDependenciesChanged;
 
         /** Raw {@code peerDependenciesMeta} node ({@code {name: {optional: bool}}}), copied verbatim (object group). */
         @Nullable

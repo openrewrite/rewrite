@@ -260,8 +260,11 @@ public final class NativeLockEngine {
         VersionManifest newManifest = client.getManifest(registry, name, targetVersion);
 
         // Every closure surface but `dependencies` must be unchanged; a `dependencies` delta no longer fails
-        // loud outright, it seeds the greedy-forward cascade below.
-        proveNonDependencySurfacesUnchanged(name, oldManifest, newManifest);
+        // loud outright, it seeds the greedy-forward cascade below. A peer-surface delta whose already-installed
+        // providers still satisfy the new ranges is written through rather than deferred (npm only).
+        boolean depsEqual = dependenciesEqual(oldManifest, newManifest);
+        LockEditSet.WriteThroughMetadata surfaces =
+                proveSurfacesAndWriteThrough(pm, name, oldManifest, newManifest, existingLock, depsEqual);
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
@@ -273,14 +276,14 @@ public final class NativeLockEngine {
                 .newShasum(dist == null ? null : dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .writeThroughMetadata(writeThrough(pm, oldManifest, newManifest))
+                .writeThroughMetadata(surfaces)
                 .prunesOrphans(prunesOrphans)
                 .build();
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
         edits.add(rootEdit);
         edits.addAll(nestEdits);
-        if (!dependenciesEqual(oldManifest, newManifest)) {
+        if (!depsEqual) {
             if (pm == PackageManager.Npm) {
                 edits.addAll(cascadeForcedMoves(name, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.Pnpm) {
@@ -1678,6 +1681,11 @@ public final class NativeLockEngine {
         requireEqual(name, "peerDependencies", oldM.getPeerDependencies(), newM.getPeerDependencies());
         requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
         requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
+        provePlatformSurfacesUnchanged(name, oldM, newM);
+    }
+
+    /** The always-strict subset: platform gates and install scripts, which reshape the graph or its side effects. */
+    private static void provePlatformSurfacesUnchanged(String name, VersionManifest oldM, VersionManifest newM) {
         requireEqual(name, "os", oldM.getOs(), newM.getOs());
         requireEqual(name, "cpu", oldM.getCpu(), newM.getCpu());
         requireEqual(name, "libc", oldM.getLibc(), newM.getLibc());
@@ -1687,6 +1695,101 @@ public final class NativeLockEngine {
         }
         // Peer-provider and dedupe-reshuffle detection need the full hoisting model; the single-locked-version
         // guard plus the cascade's reverse-edge check reject the common triggers.
+    }
+
+    /**
+     * A direct-dependency bump's non-{@code dependencies} surfaces, returning the metadata written through instead
+     * of deferred. The platform gates and {@code optionalDependencies} stay strict. A {@code peerDependencies} delta
+     * is written through — but only for npm, only for a pure-metadata bump (a {@code dependencies} reshape defers),
+     * and only when the change is add-or-widen: {@code peerDependenciesMeta} unchanged and no peer dropped (both
+     * would let npm GC a provider it auto-installed for a now-slack peer), and every peer the new version requires is
+     * already installed at a satisfying version (an absent optional peer counts as satisfied). Anything else defers.
+     */
+    private static LockEditSet.@Nullable WriteThroughMetadata proveSurfacesAndWriteThrough(
+            PackageManager pm, String name, VersionManifest oldM, VersionManifest newM, String lock, boolean depsEqual) {
+        provePlatformSurfacesUnchanged(name, oldM, newM);
+        requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
+
+        boolean peerChanged = !Objects.equals(normalize(oldM.getPeerDependencies()), normalize(newM.getPeerDependencies()));
+        LockEditSet.WriteThroughMetadata base = writeThrough(pm, oldM, newM);
+        if (!peerChanged) {
+            // A meta-only delta always flips a peer's optional-ness (npm may drop an auto-installed peer); defer.
+            requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
+            return base;
+        }
+
+        boolean peerMetaChanged =
+                !Objects.equals(normalize(oldM.getPeerDependenciesMeta()), normalize(newM.getPeerDependenciesMeta()));
+        if (pm != PackageManager.Npm || !depsEqual || peerMetaChanged || removesPeer(oldM, newM)) {
+            requireEqual(name, "peerDependencies", oldM.getPeerDependencies(), newM.getPeerDependencies());
+            requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
+            return base;
+        }
+        requirePeerProvidersSatisfy(pm, name, newM, lock);
+
+        LockEditSet.WriteThroughMetadata.WriteThroughMetadataBuilder b =
+                base == null ? LockEditSet.WriteThroughMetadata.builder() : base.toBuilder();
+        return b.peerDependencies(notEmpty(newM.getPeerDependencies()) ? newM.getPeerDependencies() : null)
+                .peerDependenciesChanged(true)
+                .build();
+    }
+
+    /** Whether the new version drops a {@code peerDependencies} name the old version declared. */
+    private static boolean removesPeer(VersionManifest oldM, VersionManifest newM) {
+        Map<String, String> oldPeers = oldM.getPeerDependencies();
+        if (oldPeers == null || oldPeers.isEmpty()) {
+            return false;
+        }
+        Map<String, String> newPeers = newM.getPeerDependencies() == null ?
+                Collections.emptyMap() : newM.getPeerDependencies();
+        for (String p : oldPeers.keySet()) {
+            if (!newPeers.containsKey(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Every non-optional peer the new version declares must already be installed at a version its new range admits;
+     * an optional peer (per the new {@code peerDependenciesMeta}) may be absent. A peer present at multiple versions
+     * is ambiguous. Any auto-install or re-resolve fails loud — that hard tail is out of scope.
+     */
+    private static void requirePeerProvidersSatisfy(PackageManager pm, String name, VersionManifest newM, String lock) {
+        Map<String, String> peers = newM.getPeerDependencies();
+        if (peers == null) {
+            return;
+        }
+        JsonNode meta = newM.getPeerDependenciesMeta();
+        for (Map.Entry<String, String> e : peers.entrySet()) {
+            String peer = e.getKey();
+            String range = e.getValue();
+            Set<String> installed = findLockedVersions(pm, lock, peer);
+            if (installed.isEmpty()) {
+                if (isOptionalPeer(meta, peer)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + " peer " + peer + " is not installed; auto-installing a peer is not yet supported");
+            }
+            if (installed.size() > 1) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer +
+                        " is present at multiple versions " + installed + "; cannot prove the graph is unchanged");
+            }
+            String v = installed.iterator().next();
+            if (!(NodeSemver.validRange(range) && NodeSemver.satisfies(v, range))) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer + "@" + v +
+                        " does not satisfy the new range " + range + "; resolving a new provider is not yet supported");
+            }
+        }
+    }
+
+    private static boolean isOptionalPeer(@Nullable JsonNode meta, String peer) {
+        if (meta == null) {
+            return false;
+        }
+        JsonNode entry = meta.get(peer);
+        return entry != null && entry.path("optional").asBoolean(false);
     }
 
     private static boolean dependenciesEqual(VersionManifest oldM, VersionManifest newM) {

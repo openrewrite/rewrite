@@ -802,6 +802,11 @@ public final class NpmLockPatcher implements LockPatcher {
         if (wt.isFundingChanged()) {
             entry = writeThroughObjectMember(name, packages, entry, "funding", wt.getFunding());
         }
+        if (wt.isPeerDependenciesChanged()) {
+            Map<String, String> peers = wt.getPeerDependencies();
+            JsonNode value = (peers == null || peers.isEmpty()) ? null : JSON.valueToTree(peers);
+            entry = writeThroughObjectMember(name, packages, entry, "peerDependencies", value);
+        }
         if (wt.getLicense() != null) {
             if (LockJson.member(entry, "license") == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gained a license field");

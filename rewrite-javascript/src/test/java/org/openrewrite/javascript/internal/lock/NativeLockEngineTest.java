@@ -119,7 +119,8 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("peerDependencies changed");
+        // The new version adds a non-optional react peer that is not installed; auto-installing it reshapes the graph.
+        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
     @Test
