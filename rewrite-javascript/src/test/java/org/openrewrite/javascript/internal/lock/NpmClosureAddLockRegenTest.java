@@ -147,8 +147,8 @@ class NpmClosureAddLockRegenTest extends LockRegenTestSupport {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // The resolver defers: the non-optional peer has no provider, so npm would auto-install it (harder tail).
+        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
     /**

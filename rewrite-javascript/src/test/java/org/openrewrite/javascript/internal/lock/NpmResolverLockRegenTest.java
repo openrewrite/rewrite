@@ -64,6 +64,38 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
                 new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}, {"ms", "2.1.3"}});
     }
 
+    @Test
+    void satisfiedPeerProviderV3() {
+        // use-sync-external-store peer-depends on react, which root also declares top-level. The peer is a
+        // constraint already met (no new node); npm records peerDependencies verbatim and flags react `peer: true`.
+        assertResolveByteExact("lock/npm/resolve-peer", "after", null,
+                new String[][]{{"react", "19.2.8"}, {"use-sync-external-store", "1.4.0"}});
+    }
+
+    @Test
+    void satisfiedPeerProviderV2() {
+        // The same closure into a lockfileVersion 2 lock: react keeps `peer: true` in the legacy tree, and the
+        // peer-only declarer gets an empty `requires` (npm omits the peer edge but still emits the field).
+        assertResolveByteExact("lock/npm/resolve-peer", "after-v2", "{\"lockfileVersion\":2}",
+                new String[][]{{"react", "19.2.8"}, {"use-sync-external-store", "1.4.0"}});
+    }
+
+    @Test
+    void satisfiedPeerWithMetaV3() {
+        // use-callback-ref declares two peers (react satisfied top-level, @types/react optional and absent) plus
+        // peerDependenciesMeta; npm records both peer objects verbatim and flags react `peer: true`.
+        assertResolveByteExact("lock/npm/resolve-peer-meta", "after", null,
+                new String[][]{{"react", "19.2.8"}, {"use-callback-ref", "1.3.3"}, {"tslib", "2.8.1"}});
+    }
+
+    @Test
+    void satisfiedPeerWithMetaV2() {
+        // The same closure as lockfileVersion 2: the declarer's `requires` keeps only its regular dep (tslib), the
+        // peer edges omitted, and react keeps `peer: true` in the legacy tree.
+        assertResolveByteExact("lock/npm/resolve-peer-meta", "after-v2", "{\"lockfileVersion\":2}",
+                new String[][]{{"react", "19.2.8"}, {"use-callback-ref", "1.3.3"}, {"tslib", "2.8.1"}});
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the resolver output equals {@code dir/golden} byte-for-byte.
      * Each distinct name maps to a packument route {@code http/<name>}; each {@code {name, version}} to a manifest
@@ -93,5 +125,9 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
         assertNpmReproduces("lock/npm/resolve-clean/pkg", "lock/npm/resolve-clean/after", "3");
         assertNpmReproduces("lock/npm/resolve-clean/pkg", "lock/npm/resolve-clean/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-fork/pkg", "lock/npm/resolve-fork/after", "3");
+        assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after", "3");
+        assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after-v2", "2");
+        assertNpmReproduces("lock/npm/resolve-peer-meta/pkg", "lock/npm/resolve-peer-meta/after", "3");
+        assertNpmReproduces("lock/npm/resolve-peer-meta/pkg", "lock/npm/resolve-peer-meta/after-v2", "2");
     }
 }

@@ -30,9 +30,10 @@ import java.util.Map;
  * The npm {@link LockResolver}: resolves the whole closure of an edited manifest set from scratch and serializes
  * the {@code package-lock.json} byte-exact, deferring anything not yet proven reproducible. It parses the importer
  * manifests, adapts the live registry, runs {@link NpmGraphBuilder}, and writes with {@link NpmLockWriter}. The
- * lockfileVersion is taken from the existing lock (defaulting to 3). A clean, hoisted, prod-only closure — flat or
- * a single directly-declared fork — is reproduced exactly; a workspace, a dev/optional/peer surface, or a
- * closure-reshaping the builder/writer cannot yet match fails loud, leaving the old lock untouched.
+ * lockfileVersion is taken from the existing lock (defaulting to 3). A clean, hoisted, prod-only closure — flat, a
+ * single directly-declared fork, or one carrying already-satisfied {@code peerDependencies} — is reproduced
+ * exactly; a workspace, a dev/optional surface, an unsatisfied peer, or a closure-reshaping the builder/writer
+ * cannot yet match fails loud, leaving the old lock untouched.
  */
 public final class NpmResolver implements LockResolver {
 

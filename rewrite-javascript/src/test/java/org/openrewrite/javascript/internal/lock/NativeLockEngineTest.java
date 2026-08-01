@@ -107,8 +107,9 @@ class NativeLockEngineTest {
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
-        // The resolver made the deeper attempt and also defers (its peer/optional gate); its detail is preferred.
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // The resolver made the deeper attempt and defers: the new transitive's non-optional peer is unsatisfied,
+        // so npm would auto-install it (the harder tail). Its detail is preferred over the surgical message.
+        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
     @Test
@@ -157,8 +158,8 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // The bumped version gains a non-optional peer nothing provides; the resolver defers on the auto-install.
+        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
     @Test
@@ -566,8 +567,7 @@ class NativeLockEngineTest {
     // --- closure surfaces (each fails loud individually) -----------------
 
     // The expected detail is the resolver's from-scratch deferral (preferred over the surgical message): a leaf
-    // surface it cannot yet reproduce reports "declares <field>", and an optional-deps surface trips its
-    // peer/optional gate first.
+    // surface it cannot yet reproduce reports "declares <field>".
     @Test
     void osChangeFailsLoud() {
         assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "declares os");
@@ -590,7 +590,7 @@ class NativeLockEngineTest {
 
     @Test
     void optionalDependenciesChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "peer/optional dependencies");
+        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "declares optionalDependencies");
     }
 
     @Test

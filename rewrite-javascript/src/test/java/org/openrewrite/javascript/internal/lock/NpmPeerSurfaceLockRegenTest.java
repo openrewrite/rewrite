@@ -71,8 +71,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("needy", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // The surgical tier defers because npm would auto-install the missing non-optional peer (harder tail).
+        assertThat(result.getFailure().getDetail()).contains("peer vue is not installed");
     }
 
     @Test
@@ -89,8 +89,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("picky", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // The installed provider no longer satisfies the narrowed peer range; the surgical tier defers.
+        assertThat(result.getFailure().getDetail()).contains("does not satisfy the new range");
     }
 
     @Test
@@ -109,8 +109,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("flippy", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // Flipping a peer to optional may let npm GC an auto-installed provider; the surgical meta guard defers.
+        assertThat(result.getFailure().getDetail()).contains("peerDependenciesMeta changed");
     }
 
     @Test
@@ -140,8 +140,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
                 lock, null, Paths.get("package.json"), ctx);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // Dropping a peer may let npm GC a provider auto-installed only for it; the surgical peer guard defers.
+        assertThat(result.getFailure().getDetail()).contains("peerDependencies changed");
     }
 
     /** A minimal lock with the bumped package plus an installed react@18.3.1 peer provider (top-level). */

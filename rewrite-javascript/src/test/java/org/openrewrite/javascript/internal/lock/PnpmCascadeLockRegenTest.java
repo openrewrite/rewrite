@@ -111,8 +111,8 @@ class PnpmCascadeLockRegenTest extends LockRegenTestSupport {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("plugin");
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
+        // The resolver defers: the moved plugin's non-optional peer has no provider (npm/pnpm would auto-install).
+        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
     private static String editedOneDep(String name, String range) {

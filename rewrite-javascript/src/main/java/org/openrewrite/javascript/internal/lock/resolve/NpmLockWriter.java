@@ -31,9 +31,10 @@ import java.util.*;
  * {@code npm install --package-lock-only} would write. It computes npm's hoisted {@code node_modules} layout from
  * the graph (every package top-level for a clean closure; the conflicting version of a fork nested under its
  * requiring parent), builds the {@code packages} map (and, for lockfileVersion 2, the legacy {@code dependencies}
- * tree), and renders through {@link NpmJson} so the key order and pretty-print match npm exactly. Anything it
- * cannot reproduce byte-exact — a workspace, a dev/optional/peer surface, a manifest field it does not model —
- * fails loud rather than emit a wrong lock.
+ * tree), and renders through {@link NpmJson} so the key order and pretty-print match npm exactly. A satisfied
+ * {@code peerDependencies} surface is reproduced (recorded verbatim, its provider flagged {@code peer: true});
+ * anything else it cannot reproduce byte-exact — a workspace, a dev/optional surface, a manifest field it does
+ * not model — fails loud rather than emit a wrong lock.
  */
 public final class NpmLockWriter {
 
@@ -59,6 +60,7 @@ public final class NpmLockWriter {
         lock.put("lockfileVersion", lockfileVersion);
         lock.put("requires", true);
 
+        Set<String> peerProviders = peerProviderKeys(graph);
         ObjectNode packages = lock.putObject("packages");
         packages.set("", rootEntry(root));
         for (Map.Entry<String, ResolvedNode> e : graph.getNodes().entrySet()) {
@@ -67,11 +69,11 @@ public final class NpmLockWriter {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getValue().getName(),
                         e.getValue().getName() + "@" + e.getValue().getVersion() + " resolved but was not placed");
             }
-            packages.set(key, packageEntry(e.getValue()));
+            packages.set(key, packageEntry(e.getValue(), peerProviders.contains(e.getKey())));
         }
 
         if (lockfileVersion == 2) {
-            lock.set("dependencies", legacyTree(graph, placements));
+            lock.set("dependencies", legacyTree(graph, placements, peerProviders));
         }
         return NpmJson.render(lock, "", UNIT) + "\n";
     }
@@ -95,7 +97,7 @@ public final class NpmLockWriter {
 
     // --- package entry ----------------------------------------------------
 
-    private ObjectNode packageEntry(ResolvedNode node) {
+    private ObjectNode packageEntry(ResolvedNode node, boolean peer) {
         VersionManifest m = node.getManifest();
         requireEmittable(m);
 
@@ -124,24 +126,39 @@ public final class NpmLockWriter {
                     m.getName() + " carries a legacy licenses array (not yet reproduced)");
         }
 
+        // A node with any incoming peer edge is flagged, even when it is also a regular/top-level dependency.
+        if (peer) {
+            entry.put("peer", true);
+        }
         if (notEmpty(m.getDependencies())) {
             entry.set("dependencies", stringMapNode(m.getDependencies()));
         }
         if (notEmpty(m.getEngines())) {
             entry.set("engines", stringMapNode(m.getEngines()));
         }
+        if (notEmpty(m.getPeerDependencies())) {
+            entry.set("peerDependencies", stringMapNode(m.getPeerDependencies()));
+        }
+        JsonNode peerMeta = m.getPeerDependenciesMeta();
+        if (peerMeta != null && peerMeta.isObject() && peerMeta.size() > 0) {
+            entry.set("peerDependenciesMeta", peerMeta.deepCopy());
+        }
         return entry;
     }
 
     /**
-     * The clean-closure/fork writer reproduces only the entry fields the corpus goldens pin exactly. A manifest
-     * carrying any other lock-surfaced field (a platform gate, a bin, a peer/optional surface, an install script,
-     * a bundle) reshapes the entry in a way not yet byte-verified, so it defers rather than guess.
+     * The writer reproduces only the entry fields the corpus goldens pin exactly. {@code peerDependencies} and
+     * {@code peerDependenciesMeta} are recorded verbatim (the graph proved the peers already satisfied). A manifest
+     * carrying any other lock-surfaced field (a platform gate, a bin, an install script, a bundle, an optional
+     * surface) reshapes the entry in a way not yet byte-verified, so it defers rather than guess.
      */
     private static void requireEmittable(VersionManifest m) {
         deferIf(m, "optionalDependencies", notEmpty(m.getOptionalDependencies()));
-        deferIf(m, "peerDependencies", notEmpty(m.getPeerDependencies()));
-        deferIf(m, "peerDependenciesMeta", m.getPeerDependenciesMeta() != null);
+        // peerDependenciesMeta is only reproduced alongside the peerDependencies it annotates; a meta-only shape
+        // (no peers) is unusual and not byte-verified, so it defers.
+        JsonNode peerMeta = m.getPeerDependenciesMeta();
+        deferIf(m, "peerDependenciesMeta",
+                peerMeta != null && peerMeta.isObject() && peerMeta.size() > 0 && !notEmpty(m.getPeerDependencies()));
         deferIf(m, "bin", m.getBin() != null);
         deferIf(m, "os", m.getOs() != null);
         deferIf(m, "cpu", m.getCpu() != null);
@@ -272,10 +289,11 @@ public final class NpmLockWriter {
     /**
      * The lockfileVersion 2 legacy {@code dependencies} tree. Reproduced byte-exact only for a flat closure (no
      * fork): one minimal {@code version}/{@code resolved}/{@code integrity} entry per name, keyed by bare name,
-     * carrying a {@code requires} constraint map when the package has dependencies. A fork would nest the legacy
-     * tree, which defers.
+     * carrying a {@code peer} flag for a peer provider and a {@code requires} constraint map. npm omits peer edges
+     * from {@code requires} but still emits it (as {@code {}}) whenever the node has any edge, so a peer-only node
+     * gets an empty {@code requires}. A fork would nest the legacy tree, which defers.
      */
-    private ObjectNode legacyTree(ResolutionGraph graph, Map<String, String> placements) {
+    private ObjectNode legacyTree(ResolutionGraph graph, Map<String, String> placements, Set<String> peerProviders) {
         ObjectNode legacy = JSON.createObjectNode();
         for (Map.Entry<String, ResolvedNode> e : graph.getNodes().entrySet()) {
             ResolvedNode node = e.getValue();
@@ -290,12 +308,43 @@ public final class NpmLockWriter {
             entry.put("version", m.getVersion());
             entry.put("resolved", dist == null ? null : dist.getTarball());
             entry.put("integrity", dist == null ? null : dist.getIntegrity());
+            if (peerProviders.contains(e.getKey())) {
+                entry.put("peer", true);
+            }
             if (notEmpty(m.getDependencies())) {
                 entry.set("requires", stringMapNode(m.getDependencies()));
+            } else if (notEmpty(m.getPeerDependencies())) {
+                entry.set("requires", JSON.createObjectNode());
             }
             legacy.set(node.getName(), entry);
         }
         return legacy;
+    }
+
+    /**
+     * The node keys npm flags {@code peer: true}: a node has an incoming peer edge when some resolved package
+     * declares its name in {@code peerDependencies}. The graph proved each such peer resolves to a single
+     * satisfying version, so the provider is that one node — matched by name.
+     */
+    private static Set<String> peerProviderKeys(ResolutionGraph graph) {
+        Map<String, Set<String>> versionsByName = new LinkedHashMap<>();
+        for (ResolvedNode node : graph.getNodes().values()) {
+            versionsByName.computeIfAbsent(node.getName(), k -> new LinkedHashSet<>()).add(node.getVersion());
+        }
+        Set<String> providers = new LinkedHashSet<>();
+        for (ResolvedNode node : graph.getNodes().values()) {
+            Map<String, String> peers = node.getManifest().getPeerDependencies();
+            if (peers == null) {
+                continue;
+            }
+            for (String peerName : peers.keySet()) {
+                Set<String> versions = versionsByName.get(peerName);
+                if (versions != null && versions.size() == 1) {
+                    providers.add(ResolutionGraph.key(peerName, versions.iterator().next()));
+                }
+            }
+        }
+        return providers;
     }
 
     // --- helpers ----------------------------------------------------------

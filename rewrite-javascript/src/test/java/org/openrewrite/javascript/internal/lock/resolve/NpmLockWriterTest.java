@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.resolve;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -140,6 +141,52 @@ class NpmLockWriterTest {
                 "      \"license\": \"MIT\",\n" +
                 "      \"dependencies\": {\n" +
                 "        \"shared\": \"1.0.0\"\n" +
+                "      }\n" +
+                "    }");
+    }
+
+    @Test
+    void satisfiedPeerFlagsProviderAndRecordsMetaVerbatim() {
+        FakeRegistry registry = new FakeRegistry()
+                .add("framework", "1.0.0", emptyMap(), "MIT", null);
+        // plugin declares a satisfied non-optional peer (framework, also a top-level dep) and an absent optional peer.
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("types").put("optional", true);
+        Map<String, String> peers = new LinkedHashMap<>();
+        peers.put("framework", "^1.0.0");
+        peers.put("types", ">=1.0.0");
+        registry.versionsByName.computeIfAbsent("plugin", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("plugin@1.0.0", new VersionManifest("plugin", "1.0.0", TextNode.valueOf("MIT"), "MIT",
+                null, null, peers, meta, null, null, null, null, null, null, null, null, null, null,
+                new VersionManifest.Dist("https://r/plugin/-/plugin-1.0.0.tgz", null, "sha512-plugin-1.0.0"), null, null, null));
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("plugin", "^1.0.0");
+        deps.put("framework", "^1.0.0");
+        String lock = new NpmLockWriter().write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))), 3);
+
+        // The provider is flagged `peer: true` even though it is also a top-level dependency.
+        assertThat(lock).contains("\"node_modules/framework\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://r/framework/-/framework-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-framework-1.0.0\",\n" +
+                "      \"license\": \"MIT\",\n" +
+                "      \"peer\": true\n" +
+                "    }");
+        // The declarer records peerDependencies and peerDependenciesMeta verbatim (objects, after the scalars).
+        assertThat(lock).contains("\"node_modules/plugin\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://r/plugin/-/plugin-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-plugin-1.0.0\",\n" +
+                "      \"license\": \"MIT\",\n" +
+                "      \"peerDependencies\": {\n" +
+                "        \"framework\": \"^1.0.0\",\n" +
+                "        \"types\": \">=1.0.0\"\n" +
+                "      },\n" +
+                "      \"peerDependenciesMeta\": {\n" +
+                "        \"types\": {\n" +
+                "          \"optional\": true\n" +
+                "        }\n" +
                 "      }\n" +
                 "    }");
     }

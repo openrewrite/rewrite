@@ -118,8 +118,8 @@ class PnpmAddLockRegenTest extends LockRegenTestSupport {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies").contains("has-peer");
+        // The surgical add gate defers on the peer surface (the resolver fallback hits the unrouted sibling first).
+        assertThat(result.getFailure().getDetail()).contains("declares peerDependencies").contains("has-peer");
     }
 
     private static String editedPkg(String name, String range) {

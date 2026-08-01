@@ -27,10 +27,13 @@ import java.util.*;
 import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RESOLUTION_REQUIRED;
 
 /**
- * Builds the {@link ResolutionGraph} for the npm resolution of a clean closure: every package resolves to a
- * single version (the highest satisfying every requirer), with no fork, peer, or optional dependency. Anything
- * beyond that clean case fails loud — the fork/peer slices layer on top later. Version and constraint decisions
- * are delegated entirely to node-semver.
+ * Builds the {@link ResolutionGraph} for the npm resolution of a closure: every package resolves to a single
+ * version (the highest satisfying every requirer), with no fork or optional dependency. A manifest may declare
+ * {@code peerDependencies} as long as every non-optional peer is already satisfied by a resolved node (a
+ * top-level dependency or a normal dependency of some node) at a version its range admits — the peer is then a
+ * constraint already met and adds no node. A missing non-optional peer (npm would auto-install it), an optional
+ * peer present at a non-satisfying version, or a peer resolving to more than one version fails loud. Version and
+ * constraint decisions are delegated entirely to node-semver.
  */
 public final class NpmGraphBuilder {
 
@@ -81,6 +84,7 @@ public final class NpmGraphBuilder {
             }
             nodeEdges.put(ResolutionGraph.key(cur[0], cur[1]), edges);
         }
+        verifyPeersSatisfied(manifests, chosen);
 
         Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
         for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
@@ -126,7 +130,7 @@ public final class NpmGraphBuilder {
         String key = ResolutionGraph.key(name, version);
         if (!manifests.containsKey(key)) {
             VersionManifest manifest = registry.manifest(name, version);
-            requireCleanLeaf(manifest);
+            requireResolvableLeaf(manifest);
             manifests.put(key, manifest);
             chosen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(version);
             work.add(new String[]{name, version});
@@ -134,11 +138,57 @@ public final class NpmGraphBuilder {
         return version;
     }
 
-    private static void requireCleanLeaf(VersionManifest manifest) {
-        if (notEmpty(manifest.getPeerDependencies()) || notEmpty(manifest.getOptionalDependencies())) {
+    /** {@code optionalDependencies} still reshape the closure (npm skips unmet ones); defer until modeled. */
+    private static void requireResolvableLeaf(VersionManifest manifest) {
+        if (notEmpty(manifest.getOptionalDependencies())) {
             throw new EngineFailure(RESOLUTION_REQUIRED, manifest.getName(),
-                    manifest.getName() + " declares peer/optional dependencies (not yet resolved)");
+                    manifest.getName() + " declares optionalDependencies (not yet resolved)");
         }
+    }
+
+    /**
+     * Every {@code peerDependencies} declaration must already be met by the resolved closure. A non-optional peer
+     * with no provider would make npm auto-install one (a new node); a peer present but not admitted by the range,
+     * or resolved to more than one version, would reshape the layout. All of those defer. An optional peer
+     * (per {@code peerDependenciesMeta}) may be absent.
+     */
+    private static void verifyPeersSatisfied(Map<String, VersionManifest> manifests, Map<String, Set<String>> chosen) {
+        for (VersionManifest m : manifests.values()) {
+            Map<String, String> peers = m.getPeerDependencies();
+            if (peers == null || peers.isEmpty()) {
+                continue;
+            }
+            JsonNode meta = m.getPeerDependenciesMeta();
+            for (Map.Entry<String, String> peer : peers.entrySet()) {
+                String peerName = peer.getKey();
+                String range = peer.getValue();
+                Set<String> resolved = chosen.getOrDefault(peerName, Collections.emptySet());
+                if (resolved.isEmpty()) {
+                    if (isOptionalPeer(meta, peerName)) {
+                        continue;
+                    }
+                    throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(),
+                            m.getName() + " peer " + peerName + " is not installed (peer auto-install not yet resolved)");
+                }
+                if (resolved.size() > 1) {
+                    throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(), m.getName() + " peer " + peerName +
+                            " resolves to multiple versions " + resolved + " (peer fork not yet resolved)");
+                }
+                String v = resolved.iterator().next();
+                if (!NodeSemver.validRange(range) || !NodeSemver.satisfies(v, range)) {
+                    throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(), m.getName() + " peer " + peerName + "@" +
+                            v + " does not satisfy " + range + " (peer re-resolution not yet resolved)");
+                }
+            }
+        }
+    }
+
+    private static boolean isOptionalPeer(@Nullable JsonNode meta, String peer) {
+        if (meta == null) {
+            return false;
+        }
+        JsonNode entry = meta.get(peer);
+        return entry != null && entry.path("optional").asBoolean(false);
     }
 
     private static boolean notEmpty(Map<String, String> m) {

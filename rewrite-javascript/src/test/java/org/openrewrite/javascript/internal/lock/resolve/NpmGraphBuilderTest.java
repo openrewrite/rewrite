@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.resolve;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
@@ -79,13 +81,40 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void peerDeclaringPackageDefers() {
+    void missingNonOptionalPeerDefers() {
+        // has-peer needs react, which nothing provides; auto-installing it is the harder tail — defer.
         FakeRegistry registry = new FakeRegistry();
         registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
         registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
 
         assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
                 new NpmGraphBuilder(registry).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
+    }
+
+    @Test
+    void satisfiedPeerResolvesWithNoExtraNode() {
+        // react (a top-level dep) satisfies has-peer's react peer; the peer is a constraint already met.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\",\"react\":\"^18.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0", "react@18.2.0");
+    }
+
+    @Test
+    void optionalPeerAbsentResolves() {
+        // has-peer's react peer is marked optional, so its absence is satisfied — the closure still resolves.
+        FakeRegistry registry = new FakeRegistry();
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vmWithOptionalPeer("has-peer", "1.0.0", "react", ">=17"));
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0");
     }
 
     // --- in-memory registry -------------------------------------------------
@@ -118,5 +147,12 @@ class NpmGraphBuilderTest {
     private static VersionManifest vm(String name, String version, Map<String, String> deps, Map<String, String> peers) {
         return new VersionManifest(name, version, null, null, deps, null, peers, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null);
+    }
+
+    private static VersionManifest vmWithOptionalPeer(String name, String version, String peer, String range) {
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject(peer).put("optional", true);
+        return new VersionManifest(name, version, null, null, emptyMap(), null, singletonMap(peer, range), meta,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 }
