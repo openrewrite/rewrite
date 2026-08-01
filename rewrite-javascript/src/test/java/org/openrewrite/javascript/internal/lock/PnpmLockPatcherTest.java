@@ -185,7 +185,7 @@ class PnpmLockPatcherTest {
     }
 
     @Test
-    void blockStyleResolutionFailsLoud() {
+    void blockStyleResolutionDefersResolution() {
         String before = "lockfileVersion: '9.0'\n\n" +
                 "importers:\n\n" +
                 "  .:\n" +
@@ -206,7 +206,9 @@ class PnpmLockPatcherTest {
                         .scope("dependencies").build()));
         assertThatThrownBy(() -> new PnpmLockPatcher().patch(edits))
                 .isInstanceOfSatisfying(EngineFailure.class, e -> {
-                    assertThat(e.failure.getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+                    // The lock is valid; this patcher just cannot rewrite integrity inside a block-style resolution,
+                    // so it defers to a real resolver rather than reporting the lock as malformed.
+                    assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
                     assertThat(e.failure.getDetail()).contains("flow-scalar");
                 });
     }

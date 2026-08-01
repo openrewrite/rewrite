@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
@@ -98,6 +99,15 @@ public final class NativeLockEngine {
             return Result.failure(ef.failure);
         } catch (NodeRegistryException nre) {
             return Result.failure(toFailure(nre));
+        } catch (RecipeRunException rre) {
+            // A patcher that fails loud from inside a rewrite-json/yaml visitor has its EngineFailure wrapped;
+            // unwrap it so the deferral stays a graceful Failure rather than crashing the recipe run.
+            for (Throwable cause = rre.getCause(); cause != null; cause = cause.getCause()) {
+                if (cause instanceof EngineFailure) {
+                    return Result.failure(((EngineFailure) cause).failure);
+                }
+            }
+            throw rre;
         }
     }
 

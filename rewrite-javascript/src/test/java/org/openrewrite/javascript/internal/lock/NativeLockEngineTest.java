@@ -111,6 +111,35 @@ class NativeLockEngineTest {
     }
 
     @Test
+    void bunVisitorThrownFailureDefersGracefully() {
+        // A bun bump whose new version gains a dependencies map throws EngineFailure from INSIDE the rewrite-json
+        // visitor, so it arrives wrapped in a RecipeRunException; regenerate must unwrap it into a graceful Failure
+        // rather than let the wrapper escape and crash the recipe run.
+        routes.put("https://registry.npmjs.org/foo",
+                "{\"name\":\"foo\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/foo/1.0.0",
+                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{}}");
+        routes.put("https://registry.npmjs.org/foo/2.0.0",
+                "{\"name\":\"foo\",\"version\":\"2.0.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/foo/-/foo-2.0.0.tgz\",\"integrity\":\"sha512-FOO2\"}}");
+
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": {\n" +
+                "    \"\": {\n      \"name\": \"crash-test\",\n      \"dependencies\": {\n" +
+                "        \"foo\": \"^1.0.0\",\n      },\n    },\n  },\n  \"packages\": {\n" +
+                "    \"foo\": [\"foo@1.0.0\", \"\", {}, \"sha512-FOO\"],\n\n" +
+                "    \"tslib\": [\"tslib@2.0.0\", \"\", {}, \"sha512-TSLIB\"],\n  }\n}\n";
+
+        Result result = regen(PackageManager.Bun,
+                "{\"dependencies\":{\"foo\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"foo\":\"^2.0.0\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("gains a dependencies map");
+    }
+
+    @Test
     void addedPeerDependencyFailsLoud() {
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");

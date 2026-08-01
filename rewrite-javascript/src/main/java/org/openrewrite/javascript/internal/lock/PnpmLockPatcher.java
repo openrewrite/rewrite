@@ -406,9 +406,9 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         Yaml.Mapping.Entry entry = LockYaml.findEntry(body, "resolution");
         if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
-            // A block-style resolution map is not the flow-scalar this patcher rewrites integrity inside;
-            // silently keeping the OLD integrity would emit a lock a real install rejects.
-            throw fail(Reason.MALFORMED_LOCK, edit.getName(),
+            // A block-style resolution map is a valid lock shape this patcher cannot rewrite integrity inside;
+            // silently keeping the OLD integrity would emit a lock a real install rejects, so defer.
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     edit.getName() + " resolution is not a flow-scalar; cannot rewrite integrity");
         }
         Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
