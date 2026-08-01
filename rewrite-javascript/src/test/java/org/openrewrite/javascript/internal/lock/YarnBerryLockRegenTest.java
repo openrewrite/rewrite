@@ -80,6 +80,16 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void scopedClosureAdd() {
+        // Add @types/yargs (-> @types/yargs-parser: *): two scoped entries, "@types/yargs-parser@npm:*" sorting
+        // before "@types/yargs@npm:^17.0.0" (- < @), and the quoted scoped dependency-map key.
+        String dir = "lock/yarn-berry/add-scoped-closure";
+        routeScoped(dir, "@types/yargs", "17.0.35");
+        routeScoped(dir, "@types/yargs-parser", "21.0.3");
+        assertRegenEquals(dir);
+    }
+
+    @Test
     void cascade() {
         // debug 4.3.4 -> 4.4.1 changes its ms constraint 2.1.2 -> ^2.1.3, forcing ms to move and its descriptor
         // to re-head to ms@npm:^2.1.3. Both the bumped entry and the moved transitive get reproduced checksums.
@@ -173,7 +183,7 @@ class YarnBerryLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldensWithRealYarn() throws Exception {
-        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-scoped-leaf", "add-closure", "cascade", "orphan-prune", "promote-merge", "remove", "widen"}) {
+        for (String fixture : new String[]{"leaf-bump", "add-leaf", "add-scoped-leaf", "add-closure", "add-scoped-closure", "cascade", "orphan-prune", "promote-merge", "remove", "widen"}) {
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-before", "lock/yarn-berry/" + fixture + "/before");
             assertBerryReproduces("lock/yarn-berry/" + fixture + "/pkg-after", "lock/yarn-berry/" + fixture + "/after");
         }

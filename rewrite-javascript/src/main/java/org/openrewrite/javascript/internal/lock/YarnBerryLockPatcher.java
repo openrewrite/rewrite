@@ -40,8 +40,8 @@ import java.util.TreeSet;
  * <p>
  * Supported: an in-place version bump (rewrite the entry's descriptor key, {@code version}, {@code resolution}
  * and {@code checksum} plus the importer range) and adding a dependency plus its runtime closure (a fresh entry
- * per member at its sorted position; a scoped leaf add is supported, its {@code @scope/name} key sorting by plain
- * string like any other). A merged descriptor key, fork, scoped closure add, or workspaces all fail loud.
+ * per member at its sorted position; scoped members are supported, their {@code @scope/name} keys sorting by
+ * plain string like any other and quoted for YAML). A merged descriptor key, fork, or workspaces all fail loud.
  */
 public final class YarnBerryLockPatcher implements LockPatcher {
 
@@ -93,13 +93,9 @@ public final class YarnBerryLockPatcher implements LockPatcher {
     }
 
     private Yaml.Mapping applyAdds(Yaml.Mapping root, List<PackageEdit> adds, @Nullable String editedPackageJson) {
-        // A scoped key sorts by plain string like any other (@ < letters, __metadata pinned first), so a scoped
-        // leaf add is byte-exact. A scoped closure would also need its dependency-map keys quoted and its merged
-        // descriptors validated, so any scoped add carrying a runtime closure still defers.
-        if (isScopedClosure(adds)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, adds.get(0).getName(),
-                    "scoped berry closure adds defer until validated; only a scoped leaf add is byte-exact");
-        }
+        // A scoped key sorts by plain string like any other (@ < letters, __metadata pinned first) and its
+        // YAML-reserved leading @ is quoted, so both a scoped leaf and a scoped clean closure are byte-exact;
+        // the engine already defers a merge/fork/peer, and a multi-range merged descriptor fails loud below.
         for (PackageEdit edit : adds) {
             if (edit.getNewBerryChecksum() == null) {
                 throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, edit.getName(),
@@ -115,18 +111,6 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             }
         }
         return root;
-    }
-
-    /** True when any added member is scoped and the add pulls a runtime closure (multiple members or own deps). */
-    private static boolean isScopedClosure(List<PackageEdit> adds) {
-        boolean scoped = false;
-        for (PackageEdit e : adds) {
-            if (e.getName().startsWith("@")) {
-                scoped = true;
-                break;
-            }
-        }
-        return scoped && (adds.size() > 1 || adds.get(0).getNewDependencies() != null);
     }
 
     /** The merged {@code name@npm:range} descriptor: every range that resolves to this member, sorted. */
@@ -163,7 +147,8 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (deps != null && !deps.isEmpty()) {
             body.append("  dependencies:\n");
             for (Map.Entry<String, String> dep : new TreeMap<>(deps).entrySet()) {
-                body.append("    ").append(dep.getKey()).append(": \"npm:").append(dep.getValue()).append("\"\n");
+                String key = dep.getKey().startsWith("@") ? "\"" + dep.getKey() + "\"" : dep.getKey();
+                body.append("    ").append(key).append(": \"npm:").append(dep.getValue()).append("\"\n");
             }
         }
         body.append("  checksum: ").append(edit.getNewBerryChecksum()).append('\n');
