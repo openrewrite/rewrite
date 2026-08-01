@@ -393,23 +393,11 @@ public final class BunLockPatcher implements LockPatcher {
 
     /** bun's compact single-line metadata: {@code {}} or {@code { "dependencies": { "<dep>": "<range>", … } }}. */
     private static String renderMetadata(@Nullable Map<String, String> deps) {
-        if (deps == null || deps.isEmpty()) {
-            return "{}";
-        }
-        return "{ " + quote("dependencies") + ": " + renderInlineMap(deps) + " }";
+        return BunJson.renderMetadata(deps);
     }
 
     private static String renderInlineMap(Map<String, String> map) {
-        List<String> keys = new ArrayList<>(map.keySet());
-        keys.sort(null); // bun sorts the dependency map by name (ASCII)
-        StringBuilder sb = new StringBuilder("{ ");
-        for (int i = 0; i < keys.size(); i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append(quote(keys.get(i))).append(": ").append(quote(map.get(keys.get(i))));
-        }
-        return sb.append(" }").toString();
+        return BunJson.renderInlineMap(map);
     }
 
     /** Splice {@code member} at its ASCII-sorted key position, before any trailing comma placeholder ({@link Json.Empty}). */
@@ -468,7 +456,7 @@ public final class BunLockPatcher implements LockPatcher {
 
     /** bun package names, versions, ranges and SRI integrity never contain {@code "}/{@code \\}, so a plain quote suffices. */
     private static String quote(String value) {
-        return "\"" + value + "\"";
+        return BunJson.quote(value);
     }
 
     /** Rewrite the top-level {@code packages} object, dropping {@code dropKeys} and preserving bun's blank-line layout. */
