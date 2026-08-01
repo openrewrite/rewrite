@@ -107,7 +107,8 @@ class NativeLockEngineTest {
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
-        assertThat(result.getFailure().getDetail()).contains("non-optional peerDependencies");
+        // The resolver made the deeper attempt and also defers (its peer/optional gate); its detail is preferred.
+        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
     }
 
     @Test
@@ -156,8 +157,8 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The new version adds a non-optional react peer that is not installed; auto-installing it reshapes the graph.
-        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
+        // The resolver's from-scratch attempt also defers on the peer surface (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
     }
 
     @Test
@@ -232,7 +233,8 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("bin metadata changed");
+        // The resolver's from-scratch attempt also defers on the bin entry shape (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("declares bin");
     }
 
     @Test
@@ -389,7 +391,8 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("not yet supported");
+        // The resolver's from-scratch attempt also defers on the bundleDependencies shape (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("entry shape not yet reproduced");
     }
 
     @Test
@@ -562,40 +565,43 @@ class NativeLockEngineTest {
 
     // --- closure surfaces (each fails loud individually) -----------------
 
+    // The expected detail is the resolver's from-scratch deferral (preferred over the surgical message): a leaf
+    // surface it cannot yet reproduce reports "declares <field>", and an optional-deps surface trips its
+    // peer/optional gate first.
     @Test
     void osChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "os changed");
+        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "declares os");
     }
 
     @Test
     void cpuChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "cpu changed");
+        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "declares cpu");
     }
 
     @Test
     void libcChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "libc changed");
+        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "declares libc");
     }
 
     @Test
     void bundleDependenciesChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"bundleDependencies\":[\"x\"]", "bundleDependencies changed");
+        assertClosureSurfaceFailsLoud("", ",\"bundleDependencies\":[\"x\"]", "declares bundleDependencies");
     }
 
     @Test
     void optionalDependenciesChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "optionalDependencies changed");
+        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "peer/optional dependencies");
     }
 
     @Test
     void peerDependenciesMetaChangeFailsLoud() {
         assertClosureSurfaceFailsLoud("", ",\"peerDependenciesMeta\":{\"x\":{\"optional\":true}}",
-                "peerDependenciesMeta changed");
+                "declares peerDependenciesMeta");
     }
 
     @Test
     void hasInstallScriptChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "hasInstallScript changed");
+        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "declares hasInstallScript");
     }
 
     private void assertClosureSurfaceFailsLoud(String oldExtra, String newExtra, String expectedDetail) {

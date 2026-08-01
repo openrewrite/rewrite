@@ -86,7 +86,8 @@ class NpmFundingWriteThroughLockRegenTest extends LockRegenTestSupport {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("non-string form");
+        // The resolver's deeper from-scratch attempt also defers on the funding entry shape (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("declares funding");
     }
 
     private void assertFundingByteExact(String dir, String[][] packages) {

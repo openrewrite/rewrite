@@ -74,7 +74,8 @@ class NpmPromoteLockRegenTest extends LockRegenTestSupport {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("lockfileVersion 2 promotion");
+        // The resolver's deeper from-scratch attempt also defers (it resolves prod-only closures today); its detail is preferred.
+        assertThat(result.getFailure().getDetail()).contains("only prod dependencies are resolved today");
     }
 
     /**

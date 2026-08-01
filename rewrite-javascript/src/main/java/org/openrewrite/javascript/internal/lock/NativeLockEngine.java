@@ -28,6 +28,9 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.resolve.LockResolver;
+import org.openrewrite.javascript.internal.lock.resolve.LockResolvers;
+import org.openrewrite.javascript.internal.lock.resolve.ResolveRequest;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -47,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -82,6 +86,14 @@ public final class NativeLockEngine {
     /** Manifest dependency scopes an importer entry can declare a dependency under. */
     private static final List<String> DECLARED_SCOPES = Arrays.asList(
             "dependencies", "devDependencies", "peerDependencies", "optionalDependencies");
+
+    /**
+     * The cannot-reshape deferrals the from-scratch {@link LockResolver} may still reproduce byte-exact. Genuine
+     * input/environment failures (malformed lock/manifest, registry/auth/not-found) are deliberately absent — the
+     * resolver cannot fix those, so they stay fail-loud.
+     */
+    private static final Set<Reason> RESOLVER_FALLBACK_REASONS =
+            EnumSet.of(Reason.RESOLUTION_REQUIRED, Reason.CHECKSUM_UNAVAILABLE);
 
     private NativeLockEngine() {
     }
@@ -121,6 +133,32 @@ public final class NativeLockEngine {
         if (existingLock == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no existing lock file to update");
         }
+
+        // Built once and shared by both the surgical patch tier and the resolver fallback.
+        NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, Environment.SYSTEM);
+        NpmRegistryClient client = NodeExecutionContextView.view(ctx).getRegistryClient();
+
+        try {
+            return surgicalRegenerate(pm, editedPackageJson, originalPackageJson, existingLock,
+                    packageJsonPath, registries, client);
+        } catch (EngineFailure surgical) {
+            return resolverFallback(pm, surgical, editedPackageJson, existingLock, packageJsonPath, registries, client);
+        } catch (RecipeRunException rre) {
+            // A patcher failing loud from inside a rewrite-json/yaml visitor wraps its EngineFailure; unwrap it
+            // so a cannot-reshape deferral still routes through the resolver fallback.
+            EngineFailure surgical = engineFailureCause(rre);
+            if (surgical == null) {
+                throw rre;
+            }
+            return resolverFallback(pm, surgical, editedPackageJson, existingLock, packageJsonPath, registries, client);
+        }
+    }
+
+    /** The fast surgical patch tier: diff the declared deps, prove the closure is unchanged, and patch in place. */
+    private static Result surgicalRegenerate(PackageManager pm, String editedPackageJson,
+                                             @Nullable String originalPackageJson, String existingLock,
+                                             @Nullable Path packageJsonPath, NodeRegistries registries,
+                                             NpmRegistryClient client) {
         if (originalPackageJson == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "cannot scope the edit without the pre-edit package.json");
@@ -140,9 +178,6 @@ public final class NativeLockEngine {
         }
 
         Path lockPath = lockPath(pm, packageJsonPath);
-        NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, Environment.SYSTEM);
-        NpmRegistryClient client = NodeExecutionContextView.view(ctx).getRegistryClient();
-
         String memberImporterDir = addImporterDir(pm, existingLock, packageJsonPath);
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
         for (DepChange change : changes) {
@@ -160,6 +195,116 @@ public final class NativeLockEngine {
                     "no native patcher for " + pm + " yet");
         }
         return Result.success(patcher.patch(editSet));
+    }
+
+    /**
+     * The resolver fallback tier: when the surgical patch defers because it cannot reshape the closure, resolve the
+     * whole closure from scratch with the package manager's {@link LockResolver}. The resolver is
+     * byte-exact-or-fail-loud, so this never yields a lock a real install would disagree with; when it also defers,
+     * its (deeper) failure propagates and is returned. A genuine input/environment deferral the resolver cannot fix
+     * (or a package manager without a resolver) rethrows the surgical failure unchanged.
+     */
+    private static Result resolverFallback(PackageManager pm, EngineFailure surgical, String editedPackageJson,
+                                           String existingLock, @Nullable Path packageJsonPath,
+                                           NodeRegistries registries, NpmRegistryClient client) {
+        LockResolver resolver = LockResolvers.forPackageManager(pm);
+        if (resolver == null || !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
+            throw surgical;
+        }
+        // The fallback resolves the one edited manifest as a single importer. For a workspace that would drop the
+        // sibling importers and write a truncated lock, so keep those deferred (return the surgical failure).
+        if (isMultiPackageProject(pm, editedPackageJson, existingLock, packageJsonPath)) {
+            throw surgical;
+        }
+        ResolveRequest request = new ResolveRequest(
+                Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
+        try {
+            return Result.success(resolver.resolve(request));
+        } catch (NodeRegistryException nre) {
+            // The resolver's deeper closure walk hit a registry/environment error the surgical tier did not need to
+            // reach; it produced no better answer, so return the surgical deferral unchanged (no wrong lock either way).
+            throw surgical;
+        }
+        // A resolver EngineFailure propagates: it made the deeper attempt, so its reason/detail is preferred.
+    }
+
+    /**
+     * Whether the project has more than the single root importer the resolver reproduces. A workspace root manifest
+     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers}, npm/bun
+     * workspace importer entries, berry {@code @workspace:} headers). yarn.lock is flat and cannot be told apart, so
+     * a manifest in a sub-directory is treated as a member conservatively.
+     */
+    private static boolean isMultiPackageProject(PackageManager pm, String editedManifest, String lock,
+                                                 @Nullable Path packageJsonPath) {
+        try {
+            if (declaresWorkspaces(editedManifest) || multiImporterLock(pm, lock)) {
+                return true;
+            }
+        } catch (RuntimeException ignored) {
+            // Unparseable here: let the resolver's own gates decide rather than misclassify.
+        }
+        if (pm == PackageManager.YarnClassic && packageJsonPath != null) {
+            Path parent = packageJsonPath.getParent();
+            String dir = parent == null ? "" : parent.toString().replace('\\', '/');
+            return !(dir.isEmpty() || ".".equals(dir));
+        }
+        return false;
+    }
+
+    private static boolean declaresWorkspaces(String manifestJson) {
+        Object ws = parseJsonObject(manifestJson, true).get("workspaces");
+        return (ws instanceof List && !((List<?>) ws).isEmpty()) ||
+                (ws instanceof Map && !((Map<?, ?>) ws).isEmpty());
+    }
+
+    private static boolean multiImporterLock(PackageManager pm, String lock) {
+        switch (pm) {
+            case Npm:
+                return jsonImporterCount(lock, "packages", true) > 1;
+            case Bun:
+                return jsonImporterCount(lock, "workspaces", false) > 1;
+            case Pnpm:
+                return pnpmImporterKeys(lock).size() > 1;
+            case YarnBerry:
+                return berryWorkspaceHeaderCount(lock) > 1;
+            default:
+                return false; // yarn classic: flat lock, no importer sections to count
+        }
+    }
+
+    /** Count importer entries in a JSON lock's {@code section} map (npm skips nested {@code node_modules/} keys). */
+    private static int jsonImporterCount(String lock, String section, boolean skipNodeModules) {
+        Object entries = parseJsonObject(lock, false).get(section);
+        if (!(entries instanceof Map)) {
+            return 0;
+        }
+        int count = 0;
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) entries).entrySet()) {
+            if (e.getValue() instanceof Map && !(skipNodeModules && String.valueOf(e.getKey()).contains("node_modules/"))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int berryWorkspaceHeaderCount(String lock) {
+        int count = 0;
+        for (String line : lock.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.contains("@workspace:") && trimmed.endsWith("\":")) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static @Nullable EngineFailure engineFailureCause(Throwable t) {
+        for (Throwable cause = t.getCause(); cause != null; cause = cause.getCause()) {
+            if (cause instanceof EngineFailure) {
+                return (EngineFailure) cause;
+            }
+        }
+        return null;
     }
 
     private static List<LockEditSet.PackageEdit> resolveEdit(PackageManager pm, DepChange change, String existingLock,

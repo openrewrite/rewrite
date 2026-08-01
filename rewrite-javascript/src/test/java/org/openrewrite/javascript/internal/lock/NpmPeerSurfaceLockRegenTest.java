@@ -71,7 +71,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("needy", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("peer vue is not installed");
+        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
     }
 
     @Test
@@ -88,7 +89,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("picky", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("does not satisfy the new range");
+        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
     }
 
     @Test
@@ -107,7 +109,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("flippy", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("peerDependenciesMeta changed");
+        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
     }
 
     @Test
@@ -137,7 +140,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
                 lock, null, Paths.get("package.json"), ctx);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("peerDependencies changed");
+        // The resolver's deeper from-scratch attempt also defers on the peer surface (its detail is preferred).
+        assertThat(result.getFailure().getDetail()).contains("peer/optional dependencies");
     }
 
     /** A minimal lock with the bumped package plus an installed react@18.3.1 peer provider (top-level). */
