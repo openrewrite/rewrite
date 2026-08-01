@@ -91,6 +91,52 @@ class YarnClassicLockWriterTest {
     }
 
     @Test
+    void satisfiedPeerSurfaceOmitsPeerSection() {
+        // has-peer declares a `react` peer satisfied by the top-level react; yarn v1 records no peer surface, so
+        // has-peer's block is byte-identical to a peer-free one (no dependencies:, no peerDependencies:).
+        FakeRegistry registry = new FakeRegistry()
+                .addWithPeers("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17"))
+                .add("react", "18.2.0", emptyMap());
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("has-peer", "^1.0.0");
+        deps.put("react", "^18.0.0");
+
+        String lock = new YarnClassicLockWriter(true).write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))));
+        assertThat(lock).isEqualTo(HEADER +
+                "has-peer@^1.0.0:\n" +
+                "  version \"1.0.0\"\n" +
+                "  resolved \"https://registry.yarnpkg.com/has-peer/-/has-peer-1.0.0.tgz#sha1-has-peer-1.0.0\"\n" +
+                "  integrity sha512-has-peer-1.0.0\n" +
+                "\n" +
+                "react@^18.0.0:\n" +
+                "  version \"18.2.0\"\n" +
+                "  resolved \"https://registry.yarnpkg.com/react/-/react-18.2.0.tgz#sha1-react-18.2.0\"\n" +
+                "  integrity sha512-react-18.2.0\n");
+    }
+
+    @Test
+    void peerDeclarerStillEmitsItsOwnDependencies() {
+        // widget carries both a regular dep and a satisfied `react` peer; its block keeps dependencies: but the
+        // peer is neither a peerDependencies: section nor folded into dependencies:.
+        FakeRegistry registry = new FakeRegistry()
+                .addWithPeers("widget", "1.0.0", singletonMap("dep", "^1.0.0"), singletonMap("react", ">=17"))
+                .add("dep", "1.0.0", emptyMap())
+                .add("react", "18.2.0", emptyMap());
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("widget", "^1.0.0");
+        deps.put("react", "^18.0.0");
+
+        String lock = new YarnClassicLockWriter(true).write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))));
+        assertThat(lock).contains("widget@^1.0.0:\n" +
+                "  version \"1.0.0\"\n" +
+                "  resolved \"https://registry.yarnpkg.com/widget/-/widget-1.0.0.tgz#sha1-widget-1.0.0\"\n" +
+                "  integrity sha512-widget-1.0.0\n" +
+                "  dependencies:\n" +
+                "    dep \"^1.0.0\"\n");
+        assertThat(lock).doesNotContain("peerDependencies");
+    }
+
+    @Test
     void keepsNpmjsHostWhenNotMirroring() {
         FakeRegistry registry = new FakeRegistry().add("a", "1.0.0", emptyMap());
         String lock = new YarnClassicLockWriter(false)
@@ -131,7 +177,12 @@ class YarnClassicLockWriterTest {
     }
 
     private static VersionManifest vm(String name, String version, Map<String, String> deps, VersionManifest.@Nullable Dist dist) {
-        return new VersionManifest(name, version, null, null, deps.isEmpty() ? null : deps, null, null, null, null,
+        return vm(name, version, deps, null, dist);
+    }
+
+    private static VersionManifest vm(String name, String version, Map<String, String> deps,
+                                      @Nullable Map<String, String> peers, VersionManifest.@Nullable Dist dist) {
+        return new VersionManifest(name, version, null, null, deps.isEmpty() ? null : deps, null, peers, null, null,
                 null, null, null, null, null, null, null, null, null, dist, null, null, null);
     }
 
@@ -140,11 +191,15 @@ class YarnClassicLockWriterTest {
         final Map<String, VersionManifest> manifests = new HashMap<>();
 
         FakeRegistry add(String name, String version, Map<String, String> deps) {
+            return addWithPeers(name, version, deps, null);
+        }
+
+        FakeRegistry addWithPeers(String name, String version, Map<String, String> deps, @Nullable Map<String, String> peers) {
             versionsByName.computeIfAbsent(name, k -> new TreeSet<>()).add(version);
             VersionManifest.Dist dist = new VersionManifest.Dist(
                     "https://registry.npmjs.org/" + name + "/-/" + name + "-" + version + ".tgz",
                     "sha1-" + name + "-" + version, "sha512-" + name + "-" + version);
-            manifests.put(name + "@" + version, vm(name, version, deps, dist));
+            manifests.put(name + "@" + version, vm(name, version, deps, peers, dist));
             return this;
         }
 

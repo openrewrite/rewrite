@@ -1,0 +1,1 @@
+{ "name": "peertest", "version": "1.0.0", "dependencies": { "use-sync-external-store": "1.2.2", "react": "18.2.0" } }

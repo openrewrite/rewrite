@@ -65,6 +65,15 @@ class YarnClassicResolverLockRegenTest extends LockRegenTestSupport {
                 new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}, {"ms", "2.1.3"}});
     }
 
+    @Test
+    void satisfiedPeerClosure() {
+        // use-sync-external-store@1.2.2 declares a `react` peer satisfied by the top-level react@18.2.0. yarn v1
+        // installs no peers and records none in the lock, so its block is byte-identical to a peer-free one.
+        assertResolveByteExact("lock/yarn-classic/resolve-peer",
+                new String[][]{{"use-sync-external-store", "1.2.2"}, {"react", "18.2.0"},
+                        {"loose-envify", "1.4.0"}, {"js-tokens", "4.0.0"}});
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the resolver output equals {@code dir/after} byte-for-byte.
      * Each distinct name maps to a packument route {@code http/<name>}; each {@code {name, version}} to a manifest
@@ -94,5 +103,6 @@ class YarnClassicResolverLockRegenTest extends LockRegenTestSupport {
         assertYarnReproduces("lock/yarn-classic/resolve-clean/pkg", "lock/yarn-classic/resolve-clean/after");
         assertYarnReproduces("lock/yarn-classic/resolve-merged/pkg", "lock/yarn-classic/resolve-merged/after");
         assertYarnReproduces("lock/yarn-classic/resolve-fork/pkg", "lock/yarn-classic/resolve-fork/after");
+        assertYarnReproduces("lock/yarn-classic/resolve-peer/pkg", "lock/yarn-classic/resolve-peer/after");
     }
 }

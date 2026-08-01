@@ -29,8 +29,10 @@ import java.util.*;
  * order); a fork is simply two flat blocks. Each block carries {@code version}, {@code resolved}
  * ({@code registry.yarnpkg.com/…#<sha1>}), {@code integrity}, and a {@code dependencies:} section of the declared
  * ranges. Blocks are ordered by {@code sortAlpha} of their first selector. Serialization goes through
- * {@link YarnLock} so the quoting/ordering match yarn's own {@code _stringify}. Anything not byte-verified — a
- * missing locator, an empty selector set, a workspace importer — fails loud rather than emit a wrong lock.
+ * {@link YarnLock} so the quoting/ordering match yarn's own {@code _stringify}. A satisfied {@code peerDependencies}
+ * surface is reproduced by omission — yarn v1 records no peers in the lock, so the declarer's block is byte-identical
+ * to one with no peers. Anything not byte-verified — a missing locator, an empty selector set, a workspace importer,
+ * an {@code optionalDependencies} section — fails loud rather than emit a wrong lock.
  */
 public final class YarnClassicLockWriter {
 
@@ -164,18 +166,16 @@ public final class YarnClassicLockWriter {
     }
 
     /**
-     * The clean/merged/fork writer reproduces only the block fields the goldens pin exactly. A manifest carrying an
-     * optional/peer surface reshapes the block in ways not yet byte-verified (yarn resolves peers into further
-     * blocks, and optional deps get their own section), so it defers rather than guess.
+     * The clean/merged/fork writer reproduces only the block fields the goldens pin exactly. yarn v1 never records
+     * the peer surface (a real {@code yarn install} writes no {@code peerDependencies:} into any block — it does not
+     * install peers), so a satisfied-peer manifest emits a block byte-identical to one with no peers and needs no
+     * guard. An {@code optionalDependencies} surface, by contrast, gets its own section not yet byte-verified (and
+     * the graph builder defers it), so it still defers.
      */
     private static void requireEmittable(VersionManifest m) {
         if (notEmpty(m.getOptionalDependencies())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, m.getName(),
                     m.getName() + "@" + m.getVersion() + " declares optionalDependencies (block shape not yet reproduced)");
-        }
-        if (notEmpty(m.getPeerDependencies())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, m.getName(),
-                    m.getName() + "@" + m.getVersion() + " declares peerDependencies (block shape not yet reproduced)");
         }
     }
 
