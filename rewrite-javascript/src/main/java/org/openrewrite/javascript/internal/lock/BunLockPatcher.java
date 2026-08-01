@@ -62,6 +62,7 @@ public final class BunLockPatcher implements LockPatcher {
         boolean anyRemoval = false;
         boolean anyPrune = false;
         List<PackageEdit> adds = new ArrayList<>();
+        List<PackageEdit> promotions = new ArrayList<>();
         List<PackageEdit> rewrites = new ArrayList<>();
         List<PackageEdit> relocateNests = new ArrayList<>();
         List<PackageEdit> freshNests = new ArrayList<>();
@@ -69,7 +70,9 @@ public final class BunLockPatcher implements LockPatcher {
             if (edit.isPrunesOrphans()) {
                 anyPrune = true;
             }
-            if (edit.getNestedUnder() != null) {
+            if (edit.getKind() == PROMOTION) {
+                promotions.add(edit);
+            } else if (edit.getNestedUnder() != null) {
                 (edit.getKind() == ADD ? freshNests : relocateNests).add(edit);
             } else if (edit.getNewVersion() == null) {
                 anyRemoval = true;
@@ -106,6 +109,12 @@ public final class BunLockPatcher implements LockPatcher {
         if (!adds.isEmpty()) {
             document = document.withValue(
                     applyAdds((Json.JsonObject) document.getValue(), adds, edits.getEditedPackageJson()));
+        }
+
+        if (!promotions.isEmpty()) {
+            // Promoting an already-installed transitive: the tuple stays, only the importer edge is added.
+            document = document.withValue(insertWorkspaceConstraints(
+                    (Json.JsonObject) document.getValue(), promotions, edits.getEditedPackageJson()));
         }
 
         Json.Document patched = (Json.Document) new BunVisitor(rewrites, edits.getEditedPackageJson())

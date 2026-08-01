@@ -118,29 +118,6 @@ class BunAddLockRegenTest extends LockRegenTestSupport {
         assertThat(result.getFailure().getDetail()).contains("is-number").contains("nest");
     }
 
-    @Test
-    void promotingAlreadyInstalledTransitiveFailsLoud() {
-        // The lock has ms@2.0.0 top-level as a transitive of debug (not declared). Adding ms directly would
-        // rewrite the importer edge; the npm-verified promotion is not ported to bun's tuple format, so defer.
-        String lock = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": {\n" +
-                "    \"\": {\n      \"name\": \"bun-promote\",\n      \"dependencies\": {\n" +
-                "        \"debug\": \"2.6.9\",\n      },\n    },\n  },\n  \"packages\": {\n" +
-                "    \"debug\": [\"debug@2.6.9\", \"\", { \"dependencies\": { \"ms\": \"2.0.0\" } }, \"sha512-D\"],\n" +
-                "    \"ms\": [\"ms@2.0.0\", \"\", {}, \"sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==\"],\n" +
-                "  }\n}\n";
-        String original = "{\n  \"name\": \"bun-promote\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
-                "    \"debug\": \"2.6.9\"\n  }\n}\n";
-        String edited = "{\n  \"name\": \"bun-promote\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
-                "    \"debug\": \"2.6.9\",\n    \"ms\": \"^2.0.0\"\n  }\n}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Bun,
-                edited, original, lock, null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("promoting already-installed ms");
-    }
-
     private static String editedPkg(String name, String range) {
         return "{\n  \"name\": \"bun-leaf\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
                 "    \"" + name + "\": \"" + range + "\",\n    \"ms\": \"^2.1.3\"\n  }\n}\n";

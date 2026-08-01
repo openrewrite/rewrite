@@ -1,0 +1,6 @@
+{
+  "name": "promote-fix",
+  "dependencies": {
+    "debug": "2.6.9"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "promote-fix",
+  "dependencies": {
+    "debug": "2.6.9",
+    "ms": "^2.0.0"
+  }
+}

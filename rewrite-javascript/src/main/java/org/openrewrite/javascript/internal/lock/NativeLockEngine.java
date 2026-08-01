@@ -1012,6 +1012,22 @@ public final class NativeLockEngine {
         Map<String, String> existingTopLevel = topLevelVersionsBun(existingLock);
         boolean dev = "devDependencies".equals(change.scope);
 
+        // Promoting a transitive to a direct dep: bun keys packages by name, so a satisfying locked version just
+        // gains the importer edge (its tuple is untouched). A non-satisfying version would fork/upgrade — defer.
+        String promoteVersion = existingTopLevel.get(rootName);
+        if (promoteVersion != null) {
+            if (!existingSatisfies(promoteVersion, rootConstraint)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
+                        promoteVersion + " which excludes " + rootConstraint + " (bun would fork); deferred");
+            }
+            return Collections.singletonList(LockEditSet.PackageEdit.builder()
+                    .name(rootName)
+                    .newConstraint(rootConstraint)
+                    .scope(change.scope)
+                    .kind(PROMOTION)
+                    .build());
+        }
+
         Map<String, Placement> placed = new LinkedHashMap<>();
         Map<String, NestedPlacement> nested = new LinkedHashMap<>();
         Deque<Requirement> queue = new ArrayDeque<>();
@@ -1022,12 +1038,6 @@ public final class NativeLockEngine {
 
             String existingVersion = existingTopLevel.get(req.name);
             if (existingVersion != null) {
-                if (req.name.equals(rootName)) {
-                    // Already installed as a transitive: bun's promotion (rewrite importer edge, clear dev) is not
-                    // yet ported to its tuple format, so fail loud rather than emit a lock missing the edge.
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
-                            "promoting already-installed " + rootName + " to a declared dependency is not yet supported for bun");
-                }
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
