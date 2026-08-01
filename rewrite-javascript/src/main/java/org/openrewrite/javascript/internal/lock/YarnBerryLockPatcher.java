@@ -183,7 +183,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "yarn berry removal is deferred");
         }
         if (edit.getOldConstraint() == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing old constraint for " + name);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "missing old constraint for " + name);
         }
         // A constraint-only widening keeps the resolved version (and its checksum); only the descriptor and the
         // importer range move. A version move rewrites the resolution triple and needs a reproduced checksum.
@@ -373,7 +373,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         }
         Yaml.Mapping.Entry entry = registryEntry(root, name);
         if (entry == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no berry entry for " + name);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no berry entry for " + name);
         }
         String key = LockYaml.keyOf(entry);
         Set<String> descriptors = new TreeSet<>();
@@ -405,7 +405,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, name, "no reproduced checksum for " + name);
         }
         if (edit.getOldConstraint() == null || edit.getNewConstraint() == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing descriptor range for moved " + name);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "missing descriptor range for moved " + name);
         }
         String oldDescriptor = name + "@npm:" + edit.getOldConstraint();
         Yaml.Mapping.Entry entry = findSingleDescriptor(root, oldDescriptor, name);
@@ -526,7 +526,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                 return entry;
             }
         }
-        throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no berry entry for " + descriptor);
+        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no berry entry for " + descriptor);
     }
 
     private static @Nullable String firstName(LockEditSet edits) {

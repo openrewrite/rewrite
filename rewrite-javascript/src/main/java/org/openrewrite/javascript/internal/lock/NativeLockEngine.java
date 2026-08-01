@@ -2323,7 +2323,9 @@ public final class NativeLockEngine {
                                                                  @Nullable String oldConstraint, String newConstraint,
                                                                  String lock, NodeRegistries registries, NpmRegistryClient client) {
         if (oldConstraint == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, dep, "no prior selector for moved " + dep);
+            // The transitive is locked but the upgraded root's old manifest never declared it (it was pulled in
+            // via another path), so the minimal engine can't reshape this closure — defer to a real resolver.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no prior selector for moved " + dep);
         }
         if (yarnHasOtherRequirer(pm, lock, dep, rootName)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,

@@ -189,14 +189,16 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         String name = edit.getName();
         String oldConstraint = edit.getOldConstraint();
         if (oldConstraint == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing old constraint for " + name);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "missing old constraint for " + name);
         }
         String oldDescriptor = name + "@" + oldConstraint;
 
         Blocks blocks = Blocks.parse(content);
         int bi = blocks.indexOfSelector(oldDescriptor);
         if (bi < 0) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no yarn block for " + oldDescriptor);
+            // The engine already proved this name is locked; a descriptor it can't locate means the closure was
+            // keyed under a selector the minimal engine can't reproduce (a complex reshape), not a broken lock.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no yarn block for " + oldDescriptor);
         }
 
         if (edit.getNewVersion() == null) {
@@ -325,7 +327,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         Blocks blocks = Blocks.parse(content);
         int bi = blocks.indexOfName(name);
         if (bi < 0) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no yarn block for " + name);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no yarn block for " + name);
         }
         blocks.set(bi, mergeSelector(blocks.get(bi), name + "@" + constraint));
         return blocks.reconstruct();
@@ -360,13 +362,13 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         String oldConstraint = edit.getOldConstraint();
         String newConstraint = edit.getNewConstraint();
         if (oldConstraint == null || newConstraint == null) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "missing selector range for moved " + name);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "missing selector range for moved " + name);
         }
         String oldDescriptor = name + "@" + oldConstraint;
         Blocks blocks = Blocks.parse(content);
         int bi = blocks.indexOfSelector(oldDescriptor);
         if (bi < 0) {
-            throw new EngineFailure(Reason.MALFORMED_LOCK, name, "no yarn block for " + oldDescriptor);
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no yarn block for " + oldDescriptor);
         }
         if (headerTokens(blocks.get(bi)).size() != 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " shares a merged selector; resolution required");
