@@ -45,12 +45,19 @@ public class ResolutionGraph {
     }
 
     /**
-     * A workspace importer: its directory ({@code ""} for the root), the ranges it declares per scope, and the
-     * version each declared dependency resolved to.
+     * A workspace importer: its directory ({@code ""} for the root), its own name/version (which the lock's
+     * importer entry mirrors), the ranges it declares per scope, and the version each declared dependency
+     * resolved to.
      */
     @Value
     public static class Importer {
         String dir;
+
+        /** The importer's own {@code name}, if its manifest declares one. */
+        @Nullable String name;
+
+        /** The importer's own {@code version}, if its manifest declares one. */
+        @Nullable String version;
 
         /** Declared ranges by scope ({@code dependencies}/{@code devDependencies}/…) then dependency name. */
         Map<String, Map<String, String>> declared;

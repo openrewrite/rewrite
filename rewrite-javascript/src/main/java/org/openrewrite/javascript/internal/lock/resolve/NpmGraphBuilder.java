@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.resolve;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 import org.openrewrite.semver.NodeSemver;
@@ -43,72 +44,94 @@ public final class NpmGraphBuilder {
     }
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
-        Map<String, String> resolved = new LinkedHashMap<>();   // name -> chosen single version
-        Deque<Requirement> work = new ArrayDeque<>();
         List<ImporterDecl> declared = new ArrayList<>();
-
+        Set<String> directDepNames = new LinkedHashSet<>();
         for (Map.Entry<String, String> e : importerManifests.entrySet()) {
-            ImporterDecl decl = new ImporterDecl(e.getKey(), declaredScopes(e.getValue()));
+            ImporterDecl decl = parseImporter(e.getKey(), e.getValue());
             declared.add(decl);
             for (Map<String, String> scope : decl.scopes.values()) {
-                for (Map.Entry<String, String> dep : scope.entrySet()) {
-                    work.add(new Requirement(dep.getKey(), dep.getValue()));
-                }
+                directDepNames.addAll(scope.keySet());
             }
         }
 
-        while (!work.isEmpty()) {
-            Requirement req = work.poll();
-            String cur = resolved.get(req.name);
-            if (cur != null) {
-                if (!NodeSemver.satisfies(cur, req.range)) {
-                    // Reconciling to a version satisfying both requirers, or forking, is a later slice.
-                    throw new EngineFailure(RESOLUTION_REQUIRED, req.name,
-                            req.name + " required at " + req.range + " but already resolved to " + cur + " (fork/upgrade)");
+        Map<String, Set<String>> chosen = new LinkedHashMap<>();      // name -> selected versions (>1 = fork)
+        Map<String, VersionManifest> manifests = new LinkedHashMap<>();  // nodeKey -> manifest
+        Map<String, Map<String, String>> nodeEdges = new LinkedHashMap<>();  // nodeKey -> (dep name -> resolved version)
+        Deque<String[]> work = new ArrayDeque<>();                    // {name, version} awaiting edge resolution
+
+        // Phase 1: importer direct deps select their versions first, so a directly-declared version wins the
+        // hoisted slot over any conflicting transitive requirement of the same name.
+        for (ImporterDecl decl : declared) {
+            for (Map<String, String> scope : decl.scopes.values()) {
+                for (Map.Entry<String, String> dep : scope.entrySet()) {
+                    select(dep.getKey(), dep.getValue(), directDepNames, chosen, manifests, work);
                 }
-                continue;
             }
-            String version = NodeSemver.maxSatisfying(registry.versions(req.name), req.range);
-            if (version == null) {
-                throw new EngineFailure(RESOLUTION_REQUIRED, req.name, "no version of " + req.name + " satisfies " + req.range);
-            }
-            VersionManifest manifest = registry.manifest(req.name, version);
-            requireCleanLeaf(manifest);
-            resolved.put(req.name, version);
+        }
+        // Phase 2: BFS every resolved node's edges (dedup to an already-chosen satisfying version, else fork).
+        while (!work.isEmpty()) {
+            String[] cur = work.poll();
+            VersionManifest manifest = manifests.get(ResolutionGraph.key(cur[0], cur[1]));
+            Map<String, String> edges = new LinkedHashMap<>();
             if (manifest.getDependencies() != null) {
                 for (Map.Entry<String, String> dep : manifest.getDependencies().entrySet()) {
-                    work.add(new Requirement(dep.getKey(), dep.getValue()));
+                    edges.put(dep.getKey(),
+                            select(dep.getKey(), dep.getValue(), directDepNames, chosen, manifests, work));
                 }
             }
+            nodeEdges.put(ResolutionGraph.key(cur[0], cur[1]), edges);
         }
 
         Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
-        for (Map.Entry<String, String> e : resolved.entrySet()) {
-            VersionManifest manifest = registry.manifest(e.getKey(), e.getValue());
-            nodes.put(ResolutionGraph.key(e.getKey(), e.getValue()), new ResolvedNode(manifest, edgesOf(manifest, resolved)));
+        for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
+            Map<String, String> edges = nodeEdges.getOrDefault(e.getKey(), Collections.emptyMap());
+            nodes.put(e.getKey(), new ResolvedNode(e.getValue(), edges));
         }
 
         List<ResolutionGraph.Importer> importers = new ArrayList<>();
         for (ImporterDecl decl : declared) {
             Map<String, String> importerResolved = new LinkedHashMap<>();
             for (Map<String, String> scope : decl.scopes.values()) {
-                for (String name : scope.keySet()) {
-                    importerResolved.put(name, resolved.get(name));
+                for (Map.Entry<String, String> dep : scope.entrySet()) {
+                    importerResolved.put(dep.getKey(),
+                            NodeSemver.maxSatisfying(chosen.getOrDefault(dep.getKey(), Collections.emptySet()), dep.getValue()));
                 }
             }
-            importers.add(new ResolutionGraph.Importer(decl.dir, decl.scopes, importerResolved));
+            importers.add(new ResolutionGraph.Importer(decl.dir, decl.name, decl.version, decl.scopes, importerResolved));
         }
         return new ResolutionGraph(importers, nodes);
     }
 
-    private static Map<String, String> edgesOf(VersionManifest manifest, Map<String, String> resolved) {
-        Map<String, String> edges = new LinkedHashMap<>();
-        if (manifest.getDependencies() != null) {
-            for (String dep : manifest.getDependencies().keySet()) {
-                edges.put(dep, resolved.get(dep));
-            }
+    /**
+     * Resolve a single {@code (name, range)} requirement, deduping to an already-chosen version when one
+     * satisfies. A range no chosen version satisfies selects a fresh version; when that means a <em>second</em>
+     * version of an already-resolved name (a fork), it is allowed only for a directly-declared dependency — whose
+     * declared version wins the hoisted slot — and otherwise defers.
+     */
+    private String select(String name, String range, Set<String> directDepNames,
+                          Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
+                          Deque<String[]> work) {
+        String deduped = NodeSemver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range);
+        if (deduped != null) {
+            return deduped;
         }
-        return edges;
+        if (chosen.containsKey(name) && !directDepNames.contains(name)) {
+            throw new EngineFailure(RESOLUTION_REQUIRED, name,
+                    name + " required at " + range + " forks from " + chosen.get(name) + " (transitive fork)");
+        }
+        String version = NodeSemver.maxSatisfying(registry.versions(name), range);
+        if (version == null) {
+            throw new EngineFailure(RESOLUTION_REQUIRED, name, "no version of " + name + " satisfies " + range);
+        }
+        String key = ResolutionGraph.key(name, version);
+        if (!manifests.containsKey(key)) {
+            VersionManifest manifest = registry.manifest(name, version);
+            requireCleanLeaf(manifest);
+            manifests.put(key, manifest);
+            chosen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(version);
+            work.add(new String[]{name, version});
+        }
+        return version;
     }
 
     private static void requireCleanLeaf(VersionManifest manifest) {
@@ -122,10 +145,12 @@ public final class NpmGraphBuilder {
         return m != null && !m.isEmpty();
     }
 
-    private static Map<String, Map<String, String>> declaredScopes(String manifestJson) {
+    private static ImporterDecl parseImporter(String dir, String manifestJson) {
         Map<String, Map<String, String>> scopes = new LinkedHashMap<>();
         try {
             JsonNode root = JSON.readTree(manifestJson);
+            String name = root.hasNonNull("name") ? root.get("name").asText() : null;
+            String version = root.hasNonNull("version") ? root.get("version").asText() : null;
             for (String scope : ROOT_SCOPES) {
                 JsonNode node = root.get(scope);
                 if (node != null && node.isObject()) {
@@ -136,28 +161,25 @@ public final class NpmGraphBuilder {
                     }
                 }
             }
+            return new ImporterDecl(dir, name, version, scopes);
+        } catch (EngineFailure ef) {
+            throw ef;
         } catch (Exception e) {
             throw new EngineFailure(RESOLUTION_REQUIRED, null, "could not parse importer manifest");
-        }
-        return scopes;
-    }
-
-    private static final class Requirement {
-        final String name;
-        final String range;
-
-        Requirement(String name, String range) {
-            this.name = name;
-            this.range = range;
         }
     }
 
     private static final class ImporterDecl {
         final String dir;
+        final @Nullable String name;
+        final @Nullable String version;
         final Map<String, Map<String, String>> scopes;
 
-        ImporterDecl(String dir, Map<String, Map<String, String>> scopes) {
+        ImporterDecl(String dir, @Nullable String name, @Nullable String version,
+                     Map<String, Map<String, String>> scopes) {
             this.dir = dir;
+            this.name = name;
+            this.version = version;
             this.scopes = scopes;
         }
     }
