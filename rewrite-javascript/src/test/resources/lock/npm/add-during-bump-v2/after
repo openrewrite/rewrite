@@ -1,0 +1,51 @@
+{
+  "name": "regen",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "regen",
+      "version": "1.0.0",
+      "dependencies": {
+        "p-limit": "1.2.0"
+      }
+    },
+    "node_modules/p-limit": {
+      "version": "1.2.0",
+      "resolved": "https://registry.npmjs.org/p-limit/-/p-limit-1.2.0.tgz",
+      "integrity": "sha512-Y/OtIaXtUPr4/YpMv1pCL5L5ed0rumAaAeBSj12F+bSlMdys7i8oQF/GUJmfpTS/QoaRrS/k6pma29haJpsMng==",
+      "license": "MIT",
+      "dependencies": {
+        "p-try": "^1.0.0"
+      },
+      "engines": {
+        "node": ">=4"
+      }
+    },
+    "node_modules/p-try": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/p-try/-/p-try-1.0.0.tgz",
+      "integrity": "sha512-U1etNYuMJoIz3ZXSrrySFjsXQTWOx2/jdi86L+2pRvph/qMKL6sbcCYdH23fqsbm8TH2Gn0OybpT4eSFlCVHww==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=4"
+      }
+    }
+  },
+  "dependencies": {
+    "p-limit": {
+      "version": "1.2.0",
+      "resolved": "https://registry.npmjs.org/p-limit/-/p-limit-1.2.0.tgz",
+      "integrity": "sha512-Y/OtIaXtUPr4/YpMv1pCL5L5ed0rumAaAeBSj12F+bSlMdys7i8oQF/GUJmfpTS/QoaRrS/k6pma29haJpsMng==",
+      "requires": {
+        "p-try": "^1.0.0"
+      }
+    },
+    "p-try": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/p-try/-/p-try-1.0.0.tgz",
+      "integrity": "sha512-U1etNYuMJoIz3ZXSrrySFjsXQTWOx2/jdi86L+2pRvph/qMKL6sbcCYdH23fqsbm8TH2Gn0OybpT4eSFlCVHww=="
+    }
+  }
+}

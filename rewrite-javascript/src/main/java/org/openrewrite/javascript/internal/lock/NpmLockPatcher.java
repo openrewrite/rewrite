@@ -157,9 +157,17 @@ public final class NpmLockPatcher implements LockPatcher {
             entry = setStringField(entry, "resolved", edit.getNewResolved());
             entry = setStringField(entry, "integrity", edit.getNewIntegrity());
             entry = applyWriteThrough(name, packages, entry, edit.getWriteThroughMetadata());
-            // A cascade bump re-pins the entry's own dependency edges (unchanged ones stay byte-identical); an
-            // added edge fails loud, a dropped edge orphan-prunes when the edit allows it.
-            entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
+            if (edit.isAddsDependencyEdges()) {
+                // add-during-bump: the entry gains dependency edges whose subtrees are placed as fresh ADDs; graft
+                // the full new dependencies map at npm's field position (v3 only; the engine gates v2 out).
+                Map<String, String> deps = edit.getNewDependencies();
+                entry = writeThroughObjectMember(name, packages, entry, "dependencies",
+                        deps == null ? null : JSON.valueToTree(deps));
+            } else {
+                // A cascade bump re-pins the entry's own dependency edges (unchanged ones stay byte-identical); an
+                // added edge fails loud, a dropped edge orphan-prunes when the edit allows it.
+                entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
+            }
             packages = LockJson.replaceValue(packages, "node_modules/" + name, entry);
             root = LockJson.replaceValue(root, "packages", packages);
         }
@@ -221,9 +229,16 @@ public final class NpmLockPatcher implements LockPatcher {
         entry = setStringField(entry, "version", edit.getNewVersion());
         entry = setStringField(entry, "resolved", edit.getNewResolved());
         entry = setStringField(entry, "integrity", edit.getNewIntegrity());
-        // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them, an
-        // orphan-prune drops them.
-        entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies(), edit.isPrunesOrphans());
+        if (edit.isAddsDependencyEdges()) {
+            // add-during-bump: the legacy mirror gains a `requires` map (its edges' subtrees added as fresh entries);
+            // graft the full new map at npm's field position.
+            Map<String, String> deps = edit.getNewDependencies();
+            entry = writeThroughObjectMember(name, legacy, entry, "requires", deps == null ? null : JSON.valueToTree(deps));
+        } else {
+            // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them, an
+            // orphan-prune drops them.
+            entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies(), edit.isPrunesOrphans());
+        }
         legacy = LockJson.replaceValue(legacy, name, entry);
         return LockJson.replaceValue(root, "dependencies", legacy);
     }

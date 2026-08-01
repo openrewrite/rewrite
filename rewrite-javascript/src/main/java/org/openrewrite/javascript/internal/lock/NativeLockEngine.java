@@ -285,7 +285,14 @@ public final class NativeLockEngine {
         edits.addAll(nestEdits);
         if (!depsEqual) {
             if (pm == PackageManager.Npm) {
-                edits.addAll(cascadeForcedMoves(name, newManifest, existingLock, registries, client));
+                CascadeResult cr = cascadeForcedMoves(name, newManifest,
+                        "devDependencies".equals(change.scope), existingLock, registries, client);
+                edits.addAll(cr.edits);
+                if (cr.rootAddsEdges) {
+                    // The bumped root's entry gains new dependency edges whose subtrees were placed above;
+                    // tell the patcher to graft the full new dependencies map rather than fail loud.
+                    edits.set(0, rootEdit.toBuilder().addsDependencyEdges(true).build());
+                }
             } else if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
@@ -300,18 +307,31 @@ public final class NativeLockEngine {
         return edits;
     }
 
+    /** The cascade's emitted edits, plus whether the bumped root's own {@code dependencies} map gained new edges. */
+    private static final class CascadeResult {
+        final List<LockEditSet.PackageEdit> edits;
+        final boolean rootAddsEdges;
+
+        CascadeResult(List<LockEditSet.PackageEdit> edits, boolean rootAddsEdges) {
+            this.edits = edits;
+            this.rootAddsEdges = rootAddsEdges;
+        }
+    }
+
     /**
      * A direct-dependency bump whose new {@code dependencies} edges force a currently-locked transitive to move.
      * Each forced transitive resolves over the union of all live constraints on it (the bumped dep's new
      * constraint substituted for its stale lock entry). When a moved transitive's own target ALSO changes ITS
      * {@code dependencies} (a multi-level cascade), those changed edges seed the next wave via the same worklist,
-     * each wave byte-exact-or-fail-loud. Any move that would reshape fails loud: union unsatisfiable (npm would
-     * fork/nest), a brand-new transitive (add-during-bump), an added/dropped edge mid-cascade, or a transitive
-     * re-touched across waves (an earlier union missed a requirer).
+     * each wave byte-exact-or-fail-loud. A brand-new transitive the root introduces (add-during-bump) resolves and
+     * hoists its own fresh subtree via {@link #placeAddedTransitivesNpm}; only the root can introduce one (a deeper
+     * mover's edge set must be identical, else it already fails loud). Any move that would reshape fails loud:
+     * union unsatisfiable (npm would fork/nest), an added/dropped edge mid-cascade, or a transitive re-touched
+     * across waves (an earlier union missed a requirer).
      */
-    private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootNew,
-                                                                    String existingLock, NodeRegistries registries,
-                                                                    NpmRegistryClient client) {
+    private static CascadeResult cascadeForcedMoves(String rootName, VersionManifest rootNew, boolean dev,
+                                                    String existingLock, NodeRegistries registries,
+                                                    NpmRegistryClient client) {
         // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop only
         // re-resolves kept edges. Each resolves over the actual installed tree via npm's hoisting walk, so an
         // edge already satisfied by a nested copy is a no-op.
@@ -327,6 +347,7 @@ public final class NativeLockEngine {
 
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         Set<String> movedDeps = new LinkedHashSet<>();
+        Map<String, String> newTransitives = new LinkedHashMap<>();
         while (!worklist.isEmpty()) {
             String moverName = worklist.poll();
             String moverKey = "node_modules/" + moverName;
@@ -336,9 +357,16 @@ public final class NativeLockEngine {
                 String resolvedKey = NpmLockPatcher.resolveFrom(installed.keySet(), moverKey, dep);
                 String cur = installedVersion(installed, resolvedKey);
                 if (cur == null) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            "upgrading " + moverName + " introduces new transitive " + dep +
-                                    " (add-during-bump) not yet supported");
+                    // A brand-new transitive. Only the initially-bumped root can introduce one; a deeper mover's
+                    // edge set must be identical (resolveForcedMove fails loud otherwise), so this never fires for
+                    // a mover. Collect it; its fresh subtree is resolved+hoisted after the move waves settle.
+                    if (!moverName.equals(rootName)) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                                "upgrading " + moverName + " introduces new transitive " + dep +
+                                        " (add-during-bump) not yet supported");
+                    }
+                    newTransitives.put(dep, constraint);
+                    continue;
                 }
                 if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
@@ -369,7 +397,108 @@ public final class NativeLockEngine {
                 }
             }
         }
-        return moves;
+        if (!newTransitives.isEmpty()) {
+            moves.addAll(placeAddedTransitivesNpm(newTransitives, dev, installed, movedNewDeps.keySet(),
+                    existingLock, registries, client));
+        }
+        return new CascadeResult(moves, !newTransitives.isEmpty());
+    }
+
+    /**
+     * Resolve and hoist the fresh subtree(s) a bump pulls into the closure (add-during-bump), reusing npm's
+     * hoisting placement. Maximally conservative: every subtree member must land at a free top-level
+     * {@code node_modules/<name>} slot — a name that already sits anywhere in the tree, that the cascade moves,
+     * or that is required at two incompatible versions within the added subtree, all fail loud (dedupe/nest/fork
+     * are left to a full resolver). Each placed member is emitted as a fresh {@code ADD}.
+     */
+    private static List<LockEditSet.PackageEdit> placeAddedTransitivesNpm(Map<String, String> seeds, boolean dev,
+                                                                          Map<String, Object> installed,
+                                                                          Set<String> cascadeNames, String existingLock,
+                                                                          NodeRegistries registries,
+                                                                          NpmRegistryClient client) {
+        Map<String, String> existingTop = topLevelVersionsNpm(existingLock);
+        Map<String, Placement> placed = new LinkedHashMap<>();
+        Deque<Requirement> queue = new ArrayDeque<>();
+        for (Map.Entry<String, String> e : seeds.entrySet()) {
+            queue.add(new Requirement(e.getKey(), e.getValue(), dev));
+        }
+        while (!queue.isEmpty()) {
+            Requirement req = queue.poll();
+            if (cascadeNames.contains(req.name)) {
+                // The added subtree needs a package the same bump is moving; the two interact, defer.
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
+                        "the added transitive subtree needs " + req.name + " which the bump also moves; deferred");
+            }
+            String existingVersion = existingTop.get(req.name);
+            if (existingVersion != null) {
+                if (existingSatisfies(existingVersion, req.constraint)) {
+                    continue; // dedup to the stable top-level pin the bump does not touch
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is installed at " +
+                        existingVersion + " which does not satisfy the added " + req.constraint +
+                        " (npm would nest/move it); deferred");
+            }
+            if (installedAnywhereNpm(installed, req.name)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
+                        req.name + " already exists nested in the tree; hoisting the added copy is not yet supported");
+            }
+            Placement already = placed.get(req.name);
+            if (already != null) {
+                if (existingSatisfies(already.version, req.constraint)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
+                        " is required at two incompatible versions within the added subtree (" +
+                        already.version + " vs " + req.constraint + "); deferred");
+            }
+
+            NodeRegistry registry = registries.registryFor(req.name);
+            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
+            VersionManifest manifest = client.getManifest(registry, req.name, version);
+            requireEmittableClosureMember(req.name, manifest);
+            VersionManifest.Dist dist = manifest.getDist();
+            if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
+                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
+                        req.name + "@" + version + " has no registry tarball/integrity");
+            }
+            // A stray reverse-dependent whose recorded constraint excludes the resolved version fails loud.
+            proveReverseDependentsAccept(PackageManager.Npm, req.name, version, version, existingLock);
+
+            placed.put(req.name, new Placement(version, manifest, req.dev));
+            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
+            enqueueDeps(queue, manifest.getOptionalDependencies(), req.dev, req.name);
+        }
+
+        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
+        for (Map.Entry<String, Placement> e : placed.entrySet()) {
+            Placement p = e.getValue();
+            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
+            edits.add(LockEditSet.PackageEdit.builder()
+                    .name(e.getKey())
+                    .oldVersion("")
+                    .newVersion(p.version)
+                    .newResolved(dist.getTarball())
+                    .newIntegrity(dist.getIntegrity())
+                    .newShasum(dist.getShasum())
+                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
+                    .scope(p.dev ? "devDependencies" : "dependencies")
+                    .importerDir(null)
+                    .kind(ADD)
+                    .writeThroughMetadata(leafMetadata(p.manifest))
+                    .build());
+        }
+        return edits;
+    }
+
+    /** Whether {@code name} is installed at any depth ({@code node_modules/<name>} top-level or nested). */
+    private static boolean installedAnywhereNpm(Map<String, Object> installed, String name) {
+        String suffix = "node_modules/" + name;
+        for (String key : installed.keySet()) {
+            if (key.equals(suffix) || key.endsWith("/" + suffix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A forced move's emitted edit, plus the mover's changed edges when its target seeds a deeper cascade wave. */

@@ -79,16 +79,24 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void bumpIntroducingNewTransitiveFailsLoud() {
-        // lodash 4.18.0 pulls a brand-new transitive (tslib) not in the lock — a closure add seeded by a
-        // bump (I2+I3), still deferred rather than resolved. A changed edge that MOVES an existing
-        // transitive is the supported I3 cascade (see NpmCascadeLockRegenTest).
+    void bumpIntroducingNewTransitiveWithPeerFailsLoud() {
+        // A clean single-leaf add-during-bump is now placed byte-exact (see NpmAddDuringBumpLockRegenTest); a NEW
+        // transitive that declares a non-optional peer (which npm auto-installs) is beyond the conservative slice,
+        // so it still defers rather than guess the peer placement.
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.18.0\":{}}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.20",
                 "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
         routes.put("https://registry.npmjs.org/lodash/4.18.0",
-                "{\"name\":\"lodash\",\"version\":\"4.18.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}}");
+                "{\"name\":\"lodash\",\"version\":\"4.18.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.18.0.tgz\"," +
+                        "\"integrity\":\"sha512-LODASH\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"peerDependencies\":{\"react\":\">=17\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-TSLIB\"}}");
 
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
@@ -99,7 +107,7 @@ class NativeLockEngineTest {
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
-        assertThat(result.getFailure().getDetail()).contains("introduces new transitive");
+        assertThat(result.getFailure().getDetail()).contains("non-optional peerDependencies");
     }
 
     @Test

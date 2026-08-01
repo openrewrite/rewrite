@@ -114,6 +114,9 @@ public class LockEditSet {
         /** A {@code PROMOTION} of a dev-only transitive now production-reachable clears {@code "dev": true} (leaf only). */
         boolean clearDev;
 
+        /** An add-during-bump: this bump's entry gains new dependency edges whose subtrees are placed as fresh ADDs. */
+        boolean addsDependencyEdges;
+
         /**
          * ADD is a brand-new dependency; ADD with a {@link #nestedUnder} is a fresh nested add. FORCED_MOVE is a
          * transitive a bump pushes to a new version; CONTENT_FORK is pnpm's non-nesting fork; PROMOTION reuses an
