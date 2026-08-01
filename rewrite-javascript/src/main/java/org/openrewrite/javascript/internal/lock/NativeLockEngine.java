@@ -133,9 +133,10 @@ public final class NativeLockEngine {
         NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, Environment.SYSTEM);
         NpmRegistryClient client = NodeExecutionContextView.view(ctx).getRegistryClient();
 
+        String memberImporterDir = addImporterDir(pm, existingLock, packageJsonPath);
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
         for (DepChange change : changes) {
-            edits.addAll(resolveEdit(pm, change, existingLock, registries, client));
+            edits.addAll(resolveEdit(pm, change, existingLock, memberImporterDir, registries, client));
         }
         if (pm == PackageManager.YarnBerry) {
             edits = enrichBerryChecksums(edits, existingLock, registries, client);
@@ -152,13 +153,14 @@ public final class NativeLockEngine {
     }
 
     private static List<LockEditSet.PackageEdit> resolveEdit(PackageManager pm, DepChange change, String existingLock,
+                                                             @Nullable String memberImporterDir,
                                                              NodeRegistries registries, NpmRegistryClient client) {
         String name = change.name;
 
         if (change.oldConstraint == null) {
             // The added direct dep plus its resolved runtime closure is hoisted against the existing tree;
             // any placement that would move/nest/fork fails loud.
-            return resolveClosureAdd(pm, change, existingLock, registries, client);
+            return resolveClosureAdd(pm, change, existingLock, memberImporterDir, registries, client);
         }
 
         Set<String> lockedVersions = findLockedVersions(pm, existingLock, name);
@@ -764,8 +766,8 @@ public final class NativeLockEngine {
      * needed at two versions, an excluding reverse-dependent, or an unverified metadata surface).
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAdd(PackageManager pm, DepChange change,
-                                                                   String existingLock, NodeRegistries registries,
-                                                                   NpmRegistryClient client) {
+                                                                   String existingLock, @Nullable String memberImporterDir,
+                                                                   NodeRegistries registries, NpmRegistryClient client) {
         String rootName = change.name;
         String rootConstraint = Objects.requireNonNull(change.newConstraint);
 
@@ -776,7 +778,7 @@ public final class NativeLockEngine {
         if (pm == PackageManager.Pnpm) {
             // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
             // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
-            return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, registries, client);
+            return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, memberImporterDir, registries, client);
         }
         if (pm == PackageManager.Bun) {
             // bun hoists like npm: the closure resolves identically, one packages tuple per member, failing
@@ -988,6 +990,7 @@ public final class NativeLockEngine {
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAddPnpm(DepChange change, String rootName,
                                                                        String rootConstraint, String existingLock,
+                                                                       @Nullable String memberImporterDir,
                                                                        NodeRegistries registries, NpmRegistryClient client) {
         if (pnpmLockMajor(existingLock) < 9) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
@@ -1045,7 +1048,7 @@ public final class NativeLockEngine {
                     .newIntegrity(dist.getIntegrity())
                     .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
                     .scope(p.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
+                    .importerDir(e.getKey().equals(rootName) ? memberImporterDir : null)
                     .kind(ADD)
                     .writeThroughMetadata(pnpmLeafMetadata(p.manifest))
                     .build());
@@ -2290,6 +2293,42 @@ public final class NativeLockEngine {
             }
         }
         return null;
+    }
+
+    /**
+     * The workspace importer directory that owns a newly-added dependency, derived from the edited manifest's
+     * path. An add has no lock entry to match on, so the member is located by its directory being an importer
+     * key (the manifest path is repo-relative, and a root lock keys its importers by member directory).
+     * {@code null} for the root manifest, a standalone package, or any member whose importer cannot be located
+     * exactly — the patcher then targets {@code .} or fails loud. Only pnpm carries per-member importer sections.
+     */
+    private static @Nullable String addImporterDir(PackageManager pm, String lock, @Nullable Path packageJsonPath) {
+        if (pm != PackageManager.Pnpm || packageJsonPath == null) {
+            return null;
+        }
+        Path parent = packageJsonPath.getParent();
+        if (parent == null) {
+            return null; // root manifest: the "." importer
+        }
+        String dir = parent.toString().replace('\\', '/');
+        if (dir.isEmpty() || ".".equals(dir)) {
+            return null;
+        }
+        return pnpmImporterKeys(lock).contains(dir) ? dir : null;
+    }
+
+    private static Set<String> pnpmImporterKeys(String lock) {
+        Set<String> keys = new LinkedHashSet<>();
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            Object importers = ((Map<?, ?>) loaded).get("importers");
+            if (importers instanceof Map) {
+                for (Object k : ((Map<?, ?>) importers).keySet()) {
+                    keys.add(String.valueOf(k));
+                }
+            }
+        }
+        return keys;
     }
 
     // --- raw lock inspection (read-only) ---------------------------------
