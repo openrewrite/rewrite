@@ -60,11 +60,15 @@ public final class BunLockPatcher implements LockPatcher {
         }
 
         boolean anyRemoval = false;
+        boolean anyPrune = false;
         List<PackageEdit> adds = new ArrayList<>();
         List<PackageEdit> rewrites = new ArrayList<>();
         List<PackageEdit> relocateNests = new ArrayList<>();
         List<PackageEdit> freshNests = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
+            if (edit.isPrunesOrphans()) {
+                anyPrune = true;
+            }
             if (edit.getNestedUnder() != null) {
                 (edit.getKind() == ADD ? freshNests : relocateNests).add(edit);
             } else if (edit.getNewVersion() == null) {
@@ -112,6 +116,15 @@ public final class BunLockPatcher implements LockPatcher {
         }
         if (!freshNests.isEmpty()) {
             patched = patched.withValue(applyFreshNests((Json.JsonObject) patched.getValue(), freshNests));
+        }
+        if (anyPrune) {
+            // A bump dropped a dependency edge (already removed from the mover's metadata above); GC whatever that
+            // leaves unreachable from the workspace importers.
+            Json.JsonObject prunedRoot = (Json.JsonObject) patched.getValue();
+            Set<String> orphanKeys = orphanPackageKeys(prunedRoot, edits.getEdits());
+            if (!orphanKeys.isEmpty()) {
+                patched = patched.withValue(dropPackagesMembers(prunedRoot, orphanKeys));
+            }
         }
         return patched.printAll();
     }
@@ -309,21 +322,64 @@ public final class BunLockPatcher implements LockPatcher {
 
     /**
      * Rewrite the {@code dependencies} sub-map inside a package tuple's metadata (element 2) to the bump's new
-     * ranges, byte-exact. Sibling surfaces (optionalDependencies/peer/os/…) are proven unchanged upstream, so they
-     * stay. A null delta leaves the metadata alone (a leaf move / deps-unchanged bump); gaining a dependencies map
-     * is a reshape this slice does not do.
+     * ranges, byte-exact. Sibling surfaces (optionalDependencies/peer/bin/…) are proven unchanged upstream, so they
+     * stay. When an orphan-pruning bump drops every edge, the whole map is removed (keeping siblings). A null delta
+     * with no prune leaves the metadata alone (a leaf move / deps-unchanged bump); gaining a map is not yet done.
      */
     private static Json.JsonObject rewriteMetadataDeps(Json.JsonObject metadata, @Nullable Map<String, String> newDeps,
-                                                       String name) {
-        if (newDeps == null || newDeps.isEmpty()) {
-            return metadata;
-        }
+                                                       boolean prunesOrphans, String name) {
+        boolean hasNew = newDeps != null && !newDeps.isEmpty();
         Json.Member depsMember = LockJson.member(metadata, "dependencies");
+        if (!hasNew) {
+            return prunesOrphans && depsMember != null ? removeInlineMember(metadata, "dependencies") : metadata;
+        }
         if (depsMember == null || !(depsMember.getValue() instanceof Json.JsonObject)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gains a dependencies map; not yet supported");
         }
         Json.JsonObject rendered = (Json.JsonObject) LockJson.parse(renderInlineMap(newDeps), null).getValue();
         return LockJson.replaceValue(metadata, "dependencies", rendered.withPrefix(depsMember.getValue().getPrefix()));
+    }
+
+    /** Remove {@code key} from an inline object, re-applying the original first-member prefix and last-member trailing space. */
+    private static Json.JsonObject removeInlineMember(Json.JsonObject obj, String key) {
+        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
+        Space firstPrefix = null;
+        Space lastAfter = null;
+        for (JsonRightPadded<Json> rp : members) {
+            if (rp.getElement() instanceof Json.Member) {
+                if (firstPrefix == null) {
+                    firstPrefix = rp.getElement().getPrefix();
+                }
+                lastAfter = rp.getAfter();
+            }
+        }
+        int removeIdx = -1;
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            if (el instanceof Json.Member && key.equals(LockJson.memberKey((Json.Member) el))) {
+                removeIdx = i;
+                break;
+            }
+        }
+        if (removeIdx < 0) {
+            return obj;
+        }
+        members.remove(removeIdx);
+        boolean firstDone = false;
+        int newLast = -1;
+        for (int i = 0; i < members.size(); i++) {
+            if (members.get(i).getElement() instanceof Json.Member) {
+                if (!firstDone && firstPrefix != null) {
+                    members.set(i, members.get(i).withElement(members.get(i).getElement().withPrefix(firstPrefix)));
+                    firstDone = true;
+                }
+                newLast = i;
+            }
+        }
+        if (newLast >= 0 && lastAfter != null) {
+            members.set(newLast, members.get(newLast).withAfter(lastAfter));
+        }
+        return obj.getPadding().withMembers(members);
     }
 
     /** bun's compact single-line metadata: {@code {}} or {@code { "dependencies": { "<dep>": "<range>", … } }}. */
@@ -588,7 +644,8 @@ public final class BunLockPatcher implements LockPatcher {
                     updated.set(0, ((Json.Literal) values.get(0)).withSource('"' + newLocator + '"').withValue(newLocator));
                     // A closure-changing bump re-pins the package's own dependency ranges (tuple metadata, element 2).
                     if (values.get(2) instanceof Json.JsonObject) {
-                        updated.set(2, rewriteMetadataDeps((Json.JsonObject) values.get(2), edit.getNewDependencies(), edit.getName()));
+                        updated.set(2, rewriteMetadataDeps((Json.JsonObject) values.get(2), edit.getNewDependencies(),
+                                edit.isPrunesOrphans(), edit.getName()));
                     }
                     if (edit.getNewIntegrity() != null && values.get(3) instanceof Json.Literal) {
                         String integrity = edit.getNewIntegrity();

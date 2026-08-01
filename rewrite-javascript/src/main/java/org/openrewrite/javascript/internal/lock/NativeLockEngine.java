@@ -238,8 +238,8 @@ public final class NativeLockEngine {
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (npm, pnpm v9, both yarns).
-        boolean prunesOrphans = pm != PackageManager.Bun && dropsDependencyEdge(oldManifest, newManifest);
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (npm, pnpm v9, both yarns, bun).
+        boolean prunesOrphans = dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
                 .newIntegrity(dist == null ? null : dist.getIntegrity())
@@ -261,10 +261,6 @@ public final class NativeLockEngine {
             } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
                 edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.Bun) {
-                if (dropsDependencyEdge(oldManifest, newManifest)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                            name + " drops a dependency edge (orphan-prune) not yet supported for bun");
-                }
                 edits.addAll(cascadeForcedMovesBun(name, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
