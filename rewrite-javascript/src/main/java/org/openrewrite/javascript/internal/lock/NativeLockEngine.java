@@ -273,61 +273,101 @@ public final class NativeLockEngine {
     /**
      * A direct-dependency bump whose new {@code dependencies} edges force a currently-locked transitive to move.
      * Each forced transitive resolves over the union of all live constraints on it (the bumped dep's new
-     * constraint substituted for its stale lock entry), and any move that would reshape fails loud: union
-     * unsatisfiable (npm would fork/nest), a mover whose own dependencies also change, a brand-new transitive, or
-     * a dropped edge.
+     * constraint substituted for its stale lock entry). When a moved transitive's own target ALSO changes ITS
+     * {@code dependencies} (a multi-level cascade), those changed edges seed the next wave via the same worklist,
+     * each wave byte-exact-or-fail-loud. Any move that would reshape fails loud: union unsatisfiable (npm would
+     * fork/nest), a brand-new transitive (add-during-bump), an added/dropped edge mid-cascade, or a transitive
+     * re-touched across waves (an earlier union missed a requirer).
      */
     private static List<LockEditSet.PackageEdit> cascadeForcedMoves(String rootName, VersionManifest rootNew,
                                                                     String existingLock, NodeRegistries registries,
                                                                     NpmRegistryClient client) {
-        Map<String, String> newDeps = rootNew.getDependencies() == null ?
-                Collections.emptyMap() : rootNew.getDependencies();
-
         // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop only
         // re-resolves kept edges. Each resolves over the actual installed tree via npm's hoisting walk, so an
         // edge already satisfied by a nested copy is a no-op.
         Map<String, Object> installed = installedPackagesNpm(existingLock);
-        String rootKey = "node_modules/" + rootName;
+
+        // Every mover's new constraint map, seeded with the bumped root and grown by each cascade wave. It lets a
+        // shared transitive's union substitute EVERY moved requirer's new constraint for its stale lock value.
+        Map<String, Map<String, String>> movedNewDeps = new LinkedHashMap<>();
+        movedNewDeps.put(rootName, rootNew.getDependencies() == null ?
+                Collections.emptyMap() : rootNew.getDependencies());
+        Deque<String> worklist = new ArrayDeque<>();
+        worklist.add(rootName);
+
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
-        for (Map.Entry<String, String> e : newDeps.entrySet()) {
-            String dep = e.getKey();
-            String constraint = e.getValue();
-            String resolvedKey = NpmLockPatcher.resolveFrom(installed.keySet(), rootKey, dep);
-            String cur = installedVersion(installed, resolvedKey);
-            if (cur == null) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                        "upgrading " + rootName + " introduces new transitive " + dep +
-                                " (add-during-bump) not yet supported");
-            }
-            if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                        dep + " is constrained by an unresolvable range: " + constraint);
-            }
-            if (!NodeSemver.satisfies(cur, constraint)) {
+        Set<String> movedDeps = new LinkedHashSet<>();
+        while (!worklist.isEmpty()) {
+            String moverName = worklist.poll();
+            String moverKey = "node_modules/" + moverName;
+            for (Map.Entry<String, String> e : movedNewDeps.get(moverName).entrySet()) {
+                String dep = e.getKey();
+                String constraint = e.getValue();
+                String resolvedKey = NpmLockPatcher.resolveFrom(installed.keySet(), moverKey, dep);
+                String cur = installedVersion(installed, resolvedKey);
+                if (cur == null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                            "upgrading " + moverName + " introduces new transitive " + dep +
+                                    " (add-during-bump) not yet supported");
+                }
+                if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                            dep + " is constrained by an unresolvable range: " + constraint);
+                }
+                if (NodeSemver.satisfies(cur, constraint)) {
+                    continue; // kept edge already satisfied by the installed version (constraint re-pin only)
+                }
                 if (!resolvedKey.equals("node_modules/" + dep)) {
                     // A nested copy that no longer satisfies would move within its own subtree; the mover path
                     // assumes a top-level entry, so defer rather than risk a non-byte-exact tree.
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            "moving nested " + dep + " to satisfy the upgraded " + rootName +
+                            "moving nested " + dep + " to satisfy the upgraded " + moverName +
                                     " constraint is not yet supported");
                 }
-                moves.add(resolveForcedMove(rootName, dep, cur, newDeps, existingLock, registries, client));
+                if (!movedDeps.add(dep)) {
+                    // A transitive forced by more than one wave means an earlier union missed a requirer; the
+                    // second resolve would not be byte-safe. Defer.
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                            dep + " is forced to move by more than one cascade wave; deferred");
+                }
+                ForcedMove move = resolveForcedMove(dep, cur, movedNewDeps, existingLock, registries, client);
+                moves.add(move.edit);
+                if (move.cascadeDeps != null) {
+                    // The moved transitive's target changes its own edges: seed the next wave.
+                    movedNewDeps.put(dep, move.cascadeDeps);
+                    worklist.add(dep);
+                }
             }
         }
         return moves;
     }
 
-    /** Resolve and emit the move of a single forced transitive, failing loud on any reshape. */
-    private static LockEditSet.PackageEdit resolveForcedMove(String rootName, String dep, String oldVersion,
-                                                             Map<String, String> rootNewDeps, String existingLock,
-                                                             NodeRegistries registries, NpmRegistryClient client) {
+    /** A forced move's emitted edit, plus the mover's changed edges when its target seeds a deeper cascade wave. */
+    private static final class ForcedMove {
+        final LockEditSet.PackageEdit edit;
+        final @Nullable Map<String, String> cascadeDeps;
+
+        ForcedMove(LockEditSet.PackageEdit edit, @Nullable Map<String, String> cascadeDeps) {
+            this.edit = edit;
+            this.cascadeDeps = cascadeDeps;
+        }
+    }
+
+    /**
+     * Resolve and emit the move of a single forced transitive, failing loud on any reshape. When the target
+     * changes the transitive's OWN {@code dependencies} (same edge set, changed constraints), the changed edges
+     * are returned to seed the next cascade wave; an added/dropped edge reshapes the tree and fails loud.
+     */
+    private static ForcedMove resolveForcedMove(String dep, String oldVersion,
+                                                Map<String, Map<String, String>> movedNewDeps, String existingLock,
+                                                NodeRegistries registries, NpmRegistryClient client) {
         // A transitive that is also directly declared would need its importer declaration reconciled too.
         if (importerDeclaresNpm(existingLock, dep)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                     dep + " is directly declared; moving it via cascade is not yet supported");
         }
 
-        Set<String> union = liveConstraintsNpm(existingLock, dep, rootName, rootNewDeps);
+        Set<String> union = liveConstraintsNpm(existingLock, dep, movedNewDeps);
         NodeRegistry registry = registries.registryFor(dep);
         Set<String> published = client.getPackument(registry, dep).getVersions();
         String target = maxSatisfyingAll(published, union);
@@ -343,12 +383,22 @@ public final class NativeLockEngine {
 
         VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
         VersionManifest newManifest = client.getManifest(registry, dep, target);
-        // A mover must itself be a clean-closure bump; a change to its own edges is a deeper wave.
+        // A mover must be a clean bump on every non-`dependencies` surface; a `dependencies` delta seeds the next
+        // wave, but only when the edge SET is identical (an added/dropped edge mid-cascade would place/GC a
+        // subtree — npm reshapes, so it defers).
         proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
+        Map<String, String> cascadeDeps = null;
         if (!dependenciesEqual(oldManifest, newManifest)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    "moving " + dep + " to " + target + " changes its own dependencies " +
-                            "(multi-level cascade) not yet supported");
+            Map<String, String> oldDeps = oldManifest.getDependencies() == null ?
+                    Collections.emptyMap() : oldManifest.getDependencies();
+            Map<String, String> newDeps = newManifest.getDependencies() == null ?
+                    Collections.emptyMap() : newManifest.getDependencies();
+            if (!oldDeps.keySet().equals(newDeps.keySet())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
+                        "moving " + dep + " to " + target + " adds/drops a dependency edge " +
+                                "(mid-cascade reshape) not yet supported");
+            }
+            cascadeDeps = newManifest.getDependencies();
         }
 
         VersionManifest.Dist dist = newManifest.getDist();
@@ -356,7 +406,7 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep,
                     dep + "@" + target + " has no registry tarball/integrity");
         }
-        return LockEditSet.PackageEdit.builder()
+        LockEditSet.PackageEdit edit = LockEditSet.PackageEdit.builder()
                 .name(dep)
                 .oldVersion(oldVersion)
                 .newVersion(target)
@@ -370,14 +420,16 @@ public final class NativeLockEngine {
                 .importerDir(null)
                 .kind(FORCED_MOVE)
                 .build();
+        return new ForcedMove(edit, cascadeDeps);
     }
 
     /**
-     * Every recorded constraint on {@code dep} across the lock's installed entries, with the bumped root's new
-     * constraint substituted for its stale lock entry. If no version satisfies all of them, npm would fork/nest.
+     * Every recorded constraint on {@code dep} across the lock's installed entries, with each moved requirer's new
+     * constraint substituted for its stale lock entry ({@code movedNewDeps} holds the bumped root plus every
+     * cascade mover). If no version satisfies all of them, npm would fork/nest.
      */
-    private static Set<String> liveConstraintsNpm(String lock, String dep, String rootName,
-                                                  Map<String, String> rootNewDeps) {
+    private static Set<String> liveConstraintsNpm(String lock, String dep,
+                                                  Map<String, Map<String, String>> movedNewDeps) {
         Set<String> constraints = new LinkedHashSet<>();
         Map<String, Object> root = parseJsonObject(lock, false);
         Object packages = root.get("packages");
@@ -389,8 +441,8 @@ public final class NativeLockEngine {
                 if (nm < 0 || !(e.getValue() instanceof Map)) {
                     continue; // importer entries: dep is not importer-declared (guarded above)
                 }
-                if (key.substring(nm + prefix.length()).equals(rootName)) {
-                    continue; // the bumped root: substituted with its new constraint below
+                if (movedNewDeps.containsKey(key.substring(nm + prefix.length()))) {
+                    continue; // a mover: its lock constraint is stale, its new one is substituted below
                 }
                 Map<?, ?> entry = (Map<?, ?>) e.getValue();
                 addConstraintOn(constraints, entry.get("dependencies"), dep);
@@ -398,9 +450,11 @@ public final class NativeLockEngine {
                 addConstraintOn(constraints, entry.get("peerDependencies"), dep);
             }
         }
-        String rootConstraint = rootNewDeps.get(dep);
-        if (rootConstraint != null) {
-            constraints.add(rootConstraint);
+        for (Map<String, String> newDeps : movedNewDeps.values()) {
+            String rootConstraint = newDeps.get(dep);
+            if (rootConstraint != null) {
+                constraints.add(rootConstraint);
+            }
         }
         return constraints;
     }
