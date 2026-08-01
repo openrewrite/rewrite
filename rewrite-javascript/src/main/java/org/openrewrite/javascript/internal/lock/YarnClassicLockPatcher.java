@@ -32,6 +32,9 @@ import java.util.TreeMap;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.FORCED_MOVE;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.PROMOTION;
+import static org.openrewrite.javascript.internal.lock.YarnLock.maybeWrap;
+import static org.openrewrite.javascript.internal.lock.YarnLock.sortAlpha;
+import static org.openrewrite.javascript.internal.lock.YarnLock.unwrap;
 
 /**
  * Patches a classic {@code yarn.lock} (v1). Not valid YAML, so this is a targeted text edit over the raw
@@ -42,8 +45,6 @@ import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.K
 public final class YarnClassicLockPatcher implements LockPatcher {
 
     private static final String YARN_HEADER = "# yarn lockfile v1";
-    private static final String NPM_REGISTRY = "https://registry.npmjs.org/";
-    private static final String YARN_REGISTRY = "https://registry.yarnpkg.com/";
 
     /** True when the existing lock's sibling {@code resolved} entries use the yarnpkg mirror. */
     private boolean mirrorToYarnpkg;
@@ -59,7 +60,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         }
         // Mirror the host the siblings use rather than force-rewriting to yarnpkg: a lock already on
         // registry.npmjs.org must stay there, or the new entry's host won't match a real yarn install.
-        mirrorToYarnpkg = content.contains(YARN_REGISTRY);
+        mirrorToYarnpkg = content.contains(YarnLock.YARN_REGISTRY);
         droppedTargets.clear();
         List<PackageEdit> adds = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
@@ -174,7 +175,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         for (String range : ranges) {
             selectors.add(name + "@" + range);
         }
-        selectors.sort(YarnClassicLockPatcher::sortAlpha);
+        selectors.sort(YarnLock::sortAlpha);
         StringBuilder header = new StringBuilder();
         for (int i = 0; i < selectors.size(); i++) {
             if (i > 0) {
@@ -345,7 +346,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             return block;
         }
         List<String> sorted = new ArrayList<>(selectors);
-        sorted.sort(YarnClassicLockPatcher::sortAlpha);
+        sorted.sort(YarnLock::sortAlpha);
         StringBuilder header = new StringBuilder();
         for (int i = 0; i < sorted.size(); i++) {
             if (i > 0) {
@@ -424,9 +425,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "missing resolved metadata for " + edit.getName());
         }
-        if (mirrorToYarnpkg && url.startsWith(NPM_REGISTRY)) {
-            url = YARN_REGISTRY + url.substring(NPM_REGISTRY.length());
-        }
+        url = YarnLock.mirrorHost(url, mirrorToYarnpkg);
         if (edit.getNewShasum() != null) {
             url = url + "#" + edit.getNewShasum();
         }
@@ -505,62 +504,6 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             }
         }
         return String.join("\n", lines);
-    }
-
-    // --- yarn serialization (mirrors yarn's own shouldWrapKey/maybeWrap/sortAlpha) --------------------
-
-    static String maybeWrap(String s) {
-        return shouldWrapKey(s) ? jsonQuote(s) : s;
-    }
-
-    private static boolean shouldWrapKey(String s) {
-        if (s.startsWith("true") || s.startsWith("false")) {
-            return true;
-        }
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == ':' || c == '\n' || c == '\\' || c == '"' || c == ',' || c == '[' || c == ']' || Character.isWhitespace(c)) {
-                return true;
-            }
-        }
-        if (s.isEmpty()) {
-            return true;
-        }
-        char c0 = s.charAt(0);
-        if (c0 >= '0' && c0 <= '9') {
-            return true;
-        }
-        return !((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z'));
-    }
-
-    private static String jsonQuote(String s) {
-        StringBuilder b = new StringBuilder("\"");
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '"' || c == '\\') {
-                b.append('\\');
-            }
-            b.append(c);
-        }
-        return b.append('"').toString();
-    }
-
-    static int sortAlpha(String a, String b) {
-        int shortLen = Math.min(a.length(), b.length());
-        for (int i = 0; i < shortLen; i++) {
-            int diff = a.charAt(i) - b.charAt(i);
-            if (diff != 0) {
-                return diff;
-            }
-        }
-        return a.length() - b.length();
-    }
-
-    private static String unwrap(String token) {
-        if (token.length() >= 2 && token.charAt(0) == '"' && token.charAt(token.length() - 1) == '"') {
-            return token.substring(1, token.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
-        }
-        return token;
     }
 
     /** The raw-string block model: the leading comment/blank prefix plus each top-level block, verbatim. */
