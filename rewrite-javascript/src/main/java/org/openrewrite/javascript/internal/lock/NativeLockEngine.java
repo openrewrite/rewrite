@@ -184,6 +184,17 @@ public final class NativeLockEngine {
                     name + " uses an unsupported entry type: " + change.newConstraint);
         }
 
+        if (pm == PackageManager.Pnpm && lockedVersions.size() > 1) {
+            // A direct dep unambiguous at its importer defers today only because the SAME package is forked
+            // (nested/transitive) elsewhere at another version. Re-scope the bump to the version the importer
+            // edge actually resolves; the other versions are forks this direct bump does not touch. A genuine
+            // fork at the importer (the edge itself resolves to more than one version) stays fail-loud below.
+            Set<String> importerVersions = importerResolvedVersionsPnpm(existingLock, name, change.oldConstraint);
+            if (importerVersions.size() == 1) {
+                lockedVersions = importerVersions;
+            }
+        }
+
         if (lockedVersions.isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no locked entry for " + name);
         }
@@ -194,6 +205,12 @@ public final class NativeLockEngine {
         String oldVersion = lockedVersions.iterator().next();
 
         String targetVersion = resolveTarget(client, registries, name, oldVersion, change.newConstraint);
+
+        if (pm == PackageManager.Pnpm && !targetVersion.equals(oldVersion)) {
+            // The pnpm patcher renames the old packages/snapshots key in place; that stays byte-exact only when
+            // no other version of this package sorts between old and new (else a real pnpm reorders the entries).
+            requirePnpmRenameKeepsOrder(name, oldVersion, targetVersion, existingLock);
+        }
 
         LockEditSet.PackageEdit.PackageEditBuilder edit = LockEditSet.PackageEdit.builder()
                 .name(name)
@@ -2807,6 +2824,84 @@ public final class NativeLockEngine {
             int at = k.lastIndexOf('@');
             if (at > 0 && k.substring(0, at).equals(name)) {
                 versions.add(k.substring(at + 1));
+            }
+        }
+    }
+
+    /**
+     * The resolved versions the workspace importers pin for {@code name} through an edge whose specifier matches
+     * {@code oldConstraint} (peer suffix stripped). A single value means the direct dependency is unambiguous at
+     * the importer even when the package is separately forked (nested/transitive) elsewhere in the graph.
+     */
+    private static Set<String> importerResolvedVersionsPnpm(String lock, String name, @Nullable String oldConstraint) {
+        Set<String> versions = new LinkedHashSet<>();
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return versions;
+        }
+        Object importers = ((Map<?, ?>) loaded).get("importers");
+        List<Object> roots = new ArrayList<>();
+        if (importers instanceof Map) {
+            roots.addAll(((Map<?, ?>) importers).values());
+        } else {
+            roots.add(loaded); // single-package v6: the root mapping is the sole importer
+        }
+        for (Object importer : roots) {
+            if (!(importer instanceof Map)) {
+                continue;
+            }
+            for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies")) {
+                Object deps = ((Map<?, ?>) importer).get(scope);
+                if (!(deps instanceof Map)) {
+                    continue;
+                }
+                Object dep = ((Map<?, ?>) deps).get(name);
+                if (!(dep instanceof Map)) {
+                    continue;
+                }
+                Object specifier = ((Map<?, ?>) dep).get("specifier");
+                Object version = ((Map<?, ?>) dep).get("version");
+                if (version != null && (oldConstraint == null || oldConstraint.equals(String.valueOf(specifier)))) {
+                    String v = String.valueOf(version);
+                    int paren = v.indexOf('(');
+                    versions.add(paren >= 0 ? v.substring(0, paren) : v);
+                }
+            }
+        }
+        return versions;
+    }
+
+    /**
+     * A pnpm bump renames the {@code packages}/{@code snapshots} key {@code name@old} to {@code name@new} in place.
+     * That is byte-exact only when the rename does not cross another version of the same package in pnpm's
+     * (lexicographic) key order; otherwise a real pnpm reorders the entries, so defer.
+     */
+    private static void requirePnpmRenameKeepsOrder(String name, String oldVersion, String newVersion, String lock) {
+        String oldKey = name + "@" + oldVersion;
+        String newKey = name + "@" + newVersion;
+        String lo = oldKey.compareTo(newKey) <= 0 ? oldKey : newKey;
+        String hi = oldKey.compareTo(newKey) <= 0 ? newKey : oldKey;
+        Object loaded = new Yaml().load(lock);
+        if (!(loaded instanceof Map)) {
+            return;
+        }
+        Map<?, ?> root = (Map<?, ?>) loaded;
+        for (String section : new String[]{"packages", "snapshots"}) {
+            Object node = root.get(section);
+            if (!(node instanceof Map)) {
+                continue;
+            }
+            for (Object key : ((Map<?, ?>) node).keySet()) {
+                String k = String.valueOf(key);
+                String bare = k.startsWith("/") ? k.substring(1) : k;
+                if (bare.equals(oldKey) || !bare.startsWith(name + "@")) {
+                    continue;
+                }
+                if (bare.compareTo(lo) > 0 && bare.compareTo(hi) < 0) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            newKey + " would reorder past " + bare +
+                                    "; pnpm's in-place rename is not byte-exact, resolution required");
+                }
             }
         }
     }
