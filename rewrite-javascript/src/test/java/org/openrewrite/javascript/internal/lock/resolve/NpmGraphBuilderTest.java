@@ -279,6 +279,55 @@ class NpmGraphBuilderTest {
         assertThat(graph.node("dep", "1.0.0").isOptional()).isFalse();
     }
 
+    @Test
+    void resolvesAnImporterAliasToRealPackage() {
+        // react-is-18 aliases the real react-is; the node is keyed by the alias name but carries react-is's manifest.
+        FakeRegistry registry = new FakeRegistry().add("react-is", "18.3.1", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"react-is-18\":\"npm:react-is@^18.3.1\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("react-is-18@18.3.1");
+        assertThat(graph.node("react-is-18", "18.3.1").getName()).isEqualTo("react-is");
+        assertThat(graph.getImporters()).singleElement().satisfies(imp ->
+                assertThat(imp.getResolved()).containsExactly(Map.entry("react-is-18", "18.3.1")));
+    }
+
+    @Test
+    void resolvesAnAliasCleanSubClosureUnderRealNames() {
+        // mydebug aliases debug; debug's own dependency ms resolves under its own (real) name and identity.
+        FakeRegistry registry = new FakeRegistry()
+                .add("debug", "2.6.9", singletonMap("ms", "2.0.0"))
+                .add("ms", "2.0.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"mydebug\":\"npm:debug@2.6.9\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("mydebug@2.6.9", "ms@2.0.0");
+        assertThat(graph.node("mydebug", "2.6.9").getName()).isEqualTo("debug");
+        assertThat(graph.node("mydebug", "2.6.9").getResolvedEdges()).containsExactly(Map.entry("ms", "2.0.0"));
+    }
+
+    @Test
+    void defersAliasForkingWithUnaliasedCopy() {
+        // react-is is both a normal dependency and an alias target: the alias would fork a non-aliased copy — defer.
+        FakeRegistry registry = new FakeRegistry().add("react-is", "18.3.1", emptyMap());
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry).build(singletonMap("",
+                        "{\"dependencies\":{\"react-is\":\"^18.3.1\",\"react-is-18\":\"npm:react-is@^18.3.1\"}}")));
+    }
+
+    @Test
+    void defersAliasWithNonRegistryTarget() {
+        // A git/file/url alias target is not a registry range; defer rather than treat it as one.
+        FakeRegistry registry = new FakeRegistry();
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry).build(singletonMap("",
+                        "{\"dependencies\":{\"dep\":\"npm:foo@github:owner/foo\"}}")));
+    }
+
     // --- in-memory registry -------------------------------------------------
 
     private static final class FakeRegistry implements Registry {

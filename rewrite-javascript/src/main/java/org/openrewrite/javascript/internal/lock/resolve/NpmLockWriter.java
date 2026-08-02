@@ -35,9 +35,10 @@ import java.util.*;
  * {@code peerDependencies} surface — a resolved node's or a library root importer's own — is reproduced (recorded
  * verbatim, its provider flagged {@code peer: true}); a missing non-optional peer the graph auto-installed is a
  * provider the dependency edges never reach, so it is seeded top-level here. dev/optional dependencies are placed
- * and flagged ({@code dev}/{@code optional}/{@code devOptional}) per
- * npm's reachability; anything else it cannot reproduce byte-exact — a workspace, a manifest field it does not
- * model — fails loud rather than emit a wrong lock.
+ * and flagged ({@code dev}/{@code optional}/{@code devOptional}) per npm's reachability. An alias (its
+ * {@code node_modules} slot renamed off the real package name) carries a {@code name} field with the real name
+ * (and, in the lockfileVersion 2 legacy tree, an {@code npm:<name>@<version>} version). Anything else it cannot
+ * reproduce byte-exact — a workspace, a manifest field it does not model — fails loud rather than emit a wrong lock.
  */
 public final class NpmLockWriter {
 
@@ -72,7 +73,7 @@ public final class NpmLockWriter {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getValue().getName(),
                         e.getValue().getName() + "@" + e.getValue().getVersion() + " resolved but was not placed");
             }
-            packages.set(key, packageEntry(e.getValue(), peerProviders.contains(e.getKey())));
+            packages.set(key, packageEntry(e.getValue(), peerProviders.contains(e.getKey()), key));
         }
 
         if (lockfileVersion == 2) {
@@ -100,11 +101,16 @@ public final class NpmLockWriter {
 
     // --- package entry ----------------------------------------------------
 
-    private ObjectNode packageEntry(ResolvedNode node, boolean peer) {
+    private ObjectNode packageEntry(ResolvedNode node, boolean peer, String placementKey) {
         VersionManifest m = node.getManifest();
         requireEmittable(m);
 
         ObjectNode entry = JSON.createObjectNode();
+        // An alias (its node_modules slot renamed away from the real package name) carries a `name` field with the
+        // real name; the renderer orders it before `version`.
+        if (isAlias(placementKey, m.getName())) {
+            entry.put("name", m.getName());
+        }
         entry.put("version", m.getVersion());
 
         VersionManifest.Dist dist = m.getDist();
@@ -431,7 +437,8 @@ public final class NpmLockWriter {
         for (Map.Entry<String, ResolvedNode> e : graph.getNodes().entrySet()) {
             ResolvedNode node = e.getValue();
             String key = placements.get(e.getKey());
-            if (!(NM + node.getName()).equals(key)) {
+            String slot = slotName(key);
+            if (!(NM + slot).equals(key)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, node.getName(),
                         node.getName() + " is nested; the lockfileVersion 2 legacy tree of a fork is not yet reproduced");
             }
@@ -443,7 +450,8 @@ public final class NpmLockWriter {
             }
             VersionManifest.Dist dist = m.getDist();
             ObjectNode entry = JSON.createObjectNode();
-            entry.put("version", m.getVersion());
+            // An alias records its real target in the version ("npm:<realName>@<version>"), keyed by the slot name.
+            entry.put("version", slot.equals(m.getName()) ? m.getVersion() : "npm:" + m.getName() + "@" + m.getVersion());
             entry.put("resolved", dist == null ? null : dist.getTarball());
             entry.put("integrity", dist == null ? null : dist.getIntegrity());
             applyDepFlags(entry, node);
@@ -455,7 +463,7 @@ public final class NpmLockWriter {
             } else if (notEmpty(m.getPeerDependencies())) {
                 entry.set("requires", JSON.createObjectNode());
             }
-            legacy.set(node.getName(), entry);
+            legacy.set(slot, entry);
         }
         return legacy;
     }
@@ -514,6 +522,16 @@ public final class NpmLockWriter {
     }
 
     // --- helpers ----------------------------------------------------------
+
+    /** The directory slot a placement key names (the segment after its last {@code node_modules/}). */
+    private static String slotName(String placementKey) {
+        return placementKey.substring(placementKey.lastIndexOf(NM) + NM.length());
+    }
+
+    /** An alias entry: the node's directory slot was renamed away from the real package name. */
+    private static boolean isAlias(String placementKey, String realName) {
+        return !slotName(placementKey).equals(realName);
+    }
 
     private static ObjectNode stringMapNode(Map<String, String> map) {
         ObjectNode node = JSON.createObjectNode();

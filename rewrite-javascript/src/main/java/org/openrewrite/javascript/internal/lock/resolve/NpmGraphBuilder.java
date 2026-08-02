@@ -37,7 +37,9 @@ import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RE
  * constraint already met and adds no node. A missing non-optional peer is npm's auto-install: when it is enabled
  * (only the npm resolver; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
  * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
- * missing-peer shape fails loud. Version and constraint decisions are delegated entirely to node-semver.
+ * missing-peer shape fails loud. An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
+ * placed by the alias name, reproduced only when self-contained (no un-aliased copy of the same package, no peer
+ * entanglement). Version and constraint decisions are delegated entirely to node-semver.
  */
 public final class NpmGraphBuilder {
 
@@ -80,7 +82,7 @@ public final class NpmGraphBuilder {
         for (ImporterDecl decl : declared) {
             for (Map<String, String> scope : decl.scopes.values()) {
                 for (Map.Entry<String, String> dep : scope.entrySet()) {
-                    select(dep.getKey(), dep.getValue(), chosen, manifests, work);
+                    selectDep(dep.getKey(), dep.getValue(), chosen, manifests, work);
                 }
             }
         }
@@ -95,6 +97,7 @@ public final class NpmGraphBuilder {
             nodeOptionalEdges.put(nodeKey,
                     resolveEdges(manifest.getOptionalDependencies(), chosen, manifests, work));
         }
+        requireResolvableAliases(deriveAliases(manifests), chosen, manifests);
         Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared);
 
         List<ResolutionGraph.Importer> importers = new ArrayList<>();
@@ -102,8 +105,7 @@ public final class NpmGraphBuilder {
             Map<String, String> importerResolved = new LinkedHashMap<>();
             for (Map<String, String> scope : decl.scopes.values()) {
                 for (Map.Entry<String, String> dep : scope.entrySet()) {
-                    importerResolved.put(dep.getKey(),
-                            NodeSemver.maxSatisfying(chosen.getOrDefault(dep.getKey(), Collections.emptySet()), dep.getValue()));
+                    importerResolved.put(dep.getKey(), resolvedVersionOf(dep.getKey(), dep.getValue(), chosen));
                 }
             }
             // peerDependencies trails the resolved scopes so the writer mirrors npm's root-entry field order.
@@ -138,7 +140,7 @@ public final class NpmGraphBuilder {
         Map<String, String> edges = new LinkedHashMap<>();
         if (declaredEdges != null) {
             for (Map.Entry<String, String> dep : declaredEdges.entrySet()) {
-                edges.put(dep.getKey(), select(dep.getKey(), dep.getValue(), chosen, manifests, work));
+                edges.put(dep.getKey(), selectDep(dep.getKey(), dep.getValue(), chosen, manifests, work));
             }
         }
         return edges;
@@ -169,6 +171,147 @@ public final class NpmGraphBuilder {
             work.add(new String[]{name, version});
         }
         return version;
+    }
+
+    /**
+     * Resolve one declared dependency value. An {@code npm:<name>@<range>} alias installs the real package
+     * {@code <name>} under the declared directory name, so it routes to {@link #selectAlias}; anything else is a
+     * plain requirement for {@link #select}. An alias whose target is not a registry range (a git/file/url/dist-tag
+     * spec) defers.
+     */
+    private String selectDep(String name, String spec, Map<String, Set<String>> chosen,
+                             Map<String, VersionManifest> manifests, Deque<String[]> work) {
+        if (spec.startsWith("npm:")) {
+            Alias alias = parseAlias(spec);
+            if (alias == null) {
+                throw new EngineFailure(RESOLUTION_REQUIRED, name,
+                        name + " aliases " + spec + " (only a registry-range alias is resolved)");
+            }
+            return selectAlias(name, alias.realName, alias.range, chosen, manifests, work);
+        }
+        return select(name, spec, chosen, manifests, work);
+    }
+
+    /**
+     * Resolve an alias's real package but key it by the alias name ({@code aliasName@version}), so its tree slot
+     * and dedup follow the alias while its (real) manifest drives the entry. The real package's own dependencies
+     * resolve normally under their real names.
+     */
+    private String selectAlias(String aliasName, String realName, String range, Map<String, Set<String>> chosen,
+                               Map<String, VersionManifest> manifests, Deque<String[]> work) {
+        String deduped = NodeSemver.maxSatisfying(chosen.getOrDefault(aliasName, Collections.emptySet()), range);
+        if (deduped != null) {
+            return deduped;
+        }
+        String version = NodeSemver.maxSatisfying(registry.versions(realName), range);
+        if (version == null) {
+            throw new EngineFailure(RESOLUTION_REQUIRED, realName, "no version of " + realName + " satisfies " + range);
+        }
+        String key = ResolutionGraph.key(aliasName, version);
+        if (!manifests.containsKey(key)) {
+            manifests.put(key, registry.manifest(realName, version));
+            chosen.computeIfAbsent(aliasName, k -> new LinkedHashSet<>()).add(version);
+            work.add(new String[]{aliasName, version});
+        }
+        return version;
+    }
+
+    /** The version a directly-declared dependency resolved to, reading an alias spec's range rather than its literal. */
+    private static String resolvedVersionOf(String name, String spec, Map<String, Set<String>> chosen) {
+        String range = spec;
+        if (spec.startsWith("npm:")) {
+            Alias alias = parseAlias(spec);
+            if (alias != null) {
+                range = alias.range;
+            }
+        }
+        return NodeSemver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range);
+    }
+
+    /** Parse an {@code npm:<name>@<range>} alias, or {@code null} when the target is not a registry range. */
+    private static @Nullable Alias parseAlias(String spec) {
+        String body = spec.substring("npm:".length());
+        int at = body.lastIndexOf('@');
+        if (at <= 0) {
+            return null;
+        }
+        String range = body.substring(at + 1);
+        if (range.isEmpty() || !NodeSemver.validRange(range)) {
+            return null;
+        }
+        return new Alias(body.substring(0, at), range);
+    }
+
+    /**
+     * Recover every resolved alias node — one whose graph key name differs from its manifest name — as
+     * {@code aliasName -> realName}, so the reproducibility guard can inspect them without threading extra state.
+     */
+    private static Map<String, String> deriveAliases(Map<String, VersionManifest> manifests) {
+        Map<String, String> aliases = new LinkedHashMap<>();
+        for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
+            String key = e.getKey();
+            String slot = key.substring(0, key.lastIndexOf('@'));
+            if (!slot.equals(e.getValue().getName())) {
+                aliases.put(slot, e.getValue().getName());
+            }
+        }
+        return aliases;
+    }
+
+    /**
+     * Only a self-contained alias is reproduced byte-exact: the real package must not also resolve un-aliased (nor
+     * be aliased more than once), and it must not entangle the peer machinery (which keys by real name). An alias
+     * that forks with a non-aliased copy, whose real name is required as a peer, or that itself declares peers,
+     * defers with the classic message.
+     */
+    private static void requireResolvableAliases(Map<String, String> aliases, Map<String, Set<String>> chosen,
+                                                 Map<String, VersionManifest> manifests) {
+        if (aliases.isEmpty()) {
+            return;
+        }
+        Map<String, Integer> targetCount = new LinkedHashMap<>();
+        for (String realName : aliases.values()) {
+            targetCount.merge(realName, 1, Integer::sum);
+        }
+        Set<String> aliasedReal = new HashSet<>(aliases.values());
+        for (Map.Entry<String, String> alias : aliases.entrySet()) {
+            String realName = alias.getValue();
+            if (chosen.containsKey(realName) || targetCount.get(realName) > 1) {
+                throw new EngineFailure(RESOLUTION_REQUIRED, realName, alias.getKey() + " aliases " + realName +
+                        " which also resolves un-aliased (alias fork not yet resolved)");
+            }
+        }
+        for (VersionManifest m : manifests.values()) {
+            Map<String, String> peers = m.getPeerDependencies();
+            if (peers == null) {
+                continue;
+            }
+            for (String peerName : peers.keySet()) {
+                if (aliasedReal.contains(peerName)) {
+                    throw new EngineFailure(RESOLUTION_REQUIRED, peerName, peerName +
+                            " is aliased but also required as a peer (alias-peer entanglement not yet resolved)");
+                }
+            }
+        }
+        for (Map.Entry<String, String> alias : aliases.entrySet()) {
+            for (String version : chosen.getOrDefault(alias.getKey(), Collections.emptySet())) {
+                VersionManifest m = manifests.get(ResolutionGraph.key(alias.getKey(), version));
+                if (m != null && notEmpty(m.getPeerDependencies())) {
+                    throw new EngineFailure(RESOLUTION_REQUIRED, alias.getValue(), alias.getValue() +
+                            " (aliased) declares peerDependencies (alias-with-peers not yet resolved)");
+                }
+            }
+        }
+    }
+
+    private static final class Alias {
+        final String realName;
+        final String range;
+
+        Alias(String realName, String range) {
+            this.realName = realName;
+            this.range = range;
+        }
     }
 
     /**

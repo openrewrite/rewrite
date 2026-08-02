@@ -33,10 +33,11 @@ import java.util.Map;
  * lockfileVersion is taken from the existing lock (defaulting to 3). A clean, hoisted closure — flat, a single
  * directly-declared fork, or one carrying {@code peerDependencies} (already satisfied, or a single missing leaf peer
  * npm auto-installs top-level) — including its {@code devDependencies} and {@code optionalDependencies} (marked per
- * npm's dev/optional reachability), is reproduced exactly. A library root's own {@code peerDependencies} are
- * resolved the same way (npm 7+ auto-installs them top-level, flagged {@code peer: true}, and mirrors the scope
- * verbatim in the root entry) in the cleanest slice; a workspace, a {@code bundleDependencies} surface, a root
- * {@code peerDependenciesMeta}, a peer beyond the clean auto-install slice, or a closure-reshaping the
+ * npm's dev/optional reachability) and any self-contained {@code npm:<name>@<range>} alias, is reproduced exactly.
+ * A library root's own {@code peerDependencies} are resolved the same way (npm 7+ auto-installs them top-level,
+ * flagged {@code peer: true}, and mirrors the scope verbatim in the root entry) in the cleanest slice; a workspace,
+ * a {@code bundleDependencies} surface, a root {@code peerDependenciesMeta}, a peer beyond the clean auto-install
+ * slice, or a closure-reshaping the
  * builder/writer cannot yet match fails loud, leaving the old lock untouched.
  */
 public final class NpmResolver implements LockResolver {

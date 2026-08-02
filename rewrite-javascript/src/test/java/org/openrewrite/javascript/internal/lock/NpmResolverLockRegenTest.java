@@ -147,6 +147,22 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void aliasDependencyV3() {
+        // react-is-18 aliases the real react-is at ^18.3.1: npm installs react-is under node_modules/react-is-18
+        // with a `name` field recording the real package, and mirrors the alias spec verbatim in the root deps.
+        assertResolveByteExact("lock/npm/resolve-alias", "after", null,
+                new String[][]{{"react-is", "18.3.1"}});
+    }
+
+    @Test
+    void aliasDependencyV2() {
+        // The same closure into a lockfileVersion 2 lock: the legacy tree keys by the alias name and records the
+        // target as `npm:react-is@18.3.1`.
+        assertResolveByteExact("lock/npm/resolve-alias", "after-v2", "{\"lockfileVersion\":2}",
+                new String[][]{{"react-is", "18.3.1"}});
+    }
+
+    @Test
     void satisfiedPeerWithMetaV2() {
         // The same closure as lockfileVersion 2: the declarer's `requires` keeps only its regular dep (tslib), the
         // peer edges omitted, and react keeps `peer: true` in the legacy tree.
@@ -194,5 +210,7 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
         assertNpmReproduces("lock/npm/resolve-peer-autoinstall/pkg", "lock/npm/resolve-peer-autoinstall/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-root-peer/pkg", "lock/npm/resolve-root-peer/after", "3");
         assertNpmReproduces("lock/npm/resolve-root-peer/pkg", "lock/npm/resolve-root-peer/after-v2", "2");
+        assertNpmReproduces("lock/npm/resolve-alias/pkg", "lock/npm/resolve-alias/after", "3");
+        assertNpmReproduces("lock/npm/resolve-alias/pkg", "lock/npm/resolve-alias/after-v2", "2");
     }
 }

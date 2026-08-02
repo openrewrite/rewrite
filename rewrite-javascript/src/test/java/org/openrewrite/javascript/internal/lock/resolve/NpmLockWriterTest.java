@@ -344,6 +344,66 @@ class NpmLockWriterTest {
     }
 
     @Test
+    void aliasEntryCarriesNameFieldV3() {
+        // react-is-18 aliases react-is: the slot is node_modules/react-is-18, and the entry leads with the real name.
+        FakeRegistry registry = new FakeRegistry()
+                .add("react-is", "18.3.1", emptyMap(), "MIT", null);
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", app(singletonMap("react-is-18", "npm:react-is@^18.3.1"))));
+
+        String lock = new NpmLockWriter().write(graph, 3);
+        assertThat(lock).contains("\"node_modules/react-is-18\": {\n" +
+                "      \"name\": \"react-is\",\n" +
+                "      \"version\": \"18.3.1\",\n" +
+                "      \"resolved\": \"https://r/react-is/-/react-is-18.3.1.tgz\",\n" +
+                "      \"integrity\": \"sha512-react-is-18.3.1\",\n" +
+                "      \"license\": \"MIT\"\n" +
+                "    }");
+        // The root records the alias spec verbatim.
+        assertThat(lock).contains("\"react-is-18\": \"npm:react-is@^18.3.1\"");
+    }
+
+    @Test
+    void aliasSubClosureHoistsTransitiveTopLevelV3() {
+        // mydebug aliases debug; debug's real dependency ms hoists top-level under its own name, not under the slot.
+        FakeRegistry registry = new FakeRegistry()
+                .add("debug", "2.6.9", singletonMap("ms", "2.0.0"), "MIT", null)
+                .add("ms", "2.0.0", emptyMap(), "MIT", null);
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", app(singletonMap("mydebug", "npm:debug@2.6.9"))));
+
+        String lock = new NpmLockWriter().write(graph, 3);
+        assertThat(lock).contains("\"node_modules/mydebug\": {\n" +
+                "      \"name\": \"debug\",\n" +
+                "      \"version\": \"2.6.9\",");
+        assertThat(lock).contains("\"node_modules/ms\": {\n      \"version\": \"2.0.0\",");
+        assertThat(lock).doesNotContain("node_modules/mydebug/node_modules");
+    }
+
+    @Test
+    void aliasLegacyTreeV2() {
+        // The lockfileVersion 2 legacy tree keys by the alias name and records the target as npm:react-is@18.3.1.
+        FakeRegistry registry = new FakeRegistry()
+                .add("react-is", "18.3.1", emptyMap(), "MIT", null);
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", app(singletonMap("react-is-18", "npm:react-is@^18.3.1"))));
+
+        String lock = new NpmLockWriter().write(graph, 2);
+        assertThat(lock).endsWith(
+                "  \"dependencies\": {\n" +
+                "    \"react-is-18\": {\n" +
+                "      \"version\": \"npm:react-is@18.3.1\",\n" +
+                "      \"resolved\": \"https://r/react-is/-/react-is-18.3.1.tgz\",\n" +
+                "      \"integrity\": \"sha512-react-is-18.3.1\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
     void binBearingManifestDefers() {
         VersionManifest withBin = new VersionManifest("cli", "1.0.0", TextNode.valueOf("MIT"), "MIT",
                 null, null, null, null, TextNode.valueOf("cli.js"), null, null, null, null, null, null, null, null,
