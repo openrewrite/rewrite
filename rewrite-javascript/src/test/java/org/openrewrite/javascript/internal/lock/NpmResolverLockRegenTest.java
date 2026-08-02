@@ -131,6 +131,22 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void rootPeerV3() {
+        // The root package.json is a library declaring peerDependencies.react (no other deps); npm 7+ auto-installs
+        // react top-level and flags it `peer: true`, mirroring the peerDependencies scope verbatim in the root entry.
+        assertResolveByteExact("lock/npm/resolve-root-peer", "after", null,
+                new String[][]{{"react", "19.2.8"}});
+    }
+
+    @Test
+    void rootPeerV2() {
+        // The same root-peer closure into a lockfileVersion 2 lock: react is auto-installed into the legacy tree too
+        // (`peer: true`, no requires), and the root entry keeps its `peerDependencies` verbatim.
+        assertResolveByteExact("lock/npm/resolve-root-peer", "after-v2", "{\"lockfileVersion\":2}",
+                new String[][]{{"react", "19.2.8"}});
+    }
+
+    @Test
     void satisfiedPeerWithMetaV2() {
         // The same closure as lockfileVersion 2: the declarer's `requires` keeps only its regular dep (tslib), the
         // peer edges omitted, and react keeps `peer: true` in the legacy tree.
@@ -176,5 +192,7 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
         assertNpmReproduces("lock/npm/resolve-peer-meta/pkg", "lock/npm/resolve-peer-meta/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-peer-autoinstall/pkg", "lock/npm/resolve-peer-autoinstall/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer-autoinstall/pkg", "lock/npm/resolve-peer-autoinstall/after-v2", "2");
+        assertNpmReproduces("lock/npm/resolve-root-peer/pkg", "lock/npm/resolve-root-peer/after", "3");
+        assertNpmReproduces("lock/npm/resolve-root-peer/pkg", "lock/npm/resolve-root-peer/after-v2", "2");
     }
 }

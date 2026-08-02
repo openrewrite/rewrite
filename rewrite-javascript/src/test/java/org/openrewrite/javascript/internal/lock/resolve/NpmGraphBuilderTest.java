@@ -163,6 +163,51 @@ class NpmGraphBuilderTest {
     }
 
     @Test
+    void autoInstallsRootPeerTopLevel() {
+        // The root is a library declaring peerDependencies.react (a leaf) with no other deps; npm auto-installs it.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true)
+                .build(singletonMap("", "{\"name\":\"lib\",\"peerDependencies\":{\"react\":\">=17\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("react@18.2.0");
+        // The auto-installed root peer carries no dev/optional flag, and the root entry mirrors the scope verbatim.
+        assertThat(graph.node("react", "18.2.0").isDev()).isFalse();
+        assertThat(graph.node("react", "18.2.0").isOptional()).isFalse();
+        assertThat(graph.getImporters()).singleElement().satisfies(imp ->
+                assertThat(imp.getDeclared()).containsExactly(Map.entry("peerDependencies", singletonMap("react", ">=17"))));
+    }
+
+    @Test
+    void rootPeerDefersWhenAutoInstallDisabled() {
+        // The shared builder (pnpm/bun/yarn) keeps the classic deferral even for a library root's own peer.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry).build(singletonMap("", "{\"peerDependencies\":{\"react\":\">=17\"}}")));
+    }
+
+    @Test
+    void rootPeerIntoDevClosureDefers() {
+        // A root peer alongside a devDependency is not an all-prod closure, so the auto-install defers.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap()).add("dev", "1.0.0", emptyMap());
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmGraphBuilder(registry, true)
+                .build(singletonMap("", "{\"devDependencies\":{\"dev\":\"^1.0.0\"},\"peerDependencies\":{\"react\":\">=17\"}}")));
+    }
+
+    @Test
+    void satisfiedRootPeerResolvesWithNoExtraNode() {
+        // The root declares react both as a dependency and a peer; the peer is a constraint already met (no node added).
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true).build(singletonMap("",
+                "{\"dependencies\":{\"react\":\"^18.0.0\"},\"peerDependencies\":{\"react\":\">=17\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("react@18.2.0");
+    }
+
+    @Test
     void optionalPeerAbsentResolves() {
         // has-peer's react peer is marked optional, so its absence is satisfied — the closure still resolves.
         FakeRegistry registry = new FakeRegistry();

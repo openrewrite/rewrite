@@ -106,7 +106,12 @@ public final class NpmGraphBuilder {
                             NodeSemver.maxSatisfying(chosen.getOrDefault(dep.getKey(), Collections.emptySet()), dep.getValue()));
                 }
             }
-            importers.add(new ResolutionGraph.Importer(decl.dir, decl.name, decl.version, decl.scopes, importerResolved));
+            // peerDependencies trails the resolved scopes so the writer mirrors npm's root-entry field order.
+            Map<String, Map<String, String>> declaredScopes = new LinkedHashMap<>(decl.scopes);
+            if (!decl.peers.isEmpty()) {
+                declaredScopes.put("peerDependencies", decl.peers);
+            }
+            importers.add(new ResolutionGraph.Importer(decl.dir, decl.name, decl.version, declaredScopes, importerResolved));
         }
 
         DepFlags flags = classifyFlags(manifests.keySet(), importers, nodeEdges, nodeOptionalEdges);
@@ -252,14 +257,15 @@ public final class NpmGraphBuilder {
     }
 
     /**
-     * Resolve every {@code peerDependencies} declaration. A peer already met by the resolved closure adds no node
-     * (verified in place). A non-optional peer with no provider is npm's auto-install: when {@link #autoInstallPeers}
-     * is enabled and the slice is the cleanest one — an all-prod closure, each missing peer a single pure-leaf
-     * version required by a single package — the peer is added as a top-level node the serializer flags
-     * {@code peer: true}. Every other missing-peer shape (auto-install disabled, a dev/optional closure, a non-leaf
-     * peer, an interacting multi-requirer peer, an unfetchable peer, or a peer present at a non-satisfying / forked
-     * version) fails loud with the classic deferral so no serializer emits a peer layout it cannot reproduce. An
-     * optional peer (per {@code peerDependenciesMeta}) may be absent.
+     * Resolve every {@code peerDependencies} declaration — both a resolved node's and a library root importer's own.
+     * A peer already met by the resolved closure adds no node (verified in place). A non-optional peer with no
+     * provider is npm's auto-install: when {@link #autoInstallPeers} is enabled and the slice is the cleanest one —
+     * an all-prod closure, each missing peer a single pure-leaf version required by a single package (a node or the
+     * root) — the peer is added as a top-level node the serializer flags {@code peer: true}. Every other missing-peer
+     * shape (auto-install disabled, a dev/optional closure, a non-leaf peer, an interacting multi-requirer peer, an
+     * unfetchable peer, or a peer present at a non-satisfying / forked version) fails loud with the classic deferral
+     * so no serializer emits a peer layout it cannot reproduce. An optional peer (per {@code peerDependenciesMeta})
+     * may be absent; the root importer carries no meta here (the resolver defers that), so its peers are all required.
      *
      * @return the node keys of the auto-installed peers (they carry no dev/optional flag in the all-prod closure).
      */
@@ -268,36 +274,53 @@ public final class NpmGraphBuilder {
         List<String[]> missing = new ArrayList<>();  // {requirer, peerName, range}
         for (VersionManifest m : new ArrayList<>(manifests.values())) {
             Map<String, String> peers = m.getPeerDependencies();
-            if (peers == null || peers.isEmpty()) {
+            if (peers == null) {
                 continue;
             }
             JsonNode meta = m.getPeerDependenciesMeta();
             for (Map.Entry<String, String> peer : peers.entrySet()) {
-                String peerName = peer.getKey();
-                String range = peer.getValue();
-                Set<String> resolved = chosen.getOrDefault(peerName, Collections.emptySet());
-                if (resolved.isEmpty()) {
-                    if (isOptionalPeer(meta, peerName)) {
-                        continue;
-                    }
-                    if (!autoInstallPeers) {
-                        throw peerNotInstalled(m.getName(), peerName);
-                    }
-                    missing.add(new String[]{m.getName(), peerName, range});
-                    continue;
-                }
-                if (resolved.size() > 1) {
-                    throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(), m.getName() + " peer " + peerName +
-                            " resolves to multiple versions " + resolved + " (peer fork not yet resolved)");
-                }
-                String v = resolved.iterator().next();
-                if (!NodeSemver.validRange(range) || !NodeSemver.satisfies(v, range)) {
-                    throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(), m.getName() + " peer " + peerName + "@" +
-                            v + " does not satisfy " + range + " (peer re-resolution not yet resolved)");
-                }
+                resolvePeer(m.getName(), peer.getKey(), peer.getValue(), meta, chosen, missing);
+            }
+        }
+        for (ImporterDecl decl : declared) {
+            for (Map.Entry<String, String> peer : decl.peers.entrySet()) {
+                resolvePeer(rootRequirer(decl), peer.getKey(), peer.getValue(), null, chosen, missing);
             }
         }
         return missing.isEmpty() ? Collections.emptySet() : installMissingPeers(missing, manifests, chosen, declared);
+    }
+
+    /**
+     * Classify one {@code (requirer, peer, range)}: an unmet non-optional peer is collected for auto-install (or
+     * defers when disabled), a present peer must resolve to a single satisfying version, and an optional absent peer
+     * is skipped.
+     */
+    private void resolvePeer(String requirer, String peerName, String range, @Nullable JsonNode meta,
+                             Map<String, Set<String>> chosen, List<String[]> missing) {
+        Set<String> resolved = chosen.getOrDefault(peerName, Collections.emptySet());
+        if (resolved.isEmpty()) {
+            if (isOptionalPeer(meta, peerName)) {
+                return;
+            }
+            if (!autoInstallPeers) {
+                throw peerNotInstalled(requirer, peerName);
+            }
+            missing.add(new String[]{requirer, peerName, range});
+            return;
+        }
+        if (resolved.size() > 1) {
+            throw new EngineFailure(RESOLUTION_REQUIRED, requirer, requirer + " peer " + peerName +
+                    " resolves to multiple versions " + resolved + " (peer fork not yet resolved)");
+        }
+        String v = resolved.iterator().next();
+        if (!NodeSemver.validRange(range) || !NodeSemver.satisfies(v, range)) {
+            throw new EngineFailure(RESOLUTION_REQUIRED, requirer, requirer + " peer " + peerName + "@" +
+                    v + " does not satisfy " + range + " (peer re-resolution not yet resolved)");
+        }
+    }
+
+    private static String rootRequirer(ImporterDecl decl) {
+        return decl.name != null ? decl.name : "root";
     }
 
     /**
@@ -399,7 +422,14 @@ public final class NpmGraphBuilder {
                     }
                 }
             }
-            return new ImporterDecl(dir, name, version, scopes);
+            // A library root's own peerDependencies are kept apart from the resolved scopes: they never select a
+            // node directly (Phase 1), they auto-install through resolvePeers like any transitive peer.
+            Map<String, String> peers = new LinkedHashMap<>();
+            JsonNode peerNode = root.get("peerDependencies");
+            if (peerNode != null && peerNode.isObject()) {
+                peerNode.fields().forEachRemaining(f -> peers.put(f.getKey(), f.getValue().asText()));
+            }
+            return new ImporterDecl(dir, name, version, scopes, peers);
         } catch (EngineFailure ef) {
             throw ef;
         } catch (Exception e) {
@@ -412,13 +442,15 @@ public final class NpmGraphBuilder {
         final @Nullable String name;
         final @Nullable String version;
         final Map<String, Map<String, String>> scopes;
+        final Map<String, String> peers;
 
         ImporterDecl(String dir, @Nullable String name, @Nullable String version,
-                     Map<String, Map<String, String>> scopes) {
+                     Map<String, Map<String, String>> scopes, Map<String, String> peers) {
             this.dir = dir;
             this.name = name;
             this.version = version;
             this.scopes = scopes;
+            this.peers = peers;
         }
     }
 }

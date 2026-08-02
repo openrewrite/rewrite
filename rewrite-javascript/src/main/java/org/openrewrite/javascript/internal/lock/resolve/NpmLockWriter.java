@@ -32,9 +32,10 @@ import java.util.*;
  * the graph (every package top-level for a clean closure; the conflicting version of a fork nested under its
  * requiring parent), builds the {@code packages} map (and, for lockfileVersion 2, the legacy {@code dependencies}
  * tree), and renders through {@link NpmJson} so the key order and pretty-print match npm exactly. A
- * {@code peerDependencies} surface is reproduced (recorded verbatim, its provider flagged {@code peer: true}); a
- * missing non-optional peer the graph auto-installed is a provider the dependency edges never reach, so it is
- * seeded top-level here. dev/optional dependencies are placed and flagged ({@code dev}/{@code optional}/{@code devOptional}) per
+ * {@code peerDependencies} surface — a resolved node's or a library root importer's own — is reproduced (recorded
+ * verbatim, its provider flagged {@code peer: true}); a missing non-optional peer the graph auto-installed is a
+ * provider the dependency edges never reach, so it is seeded top-level here. dev/optional dependencies are placed
+ * and flagged ({@code dev}/{@code optional}/{@code devOptional}) per
  * npm's reachability; anything else it cannot reproduce byte-exact — a workspace, a manifest field it does not
  * model — fails loud rather than emit a wrong lock.
  */
@@ -460,10 +461,11 @@ public final class NpmLockWriter {
     }
 
     /**
-     * The node keys npm flags {@code peer: true}: a node has an incoming peer edge when some resolved package
-     * declares its name in a <em>non-optional</em> {@code peerDependencies}. An optional peer (per
-     * {@code peerDependenciesMeta}) confers no flag even when the provider is present, so it is skipped. The graph
-     * proved each such peer resolves to a single satisfying version, so the provider is that one node.
+     * The node keys npm flags {@code peer: true}: a node has an incoming peer edge when some resolved package — or a
+     * library root importer itself — declares its name in a <em>non-optional</em> {@code peerDependencies}. An
+     * optional peer (per {@code peerDependenciesMeta}) confers no flag even when the provider is present, so it is
+     * skipped. The graph proved each such peer resolves to a single satisfying version, so the provider is that one
+     * node.
      */
     private static Set<String> peerProviderKeys(ResolutionGraph graph) {
         Map<String, Set<String>> versionsByName = new LinkedHashMap<>();
@@ -481,13 +483,26 @@ public final class NpmLockWriter {
                 if (isOptionalPeer(meta, peerName)) {
                     continue;
                 }
-                Set<String> versions = versionsByName.get(peerName);
-                if (versions != null && versions.size() == 1) {
-                    providers.add(ResolutionGraph.key(peerName, versions.iterator().next()));
+                addProvider(providers, versionsByName, peerName);
+            }
+        }
+        // A library root's own peers flag their provider too (the root carries no peerDependenciesMeta here).
+        for (ResolutionGraph.Importer importer : graph.getImporters()) {
+            Map<String, String> rootPeers = importer.getDeclared().get("peerDependencies");
+            if (rootPeers != null) {
+                for (String peerName : rootPeers.keySet()) {
+                    addProvider(providers, versionsByName, peerName);
                 }
             }
         }
         return providers;
+    }
+
+    private static void addProvider(Set<String> providers, Map<String, Set<String>> versionsByName, String peerName) {
+        Set<String> versions = versionsByName.get(peerName);
+        if (versions != null && versions.size() == 1) {
+            providers.add(ResolutionGraph.key(peerName, versions.iterator().next()));
+        }
     }
 
     private static boolean isOptionalPeer(@Nullable JsonNode meta, String peer) {

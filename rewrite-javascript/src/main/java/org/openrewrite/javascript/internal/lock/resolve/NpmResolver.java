@@ -33,15 +33,17 @@ import java.util.Map;
  * lockfileVersion is taken from the existing lock (defaulting to 3). A clean, hoisted closure — flat, a single
  * directly-declared fork, or one carrying {@code peerDependencies} (already satisfied, or a single missing leaf peer
  * npm auto-installs top-level) — including its {@code devDependencies} and {@code optionalDependencies} (marked per
- * npm's dev/optional reachability), is reproduced exactly; a workspace, a root {@code peerDependencies}/
- * {@code bundleDependencies} surface, a peer beyond the clean auto-install slice, or a closure-reshaping the
+ * npm's dev/optional reachability), is reproduced exactly. A library root's own {@code peerDependencies} are
+ * resolved the same way (npm 7+ auto-installs them top-level, flagged {@code peer: true}, and mirrors the scope
+ * verbatim in the root entry) in the cleanest slice; a workspace, a {@code bundleDependencies} surface, a root
+ * {@code peerDependenciesMeta}, a peer beyond the clean auto-install slice, or a closure-reshaping the
  * builder/writer cannot yet match fails loud, leaving the old lock untouched.
  */
 public final class NpmResolver implements LockResolver {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final List<String> DEFERRED_SCOPES =
-            Arrays.asList("peerDependencies", "bundleDependencies");
+    // peerDependencies is now resolved (see NpmGraphBuilder root-peer auto-install); only bundleDependencies defers.
+    private static final List<String> DEFERRED_SCOPES = Arrays.asList("bundleDependencies");
 
     @Override
     public PackageManager packageManager() {
@@ -58,9 +60,9 @@ public final class NpmResolver implements LockResolver {
     }
 
     /**
-     * A {@code dependencies}/{@code devDependencies}/{@code optionalDependencies} closure is reproduced; a root
-     * {@code peerDependencies} or {@code bundleDependencies} declaration reshapes resolution in ways not yet
-     * modeled and defers.
+     * A {@code dependencies}/{@code devDependencies}/{@code optionalDependencies}/{@code peerDependencies} closure is
+     * reproduced; a root {@code bundleDependencies} declaration reshapes resolution in ways not yet modeled and
+     * defers, as does a root {@code peerDependenciesMeta} (its optional-peer marking is not yet byte-verified).
      */
     private static void requireResolvableScopes(Map<String, String> importerManifests) {
         for (String manifestJson : importerManifests.values()) {
@@ -76,6 +78,11 @@ public final class NpmResolver implements LockResolver {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                             "importer declares " + scope + " (only prod dependencies are resolved today)");
                 }
+            }
+            JsonNode meta = manifest.get("peerDependenciesMeta");
+            if (meta != null && meta.isObject() && meta.size() > 0) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "importer declares peerDependenciesMeta (root optional peers not yet resolved)");
             }
         }
     }
