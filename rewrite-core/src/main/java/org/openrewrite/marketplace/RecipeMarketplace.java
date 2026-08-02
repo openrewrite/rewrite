@@ -94,9 +94,8 @@ public class RecipeMarketplace {
      * nearest scope first.
      *
      * @return The listings actually added, so callers report what landed rather than what was
-     * offered. Keyed by recipe name, so a recipe filed under several categories counts once --
-     * and so do two bundles declaring one name, which no current caller can produce because
-     * every merge contributes a single bundle.
+     * offered. Keyed by recipe name, so a recipe filed under several categories counts once,
+     * as do two bundles declaring one name.
      */
     public Set<RecipeListing> merge(RecipeMarketplace marketplace) {
         Set<RecipeListing> added = new LinkedHashSet<>();
