@@ -177,5 +177,8 @@ public class LockEditSet {
         /** Raw {@code peerDependenciesMeta} node ({@code {name: {optional: bool}}}), copied verbatim (object group). */
         @Nullable
         JsonNode peerDependenciesMeta;
+
+        /** A bump rewrote {@code peerDependenciesMeta} (optionality delta), so the patcher replaces the field in place. */
+        boolean peerDependenciesMetaChanged;
     }
 }

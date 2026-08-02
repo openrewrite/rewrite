@@ -1,0 +1,9 @@
+{
+  "name": "peer-meta-add",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "18.3.1",
+    "react-redux": "8.0.6",
+    "redux": "4.2.1"
+  }
+}

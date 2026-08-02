@@ -784,6 +784,9 @@ public final class NpmLockPatcher implements LockPatcher {
             JsonNode value = (peers == null || peers.isEmpty()) ? null : JSON.valueToTree(peers);
             entry = writeThroughObjectMember(name, packages, entry, "peerDependencies", value);
         }
+        if (wt.isPeerDependenciesMetaChanged()) {
+            entry = writeThroughObjectMember(name, packages, entry, "peerDependenciesMeta", wt.getPeerDependenciesMeta());
+        }
         if (wt.getLicense() != null) {
             if (LockJson.member(entry, "license") == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " gained a license field");

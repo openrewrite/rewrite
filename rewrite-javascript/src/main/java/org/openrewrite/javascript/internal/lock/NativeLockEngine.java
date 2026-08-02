@@ -51,6 +51,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1983,11 +1984,12 @@ public final class NativeLockEngine {
 
     /**
      * A direct-dependency bump's non-{@code dependencies} surfaces, returning the metadata written through instead
-     * of deferred. The platform gates and {@code optionalDependencies} stay strict. A {@code peerDependencies} delta
-     * is written through — but only for npm, only for a pure-metadata bump (a {@code dependencies} reshape defers),
-     * and only when the change is add-or-widen: {@code peerDependenciesMeta} unchanged and no peer dropped (both
-     * would let npm GC a provider it auto-installed for a now-slack peer), and every peer the new version requires is
-     * already installed at a satisfying version (an absent optional peer counts as satisfied). Anything else defers.
+     * of deferred. The platform gates and {@code optionalDependencies} stay strict. A {@code peerDependencies} and/or
+     * {@code peerDependenciesMeta} delta is written through — but only for npm, only for a pure-metadata bump (a
+     * {@code dependencies} reshape defers), and only when the installed tree provably does not reshape: no peer
+     * dropped (npm may GC an auto-installed provider), every peer the new version requires is already installed at a
+     * satisfying version (an absent optional peer counts as satisfied), and no peer that flips to optional could let
+     * npm GC its provider — each such provider is a root-anchored dependency npm never prunes. Anything else defers.
      */
     private static LockEditSet.@Nullable WriteThroughMetadata proveSurfacesAndWriteThrough(
             PackageManager pm, String name, VersionManifest oldM, VersionManifest newM, String lock, boolean depsEqual) {
@@ -1995,27 +1997,94 @@ public final class NativeLockEngine {
         requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
 
         boolean peerChanged = !Objects.equals(normalize(oldM.getPeerDependencies()), normalize(newM.getPeerDependencies()));
+        boolean peerMetaChanged =
+                !Objects.equals(normalize(oldM.getPeerDependenciesMeta()), normalize(newM.getPeerDependenciesMeta()));
         LockEditSet.WriteThroughMetadata base = writeThrough(pm, oldM, newM);
-        if (!peerChanged) {
-            // A meta-only delta always flips a peer's optional-ness (npm may drop an auto-installed peer); defer.
-            requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
+        if (!peerChanged && !peerMetaChanged) {
             return base;
         }
 
-        boolean peerMetaChanged =
-                !Objects.equals(normalize(oldM.getPeerDependenciesMeta()), normalize(newM.getPeerDependenciesMeta()));
-        if (pm != PackageManager.Npm || !depsEqual || peerMetaChanged || removesPeer(oldM, newM)) {
+        if (pm != PackageManager.Npm || !depsEqual || removesPeer(oldM, newM) || metaReferencesUndeclaredPeer(newM)) {
             requireEqual(name, "peerDependencies", oldM.getPeerDependencies(), newM.getPeerDependencies());
             requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
             return base;
         }
         requirePeerProvidersSatisfy(pm, name, newM, lock);
+        requireOptionalFlipsAnchored(pm, name, oldM, newM, lock);
 
         LockEditSet.WriteThroughMetadata.WriteThroughMetadataBuilder b =
                 base == null ? LockEditSet.WriteThroughMetadata.builder() : base.toBuilder();
-        return b.peerDependencies(notEmpty(newM.getPeerDependencies()) ? newM.getPeerDependencies() : null)
-                .peerDependenciesChanged(true)
-                .build();
+        if (peerChanged) {
+            b.peerDependencies(notEmpty(newM.getPeerDependencies()) ? newM.getPeerDependencies() : null)
+                    .peerDependenciesChanged(true);
+        }
+        if (peerMetaChanged) {
+            JsonNode meta = newM.getPeerDependenciesMeta();
+            b.peerDependenciesMeta(nonEmptyObject(meta) ? meta : null).peerDependenciesMetaChanged(true);
+        }
+        return b.build();
+    }
+
+    /**
+     * A peer that flips from required to optional lets npm GC a provider it auto-installed only for that peer. The
+     * cheap sound proof it survives is a root direct dependency: npm never prunes one. A flipped peer whose provider
+     * is installed but not root-anchored defers (proving another anchor needs the full hoisting graph).
+     */
+    private static void requireOptionalFlipsAnchored(PackageManager pm, String name, VersionManifest oldM,
+                                                     VersionManifest newM, String lock) {
+        Map<String, String> newPeers = newM.getPeerDependencies();
+        if (newPeers == null) {
+            return;
+        }
+        Map<String, String> oldPeers = oldM.getPeerDependencies() == null ?
+                Collections.emptyMap() : oldM.getPeerDependencies();
+        JsonNode oldMeta = oldM.getPeerDependenciesMeta();
+        JsonNode newMeta = newM.getPeerDependenciesMeta();
+        Set<String> rootAnchored = rootDirectDependencyNames(lock);
+        for (String peer : newPeers.keySet()) {
+            boolean wasRequired = oldPeers.containsKey(peer) && !isOptionalPeer(oldMeta, peer);
+            if (wasRequired && isOptionalPeer(newMeta, peer) && !rootAnchored.contains(peer) &&
+                    !findLockedVersions(pm, lock, peer).isEmpty()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer +
+                        " flips to optional and its provider is not a root dependency; npm may prune it");
+            }
+        }
+    }
+
+    /** Names the root importer declares directly; npm never prunes a top-level direct dependency. */
+    private static Set<String> rootDirectDependencyNames(String lock) {
+        Set<String> names = new LinkedHashSet<>();
+        Object packages = parseJsonObject(lock, false).get("packages");
+        if (packages instanceof Map) {
+            Object root = ((Map<?, ?>) packages).get("");
+            if (root instanceof Map) {
+                for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies")) {
+                    Object deps = ((Map<?, ?>) root).get(scope);
+                    if (deps instanceof Map) {
+                        for (Object key : ((Map<?, ?>) deps).keySet()) {
+                            names.add(String.valueOf(key));
+                        }
+                    }
+                }
+            }
+        }
+        return names;
+    }
+
+    /** Whether {@code peerDependenciesMeta} names a peer absent from {@code peerDependencies} (an unverified shape). */
+    private static boolean metaReferencesUndeclaredPeer(VersionManifest m) {
+        JsonNode meta = m.getPeerDependenciesMeta();
+        if (meta == null || !meta.isObject()) {
+            return false;
+        }
+        Set<String> declared = m.getPeerDependencies() == null ?
+                Collections.emptySet() : m.getPeerDependencies().keySet();
+        for (Iterator<String> it = meta.fieldNames(); it.hasNext(); ) {
+            if (!declared.contains(it.next())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the new version drops a {@code peerDependencies} name the old version declared. */

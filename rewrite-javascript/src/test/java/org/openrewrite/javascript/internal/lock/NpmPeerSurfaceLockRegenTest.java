@@ -27,9 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The differential harness for the npm peer-satisfied fast-path: a direct-dependency bump whose new version only
- * changes {@code peerDependencies} (or {@code peerDependenciesMeta}), where the already-installed providers still
- * satisfy the new ranges. npm adds and moves nothing, so the closure is unchanged and only the bumped entry's peer
- * fields are rewritten; the engine writes them through instead of failing loud (as it did on any peer delta before).
+ * changes {@code peerDependencies} and/or {@code peerDependenciesMeta}, where the already-installed providers still
+ * satisfy the new ranges and no now-optional peer's provider can be pruned. npm adds and moves nothing, so the
+ * closure is unchanged and only the bumped entry's peer fields are rewritten; the engine writes them through instead
+ * of failing loud (as it did on any peer delta before).
  * Each byte-exact test replays a fixture entirely OFFLINE (a stub {@code HttpSender} serves captured
  * packuments/manifests for the bumped package only; the peer providers are read from the lock) through
  * {@link NativeLockEngine} and asserts the emitted lock is BYTE-IDENTICAL to a golden {@code after} recorded from a
@@ -53,6 +54,23 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         // Bump ws 8.11.0 -> 8.12.0: its `utf-8-validate` peer range changes ("^5.0.2" -> ">=5.0.2"). Both peers are
         // optional and neither is installed, so they are satisfied-if-absent and the graph is unchanged.
         assertPeerByteExact("lock/npm/peer-optional-absent", "ws", "8.11.0", "8.12.0");
+    }
+
+    @Test
+    void pureMetaFlipToOptionalProviderRootAnchored() {
+        // Bump zustand 3.5.1 -> 3.5.2: the sole surface delta adds `peerDependenciesMeta` marking `react` optional
+        // (the `react` peer range is unchanged). react@18.3.1 is a root dependency npm never prunes, so nothing moves
+        // and only the entry's `peerDependenciesMeta` is written through.
+        assertPeerByteExact("lock/npm/peer-writethrough/meta-optional", "zustand", "3.5.1", "3.5.2");
+    }
+
+    @Test
+    void peerAndMetaAddOptionalAbsentProvider() {
+        // Bump react-redux 8.0.5 -> 8.0.6: adds an optional `@reduxjs/toolkit` peer (absent, satisfied-if-absent) and
+        // widens the optional `redux` peer (redux@4.2.1 still satisfies), touching both `peerDependencies` and
+        // `peerDependenciesMeta`. No required peer flips or drops, so the graph is unchanged and both fields are
+        // written through at npm's sorted key positions.
+        assertPeerByteExact("lock/npm/peer-writethrough/meta-add", "react-redux", "8.0.5", "8.0.6");
     }
 
     // --- a non-optional peer that would need auto-installing / re-resolving: fail loud ---
@@ -94,23 +112,36 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
-    void peerBecomesOptionalFailsLoud() {
-        // The peer list is unchanged but the new version marks react optional; npm may drop an auto-installed
-        // provider, so the meta delta is not a safe write-through.
+    void peerFlipsToOptionalUnanchoredProviderFailsLoud() {
+        // The new version marks the required `helper` peer optional. Its provider is only a transitively installed
+        // entry (not a root dependency), so npm may GC it once it is no longer required, and writing the meta through
+        // would leave the stale provider behind; the surgical tier defers. The manifest declares `workspaces` so the
+        // resolver fallback stands down and the surgical decision itself surfaces.
         routes.put(REG + "flippy", "{\"name\":\"flippy\",\"dist-tags\":{\"latest\":\"2.0.0\"},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
         routes.put(REG + "flippy/1.0.0",
-                "{\"name\":\"flippy\",\"version\":\"1.0.0\",\"peerDependencies\":{\"react\":\"^18.0.0\"}}");
+                "{\"name\":\"flippy\",\"version\":\"1.0.0\",\"peerDependencies\":{\"helper\":\"^1.0.0\"}}");
         routes.put(REG + "flippy/2.0.0",
-                "{\"name\":\"flippy\",\"version\":\"2.0.0\",\"peerDependencies\":{\"react\":\"^18.0.0\"}," +
-                        "\"peerDependenciesMeta\":{\"react\":{\"optional\":true}}," +
+                "{\"name\":\"flippy\",\"version\":\"2.0.0\",\"peerDependencies\":{\"helper\":\"^1.0.0\"}," +
+                        "\"peerDependenciesMeta\":{\"helper\":{\"optional\":true}}," +
                         "\"dist\":{\"tarball\":\"https://registry.npmjs.org/flippy/-/flippy-2.0.0.tgz\"," +
                         "\"integrity\":\"sha512-FLIPPY2\"}}");
 
-        Result result = bump("flippy", "^1.0.0", "^2.0.0");
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"flippy\": \"^1.0.0\"}},\n" +
+                "    \"node_modules/flippy\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/flippy/-/flippy-1.0.0.tgz\", \"integrity\": \"sha512-OLD\"},\n" +
+                "    \"node_modules/helper\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/helper/-/helper-1.0.0.tgz\", \"integrity\": \"sha512-HELPER\", \"peer\": true}\n" +
+                "  }\n" +
+                "}\n";
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"flippy\":\"^2.0.0\"},\"workspaces\":[\"packages/*\"]}",
+                "{\"dependencies\":{\"flippy\":\"^1.0.0\"},\"workspaces\":[\"packages/*\"]}",
+                lock, null, Paths.get("package.json"), ctx);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // Flipping a peer to optional may let npm GC an auto-installed provider; the surgical meta guard defers.
-        assertThat(result.getFailure().getDetail()).contains("peerDependenciesMeta changed");
+        // The now-optional peer's provider is not root-anchored, so npm may prune it; the surgical guard defers.
+        assertThat(result.getFailure().getDetail()).contains("may prune it");
     }
 
     @Test
@@ -181,7 +212,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
     @Test
     @Disabled("live: runs real npm 11.6.2 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealNpm() throws Exception {
-        String[] dirs = {"lock/npm/peer-widen", "lock/npm/peer-optional-absent"};
+        String[] dirs = {"lock/npm/peer-widen", "lock/npm/peer-optional-absent",
+                "lock/npm/peer-writethrough/meta-optional", "lock/npm/peer-writethrough/meta-add"};
         for (String dir : dirs) {
             assertNpmReproduces(dir + "/pkg-before", dir + "/before", "3");
             assertNpmReproduces(dir + "/pkg-after", dir + "/after", "3");
