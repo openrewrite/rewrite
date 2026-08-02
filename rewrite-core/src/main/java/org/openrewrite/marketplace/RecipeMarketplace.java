@@ -50,9 +50,23 @@ public class RecipeMarketplace {
     public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
         RecipeMarketplace marketplace = bundleReader.read();
         RecipeBundle bundle = bundleReader.getBundle();
+        bindRecursive(marketplace.getRoot(), bundle);
         uninstall(bundle.getPackageEcosystem(), bundle.getPackageName());
         root.merge(marketplace.getRoot());
         return marketplace.getAllRecipes();
+    }
+
+    /**
+     * A reader contributes only its own bundle's recipes, so whatever identity the payload
+     * claimed is replaced by the bundle that was actually resolved. Walks the tree rather than
+     * getAllRecipes(), which deduplicates by name and would miss a recipe's sibling listings
+     * in other categories.
+     */
+    private void bindRecursive(Category category, RecipeBundle bundle) {
+        category.getRecipes().replaceAll(listing -> listing.withBundle(bundle));
+        for (Category child : category.getCategories()) {
+            bindRecursive(child, bundle);
+        }
     }
 
     public void uninstall(String packageEcosystem, String packageName) {
