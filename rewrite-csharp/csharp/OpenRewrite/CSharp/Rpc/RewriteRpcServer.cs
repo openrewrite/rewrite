@@ -882,8 +882,6 @@ public class RewriteRpcServer
     {
         var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
-        // Empty is the same statement as absent — no constraint requested. Appending an empty
-        // --version emits a dangling flag and fails the restore instead of resolving latest.
         if (!string.IsNullOrWhiteSpace(requestedVersion))
             addArgs += $" --version {requestedVersion}";
         RunDotnet(addArgs);
