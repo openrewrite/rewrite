@@ -32,8 +32,10 @@ import java.util.Map;
  * The bun {@link LockResolver}: resolves the whole closure of an edited manifest set from scratch and serializes
  * {@code bun.lock} byte-exact, deferring anything not yet proven reproducible. It parses the importer manifests,
  * adapts the live registry ({@link NpmRegistryAdapter}), runs {@link NpmGraphBuilder} (bun hoists and forks like
- * npm), and writes with {@link BunLockWriter}. A clean, hoisted, prod-only closure — flat or a single
- * directly-declared fork — is reproduced exactly; a workspace, a dev/optional/peer surface, or a
+ * npm), and writes with {@link BunLockWriter}. A clean, hoisted closure — flat, a single directly-declared fork,
+ * or one carrying satisfied {@code peerDependencies} — including its {@code devDependencies} and
+ * {@code optionalDependencies} (recorded in the workspace scopes; bun does not flag package tuples dev/optional),
+ * is reproduced exactly; a workspace, a root {@code peerDependencies}/{@code bundleDependencies} surface, or a
  * closure-reshaping the builder/writer cannot yet match fails loud, leaving the old lock untouched.
  */
 public final class BunResolver implements LockResolver {
@@ -44,7 +46,7 @@ public final class BunResolver implements LockResolver {
             .enable(JsonReadFeature.ALLOW_JAVA_COMMENTS)
             .build();
     private static final List<String> DEFERRED_SCOPES =
-            Arrays.asList("devDependencies", "optionalDependencies", "peerDependencies", "bundleDependencies");
+            Arrays.asList("peerDependencies", "bundleDependencies");
 
     @Override
     public PackageManager packageManager() {
@@ -53,15 +55,19 @@ public final class BunResolver implements LockResolver {
 
     @Override
     public String resolve(ResolveRequest request) {
-        requireProdOnly(request.getImporterManifests());
+        requireResolvableScopes(request.getImporterManifests());
         requireBun1(request.getExistingLock());
         Registry registry = new NpmRegistryAdapter(request.getRegistries(), request.getClient());
         ResolutionGraph graph = new NpmGraphBuilder(registry).build(request.getImporterManifests());
         return new BunLockWriter().write(graph, 1, 1);
     }
 
-    /** Only a pure {@code dependencies} closure is reproduced today; a dev/optional/peer scope defers. */
-    private static void requireProdOnly(Map<String, String> importerManifests) {
+    /**
+     * A {@code dependencies}/{@code devDependencies}/{@code optionalDependencies} closure is reproduced; a root
+     * {@code peerDependencies} or {@code bundleDependencies} declaration reshapes resolution in ways not yet
+     * modeled and defers.
+     */
+    private static void requireResolvableScopes(Map<String, String> importerManifests) {
         for (String manifestJson : importerManifests.values()) {
             JsonNode manifest;
             try {

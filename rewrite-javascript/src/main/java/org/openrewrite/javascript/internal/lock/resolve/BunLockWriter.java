@@ -30,13 +30,15 @@ import java.util.*;
  * top-level for a clean closure; the conflicting version of a directly-declared fork nested under its requiring
  * parent as a {@code "parent/name"} tuple) and renders each entry through {@link BunJson}. A satisfied
  * {@code peerDependencies} surface is reproduced (its ranges verbatim, its optional peers flattened into bun's
- * {@code optionalPeers} array). Anything else it cannot reproduce byte-exact — a workspace, a dev/optional surface,
- * a manifest field bun surfaces into the tuple — fails loud rather than emit a wrong lock.
+ * {@code optionalPeers} array). The root's {@code devDependencies} and {@code optionalDependencies} scopes are
+ * written into the workspace object (bun does not flag the package tuples). Anything else it cannot reproduce
+ * byte-exact — a workspace, a manifest field bun folds into the tuple metadata — fails loud rather than emit a
+ * wrong lock.
  */
 public final class BunLockWriter {
 
     private static final String UNIT = "  ";
-    /** Importer scopes in the order bun writes them; only {@code dependencies} survives the prod-only gate today. */
+    /** Importer scopes in the order bun writes them; {@code peerDependencies} still defers at the resolver gate. */
     private static final List<String> SCOPE_ORDER =
             Arrays.asList("dependencies", "devDependencies", "optionalDependencies", "peerDependencies");
 

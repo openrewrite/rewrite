@@ -68,6 +68,49 @@ class BunLockWriterTest {
     }
 
     @Test
+    void devAndOptionalScopesRenderInWorkspace() {
+        // a (prod), b (dev), c (optional) each hoist top-level; bun records all three scopes in the workspace object
+        // in canonical order and leaves the package tuples unflagged.
+        FakeRegistry registry = new FakeRegistry()
+                .add("a", "1.0.0", emptyMap(), "MIT", null)
+                .add("b", "1.0.0", emptyMap(), "MIT", null)
+                .add("c", "1.0.0", emptyMap(), "MIT", null);
+        String manifest = "{\"name\":\"app\",\"version\":\"1.0.0\"," +
+                "\"dependencies\":{\"a\":\"^1.0.0\"}," +
+                "\"devDependencies\":{\"b\":\"^1.0.0\"}," +
+                "\"optionalDependencies\":{\"c\":\"^1.0.0\"}}";
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", manifest));
+
+        assertThat(new BunLockWriter().write(graph, 1, 1)).isEqualTo(
+                "{\n" +
+                "  \"lockfileVersion\": 1,\n" +
+                "  \"configVersion\": 1,\n" +
+                "  \"workspaces\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"app\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"a\": \"^1.0.0\",\n" +
+                "      },\n" +
+                "      \"devDependencies\": {\n" +
+                "        \"b\": \"^1.0.0\",\n" +
+                "      },\n" +
+                "      \"optionalDependencies\": {\n" +
+                "        \"c\": \"^1.0.0\",\n" +
+                "      },\n" +
+                "    },\n" +
+                "  },\n" +
+                "  \"packages\": {\n" +
+                "    \"a\": [\"a@1.0.0\", \"\", {}, \"sha512-a-1.0.0\"],\n" +
+                "\n" +
+                "    \"b\": [\"b@1.0.0\", \"\", {}, \"sha512-b-1.0.0\"],\n" +
+                "\n" +
+                "    \"c\": [\"c@1.0.0\", \"\", {}, \"sha512-c-1.0.0\"],\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
     void directlyDeclaredForkNestsUnderParent() {
         // root directly depends on shared@2.0.0 (wins the top slot) and on parent, whose shared@1.0.0 nests.
         FakeRegistry registry = new FakeRegistry()

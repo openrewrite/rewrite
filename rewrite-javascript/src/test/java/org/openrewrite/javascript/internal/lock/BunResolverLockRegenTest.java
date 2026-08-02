@@ -73,6 +73,15 @@ class BunResolverLockRegenTest extends LockRegenTestSupport {
                 new String[][]{{"react", "19.2.8"}, {"use-callback-ref", "1.3.3"}, {"tslib", "2.8.1"}});
     }
 
+    @Test
+    void devAndOptionalClosure() {
+        // once (prod), supports-color+has-flag (dev), is-odd+is-number (optional): bun records all three scopes in
+        // the workspace object but leaves the package tuples unflagged (no dev/optional marking, unlike npm).
+        assertResolveByteExact("lock/bun/resolve-dev-optional", "after", null,
+                new String[][]{{"once", "1.4.0"}, {"wrappy", "1.0.2"}, {"supports-color", "7.2.0"},
+                        {"has-flag", "4.0.0"}, {"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the resolver output equals {@code dir/golden} byte-for-byte.
      * Each distinct name maps to a packument route {@code http/<name>}; each {@code {name, version}} to a manifest
@@ -100,6 +109,7 @@ class BunResolverLockRegenTest extends LockRegenTestSupport {
     @Disabled("live: runs real bun 1.3.10 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealBun() throws Exception {
         assertBunReproduces("lock/bun/resolve-clean/pkg", "lock/bun/resolve-clean/after");
+        assertBunReproduces("lock/bun/resolve-dev-optional/pkg", "lock/bun/resolve-dev-optional/after");
         assertBunReproduces("lock/bun/resolve-fork/pkg", "lock/bun/resolve-fork/after");
         assertBunReproduces("lock/bun/resolve-peer/pkg", "lock/bun/resolve-peer/after");
         assertBunReproduces("lock/bun/resolve-peer-meta/pkg", "lock/bun/resolve-peer-meta/after");
