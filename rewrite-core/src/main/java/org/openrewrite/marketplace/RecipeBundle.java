@@ -23,8 +23,8 @@ import org.openrewrite.rpc.request.RpcRequest;
 @Data
 @AllArgsConstructor
 public class RecipeBundle implements RpcRequest {
-    String packageEcosystem;
-    String packageName;
+    @Nullable String packageEcosystem;
+    @Nullable String packageName;
 
     /**
      * May be a dynamic constraint like LATEST or 0.2.0-SNAPSHOT, resolved in a way that is

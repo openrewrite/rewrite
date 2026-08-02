@@ -22,6 +22,7 @@ import org.openrewrite.config.DataTableDescriptor;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RecipeMarketplaceReaderTest {
 
@@ -536,6 +537,29 @@ class RecipeMarketplaceReaderTest {
         assertThat(marketplace.getRoot().getCategories().getFirst().getRecipes()).hasSize(2);
         // The first-seen casing wins
         assertThat(marketplace.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
+    }
+
+    @Test
+    void identityColumnsAreOptional() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category1
+          com.foo.Bar,Bar,Bar does a thing.,Java
+          """);
+
+        RecipeListing listing = marketplace.findRecipe("com.foo.Bar");
+        assertThat(listing).isNotNull();
+        assertThat(listing.getBundle().getPackageEcosystem()).isNull();
+        assertThat(listing.getBundle().getPackageName()).isNull();
+    }
+
+    @Test
+    void nameIsStillRequired() {
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,displayName
+          maven,org.example:lib,Bar
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("name");
     }
 
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {
