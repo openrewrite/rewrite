@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.resolve;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -116,6 +117,71 @@ class YarnBerryLockWriterTest {
     }
 
     @Test
+    void peerSurfaceSerialized() {
+        // plugin declares two peers (one raw, one range-quoted with a scoped, quoted key) and an optional-peer meta.
+        Map<String, String> peers = new LinkedHashMap<>();
+        peers.put("react", "^18.0.0");
+        peers.put("@scope/host", ">=1.0.0");
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("@scope/host").put("optional", true);
+        VersionManifest plugin = manifestWithPeers("plugin", "1.0.0", singletonMap("dep", "^2.0.0"), peers, meta);
+        ResolutionGraph graph = new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                        singletonMap("dependencies", singletonMap("plugin", "^1.0.0")), singletonMap("plugin", "1.0.0"))),
+                singletonMap("plugin@1.0.0", new ResolvedNode(plugin, emptyMap())));
+
+        // dependencies -> peerDependencies (sorted; scoped key + `>=` value quoted, `react`/`^18.0.0` raw) ->
+        // peerDependenciesMeta (scoped key quoted) -> checksum. `@` sorts before `r`.
+        assertThat(new YarnBerryLockWriter().write(graph, "10c0", 8, CHECKSUMS)).contains(
+                "\"plugin@npm:^1.0.0\":\n" +
+                "  version: 1.0.0\n" +
+                "  resolution: \"plugin@npm:1.0.0\"\n" +
+                "  dependencies:\n" +
+                "    dep: \"npm:^2.0.0\"\n" +
+                "  peerDependencies:\n" +
+                "    \"@scope/host\": \">=1.0.0\"\n" +
+                "    react: ^18.0.0\n" +
+                "  peerDependenciesMeta:\n" +
+                "    \"@scope/host\":\n" +
+                "      optional: true\n" +
+                "  checksum: ");
+    }
+
+    @Test
+    void peerMetaOnlySerialized() {
+        // debug's shape: peerDependenciesMeta with no peerDependencies still writes the meta block.
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("supports-color").put("optional", true);
+        VersionManifest leaf = manifestWithPeers("debug", "4.4.1", singletonMap("ms", "^2.1.3"), null, meta);
+        ResolutionGraph graph = new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                        singletonMap("dependencies", singletonMap("debug", "^4.0.0")), singletonMap("debug", "4.4.1"))),
+                singletonMap("debug@4.4.1", new ResolvedNode(leaf, emptyMap())));
+
+        assertThat(new YarnBerryLockWriter().write(graph, "10c0", 8, CHECKSUMS)).contains(
+                "  dependencies:\n" +
+                "    ms: \"npm:^2.1.3\"\n" +
+                "  peerDependenciesMeta:\n" +
+                "    supports-color:\n" +
+                "      optional: true\n" +
+                "  checksum: ");
+    }
+
+    @Test
+    void nonBooleanPeerMetaDefers() {
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("x").put("optional", "yes");
+        VersionManifest plugin = manifestWithPeers("plugin", "1.0.0", null, singletonMap("react", "^18.0.0"), meta);
+        ResolutionGraph graph = new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                        singletonMap("dependencies", singletonMap("plugin", "^1.0.0")), singletonMap("plugin", "1.0.0"))),
+                singletonMap("plugin@1.0.0", new ResolvedNode(plugin, emptyMap())));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> new YarnBerryLockWriter().write(graph, "10c0", 8, CHECKSUMS));
+    }
+
+    @Test
     void binBearingManifestDefers() {
         VersionManifest withBin = buildManifest("cli", "1.0.0", null, TextNode.valueOf("cli.js"));
         ResolutionGraph graph = new ResolutionGraph(
@@ -175,6 +241,14 @@ class YarnBerryLockWriterTest {
         VersionManifest.Dist dist = new VersionManifest.Dist(
                 "https://r/" + name + "/-/" + name + "-" + version + ".tgz", null, "sha512-" + name + "-" + version);
         return new VersionManifest(name, version, null, null, deps, null, null, null, bin, null, null, null, null,
+                null, null, null, null, null, dist, null, null, null);
+    }
+
+    private static VersionManifest manifestWithPeers(String name, String version, @Nullable Map<String, String> deps,
+                                            @Nullable Map<String, String> peers, @Nullable JsonNode meta) {
+        VersionManifest.Dist dist = new VersionManifest.Dist(
+                "https://r/" + name + "/-/" + name + "-" + version + ".tgz", null, "sha512-" + name + "-" + version);
+        return new VersionManifest(name, version, null, null, deps, null, peers, meta, null, null, null, null, null,
                 null, null, null, null, null, dist, null, null, null);
     }
 

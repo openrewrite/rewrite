@@ -1,0 +1,9 @@
+{
+  "name": "bpeer2",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.5.3",
+  "dependencies": {
+    "react": "19.0.0",
+    "styled-jsx": "5.1.6"
+  }
+}

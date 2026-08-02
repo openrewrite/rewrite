@@ -60,6 +60,20 @@ class YarnBerryResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void satisfiedPeer() {
+        // use-sync-external-store peers react (satisfied by the top-level react); its unquoted peerDependencies range.
+        assertResolveByteExact("lock/yarn-berry/resolve-peer", "after", EXISTING,
+                new String[][]{{"react", "19.0.0"}, {"use-sync-external-store", "1.4.0"}});
+    }
+
+    @Test
+    void satisfiedPeerWithMeta() {
+        // styled-jsx: dependencies + a quoted peerDependencies range + peerDependenciesMeta (scoped + plain keys).
+        assertResolveByteExact("lock/yarn-berry/resolve-peer-meta", "after", EXISTING,
+                new String[][]{{"react", "19.0.0"}, {"styled-jsx", "5.1.6"}, {"client-only", "0.0.1"}});
+    }
+
+    @Test
     void unsupportedCacheKeyFailsLoud() {
         // Only the 10c0 zip format is validated; any other cacheKey cannot be reproduced, so refuse.
         String dir = "lock/yarn-berry/resolve-clean";
