@@ -56,13 +56,25 @@ public final class NpmGraphBuilder {
      */
     private final boolean autoInstallPeers;
 
+    /**
+     * Versions already present in the existing lock, keyed by tree-slot name (an alias seeds under its alias name).
+     * Real installs are incremental: a locked version still satisfying a range is kept rather than re-resolved to
+     * the registry maximum. Empty seeds a fresh resolution.
+     */
+    private final Map<String, Set<String>> lockedVersions;
+
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers) {
+        this(registry, autoInstallPeers, Collections.emptyMap());
+    }
+
+    public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions) {
         this.registry = registry;
         this.autoInstallPeers = autoInstallPeers;
+        this.lockedVersions = lockedVersions;
     }
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
@@ -159,7 +171,10 @@ public final class NpmGraphBuilder {
         if (deduped != null) {
             return deduped;
         }
-        String version = NodeSemver.maxSatisfying(registry.versions(name), range);
+        String version = lockedSatisfying(name, range);
+        if (version == null) {
+            version = NodeSemver.maxSatisfying(registry.versions(name), range);
+        }
         if (version == null) {
             throw new EngineFailure(RESOLUTION_REQUIRED, name, "no version of " + name + " satisfies " + range);
         }
@@ -171,6 +186,11 @@ public final class NpmGraphBuilder {
             work.add(new String[]{name, version});
         }
         return version;
+    }
+
+    /** The highest already-locked version of {@code name} that {@code range} admits, or {@code null}. */
+    private @Nullable String lockedSatisfying(String name, String range) {
+        return NodeSemver.maxSatisfying(lockedVersions.getOrDefault(name, Collections.emptySet()), range);
     }
 
     /**
@@ -203,7 +223,10 @@ public final class NpmGraphBuilder {
         if (deduped != null) {
             return deduped;
         }
-        String version = NodeSemver.maxSatisfying(registry.versions(realName), range);
+        String version = lockedSatisfying(aliasName, range);
+        if (version == null) {
+            version = NodeSemver.maxSatisfying(registry.versions(realName), range);
+        }
         if (version == null) {
             throw new EngineFailure(RESOLUTION_REQUIRED, realName, "no version of " + realName + " satisfies " + range);
         }
@@ -504,7 +527,10 @@ public final class NpmGraphBuilder {
     private @Nullable VersionManifest resolveLeafPeer(String peerName, String range) {
         VersionManifest m;
         try {
-            String version = NodeSemver.maxSatisfying(registry.versions(peerName), range);
+            String version = lockedSatisfying(peerName, range);
+            if (version == null) {
+                version = NodeSemver.maxSatisfying(registry.versions(peerName), range);
+            }
             if (version == null) {
                 return null;
             }

@@ -328,6 +328,68 @@ class NpmGraphBuilderTest {
                         "{\"dependencies\":{\"dep\":\"npm:foo@github:owner/foo\"}}")));
     }
 
+    @Test
+    void prefersLockedVersionSatisfyingRange() {
+        // Real installs are incremental: b keeps its locked 2.1.0 (which ^2.0.0 admits) over the registry max.
+        FakeRegistry registry = new FakeRegistry()
+                .add("a", "1.2.0", singletonMap("b", "^2.0.0"))
+                .add("b", "2.1.0", emptyMap())
+                .add("b", "2.3.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false,
+                singletonMap("b", Collections.singleton("2.1.0")))
+                .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("a@1.2.0", "b@2.1.0");
+        assertThat(graph.node("a", "1.2.0").getResolvedEdges()).containsExactly(Map.entry("b", "2.1.0"));
+    }
+
+    @Test
+    void reResolvesWhenLockedVersionExcluded() {
+        // A range the locked version no longer satisfies re-resolves to the registry maximum (a bump moves).
+        FakeRegistry registry = new FakeRegistry()
+                .add("a", "1.2.0", singletonMap("b", "^2.0.0"))
+                .add("b", "1.9.0", emptyMap())
+                .add("b", "2.3.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false,
+                singletonMap("b", Collections.singleton("1.9.0")))
+                .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("a@1.2.0", "b@2.3.0");
+    }
+
+    @Test
+    void seedsAutoInstalledPeerFromLock() {
+        // The auto-installed peer keeps the lock's react 18.2.0 rather than the registry's newer 18.3.0.
+        FakeRegistry registry = new FakeRegistry()
+                .add("react", "18.2.0", emptyMap())
+                .add("react", "18.3.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true,
+                singletonMap("react", Collections.singleton("18.2.0")))
+                .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0", "react@18.2.0");
+    }
+
+    @Test
+    void seedsAliasFromLockedSlotVersion() {
+        // The alias seeds under its slot name: react-is-18 locked at 18.2.0 is kept over react-is's 18.3.1.
+        FakeRegistry registry = new FakeRegistry()
+                .add("react-is", "18.2.0", emptyMap())
+                .add("react-is", "18.3.1", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false,
+                singletonMap("react-is-18", Collections.singleton("18.2.0")))
+                .build(singletonMap("", "{\"dependencies\":{\"react-is-18\":\"npm:react-is@^18.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("react-is-18@18.2.0");
+        assertThat(graph.node("react-is-18", "18.2.0").getName()).isEqualTo("react-is");
+    }
+
     // --- in-memory registry -------------------------------------------------
 
     private static final class FakeRegistry implements Registry {
