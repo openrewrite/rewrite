@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EngineFailure;
+import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 import org.openrewrite.semver.NodeSemver;
 
@@ -33,9 +34,10 @@ import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RE
  * {@code devOptional} by npm's reachability rules for the serializers to mark. A manifest may declare
  * {@code peerDependencies} as long as every non-optional peer is already satisfied by a resolved node (a
  * top-level dependency or a normal dependency of some node) at a version its range admits — the peer is then a
- * constraint already met and adds no node. A missing non-optional peer (npm would auto-install it), an optional
- * peer present at a non-satisfying version, or a peer resolving to more than one version fails loud. Version and
- * constraint decisions are delegated entirely to node-semver.
+ * constraint already met and adds no node. A missing non-optional peer is npm's auto-install: when it is enabled
+ * (only the npm resolver; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
+ * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
+ * missing-peer shape fails loud. Version and constraint decisions are delegated entirely to node-semver.
  */
 public final class NpmGraphBuilder {
 
@@ -45,8 +47,20 @@ public final class NpmGraphBuilder {
 
     private final Registry registry;
 
+    /**
+     * npm 7+ auto-installs a missing non-optional peer. Only {@link NpmLockWriter} places such a node byte-exact, so
+     * it is enabled solely for the npm resolver; the pnpm/bun/yarn resolvers share this builder but keep the classic
+     * deferral (their serializers would not reproduce an auto-installed peer node).
+     */
+    private final boolean autoInstallPeers;
+
     public NpmGraphBuilder(Registry registry) {
+        this(registry, false);
+    }
+
+    public NpmGraphBuilder(Registry registry, boolean autoInstallPeers) {
         this.registry = registry;
+        this.autoInstallPeers = autoInstallPeers;
     }
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
@@ -86,7 +100,7 @@ public final class NpmGraphBuilder {
             nodeOptionalEdges.put(nodeKey,
                     resolveEdges(manifest.getOptionalDependencies(), directDepNames, chosen, manifests, work));
         }
-        verifyPeersSatisfied(manifests, chosen);
+        Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared);
 
         List<ResolutionGraph.Importer> importers = new ArrayList<>();
         for (ImporterDecl decl : declared) {
@@ -101,6 +115,11 @@ public final class NpmGraphBuilder {
         }
 
         DepFlags flags = classifyFlags(manifests.keySet(), importers, nodeEdges, nodeOptionalEdges);
+        // An auto-installed peer is unreachable from the dependency graph, so the reachability fixpoint leaves it a
+        // candidate for every flag; in the all-prod closure it is gated to, it carries none.
+        flags.dev.removeAll(autoInstalledPeers);
+        flags.optional.removeAll(autoInstalledPeers);
+        flags.devOptional.removeAll(autoInstalledPeers);
 
         Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
         for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
@@ -242,13 +261,21 @@ public final class NpmGraphBuilder {
     }
 
     /**
-     * Every {@code peerDependencies} declaration must already be met by the resolved closure. A non-optional peer
-     * with no provider would make npm auto-install one (a new node); a peer present but not admitted by the range,
-     * or resolved to more than one version, would reshape the layout. All of those defer. An optional peer
-     * (per {@code peerDependenciesMeta}) may be absent.
+     * Resolve every {@code peerDependencies} declaration. A peer already met by the resolved closure adds no node
+     * (verified in place). A non-optional peer with no provider is npm's auto-install: when {@link #autoInstallPeers}
+     * is enabled and the slice is the cleanest one — an all-prod closure, each missing peer a single pure-leaf
+     * version required by a single package — the peer is added as a top-level node the serializer flags
+     * {@code peer: true}. Every other missing-peer shape (auto-install disabled, a dev/optional closure, a non-leaf
+     * peer, an interacting multi-requirer peer, an unfetchable peer, or a peer present at a non-satisfying / forked
+     * version) fails loud with the classic deferral so no serializer emits a peer layout it cannot reproduce. An
+     * optional peer (per {@code peerDependenciesMeta}) may be absent.
+     *
+     * @return the node keys of the auto-installed peers (they carry no dev/optional flag in the all-prod closure).
      */
-    private static void verifyPeersSatisfied(Map<String, VersionManifest> manifests, Map<String, Set<String>> chosen) {
-        for (VersionManifest m : manifests.values()) {
+    private Set<String> resolvePeers(Map<String, VersionManifest> manifests, Map<String, Set<String>> chosen,
+                                     List<ImporterDecl> declared) {
+        List<String[]> missing = new ArrayList<>();  // {requirer, peerName, range}
+        for (VersionManifest m : new ArrayList<>(manifests.values())) {
             Map<String, String> peers = m.getPeerDependencies();
             if (peers == null || peers.isEmpty()) {
                 continue;
@@ -262,8 +289,11 @@ public final class NpmGraphBuilder {
                     if (isOptionalPeer(meta, peerName)) {
                         continue;
                     }
-                    throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(),
-                            m.getName() + " peer " + peerName + " is not installed (peer auto-install not yet resolved)");
+                    if (!autoInstallPeers) {
+                        throw peerNotInstalled(m.getName(), peerName);
+                    }
+                    missing.add(new String[]{m.getName(), peerName, range});
+                    continue;
                 }
                 if (resolved.size() > 1) {
                     throw new EngineFailure(RESOLUTION_REQUIRED, m.getName(), m.getName() + " peer " + peerName +
@@ -276,6 +306,82 @@ public final class NpmGraphBuilder {
                 }
             }
         }
+        return missing.isEmpty() ? Collections.emptySet() : installMissingPeers(missing, manifests, chosen, declared);
+    }
+
+    /**
+     * Add each missing non-optional peer as a top-level node (npm 7+ auto-install), gated to the clean slice
+     * {@link NpmLockWriter} reproduces byte-exact. Any un-clean condition defers with the classic peer message.
+     */
+    private Set<String> installMissingPeers(List<String[]> missing, Map<String, VersionManifest> manifests,
+                                            Map<String, Set<String>> chosen, List<ImporterDecl> declared) {
+        String[] first = missing.get(0);
+        // Only an all-prod closure with each peer required by a single package is reproduced; the peer inheriting a
+        // dev/optional flag, or an interacting (multi-requirer) peer, defers.
+        Set<String> requestedPeers = new LinkedHashSet<>();
+        boolean clean = closureIsAllProd(declared, manifests);
+        for (String[] miss : missing) {
+            clean &= requestedPeers.add(miss[1]);
+        }
+        if (!clean) {
+            throw peerNotInstalled(first[0], first[1]);
+        }
+        Set<String> autoInstalled = new LinkedHashSet<>();
+        for (String[] miss : missing) {
+            VersionManifest peerManifest = resolveLeafPeer(miss[1], miss[2]);
+            if (peerManifest == null) {
+                throw peerNotInstalled(miss[0], miss[1]);
+            }
+            String key = ResolutionGraph.key(miss[1], peerManifest.getVersion());
+            manifests.put(key, peerManifest);
+            chosen.computeIfAbsent(miss[1], k -> new LinkedHashSet<>()).add(peerManifest.getVersion());
+            autoInstalled.add(key);
+        }
+        return autoInstalled;
+    }
+
+    /**
+     * The single pure-leaf version of {@code peerName} admitted by {@code range}, or {@code null} when the peer is
+     * unfetchable, has no satisfying version, or carries dependencies/peers of its own (all of which defer).
+     */
+    private @Nullable VersionManifest resolveLeafPeer(String peerName, String range) {
+        VersionManifest m;
+        try {
+            String version = NodeSemver.maxSatisfying(registry.versions(peerName), range);
+            if (version == null) {
+                return null;
+            }
+            m = registry.manifest(peerName, version);
+        } catch (NodeRegistryException e) {
+            return null;
+        }
+        boolean leaf = !notEmpty(m.getDependencies()) && !notEmpty(m.getOptionalDependencies()) &&
+                !notEmpty(m.getPeerDependencies());
+        return leaf ? m : null;
+    }
+
+    private static EngineFailure peerNotInstalled(String requirer, String peerName) {
+        return new EngineFailure(RESOLUTION_REQUIRED, requirer,
+                requirer + " peer " + peerName + " is not installed (peer auto-install not yet resolved)");
+    }
+
+    /** No importer declares dev/optional scopes and no resolved manifest declares optionalDependencies. */
+    private static boolean closureIsAllProd(List<ImporterDecl> declared, Map<String, VersionManifest> manifests) {
+        for (ImporterDecl decl : declared) {
+            if (decl.scopes.containsKey("devDependencies") || decl.scopes.containsKey("optionalDependencies")) {
+                return false;
+            }
+        }
+        for (VersionManifest m : manifests.values()) {
+            if (notEmpty(m.getOptionalDependencies())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean notEmpty(@Nullable Map<String, String> m) {
+        return m != null && !m.isEmpty();
     }
 
     private static boolean isOptionalPeer(@Nullable JsonNode meta, String peer) {

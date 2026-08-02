@@ -31,11 +31,11 @@ import java.util.Map;
  * the {@code package-lock.json} byte-exact, deferring anything not yet proven reproducible. It parses the importer
  * manifests, adapts the live registry, runs {@link NpmGraphBuilder}, and writes with {@link NpmLockWriter}. The
  * lockfileVersion is taken from the existing lock (defaulting to 3). A clean, hoisted closure — flat, a single
- * directly-declared fork, or one carrying already-satisfied {@code peerDependencies} — including its
- * {@code devDependencies} and {@code optionalDependencies} (marked per npm's dev/optional reachability), is
- * reproduced exactly; a workspace, a root {@code peerDependencies}/{@code bundleDependencies} surface, an
- * unsatisfied peer, or a closure-reshaping the builder/writer cannot yet match fails loud, leaving the old lock
- * untouched.
+ * directly-declared fork, or one carrying {@code peerDependencies} (already satisfied, or a single missing leaf peer
+ * npm auto-installs top-level) — including its {@code devDependencies} and {@code optionalDependencies} (marked per
+ * npm's dev/optional reachability), is reproduced exactly; a workspace, a root {@code peerDependencies}/
+ * {@code bundleDependencies} surface, a peer beyond the clean auto-install slice, or a closure-reshaping the
+ * builder/writer cannot yet match fails loud, leaving the old lock untouched.
  */
 public final class NpmResolver implements LockResolver {
 
@@ -53,7 +53,7 @@ public final class NpmResolver implements LockResolver {
         requireResolvableScopes(request.getImporterManifests());
         int lockfileVersion = lockfileVersionOf(request.getExistingLock());
         Registry registry = new NpmRegistryAdapter(request.getRegistries(), request.getClient());
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(request.getImporterManifests());
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true).build(request.getImporterManifests());
         return new NpmLockWriter().write(graph, lockfileVersion);
     }
 

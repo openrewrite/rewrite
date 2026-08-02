@@ -31,9 +31,10 @@ import java.util.*;
  * {@code npm install --package-lock-only} would write. It computes npm's hoisted {@code node_modules} layout from
  * the graph (every package top-level for a clean closure; the conflicting version of a fork nested under its
  * requiring parent), builds the {@code packages} map (and, for lockfileVersion 2, the legacy {@code dependencies}
- * tree), and renders through {@link NpmJson} so the key order and pretty-print match npm exactly. A satisfied
- * {@code peerDependencies} surface is reproduced (recorded verbatim, its provider flagged {@code peer: true}),
- * and dev/optional dependencies are placed and flagged ({@code dev}/{@code optional}/{@code devOptional}) per
+ * tree), and renders through {@link NpmJson} so the key order and pretty-print match npm exactly. A
+ * {@code peerDependencies} surface is reproduced (recorded verbatim, its provider flagged {@code peer: true}); a
+ * missing non-optional peer the graph auto-installed is a provider the dependency edges never reach, so it is
+ * seeded top-level here. dev/optional dependencies are placed and flagged ({@code dev}/{@code optional}/{@code devOptional}) per
  * npm's reachability; anything else it cannot reproduce byte-exact — a workspace, a manifest field it does not
  * model — fails loud rather than emit a wrong lock.
  */
@@ -223,6 +224,14 @@ public final class NpmLockWriter {
                 resolveEdge(graph, cur[1], edge.getKey(), edge.getValue(), placements, shelf, visited, queue);
             }
         }
+        seedAutoInstalledPeers(graph, placements, shelf, visited, queue);
+        while (!queue.isEmpty()) {
+            String[] cur = queue.poll();
+            ResolvedNode node = graph.getNodes().get(cur[0]);
+            for (Map.Entry<String, String> edge : node.getResolvedEdges().entrySet()) {
+                resolveEdge(graph, cur[1], edge.getKey(), edge.getValue(), placements, shelf, visited, queue);
+            }
+        }
         requireUnambiguousForks(graph, placements, root);
         return placements;
     }
@@ -255,6 +264,22 @@ public final class NpmLockWriter {
         }
         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, depName,
                 depName + "@" + depVersion + " could not be placed (no free node_modules on the path)");
+    }
+
+    /**
+     * An auto-installed peer is a peer provider the dependency graph never reaches (no importer or transitive edge
+     * points at it), so the main traversal leaves it unplaced. npm hoists it to the top level; seed it there.
+     */
+    private void seedAutoInstalledPeers(ResolutionGraph graph, Map<String, String> placements,
+                                        Map<String, Map<String, String>> shelf, Set<String> visited,
+                                        Deque<String[]> queue) {
+        Set<String> peerProviders = peerProviderKeys(graph);
+        for (Map.Entry<String, ResolvedNode> e : graph.getNodes().entrySet()) {
+            if (!placements.containsKey(e.getKey()) && peerProviders.contains(e.getKey())) {
+                ResolvedNode node = e.getValue();
+                resolveEdge(graph, "", node.getName(), node.getVersion(), placements, shelf, visited, queue);
+            }
+        }
     }
 
     /** The {@code node_modules} prefixes visible to a package at {@code locationKey}, shallowest first. */

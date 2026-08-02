@@ -81,14 +81,66 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void missingNonOptionalPeerDefers() {
-        // has-peer needs react, which nothing provides; auto-installing it is the harder tail — defer.
-        FakeRegistry registry = new FakeRegistry();
+    void autoInstallsMissingLeafPeerTopLevel() {
+        // react is a published leaf; has-peer peer-depends on it and root does not, so npm auto-installs react.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true)
+                .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0", "react@18.2.0");
+        // The auto-installed peer carries no dev/optional flag in an all-prod closure.
+        assertThat(graph.node("react", "18.2.0").isDev()).isFalse();
+        assertThat(graph.node("react", "18.2.0").isOptional()).isFalse();
+        assertThat(graph.node("react", "18.2.0").isDevOptional()).isFalse();
+    }
+
+    @Test
+    void missingNonOptionalPeerDefersWhenAutoInstallDisabled() {
+        // The shared builder (pnpm/bun/yarn) keeps the classic deferral: a missing non-optional peer fails loud.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
         registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
         registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
 
         assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
                 new NpmGraphBuilder(registry).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
+    }
+
+    @Test
+    void peerAutoInstallWithNoSatisfyingVersionDefers() {
+        // has-peer needs react, but the registry publishes no react version to auto-install — defer.
+        FakeRegistry registry = new FakeRegistry();
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry, true).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
+    }
+
+    @Test
+    void autoInstalledPeerWithOwnDepsDefers() {
+        // the missing peer would itself pull a dependency; only a pure-leaf auto-install is reproduced.
+        FakeRegistry registry = new FakeRegistry()
+                .add("react", "18.2.0", singletonMap("loose-envify", "^1.0.0"))
+                .add("loose-envify", "1.4.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry, true).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
+    }
+
+    @Test
+    void peerAutoInstallIntoDevClosureDefers() {
+        // has-peer is a dev dependency, so its auto-installed peer would inherit dev-ness; a non-prod closure defers.
+        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry, true).build(singletonMap("", "{\"devDependencies\":{\"has-peer\":\"^1.0.0\"}}")));
     }
 
     @Test

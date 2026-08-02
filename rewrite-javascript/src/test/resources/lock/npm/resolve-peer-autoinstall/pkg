@@ -1,0 +1,7 @@
+{
+  "name": "resolve-peer-autoinstall",
+  "version": "1.0.0",
+  "dependencies": {
+    "use-sync-external-store": "1.4.0"
+  }
+}

@@ -192,6 +192,37 @@ class NpmLockWriterTest {
     }
 
     @Test
+    void autoInstalledPeerSeededTopLevelAndFlagged() {
+        FakeRegistry registry = new FakeRegistry()
+                .add("react", "18.2.0", emptyMap(), "MIT", null);
+        // plugin peer-depends on react, which the app does not declare — npm auto-installs react top-level.
+        registry.versionsByName.computeIfAbsent("plugin", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("plugin@1.0.0", new VersionManifest("plugin", "1.0.0", TextNode.valueOf("MIT"), "MIT",
+                null, null, singletonMap("react", ">=17"), null, null, null, null, null, null, null, null, null,
+                null, null, new VersionManifest.Dist("https://r/plugin/-/plugin-1.0.0.tgz", null, "sha512-plugin"),
+                null, null, null));
+
+        String lock = new NpmLockWriter().write(
+                new NpmGraphBuilder(registry, true).build(singletonMap("", app(singletonMap("plugin", "^1.0.0")))), 3);
+
+        // react is seeded top-level and flagged `peer: true`, but is NOT added to the root's declared dependencies.
+        assertThat(lock).contains("\"node_modules/react\": {\n" +
+                "      \"version\": \"18.2.0\",\n" +
+                "      \"resolved\": \"https://r/react/-/react-18.2.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-react-18.2.0\",\n" +
+                "      \"license\": \"MIT\",\n" +
+                "      \"peer\": true\n" +
+                "    }");
+        assertThat(lock).contains("\"\": {\n" +
+                "      \"name\": \"app\",\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"plugin\": \"^1.0.0\"\n" +
+                "      }\n" +
+                "    }");
+    }
+
+    @Test
     void optionalPeerProviderNotFlagged() {
         // widget declares theme as an OPTIONAL peer; even though theme is present as a top-level dep, an optional
         // peer confers no `peer: true` on its provider (unlike the non-optional peer above).
