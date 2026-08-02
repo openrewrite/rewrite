@@ -83,8 +83,7 @@ public class RecipeMarketplace {
         RecipeBundle bundle = bundleReader.getBundle();
         bindRecursive(marketplace.getRoot(), bundle);
         uninstall(bundle.getPackageEcosystem(), bundle.getPackageName());
-        root.merge(marketplace.getRoot());
-        return marketplace.getAllRecipes();
+        return root.merge(marketplace.getRoot());
     }
 
     /**
@@ -120,14 +119,22 @@ public class RecipeMarketplace {
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
 
-        public void merge(Category category) {
+        /**
+         * @return The listings actually added to this category (or a subcategory), i.e. excluding
+         * any that lost the first-wins name collision below. Used by {@link RecipeMarketplace#install}
+         * to report only what actually landed, rather than everything the source category offered.
+         */
+        public Set<RecipeListing> merge(Category category) {
+            Set<RecipeListing> added = new LinkedHashSet<>();
             for (RecipeListing recipe : category.recipes) {
                 // First-wins, matching findRecipe/getAllRecipes traversal order and this method's own
                 // subcategory branch, which keeps the existing node. Callers express precedence by
                 // merging the nearest scope first.
                 if (!recipes.contains(recipe)) {
-                    recipes.add(recipe.withMarketplace(RecipeMarketplace.this)
-                            .withBundle(intern(recipe.getBundle())));
+                    RecipeListing installed = recipe.withMarketplace(RecipeMarketplace.this)
+                            .withBundle(intern(recipe.getBundle()));
+                    recipes.add(installed);
+                    added.add(installed);
                 }
             }
             for (Category subCategory : category.categories) {
@@ -139,13 +146,14 @@ public class RecipeMarketplace {
                     }
                 }
                 if (existingSubCategory != null) {
-                    existingSubCategory.merge(subCategory);
+                    added.addAll(existingSubCategory.merge(subCategory));
                 } else {
                     Category copy = new Category(subCategory.displayName, subCategory.description);
-                    copy.merge(subCategory);
+                    added.addAll(copy.merge(subCategory));
                     categories.add(copy);
                 }
             }
+            return added;
         }
 
         public void uninstall(String packageEcosystem, String packageName) {

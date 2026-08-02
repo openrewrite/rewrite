@@ -186,7 +186,7 @@ class MavenRecipeBundleReaderTest {
 
         assertThat(reader).isNotInstanceOf(ThrowingRecipeBundleReader.class);
         assertThat(reader.getBundle().getVersion())
-                .as("RELEASE excludes snapshots")
-                .doesNotContain("-SNAPSHOT");
+                .as("a blank version should resolve to a concrete release, not the literal RELEASE constraint")
+                .matches("\\d+\\.\\d+\\.\\d+");
     }
 }

@@ -22,6 +22,7 @@ import org.openrewrite.config.RecipeDescriptor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -106,5 +107,68 @@ class RecipeMarketplaceInstallTest {
             out.addAll(allListings(child));
         }
         return out;
+    }
+
+    /** A reader whose sole listing is {@code recipeName}, bound to {@code bundle}. */
+    private static RecipeBundleReader singleRecipeReader(RecipeBundle bundle, String recipeName) {
+        return new RecipeBundleReader() {
+            @Override
+            public RecipeBundle getBundle() {
+                return bundle;
+            }
+
+            @Override
+            public RecipeMarketplace read() {
+                RecipeMarketplace m = new RecipeMarketplace();
+                RecipeListing listing = new RecipeListing(null, recipeName, recipeName, recipeName + ".",
+                        null, emptyList(), emptyList(), 1, bundle);
+                m.install(listing, List.of(category("Java")));
+                return m;
+            }
+
+            @Override
+            public RecipeDescriptor describe(RecipeListing listing) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    @Test
+    void installReportsOnlyListingsThatActuallyLanded() {
+        RecipeBundle bundleA = new RecipeBundle("maven", "org.example:a", "1.0.0", "1.0.0", null);
+        RecipeBundle bundleB = new RecipeBundle("maven", "org.example:b", "1.0.0", "1.0.0", null);
+
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+
+        Set<RecipeListing> installedA = marketplace.install(singleRecipeReader(bundleA, "com.foo.Bar"));
+        assertThat(installedA)
+                .as("bundle a is the first to claim com.foo.Bar, so it lands")
+                .extracting(RecipeListing::getName)
+                .containsExactly("com.foo.Bar");
+
+        // bundle b also declares com.foo.Bar, but a already owns that name -- Category.merge's
+        // first-wins tie-break skips it. install() must not report a listing it didn't add.
+        Set<RecipeListing> installedB = marketplace.install(singleRecipeReader(bundleB, "com.foo.Bar"));
+        assertThat(installedB)
+                .as("install() must report nothing when every listing lost the name collision")
+                .isEmpty();
+
+        // The marketplace itself is unaffected: com.foo.Bar is still owned by bundle a.
+        assertThat(marketplace.findRecipe("com.foo.Bar"))
+                .isNotNull()
+                .extracting(l -> l.getBundle().getPackageName())
+                .isEqualTo("org.example:a");
+
+        // A bundle that contributed no listings must not appear as installed.
+        assertThat(marketplace.getBundles())
+                .as("bundle b never interned a listing, so it must not be reported as installed")
+                .extracting(RecipeBundle::getPackageName)
+                .containsExactly("org.example:a");
+        assertThat(marketplace.bundleFor("maven", "org.example:b")).isNull();
     }
 }
