@@ -1,0 +1,1 @@
+{"name":"@floating-ui/dom","version":"1.8.0","dependencies":{"@floating-ui/core":"^1.8.0","@floating-ui/utils":"^0.2.12"},"dist":{"tarball":"https://registry.npmjs.org/@floating-ui/dom/-/dom-1.8.0.tgz","integrity":"sha512-yXSrzeHZBTZadLOlfyhCkJHNeLJnHRnRInwdZ40L7ZiaAtrBwoYlsDrX3v5zB1Utk7CLfzcOVnVVWoXEky7Ceg=="}}

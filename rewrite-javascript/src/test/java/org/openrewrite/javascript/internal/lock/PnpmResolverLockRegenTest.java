@@ -58,6 +58,25 @@ class PnpmResolverLockRegenTest extends LockRegenTestSupport {
                 new String[][]{{"is-odd", "3.0.1"}, {"is-number", "6.0.0"}, {"is-number", "7.0.0"}});
     }
 
+    @Test
+    void satisfiedPeerV9() {
+        // use-sync-external-store@1.4.0 peers react, satisfied by the directly-declared react@19.0.0. pnpm keys the
+        // consumer snapshot use-sync-external-store@1.4.0(react@19.0.0) and materializes react as a snapshot dep,
+        // records the raw `peerDependencies` on its packages entry, and suffixes its importer version.
+        assertResolveByteExact("lock/pnpm/resolve-peer", "after", null,
+                new String[][]{{"react", "19.0.0"}, {"use-sync-external-store", "1.4.0"}});
+    }
+
+    @Test
+    void nestedMultiPeerV9() {
+        // @floating-ui/react-dom peers react + react-dom; react-dom itself peers react. The suffix nests
+        // (react-dom@19.0.0(react@19.0.0)) inside the consumer key and orders the two peers by rendered reference.
+        assertResolveByteExact("lock/pnpm/resolve-peer-nested", "after", null,
+                new String[][]{{"react", "19.0.0"}, {"react-dom", "19.0.0"}, {"scheduler", "0.25.0"},
+                        {"@floating-ui/react-dom", "2.1.2"}, {"@floating-ui/dom", "1.8.0"},
+                        {"@floating-ui/core", "1.8.0"}, {"@floating-ui/utils", "0.2.12"}});
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the resolver output equals {@code dir/golden} byte-for-byte.
      * Each distinct name maps to a packument route {@code http/<name>}; each {@code {name, version}} to a manifest
@@ -86,5 +105,7 @@ class PnpmResolverLockRegenTest extends LockRegenTestSupport {
     void recordGoldensWithRealPnpm() throws Exception {
         assertPnpmReproduces("lock/pnpm/resolve-clean/pkg", "lock/pnpm/resolve-clean/after");
         assertPnpmReproduces("lock/pnpm/resolve-fork/pkg", "lock/pnpm/resolve-fork/after");
+        assertPnpmReproduces("lock/pnpm/resolve-peer/pkg", "lock/pnpm/resolve-peer/after");
+        assertPnpmReproduces("lock/pnpm/resolve-peer-nested/pkg", "lock/pnpm/resolve-peer-nested/after");
     }
 }

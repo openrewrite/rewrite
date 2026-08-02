@@ -133,6 +133,167 @@ class PnpmLockWriterTest {
     }
 
     @Test
+    void satisfiedPeerMaterializesAsSnapshotDep() {
+        // host peers prov, satisfied by the directly-declared prov: pnpm suffixes the consumer snapshot key with
+        // (prov@1.0.0), materializes prov as a snapshot dependency, and records the raw peerDependencies verbatim.
+        FakeRegistry registry = new FakeRegistry()
+                .addPeer("host", "1.0.0", emptyMap(), singletonMap("prov", "^1.0.0"), null)
+                .add("prov", "1.0.0", emptyMap(), null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("host", "^1.0.0");
+        deps.put("prov", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThat(new PnpmLockWriter().write(graph)).isEqualTo(
+                "lockfileVersion: '9.0'\n" +
+                "\n" +
+                "settings:\n" +
+                "  autoInstallPeers: true\n" +
+                "  excludeLinksFromLockfile: false\n" +
+                "\n" +
+                "importers:\n" +
+                "\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      host:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0(prov@1.0.0)\n" +
+                "      prov:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  host@1.0.0:\n" +
+                "    resolution: {integrity: sha512-host-1.0.0}\n" +
+                "    peerDependencies:\n" +
+                "      prov: ^1.0.0\n" +
+                "\n" +
+                "  prov@1.0.0:\n" +
+                "    resolution: {integrity: sha512-prov-1.0.0}\n" +
+                "\n" +
+                "snapshots:\n" +
+                "\n" +
+                "  host@1.0.0(prov@1.0.0):\n" +
+                "    dependencies:\n" +
+                "      prov: 1.0.0\n" +
+                "\n" +
+                "  prov@1.0.0: {}\n");
+    }
+
+    @Test
+    void nestedPeerSuffixOrdersByReference() {
+        // top peers base + mid, and mid itself peers base: the mid reference nests (base@1.0.0) and the two peer
+        // suffixes on top are ordered by their rendered reference. top's regular dep lib merges into the snapshot deps.
+        FakeRegistry registry = new FakeRegistry()
+                .add("base", "1.0.0", emptyMap(), null)
+                .add("lib", "1.0.0", emptyMap(), null)
+                .addPeer("mid", "1.0.0", emptyMap(), singletonMap("base", "^1.0.0"), null)
+                // peers passed unsorted (mid before base) to prove the writer sorts the peerDependencies block
+                .addPeer("top", "1.0.0", singletonMap("lib", "^1.0.0"), peers("mid", "^1.0.0", "base", "^1.0.0"), null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("base", "^1.0.0");
+        deps.put("mid", "^1.0.0");
+        deps.put("top", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThat(new PnpmLockWriter().write(graph)).isEqualTo(
+                "lockfileVersion: '9.0'\n" +
+                "\n" +
+                "settings:\n" +
+                "  autoInstallPeers: true\n" +
+                "  excludeLinksFromLockfile: false\n" +
+                "\n" +
+                "importers:\n" +
+                "\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      base:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "      mid:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0(base@1.0.0)\n" +
+                "      top:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0(base@1.0.0)(mid@1.0.0(base@1.0.0))\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  base@1.0.0:\n" +
+                "    resolution: {integrity: sha512-base-1.0.0}\n" +
+                "\n" +
+                "  lib@1.0.0:\n" +
+                "    resolution: {integrity: sha512-lib-1.0.0}\n" +
+                "\n" +
+                "  mid@1.0.0:\n" +
+                "    resolution: {integrity: sha512-mid-1.0.0}\n" +
+                "    peerDependencies:\n" +
+                "      base: ^1.0.0\n" +
+                "\n" +
+                "  top@1.0.0:\n" +
+                "    resolution: {integrity: sha512-top-1.0.0}\n" +
+                "    peerDependencies:\n" +
+                "      base: ^1.0.0\n" +
+                "      mid: ^1.0.0\n" +
+                "\n" +
+                "snapshots:\n" +
+                "\n" +
+                "  base@1.0.0: {}\n" +
+                "\n" +
+                "  lib@1.0.0: {}\n" +
+                "\n" +
+                "  mid@1.0.0(base@1.0.0):\n" +
+                "    dependencies:\n" +
+                "      base: 1.0.0\n" +
+                "\n" +
+                "  top@1.0.0(base@1.0.0)(mid@1.0.0(base@1.0.0)):\n" +
+                "    dependencies:\n" +
+                "      base: 1.0.0\n" +
+                "      lib: 1.0.0\n" +
+                "      mid: 1.0.0(base@1.0.0)\n");
+    }
+
+    @Test
+    void transitivePeerDefers() {
+        // wrap depends on consumer, which peers base; wrap does not declare base — pnpm would record base under
+        // wrap's transitivePeerDependencies, which the writer does not yet reproduce, so it defers.
+        FakeRegistry registry = new FakeRegistry()
+                .add("base", "1.0.0", emptyMap(), null)
+                .addPeer("consumer", "1.0.0", emptyMap(), singletonMap("base", "^1.0.0"), null)
+                .add("wrap", "1.0.0", singletonMap("consumer", "^1.0.0"), null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("base", "^1.0.0");
+        deps.put("wrap", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> new PnpmLockWriter().write(graph));
+    }
+
+    @Test
+    void optionalPeerMetaDefers() {
+        // host's peer prov is marked optional; a present optional peer materializes under a separate snapshot
+        // optionalDependencies block (and absent ones can leak transitively), so the meta surface defers.
+        JsonNode meta = JsonNodeFactory.instance.objectNode()
+                .set("prov", JsonNodeFactory.instance.objectNode().put("optional", true));
+        FakeRegistry registry = new FakeRegistry()
+                .addPeer("host", "1.0.0", emptyMap(), singletonMap("prov", "^1.0.0"), meta)
+                .add("prov", "1.0.0", emptyMap(), null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("host", "^1.0.0");
+        deps.put("prov", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> new PnpmLockWriter().write(graph));
+    }
+
+    @Test
     void binBearingManifestDefers() {
         VersionManifest withBin = new VersionManifest("cli", "1.0.0", TextNode.valueOf("MIT"), "MIT",
                 null, null, null, null, TextNode.valueOf("cli.js"), null, null, null, null, null, null, null, null,
@@ -158,6 +319,13 @@ class PnpmLockWriterTest {
 
     // --- in-memory registry + manifest builders ---------------------------
 
+    private static Map<String, String> peers(String n1, String r1, String n2, String r2) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put(n1, r1);
+        map.put(n2, r2);
+        return map;
+    }
+
     private static String app(Map<String, String> dependencies) {
         StringBuilder deps = new StringBuilder();
         for (Map.Entry<String, String> e : dependencies.entrySet()) {
@@ -181,6 +349,18 @@ class PnpmLockWriterTest {
             manifests.put(name + "@" + version, new VersionManifest(name, version, lic, "MIT",
                     deps.isEmpty() ? null : deps, null, null, null, null, engines, null, null, null, null, null,
                     null, null, null, dist, null, null, null));
+            return this;
+        }
+
+        FakeRegistry addPeer(String name, String version, Map<String, String> deps,
+                             Map<String, String> peers, @Nullable JsonNode peerMeta) {
+            versionsByName.computeIfAbsent(name, k -> new TreeSet<>()).add(version);
+            JsonNode lic = JsonNodeFactory.instance.textNode("MIT");
+            VersionManifest.Dist dist = new VersionManifest.Dist(
+                    "https://r/" + name + "/-/" + name + "-" + version + ".tgz", null, "sha512-" + name + "-" + version);
+            manifests.put(name + "@" + version, new VersionManifest(name, version, lic, "MIT",
+                    deps.isEmpty() ? null : deps, null, peers, peerMeta, null, null, null, null, null, null,
+                    null, null, null, null, dist, null, null, null));
             return this;
         }
 
