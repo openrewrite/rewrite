@@ -146,6 +146,104 @@ class NpmLockWriterTest {
     }
 
     @Test
+    void transitiveForkHoistsAlphabeticalRequirer() {
+        // apkg and zpkg pull shared transitively at disjoint versions; neither shared is directly declared. npm
+        // hoists the alphabetically-first requirer's version (apkg -> shared@1.0.0) and nests zpkg's shared@2.0.0.
+        FakeRegistry registry = new FakeRegistry()
+                .add("apkg", "1.0.0", singletonMap("shared", "^1.0.0"), "MIT", null)
+                .add("zpkg", "1.0.0", singletonMap("shared", "^2.0.0"), "MIT", null)
+                .add("shared", "1.0.0", emptyMap(), "MIT", null)
+                .add("shared", "2.0.0", emptyMap(), "MIT", null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("apkg", "^1.0.0");
+        deps.put("zpkg", "^1.0.0");
+        String lock = new NpmLockWriter().write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))), 3);
+
+        assertThat(lock).contains("\"node_modules/shared\": {\n      \"version\": \"1.0.0\",");
+        assertThat(lock).contains("\"node_modules/zpkg/node_modules/shared\": {\n      \"version\": \"2.0.0\",");
+    }
+
+    @Test
+    void transitiveForkHoistIndependentOfDeclarationOrder() {
+        // Declaring zpkg before apkg does not change the hoisted winner: the writer sorts roots the way npm does.
+        FakeRegistry registry = new FakeRegistry()
+                .add("apkg", "1.0.0", singletonMap("shared", "^1.0.0"), "MIT", null)
+                .add("zpkg", "1.0.0", singletonMap("shared", "^2.0.0"), "MIT", null)
+                .add("shared", "1.0.0", emptyMap(), "MIT", null)
+                .add("shared", "2.0.0", emptyMap(), "MIT", null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("zpkg", "^1.0.0");
+        deps.put("apkg", "^1.0.0");
+        String lock = new NpmLockWriter().write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))), 3);
+
+        assertThat(lock).contains("\"node_modules/shared\": {\n      \"version\": \"1.0.0\",");
+        assertThat(lock).contains("\"node_modules/zpkg/node_modules/shared\": {\n      \"version\": \"2.0.0\",");
+    }
+
+    @Test
+    void threeVersionTransitiveForkDefers() {
+        FakeRegistry registry = new FakeRegistry()
+                .add("apkg", "1.0.0", singletonMap("shared", "1.0.0"), "MIT", null)
+                .add("mpkg", "1.0.0", singletonMap("shared", "2.0.0"), "MIT", null)
+                .add("zpkg", "1.0.0", singletonMap("shared", "3.0.0"), "MIT", null)
+                .add("shared", "1.0.0", emptyMap(), "MIT", null)
+                .add("shared", "2.0.0", emptyMap(), "MIT", null)
+                .add("shared", "3.0.0", emptyMap(), "MIT", null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("apkg", "^1.0.0");
+        deps.put("mpkg", "^1.0.0");
+        deps.put("zpkg", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmLockWriter().write(graph, 3));
+    }
+
+    @Test
+    void collationAmbiguousForkRequirersDefer() {
+        // The two requirers first differ at a digit, where compareTo and ICU localeCompare could disagree on the
+        // top-slot winner; the writer refuses to guess.
+        FakeRegistry registry = new FakeRegistry()
+                .add("pkg1", "1.0.0", singletonMap("shared", "1.0.0"), "MIT", null)
+                .add("pkg2", "1.0.0", singletonMap("shared", "2.0.0"), "MIT", null)
+                .add("shared", "1.0.0", emptyMap(), "MIT", null)
+                .add("shared", "2.0.0", emptyMap(), "MIT", null);
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("pkg1", "^1.0.0");
+        deps.put("pkg2", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmLockWriter().write(graph, 3));
+    }
+
+    @Test
+    void forkMemberCarryingPeersDefers() {
+        // zpkg's shared@2.0.0 declares a peer that is satisfied top-level (so the builder resolves it), but a
+        // fork member carrying peerDependencies could reshape placement, so the writer defers.
+        FakeRegistry registry = new FakeRegistry()
+                .add("apkg", "1.0.0", singletonMap("shared", "^1.0.0"), "MIT", null)
+                .add("zpkg", "1.0.0", singletonMap("shared", "^2.0.0"), "MIT", null)
+                .add("shared", "1.0.0", emptyMap(), "MIT", null)
+                .add("host", "1.0.0", emptyMap(), "MIT", null);
+        registry.versionsByName.computeIfAbsent("shared", k -> new TreeSet<>()).add("2.0.0");
+        registry.manifests.put("shared@2.0.0", new VersionManifest("shared", "2.0.0", TextNode.valueOf("MIT"), "MIT",
+                null, null, singletonMap("host", "^1.0.0"), null, null, null, null, null, null, null, null, null, null,
+                null, new VersionManifest.Dist("https://r/shared/-/shared-2.0.0.tgz", null, "sha512-shared-2.0.0"),
+                null, null, null));
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("apkg", "^1.0.0");
+        deps.put("zpkg", "^1.0.0");
+        deps.put("host", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmLockWriter().write(graph, 3));
+    }
+
+    @Test
     void satisfiedPeerFlagsProviderAndRecordsMetaVerbatim() {
         FakeRegistry registry = new FakeRegistry()
                 .add("framework", "1.0.0", emptyMap(), "MIT", null);

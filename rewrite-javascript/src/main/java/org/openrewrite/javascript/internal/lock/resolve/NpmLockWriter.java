@@ -214,7 +214,9 @@ public final class NpmLockWriter {
         Set<String> visited = new HashSet<>();
         Deque<String[]> queue = new ArrayDeque<>();                      // {nodeKey, locationKey}
 
-        for (Map.Entry<String, String> direct : root.getResolved().entrySet()) {
+        // npm places direct deps in node_modules path (localeCompare) order, so the requirer that claims a
+        // shared slot for a transitive fork is deterministic; sorting the roots here reproduces that winner.
+        for (Map.Entry<String, String> direct : new TreeMap<>(root.getResolved()).entrySet()) {
             resolveEdge(graph, "", direct.getKey(), direct.getValue(), placements, shelf, visited, queue);
         }
         while (!queue.isEmpty()) {
@@ -232,7 +234,7 @@ public final class NpmLockWriter {
                 resolveEdge(graph, cur[1], edge.getKey(), edge.getValue(), placements, shelf, visited, queue);
             }
         }
-        requireUnambiguousForks(graph, placements, root);
+        requireReproducibleForks(graph, placements, root);
         return placements;
     }
 
@@ -303,32 +305,115 @@ public final class NpmLockWriter {
     }
 
     /**
-     * A fork is reproduced byte-exact only when its hoisted (top-level) version is the importer's directly
-     * declared one — so the winner of the top slot is unambiguous. A fork whose top-level version is transitive
-     * would depend on npm's tie-breaking across the whole tree and defers.
+     * A fork is reproduced byte-exact only where the top-slot winner is unambiguous. Two shapes qualify: a
+     * <em>directly-declared</em> fork, whose hoisted version must be the importer's declared one; and a clean
+     * <em>transitive</em> fork of exactly two versions, each required by a single top-level package, whose two
+     * requirer names order the same under {@code compareTo} and npm's {@code localeCompare} — the alphabetically
+     * first requirer's version hoists and the other nests under its requirer. Everything else (three or more
+     * versions, a nested or shared requirer, a collation-ambiguous requirer order, a fork member carrying
+     * {@code peerDependencies}) defers rather than guess.
      */
-    private static void requireUnambiguousForks(ResolutionGraph graph, Map<String, String> placements,
-                                                ResolutionGraph.Importer root) {
+    private static void requireReproducibleForks(ResolutionGraph graph, Map<String, String> placements,
+                                                 ResolutionGraph.Importer root) {
         Map<String, Set<String>> versionsByName = new LinkedHashMap<>();
         for (ResolvedNode node : graph.getNodes().values()) {
             versionsByName.computeIfAbsent(node.getName(), k -> new LinkedHashSet<>()).add(node.getVersion());
         }
         for (Map.Entry<String, Set<String>> e : versionsByName.entrySet()) {
-            if (e.getValue().size() < 2) {
+            String name = e.getKey();
+            Set<String> versions = e.getValue();
+            if (versions.size() < 2) {
                 continue;
             }
-            String topKey = NM + e.getKey();
+            if (versions.size() > 2) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + " forks into " + versions.size() + " versions (only a two-version fork is reproduced)");
+            }
             String topVersion = null;
-            for (String version : e.getValue()) {
-                if (topKey.equals(placements.get(ResolutionGraph.key(e.getKey(), version)))) {
+            for (String version : versions) {
+                if ((NM + name).equals(placements.get(ResolutionGraph.key(name, version)))) {
                     topVersion = version;
                 }
             }
-            if (topVersion == null || !topVersion.equals(root.getResolved().get(e.getKey()))) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getKey(),
-                        e.getKey() + " forks but its hoisted version is not the directly-declared one (ambiguous)");
+            String declared = root.getResolved().get(name);
+            if (declared != null) {
+                if (!declared.equals(topVersion)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            name + " forks but its hoisted version is not the directly-declared one (ambiguous)");
+                }
+                continue;
+            }
+            requireReproducibleTransitiveFork(graph, placements, name, versions, topVersion);
+        }
+    }
+
+    /**
+     * A transitive fork (neither version directly declared) is reproduced only in its cleanest shape: exactly two
+     * versions, each required by exactly one top-level package, neither member carrying {@code peerDependencies},
+     * and the two requirer names ordering unambiguously so the hoisted winner matches npm's {@code localeCompare}.
+     */
+    private static void requireReproducibleTransitiveFork(ResolutionGraph graph, Map<String, String> placements,
+                                                          String name, Set<String> versions, @Nullable String topVersion) {
+        for (String version : versions) {
+            ResolvedNode member = graph.node(name, version);
+            if (member != null && notEmpty(member.getManifest().getPeerDependencies())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + "@" + version + " forks and carries peerDependencies (fork-with-peers not reproduced)");
             }
         }
+        // Each forked version must have exactly one requirer, and both requirers must be hoisted top-level.
+        Map<String, ResolvedNode> requirerByVersion = new LinkedHashMap<>();
+        for (ResolvedNode node : graph.getNodes().values()) {
+            String required = node.getResolvedEdges().get(name);
+            if (required != null && versions.contains(required) && requirerByVersion.putIfAbsent(required, node) != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + "@" + required + " has multiple requirers (only a single-requirer fork is reproduced)");
+            }
+        }
+        if (requirerByVersion.size() != versions.size()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " forks but a version has no single top-level requirer (not reproduced)");
+        }
+        for (ResolvedNode requirer : requirerByVersion.values()) {
+            if (!(NM + requirer.getName()).equals(placements.get(ResolutionGraph.key(requirer.getName(), requirer.getVersion())))) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + " forks under nested requirer " + requirer.getName() + " (not reproduced)");
+            }
+        }
+        List<Map.Entry<String, ResolvedNode>> pairs = new ArrayList<>(requirerByVersion.entrySet());
+        String nameA = pairs.get(0).getValue().getName();
+        String nameB = pairs.get(1).getValue().getName();
+        if (!unambiguousOrder(nameA, nameB)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " forks with a collation-ambiguous requirer order (" + nameA + ", " + nameB + ")");
+        }
+        boolean aFirst = nameA.compareTo(nameB) < 0;
+        String hoistedVersion = pairs.get(aFirst ? 0 : 1).getKey();
+        Map.Entry<String, ResolvedNode> nested = pairs.get(aFirst ? 1 : 0);
+        String expectedNest = NM + nested.getValue().getName() + "/" + NM + name;
+        if (!hoistedVersion.equals(topVersion) ||
+                !expectedNest.equals(placements.get(ResolutionGraph.key(name, nested.getKey())))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " forks into a layout the writer cannot yet reproduce byte-exact");
+        }
+    }
+
+    /**
+     * Whether {@code a} and {@code b} order the same under {@code compareTo} and npm's {@code localeCompare('en')}:
+     * true only when they first differ at two ASCII-lowercase letters (all npm names lowercase), so the shared
+     * prefix cancels and the decision is a plain letter comparison. A prefix relation or any non-letter deciding
+     * character could reorder under ICU collation, so it is treated as ambiguous.
+     */
+    private static boolean unambiguousOrder(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        for (int i = 0; i < n; i++) {
+            char ca = a.charAt(i);
+            char cb = b.charAt(i);
+            if (ca != cb) {
+                return ca >= 'a' && ca <= 'z' && cb >= 'a' && cb <= 'z';
+            }
+        }
+        return false;
     }
 
     // --- lockfileVersion 2 legacy tree ------------------------------------

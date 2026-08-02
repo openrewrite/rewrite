@@ -65,6 +65,15 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void transitiveForkV3() {
+        // root declares debug@2.2.0 (needs ms@0.7.1) and humanize-ms@1.2.1 (needs ms@^2.0.0); ms forks
+        // transitively — neither version is directly declared. npm hoists the version required by the
+        // alphabetically-first requirer (debug's ms@0.7.1) and nests humanize-ms's ms@2.1.3 under humanize-ms.
+        assertResolveByteExact("lock/npm/resolve-transitive-fork", "after", null,
+                new String[][]{{"debug", "2.2.0"}, {"humanize-ms", "1.2.1"}, {"ms", "0.7.1"}, {"ms", "2.1.3"}});
+    }
+
+    @Test
     void satisfiedPeerProviderV3() {
         // use-sync-external-store peer-depends on react, which root also declares top-level. The peer is a
         // constraint already met (no new node); npm records peerDependencies verbatim and flags react `peer: true`.
@@ -160,6 +169,7 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
         assertNpmReproduces("lock/npm/resolve-dev-optional/pkg", "lock/npm/resolve-dev-optional/after", "3");
         assertNpmReproduces("lock/npm/resolve-dev-optional/pkg", "lock/npm/resolve-dev-optional/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-fork/pkg", "lock/npm/resolve-fork/after", "3");
+        assertNpmReproduces("lock/npm/resolve-transitive-fork/pkg", "lock/npm/resolve-transitive-fork/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-peer-meta/pkg", "lock/npm/resolve-peer-meta/after", "3");

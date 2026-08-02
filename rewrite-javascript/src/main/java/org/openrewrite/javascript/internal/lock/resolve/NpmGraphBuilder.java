@@ -147,8 +147,8 @@ public final class NpmGraphBuilder {
     /**
      * Resolve a single {@code (name, range)} requirement, deduping to an already-chosen version when one
      * satisfies. A range no chosen version satisfies selects a fresh version; when that means a <em>second</em>
-     * version of an already-resolved name (a fork), it is allowed only for a directly-declared dependency — whose
-     * declared version wins the hoisted slot — and otherwise defers.
+     * version of an already-resolved name it is kept as a fork (both directly-declared and transitive forks
+     * proceed), and the {@link NpmLockWriter} decides which layouts it can reproduce byte-exact.
      */
     private String select(String name, String range, Set<String> directDepNames,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
@@ -156,10 +156,6 @@ public final class NpmGraphBuilder {
         String deduped = NodeSemver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range);
         if (deduped != null) {
             return deduped;
-        }
-        if (chosen.containsKey(name) && !directDepNames.contains(name)) {
-            throw new EngineFailure(RESOLUTION_REQUIRED, name,
-                    name + " required at " + range + " forks from " + chosen.get(name) + " (transitive fork)");
         }
         String version = NodeSemver.maxSatisfying(registry.versions(name), range);
         if (version == null) {

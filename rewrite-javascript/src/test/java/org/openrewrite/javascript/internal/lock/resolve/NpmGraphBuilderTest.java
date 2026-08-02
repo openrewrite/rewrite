@@ -69,15 +69,21 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void incompatibleForkDefers() {
+    void resolvesATransitiveForkToTwoVersions() {
+        // a needs b@^1 and c needs b@^2 (disjoint), neither b directly declared: npm keeps both versions (a
+        // transitive fork). The builder no longer defers — it carries the fork for the writer to place.
         FakeRegistry registry = new FakeRegistry()
                 .add("a", "1.0.0", singletonMap("b", "^1.0.0"))
                 .add("c", "1.0.0", singletonMap("b", "^2.0.0"))
                 .add("b", "1.9.0", emptyMap())
                 .add("b", "2.0.0", emptyMap());
 
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
-                new NpmGraphBuilder(registry).build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\",\"c\":\"^1.0.0\"}}")));
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\",\"c\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("a@1.0.0", "c@1.0.0", "b@1.9.0", "b@2.0.0");
+        assertThat(graph.node("a", "1.0.0").getResolvedEdges()).containsExactly(Map.entry("b", "1.9.0"));
+        assertThat(graph.node("c", "1.0.0").getResolvedEdges()).containsExactly(Map.entry("b", "2.0.0"));
     }
 
     @Test
