@@ -540,6 +540,32 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void versionColumnsAreAlwaysEmitted() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,name,displayName,category1
+          yaml,recipes/team.yml,com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,requestedVersion,version,");
+    }
+
+    @Test
+    void nullIdentityWritesEmptyCellsNotNullLiterals() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1
+          com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv).doesNotContain("null");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow()).startsWith(",,,,com.foo.Bar,");
+    }
+
+    @Test
     void identityColumnsAreOptional() {
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           name,displayName,description,category1
