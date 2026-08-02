@@ -310,10 +310,8 @@ class RecipeMarketplaceReaderTest {
 
     @Test
     void recipeInMultipleCategoriesHasSeparateListingInstances() {
-        // This tests the scenario where a recipe appears in multiple categories
-        // (e.g., Java recipes that also work for JavaScript). Each listing is a
-        // distinct instance -- that's what encodes multi-category membership --
-        // but they share one interned RecipeBundle per marketplace.
+        // Distinct listing instances are what encode multi-category membership, so a recipe
+        // that works for two languages is filed under both.
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           name,displayName,category1,category2,ecosystem,packageName
           org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,Java,maven,org.openrewrite:rewrite-java
@@ -333,7 +331,6 @@ class RecipeMarketplaceReaderTest {
         RecipeListing javaListing = findCategory(java, "ChangeMethodName").getRecipes().getFirst();
         RecipeListing jsListing = findCategory(javascript, "ChangeMethodName").getRecipes().getFirst();
 
-        // These are DIFFERENT RecipeListing instances, but they share ONE interned RecipeBundle
         assertThat(javaListing).isNotSameAs(jsListing);
         assertThat(javaListing.getBundle()).isSameAs(jsListing.getBundle());
     }
@@ -654,6 +651,19 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void mergeRejectsAMarketplaceWhoseBundlesAreUnidentified() {
+        RecipeMarketplace inner = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category1
+          com.foo.Bar,Bar,Bar does a thing.,Java
+          """);
+
+        assertThatThrownBy(() -> new RecipeMarketplace().merge(inner))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("com.foo.Bar")
+          .hasMessageContaining("bound to a resolved bundle");
+    }
+
+    @Test
     void identityColumnsAreAllOrNothing() {
         assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
           ecosystem,name,displayName,category1
@@ -725,12 +735,9 @@ class RecipeMarketplaceReaderTest {
         RecipeBundle unresolved = new RecipeBundle("maven", "org.example:lib", "LATEST", null, null);
         RecipeBundle resolved = unresolved.withVersion("1.0.0");
 
-        // getVersion() is the raw field: null until resolution sets it, then exactly what was set.
         assertThat(unresolved.getVersion()).isNull();
         assertThat(resolved.getVersion()).isEqualTo("1.0.0");
 
-        // getEffectiveVersion() is the resolution decision: falls back to requestedVersion when
-        // version is unset, and otherwise matches the resolved version.
         assertThat(unresolved.getEffectiveVersion()).isEqualTo("LATEST");
         assertThat(resolved.getEffectiveVersion()).isEqualTo("1.0.0");
     }

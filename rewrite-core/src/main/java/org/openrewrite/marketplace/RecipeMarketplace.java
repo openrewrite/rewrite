@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.config.CategoryDescriptor;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.*;
 
@@ -79,10 +80,17 @@ public class RecipeMarketplace {
     }
 
     public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
-        RecipeMarketplace marketplace = bundleReader.read();
         RecipeBundle bundle = bundleReader.getBundle();
+        String packageEcosystem = bundle.getPackageEcosystem();
+        String packageName = bundle.getPackageName();
+        if (StringUtils.isBlank(packageEcosystem) || StringUtils.isBlank(packageName)) {
+            throw new IllegalArgumentException("A bundle must be resolved to an ecosystem and package name " +
+                                               "before it can be installed, but got ecosystem '" + packageEcosystem +
+                                               "' and package name '" + packageName + "'");
+        }
+        RecipeMarketplace marketplace = bundleReader.read();
         bindRecursive(marketplace.getRoot(), bundle);
-        uninstall(bundle.getPackageEcosystem(), bundle.getPackageName());
+        uninstall(packageEcosystem, packageName);
         return merge(marketplace);
     }
 
@@ -133,8 +141,14 @@ public class RecipeMarketplace {
         private void merge(Category category, Set<BundleKey> alreadyInstalled, Set<RecipeListing> added) {
             for (RecipeListing recipe : category.recipes) {
                 RecipeBundle bundle = recipe.getBundle();
-                if (bundle.getPackageEcosystem() != null && bundle.getPackageName() != null &&
-                    alreadyInstalled.contains(new BundleKey(bundle.getPackageEcosystem(), bundle.getPackageName()))) {
+                String packageEcosystem = bundle.getPackageEcosystem();
+                String packageName = bundle.getPackageName();
+                if (StringUtils.isBlank(packageEcosystem) || StringUtils.isBlank(packageName)) {
+                    throw new IllegalArgumentException("Cannot merge '" + recipe.getName() + "' because its bundle " +
+                                                       "has no ecosystem and package name. A marketplace read from " +
+                                                       "an inner CSV must be bound to a resolved bundle first.");
+                }
+                if (alreadyInstalled.contains(new BundleKey(packageEcosystem, packageName))) {
                     continue;
                 }
                 RecipeListing installed = recipe.withMarketplace(RecipeMarketplace.this)

@@ -27,6 +27,7 @@ import java.util.Set;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RecipeMarketplaceInstallTest {
 
@@ -139,6 +140,16 @@ class RecipeMarketplaceInstallTest {
     }
 
     @Test
+    void installRejectsABundleThatWasNeverResolvedToACoordinate() {
+        RecipeBundle unidentified = new RecipeBundle("maven", "", "1.0.0", "1.0.0", null);
+
+        assertThatThrownBy(() -> new RecipeMarketplace()
+                .install(singleRecipeReader(unidentified, "com.foo.Bar")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be resolved to an ecosystem and package name");
+    }
+
+    @Test
     void installStoresACollidingNameShadowedRatherThanDroppingIt() {
         RecipeBundle bundleA = new RecipeBundle("maven", "org.example:a", "1.0.0", "1.0.0", null);
         RecipeBundle bundleB = new RecipeBundle("maven", "org.example:b", "1.0.0", "1.0.0", null);
@@ -151,8 +162,7 @@ class RecipeMarketplaceInstallTest {
                 .extracting(RecipeListing::getName)
                 .containsExactly("com.foo.Bar");
 
-        // bundle b declares the same name from a different coordinate, so it is stored behind a
-        // rather than dropped -- otherwise revealing it later would mean reprocessing bundle b.
+        // Dropping b's listing instead would make revealing it later a reprocess of bundle b.
         Set<RecipeListing> installedB = marketplace.install(singleRecipeReader(bundleB, "com.foo.Bar"));
         assertThat(installedB)
                 .extracting(RecipeListing::getName)
