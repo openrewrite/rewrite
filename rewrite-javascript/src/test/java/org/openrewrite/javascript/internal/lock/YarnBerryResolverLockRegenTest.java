@@ -60,6 +60,15 @@ class YarnBerryResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void devAndOptionalClosure() {
+        // once (prod), supports-color (dev), is-odd (optional) all merge into the workspace importer's single
+        // dependencies block, sorted; is-odd is flagged in dependenciesMeta. Package entries stay unmarked.
+        assertResolveByteExact("lock/yarn-berry/resolve-dev-optional", "after", EXISTING,
+                new String[][]{{"once", "1.4.0"}, {"wrappy", "1.0.2"}, {"supports-color", "7.2.0"},
+                        {"has-flag", "4.0.0"}, {"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
+    }
+
+    @Test
     void satisfiedPeer() {
         // use-sync-external-store peers react (satisfied by the top-level react); its unquoted peerDependencies range.
         assertResolveByteExact("lock/yarn-berry/resolve-peer", "after", EXISTING,
@@ -109,15 +118,21 @@ class YarnBerryResolverLockRegenTest extends LockRegenTestSupport {
     // --- live re-record / provenance check (disabled: needs corepack + network) ---
 
     @Test
-    @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the golden")
+    @Disabled("live: runs real yarn 4.5.3 via corepack to re-derive and verify the goldens")
     void recordGoldenWithRealYarn() throws Exception {
+        recordGolden("lock/yarn-berry/resolve-clean");
+        recordGolden("lock/yarn-berry/resolve-dev-optional");
+    }
+
+    /** Runs yarn 4.5.3 (from the fixture pkg's {@code packageManager}) on {@code dir/pkg} and verifies {@code dir/after}. */
+    private void recordGolden(String dir) throws Exception {
         Path tmp = Files.createTempDirectory("berry-resolve-record");
         try {
-            Files.write(tmp.resolve("package.json"),
-                    resource("lock/yarn-berry/resolve-clean/pkg").getBytes(StandardCharsets.UTF_8));
+            Files.write(tmp.resolve("package.json"), resource(dir + "/pkg").getBytes(StandardCharsets.UTF_8));
             Files.write(tmp.resolve(".yarnrc.yml"),
                     "nodeLinker: node-modules\nenableTelemetry: false\n".getBytes(StandardCharsets.UTF_8));
-            ProcessBuilder pb = new ProcessBuilder("corepack", "yarn", "install");
+            Files.write(tmp.resolve("yarn.lock"), new byte[0]);
+            ProcessBuilder pb = new ProcessBuilder("corepack", "yarn", "install", "--mode", "update-lockfile");
             pb.directory(tmp.toFile());
             pb.environment().put("COREPACK_ENABLE_DOWNLOAD_PROMPT", "0");
             pb.environment().put("YARN_GLOBAL_FOLDER", tmp.resolve(".yarn-global").toString());
@@ -129,7 +144,7 @@ class YarnBerryResolverLockRegenTest extends LockRegenTestSupport {
                 throw new IllegalStateException("yarn install timed out");
             }
             String generated = new String(Files.readAllBytes(tmp.resolve("yarn.lock")), StandardCharsets.UTF_8);
-            assertThat(generated).isEqualTo(resource("lock/yarn-berry/resolve-clean/after"));
+            assertThat(generated).as(dir).isEqualTo(resource(dir + "/after"));
         } finally {
             try (Stream<Path> walk = Files.walk(tmp)) {
                 walk.sorted(Comparator.reverseOrder()).forEach(p -> {

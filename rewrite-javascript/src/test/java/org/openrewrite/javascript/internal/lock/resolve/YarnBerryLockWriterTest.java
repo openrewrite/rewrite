@@ -104,6 +104,39 @@ class YarnBerryLockWriterTest {
     }
 
     @Test
+    void devAndOptionalImporterMerged() {
+        // Root declares once (prod), supports-color (dev), is-odd (optional): berry merges all three into one
+        // sorted dependencies block and flags the optional-scope is-odd in dependenciesMeta.
+        Map<String, Map<String, String>> declared = new LinkedHashMap<>();
+        declared.put("dependencies", singletonMap("once", "1.4.0"));
+        declared.put("devDependencies", singletonMap("supports-color", "7.2.0"));
+        declared.put("optionalDependencies", singletonMap("is-odd", "3.0.1"));
+        Map<String, String> resolved = new LinkedHashMap<>();
+        resolved.put("once", "1.4.0");
+        resolved.put("supports-color", "7.2.0");
+        resolved.put("is-odd", "3.0.1");
+        ResolutionGraph graph = new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", "resolve-devopt", "1.0.0", declared, resolved)),
+                nodes(new ResolvedNode(leaf("once", "1.4.0"), emptyMap()),
+                        new ResolvedNode(leaf("supports-color", "7.2.0"), emptyMap()),
+                        new ResolvedNode(leaf("is-odd", "3.0.1"), emptyMap())));
+
+        assertThat(new YarnBerryLockWriter().write(graph, "10c0", 8, CHECKSUMS)).contains(
+                "\"resolve-devopt@workspace:.\":\n" +
+                "  version: 0.0.0-use.local\n" +
+                "  resolution: \"resolve-devopt@workspace:.\"\n" +
+                "  dependencies:\n" +
+                "    is-odd: \"npm:3.0.1\"\n" +
+                "    once: \"npm:1.4.0\"\n" +
+                "    supports-color: \"npm:7.2.0\"\n" +
+                "  dependenciesMeta:\n" +
+                "    is-odd:\n" +
+                "      optional: true\n" +
+                "  languageName: unknown\n" +
+                "  linkType: soft\n");
+    }
+
+    @Test
     void forkDefers() {
         // Two versions of one name is a fork; berry's flat descriptor layout for a fork is not yet reproduced.
         ResolutionGraph graph = new ResolutionGraph(

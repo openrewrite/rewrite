@@ -35,14 +35,16 @@ import java.util.Map;
  * importer manifests, adapts the live registry (shared {@link NpmRegistryAdapter}), builds the graph with the
  * shared node-semver {@link NpmGraphBuilder}, reproduces each node's checksum from its tarball
  * ({@code BerryZipChecksum}), and writes with {@link YarnBerryLockWriter}. The {@code __metadata} version and
- * {@code cacheKey} are taken from the existing lock; only the validated {@code 10c0} checksum format resolves —
- * any other cacheKey, a dev/optional/peer surface, a workspace, or a fork fails loud, leaving the old lock alone.
+ * {@code cacheKey} are taken from the existing lock; only the validated {@code 10c0} checksum format resolves. A
+ * {@code dependencies}/{@code devDependencies}/{@code optionalDependencies} closure is reproduced (dev/optional merge
+ * into the importer's single {@code dependencies} block, the optional ones marked in {@code dependenciesMeta}); any
+ * other cacheKey, a root peer/bundle surface, a workspace, or a fork fails loud, leaving the old lock alone.
  */
 public final class YarnBerryResolver implements LockResolver {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final List<String> DEFERRED_SCOPES =
-            Arrays.asList("devDependencies", "optionalDependencies", "peerDependencies", "bundleDependencies");
+            Arrays.asList("peerDependencies", "bundleDependencies");
 
     @Override
     public PackageManager packageManager() {
@@ -51,7 +53,7 @@ public final class YarnBerryResolver implements LockResolver {
 
     @Override
     public String resolve(ResolveRequest request) {
-        requireProdOnly(request.getImporterManifests());
+        requireResolvableScopes(request.getImporterManifests());
         Metadata meta = metadataOf(request.getExistingLock());
         Registry registry = new NpmRegistryAdapter(request.getRegistries(), request.getClient());
         ResolutionGraph graph = new NpmGraphBuilder(registry).build(request.getImporterManifests());
@@ -64,8 +66,12 @@ public final class YarnBerryResolver implements LockResolver {
         return new YarnBerryLockWriter().write(graph, meta.cacheKey, meta.version, checksums);
     }
 
-    /** Only a pure {@code dependencies} closure is reproduced today; a dev/optional/peer scope defers. */
-    private static void requireProdOnly(Map<String, String> importerManifests) {
+    /**
+     * A {@code dependencies}/{@code devDependencies}/{@code optionalDependencies} closure is reproduced; a root
+     * {@code peerDependencies} or {@code bundleDependencies} declaration reshapes resolution in ways not yet
+     * modeled and defers.
+     */
+    private static void requireResolvableScopes(Map<String, String> importerManifests) {
         for (String manifestJson : importerManifests.values()) {
             JsonNode manifest;
             try {

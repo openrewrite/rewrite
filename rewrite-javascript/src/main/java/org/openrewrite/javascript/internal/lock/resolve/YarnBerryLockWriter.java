@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,7 +38,9 @@ import java.util.regex.Pattern;
  * Serializes a {@link ResolutionGraph} to a Yarn Berry {@code yarn.lock}, byte-for-byte identical to what a real
  * {@code yarn install} (yarn 4.x, {@code cacheKey: 10c0}) would write. The lock is a flat map: a fixed header, the
  * {@code __metadata} block, one workspace importer entry, and one entry per resolved node keyed by its merged,
- * sorted {@code name@npm:range} descriptor(s). Each registry entry carries the {@code checksum} reproduced by
+ * sorted {@code name@npm:range} descriptor(s). The importer entry merges the root's dependency/dev/optional scopes
+ * into one sorted {@code dependencies} block, then flags each optional-scope dependency in {@code dependenciesMeta}.
+ * Each registry entry carries the {@code checksum} reproduced by
  * {@code BerryZipChecksum} from the tarball (threaded in via {@link Checksums}). A satisfied {@code peerDependencies}
  * surface is reproduced too — its declaration and any {@code peerDependenciesMeta} copied verbatim (the graph proved
  * the peers already resolved), sitting between {@code dependencies} and {@code checksum} and quoted by yarn's own
@@ -48,6 +51,10 @@ import java.util.regex.Pattern;
 public final class YarnBerryLockWriter {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** Scopes the importer entry merges into its single {@code dependencies} block. */
+    private static final Set<String> MERGED_SCOPES =
+            new LinkedHashSet<>(Arrays.asList("dependencies", "devDependencies", "optionalDependencies"));
 
     /** Yarn's syml stringifier emits a scalar raw when it matches this, else JSON-quotes it (yarnpkg/parsers). */
     private static final Pattern SYML_SAFE = Pattern.compile(
@@ -110,16 +117,35 @@ public final class YarnBerryLockWriter {
         body.append('"').append(descriptor).append("\":\n");
         body.append("  version: 0.0.0-use.local\n");
         body.append("  resolution: \"").append(descriptor).append("\"\n");
+        // Berry merges dependencies/devDependencies/optionalDependencies into one sorted dependencies block; the
+        // optional ones (declared in the optionalDependencies scope) are then flagged in dependenciesMeta.
+        Map<String, String> merged = new TreeMap<>();
         for (Map.Entry<String, Map<String, String>> scope : root.getDeclared().entrySet()) {
-            if (!"dependencies".equals(scope.getKey())) {
+            if (!MERGED_SCOPES.contains(scope.getKey())) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "workspace importer declares " + scope.getKey() + " (only prod dependencies are resolved today)");
+                        "workspace importer declares " + scope.getKey() + " (only dependency scopes are resolved today)");
             }
-            appendDependencies(body, scope.getValue());
+            merged.putAll(scope.getValue());
         }
+        appendDependencies(body, merged);
+        Map<String, String> optional = root.getDeclared().get("optionalDependencies");
+        appendDependenciesMeta(body, optional == null ? Collections.emptySet() : new TreeSet<>(optional.keySet()));
         body.append("  languageName: unknown\n");
         body.append("  linkType: soft\n");
         return body.toString();
+    }
+
+    /** Emit a sorted {@code dependenciesMeta:} block flagging each root-declared optional dependency; omit if none. */
+    private static void appendDependenciesMeta(StringBuilder body, Set<String> optionalNames) {
+        if (optionalNames.isEmpty()) {
+            return;
+        }
+        body.append("  dependenciesMeta:\n");
+        for (String name : optionalNames) {
+            String key = name.startsWith("@") ? "\"" + name + "\"" : name;
+            body.append("    ").append(key).append(":\n");
+            body.append("      optional: true\n");
+        }
     }
 
     // --- registry entry ---------------------------------------------------
