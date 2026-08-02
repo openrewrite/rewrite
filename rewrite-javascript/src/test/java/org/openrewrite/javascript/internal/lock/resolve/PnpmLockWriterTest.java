@@ -133,6 +133,74 @@ class PnpmLockWriterTest {
     }
 
     @Test
+    void devAndOptionalScopesAndOptionalMarking() {
+        // p (prod) and d (dev) carry no snapshot flag; o and its child oc (optional-reachable) get `optional: true` —
+        // oc as a leaf, o after its dependencies block. The importer emits all three scopes in canonical order.
+        FakeRegistry registry = new FakeRegistry()
+                .add("p", "1.0.0", emptyMap(), null)
+                .add("d", "1.0.0", emptyMap(), null)
+                .add("o", "1.0.0", singletonMap("oc", "^1.0.0"), null)
+                .add("oc", "1.0.0", emptyMap(), null);
+
+        String root = "{\"name\":\"app\",\"version\":\"1.0.0\"," +
+                "\"dependencies\":{\"p\":\"^1.0.0\"}," +
+                "\"devDependencies\":{\"d\":\"^1.0.0\"}," +
+                "\"optionalDependencies\":{\"o\":\"^1.0.0\"}}";
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", root));
+
+        assertThat(new PnpmLockWriter().write(graph)).isEqualTo(
+                "lockfileVersion: '9.0'\n" +
+                "\n" +
+                "settings:\n" +
+                "  autoInstallPeers: true\n" +
+                "  excludeLinksFromLockfile: false\n" +
+                "\n" +
+                "importers:\n" +
+                "\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      p:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "    devDependencies:\n" +
+                "      d:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "    optionalDependencies:\n" +
+                "      o:\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  d@1.0.0:\n" +
+                "    resolution: {integrity: sha512-d-1.0.0}\n" +
+                "\n" +
+                "  o@1.0.0:\n" +
+                "    resolution: {integrity: sha512-o-1.0.0}\n" +
+                "\n" +
+                "  oc@1.0.0:\n" +
+                "    resolution: {integrity: sha512-oc-1.0.0}\n" +
+                "\n" +
+                "  p@1.0.0:\n" +
+                "    resolution: {integrity: sha512-p-1.0.0}\n" +
+                "\n" +
+                "snapshots:\n" +
+                "\n" +
+                "  d@1.0.0: {}\n" +
+                "\n" +
+                "  o@1.0.0:\n" +
+                "    dependencies:\n" +
+                "      oc: 1.0.0\n" +
+                "    optional: true\n" +
+                "\n" +
+                "  oc@1.0.0:\n" +
+                "    optional: true\n" +
+                "\n" +
+                "  p@1.0.0: {}\n");
+    }
+
+    @Test
     void satisfiedPeerMaterializesAsSnapshotDep() {
         // host peers prov, satisfied by the directly-declared prov: pnpm suffixes the consumer snapshot key with
         // (prov@1.0.0), materializes prov as a snapshot dependency, and records the raw peerDependencies verbatim.

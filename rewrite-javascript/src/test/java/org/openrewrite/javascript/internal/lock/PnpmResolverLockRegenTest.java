@@ -68,6 +68,15 @@ class PnpmResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void devAndOptionalClosureV9() {
+        // once (prod), supports-color+has-flag (dev, unmarked), is-odd+is-number (optional, `optional: true` on the
+        // snapshot). Root emits dependencies/devDependencies/optionalDependencies scopes in that order.
+        assertResolveByteExact("lock/pnpm/resolve-dev-optional", "after", null,
+                new String[][]{{"once", "1.4.0"}, {"wrappy", "1.0.2"}, {"supports-color", "7.2.0"},
+                        {"has-flag", "4.0.0"}, {"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
+    }
+
+    @Test
     void nestedMultiPeerV9() {
         // @floating-ui/react-dom peers react + react-dom; react-dom itself peers react. The suffix nests
         // (react-dom@19.0.0(react@19.0.0)) inside the consumer key and orders the two peers by rendered reference.
@@ -104,6 +113,7 @@ class PnpmResolverLockRegenTest extends LockRegenTestSupport {
     @Disabled("live: runs real pnpm 11.2.2 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealPnpm() throws Exception {
         assertPnpmReproduces("lock/pnpm/resolve-clean/pkg", "lock/pnpm/resolve-clean/after");
+        assertPnpmReproduces("lock/pnpm/resolve-dev-optional/pkg", "lock/pnpm/resolve-dev-optional/after");
         assertPnpmReproduces("lock/pnpm/resolve-fork/pkg", "lock/pnpm/resolve-fork/after");
         assertPnpmReproduces("lock/pnpm/resolve-peer/pkg", "lock/pnpm/resolve-peer/after");
         assertPnpmReproduces("lock/pnpm/resolve-peer-nested/pkg", "lock/pnpm/resolve-peer-nested/after");

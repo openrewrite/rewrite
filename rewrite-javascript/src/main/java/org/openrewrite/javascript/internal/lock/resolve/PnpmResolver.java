@@ -30,16 +30,17 @@ import java.util.Map;
  * The pnpm {@link LockResolver}: resolves the whole closure of an edited manifest set from scratch and serializes
  * {@code pnpm-lock.yaml} byte-exact (lockfileVersion 9), deferring anything not yet proven reproducible. It parses
  * the importer manifests, adapts the live registry, runs the shared {@link NpmGraphBuilder} (pnpm and npm share the
- * clean-closure node-semver resolution), and writes with {@link PnpmLockWriter}. A clean prod-only closure — flat
- * or a directly-declared fork (pnpm keeps both content-addressed versions with no nesting) — is reproduced exactly;
- * a workspace, a dev/optional/peer surface, or an existing lock below version 9 fails loud, leaving the old lock
- * untouched.
+ * clean-closure node-semver resolution), and writes with {@link PnpmLockWriter}. A clean
+ * {@code dependencies}/{@code devDependencies}/{@code optionalDependencies} closure — flat or a directly-declared
+ * fork (pnpm keeps both content-addressed versions with no nesting), with optional nodes marked pnpm's way — is
+ * reproduced exactly; a workspace, a root {@code peerDependencies}/{@code bundleDependencies} surface, or an
+ * existing lock below version 9 fails loud, leaving the old lock untouched.
  */
 public final class PnpmResolver implements LockResolver {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final List<String> DEFERRED_SCOPES =
-            Arrays.asList("devDependencies", "optionalDependencies", "peerDependencies", "bundleDependencies");
+            Arrays.asList("peerDependencies", "bundleDependencies");
 
     @Override
     public PackageManager packageManager() {
@@ -48,14 +49,19 @@ public final class PnpmResolver implements LockResolver {
 
     @Override
     public String resolve(ResolveRequest request) {
-        requireProdOnly(request.getImporterManifests());
+        requireResolvableScopes(request.getImporterManifests());
         requireVersion9(request.getExistingLock());
         Registry registry = new NpmRegistryAdapter(request.getRegistries(), request.getClient());
         ResolutionGraph graph = new NpmGraphBuilder(registry).build(request.getImporterManifests());
         return new PnpmLockWriter().write(graph);
     }
 
-    private static void requireProdOnly(Map<String, String> importerManifests) {
+    /**
+     * A {@code dependencies}/{@code devDependencies}/{@code optionalDependencies} closure is reproduced; a root
+     * {@code peerDependencies} or {@code bundleDependencies} declaration reshapes resolution in ways not yet
+     * modeled and defers.
+     */
+    private static void requireResolvableScopes(Map<String, String> importerManifests) {
         for (String manifestJson : importerManifests.values()) {
             JsonNode manifest;
             try {

@@ -25,20 +25,22 @@ import java.util.*;
 /**
  * Serializes a {@link ResolutionGraph} to {@code pnpm-lock.yaml} text (lockfileVersion 9), byte-for-byte identical
  * to what a real {@code pnpm install --lockfile-only} writes. pnpm is content-addressed — no hoisting — so layout
- * is trivial: the {@code importers} entry lists each declared dependency's specifier and resolved version, the
- * {@code packages} map carries one {@code name@version} per resolved node (its {@code resolution} integrity,
- * {@code engines} and verbatim {@code peerDependencies}), and the {@code snapshots} map carries one entry per node
- * with its resolved dependency edges. A satisfied peer surface is reproduced through pnpm's peer-specific snapshot
- * keys: a node with resolved peers is keyed {@code name@version(peer@version)...} in {@code snapshots} (and
- * referenced that way from its dependents), the peer materializing as a normal snapshot dependency. A directly
- * declared fork keeps both versions side by side with no nesting. Anything not yet byte-verified — an optional peer,
- * a transitive peer ({@code transitivePeerDependencies}), a platform gate, a bin, a workspace — fails loud.
+ * is trivial: the {@code importers} entry lists each declared dependency's specifier and resolved version under its
+ * scope ({@code dependencies}/{@code devDependencies}/{@code optionalDependencies}), the {@code packages} map
+ * carries one {@code name@version} per resolved node (its {@code resolution} integrity, {@code engines} and verbatim
+ * {@code peerDependencies}), and the {@code snapshots} map carries one entry per node with its resolved dependency
+ * edges, an optional-reachable node marked {@code optional: true}. A satisfied peer surface is reproduced through
+ * pnpm's peer-specific snapshot keys: a node with resolved peers is keyed {@code name@version(peer@version)...} in
+ * {@code snapshots} (and referenced that way from its dependents), the peer materializing as a normal snapshot
+ * dependency. A directly declared fork keeps both versions side by side with no nesting. Anything not yet
+ * byte-verified — an optional peer, a transitive peer ({@code transitivePeerDependencies}), a platform gate, a bin,
+ * a workspace — fails loud.
  */
 public final class PnpmLockWriter {
 
     public String write(ResolutionGraph graph) {
         ResolutionGraph.Importer root = singleRootImporter(graph);
-        Map<String, String> declared = prodDeclared(root);
+        Map<String, Map<String, String>> declared = declaredScopes(root);
         PeerLayout peers = new PeerLayout(graph);
 
         List<String> nodeKeys = new ArrayList<>(graph.getNodes().keySet());
@@ -56,17 +58,23 @@ public final class PnpmLockWriter {
         if (declared.isEmpty()) {
             sb.append(" {}\n");
         } else {
-            sb.append("\n    dependencies:\n");
-            for (String name : sortedKeys(declared)) {
-                String resolved = root.getResolved().get(name);
-                if (resolved == null) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                            name + " declared but not resolved");
+            // dependencies, devDependencies, optionalDependencies in canonical order (only the non-empty ones)
+            boolean firstScope = true;
+            for (Map.Entry<String, Map<String, String>> scope : declared.entrySet()) {
+                sb.append(firstScope ? "\n    " : "    ").append(scope.getKey()).append(":\n");
+                firstScope = false;
+                Map<String, String> ranges = scope.getValue();
+                for (String name : sortedKeys(ranges)) {
+                    String resolved = root.getResolved().get(name);
+                    if (resolved == null) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                                name + " declared but not resolved");
+                    }
+                    requirePlainSpecifier(name, ranges.get(name));
+                    sb.append("      ").append(yamlToken(name)).append(":\n")
+                            .append("        specifier: ").append(ranges.get(name)).append('\n')
+                            .append("        version: ").append(peers.reference(ResolutionGraph.key(name, resolved))).append('\n');
                 }
-                requirePlainSpecifier(name, declared.get(name));
-                sb.append("      ").append(yamlToken(name)).append(":\n")
-                        .append("        specifier: ").append(declared.get(name)).append('\n')
-                        .append("        version: ").append(peers.reference(ResolutionGraph.key(name, resolved))).append('\n');
             }
         }
 
@@ -104,14 +112,23 @@ public final class PnpmLockWriter {
             bySnapshotKey.put(peers.snapshotKey(key), key);
         }
         for (Map.Entry<String, String> e : bySnapshotKey.entrySet()) {
+            ResolvedNode node = graph.getNodes().get(e.getValue());
+            requireOptionalMarkable(node);
             Map<String, String> deps = peers.snapshotDependencies(e.getValue());
+            boolean optional = node.isOptional();
             sb.append("\n  ").append(yamlToken(e.getKey())).append(':');
-            if (deps.isEmpty()) {
+            if (deps.isEmpty() && !optional) {
                 sb.append(" {}\n");
             } else {
-                sb.append("\n    dependencies:\n");
-                for (String dep : sortedKeys(deps)) {
-                    sb.append("      ").append(yamlToken(dep)).append(": ").append(deps.get(dep)).append('\n');
+                if (!deps.isEmpty()) {
+                    sb.append("\n    dependencies:\n");
+                    for (String dep : sortedKeys(deps)) {
+                        sb.append("      ").append(yamlToken(dep)).append(": ").append(deps.get(dep)).append('\n');
+                    }
+                }
+                // An optional node carries `optional: true` after any dependencies block (a leaf opens the block here).
+                if (optional) {
+                    sb.append(deps.isEmpty() ? "\n" : "").append("    optional: true\n");
                 }
             }
         }
@@ -302,15 +319,31 @@ public final class PnpmLockWriter {
         }
     }
 
-    /** Only a pure {@code dependencies} closure is reproduced; a dev/optional importer scope defers. */
-    private static Map<String, String> prodDeclared(ResolutionGraph.Importer root) {
+    /**
+     * The importer's declared scopes in pnpm's canonical order ({@code dependencies}, {@code devDependencies},
+     * {@code optionalDependencies}); any other scope reaching the writer is not yet reproduced and defers.
+     */
+    private static Map<String, Map<String, String>> declaredScopes(ResolutionGraph.Importer root) {
         for (String scope : root.getDeclared().keySet()) {
-            if (!"dependencies".equals(scope)) {
+            if (!"dependencies".equals(scope) && !"devDependencies".equals(scope) &&
+                    !"optionalDependencies".equals(scope)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "importer declares " + scope + " (only prod dependencies are resolved today)");
+                        "importer declares " + scope + " (scope not yet reproduced)");
             }
         }
-        return root.getDeclared().getOrDefault("dependencies", Collections.emptyMap());
+        return root.getDeclared();
+    }
+
+    /**
+     * pnpm marks a snapshot {@code optional: true} iff the node is optional-reachable. A node that is only
+     * dev-optional (neither purely dev nor purely optional — reachable via both a dev and an optional path) would
+     * carry a different marking pnpm-side that is not yet byte-verified, so it defers.
+     */
+    private static void requireOptionalMarkable(ResolvedNode node) {
+        if (node.isDevOptional() && !node.isOptional() && !node.isDev()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, node.getName(),
+                    node.getName() + " is dev-optional (pnpm snapshot marking not yet reproduced)");
+        }
     }
 
     /** pnpm single-quotes engine ranges; a value it would leave bare would be over-quoted by the renderer, so defer. */
