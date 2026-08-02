@@ -122,9 +122,13 @@ public class RecipeMarketplace {
 
         public void merge(Category category) {
             for (RecipeListing recipe : category.recipes) {
-                recipes.remove(recipe);
-                recipes.add(recipe.withMarketplace(RecipeMarketplace.this)
-                        .withBundle(intern(recipe.getBundle())));
+                // First-wins, matching findRecipe/getAllRecipes traversal order and this method's own
+                // subcategory branch, which keeps the existing node. Callers express precedence by
+                // merging the nearest scope first.
+                if (!recipes.contains(recipe)) {
+                    recipes.add(recipe.withMarketplace(RecipeMarketplace.this)
+                            .withBundle(intern(recipe.getBundle())));
+                }
             }
             for (Category subCategory : category.categories) {
                 Category existingSubCategory = null;

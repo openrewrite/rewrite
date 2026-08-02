@@ -432,6 +432,24 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void mergeKeepsTheIncumbent() {
+        RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:near,1.0.0,1.0.0,com.foo.Bar,Near,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:far,2.0.0,2.0.0,com.foo.Bar,Far,Java
+          """);
+
+        nearest.getRoot().merge(farther.getRoot());
+
+        assertThat(nearest.findRecipe("com.foo.Bar").getBundle().getPackageName())
+                .isEqualTo("org.example:near");
+        assertThat(nearest.getAllRecipes()).hasSize(1);
+    }
+
+    @Test
     void mergeCategoriesCaseInsensitive() {
         // Simulates the real-world scenario where rewrite-java defines category "AI"
         // and rewrite-ai defines category "ai" -- these should merge into one category
