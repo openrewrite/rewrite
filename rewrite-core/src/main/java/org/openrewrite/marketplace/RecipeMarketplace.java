@@ -136,9 +136,6 @@ public class RecipeMarketplace {
                     alreadyInstalled.contains(new BundleKey(bundle.getPackageEcosystem(), bundle.getPackageName()))) {
                     continue;
                 }
-                // No name check: the coordinate filter above means nothing surviving can already
-                // be here, so a colliding name belongs to another bundle and is stored shadowed --
-                // it resolves as soon as the winner is uninstalled, without reprocessing.
                 RecipeListing installed = recipe.withMarketplace(RecipeMarketplace.this)
                         .withBundle(intern(bundle));
                 recipes.add(installed);
@@ -157,8 +154,6 @@ public class RecipeMarketplace {
                 } else {
                     Category copy = new Category(subCategory.displayName, subCategory.description);
                     copy.merge(subCategory, alreadyInstalled, added);
-                    // A wholly blocked subtree contributes nothing; grafting it would leave empty
-                    // categories for a UI to render.
                     if (!copy.recipes.isEmpty() || !copy.categories.isEmpty()) {
                         categories.add(copy);
                     }
