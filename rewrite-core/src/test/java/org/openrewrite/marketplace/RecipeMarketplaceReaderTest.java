@@ -572,6 +572,36 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void identityColumnsAreAllOrNothing() {
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,name,displayName,category1
+          maven,com.foo.Bar,Bar,Java
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("com.foo.Bar")
+          .hasMessageContaining("only 'ecosystem'");
+
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          packageName,name,displayName,category1
+          org.example:lib,com.foo.Bar,Bar,Java
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("only 'packageName'");
+    }
+
+    @Test
+    void blankIdentityCellCountsAsAbsent() {
+        // The reader normalizes a blank cell to null, so a populated ecosystem beside an empty
+        // packageName is exactly-one, not both.
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,name,displayName,category1
+          maven,,com.foo.Bar,Bar,Java
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("only 'ecosystem'");
+    }
+
+    @Test
     void writerPersistsRawVersionNotEffectiveVersion() {
         // An unresolved bundle (version=null, requestedVersion=">=1.0") must write an empty
         // version cell. The writer must not persist getEffectiveVersion()'s fallback -- doing so
