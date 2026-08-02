@@ -572,6 +572,23 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void writerPersistsRawVersionNotEffectiveVersion() {
+        // An unresolved bundle (version=null, requestedVersion=">=1.0") must write an empty
+        // version cell. The writer must not persist getEffectiveVersion()'s fallback -- doing so
+        // would make a read-back bundle's "resolved" version look like a dynamic constraint.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1,ecosystem,packageName,requestedVersion
+          com.foo.Bar,Bar,Java,maven,org.example:lib,>=1.0
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        String[] columns = csv.lines().skip(1).findFirst().orElseThrow().split(",", -1);
+
+        assertThat(columns[2]).as("requestedVersion column").isEqualTo(">=1.0");
+        assertThat(columns[3]).as("version column").isEmpty();
+    }
+
+    @Test
     void equalityIsIdentityOnly() {
         RecipeBundle a = new RecipeBundle("maven", "org.example:lib", "LATEST", "1.0.0", null);
         RecipeBundle b = new RecipeBundle("maven", "org.example:lib", null, "2.0.0", "team");
@@ -587,8 +604,42 @@ class RecipeMarketplaceReaderTest {
         RecipeBundle b = a.withVersion("1.0.0");
 
         assertThat(b).isNotSameAs(a);
-        assertThat(a.getVersion()).isEqualTo("LATEST");   // getVersion() falls back to requestedVersion
+        assertThat(a.getVersion()).isNull();
         assertThat(b.getVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void effectiveVersionFallsBackToRequestedVersionButVersionDoesNot() {
+        RecipeBundle unresolved = new RecipeBundle("maven", "org.example:lib", "LATEST", null, null);
+        RecipeBundle resolved = unresolved.withVersion("1.0.0");
+
+        // getVersion() is the raw field: null until resolution sets it, then exactly what was set.
+        assertThat(unresolved.getVersion()).isNull();
+        assertThat(resolved.getVersion()).isEqualTo("1.0.0");
+
+        // getEffectiveVersion() is the resolution decision: falls back to requestedVersion when
+        // version is unset, and otherwise matches the resolved version.
+        assertThat(unresolved.getEffectiveVersion()).isEqualTo("LATEST");
+        assertThat(resolved.getEffectiveVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void roundTripDoesNotMigrateRequestedVersionIntoVersionColumn() {
+        // An unresolved bundle (version=null, requestedVersion set) must survive
+        // read -> write -> read without the constraint leaking into the version column.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1,ecosystem,packageName,requestedVersion
+          com.foo.Bar,Bar,Java,maven,org.example:lib,>=1.0
+          """);
+
+        String firstCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(firstCsv);
+        String secondCsv = new RecipeMarketplaceWriter().toCsv(roundTripped);
+
+        RecipeBundle bundle = roundTripped.findRecipe("com.foo.Bar").getBundle();
+        assertThat(bundle.getRequestedVersion()).isEqualTo(">=1.0");
+        assertThat(bundle.getVersion()).isNull();
+        assertThat(secondCsv).isEqualTo(firstCsv);
     }
 
     @Test

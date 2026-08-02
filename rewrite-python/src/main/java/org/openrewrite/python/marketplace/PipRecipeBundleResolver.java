@@ -47,7 +47,7 @@ public class PipRecipeBundleResolver implements RecipeBundleResolver {
                     bundle.getRequestedVersion(), bundle.getVersion(), bundle.getTeam());
             response = rpc.installRecipes(absolute.toFile());
         } else {
-            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getEffectiveVersion());
         }
         if (response.getVersion() != null) {
             resolved = resolved.withVersion(response.getVersion());

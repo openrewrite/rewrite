@@ -102,7 +102,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     classLoader
             ).build();
 
-            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getEffectiveVersion());
 
             for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
                 marketplace.install(

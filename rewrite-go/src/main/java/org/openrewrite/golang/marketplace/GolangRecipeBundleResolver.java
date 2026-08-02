@@ -59,7 +59,7 @@ public class GolangRecipeBundleResolver implements RecipeBundleResolver {
                     bundle.getRequestedVersion(), bundle.getVersion(), bundle.getTeam());
             response = rpc.installRecipes(absolute.toFile());
         } else {
-            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getEffectiveVersion());
         }
         this.lastResponse = response;
         if (response.getVersion() != null) {

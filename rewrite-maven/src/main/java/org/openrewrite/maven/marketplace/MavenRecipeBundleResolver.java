@@ -54,7 +54,7 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
             // RELEASE rather than LATEST: DynamicVersion.matches treats LATEST as snapshot-eligible, and an
             // unexpressed preference should not opt a caller into pre-release artifacts. This is a
             // resolver-boundary translation only — the stored column stays blank.
-            String requested = StringUtils.isBlank(bundle.getVersion()) ? "RELEASE" : bundle.getVersion();
+            String requested = StringUtils.isBlank(bundle.getEffectiveVersion()) ? "RELEASE" : bundle.getEffectiveVersion();
             String[] ga = bundle.getPackageName().split(":");
             GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], requested);
             return resolveDependencies(gav)

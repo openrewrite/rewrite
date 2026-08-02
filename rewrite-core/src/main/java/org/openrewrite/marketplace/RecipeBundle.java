@@ -42,7 +42,7 @@ public class RecipeBundle implements RpcRequest {
      * will then be set on version so that subsequent installations of the same bundle result
      * in a repeatable outcome.
      */
-    public @Nullable String getVersion() {
+    public @Nullable String getEffectiveVersion() {
         return version == null ? requestedVersion : version;
     }
 
