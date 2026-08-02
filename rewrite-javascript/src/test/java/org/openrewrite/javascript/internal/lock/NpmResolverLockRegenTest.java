@@ -89,6 +89,23 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void devAndOptionalClosureV3() {
+        // once (prod) hoists unflagged; supports-color+has-flag (dev) get `dev: true`; is-odd+is-number (optional)
+        // get `optional: true`. Root records all three scopes verbatim.
+        assertResolveByteExact("lock/npm/resolve-dev-optional", "after", null,
+                new String[][]{{"once", "1.4.0"}, {"wrappy", "1.0.2"}, {"supports-color", "7.2.0"},
+                        {"has-flag", "4.0.0"}, {"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
+    }
+
+    @Test
+    void devAndOptionalClosureV2() {
+        // The same closure into a lockfileVersion 2 lock carries the dev/optional flags into the legacy tree too.
+        assertResolveByteExact("lock/npm/resolve-dev-optional", "after-v2", "{\"lockfileVersion\":2}",
+                new String[][]{{"once", "1.4.0"}, {"wrappy", "1.0.2"}, {"supports-color", "7.2.0"},
+                        {"has-flag", "4.0.0"}, {"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
+    }
+
+    @Test
     void satisfiedPeerWithMetaV2() {
         // The same closure as lockfileVersion 2: the declarer's `requires` keeps only its regular dep (tslib), the
         // peer edges omitted, and react keeps `peer: true` in the legacy tree.
@@ -124,6 +141,8 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
     void recordGoldensWithRealNpm() throws Exception {
         assertNpmReproduces("lock/npm/resolve-clean/pkg", "lock/npm/resolve-clean/after", "3");
         assertNpmReproduces("lock/npm/resolve-clean/pkg", "lock/npm/resolve-clean/after-v2", "2");
+        assertNpmReproduces("lock/npm/resolve-dev-optional/pkg", "lock/npm/resolve-dev-optional/after", "3");
+        assertNpmReproduces("lock/npm/resolve-dev-optional/pkg", "lock/npm/resolve-dev-optional/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-fork/pkg", "lock/npm/resolve-fork/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after-v2", "2");

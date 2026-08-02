@@ -15,9 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock.resolve;
 
-import lombok.Value;
+import lombok.Getter;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -25,14 +26,41 @@ import java.util.Map;
  * version, declared dependency ranges, dist/integrity, peers, platform metadata) plus the concrete version each
  * of its dependency edges resolved to. Layout (which {@code node_modules} path, which content-addressed key) is
  * derived per package manager by the serializer and is deliberately not stored here.
+ * <p>
+ * The {@code dev}/{@code optional}/{@code devOptional} flags carry npm's reachability classification (a node is
+ * {@code dev} when every path from the root reaches it through a dev edge, {@code optional} likewise through an
+ * optional edge, {@code devOptional} when every path is dev-or-optional but the two overlap). They are computed
+ * once by the graph builder and consumed by the serializers that mark them (npm on each entry, pnpm on the
+ * snapshot); the yarn/bun serializers, which record dev/optional only as importer scopes, ignore them.
  */
-@Value
-public class ResolvedNode {
+@Getter
+public final class ResolvedNode {
 
-    VersionManifest manifest;
+    private final VersionManifest manifest;
 
-    /** For each dependency edge of {@link #manifest} (by dependency name), the version it resolved to in the graph. */
-    Map<String, String> resolvedEdges;
+    /**
+     * For each dependency edge of {@link #manifest} (by dependency name), the version it resolved to. Includes
+     * both regular and optional dependency edges, since both are placed in the tree; the optionality of an edge
+     * is recovered from {@code manifest.getOptionalDependencies()}.
+     */
+    private final Map<String, String> resolvedEdges;
+
+    private final boolean dev;
+    private final boolean optional;
+    private final boolean devOptional;
+
+    public ResolvedNode(VersionManifest manifest, Map<String, String> resolvedEdges) {
+        this(manifest, resolvedEdges, false, false, false);
+    }
+
+    public ResolvedNode(VersionManifest manifest, Map<String, String> resolvedEdges,
+                        boolean dev, boolean optional, boolean devOptional) {
+        this.manifest = manifest;
+        this.resolvedEdges = Collections.unmodifiableMap(resolvedEdges);
+        this.dev = dev;
+        this.optional = optional;
+        this.devOptional = devOptional;
+    }
 
     public String getName() {
         return manifest.getName();

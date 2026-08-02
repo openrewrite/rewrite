@@ -590,7 +590,9 @@ class NativeLockEngineTest {
 
     @Test
     void optionalDependenciesChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "declares optionalDependencies");
+        // The surgical patcher defers on the optional-add; the resolver fallback would resolve a real optional
+        // dependency, but here the added `x` is unresolvable (no route), so the surgical defer stands.
+        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "optionalDependencies changed");
     }
 
     @Test

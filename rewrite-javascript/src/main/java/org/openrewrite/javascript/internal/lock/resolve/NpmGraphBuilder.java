@@ -28,7 +28,9 @@ import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RE
 
 /**
  * Builds the {@link ResolutionGraph} for the npm resolution of a closure: every package resolves to a single
- * version (the highest satisfying every requirer), with no fork or optional dependency. A manifest may declare
+ * version (the highest satisfying every requirer). Regular, dev, and optional dependencies (importer-declared or
+ * transitive) are all resolved and placed; each node is then classified {@code dev}/{@code optional}/
+ * {@code devOptional} by npm's reachability rules for the serializers to mark. A manifest may declare
  * {@code peerDependencies} as long as every non-optional peer is already satisfied by a resolved node (a
  * top-level dependency or a normal dependency of some node) at a version its range admits — the peer is then a
  * constraint already met and adds no node. A missing non-optional peer (npm would auto-install it), an optional
@@ -38,7 +40,8 @@ import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RE
 public final class NpmGraphBuilder {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final List<String> ROOT_SCOPES = Arrays.asList("dependencies", "devDependencies");
+    private static final List<String> ROOT_SCOPES =
+            Arrays.asList("dependencies", "devDependencies", "optionalDependencies");
 
     private final Registry registry;
 
@@ -59,7 +62,8 @@ public final class NpmGraphBuilder {
 
         Map<String, Set<String>> chosen = new LinkedHashMap<>();      // name -> selected versions (>1 = fork)
         Map<String, VersionManifest> manifests = new LinkedHashMap<>();  // nodeKey -> manifest
-        Map<String, Map<String, String>> nodeEdges = new LinkedHashMap<>();  // nodeKey -> (dep name -> resolved version)
+        Map<String, Map<String, String>> nodeEdges = new LinkedHashMap<>();          // nodeKey -> regular edges
+        Map<String, Map<String, String>> nodeOptionalEdges = new LinkedHashMap<>();  // nodeKey -> optional edges
         Deque<String[]> work = new ArrayDeque<>();                    // {name, version} awaiting edge resolution
 
         // Phase 1: importer direct deps select their versions first, so a directly-declared version wins the
@@ -71,26 +75,18 @@ public final class NpmGraphBuilder {
                 }
             }
         }
-        // Phase 2: BFS every resolved node's edges (dedup to an already-chosen satisfying version, else fork).
+        // Phase 2: BFS every resolved node's regular and optional edges (dedup to an already-chosen satisfying
+        // version, else fork). Optional dependencies are resolved and placed like regular ones; only their flag
+        // classification (below) differs.
         while (!work.isEmpty()) {
             String[] cur = work.poll();
-            VersionManifest manifest = manifests.get(ResolutionGraph.key(cur[0], cur[1]));
-            Map<String, String> edges = new LinkedHashMap<>();
-            if (manifest.getDependencies() != null) {
-                for (Map.Entry<String, String> dep : manifest.getDependencies().entrySet()) {
-                    edges.put(dep.getKey(),
-                            select(dep.getKey(), dep.getValue(), directDepNames, chosen, manifests, work));
-                }
-            }
-            nodeEdges.put(ResolutionGraph.key(cur[0], cur[1]), edges);
+            String nodeKey = ResolutionGraph.key(cur[0], cur[1]);
+            VersionManifest manifest = manifests.get(nodeKey);
+            nodeEdges.put(nodeKey, resolveEdges(manifest.getDependencies(), directDepNames, chosen, manifests, work));
+            nodeOptionalEdges.put(nodeKey,
+                    resolveEdges(manifest.getOptionalDependencies(), directDepNames, chosen, manifests, work));
         }
         verifyPeersSatisfied(manifests, chosen);
-
-        Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
-        for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
-            Map<String, String> edges = nodeEdges.getOrDefault(e.getKey(), Collections.emptyMap());
-            nodes.put(e.getKey(), new ResolvedNode(e.getValue(), edges));
-        }
 
         List<ResolutionGraph.Importer> importers = new ArrayList<>();
         for (ImporterDecl decl : declared) {
@@ -103,7 +99,30 @@ public final class NpmGraphBuilder {
             }
             importers.add(new ResolutionGraph.Importer(decl.dir, decl.name, decl.version, decl.scopes, importerResolved));
         }
+
+        DepFlags flags = classifyFlags(manifests.keySet(), importers, nodeEdges, nodeOptionalEdges);
+
+        Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
+        for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
+            String nodeKey = e.getKey();
+            Map<String, String> edges = new LinkedHashMap<>(nodeEdges.getOrDefault(nodeKey, Collections.emptyMap()));
+            edges.putAll(nodeOptionalEdges.getOrDefault(nodeKey, Collections.emptyMap()));
+            nodes.put(nodeKey, new ResolvedNode(e.getValue(), edges,
+                    flags.dev.contains(nodeKey), flags.optional.contains(nodeKey), flags.devOptional.contains(nodeKey)));
+        }
         return new ResolutionGraph(importers, nodes);
+    }
+
+    private Map<String, String> resolveEdges(@Nullable Map<String, String> declaredEdges, Set<String> directDepNames,
+                                             Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
+                                             Deque<String[]> work) {
+        Map<String, String> edges = new LinkedHashMap<>();
+        if (declaredEdges != null) {
+            for (Map.Entry<String, String> dep : declaredEdges.entrySet()) {
+                edges.put(dep.getKey(), select(dep.getKey(), dep.getValue(), directDepNames, chosen, manifests, work));
+            }
+        }
+        return edges;
     }
 
     /**
@@ -130,7 +149,6 @@ public final class NpmGraphBuilder {
         String key = ResolutionGraph.key(name, version);
         if (!manifests.containsKey(key)) {
             VersionManifest manifest = registry.manifest(name, version);
-            requireResolvableLeaf(manifest);
             manifests.put(key, manifest);
             chosen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(version);
             work.add(new String[]{name, version});
@@ -138,11 +156,88 @@ public final class NpmGraphBuilder {
         return version;
     }
 
-    /** {@code optionalDependencies} still reshape the closure (npm skips unmet ones); defer until modeled. */
-    private static void requireResolvableLeaf(VersionManifest manifest) {
-        if (notEmpty(manifest.getOptionalDependencies())) {
-            throw new EngineFailure(RESOLUTION_REQUIRED, manifest.getName(),
-                    manifest.getName() + " declares optionalDependencies (not yet resolved)");
+    /**
+     * npm's dev/optional/devOptional reachability, computed as a monotone flag-clearing fixpoint. Every node
+     * starts a candidate for all three flags; each edge relaxation clears the flag a path fails to preserve
+     * (a node stays {@code dev} only where every incoming path carries dev, and likewise for optional; a node
+     * is {@code devOptional} where every path is dev-or-optional). An importer-declared {@code devDependencies}
+     * edge is a dev edge, an {@code optionalDependencies} edge (importer or transitive) is an optional edge,
+     * every other edge is plain. Serializers translate the surviving flags into their own marking.
+     */
+    private static DepFlags classifyFlags(Set<String> nodeKeys, List<ResolutionGraph.Importer> importers,
+                                          Map<String, Map<String, String>> nodeEdges,
+                                          Map<String, Map<String, String>> nodeOptionalEdges) {
+        List<Edge> edges = new ArrayList<>();
+        for (ResolutionGraph.Importer importer : importers) {
+            for (Map.Entry<String, Map<String, String>> scope : importer.getDeclared().entrySet()) {
+                boolean dev = "devDependencies".equals(scope.getKey());
+                boolean optional = "optionalDependencies".equals(scope.getKey());
+                for (String name : scope.getValue().keySet()) {
+                    String version = importer.getResolved().get(name);
+                    if (version != null) {
+                        edges.add(new Edge(null, ResolutionGraph.key(name, version), dev, optional));
+                    }
+                }
+            }
+        }
+        addNodeEdges(edges, nodeEdges, false);
+        addNodeEdges(edges, nodeOptionalEdges, true);
+
+        Set<String> dev = new HashSet<>(nodeKeys);
+        Set<String> optional = new HashSet<>(nodeKeys);
+        Set<String> devOptional = new HashSet<>(nodeKeys);
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (Edge e : edges) {
+                boolean srcDev = e.src != null && dev.contains(e.src);
+                boolean srcOptional = e.src != null && optional.contains(e.src);
+                boolean srcDevOptional = e.src != null && devOptional.contains(e.src);
+                if (!(srcDev || e.dev) && dev.remove(e.dst)) {
+                    changed = true;
+                }
+                if (!(srcOptional || e.optional) && optional.remove(e.dst)) {
+                    changed = true;
+                }
+                if (!(srcDevOptional || e.dev || e.optional) && devOptional.remove(e.dst)) {
+                    changed = true;
+                }
+            }
+        }
+        return new DepFlags(dev, optional, devOptional);
+    }
+
+    private static void addNodeEdges(List<Edge> edges, Map<String, Map<String, String>> nodeEdges, boolean optional) {
+        for (Map.Entry<String, Map<String, String>> node : nodeEdges.entrySet()) {
+            for (Map.Entry<String, String> edge : node.getValue().entrySet()) {
+                edges.add(new Edge(node.getKey(), ResolutionGraph.key(edge.getKey(), edge.getValue()), false, optional));
+            }
+        }
+    }
+
+    private static final class Edge {
+        final @Nullable String src;  // null = the (flag-free) importer root
+        final String dst;
+        final boolean dev;
+        final boolean optional;
+
+        Edge(@Nullable String src, String dst, boolean dev, boolean optional) {
+            this.src = src;
+            this.dst = dst;
+            this.dev = dev;
+            this.optional = optional;
+        }
+    }
+
+    private static final class DepFlags {
+        final Set<String> dev;
+        final Set<String> optional;
+        final Set<String> devOptional;
+
+        DepFlags(Set<String> dev, Set<String> optional, Set<String> devOptional) {
+            this.dev = dev;
+            this.optional = optional;
+            this.devOptional = devOptional;
         }
     }
 
@@ -189,10 +284,6 @@ public final class NpmGraphBuilder {
         }
         JsonNode entry = meta.get(peer);
         return entry != null && entry.path("optional").asBoolean(false);
-    }
-
-    private static boolean notEmpty(Map<String, String> m) {
-        return m != null && !m.isEmpty();
     }
 
     private static ImporterDecl parseImporter(String dir, String manifestJson) {

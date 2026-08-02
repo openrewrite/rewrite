@@ -32,9 +32,10 @@ import java.util.*;
  * the graph (every package top-level for a clean closure; the conflicting version of a fork nested under its
  * requiring parent), builds the {@code packages} map (and, for lockfileVersion 2, the legacy {@code dependencies}
  * tree), and renders through {@link NpmJson} so the key order and pretty-print match npm exactly. A satisfied
- * {@code peerDependencies} surface is reproduced (recorded verbatim, its provider flagged {@code peer: true});
- * anything else it cannot reproduce byte-exact — a workspace, a dev/optional surface, a manifest field it does
- * not model — fails loud rather than emit a wrong lock.
+ * {@code peerDependencies} surface is reproduced (recorded verbatim, its provider flagged {@code peer: true}),
+ * and dev/optional dependencies are placed and flagged ({@code dev}/{@code optional}/{@code devOptional}) per
+ * npm's reachability; anything else it cannot reproduce byte-exact — a workspace, a manifest field it does not
+ * model — fails loud rather than emit a wrong lock.
  */
 public final class NpmLockWriter {
 
@@ -126,12 +127,16 @@ public final class NpmLockWriter {
                     m.getName() + " carries a legacy licenses array (not yet reproduced)");
         }
 
+        applyDepFlags(entry, node);
         // A node with any incoming peer edge is flagged, even when it is also a regular/top-level dependency.
         if (peer) {
             entry.put("peer", true);
         }
         if (notEmpty(m.getDependencies())) {
             entry.set("dependencies", stringMapNode(m.getDependencies()));
+        }
+        if (notEmpty(m.getOptionalDependencies())) {
+            entry.set("optionalDependencies", stringMapNode(m.getOptionalDependencies()));
         }
         if (notEmpty(m.getEngines())) {
             entry.set("engines", stringMapNode(m.getEngines()));
@@ -147,13 +152,30 @@ public final class NpmLockWriter {
     }
 
     /**
+     * npm's {@code dev}/{@code optional}/{@code devOptional} entry flags. npm writes {@code dev} and
+     * {@code optional} independently (a node reachable only through both a dev path and an optional path carries
+     * both) and {@code devOptional} only when the node is neither purely dev nor purely optional.
+     */
+    private static void applyDepFlags(ObjectNode entry, ResolvedNode node) {
+        if (node.isDev()) {
+            entry.put("dev", true);
+        }
+        if (node.isOptional()) {
+            entry.put("optional", true);
+        }
+        if (node.isDevOptional() && !node.isDev() && !node.isOptional()) {
+            entry.put("devOptional", true);
+        }
+    }
+
+    /**
      * The writer reproduces only the entry fields the corpus goldens pin exactly. {@code peerDependencies} and
-     * {@code peerDependenciesMeta} are recorded verbatim (the graph proved the peers already satisfied). A manifest
-     * carrying any other lock-surfaced field (a platform gate, a bin, an install script, a bundle, an optional
-     * surface) reshapes the entry in a way not yet byte-verified, so it defers rather than guess.
+     * {@code peerDependenciesMeta} are recorded verbatim (the graph proved the peers already satisfied), and
+     * {@code optionalDependencies} are recorded like {@code dependencies}. A manifest carrying any other
+     * lock-surfaced field (a platform gate, a bin, an install script, a bundle) reshapes the entry in a way not
+     * yet byte-verified, so it defers rather than guess.
      */
     private static void requireEmittable(VersionManifest m) {
-        deferIf(m, "optionalDependencies", notEmpty(m.getOptionalDependencies()));
         // peerDependenciesMeta is only reproduced alongside the peerDependencies it annotates; a meta-only shape
         // (no peers) is unusual and not byte-verified, so it defers.
         JsonNode peerMeta = m.getPeerDependenciesMeta();
@@ -303,11 +325,17 @@ public final class NpmLockWriter {
                         node.getName() + " is nested; the lockfileVersion 2 legacy tree of a fork is not yet reproduced");
             }
             VersionManifest m = node.getManifest();
+            if (notEmpty(m.getOptionalDependencies())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, node.getName(),
+                        node.getName() + " declares optionalDependencies; the lockfileVersion 2 legacy tree of an " +
+                                "optional-bearing package is not yet reproduced");
+            }
             VersionManifest.Dist dist = m.getDist();
             ObjectNode entry = JSON.createObjectNode();
             entry.put("version", m.getVersion());
             entry.put("resolved", dist == null ? null : dist.getTarball());
             entry.put("integrity", dist == null ? null : dist.getIntegrity());
+            applyDepFlags(entry, node);
             if (peerProviders.contains(e.getKey())) {
                 entry.put("peer", true);
             }
@@ -323,8 +351,9 @@ public final class NpmLockWriter {
 
     /**
      * The node keys npm flags {@code peer: true}: a node has an incoming peer edge when some resolved package
-     * declares its name in {@code peerDependencies}. The graph proved each such peer resolves to a single
-     * satisfying version, so the provider is that one node — matched by name.
+     * declares its name in a <em>non-optional</em> {@code peerDependencies}. An optional peer (per
+     * {@code peerDependenciesMeta}) confers no flag even when the provider is present, so it is skipped. The graph
+     * proved each such peer resolves to a single satisfying version, so the provider is that one node.
      */
     private static Set<String> peerProviderKeys(ResolutionGraph graph) {
         Map<String, Set<String>> versionsByName = new LinkedHashMap<>();
@@ -337,7 +366,11 @@ public final class NpmLockWriter {
             if (peers == null) {
                 continue;
             }
+            JsonNode meta = node.getManifest().getPeerDependenciesMeta();
             for (String peerName : peers.keySet()) {
+                if (isOptionalPeer(meta, peerName)) {
+                    continue;
+                }
                 Set<String> versions = versionsByName.get(peerName);
                 if (versions != null && versions.size() == 1) {
                     providers.add(ResolutionGraph.key(peerName, versions.iterator().next()));
@@ -345,6 +378,14 @@ public final class NpmLockWriter {
             }
         }
         return providers;
+    }
+
+    private static boolean isOptionalPeer(@Nullable JsonNode meta, String peer) {
+        if (meta == null) {
+            return false;
+        }
+        JsonNode entry = meta.get(peer);
+        return entry != null && entry.path("optional").asBoolean(false);
     }
 
     // --- helpers ----------------------------------------------------------

@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
@@ -61,21 +60,24 @@ class NpmPromoteLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
-    void promoteDevToProductionV2FailsLoud() {
-        // A v2 dev→prod promotion clears "dev": true in two places (the packages entry AND the legacy tree);
-        // the second writer is not yet verified, so defer rather than emit a lock missing the legacy clear.
-        routes.put(REG + "ms", resource("lock/npm/promote-dev-v2/http/ms"));
+    void promoteDevToProductionV2ResolvedByFallback() {
+        // A v2 dev→prod promotion clears "dev": true in the packages entry AND the legacy tree; the surgical
+        // patcher defers on the legacy clear, but the resolver fallback resolves the whole closure from scratch —
+        // ms (promoted, now prod) unflagged, the surviving devDependency humanize-ms still dev — byte-exact.
+        String dir = "lock/npm/promote-dev-v2";
+        routes.put(REG + "ms", resource(dir + "/http/ms"));
+        routes.put(REG + "ms/2.1.3", resource(dir + "/http/ms-2.1.3"));
+        routes.put(REG + "humanize-ms", resource(dir + "/http/humanize-ms"));
+        routes.put(REG + "humanize-ms/1.2.1", resource(dir + "/http/humanize-ms-1.2.1"));
 
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/promote-dev-v2/pkg-after"),
-                resource("lock/npm/promote-dev-v2/pkg-before"),
-                resource("lock/npm/promote-dev-v2/before"),
+                resource(dir + "/pkg-after"),
+                resource(dir + "/pkg-before"),
+                resource(dir + "/before"),
                 null, Paths.get("package.json"), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers (it resolves prod-only closures today); its detail is preferred.
-        assertThat(result.getFailure().getDetail()).contains("only prod dependencies are resolved today");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(dir + "/after"));
     }
 
     /**

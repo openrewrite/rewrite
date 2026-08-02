@@ -117,6 +117,65 @@ class NpmGraphBuilderTest {
         assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0");
     }
 
+    @Test
+    void classifiesDevAndOptionalReachability() {
+        FakeRegistry registry = new FakeRegistry()
+                .add("prod", "1.0.0", singletonMap("pt", "^1.0.0"))
+                .add("pt", "1.0.0", emptyMap())
+                .add("dv", "1.0.0", singletonMap("dt", "^1.0.0"))
+                .add("dt", "1.0.0", emptyMap())
+                .add("opt", "1.0.0", singletonMap("ot", "^1.0.0"))
+                .add("ot", "1.0.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+                "{\"dependencies\":{\"prod\":\"^1.0.0\"},\"devDependencies\":{\"dv\":\"^1.0.0\"}," +
+                        "\"optionalDependencies\":{\"opt\":\"^1.0.0\"}}"));
+
+        // prod and its transitive carry no flag; the dev subtree is dev; the optional subtree is optional.
+        assertThat(graph.node("prod", "1.0.0").isDev()).isFalse();
+        assertThat(graph.node("pt", "1.0.0").isOptional()).isFalse();
+        assertThat(graph.node("dv", "1.0.0").isDev()).isTrue();
+        assertThat(graph.node("dt", "1.0.0").isDev()).isTrue();
+        assertThat(graph.node("dt", "1.0.0").isOptional()).isFalse();
+        assertThat(graph.node("opt", "1.0.0").isOptional()).isTrue();
+        assertThat(graph.node("ot", "1.0.0").isOptional()).isTrue();
+        assertThat(graph.node("ot", "1.0.0").isDev()).isFalse();
+    }
+
+    @Test
+    void classifiesDevOptionalOverlapAsDevOptional() {
+        // shared is a dev dependency and also reached through an optional dependency: neither purely dev nor
+        // purely optional, so npm marks it devOptional.
+        FakeRegistry registry = new FakeRegistry()
+                .add("shared", "1.0.0", emptyMap())
+                .add("opt", "1.0.0", singletonMap("shared", "^1.0.0"));
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+                "{\"devDependencies\":{\"shared\":\"^1.0.0\"},\"optionalDependencies\":{\"opt\":\"^1.0.0\"}}"));
+
+        assertThat(graph.node("shared", "1.0.0").isDev()).isFalse();
+        assertThat(graph.node("shared", "1.0.0").isOptional()).isFalse();
+        assertThat(graph.node("shared", "1.0.0").isDevOptional()).isTrue();
+        assertThat(graph.node("opt", "1.0.0").isOptional()).isTrue();
+    }
+
+    @Test
+    void resolvesTransitiveOptionalDependencies() {
+        // a prod package declaring optionalDependencies resolves and places them; the optional transitive is
+        // optional-flagged, the prod one is not.
+        FakeRegistry registry = new FakeRegistry()
+                .addWithOptional("pkg", "1.0.0", singletonMap("dep", "^1.0.0"), singletonMap("native", "^1.0.0"))
+                .add("dep", "1.0.0", emptyMap())
+                .add("native", "1.0.0", emptyMap());
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"pkg\":\"^1.0.0\"}}"));
+
+        assertThat(graph.getNodes()).containsKeys("pkg@1.0.0", "dep@1.0.0", "native@1.0.0");
+        assertThat(graph.node("native", "1.0.0").isOptional()).isTrue();
+        assertThat(graph.node("dep", "1.0.0").isOptional()).isFalse();
+    }
+
     // --- in-memory registry -------------------------------------------------
 
     private static final class FakeRegistry implements Registry {
@@ -126,6 +185,15 @@ class NpmGraphBuilderTest {
         FakeRegistry add(String name, String version, Map<String, String> deps) {
             versionsByName.computeIfAbsent(name, k -> new TreeSet<>()).add(version);
             manifests.put(name + "@" + version, vm(name, version, deps, null));
+            return this;
+        }
+
+        FakeRegistry addWithOptional(String name, String version, Map<String, String> deps,
+                                     Map<String, String> optionalDeps) {
+            versionsByName.computeIfAbsent(name, k -> new TreeSet<>()).add(version);
+            manifests.put(name + "@" + version, new VersionManifest(name, version, null, null,
+                    deps.isEmpty() ? null : deps, optionalDeps.isEmpty() ? null : optionalDeps, null, null, null,
+                    null, null, null, null, null, null, null, null, null, null, null, null, null));
             return this;
         }
 

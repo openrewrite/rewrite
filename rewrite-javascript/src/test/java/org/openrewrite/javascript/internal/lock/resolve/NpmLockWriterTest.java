@@ -192,6 +192,29 @@ class NpmLockWriterTest {
     }
 
     @Test
+    void optionalPeerProviderNotFlagged() {
+        // widget declares theme as an OPTIONAL peer; even though theme is present as a top-level dep, an optional
+        // peer confers no `peer: true` on its provider (unlike the non-optional peer above).
+        FakeRegistry registry = new FakeRegistry()
+                .add("theme", "1.0.0", emptyMap(), "MIT", null);
+        ObjectNode meta = JsonNodeFactory.instance.objectNode();
+        meta.putObject("theme").put("optional", true);
+        registry.versionsByName.computeIfAbsent("widget", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("widget@1.0.0", new VersionManifest("widget", "1.0.0", TextNode.valueOf("MIT"), "MIT",
+                null, null, singletonMap("theme", "^1.0.0"), meta, null, null, null, null, null, null, null, null,
+                null, null, new VersionManifest.Dist("https://r/widget/-/widget-1.0.0.tgz", null, "sha512-widget"),
+                null, null, null));
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("widget", "^1.0.0");
+        deps.put("theme", "^1.0.0");
+        String lock = new NpmLockWriter().write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))), 3);
+
+        assertThat(lock).contains("\"node_modules/theme\": {");
+        assertThat(lock).doesNotContain("\"peer\": true");
+    }
+
+    @Test
     void binBearingManifestDefers() {
         VersionManifest withBin = new VersionManifest("cli", "1.0.0", TextNode.valueOf("MIT"), "MIT",
                 null, null, null, null, TextNode.valueOf("cli.js"), null, null, null, null, null, null, null, null,
