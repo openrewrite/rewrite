@@ -15,24 +15,25 @@
  */
 package org.openrewrite.marketplace;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
 
-@Data
-@AllArgsConstructor
+@Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class RecipeBundle implements RpcRequest {
-    @Nullable String packageEcosystem;
-    @Nullable String packageName;
+    @EqualsAndHashCode.Include @Nullable String packageEcosystem;
+    @EqualsAndHashCode.Include @Nullable String packageName;
 
     /**
      * May be a dynamic constraint like LATEST or 0.2.0-SNAPSHOT, resolved in a way that is
      * {@link RecipeBundleResolver} specific. Null when no constraint was requested.
      */
-    @Nullable String requestedVersion;
+    @With @Nullable String requestedVersion;
 
-    @Nullable String version;
+    @With @Nullable String version;
     @Nullable String team;
 
     /**

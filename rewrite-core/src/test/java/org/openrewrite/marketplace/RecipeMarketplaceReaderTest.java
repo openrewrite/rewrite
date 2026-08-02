@@ -335,39 +335,6 @@ class RecipeMarketplaceReaderTest {
         // These are DIFFERENT RecipeListing instances with DIFFERENT RecipeBundle instances
         assertThat(javaListing).isNotSameAs(jsListing);
         assertThat(javaListing.getBundle()).isNotSameAs(jsListing.getBundle());
-
-        // Simulate what MavenRecipeBundleReader needs to do - update version on ALL bundles.
-        // If we only use getAllRecipes(), we'd only update one of them.
-        // The fix uses setVersionRecursive to walk the full tree.
-        String resolvedVersion = "8.70.0";
-        String requestedVersion = "LATEST";
-
-        // Walk the full tree and update all bundles matching the package
-        setVersionRecursive(marketplace.getRoot(), "org.openrewrite:rewrite-java", requestedVersion, resolvedVersion);
-
-        // Both listings should now have the version set
-        assertThat(javaListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
-        assertThat(javaListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
-        assertThat(jsListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
-        assertThat(jsListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
-
-        // Round-trip through CSV writer to verify versions are preserved
-        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
-        assertThat(writtenCsv).contains("LATEST");
-        assertThat(writtenCsv).contains("8.70.0");
-
-        // Verify the written CSV has versions for ALL rows, not just some
-        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(writtenCsv);
-        RecipeMarketplace.Category rtJava = findCategory(roundTripped.getRoot(), "Java");
-        RecipeMarketplace.Category rtJs = findCategory(roundTripped.getRoot(), "JavaScript");
-
-        RecipeListing rtJavaListing = findCategory(rtJava, "ChangeMethodName").getRecipes().getFirst();
-        RecipeListing rtJsListing = findCategory(rtJs, "ChangeMethodName").getRecipes().getFirst();
-
-        assertThat(rtJavaListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
-        assertThat(rtJavaListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
-        assertThat(rtJsListing.getBundle().getVersion()).isEqualTo(resolvedVersion);
-        assertThat(rtJsListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
     }
 
     @Test
@@ -406,20 +373,6 @@ class RecipeMarketplaceReaderTest {
         RecipeListing rtListing = roundTripped.getAllRecipes().iterator().next();
         assertThat(rtListing.getBundle().getVersion()).isNull();
         assertThat(rtListing.getBundle().getRequestedVersion()).isNull();
-    }
-
-    private void setVersionRecursive(RecipeMarketplace.Category category, String packageName,
-                                     String requestedVersion, String version) {
-        for (RecipeListing recipe : category.getRecipes()) {
-            RecipeBundle bundle = recipe.getBundle();
-            if (packageName.equals(bundle.getPackageName())) {
-                bundle.setVersion(version);
-                bundle.setRequestedVersion(requestedVersion);
-            }
-        }
-        for (RecipeMarketplace.Category child : category.getCategories()) {
-            setVersionRecursive(child, packageName, requestedVersion, version);
-        }
     }
 
     @Test
@@ -576,6 +529,26 @@ class RecipeMarketplaceReaderTest {
         assertThat(listing).isNotNull();
         assertThat(listing.getBundle().getPackageEcosystem()).isNull();
         assertThat(listing.getBundle().getPackageName()).isNull();
+    }
+
+    @Test
+    void equalityIsIdentityOnly() {
+        RecipeBundle a = new RecipeBundle("maven", "org.example:lib", "LATEST", "1.0.0", null);
+        RecipeBundle b = new RecipeBundle("maven", "org.example:lib", null, "2.0.0", "team");
+
+        assertThat(a).isEqualTo(b);
+        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        assertThat(a).isNotEqualTo(new RecipeBundle("pip", "org.example:lib", null, "1.0.0", null));
+    }
+
+    @Test
+    void withVersionReturnsACopy() {
+        RecipeBundle a = new RecipeBundle("maven", "org.example:lib", "LATEST", null, null);
+        RecipeBundle b = a.withVersion("1.0.0");
+
+        assertThat(b).isNotSameAs(a);
+        assertThat(a.getVersion()).isEqualTo("LATEST");   // getVersion() falls back to requestedVersion
+        assertThat(b.getVersion()).isEqualTo("1.0.0");
     }
 
     @Test

@@ -57,11 +57,12 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
             GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
             return resolveDependencies(gav)
                     .map(mrr -> {
-                        ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream().filter(ResolvedDependency::isDirect)
+                        ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream()
+                                .filter(ResolvedDependency::isDirect)
                                 .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
-                        bundle.setVersion(resolvedDependency.getDatedSnapshotVersion() == null ?
+                        RecipeBundle resolved = bundle.withVersion(resolvedDependency.getDatedSnapshotVersion() == null ?
                                 resolvedDependency.getVersion() : resolvedDependency.getDatedSnapshotVersion());
-                        reader = new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory);
+                        reader = new MavenRecipeBundleReader(resolved, mrr, downloader, classLoaderFactory);
                         return (RecipeBundleReader) reader;
                     })
                     .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));
