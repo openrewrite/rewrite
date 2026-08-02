@@ -1,0 +1,13 @@
+{
+  "name": "resolve-devopt",
+  "version": "1.0.0",
+  "dependencies": {
+    "once": "1.4.0"
+  },
+  "devDependencies": {
+    "supports-color": "7.2.0"
+  },
+  "optionalDependencies": {
+    "is-odd": "3.0.1"
+  }
+}

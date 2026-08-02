@@ -74,6 +74,15 @@ class YarnClassicResolverLockRegenTest extends LockRegenTestSupport {
                         {"loose-envify", "1.4.0"}, {"js-tokens", "4.0.0"}});
     }
 
+    @Test
+    void devAndOptionalClosure() {
+        // once (prod), supports-color+has-flag (dev), is-odd+is-number (optional): yarn v1 marks no scope, so all
+        // six are plain flat blocks indistinguishable from prod deps.
+        assertResolveByteExact("lock/yarn-classic/resolve-dev-optional",
+                new String[][]{{"once", "1.4.0"}, {"wrappy", "1.0.2"}, {"supports-color", "7.2.0"},
+                        {"has-flag", "4.0.0"}, {"is-odd", "3.0.1"}, {"is-number", "6.0.0"}});
+    }
+
     /**
      * Replay {@code dir}'s fixture offline and assert the resolver output equals {@code dir/after} byte-for-byte.
      * Each distinct name maps to a packument route {@code http/<name>}; each {@code {name, version}} to a manifest
@@ -104,5 +113,6 @@ class YarnClassicResolverLockRegenTest extends LockRegenTestSupport {
         assertYarnReproduces("lock/yarn-classic/resolve-merged/pkg", "lock/yarn-classic/resolve-merged/after");
         assertYarnReproduces("lock/yarn-classic/resolve-fork/pkg", "lock/yarn-classic/resolve-fork/after");
         assertYarnReproduces("lock/yarn-classic/resolve-peer/pkg", "lock/yarn-classic/resolve-peer/after");
+        assertYarnReproduces("lock/yarn-classic/resolve-dev-optional/pkg", "lock/yarn-classic/resolve-dev-optional/after");
     }
 }

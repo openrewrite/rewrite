@@ -137,6 +137,33 @@ class YarnClassicLockWriterTest {
     }
 
     @Test
+    void dependenciesBlockComesFromManifestNotOptionalEdges() {
+        // resolvedEdges now merges optional edges too; the dependencies: block must render only manifest.dependencies
+        // (b), never the optional edge (c) that a real yarn.lock would place under optionalDependencies elsewhere.
+        VersionManifest a = vm("a", "1.0.0", singletonMap("b", "^1.0.0"), dist("a", "1.0.0"));
+        VersionManifest b = vm("b", "1.0.0", emptyMap(), dist("b", "1.0.0"));
+        Map<String, String> aEdges = new LinkedHashMap<>();
+        aEdges.put("b", "1.0.0");
+        aEdges.put("c", "2.0.0"); // stray optional edge folded into resolvedEdges
+        Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
+        nodes.put("a@1.0.0", new ResolvedNode(a, aEdges));
+        nodes.put("b@1.0.0", new ResolvedNode(b, emptyMap()));
+        ResolutionGraph graph = new ResolutionGraph(
+                Collections.singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                        singletonMap("dependencies", singletonMap("a", "^1.0.0")), singletonMap("a", "1.0.0"))),
+                nodes);
+
+        String lock = new YarnClassicLockWriter(true).write(graph);
+        assertThat(lock).contains("a@^1.0.0:\n" +
+                "  version \"1.0.0\"\n" +
+                "  resolved \"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#sha1-a-1.0.0\"\n" +
+                "  integrity sha512-a-1.0.0\n" +
+                "  dependencies:\n" +
+                "    b \"^1.0.0\"\n");
+        assertThat(lock).doesNotContain("2.0.0");
+    }
+
+    @Test
     void keepsNpmjsHostWhenNotMirroring() {
         FakeRegistry registry = new FakeRegistry().add("a", "1.0.0", emptyMap());
         String lock = new YarnClassicLockWriter(false)
@@ -174,6 +201,12 @@ class YarnClassicLockWriterTest {
             deps.append('"').append(e.getKey()).append("\":\"").append(e.getValue()).append('"');
         }
         return "{\"name\":\"app\",\"version\":\"1.0.0\",\"dependencies\":{" + deps + "}}";
+    }
+
+    private static VersionManifest.Dist dist(String name, String version) {
+        return new VersionManifest.Dist(
+                "https://registry.npmjs.org/" + name + "/-/" + name + "-" + version + ".tgz",
+                "sha1-" + name + "-" + version, "sha512-" + name + "-" + version);
     }
 
     private static VersionManifest vm(String name, String version, Map<String, String> deps, VersionManifest.@Nullable Dist dist) {

@@ -169,8 +169,9 @@ public final class YarnClassicLockWriter {
      * The clean/merged/fork writer reproduces only the block fields the goldens pin exactly. yarn v1 never records
      * the peer surface (a real {@code yarn install} writes no {@code peerDependencies:} into any block — it does not
      * install peers), so a satisfied-peer manifest emits a block byte-identical to one with no peers and needs no
-     * guard. An {@code optionalDependencies} surface, by contrast, gets its own section not yet byte-verified (and
-     * the graph builder defers it), so it still defers.
+     * guard. A resolved package whose own manifest declares {@code optionalDependencies}, by contrast, gets an
+     * {@code optionalDependencies:} block whose shape is not yet byte-verified, so it still defers. (An importer's
+     * optionalDependencies are ordinary unmarked entries — yarn v1 marks no scope — and resolve fine.)
      */
     private static void requireEmittable(VersionManifest m) {
         if (notEmpty(m.getOptionalDependencies())) {
