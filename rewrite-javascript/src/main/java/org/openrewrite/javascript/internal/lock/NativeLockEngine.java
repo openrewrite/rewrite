@@ -351,6 +351,19 @@ public final class NativeLockEngine {
             }
         }
 
+        boolean npmForkRescoped = false;
+        if (pm == PackageManager.Npm && lockedVersions.size() > 1) {
+            // The npm analogue: npm hoists a root-declared direct dep to the top-level node_modules/<name>, so
+            // the same package forked (nested under a reverse-dependent) at another version is unambiguous at the
+            // importer edge. Re-scope the bump to that top-level version; the nested forks this direct bump does
+            // not touch stay byte-identical. A member/transitive fork (empty here) stays fail-loud below.
+            Set<String> importerVersions = importerResolvedVersionsNpm(existingLock, name, change.oldConstraint);
+            if (importerVersions.size() == 1) {
+                lockedVersions = importerVersions;
+                npmForkRescoped = true;
+            }
+        }
+
         if (lockedVersions.isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no locked entry for " + name);
         }
@@ -388,6 +401,12 @@ public final class NativeLockEngine {
             // Constraint-only widening: the resolved version does not move, so the package entry keeps
             // its resolved/integrity and only the importer's declared constraint is re-pinned.
             return Collections.singletonList(edit.build());
+        }
+
+        if (npmForkRescoped) {
+            // The re-scoped top-level bump is byte-safe only while every nested fork stays a fork; a fork whose
+            // requirer would accept the bumped target dedupes up into the new top-level (a reshape). Defer those.
+            requireForksStayForkedNpm(name, oldVersion, targetVersion, existingLock);
         }
 
         // A reverse-dependent whose recorded constraint excludes the new version keeps the old version nested
@@ -1828,6 +1847,27 @@ public final class NativeLockEngine {
         return versions;
     }
 
+    /**
+     * The top-level version the root importer pins for {@code name} through a declared edge matching
+     * {@code oldConstraint}. npm hoists a root-declared direct dependency to {@code node_modules/<name>}, so a
+     * single value means the direct dep is unambiguous at its importer even when the package is separately forked
+     * (nested under a reverse-dependent) at another version. A non-root (workspace member) declaration returns
+     * empty, so a member edge stays deferred rather than re-scoped to a version it may not resolve to.
+     */
+    private static Set<String> importerResolvedVersionsNpm(String lock, String name, @Nullable String oldConstraint) {
+        Object packages = parseJsonObject(lock, false).get("packages");
+        Object rootImporter = packages instanceof Map ? ((Map<?, ?>) packages).get("") : null;
+        if (!(rootImporter instanceof Map)) {
+            return Collections.emptySet();
+        }
+        String declared = declaredConstraintIn((Map<?, ?>) rootImporter, name, DECLARED_SCOPES);
+        if (declared == null || (oldConstraint != null && !oldConstraint.equals(declared))) {
+            return Collections.emptySet();
+        }
+        String topLevel = topLevelVersionsNpm(lock).get(name);
+        return topLevel == null ? Collections.emptySet() : Collections.singleton(topLevel);
+    }
+
     private static String resolveAddedVersion(NpmRegistryClient client, NodeRegistry registry,
                                               String name, String constraint) {
         AbbreviatedPackument packument = client.getPackument(registry, name);
@@ -2237,18 +2277,51 @@ public final class NativeLockEngine {
 
     /** Installed lock entries whose recorded constraint on {@code name} excludes {@code target}, keyed by their packages key. */
     private static Map<String, String> conflictingReverseDependentsNpm(String lock, String name, String target) {
+        Map<String, Object> packages = packagesMap(lock);
         Map<String, String> conflicts = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
+        for (Map.Entry<String, Object> e : packages.entrySet()) {
             // Importer entries are the user's package.json, re-pinned by the patcher; never a nest trigger.
             if (!e.getKey().contains("node_modules/") || !(e.getValue() instanceof Map)) {
                 continue;
             }
             String c = firstExcludingConstraint((Map<?, ?>) e.getValue(), name, target);
-            if (c != null) {
+            // A dependent already served by its own pre-existing nested copy is a fork the bump leaves untouched,
+            // not a new nest npm must create; skip it so a top-level bump of an already-forked dep stays clean.
+            if (c != null && !nestedCopySatisfiesNpm(packages, e.getKey(), name, c)) {
                 conflicts.put(e.getKey(), c);
             }
         }
         return conflicts;
+    }
+
+    /**
+     * A re-scoped fork bump's dedupe guard: every reverse-dependent that currently forks {@code name} (its
+     * recorded constraint excludes the old top-level version, so it holds its own nested copy) must also exclude
+     * the bumped {@code target}. A requirer that now accepts the target would have npm dedupe its nest up into the
+     * new top-level — a reshape the surgical bump cannot express — so any such case fails loud.
+     */
+    private static void requireForksStayForkedNpm(String name, String oldVersion, String target, String lock) {
+        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
+            if (!e.getKey().contains("node_modules/") || !(e.getValue() instanceof Map)) {
+                continue;
+            }
+            String c = firstExcludingConstraint((Map<?, ?>) e.getValue(), name, oldVersion);
+            if (c != null && NodeSemver.satisfies(target, c)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " forked under " + e.getKey() +
+                        " (" + c + ") would dedupe into the bumped " + target + "; deferred");
+            }
+        }
+    }
+
+    /** Whether {@code dependentKey} already carries its own nested {@code node_modules/<name>} satisfying {@code constraint}. */
+    private static boolean nestedCopySatisfiesNpm(Map<String, Object> packages, String dependentKey,
+                                                  String name, String constraint) {
+        Object nested = packages.get(dependentKey + "/node_modules/" + name);
+        if (!(nested instanceof Map)) {
+            return false;
+        }
+        Object v = ((Map<?, ?>) nested).get("version");
+        return v != null && NodeSemver.validRange(constraint) && NodeSemver.satisfies(String.valueOf(v), constraint);
     }
 
     /** Whether some importer or installed entry pins {@code name} at exactly {@code version} (so its top slot cannot move). */

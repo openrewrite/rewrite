@@ -626,13 +626,30 @@ class NativeLockEngineTest {
     // --- other fail-loud guards ------------------------------------------
 
     @Test
-    void forkedMultipleLockedVersionsFailsLoud() {
+    void forkedTopLevelBumpRescopesLeavesNestUnchanged() {
+        // lodash is directly declared (hoisted to node_modules/lodash@4.17.20) while `wrapper` holds its own
+        // node_modules/wrapper/node_modules/lodash@3.10.1 fork. Bumping the direct lodash re-scopes to the
+        // top-level copy and moves only it; wrapper's nested fork stays byte-identical (see the byte-exact
+        // ajv/table golden in NpmBumpForkedLockRegenTest).
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
+
         String lock = "{\n" +
                 "  \"lockfileVersion\": 3,\n" +
                 "  \"packages\": {\n" +
                 "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/x/node_modules/lodash\": {\"version\": \"3.10.1\"}\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\"\n" +
+                "    },\n" +
+                "    \"node_modules/wrapper\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^3.0.0\"}},\n" +
+                "    \"node_modules/wrapper/node_modules/lodash\": {\"version\": \"3.10.1\", \"integrity\": \"sha512-OLD3\"}\n" +
                 "  }\n" +
                 "}\n";
 
@@ -640,6 +657,66 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
                 lock);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent())
+                .contains("\"version\": \"4.17.21\"")  // top-level copy bumped
+                .contains("sha512-NEW")
+                .contains("\"node_modules/wrapper/node_modules/lodash\"")
+                .contains("sha512-OLD3")               // the nested fork is byte-identical
+                .contains("\"version\": \"3.10.1\"");
+    }
+
+    @Test
+    void forkedBumpThatWouldDedupeNestFailsLoud() {
+        // `wrapper` pins lodash 4.17.21 exactly (excludes the current top-level 4.17.20, so it forks a nested
+        // copy). Bumping the direct lodash to 4.17.21 would let wrapper's requirement resolve to the new top-level
+        // and npm would dedupe the nest away — a reshape the surgical bump cannot express, so it defers.
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
+                "    \"node_modules/wrapper\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.21\"}},\n" +
+                "    \"node_modules/wrapper/node_modules/lodash\": {\"version\": \"4.17.21\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                lock);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
+        assertThat(result.getFailure().getDetail()).contains("dedupe");
+    }
+
+    @Test
+    void forkedMemberDeclaredDefersToMultipleVersions() {
+        // The forked lodash is declared by a workspace MEMBER (packages/foo), not the root importer. npm may nest
+        // the member's copy rather than hoist it, so the re-scope (which only owns a ROOT-declared top-level edge)
+        // does not apply and the bump stays fail-loud rather than guess which copy the member edge resolves.
+        String lock = "{\n" +
+                "  \"name\": \"root\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"name\": \"root\", \"workspaces\": [\"packages/foo\"]},\n" +
+                "    \"packages/foo\": {\"name\": \"foo\", \"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/foo\": {\"resolved\": \"packages/foo\", \"link\": true},\n" +
+                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
+                "    \"node_modules/legacy\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^3.0.0\"}},\n" +
+                "    \"node_modules/legacy/node_modules/lodash\": {\"version\": \"3.10.1\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                lock, null, Paths.get("packages/foo/package.json"), ctx);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
