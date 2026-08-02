@@ -235,7 +235,7 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         // The resolver's from-scratch attempt also defers on the bin entry shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("declares bin");
+        assertThat(result.getFailure().getDetail()).contains("changed its bin");
     }
 
     @Test
@@ -393,7 +393,7 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         // The resolver's from-scratch attempt also defers on the bundleDependencies shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("entry shape not yet reproduced");
+        assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("entry shape not yet patched");
     }
 
     @Test
@@ -570,17 +570,17 @@ class NativeLockEngineTest {
     // surface it cannot yet reproduce reports "declares <field>".
     @Test
     void osChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "declares os");
+        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "changed its os");
     }
 
     @Test
     void cpuChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "declares cpu");
+        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "changed its cpu");
     }
 
     @Test
     void libcChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "declares libc");
+        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "changed its libc");
     }
 
     @Test
@@ -603,7 +603,7 @@ class NativeLockEngineTest {
 
     @Test
     void hasInstallScriptChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "declares hasInstallScript");
+        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "hasInstallScript");
     }
 
     private void assertClosureSurfaceFailsLoud(String oldExtra, String newExtra, String expectedDetail) {

@@ -30,6 +30,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.resolve.LockResolver;
 import org.openrewrite.javascript.internal.lock.resolve.LockResolvers;
+import org.openrewrite.javascript.internal.lock.resolve.NpmGraphBuilder;
+import org.openrewrite.javascript.internal.lock.resolve.NpmRegistryAdapter;
+import org.openrewrite.javascript.internal.lock.resolve.Registry;
+import org.openrewrite.javascript.internal.lock.resolve.ResolutionGraph;
 import org.openrewrite.javascript.internal.lock.resolve.ResolveRequest;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
@@ -209,24 +213,62 @@ public final class NativeLockEngine {
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
         LockResolver resolver = LockResolvers.forPackageManager(pm);
-        if (resolver == null || !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
+        if ((pm != PackageManager.Npm && resolver == null) ||
+                !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
             throw surgical;
         }
-        // The fallback resolves the one edited manifest as a single importer. For a workspace that would drop the
-        // sibling importers and write a truncated lock, so keep those deferred (return the surgical failure).
+        // A single edited manifest resolves as a single importer. For a workspace that would drop the sibling
+        // importers and write a truncated lock, so keep those deferred (return the per-dependency failure).
         if (isMultiPackageProject(pm, editedPackageJson, existingLock, packageJsonPath)) {
             throw surgical;
         }
-        ResolveRequest request = new ResolveRequest(
-                Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
         try {
+            if (pm == PackageManager.Npm) {
+                return resolveAndPatchNpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            }
+            ResolveRequest request = new ResolveRequest(
+                    Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
             return Result.success(resolver.resolve(request));
         } catch (NodeRegistryException nre) {
-            // The resolver's deeper closure walk hit a registry/environment error the surgical tier did not need to
-            // reach; it produced no better answer, so return the surgical deferral unchanged (no wrong lock either way).
+            // The deeper closure walk hit a registry/environment error the per-dependency path did not need to
+            // reach; it produced no better answer, so return that deferral unchanged (no wrong lock either way).
             throw surgical;
         }
-        // A resolver EngineFailure propagates: it made the deeper attempt, so its reason/detail is preferred.
+        // An EngineFailure from the deeper attempt propagates: its reason/detail is preferred.
+    }
+
+    /**
+     * Resolve the whole closure seeded by the existing lock, then patch only the difference: a locked version
+     * still satisfying its range is kept (as a real incremental install would), the resolved graph is diffed
+     * against the lock, and the same patcher applies the edits — untouched entries keep their bytes.
+     */
+    private static Result resolveAndPatchNpm(String editedPackageJson, String existingLock,
+                                             @Nullable Path packageJsonPath, NodeRegistries registries,
+                                             NpmRegistryClient client) {
+        Registry registry = new NpmRegistryAdapter(registries, client);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock))
+                .build(Collections.singletonMap("", editedPackageJson));
+        List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
+        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
+                PackageManager.Npm, editedPackageJson, edits);
+        return Result.success(new NpmLockPatcher().patch(editSet));
+    }
+
+    /** The versions the lock already installs, keyed by tree-slot name (an alias seeds under its slot). */
+    private static Map<String, Set<String>> lockedVersionsNpm(String lock) {
+        Map<String, Set<String>> locked = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : installedPackagesNpm(lock).entrySet()) {
+            String key = e.getKey();
+            String slot = key.substring(key.lastIndexOf("node_modules/") + "node_modules/".length());
+            if (e.getValue() instanceof Map) {
+                Map<?, ?> entry = (Map<?, ?>) e.getValue();
+                Object version = entry.get("version");
+                if (version instanceof String && !Boolean.TRUE.equals(entry.get("link"))) {
+                    locked.computeIfAbsent(slot, k -> new LinkedHashSet<>()).add((String) version);
+                }
+            }
+        }
+        return locked;
     }
 
     /**

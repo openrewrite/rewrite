@@ -453,8 +453,9 @@ class NpmLockPatcherTest {
         LockEditSet set = new LockEditSet(lock, Paths.get("package-lock.json"), PackageManager.Npm,
                 "{\"dependencies\":{\"is-even\":\"^1.0.0\"}}", singletonList(edit));
         String out = new NpmLockPatcher().patch(set);
-        // The importer edge is written into a fresh dependencies scope and both trees' dev flags clear.
-        assertThat(out).contains("\"dependencies\": {\n        \"is-even\": \"^1.0.0\"\n      },\n      \"devDependencies\"");
+        // The declaration moves scope (the emptied devDependencies drops) and both trees' dev flags clear.
+        assertThat(out).contains("\"dependencies\": {\n        \"is-even\": \"^1.0.0\"\n      }\n    }");
         assertThat(out).doesNotContain("\"dev\": true");
+        assertThat(out).doesNotContain("devDependencies");
     }
 }

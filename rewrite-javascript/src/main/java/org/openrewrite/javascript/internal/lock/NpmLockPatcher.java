@@ -212,7 +212,10 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         Json.JsonObject scope = LockJson.objectMember(importer, edit.getScope());
         if (scope == null || LockJson.member(scope, edit.getName()) == null) {
-            return root;
+            // Newly declared (a bump binding to an entry the root did not declare before): insert the edge and
+            // drop any stale membership in another scope, keeping the importer a mirror of the manifest.
+            root = insertImporterConstraint(root, editedManifest, edit);
+            return dropStaleScopeMemberships(root, editedManifest, edit);
         }
         scope = setStringField(scope, edit.getName(), newConstraint);
         importer = LockJson.replaceValue(importer, edit.getScope(), scope);
@@ -390,6 +393,7 @@ public final class NpmLockPatcher implements LockPatcher {
     private Json.JsonObject applyPromotion(Json.JsonObject root, int lockfileVersion,
                                            @Nullable JsonNode editedManifest, PackageEdit edit) {
         root = insertImporterConstraint(root, editedManifest, edit);
+        root = dropStaleScopeMemberships(root, editedManifest, edit);
         EntryMetadata md = edit.getMetadata();
         if (md != null && md.isFlagsChanged()) {
             Json.JsonObject packages = requirePackages(root);
@@ -411,6 +415,42 @@ public final class NpmLockPatcher implements LockPatcher {
             }
         }
         return root;
+    }
+
+    /**
+     * A promotion moves the declaration between scopes: drop the name from every importer scope other than the
+     * edit's, mirroring the edited manifest (a scope the manifest no longer declares is dropped whole).
+     */
+    private Json.JsonObject dropStaleScopeMemberships(Json.JsonObject root, @Nullable JsonNode editedManifest,
+                                                      PackageEdit edit) {
+        String importerKey = edit.getImporterDir() == null ? "" : edit.getImporterDir();
+        Json.JsonObject packages = requirePackages(root);
+        Json.JsonObject importer = LockJson.objectMember(packages, importerKey);
+        if (importer == null) {
+            return root;
+        }
+        boolean changed = false;
+        for (String scope : IMPORTER_SCOPES) {
+            if (scope.equals(edit.getScope())) {
+                continue;
+            }
+            Json.JsonObject scopeObj = LockJson.objectMember(importer, scope);
+            if (scopeObj == null || LockJson.member(scopeObj, edit.getName()) == null) {
+                continue;
+            }
+            Json.JsonObject trimmed = removeMembers(scopeObj, Collections.singleton(edit.getName()));
+            if (isEmptyObject(trimmed) && (editedManifest == null || !editedManifest.has(scope))) {
+                importer = removeMembers(importer, Collections.singleton(scope));
+            } else {
+                importer = LockJson.replaceValue(importer, scope, trimmed);
+            }
+            changed = true;
+        }
+        if (!changed) {
+            return root;
+        }
+        packages = LockJson.replaceValue(packages, importerKey, importer);
+        return LockJson.replaceValue(root, "packages", packages);
     }
 
     /**
@@ -467,6 +507,9 @@ public final class NpmLockPatcher implements LockPatcher {
         // implicitly via placement); npm keeps them under the entry's `dependencies` map.
         if (edit.getNewDependencies() != null && !edit.getNewDependencies().isEmpty()) {
             addMetadataField(fields, "dependencies", edit.getNewDependencies(), keyIndent, unit);
+        }
+        if (edit.getNewOptionalDependencies() != null && !edit.getNewOptionalDependencies().isEmpty()) {
+            addMetadataField(fields, "optionalDependencies", edit.getNewOptionalDependencies(), keyIndent, unit);
         }
         fields.sort((a, b) -> a.object != b.object ? (a.object ? 1 : -1) : NpmKeyOrder.compareKeys(a.key, b.key));
 
