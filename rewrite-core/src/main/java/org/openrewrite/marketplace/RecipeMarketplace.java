@@ -17,6 +17,7 @@ package org.openrewrite.marketplace;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.NlsRewrite;
@@ -31,12 +32,42 @@ public class RecipeMarketplace {
             "When displaying the category hierarchy of a marketplace, " +
             "this is typically not shown.");
 
+    private final Map<BundleKey, RecipeBundle> bundles = new LinkedHashMap<>();
+
     public @Nullable RecipeListing findRecipe(String name) {
         return root.findRecipe(name);
     }
 
     public Set<RecipeListing> getAllRecipes() {
         return root.getAllRecipes();
+    }
+
+    /** @return Every distinct bundle contributing recipes to this marketplace. */
+    public Set<RecipeBundle> getBundles() {
+        return new LinkedHashSet<>(bundles.values());
+    }
+
+    public @Nullable RecipeBundle bundleFor(String packageEcosystem, String packageName) {
+        return bundles.get(new BundleKey(packageEcosystem, packageName));
+    }
+
+    /**
+     * Canonicalize so every listing from one bundle shares one instance. A bundle with no
+     * identity — an inner CSV that omitted the columns — is not registered; install binds it
+     * to the resolved bundle before it matters.
+     */
+    RecipeBundle intern(RecipeBundle bundle) {
+        if (bundle.getPackageEcosystem() == null || bundle.getPackageName() == null) {
+            return bundle;
+        }
+        return bundles.computeIfAbsent(
+                new BundleKey(bundle.getPackageEcosystem(), bundle.getPackageName()), k -> bundle);
+    }
+
+    @Value
+    private static class BundleKey {
+        String packageEcosystem;
+        String packageName;
     }
 
     public List<Category> getCategories() {
@@ -71,6 +102,10 @@ public class RecipeMarketplace {
 
     public void uninstall(String packageEcosystem, String packageName) {
         root.uninstall(packageEcosystem, packageName);
+        // Once a bundle contributes no listings it must not linger in the registry --
+        // otherwise a later install() of the same (ecosystem, packageName) at a new version
+        // finds the stale key still populated and intern() re-attaches the old instance.
+        bundles.remove(new BundleKey(packageEcosystem, packageName));
     }
 
     @Getter
@@ -88,7 +123,8 @@ public class RecipeMarketplace {
         public void merge(Category category) {
             for (RecipeListing recipe : category.recipes) {
                 recipes.remove(recipe);
-                recipes.add(recipe.withMarketplace(RecipeMarketplace.this));
+                recipes.add(recipe.withMarketplace(RecipeMarketplace.this)
+                        .withBundle(intern(recipe.getBundle())));
             }
             for (Category subCategory : category.categories) {
                 Category existingSubCategory = null;
@@ -109,8 +145,8 @@ public class RecipeMarketplace {
         }
 
         public void uninstall(String packageEcosystem, String packageName) {
-            recipes.removeIf(r -> r.getBundle().getPackageName().equals(packageName) &&
-                                  r.getBundle().getPackageEcosystem().equals(packageEcosystem));
+            recipes.removeIf(r -> Objects.equals(r.getBundle().getPackageName(), packageName) &&
+                                  Objects.equals(r.getBundle().getPackageEcosystem(), packageEcosystem));
             for (Category category : categories) {
                 category.uninstall(packageEcosystem, packageName);
             }
@@ -153,8 +189,16 @@ public class RecipeMarketplace {
          * @param categoryPath Category path from shallowest to deepest (e.g., "Java", "Search")
          */
         public void install(RecipeListing recipe, List<CategoryDescriptor> categoryPath) {
-            recipe = recipe.withMarketplace(RecipeMarketplace.this);
+            installInto(recipe.withMarketplace(RecipeMarketplace.this)
+                    .withBundle(intern(recipe.getBundle())), categoryPath);
+        }
 
+        /**
+         * Recursive descent for {@link #install}. Takes a recipe that has already been bound
+         * and interned once at the entry point, so it isn't redundantly re-bound/re-interned at
+         * every category depth.
+         */
+        private void installInto(RecipeListing recipe, List<CategoryDescriptor> categoryPath) {
             if (categoryPath.isEmpty()) {
                 recipes.add(recipe);
                 return;
@@ -165,7 +209,7 @@ public class RecipeMarketplace {
             Category targetCategory = findOrCreateCategory(firstCategory);
 
             // Recursively add to the child category
-            targetCategory.install(recipe, categoryPath.subList(1, categoryPath.size()));
+            targetCategory.installInto(recipe, categoryPath.subList(1, categoryPath.size()));
         }
 
         private Category findOrCreateCategory(CategoryDescriptor categoryDescriptor) {

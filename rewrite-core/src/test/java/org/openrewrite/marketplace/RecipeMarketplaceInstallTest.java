@@ -80,6 +80,26 @@ class RecipeMarketplaceInstallTest {
                 });
     }
 
+    @Test
+    void reinstallAtNewVersionReplacesTheInternedBundle() {
+        RecipeBundle v1 = new RecipeBundle("maven", "co.uk.acme:recipes", "LATEST", "1.0.0", null);
+        RecipeBundle v2 = new RecipeBundle("maven", "co.uk.acme:recipes", "LATEST", "2.0.0", null);
+
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        marketplace.install(driftingReader(v1, v1));
+        marketplace.install(driftingReader(v2, v2));
+
+        // Every listing must report the new version -- not a stale interned v1 bundle.
+        assertThat(allListings(marketplace.getRoot()))
+                .hasSize(2)
+                .allSatisfy(l -> assertThat(l.getBundle().getVersion()).isEqualTo("2.0.0"));
+
+        assertThat(marketplace.bundleFor("maven", "co.uk.acme:recipes"))
+                .isNotNull()
+                .extracting(RecipeBundle::getVersion)
+                .isEqualTo("2.0.0");
+    }
+
     private static List<RecipeListing> allListings(RecipeMarketplace.Category category) {
         List<RecipeListing> out = new java.util.ArrayList<>(category.getRecipes());
         for (RecipeMarketplace.Category child : category.getCategories()) {

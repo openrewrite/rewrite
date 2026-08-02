@@ -309,10 +309,11 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
-    void recipeInMultipleCategoriesHasSeparateBundleInstances() {
+    void recipeInMultipleCategoriesHasSeparateListingInstances() {
         // This tests the scenario where a recipe appears in multiple categories
-        // (e.g., Java recipes that also work for JavaScript). Each listing should
-        // have its own RecipeBundle instance that needs to be updated independently.
+        // (e.g., Java recipes that also work for JavaScript). Each listing is a
+        // distinct instance -- that's what encodes multi-category membership --
+        // but they share one interned RecipeBundle per marketplace.
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           name,displayName,category1,category2,ecosystem,packageName
           org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,Java,maven,org.openrewrite:rewrite-java
@@ -332,9 +333,30 @@ class RecipeMarketplaceReaderTest {
         RecipeListing javaListing = findCategory(java, "ChangeMethodName").getRecipes().getFirst();
         RecipeListing jsListing = findCategory(javascript, "ChangeMethodName").getRecipes().getFirst();
 
-        // These are DIFFERENT RecipeListing instances with DIFFERENT RecipeBundle instances
+        // These are DIFFERENT RecipeListing instances, but they share ONE interned RecipeBundle
         assertThat(javaListing).isNotSameAs(jsListing);
-        assertThat(javaListing.getBundle()).isNotSameAs(jsListing.getBundle());
+        assertThat(javaListing.getBundle()).isSameAs(jsListing.getBundle());
+    }
+
+    @Test
+    void bundlesAreInternedPerEcosystemAndPackage() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1,category2
+          maven,org.openrewrite:rewrite-java,LATEST,8.70.0,org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,Java
+          maven,org.openrewrite:rewrite-java,LATEST,8.70.0,org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,JavaScript
+          """);
+
+        RecipeMarketplace.Category java = findCategory(marketplace.getRoot(), "Java");
+        RecipeMarketplace.Category js = findCategory(marketplace.getRoot(), "JavaScript");
+        RecipeListing javaListing = findCategory(java, "ChangeMethodName").getRecipes().getFirst();
+        RecipeListing jsListing = findCategory(js, "ChangeMethodName").getRecipes().getFirst();
+
+        assertThat(javaListing).isNotSameAs(jsListing);
+        assertThat(javaListing.getBundle()).isSameAs(jsListing.getBundle());
+
+        assertThat(marketplace.getBundles()).hasSize(1);
+        assertThat(marketplace.bundleFor("maven", "org.openrewrite:rewrite-java"))
+                .isSameAs(javaListing.getBundle());
     }
 
     @Test
