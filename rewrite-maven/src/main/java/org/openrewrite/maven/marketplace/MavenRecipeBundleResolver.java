@@ -50,10 +50,9 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         if (reader == null) {
-            // Blank means "no constraint requested", which every other ecosystem resolves as latest.
-            // RELEASE rather than LATEST: DynamicVersion.matches treats LATEST as snapshot-eligible, and an
-            // unexpressed preference should not opt a caller into pre-release artifacts. This is a
-            // resolver-boundary translation only — the stored column stays blank.
+            // Blank means no constraint requested, which every other ecosystem resolves as latest.
+            // RELEASE rather than LATEST because LATEST is snapshot-eligible, and an unexpressed
+            // preference should not opt a caller into pre-release artifacts.
             String requested = StringUtils.isBlank(bundle.getEffectiveVersion()) ? "RELEASE" : bundle.getEffectiveVersion();
             String[] ga = bundle.getPackageName().split(":");
             GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], requested);

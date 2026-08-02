@@ -71,8 +71,8 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     JarEntry entry = jarFile.getJarEntry("META-INF/rewrite/recipes.csv");
                     if (entry != null) {
                         try (InputStream recipesCsv = jarFile.getInputStream(entry)) {
-                            // Identity and version are applied by RecipeMarketplace.install, which binds every
-                            // listing to the resolved bundle. Nothing here may trust the CSV's own columns.
+                            // The CSV's own bundle columns are not trusted; RecipeMarketplace.install
+                            // binds every listing to the resolved bundle.
                             return new RecipeMarketplaceReader().fromCsv(recipesCsv);
                         }
                     }
@@ -108,8 +108,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                 marketplace.install(
                         RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
                                 "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                                bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
-                                gav.getVersion(), null)),
+                                bundle.getRequestedVersion(), bundle.getVersion(), null)),
                         descriptor.inferCategoriesFromName(env)
                 );
             }
