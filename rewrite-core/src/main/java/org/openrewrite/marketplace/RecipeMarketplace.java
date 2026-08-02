@@ -78,12 +78,31 @@ public class RecipeMarketplace {
         root.install(recipe, categoryPath);
     }
 
-    public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
+    public List<RecipeListing> install(RecipeBundleReader bundleReader) {
         RecipeMarketplace marketplace = bundleReader.read();
         RecipeBundle bundle = bundleReader.getBundle();
         bindRecursive(marketplace.getRoot(), bundle);
         uninstall(bundle.getPackageEcosystem(), bundle.getPackageName());
-        return root.merge(marketplace.getRoot());
+        return merge(marketplace);
+    }
+
+    /**
+     * Contribute another marketplace's recipes to this one, keeping what is already here. A
+     * bundle coordinate already installed blocks every listing the incoming marketplace offers
+     * for it, whether that is the same version (a duplicate) or a different one (a farther
+     * layer, superseded by the nearer install). Callers express precedence by merging the
+     * nearest scope first.
+     *
+     * @return The listings actually added, so callers report what landed rather than what was
+     * offered. A recipe filed under several categories appears once per category.
+     */
+    public List<RecipeListing> merge(RecipeMarketplace marketplace) {
+        List<RecipeListing> added = new ArrayList<>();
+        // Snapshot, because interning registers each incoming bundle as its first listing lands
+        // and a bundle's recipes span several categories -- a live check would block its own
+        // second category.
+        root.merge(marketplace.getRoot(), new HashSet<>(bundles.keySet()), added);
+        return added;
     }
 
     private void bindRecursive(Category category, RecipeBundle bundle) {
@@ -110,19 +129,20 @@ public class RecipeMarketplace {
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
 
-        /**
-         * @return The listings actually added, excluding any that lost a name collision, so that
-         * callers can report what landed rather than what was offered.
-         */
-        public Set<RecipeListing> merge(Category category) {
-            Set<RecipeListing> added = new LinkedHashSet<>();
+        private void merge(Category category, Set<BundleKey> alreadyInstalled, List<RecipeListing> added) {
             for (RecipeListing recipe : category.recipes) {
-                if (!recipes.contains(recipe)) {
-                    RecipeListing installed = recipe.withMarketplace(RecipeMarketplace.this)
-                            .withBundle(intern(recipe.getBundle()));
-                    recipes.add(installed);
-                    added.add(installed);
+                RecipeBundle bundle = recipe.getBundle();
+                if (bundle.getPackageEcosystem() != null && bundle.getPackageName() != null &&
+                    alreadyInstalled.contains(new BundleKey(bundle.getPackageEcosystem(), bundle.getPackageName()))) {
+                    continue;
                 }
+                // No name check: the coordinate filter above means nothing surviving can already
+                // be here, so a colliding name belongs to another bundle and is stored shadowed --
+                // it resolves as soon as the winner is uninstalled, without reprocessing.
+                RecipeListing installed = recipe.withMarketplace(RecipeMarketplace.this)
+                        .withBundle(intern(bundle));
+                recipes.add(installed);
+                added.add(installed);
             }
             for (Category subCategory : category.categories) {
                 Category existingSubCategory = null;
@@ -133,14 +153,17 @@ public class RecipeMarketplace {
                     }
                 }
                 if (existingSubCategory != null) {
-                    added.addAll(existingSubCategory.merge(subCategory));
+                    existingSubCategory.merge(subCategory, alreadyInstalled, added);
                 } else {
                     Category copy = new Category(subCategory.displayName, subCategory.description);
-                    added.addAll(copy.merge(subCategory));
-                    categories.add(copy);
+                    copy.merge(subCategory, alreadyInstalled, added);
+                    // A wholly blocked subtree contributes nothing; grafting it would leave empty
+                    // categories for a UI to render.
+                    if (!copy.recipes.isEmpty() || !copy.categories.isEmpty()) {
+                        categories.add(copy);
+                    }
                 }
             }
-            return added;
         }
 
         private void uninstall(String packageEcosystem, String packageName) {

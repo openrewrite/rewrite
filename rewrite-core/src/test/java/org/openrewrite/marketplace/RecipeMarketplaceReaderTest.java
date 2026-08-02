@@ -417,7 +417,7 @@ class RecipeMarketplaceReaderTest {
 
         // Merge source into target — both have "Java" category so this exercises
         // the recursive merge path where withMarketplace() is called
-        target.getRoot().merge(source.getRoot());
+        target.merge(source);
 
         // Verify both recipes exist and metadata is preserved
         RecipeListing mergedTest = target.findRecipe("org.example.TestRecipe");
@@ -432,7 +432,7 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
-    void mergeKeepsTheIncumbent() {
+    void mergeShadowsACollidingNameRatherThanDroppingIt() {
         RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
           ecosystem,packageName,requestedVersion,version,name,displayName,category1
           maven,org.example:near,1.0.0,1.0.0,com.foo.Bar,Near,Java
@@ -442,11 +442,93 @@ class RecipeMarketplaceReaderTest {
           maven,org.example:far,2.0.0,2.0.0,com.foo.Bar,Far,Java
           """);
 
-        nearest.getRoot().merge(farther.getRoot());
+        nearest.merge(farther);
 
         assertThat(nearest.findRecipe("com.foo.Bar").getBundle().getPackageName())
                 .isEqualTo("org.example:near");
-        assertThat(nearest.getAllRecipes()).hasSize(1);
+        assertThat(nearest.getAllRecipes())
+                .as("The projection resolves one listing per name")
+                .hasSize(1);
+
+        nearest.uninstall("maven", "org.example:near");
+
+        assertThat(nearest.findRecipe("com.foo.Bar").getBundle().getPackageName())
+                .as("The shadowed listing was stored, so it resolves without reinstalling its bundle")
+                .isEqualTo("org.example:far");
+    }
+
+    @Test
+    void anInstalledCoordinateBlocksEveryListingAFartherVersionOffers() {
+        RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,2.0.0,2.0.0,com.foo.Kept,Kept,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Kept,Kept,Java
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Dropped,Dropped,Java
+          """);
+
+        assertThat(nearest.merge(farther)).isEmpty();
+        assertThat(nearest.findRecipe("com.foo.Dropped"))
+                .as("A recipe the nearer version removed stays removed; the older version does not resurrect it")
+                .isNull();
+        assertThat(nearest.bundleFor("maven", "org.example:lib").getVersion()).isEqualTo("2.0.0");
+    }
+
+    @Test
+    void mergingTheSameMarketplaceTwiceAddsNothing() {
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Bar,Bar,Java
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        assertThat(target.merge(source)).hasSize(1);
+        assertThat(target.merge(source)).isEmpty();
+        assertThat(target.getAllRecipes()).hasSize(1);
+    }
+
+    @Test
+    void aWhollyBlockedSubtreeGraftsNoEmptyCategories() {
+        RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,2.0.0,2.0.0,com.foo.Bar,Bar,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Baz,Baz,Python
+          """);
+
+        target.merge(farther);
+
+        assertThat(target.getRoot().getCategories())
+                .extracting(RecipeMarketplace.Category::getDisplayName)
+                .containsExactly("Java");
+    }
+
+    @Test
+    void aShadowedListingSurvivesACsvRoundTrip() {
+        RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:near,1.0.0,1.0.0,com.foo.Bar,Near,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:far,2.0.0,2.0.0,com.foo.Bar,Far,Java
+          """);
+        nearest.merge(farther);
+
+        RecipeMarketplace reloaded = new RecipeMarketplaceReader()
+                .fromCsv(new RecipeMarketplaceWriter().toCsv(nearest));
+
+        assertThat(reloaded.getBundles())
+                .extracting(RecipeBundle::getPackageName)
+                .containsExactly("org.example:far", "org.example:near");
+        assertThat(reloaded.findRecipe("com.foo.Bar").getBundle().getPackageName())
+                .as("The writer sorts rows by coordinate, so precedence within one marketplace " +
+                    "survives reload as a property of the coordinate rather than of install order")
+                .isEqualTo("org.example:far");
     }
 
     @Test
@@ -465,7 +547,7 @@ class RecipeMarketplaceReaderTest {
           io.moderne.ai.FindLibrariesInUse,ai,maven,io.moderne.recipe:rewrite-ai
           """);
 
-        marketplace1.getRoot().merge(marketplace2.getRoot());
+        marketplace1.merge(marketplace2);
 
         assertThat(marketplace1.getRoot().getCategories())
           .as("AI and ai should merge into a single category")
@@ -489,7 +571,7 @@ class RecipeMarketplaceReaderTest {
           """);
         RecipeMarketplace target = new RecipeMarketplace();
 
-        target.getRoot().merge(source.getRoot());
+        target.merge(source);
 
         RecipeMarketplace.Category sourceOuter = findCategory(source.getRoot(), "Outer");
         RecipeMarketplace.Category targetOuter = findCategory(target.getRoot(), "Outer");
@@ -502,7 +584,7 @@ class RecipeMarketplaceReaderTest {
           name,category1,category2,ecosystem,packageName
           org.example.OverlayRecipe,Inner,Outer,maven,org.example:overlay
           """);
-        target.getRoot().merge(overlay.getRoot());
+        target.merge(overlay);
 
         assertThat(findCategory(sourceOuter, "Inner").getRecipes())
           .as("Source category must not be mutated by changes to merge target")
