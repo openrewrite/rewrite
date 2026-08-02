@@ -65,13 +65,8 @@ public final class NpmGraphBuilder {
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
         List<ImporterDecl> declared = new ArrayList<>();
-        Set<String> directDepNames = new LinkedHashSet<>();
         for (Map.Entry<String, String> e : importerManifests.entrySet()) {
-            ImporterDecl decl = parseImporter(e.getKey(), e.getValue());
-            declared.add(decl);
-            for (Map<String, String> scope : decl.scopes.values()) {
-                directDepNames.addAll(scope.keySet());
-            }
+            declared.add(parseImporter(e.getKey(), e.getValue()));
         }
 
         Map<String, Set<String>> chosen = new LinkedHashMap<>();      // name -> selected versions (>1 = fork)
@@ -80,12 +75,12 @@ public final class NpmGraphBuilder {
         Map<String, Map<String, String>> nodeOptionalEdges = new LinkedHashMap<>();  // nodeKey -> optional edges
         Deque<String[]> work = new ArrayDeque<>();                    // {name, version} awaiting edge resolution
 
-        // Phase 1: importer direct deps select their versions first, so a directly-declared version wins the
-        // hoisted slot over any conflicting transitive requirement of the same name.
+        // Phase 1: importer direct deps select their versions first, so a compatible transitive dedupes to a
+        // directly-declared version rather than resolving its own.
         for (ImporterDecl decl : declared) {
             for (Map<String, String> scope : decl.scopes.values()) {
                 for (Map.Entry<String, String> dep : scope.entrySet()) {
-                    select(dep.getKey(), dep.getValue(), directDepNames, chosen, manifests, work);
+                    select(dep.getKey(), dep.getValue(), chosen, manifests, work);
                 }
             }
         }
@@ -96,9 +91,9 @@ public final class NpmGraphBuilder {
             String[] cur = work.poll();
             String nodeKey = ResolutionGraph.key(cur[0], cur[1]);
             VersionManifest manifest = manifests.get(nodeKey);
-            nodeEdges.put(nodeKey, resolveEdges(manifest.getDependencies(), directDepNames, chosen, manifests, work));
+            nodeEdges.put(nodeKey, resolveEdges(manifest.getDependencies(), chosen, manifests, work));
             nodeOptionalEdges.put(nodeKey,
-                    resolveEdges(manifest.getOptionalDependencies(), directDepNames, chosen, manifests, work));
+                    resolveEdges(manifest.getOptionalDependencies(), chosen, manifests, work));
         }
         Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared);
 
@@ -132,13 +127,13 @@ public final class NpmGraphBuilder {
         return new ResolutionGraph(importers, nodes);
     }
 
-    private Map<String, String> resolveEdges(@Nullable Map<String, String> declaredEdges, Set<String> directDepNames,
+    private Map<String, String> resolveEdges(@Nullable Map<String, String> declaredEdges,
                                              Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                                              Deque<String[]> work) {
         Map<String, String> edges = new LinkedHashMap<>();
         if (declaredEdges != null) {
             for (Map.Entry<String, String> dep : declaredEdges.entrySet()) {
-                edges.put(dep.getKey(), select(dep.getKey(), dep.getValue(), directDepNames, chosen, manifests, work));
+                edges.put(dep.getKey(), select(dep.getKey(), dep.getValue(), chosen, manifests, work));
             }
         }
         return edges;
@@ -150,7 +145,7 @@ public final class NpmGraphBuilder {
      * version of an already-resolved name it is kept as a fork (both directly-declared and transitive forks
      * proceed), and the {@link NpmLockWriter} decides which layouts it can reproduce byte-exact.
      */
-    private String select(String name, String range, Set<String> directDepNames,
+    private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
         String deduped = NodeSemver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range);
