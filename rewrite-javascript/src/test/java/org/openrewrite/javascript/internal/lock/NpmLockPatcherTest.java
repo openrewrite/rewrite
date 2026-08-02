@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.IOException;
@@ -133,9 +133,10 @@ class NpmLockPatcherTest {
                 .scope(scope)
                 .importerDir(null)
                 .kind(PackageEdit.Kind.ADD)
-                .writeThroughMetadata(LockEditSet.WriteThroughMetadata.builder()
+                .metadata(LockEditSet.EntryMetadata.builder()
                         .license("WTFPL")
                         .deprecated("use String.prototype.padStart()")
+                        .dev("devDependencies".equals(scope) ? Boolean.TRUE : null)
                         .build())
                 .build();
     }
@@ -188,7 +189,7 @@ class NpmLockPatcherTest {
         PackageEdit add = metaAdd("is-number", "7.0.0",
                 "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz",
                 "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==")
-                .writeThroughMetadata(WriteThroughMetadata.builder()
+                .metadata(EntryMetadata.builder()
                         .license("MIT")
                         .engines(singletonMap("node", ">=0.12.0"))
                         .build())
@@ -202,7 +203,7 @@ class NpmLockPatcherTest {
         PackageEdit add = metaAdd("he", "1.2.0",
                 "https://registry.npmjs.org/he/-/he-1.2.0.tgz",
                 "sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==")
-                .writeThroughMetadata(WriteThroughMetadata.builder()
+                .metadata(EntryMetadata.builder()
                         .license("MIT")
                         .bin(json("{\"he\": \"bin/he\"}"))
                         .build())
@@ -228,7 +229,7 @@ class NpmLockPatcherTest {
         return metaAdd("fsevents", "2.3.3",
                 "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
                 "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==")
-                .writeThroughMetadata(WriteThroughMetadata.builder()
+                .metadata(EntryMetadata.builder()
                         .license("MIT")
                         .hasInstallScript(true)
                         .os(singletonList("darwin"))
@@ -243,7 +244,7 @@ class NpmLockPatcherTest {
         PackageEdit add = metaAdd("escape-string-regexp", "5.0.0",
                 "https://registry.npmjs.org/escape-string-regexp/-/escape-string-regexp-5.0.0.tgz",
                 "sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==")
-                .writeThroughMetadata(WriteThroughMetadata.builder()
+                .metadata(EntryMetadata.builder()
                         .license("MIT")
                         .engines(singletonMap("node", ">=12"))
                         .funding(json("{\"url\": \"https://github.com/sponsors/sindresorhus\"}"))
@@ -293,5 +294,167 @@ class NpmLockPatcherTest {
         assertThatThrownBy(() -> new NpmLockPatcher().patch(set))
                 .isInstanceOfSatisfying(EngineFailure.class,
                         ef -> assertThat(ef.failure.getReason()).isEqualTo(Reason.MALFORMED_LOCK));
+    }
+
+    // --- entry flags -------------------------------------------------------
+
+    private static String flagLock(String flagsSource) {
+        return "{\n" +
+                "  \"name\": \"t\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"requires\": true,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"t\",\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"devDependencies\": {\n" +
+                "        \"is-odd\": \"^3.0.1\"\n" +
+                "      }\n" +
+                "    },\n" +
+                "    \"node_modules/is-odd\": {\n" +
+                "      \"version\": \"3.0.1\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz\",\n" +
+                "      \"integrity\": \"sha512-x\",\n" +
+                flagsSource +
+                "      \"license\": \"MIT\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+    }
+
+    private static PackageEdit flagsOnlyBump(EntryMetadata metadata) {
+        return PackageEdit.builder()
+                .name("is-odd")
+                .oldVersion("3.0.1")
+                .newVersion("3.0.1")
+                .scope("devDependencies")
+                .importerDir(null)
+                .metadata(metadata)
+                .build();
+    }
+
+    @Test
+    void flagsOnlyBumpAddsDevFlag() {
+        LockEditSet set = new LockEditSet(flagLock(""), Paths.get("package-lock.json"), PackageManager.Npm,
+                "{\"devDependencies\":{\"is-odd\":\"^3.0.1\"}}",
+                singletonList(flagsOnlyBump(EntryMetadata.builder().flagsChanged(true).dev(true).build())));
+        assertThat(new NpmLockPatcher().patch(set))
+                .isEqualTo(flagLock("      \"dev\": true,\n"));
+    }
+
+    @Test
+    void flagsOnlyBumpExactSetsFlagMembers() {
+        // dev is cleared and optional written in one exact-set pass; untouched members keep their bytes.
+        LockEditSet set = new LockEditSet(flagLock("      \"dev\": true,\n"),
+                Paths.get("package-lock.json"), PackageManager.Npm,
+                "{\"devDependencies\":{\"is-odd\":\"^3.0.1\"}}",
+                singletonList(flagsOnlyBump(EntryMetadata.builder().flagsChanged(true).optional(true).build())));
+        String out = new NpmLockPatcher().patch(set);
+        assertThat(out).contains("\"integrity\": \"sha512-x\",\n      \"license\": \"MIT\",\n      \"optional\": true\n");
+        assertThat(out).doesNotContain("\"dev\"");
+    }
+
+    @Test
+    void nestedBumpRewritesOnlyTheNestedEntry() {
+        String lock = "{\n" +
+                "  \"name\": \"t\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"requires\": true,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"t\",\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"a\": \"^1.0.0\",\n" +
+                "        \"b\": \"^2.0.0\"\n" +
+                "      }\n" +
+                "    },\n" +
+                "    \"node_modules/a\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/a/-/a-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-a1\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"b\": \"^1.0.0\"\n" +
+                "      }\n" +
+                "    },\n" +
+                "    \"node_modules/a/node_modules/b\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/b/-/b-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-b1\"\n" +
+                "    },\n" +
+                "    \"node_modules/b\": {\n" +
+                "      \"version\": \"2.0.0\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/b/-/b-2.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-b2\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+        PackageEdit edit = PackageEdit.builder()
+                .name("b")
+                .oldVersion("1.0.0")
+                .newVersion("1.0.1")
+                .newResolved("https://registry.npmjs.org/b/-/b-1.0.1.tgz")
+                .newIntegrity("sha512-b11")
+                .scope("dependencies")
+                .importerDir(null)
+                .nestedUnder("a")
+                .build();
+        LockEditSet set = new LockEditSet(lock, Paths.get("package-lock.json"), PackageManager.Npm,
+                "{\"dependencies\":{\"a\":\"^1.0.0\",\"b\":\"^2.0.0\"}}", singletonList(edit));
+        assertThat(new NpmLockPatcher().patch(set)).isEqualTo(lock
+                .replace("b-1.0.0.tgz", "b-1.0.1.tgz")
+                .replace("\"version\": \"1.0.0\",\n      \"resolved\": \"https://registry.npmjs.org/b/",
+                        "\"version\": \"1.0.1\",\n      \"resolved\": \"https://registry.npmjs.org/b/")
+                .replace("sha512-b1\"", "sha512-b11\""));
+    }
+
+    @Test
+    void promotionClearsDevInV2LegacyTree() {
+        String lock = "{\n" +
+                "  \"name\": \"t\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"lockfileVersion\": 2,\n" +
+                "  \"requires\": true,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"t\",\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"devDependencies\": {\n" +
+                "        \"is-even\": \"^1.0.0\"\n" +
+                "      }\n" +
+                "    },\n" +
+                "    \"node_modules/is-even\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/is-even/-/is-even-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-e\",\n" +
+                "      \"dev\": true\n" +
+                "    }\n" +
+                "  },\n" +
+                "  \"dependencies\": {\n" +
+                "    \"is-even\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/is-even/-/is-even-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-e\",\n" +
+                "      \"dev\": true\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+        PackageEdit edit = PackageEdit.builder()
+                .name("is-even")
+                .oldVersion("1.0.0")
+                .newVersion("1.0.0")
+                .scope("dependencies")
+                .importerDir(null)
+                .kind(PackageEdit.Kind.PROMOTION)
+                .metadata(EntryMetadata.builder().flagsChanged(true).build())
+                .build();
+        LockEditSet set = new LockEditSet(lock, Paths.get("package-lock.json"), PackageManager.Npm,
+                "{\"dependencies\":{\"is-even\":\"^1.0.0\"}}", singletonList(edit));
+        String out = new NpmLockPatcher().patch(set);
+        // The importer edge is written into a fresh dependencies scope and both trees' dev flags clear.
+        assertThat(out).contains("\"dependencies\": {\n        \"is-even\": \"^1.0.0\"\n      },\n      \"devDependencies\"");
+        assertThat(out).doesNotContain("\"dev\": true");
     }
 }

@@ -18,7 +18,7 @@ package org.openrewrite.javascript.internal.lock;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.ByteArrayOutputStream;
@@ -78,7 +78,7 @@ class PnpmLockPatcherTest {
         String patched = bump("v9-engines", PackageEdit.builder()
                 .name("is-number").oldVersion("6.0.0").newVersion("7.0.0")
                 .newIntegrity(IS_NUMBER_700).scope("dependencies")
-                .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines).build())
+                .metadata(EntryMetadata.builder().engines(engines).build())
                 .build());
         assertThat(patched).isEqualTo(read("/lock/pnpm/v9-engines/after"));
     }
@@ -127,7 +127,7 @@ class PnpmLockPatcherTest {
                 singletonList(PackageEdit.builder()
                         .name("is-number").oldVersion("").newVersion("7.0.0").newIntegrity(IS_NUMBER_700)
                         .scope("dependencies").kind(PackageEdit.Kind.ADD)
-                        .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=0.12.0")).build())
+                        .metadata(EntryMetadata.builder().engines(engines(">=0.12.0")).build())
                         .build()));
         assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/add-leaf/after"));
     }
@@ -141,12 +141,12 @@ class PnpmLockPatcherTest {
                                 .name("is-odd").oldVersion("").newVersion("3.0.1").newIntegrity(IS_ODD_301)
                                 .newDependencies(Collections.singletonMap("is-number", "^6.0.0"))
                                 .scope("dependencies").kind(PackageEdit.Kind.ADD)
-                                .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=4")).build())
+                                .metadata(EntryMetadata.builder().engines(engines(">=4")).build())
                                 .build(),
                         PackageEdit.builder()
                                 .name("is-number").oldVersion("").newVersion("6.0.0").newIntegrity(IS_NUMBER_600)
                                 .scope("dependencies").kind(PackageEdit.Kind.ADD)
-                                .writeThroughMetadata(WriteThroughMetadata.builder().engines(engines(">=0.10.0")).build())
+                                .metadata(EntryMetadata.builder().engines(engines(">=0.10.0")).build())
                                 .build()));
         assertThat(new PnpmLockPatcher().patch(edits)).isEqualTo(read("/lock/pnpm/add-closure/after"));
     }
@@ -168,7 +168,7 @@ class PnpmLockPatcherTest {
     void licenseWriteThroughFailsLoud() {
         assertThatThrownBy(() -> bump("v9", PackageEdit.builder()
                 .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213).scope("dependencies")
-                .writeThroughMetadata(WriteThroughMetadata.builder().license("MIT").build()).build()))
+                .metadata(EntryMetadata.builder().license("MIT").build()).build()))
                 .isInstanceOfSatisfying(EngineFailure.class, e -> {
                     assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
                     assertThat(e.failure.getDetail()).contains("license");
@@ -179,7 +179,7 @@ class PnpmLockPatcherTest {
     void deprecatedWriteThroughFailsLoud() {
         assertThatThrownBy(() -> bump("v9", PackageEdit.builder()
                 .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213).scope("dependencies")
-                .writeThroughMetadata(WriteThroughMetadata.builder().deprecated("no longer maintained").build()).build()))
+                .metadata(EntryMetadata.builder().deprecated("no longer maintained").build()).build()))
                 .isInstanceOfSatisfying(EngineFailure.class,
                         e -> assertThat(e.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED));
     }

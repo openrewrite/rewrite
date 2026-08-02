@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -91,8 +91,8 @@ public final class NpmLockPatcher implements LockPatcher {
 
         List<PackageEdit> removals = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
-            if (edit.getNestedUnder() != null) {
-                continue; // both nest kinds run in their own pass
+            if (edit.getNestedUnder() != null && (edit.getKind() == ADD || edit.getKind() == REVERSE_NEST)) {
+                continue; // nested adds and relocations run in their own pass
             }
             if (edit.getKind() == PROMOTION) {
                 root = applyPromotion(root, lockfileVersion, editedManifest, edit);
@@ -142,32 +142,39 @@ public final class NpmLockPatcher implements LockPatcher {
                                       @Nullable JsonNode editedManifest, PackageEdit edit) {
         String name = edit.getName();
         boolean placementMoves = !edit.getNewVersion().equals(edit.getOldVersion());
+        EntryMetadata md = edit.getMetadata();
+        boolean flagsOnly = !placementMoves && md != null && md.isFlagsChanged();
 
-        // Site (1): the hoisted package placement, only when the resolved version actually moves.
-        if (placementMoves) {
+        // Site (1): the installed package placement, when the resolved version moves or only its flags change.
+        if (placementMoves || flagsOnly) {
+            String entryKey = installedKey(edit);
             Json.JsonObject packages = requirePackages(root);
-            Json.JsonObject entry = LockJson.objectMember(packages, "node_modules/" + name);
+            Json.JsonObject entry = LockJson.objectMember(packages, entryKey);
             if (entry == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                        "no packages entry for node_modules/" + name);
+                        "no packages entry for " + entryKey);
             }
-            requireRegistryEntry(name, edit, entry);
-            entry = setStringField(entry, "version", edit.getNewVersion());
-            entry = setStringField(entry, "resolved", edit.getNewResolved());
-            entry = setStringField(entry, "integrity", edit.getNewIntegrity());
-            entry = applyWriteThrough(name, packages, entry, edit.getWriteThroughMetadata());
-            if (edit.isAddsDependencyEdges()) {
-                // add-during-bump: the entry gains dependency edges whose subtrees are placed as fresh ADDs; graft
-                // the full new dependencies map at npm's field position (v3 only; the engine gates v2 out).
-                Map<String, String> deps = edit.getNewDependencies();
-                entry = writeThroughObjectMember(name, packages, entry, "dependencies",
-                        deps == null ? null : JSON.valueToTree(deps));
-            } else {
-                // A cascade bump re-pins the entry's own dependency edges (unchanged ones stay byte-identical); an
-                // added edge fails loud, a dropped edge orphan-prunes when the edit allows it.
-                entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
+            if (placementMoves) {
+                requireRegistryEntry(name, edit, entry);
+                entry = setStringField(entry, "version", edit.getNewVersion());
+                entry = setStringField(entry, "resolved", edit.getNewResolved());
+                entry = setStringField(entry, "integrity", edit.getNewIntegrity());
             }
-            packages = LockJson.replaceValue(packages, "node_modules/" + name, entry);
+            entry = applyMetadata(name, packages, entry, md);
+            if (placementMoves) {
+                if (edit.isAddsDependencyEdges()) {
+                    // add-during-bump: the entry gains dependency edges whose subtrees are placed as fresh ADDs; graft
+                    // the full new dependencies map at npm's field position (v3 only; the engine gates v2 out).
+                    Map<String, String> deps = edit.getNewDependencies();
+                    entry = writeObjectMember(name, packages, entry, "dependencies",
+                            deps == null ? null : JSON.valueToTree(deps));
+                } else {
+                    // A cascade bump re-pins the entry's own dependency edges (unchanged ones stay byte-identical); an
+                    // added edge fails loud, a dropped edge orphan-prunes when the edit allows it.
+                    entry = reconcileConstraintMap(name, entry, "dependencies", edit.getNewDependencies(), edit.isPrunesOrphans());
+                }
+            }
+            packages = LockJson.replaceValue(packages, entryKey, entry);
             root = LockJson.replaceValue(root, "packages", packages);
         }
 
@@ -175,10 +182,20 @@ public final class NpmLockPatcher implements LockPatcher {
         root = applyImporterConstraint(root, editedManifest, edit);
 
         // Site (3): the v2 legacy dependencies tree second writer.
-        if (lockfileVersion == 2 && placementMoves) {
+        if (lockfileVersion == 2 && (placementMoves || flagsOnly)) {
+            if (edit.getNestedUnder() != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        "bumping a nested entry in a lockfileVersion 2 lock is not yet supported");
+            }
             root = applyLegacyTree(root, edit);
         }
         return root;
+    }
+
+    /** The {@code packages} key this edit rewrites: top-level or nested one level under a dependent. */
+    private static String installedKey(PackageEdit edit) {
+        return (edit.getNestedUnder() == null ? "" : "node_modules/" + edit.getNestedUnder() + "/") +
+                "node_modules/" + edit.getName();
     }
 
     private Json.JsonObject applyImporterConstraint(Json.JsonObject root, @Nullable JsonNode editedManifest,
@@ -225,21 +242,41 @@ public final class NpmLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " v2 legacy entry version " + legacyVersion + " != locked " + edit.getOldVersion());
         }
-        entry = setStringField(entry, "version", edit.getNewVersion());
-        entry = setStringField(entry, "resolved", edit.getNewResolved());
-        entry = setStringField(entry, "integrity", edit.getNewIntegrity());
-        if (edit.isAddsDependencyEdges()) {
-            // add-during-bump: the legacy mirror gains a `requires` map (its edges' subtrees added as fresh entries);
-            // graft the full new map at npm's field position.
-            Map<String, String> deps = edit.getNewDependencies();
-            entry = writeThroughObjectMember(name, legacy, entry, "requires", deps == null ? null : JSON.valueToTree(deps));
-        } else {
-            // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them, an
-            // orphan-prune drops them.
-            entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies(), edit.isPrunesOrphans());
+        if (!edit.getNewVersion().equals(edit.getOldVersion())) {
+            entry = setStringField(entry, "version", edit.getNewVersion());
+            entry = setStringField(entry, "resolved", edit.getNewResolved());
+            entry = setStringField(entry, "integrity", edit.getNewIntegrity());
+            if (edit.isAddsDependencyEdges()) {
+                // add-during-bump: the legacy mirror gains a `requires` map (its edges' subtrees added as fresh entries);
+                // graft the full new map at npm's field position.
+                Map<String, String> deps = edit.getNewDependencies();
+                entry = writeObjectMember(name, legacy, entry, "requires", deps == null ? null : JSON.valueToTree(deps));
+            } else {
+                // The v2 legacy tree mirrors a dependent's edges under `requires`; a cascade re-pins them, an
+                // orphan-prune drops them.
+                entry = reconcileConstraintMap(name, entry, "requires", edit.getNewDependencies(), edit.isPrunesOrphans());
+            }
+        }
+        EntryMetadata md = edit.getMetadata();
+        if (md != null && md.isFlagsChanged()) {
+            entry = writeLegacyFlags(name, entry, md);
         }
         legacy = LockJson.replaceValue(legacy, name, entry);
         return LockJson.replaceValue(root, "dependencies", legacy);
+    }
+
+    /**
+     * Exact-set the v2 legacy entry's {@code dev}/{@code optional} flags. The legacy serialization of
+     * {@code devOptional}/{@code peer} is not verified, so any involvement defers.
+     */
+    private Json.JsonObject writeLegacyFlags(String name, Json.JsonObject entry, EntryMetadata md) {
+        if (Boolean.TRUE.equals(md.getDevOptional()) || Boolean.TRUE.equals(md.getPeer()) ||
+                LockJson.member(entry, "devOptional") != null || LockJson.member(entry, "peer") != null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " devOptional/peer flags in a lockfileVersion 2 legacy tree are not yet supported");
+        }
+        entry = writeFlag(entry, "dev", md.getDev());
+        return writeFlag(entry, "optional", md.getOptional());
     }
 
     /**
@@ -347,24 +384,30 @@ public final class NpmLockPatcher implements LockPatcher {
 
     /**
      * Promote an already-installed transitive to a declared dependency: the {@code node_modules/<name>} entry
-     * stays, so only the importer edge is written. A dev→prod promotion also clears {@code "dev": true} on the
-     * leaf; the v2 legacy tree marks dev in two places, so clearing it there fails loud.
+     * stays, so only the importer edge is written. A dev→prod promotion also rewrites the entry's flags (both
+     * trees on v2) through the edit's metadata.
      */
     private Json.JsonObject applyPromotion(Json.JsonObject root, int lockfileVersion,
                                            @Nullable JsonNode editedManifest, PackageEdit edit) {
         root = insertImporterConstraint(root, editedManifest, edit);
-        if (edit.isClearDev()) {
-            if (lockfileVersion == 2) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                        "clearing dev on a lockfileVersion 2 promotion (legacy tree) is not yet supported");
-            }
+        EntryMetadata md = edit.getMetadata();
+        if (md != null && md.isFlagsChanged()) {
             Json.JsonObject packages = requirePackages(root);
             String entryKey = "node_modules/" + edit.getName();
             Json.JsonObject entry = LockJson.objectMember(packages, entryKey);
             if (entry != null) {
-                entry = removeMembers(entry, Collections.singleton("dev"));
+                entry = applyMetadata(edit.getName(), packages, entry, md);
                 packages = LockJson.replaceValue(packages, entryKey, entry);
                 root = LockJson.replaceValue(root, "packages", packages);
+            }
+            if (lockfileVersion == 2) {
+                Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
+                Json.JsonObject legacyEntry = legacy == null ? null : LockJson.objectMember(legacy, edit.getName());
+                if (legacyEntry != null) {
+                    legacyEntry = writeLegacyFlags(edit.getName(), legacyEntry, md);
+                    legacy = LockJson.replaceValue(legacy, edit.getName(), legacyEntry);
+                    root = LockJson.replaceValue(root, "dependencies", legacy);
+                }
             }
         }
         return root;
@@ -388,11 +431,20 @@ public final class NpmLockPatcher implements LockPatcher {
         fields.add(new EntryField("version", jsonEncode(edit.getNewVersion()), false));
         fields.add(new EntryField("resolved", jsonEncode(edit.getNewResolved()), false));
         fields.add(new EntryField("integrity", jsonEncode(edit.getNewIntegrity()), false));
-        if ("devDependencies".equals(edit.getScope())) {
-            fields.add(new EntryField("dev", "true", false));
-        }
-        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        EntryMetadata wt = edit.getMetadata();
         if (wt != null) {
+            if (Boolean.TRUE.equals(wt.getDev())) {
+                fields.add(new EntryField("dev", "true", false));
+            }
+            if (Boolean.TRUE.equals(wt.getOptional())) {
+                fields.add(new EntryField("optional", "true", false));
+            }
+            if (Boolean.TRUE.equals(wt.getDevOptional())) {
+                fields.add(new EntryField("devOptional", "true", false));
+            }
+            if (Boolean.TRUE.equals(wt.getPeer())) {
+                fields.add(new EntryField("peer", "true", false));
+            }
             if (wt.getDeprecated() != null) {
                 fields.add(new EntryField("deprecated", jsonEncode(wt.getDeprecated()), false));
             }
@@ -496,7 +548,8 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         // The v2 legacy tree marks dev entries with "dev": true; its byte-exact form for a dev closure
         // add is not yet verified, so defer rather than emit a maybe-wrong entry.
-        if ("devDependencies".equals(edit.getScope())) {
+        EntryMetadata md = edit.getMetadata();
+        if ("devDependencies".equals(edit.getScope()) || (md != null && Boolean.TRUE.equals(md.getDev()))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "adding a devDependency closure to a lockfileVersion 2 lock is not yet supported");
         }
@@ -764,28 +817,34 @@ public final class NpmLockPatcher implements LockPatcher {
         throw new EngineFailure(Reason.MALFORMED_LOCK, null, "could not construct new lock member");
     }
 
-    private Json.JsonObject applyWriteThrough(String name, Json.JsonObject packages, Json.JsonObject entry,
-                                              @Nullable WriteThroughMetadata wt) {
+    private Json.JsonObject applyMetadata(String name, Json.JsonObject packages, Json.JsonObject entry,
+                                              @Nullable EntryMetadata wt) {
         if (wt == null) {
             return entry;
+        }
+        if (wt.isFlagsChanged()) {
+            entry = writeFlag(entry, "dev", wt.getDev());
+            entry = writeFlag(entry, "optional", wt.getOptional());
+            entry = writeFlag(entry, "devOptional", wt.getDevOptional());
+            entry = writeFlag(entry, "peer", wt.getPeer());
         }
         if (wt.getBin() != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " bin metadata changed; native write-through is not supported");
         }
         if (wt.isEnginesChanged()) {
-            entry = writeThroughEngines(name, packages, entry, wt.getEngines());
+            entry = writeEngines(name, packages, entry, wt.getEngines());
         }
         if (wt.isFundingChanged()) {
-            entry = writeThroughObjectMember(name, packages, entry, "funding", wt.getFunding());
+            entry = writeObjectMember(name, packages, entry, "funding", wt.getFunding());
         }
         if (wt.isPeerDependenciesChanged()) {
             Map<String, String> peers = wt.getPeerDependencies();
             JsonNode value = (peers == null || peers.isEmpty()) ? null : JSON.valueToTree(peers);
-            entry = writeThroughObjectMember(name, packages, entry, "peerDependencies", value);
+            entry = writeObjectMember(name, packages, entry, "peerDependencies", value);
         }
         if (wt.isPeerDependenciesMetaChanged()) {
-            entry = writeThroughObjectMember(name, packages, entry, "peerDependenciesMeta", wt.getPeerDependenciesMeta());
+            entry = writeObjectMember(name, packages, entry, "peerDependenciesMeta", wt.getPeerDependenciesMeta());
         }
         if (wt.getLicense() != null) {
             if (LockJson.member(entry, "license") == null) {
@@ -802,15 +861,24 @@ public final class NpmLockPatcher implements LockPatcher {
         return entry;
     }
 
+    /** Ensure a boolean flag member is present ({@code true}) or absent; untouched bytes when already right. */
+    private Json.JsonObject writeFlag(Json.JsonObject entry, String key, @Nullable Boolean value) {
+        boolean want = Boolean.TRUE.equals(value);
+        if (want == (LockJson.member(entry, key) != null)) {
+            return entry;
+        }
+        return want ? graftSorted(entry, key, "true", false) : removeMembers(entry, Collections.singleton(key));
+    }
+
     /** Add, replace, or remove the entry's {@code engines} object at npm's field position (byte-exact). */
-    private Json.JsonObject writeThroughEngines(String name, Json.JsonObject packages, Json.JsonObject entry,
+    private Json.JsonObject writeEngines(String name, Json.JsonObject packages, Json.JsonObject entry,
                                                 @Nullable Map<String, String> engines) {
         JsonNode value = (engines == null || engines.isEmpty()) ? null : JSON.valueToTree(engines);
-        return writeThroughObjectMember(name, packages, entry, "engines", value);
+        return writeObjectMember(name, packages, entry, "engines", value);
     }
 
     /** Add, replace, or remove an object-valued entry member at npm's field position (byte-exact). */
-    private Json.JsonObject writeThroughObjectMember(String name, Json.JsonObject packages, Json.JsonObject entry,
+    private Json.JsonObject writeObjectMember(String name, Json.JsonObject packages, Json.JsonObject entry,
                                                      String key, @Nullable JsonNode value) {
         entry = removeMembers(entry, Collections.singleton(key));
         if (value == null) {

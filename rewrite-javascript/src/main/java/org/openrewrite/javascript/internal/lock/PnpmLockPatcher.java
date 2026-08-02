@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.LockEditSet.WriteThroughMetadata;
+import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
@@ -420,7 +420,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     }
 
     private Yaml.Mapping editEngines(Yaml.Mapping body, PackageEdit edit) {
-        WriteThroughMetadata metadata = edit.getWriteThroughMetadata();
+        EntryMetadata metadata = edit.getMetadata();
         if (metadata == null || metadata.getEngines() == null) {
             return body;
         }
@@ -434,7 +434,7 @@ public final class PnpmLockPatcher implements LockPatcher {
 
     /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled, so fail loud rather than silently drop them. */
     private void requireSupportedWriteThrough(PackageEdit edit) {
-        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        EntryMetadata wt = edit.getMetadata();
         if (wt == null) {
             return;
         }
@@ -597,7 +597,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     private Yaml.Mapping.Entry buildPackagesEntry(PackageEdit edit, String key) {
         StringBuilder body = new StringBuilder("packages:\n  ").append(key).append(":\n")
                 .append("    resolution: {integrity: ").append(edit.getNewIntegrity()).append('}');
-        WriteThroughMetadata wt = edit.getWriteThroughMetadata();
+        EntryMetadata wt = edit.getMetadata();
         if (wt != null && wt.getEngines() != null) {
             requireQuotableEngines(edit.getName(), wt.getEngines());
             body.append("\n    engines: ").append(renderEngines(wt.getEngines()));

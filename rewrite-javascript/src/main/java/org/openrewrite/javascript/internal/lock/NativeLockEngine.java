@@ -438,7 +438,7 @@ public final class NativeLockEngine {
         // loud outright, it seeds the greedy-forward cascade below. A peer-surface delta whose already-installed
         // providers still satisfy the new ranges is written through rather than deferred (npm only).
         boolean depsEqual = dependenciesEqual(oldManifest, newManifest);
-        LockEditSet.WriteThroughMetadata surfaces =
+        LockEditSet.EntryMetadata surfaces =
                 proveSurfacesAndWriteThrough(pm, name, oldManifest, newManifest, existingLock, depsEqual);
 
         VersionManifest.Dist dist = newManifest.getDist();
@@ -451,7 +451,7 @@ public final class NativeLockEngine {
                 .newShasum(dist == null ? null : dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .writeThroughMetadata(surfaces)
+                .metadata(surfaces)
                 .prunesOrphans(prunesOrphans)
                 .build();
 
@@ -659,7 +659,7 @@ public final class NativeLockEngine {
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
                     .kind(ADD)
-                    .writeThroughMetadata(leafMetadata(p.manifest))
+                    .metadata(leafMetadata(p.manifest, p.dev))
                     .build());
         }
         return edits;
@@ -749,7 +749,7 @@ public final class NativeLockEngine {
                 .newShasum(dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .writeThroughMetadata(writeThrough(PackageManager.Npm, oldManifest, newManifest))
+                .metadata(writeThrough(PackageManager.Npm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .kind(FORCED_MOVE)
@@ -931,7 +931,7 @@ public final class NativeLockEngine {
                 .newVersion(target)
                 .newIntegrity(dist.getIntegrity())
                 .newDependencies(newManifest.getDependencies())
-                .writeThroughMetadata(writeThrough(PackageManager.Pnpm, oldManifest, newManifest))
+                .metadata(writeThrough(PackageManager.Pnpm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .kind(FORCED_MOVE)
@@ -996,7 +996,7 @@ public final class NativeLockEngine {
                 .oldVersion(oldVersion)
                 .newVersion(targetVersion)
                 .newIntegrity(dist.getIntegrity())
-                .writeThroughMetadata(pnpmLeafMetadata(newManifest))
+                .metadata(pnpmLeafMetadata(newManifest))
                 .scope(change.scope)
                 .importerDir(findImporterDir(PackageManager.Pnpm, lock, name, change.oldConstraint))
                 .kind(CONTENT_FORK)
@@ -1211,7 +1211,7 @@ public final class NativeLockEngine {
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(null)
                     .kind(ADD)
-                    .writeThroughMetadata(leafMetadata(p.manifest))
+                    .metadata(leafMetadata(p.manifest, p.dev))
                     .build());
         }
         for (NestedPlacement np : nested.values()) {
@@ -1227,7 +1227,7 @@ public final class NativeLockEngine {
                     .importerDir(null)
                     .kind(ADD)
                     .nestedUnder(np.parent)
-                    .writeThroughMetadata(leafMetadata(np.manifest))
+                    .metadata(leafMetadata(np.manifest, np.dev))
                     .build());
         }
         if (promotion != null) {
@@ -1256,15 +1256,24 @@ public final class NativeLockEngine {
             }
         }
         String version = installedVersion(installed, entryKey);
-        return LockEditSet.PackageEdit.builder()
+        LockEditSet.PackageEdit.PackageEditBuilder promotion = LockEditSet.PackageEdit.builder()
                 .name(rootName)
                 .oldVersion(version == null ? "" : version)
                 .newVersion(version)
                 .scope(scope)
                 .importerDir(null)
-                .kind(PROMOTION)
-                .clearDev(clearDev)
-                .build();
+                .kind(PROMOTION);
+        if (clearDev) {
+            // Exact-set flags: dev cleared, the entry's other flags carried unchanged.
+            Map<?, ?> e = (Map<?, ?>) entry;
+            promotion.metadata(LockEditSet.EntryMetadata.builder()
+                    .flagsChanged(true)
+                    .optional(Boolean.TRUE.equals(e.get("optional")) ? Boolean.TRUE : null)
+                    .devOptional(Boolean.TRUE.equals(e.get("devOptional")) ? Boolean.TRUE : null)
+                    .peer(Boolean.TRUE.equals(e.get("peer")) ? Boolean.TRUE : null)
+                    .build());
+        }
+        return promotion.build();
     }
 
     /**
@@ -1382,7 +1391,7 @@ public final class NativeLockEngine {
                     .scope(p.dev ? "devDependencies" : "dependencies")
                     .importerDir(e.getKey().equals(rootName) ? memberImporterDir : null)
                     .kind(ADD)
-                    .writeThroughMetadata(pnpmLeafMetadata(p.manifest))
+                    .metadata(pnpmLeafMetadata(p.manifest))
                     .build());
         }
         return edits;
@@ -1720,11 +1729,11 @@ public final class NativeLockEngine {
     }
 
     /** The only packages-entry metadata the pnpm add patcher renders is {@code engines}; carry it, drop the rest. */
-    private static LockEditSet.@Nullable WriteThroughMetadata pnpmLeafMetadata(VersionManifest m) {
+    private static LockEditSet.@Nullable EntryMetadata pnpmLeafMetadata(VersionManifest m) {
         if (!notEmpty(m.getEngines())) {
             return null;
         }
-        return LockEditSet.WriteThroughMetadata.builder().engines(m.getEngines()).build();
+        return LockEditSet.EntryMetadata.builder().engines(m.getEngines()).build();
     }
 
     /**
@@ -1938,15 +1947,16 @@ public final class NativeLockEngine {
         return null;
     }
 
-    private static LockEditSet.@Nullable WriteThroughMetadata leafMetadata(VersionManifest m) {
+    private static LockEditSet.@Nullable EntryMetadata leafMetadata(VersionManifest m, boolean dev) {
         boolean peers = notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta());
-        boolean any = m.getLicenseString() != null || m.getDeprecated() != null || notEmpty(m.getEngines()) ||
+        boolean any = dev || m.getLicenseString() != null || m.getDeprecated() != null || notEmpty(m.getEngines()) ||
                 notEmpty(m.getOs()) || notEmpty(m.getCpu()) || notEmpty(m.getLibc()) ||
                 bool(m.getHasInstallScript()) || m.getBin() != null || m.getFunding() != null || peers;
         if (!any) {
             return null;
         }
-        return LockEditSet.WriteThroughMetadata.builder()
+        return LockEditSet.EntryMetadata.builder()
+                .dev(dev ? Boolean.TRUE : null)
                 .license(m.getLicenseString())
                 .deprecated(m.getDeprecated())
                 .engines(notEmpty(m.getEngines()) ? m.getEngines() : null)
@@ -2031,7 +2041,7 @@ public final class NativeLockEngine {
      * satisfying version (an absent optional peer counts as satisfied), and no peer that flips to optional could let
      * npm GC its provider — each such provider is a root-anchored dependency npm never prunes. Anything else defers.
      */
-    private static LockEditSet.@Nullable WriteThroughMetadata proveSurfacesAndWriteThrough(
+    private static LockEditSet.@Nullable EntryMetadata proveSurfacesAndWriteThrough(
             PackageManager pm, String name, VersionManifest oldM, VersionManifest newM, String lock, boolean depsEqual) {
         provePlatformSurfacesUnchanged(name, oldM, newM);
         requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
@@ -2039,7 +2049,7 @@ public final class NativeLockEngine {
         boolean peerChanged = !Objects.equals(normalize(oldM.getPeerDependencies()), normalize(newM.getPeerDependencies()));
         boolean peerMetaChanged =
                 !Objects.equals(normalize(oldM.getPeerDependenciesMeta()), normalize(newM.getPeerDependenciesMeta()));
-        LockEditSet.WriteThroughMetadata base = writeThrough(pm, oldM, newM);
+        LockEditSet.EntryMetadata base = writeThrough(pm, oldM, newM);
         if (!peerChanged && !peerMetaChanged) {
             return base;
         }
@@ -2052,8 +2062,8 @@ public final class NativeLockEngine {
         requirePeerProvidersSatisfy(pm, name, newM, lock);
         requireOptionalFlipsAnchored(pm, name, oldM, newM, lock);
 
-        LockEditSet.WriteThroughMetadata.WriteThroughMetadataBuilder b =
-                base == null ? LockEditSet.WriteThroughMetadata.builder() : base.toBuilder();
+        LockEditSet.EntryMetadata.EntryMetadataBuilder b =
+                base == null ? LockEditSet.EntryMetadata.builder() : base.toBuilder();
         if (peerChanged) {
             b.peerDependencies(notEmpty(newM.getPeerDependencies()) ? newM.getPeerDependencies() : null)
                     .peerDependenciesChanged(true);
@@ -2652,8 +2662,8 @@ public final class NativeLockEngine {
         return paren >= 0 ? k.substring(0, paren) : k;
     }
 
-    private static LockEditSet.@Nullable WriteThroughMetadata writeThrough(PackageManager pm, VersionManifest oldM, VersionManifest newM) {
-        LockEditSet.WriteThroughMetadata.WriteThroughMetadataBuilder b = LockEditSet.WriteThroughMetadata.builder();
+    private static LockEditSet.@Nullable EntryMetadata writeThrough(PackageManager pm, VersionManifest oldM, VersionManifest newM) {
+        LockEditSet.EntryMetadata.EntryMetadataBuilder b = LockEditSet.EntryMetadata.builder();
         boolean any = false;
         if (!Objects.equals(normalize(oldM.getEngines()), normalize(newM.getEngines()))) {
             b.engines(newM.getEngines());

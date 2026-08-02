@@ -81,9 +81,9 @@ public class LockEditSet {
         @Nullable
         Map<String, String> newOptionalDependencies;
 
-        /** Non-layout deltas the proof writes through rather than failing loud. */
+        /** Non-layout entry deltas the proof patches in place rather than failing loud. */
         @Nullable
-        WriteThroughMetadata writeThroughMetadata;
+        EntryMetadata metadata;
 
         /** Pre-edit constraint, so yarn-classic can split a moving selector out of a merged header rather than renaming it. */
         @Nullable
@@ -111,9 +111,6 @@ public class LockEditSet {
         /** The bump dropped one or more edges: drop them from this entry, then GC whatever they leave unreachable. */
         boolean prunesOrphans;
 
-        /** A {@code PROMOTION} of a dev-only transitive now production-reachable clears {@code "dev": true} (leaf only). */
-        boolean clearDev;
-
         /** An add-during-bump: this bump's entry gains new dependency edges whose subtrees are placed as fresh ADDs. */
         boolean addsDependencyEdges;
 
@@ -131,7 +128,7 @@ public class LockEditSet {
      */
     @Value
     @Builder(toBuilder = true)
-    public static class WriteThroughMetadata {
+    public static class EntryMetadata {
         @Nullable
         Map<String, String> engines;
 
@@ -180,5 +177,21 @@ public class LockEditSet {
 
         /** A bump rewrote {@code peerDependenciesMeta} (optionality delta), so the patcher replaces the field in place. */
         boolean peerDependenciesMetaChanged;
+
+        /** Entry flag members ({@code dev}/{@code optional}/{@code devOptional}/{@code peer}); written iff {@code TRUE}. */
+        @Nullable
+        Boolean dev;
+
+        @Nullable
+        Boolean optional;
+
+        @Nullable
+        Boolean devOptional;
+
+        @Nullable
+        Boolean peer;
+
+        /** The flag set changed: an in-place patch makes the entry's flag members exactly the four values above. */
+        boolean flagsChanged;
     }
 }
