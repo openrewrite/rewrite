@@ -74,6 +74,19 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void forkWithPeerBearingMembersV3() {
+        // root declares @conciv/serve (needs @hono/node-server ^2.0.8 -> 2.0.12) and @doxajs/http-hono (pins 2.0.11);
+        // @hono/node-server forks transitively and BOTH members peer-depend hono, which root also declares top-level.
+        // npm hoists @conciv/serve's 2.0.12 and nests @doxajs/http-hono's 2.0.11, records peerDependencies verbatim on
+        // both copies, and flags the shared hono provider `peer: true` — the transitive fork slice with peer-bearing members.
+        assertResolveByteExact("lock/npm/resolve-fork-peer", "after", null,
+                new String[][]{{"@conciv/serve", "0.0.17"}, {"@doxajs/http-hono", "0.1.0-alpha.31"},
+                        {"@doxajs/core", "0.1.0-alpha.31"}, {"@doxajs/runtime", "0.1.0-alpha.31"},
+                        {"@doxajs/manifest", "0.1.0-alpha.31"}, {"@hono/node-server", "2.0.11"},
+                        {"@hono/node-server", "2.0.12"}, {"hono", "4.12.29"}, {"ws", "8.21.1"}});
+    }
+
+    @Test
     void satisfiedPeerProviderV3() {
         // use-sync-external-store peer-depends on react, which root also declares top-level. The peer is a
         // constraint already met (no new node); npm records peerDependencies verbatim and flags react `peer: true`.
@@ -202,6 +215,7 @@ class NpmResolverLockRegenTest extends LockRegenTestSupport {
         assertNpmReproduces("lock/npm/resolve-dev-optional/pkg", "lock/npm/resolve-dev-optional/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-fork/pkg", "lock/npm/resolve-fork/after", "3");
         assertNpmReproduces("lock/npm/resolve-transitive-fork/pkg", "lock/npm/resolve-transitive-fork/after", "3");
+        assertNpmReproduces("lock/npm/resolve-fork-peer/pkg", "lock/npm/resolve-fork-peer/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after", "3");
         assertNpmReproduces("lock/npm/resolve-peer/pkg", "lock/npm/resolve-peer/after-v2", "2");
         assertNpmReproduces("lock/npm/resolve-peer-meta/pkg", "lock/npm/resolve-peer-meta/after", "3");

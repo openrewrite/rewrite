@@ -316,9 +316,11 @@ public final class NpmLockWriter {
      * <em>directly-declared</em> fork, whose hoisted version must be the importer's declared one; and a clean
      * <em>transitive</em> fork of exactly two versions, each required by a single top-level package, whose two
      * requirer names order the same under {@code compareTo} and npm's {@code localeCompare} — the alphabetically
-     * first requirer's version hoists and the other nests under its requirer. Everything else (three or more
-     * versions, a nested or shared requirer, a collation-ambiguous requirer order, a fork member carrying
-     * {@code peerDependencies}) defers rather than guess.
+     * first requirer's version hoists and the other nests under its requirer. A fork member may carry
+     * {@code peerDependencies} as long as each is already satisfied by a single, top-level, dependency-reached
+     * provider (recorded verbatim on both copies, its provider flagged {@code peer: true}). Everything else (three
+     * or more versions, a nested or shared requirer, a collation-ambiguous requirer order, a fork member whose
+     * peer is unsatisfied, forked, or auto-installed) defers rather than guess.
      */
     private static void requireReproducibleForks(ResolutionGraph graph, Map<String, String> placements,
                                                  ResolutionGraph.Importer root) {
@@ -350,22 +352,23 @@ public final class NpmLockWriter {
                 }
                 continue;
             }
-            requireReproducibleTransitiveFork(graph, placements, name, versions, topVersion);
+            requireReproducibleTransitiveFork(graph, placements, root, versionsByName, name, versions, topVersion);
         }
     }
 
     /**
      * A transitive fork (neither version directly declared) is reproduced only in its cleanest shape: exactly two
-     * versions, each required by exactly one top-level package, neither member carrying {@code peerDependencies},
-     * and the two requirer names ordering unambiguously so the hoisted winner matches npm's {@code localeCompare}.
+     * versions, each required by exactly one top-level package, every {@code peerDependencies} a member carries
+     * already satisfied ({@link #requireSatisfiedForkMemberPeers}), and the two requirer names ordering
+     * unambiguously so the hoisted winner matches npm's {@code localeCompare}.
      */
     private static void requireReproducibleTransitiveFork(ResolutionGraph graph, Map<String, String> placements,
+                                                          ResolutionGraph.Importer root, Map<String, Set<String>> versionsByName,
                                                           String name, Set<String> versions, @Nullable String topVersion) {
         for (String version : versions) {
             ResolvedNode member = graph.node(name, version);
-            if (member != null && notEmpty(member.getManifest().getPeerDependencies())) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                        name + "@" + version + " forks and carries peerDependencies (fork-with-peers not reproduced)");
+            if (member != null) {
+                requireSatisfiedForkMemberPeers(graph, placements, root, versionsByName, member);
             }
         }
         // Each forked version must have exactly one requirer, and both requirers must be hoisted top-level.
@@ -418,6 +421,59 @@ public final class NpmLockWriter {
             char cb = b.charAt(i);
             if (ca != cb) {
                 return ca >= 'a' && ca <= 'z' && cb >= 'a' && cb <= 'z';
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A peer-bearing fork member is reproduced only when the writer would serialize its peers the same way in or
+     * out of the fork: a non-optional peer must resolve to a single version placed top-level and reached by a real
+     * dependency edge (so it is flagged {@code peer: true} and stays visible to both the hoisted and the nested
+     * copy), and an optional peer may simply be absent. Both copies then record {@code peerDependencies} verbatim
+     * from the manifest exactly as {@link #packageEntry} already does. A forked, nested, or auto-installed peer
+     * provider — or a non-optional peer with no provider at all — reshapes the layout in a way not byte-verified,
+     * so it defers.
+     */
+    private static void requireSatisfiedForkMemberPeers(ResolutionGraph graph, Map<String, String> placements,
+                                                        ResolutionGraph.Importer root,
+                                                        Map<String, Set<String>> versionsByName, ResolvedNode member) {
+        Map<String, String> peers = member.getManifest().getPeerDependencies();
+        if (peers == null) {
+            return;
+        }
+        JsonNode meta = member.getManifest().getPeerDependenciesMeta();
+        String who = member.getName() + "@" + member.getVersion();
+        for (String peerName : peers.keySet()) {
+            Set<String> provided = versionsByName.get(peerName);
+            if (provided == null || provided.isEmpty()) {
+                if (isOptionalPeer(meta, peerName)) {
+                    continue;
+                }
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, member.getName(),
+                        who + " forks and its peer " + peerName + " is unsatisfied (fork-with-unsatisfied-peer not reproduced)");
+            }
+            if (provided.size() != 1) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, member.getName(),
+                        who + " forks and its peer " + peerName + " itself forks (fork-with-forked-peer not reproduced)");
+            }
+            String peerVersion = provided.iterator().next();
+            if (!(NM + peerName).equals(placements.get(ResolutionGraph.key(peerName, peerVersion))) ||
+                    !dependencyReachable(graph, root, peerName, peerVersion)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, member.getName(),
+                        who + " forks and its peer " + peerName + " is nested or auto-installed (fork-with-non-hoisted-peer not reproduced)");
+            }
+        }
+    }
+
+    /** Whether some importer or resolved dependency edge reaches {@code name@version} — i.e. it is not a peer-only, auto-installed node. */
+    private static boolean dependencyReachable(ResolutionGraph graph, ResolutionGraph.Importer root, String name, String version) {
+        if (version.equals(root.getResolved().get(name))) {
+            return true;
+        }
+        for (ResolvedNode node : graph.getNodes().values()) {
+            if (version.equals(node.getResolvedEdges().get(name))) {
+                return true;
             }
         }
         return false;

@@ -220,9 +220,9 @@ class NpmLockWriterTest {
     }
 
     @Test
-    void forkMemberCarryingPeersDefers() {
-        // zpkg's shared@2.0.0 declares a peer that is satisfied top-level (so the builder resolves it), but a
-        // fork member carrying peerDependencies could reshape placement, so the writer defers.
+    void forkMemberWithSatisfiedPeerReproduced() {
+        // zpkg's shared@2.0.0 (the nested fork member) peer-depends on host, satisfied by the top-level host. The
+        // writer records the peer verbatim on the nested copy and flags host `peer: true` instead of deferring.
         FakeRegistry registry = new FakeRegistry()
                 .add("apkg", "1.0.0", singletonMap("shared", "^1.0.0"), "MIT", null)
                 .add("zpkg", "1.0.0", singletonMap("shared", "^2.0.0"), "MIT", null)
@@ -238,7 +238,73 @@ class NpmLockWriterTest {
         deps.put("apkg", "^1.0.0");
         deps.put("zpkg", "^1.0.0");
         deps.put("host", "^1.0.0");
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", app(deps)));
+        String lock = new NpmLockWriter().write(new NpmGraphBuilder(registry).build(singletonMap("", app(deps))), 3);
+
+        // The satisfied peer's provider is flagged `peer: true` even though it is also a top-level dependency.
+        assertThat(lock).contains("\"node_modules/host\": {\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"resolved\": \"https://r/host/-/host-1.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-host-1.0.0\",\n" +
+                "      \"license\": \"MIT\",\n" +
+                "      \"peer\": true\n" +
+                "    }");
+        // The nested fork member records its peerDependencies verbatim, exactly like the hoisted copy would.
+        assertThat(lock).contains("\"node_modules/zpkg/node_modules/shared\": {\n" +
+                "      \"version\": \"2.0.0\",\n" +
+                "      \"resolved\": \"https://r/shared/-/shared-2.0.0.tgz\",\n" +
+                "      \"integrity\": \"sha512-shared-2.0.0\",\n" +
+                "      \"license\": \"MIT\",\n" +
+                "      \"peerDependencies\": {\n" +
+                "        \"host\": \"^1.0.0\"\n" +
+                "      }\n" +
+                "    }");
+    }
+
+    @Test
+    void forkMemberWithAutoInstalledPeerDefers() {
+        // shared@2.0.0 peer-depends on host, which the app does NOT declare; npm auto-installs host top-level, but an
+        // auto-installed peer of a fork member is a layout the writer has not byte-verified, so it defers.
+        FakeRegistry registry = new FakeRegistry()
+                .add("apkg", "1.0.0", singletonMap("shared", "^1.0.0"), "MIT", null)
+                .add("zpkg", "1.0.0", singletonMap("shared", "^2.0.0"), "MIT", null)
+                .add("shared", "1.0.0", emptyMap(), "MIT", null)
+                .add("host", "1.0.0", emptyMap(), "MIT", null);
+        registry.versionsByName.computeIfAbsent("shared", k -> new TreeSet<>()).add("2.0.0");
+        registry.manifests.put("shared@2.0.0", new VersionManifest("shared", "2.0.0", TextNode.valueOf("MIT"), "MIT",
+                null, null, singletonMap("host", "^1.0.0"), null, null, null, null, null, null, null, null, null, null,
+                null, new VersionManifest.Dist("https://r/shared/-/shared-2.0.0.tgz", null, "sha512-shared-2.0.0"),
+                null, null, null));
+
+        Map<String, String> deps = new LinkedHashMap<>();
+        deps.put("apkg", "^1.0.0");
+        deps.put("zpkg", "^1.0.0");
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true).build(singletonMap("", app(deps)));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmLockWriter().write(graph, 3));
+    }
+
+    @Test
+    void forkMemberWithForkedPeerProviderDefers() {
+        // shared@2.0.0 peer-depends on host, but host itself forks (1.0.0 under hp1, 2.0.0 under hp2). The resolver
+        // rejects a peer resolving to multiple versions upstream; this hand-built graph exercises the writer's own
+        // guard directly — a forked peer provider could resolve differently for the two shared copies, so it defers.
+        Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
+        nodes.put("apkg@1.0.0", new ResolvedNode(mani("apkg", "1.0.0", null, null), singletonMap("shared", "1.0.0")));
+        nodes.put("zpkg@1.0.0", new ResolvedNode(mani("zpkg", "1.0.0", null, null), singletonMap("shared", "2.0.0")));
+        nodes.put("hp1@1.0.0", new ResolvedNode(mani("hp1", "1.0.0", null, null), singletonMap("host", "1.0.0")));
+        nodes.put("hp2@1.0.0", new ResolvedNode(mani("hp2", "1.0.0", null, null), singletonMap("host", "2.0.0")));
+        nodes.put("shared@1.0.0", new ResolvedNode(mani("shared", "1.0.0", null, null), emptyMap()));
+        nodes.put("shared@2.0.0", new ResolvedNode(mani("shared", "2.0.0", null, singletonMap("host", "*")), emptyMap()));
+        nodes.put("host@1.0.0", new ResolvedNode(mani("host", "1.0.0", null, null), emptyMap()));
+        nodes.put("host@2.0.0", new ResolvedNode(mani("host", "2.0.0", null, null), emptyMap()));
+
+        Map<String, String> resolved = new LinkedHashMap<>();
+        resolved.put("apkg", "1.0.0");
+        resolved.put("zpkg", "1.0.0");
+        resolved.put("hp1", "1.0.0");
+        resolved.put("hp2", "1.0.0");
+        ResolutionGraph graph = new ResolutionGraph(Collections.singletonList(
+                new ResolutionGraph.Importer("", "app", "1.0.0", emptyMap(), resolved)), nodes);
 
         assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmLockWriter().write(graph, 3));
     }
@@ -428,6 +494,14 @@ class NpmLockWriterTest {
     }
 
     // --- in-memory registry + manifest builders ---------------------------
+
+    private static VersionManifest mani(String name, String version, @Nullable Map<String, String> deps,
+                                        @Nullable Map<String, String> peers) {
+        return new VersionManifest(name, version, TextNode.valueOf("MIT"), "MIT", deps, null, peers, null, null, null,
+                null, null, null, null, null, null, null, null,
+                new VersionManifest.Dist("https://r/" + name + "/-/" + name + "-" + version + ".tgz", null,
+                        "sha512-" + name + "-" + version), null, null, null);
+    }
 
     private static String app(Map<String, String> dependencies) {
         StringBuilder deps = new StringBuilder();

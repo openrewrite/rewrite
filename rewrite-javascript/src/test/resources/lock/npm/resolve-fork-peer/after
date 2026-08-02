@@ -1,0 +1,129 @@
+{
+  "name": "resolve-fork-peer",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "resolve-fork-peer",
+      "version": "1.0.0",
+      "dependencies": {
+        "@conciv/serve": "0.0.17",
+        "@doxajs/http-hono": "0.1.0-alpha.31",
+        "hono": "4.12.29"
+      }
+    },
+    "node_modules/@conciv/serve": {
+      "version": "0.0.17",
+      "resolved": "https://registry.npmjs.org/@conciv/serve/-/serve-0.0.17.tgz",
+      "integrity": "sha512-icFsWQMmOM0A0RNPuc9J04YIxqB2wP2AVLa1YmwMbhXudkupxEKJxSP904rpWwbv3ObRZhZy2xUmi7xDC2lP5Q==",
+      "license": "MIT",
+      "dependencies": {
+        "@hono/node-server": "^2.0.8",
+        "hono": "^4.12.0",
+        "ws": "^8.21.0"
+      }
+    },
+    "node_modules/@doxajs/core": {
+      "version": "0.1.0-alpha.31",
+      "resolved": "https://registry.npmjs.org/@doxajs/core/-/core-0.1.0-alpha.31.tgz",
+      "integrity": "sha512-OjucRHGLP34HhTxsbmABKAXUNYN/SmytLzwnH8Jd9KeVF9YI6rqTK5QIp/I+JDF27OIkNu1DgMF0tlhUViV/ZA==",
+      "license": "Apache-2.0",
+      "engines": {
+        "node": ">=24.7 <25"
+      }
+    },
+    "node_modules/@doxajs/http-hono": {
+      "version": "0.1.0-alpha.31",
+      "resolved": "https://registry.npmjs.org/@doxajs/http-hono/-/http-hono-0.1.0-alpha.31.tgz",
+      "integrity": "sha512-y5qFUUSqQXcS4lJzDKn4x+FOUWVnLNMSztAflCr2hZ5zcME6Eqa9D6y4VHbBvIPJYH/AzTx/vBXbBjFK8Gqb4A==",
+      "license": "Apache-2.0",
+      "dependencies": {
+        "@doxajs/core": "0.1.0-alpha.31",
+        "@doxajs/runtime": "0.1.0-alpha.31",
+        "@hono/node-server": "2.0.11",
+        "hono": "4.12.29"
+      },
+      "engines": {
+        "node": ">=24.7 <25"
+      }
+    },
+    "node_modules/@doxajs/http-hono/node_modules/@hono/node-server": {
+      "version": "2.0.11",
+      "resolved": "https://registry.npmjs.org/@hono/node-server/-/node-server-2.0.11.tgz",
+      "integrity": "sha512-bjD221KPLoJTWUwso1J6fGKiTXEUFedG/s0visavY4zakFPkeGURMRNly+FhBHs7T8Dz4qHaZIMX9ZoJHSJtKA==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=20"
+      },
+      "peerDependencies": {
+        "hono": "^4"
+      }
+    },
+    "node_modules/@doxajs/manifest": {
+      "version": "0.1.0-alpha.31",
+      "resolved": "https://registry.npmjs.org/@doxajs/manifest/-/manifest-0.1.0-alpha.31.tgz",
+      "integrity": "sha512-Zky4u8NNvWC5F0XAWBOPST0xIts1hu8chgxGOsnAoekfrcmjLMs/yYjw2tcWn9O9W6nS/IFuLMslA6maHpr5bg==",
+      "license": "Apache-2.0",
+      "engines": {
+        "node": ">=24.7 <25"
+      }
+    },
+    "node_modules/@doxajs/runtime": {
+      "version": "0.1.0-alpha.31",
+      "resolved": "https://registry.npmjs.org/@doxajs/runtime/-/runtime-0.1.0-alpha.31.tgz",
+      "integrity": "sha512-qVWaCk5VjIyw0AP50bGcMcEWoUX3uQ9h7MXa+gPxCnnqwa0lsNO/Ei9c8dBfQLcFPp8VGRbji9T/Sma9r0sEdQ==",
+      "license": "Apache-2.0",
+      "dependencies": {
+        "@doxajs/core": "0.1.0-alpha.31",
+        "@doxajs/manifest": "0.1.0-alpha.31"
+      },
+      "engines": {
+        "node": ">=24.7 <25"
+      }
+    },
+    "node_modules/@hono/node-server": {
+      "version": "2.0.12",
+      "resolved": "https://registry.npmjs.org/@hono/node-server/-/node-server-2.0.12.tgz",
+      "integrity": "sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=20"
+      },
+      "peerDependencies": {
+        "hono": "^4"
+      }
+    },
+    "node_modules/hono": {
+      "version": "4.12.29",
+      "resolved": "https://registry.npmjs.org/hono/-/hono-4.12.29.tgz",
+      "integrity": "sha512-1hNiRjawYrLq/4m3DQQjPGFg0VZkk4RjQJDff/excI6Dm9BiL75qxGrd7/c6YOxPdq6AscP3LiXhQ6fKFC1Waw==",
+      "license": "MIT",
+      "peer": true,
+      "engines": {
+        "node": ">=16.9.0"
+      }
+    },
+    "node_modules/ws": {
+      "version": "8.21.1",
+      "resolved": "https://registry.npmjs.org/ws/-/ws-8.21.1.tgz",
+      "integrity": "sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=10.0.0"
+      },
+      "peerDependencies": {
+        "bufferutil": "^4.0.1",
+        "utf-8-validate": ">=5.0.2"
+      },
+      "peerDependenciesMeta": {
+        "bufferutil": {
+          "optional": true
+        },
+        "utf-8-validate": {
+          "optional": true
+        }
+      }
+    }
+  }
+}
