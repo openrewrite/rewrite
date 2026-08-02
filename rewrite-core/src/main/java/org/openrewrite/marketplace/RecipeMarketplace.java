@@ -78,7 +78,7 @@ public class RecipeMarketplace {
         root.install(recipe, categoryPath);
     }
 
-    public List<RecipeListing> install(RecipeBundleReader bundleReader) {
+    public Set<RecipeListing> install(RecipeBundleReader bundleReader) {
         RecipeMarketplace marketplace = bundleReader.read();
         RecipeBundle bundle = bundleReader.getBundle();
         bindRecursive(marketplace.getRoot(), bundle);
@@ -94,10 +94,12 @@ public class RecipeMarketplace {
      * nearest scope first.
      *
      * @return The listings actually added, so callers report what landed rather than what was
-     * offered. A recipe filed under several categories appears once per category.
+     * offered. Keyed by recipe name, so a recipe filed under several categories counts once --
+     * and so do two bundles declaring one name, which no current caller can produce because
+     * every merge contributes a single bundle.
      */
-    public List<RecipeListing> merge(RecipeMarketplace marketplace) {
-        List<RecipeListing> added = new ArrayList<>();
+    public Set<RecipeListing> merge(RecipeMarketplace marketplace) {
+        Set<RecipeListing> added = new LinkedHashSet<>();
         // Snapshot, because interning registers each incoming bundle as its first listing lands
         // and a bundle's recipes span several categories -- a live check would block its own
         // second category.
@@ -129,7 +131,7 @@ public class RecipeMarketplace {
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
 
-        private void merge(Category category, Set<BundleKey> alreadyInstalled, List<RecipeListing> added) {
+        private void merge(Category category, Set<BundleKey> alreadyInstalled, Set<RecipeListing> added) {
             for (RecipeListing recipe : category.recipes) {
                 RecipeBundle bundle = recipe.getBundle();
                 if (bundle.getPackageEcosystem() != null && bundle.getPackageName() != null &&

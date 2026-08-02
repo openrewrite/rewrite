@@ -22,6 +22,7 @@ import org.openrewrite.config.RecipeDescriptor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -144,7 +145,7 @@ class RecipeMarketplaceInstallTest {
 
         RecipeMarketplace marketplace = new RecipeMarketplace();
 
-        List<RecipeListing> installedA = marketplace.install(singleRecipeReader(bundleA, "com.foo.Bar"));
+        Set<RecipeListing> installedA = marketplace.install(singleRecipeReader(bundleA, "com.foo.Bar"));
         assertThat(installedA)
                 .as("bundle a is the first to claim com.foo.Bar, so it resolves")
                 .extracting(RecipeListing::getName)
@@ -152,7 +153,7 @@ class RecipeMarketplaceInstallTest {
 
         // bundle b declares the same name from a different coordinate, so it is stored behind a
         // rather than dropped -- otherwise revealing it later would mean reprocessing bundle b.
-        List<RecipeListing> installedB = marketplace.install(singleRecipeReader(bundleB, "com.foo.Bar"));
+        Set<RecipeListing> installedB = marketplace.install(singleRecipeReader(bundleB, "com.foo.Bar"));
         assertThat(installedB)
                 .extracting(RecipeListing::getName)
                 .containsExactly("com.foo.Bar");
