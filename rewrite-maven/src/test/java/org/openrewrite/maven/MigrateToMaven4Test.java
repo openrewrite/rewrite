@@ -194,6 +194,85 @@ class MigrateToMaven4Test implements RewriteTest {
     }
 
     @Test
+    void removeDuplicateDependencies() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>33.4.0-jre</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>33.4.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.1.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>33.4.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void useHttpsForRepositories() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <repositories>
+                      <repository>
+                          <id>my-repo</id>
+                          <url>http://repo.example.com/repo</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.1.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <repositories>
+                      <repository>
+                          <id>my-repo</id>
+                          <url>https://repo.example.com/repo</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void migrateAllLifecyclePhases() {
         rewriteRun(
           pomXml(
@@ -284,7 +363,7 @@ class MigrateToMaven4Test implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-              <project xmlns="http://maven.apache.org/POM/4.1.0">
+              <project>
                   <modelVersion>4.1.0</modelVersion>
                   <groupId>com.example</groupId>
                   <artifactId>my-app</artifactId>
