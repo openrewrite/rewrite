@@ -26,7 +26,7 @@ import java.nio.file.Paths;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The differential harness for Phase B npm {@code funding} write-through: a direct-dependency bump whose new
+ * The differential harness for npm {@code funding} metadata patching: a direct-dependency bump whose new
  * version adds (or changes) a string-form {@code funding} field. npm records it in the {@code packages} entry
  * as {@code {"url": "<string>"}} at its sorted position (the object group, after {@code engines}/{@code bin});
  * the engine writes it through instead of failing loud, reusing the same object-member graft as engines (T13).
@@ -37,9 +37,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The goldens were produced with npm 11.6.2. To re-derive/verify them, enable {@link #recordGoldensWithRealNpm()}.
  * The isolated fixture bumps {@code is-stream 2.0.0 -> 2.0.1}, whose sole surface delta is the added funding.
  */
-class NpmFundingWriteThroughLockRegenTest extends LockRegenTestSupport {
+class NpmFundingLockRegenTest extends LockRegenTestSupport {
 
-    // --- byte-exact funding write-through (goldens from real npm 11.6.2) ---
+    // --- byte-exact funding patching (goldens from real npm 11.6.2) ---
 
     @Test
     void fundingChangeV3() {
@@ -62,7 +62,7 @@ class NpmFundingWriteThroughLockRegenTest extends LockRegenTestSupport {
     @Test
     void nonStringFundingFailsLoud() {
         // Bump funky 1.0.0 -> 2.0.0, whose new version declares an object-form funding. Only the string form
-        // is byte-reproducible (npm reshapes object/array funding), so the write-through refuses.
+        // is byte-reproducible (npm reshapes object/array funding), so the patch refuses.
         routes.put(REG + "funky", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
         routes.put(REG + "funky/1.0.0", "{\"name\":\"funky\",\"version\":\"1.0.0\"}");
         routes.put(REG + "funky/2.0.0",

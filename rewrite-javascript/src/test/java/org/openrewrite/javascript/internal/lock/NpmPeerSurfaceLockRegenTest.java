@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
 
-    // --- byte-exact peer write-through (goldens from real npm 11.6.2) ---
+    // --- byte-exact peer metadata patching (goldens from real npm 11.6.2) ---
 
     @Test
     void peerRangeWidenedProviderSatisfies() {
@@ -61,7 +61,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         // Bump zustand 3.5.1 -> 3.5.2: the sole surface delta adds `peerDependenciesMeta` marking `react` optional
         // (the `react` peer range is unchanged). react@18.3.1 is a root dependency npm never prunes, so nothing moves
         // and only the entry's `peerDependenciesMeta` is written through.
-        assertPeerByteExact("lock/npm/peer-writethrough/meta-optional", "zustand", "3.5.1", "3.5.2");
+        assertPeerByteExact("lock/npm/peer-metadata/meta-optional", "zustand", "3.5.1", "3.5.2");
     }
 
     @Test
@@ -70,7 +70,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         // widens the optional `redux` peer (redux@4.2.1 still satisfies), touching both `peerDependencies` and
         // `peerDependenciesMeta`. No required peer flips or drops, so the graph is unchanged and both fields are
         // written through at npm's sorted key positions.
-        assertPeerByteExact("lock/npm/peer-writethrough/meta-add", "react-redux", "8.0.5", "8.0.6");
+        assertPeerByteExact("lock/npm/peer-metadata/meta-add", "react-redux", "8.0.5", "8.0.6");
     }
 
     // --- a non-optional peer that would need auto-installing / re-resolving: fail loud ---
@@ -147,7 +147,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
     @Test
     void droppedPeerFailsLoud() {
         // The new version drops the react-dom peer; if it was auto-installed only for this package npm removes it,
-        // which the write-through cannot prove, so it defers.
+        // which the patch cannot prove, so it defers.
         routes.put(REG + "shrinky", "{\"name\":\"shrinky\",\"dist-tags\":{\"latest\":\"2.0.0\"},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
         routes.put(REG + "shrinky/1.0.0",
                 "{\"name\":\"shrinky\",\"version\":\"1.0.0\",\"peerDependencies\":{\"react\":\"^18.0.0\",\"react-dom\":\"^18.0.0\"}}");
@@ -213,7 +213,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
     @Disabled("live: runs real npm 11.6.2 against registry.npmjs.org to re-derive and verify the goldens")
     void recordGoldensWithRealNpm() throws Exception {
         String[] dirs = {"lock/npm/peer-widen", "lock/npm/peer-optional-absent",
-                "lock/npm/peer-writethrough/meta-optional", "lock/npm/peer-writethrough/meta-add"};
+                "lock/npm/peer-metadata/meta-optional", "lock/npm/peer-metadata/meta-add"};
         for (String dir : dirs) {
             assertNpmReproduces(dir + "/pkg-before", dir + "/before", "3");
             assertNpmReproduces(dir + "/pkg-after", dir + "/after", "3");
