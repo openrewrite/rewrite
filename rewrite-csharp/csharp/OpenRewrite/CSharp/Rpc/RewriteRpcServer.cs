@@ -20,6 +20,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
+using NuGet.Frameworks;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -90,6 +91,21 @@ public class RewriteRpcServer
     /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
     /// </summary>
     private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
+
+    /// <summary>
+    /// DependencyTypes pages its (potentially hundreds-of-MB) response: the full RpcObjectData list
+    /// is built once, cached keyed by coordinate, and handed back one
+    /// <see cref="DependencyTypesBatchSize"/> slice per repeated identical request — the Java
+    /// RpcReceiveQueue re-pulls when its local batch empties. Evicted once drained. Concurrent so
+    /// independent dependency builds (distinct keys) proceed in parallel under StreamJsonRpc's
+    /// concurrent dispatch; pulls for a single key are strictly sequential (the client awaits each
+    /// response before re-pulling), so a key's list is never mutated concurrently — the same
+    /// serial-per-key assumption the JS/Go/Python engines rely on.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, List<RpcObjectData>> _pendingDependencyTypes = new();
+
+    /// <summary>Items per DependencyTypes slice; 1000 matches the JS/Go/Python engines. Overridable for tests.</summary>
+    internal int DependencyTypesBatchSize = 1000;
 
     /// <summary>
     /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
@@ -394,6 +410,114 @@ public class RewriteRpcServer
                 fullPath = "/private" + fullPath;
         }
         return fullPath;
+    }
+
+    /// <summary>
+    /// Enumerates the exported public types of one dependency named by its NuGet coordinate:
+    /// resolves the coordinate to assemblies (<see cref="ResolveDependency"/>), reads their
+    /// public API (resolving symbols against the shared framework) into
+    /// <see cref="JavaType"/> and streams the resulting top-level types back as one
+    /// ref-deduplicated <see cref="RpcObjectData"/> batch — the same wire format
+    /// <see cref="GetObject"/> uses, but rooted at a list of types rather than a tree.
+    /// A fresh ref space per call keeps the batch self-contained (it never reuses the
+    /// tree-transfer refs).
+    /// </summary>
+    [JsonRpcMethod("DependencyTypes", UseSingleObjectParameterDeserialization = true)]
+    public Task<List<RpcObjectData>> DependencyTypes(DependencyRequest request)
+    {
+        var key = request.Id + '\0' + request.Version + '\0' + request.TargetFramework;
+        if (!_pendingDependencyTypes.TryGetValue(key, out var data))
+        {
+            var (own, references) = ResolveDependency(request);
+            Log.Debug("RPC DependencyTypes: {Id} {Version} -> {OwnCount} own, {RefCount} reference assemblies",
+                request.Id, request.Version, own.Count, references.Count);
+            var types = AssemblyTypeEnumerator.Enumerate(own, references);
+
+            data = new List<RpcObjectData>();
+            var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+            var q = new RpcSendQueue(1024, batch => data.AddRange(batch), sendRefs,
+                "org.openrewrite.java.tree.JavaType$Class", false);
+            var sender = new OpenRewrite.Java.Rpc.JavaSender();
+            // FQN strings first, so the caller can tell the types this package defines from references up front.
+            var fqns = types.Select(t => t is JavaType.Class c ? c.FullyQualifiedName : t.ToString() ?? "?").ToList();
+            q.GetAndSendList(fqns, l => l, s => (object)s, (Action<string>?)null);
+            var holder = new TypeListHolder { Types = types };
+            q.GetAndSendListAsRef(holder, h => h.Types, TypeId, t => sender.VisitType(t, q));
+            q.Put(new RpcObjectData { State = END_OF_OBJECT });
+            q.Flush();
+
+            _pendingDependencyTypes[key] = data;
+            Log.Debug("RPC DependencyTypes: {TypeCount} types, {ItemCount} items", types.Count, data.Count);
+        }
+
+        var take = Math.Min(DependencyTypesBatchSize, data.Count);
+        var batch = data.GetRange(0, take);
+        data.RemoveRange(0, take);
+        if (data.Count == 0)
+        {
+            _pendingDependencyTypes.TryRemove(key, out _);
+        }
+        return Task.FromResult(batch);
+    }
+
+    private static object TypeId(JavaType.FullyQualified type) =>
+        type is JavaType.Class cls ? cls.FullyQualifiedName : type.ToString() ?? "?";
+
+    private sealed class TypeListHolder
+    {
+        public List<JavaType.FullyQualified> Types { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Resolves a coordinate to assembly paths: a null version names a BCL assembly in this
+    /// runtime's shared framework directory; otherwise the NuGet package's lib/ (or ref/)
+    /// assets nearest the target framework. References are always the shared framework.
+    /// </summary>
+    private static (List<string> Own, List<string> References) ResolveDependency(DependencyRequest request)
+    {
+        var bclDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var bcl = Directory.GetFiles(bclDir, "*.dll").ToList();
+        if (request.Version == null)
+        {
+            var dll = Path.Combine(bclDir, request.Id + ".dll");
+            if (!File.Exists(dll))
+            {
+                throw new FileNotFoundException($"BCL assembly '{request.Id}' not found in {bclDir}", dll);
+            }
+            return ([dll], bcl);
+        }
+
+        var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+        var package = Path.Combine(root, request.Id.ToLowerInvariant(), request.Version);
+        var target = NuGetFramework.Parse(request.TargetFramework);
+        var own = NearestAssets(Path.Combine(package, "lib"), target)
+            ?? NearestAssets(Path.Combine(package, "ref"), target)
+            ?? throw new InvalidOperationException(
+                $"No assemblies compatible with {request.TargetFramework} in {package}");
+        return (own, bcl);
+    }
+
+    /// <summary>
+    /// The *.dll files of the asset folder nearest <paramref name="target"/>, or null when no
+    /// folder is compatible or the nearest holds no assemblies (a _._ placeholder).
+    /// </summary>
+    private static List<string>? NearestAssets(string assetsDir, NuGetFramework target)
+    {
+        if (!Directory.Exists(assetsDir))
+        {
+            return null;
+        }
+        var candidates = Directory.GetDirectories(assetsDir)
+            .Select(dir => (Framework: NuGetFramework.Parse(Path.GetFileName(dir)), Dir: dir))
+            .ToList();
+        var nearest = new FrameworkReducer().GetNearest(target, candidates.Select(c => c.Framework).ToList());
+        if (nearest == null)
+        {
+            return null;
+        }
+        var dlls = Directory.GetFiles(candidates.First(c => nearest.Equals(c.Framework)).Dir, "*.dll").ToList();
+        return dlls.Count == 0 ? null : dlls;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -1962,6 +2086,18 @@ public class ParseSolutionRequest
     public string Path { get; set; } = "";
     public string RootDir { get; set; } = "";
     public Dictionary<string, object>? Options { get; set; }
+}
+
+public class DependencyRequest
+{
+    /// <summary>NuGet package id, or a BCL assembly name when <see cref="Version"/> is null.</summary>
+    public string Id { get; set; } = "";
+
+    /// <summary>Package version; null names a BCL assembly in the runtime's shared framework.</summary>
+    public string? Version { get; set; }
+
+    /// <summary>Framework whose nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    public string TargetFramework { get; set; } = "";
 }
 
 public class ParseSolutionResponse

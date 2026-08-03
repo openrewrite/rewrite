@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
@@ -33,6 +35,9 @@ import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -257,6 +262,25 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+    }
+
+    /**
+     * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
+     * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
     }
 
     public static Builder builder() {

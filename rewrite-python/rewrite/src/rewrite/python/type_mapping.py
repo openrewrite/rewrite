@@ -607,7 +607,7 @@ class PythonTypeMapping:
             name = descriptor.get('name', '')
             if not name:
                 return _UNKNOWN
-            class_type = self._create_class_type(name)
+            class_type = self._create_class_type(name, shallow=False)
             fields = descriptor.get('fields', [])
             if fields and getattr(class_type, '_members', None) is None:
                 variables = []
@@ -1107,12 +1107,8 @@ class PythonTypeMapping:
                         return self._create_class_type(descriptor.get('moduleName', ''))
                     elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
                         # boundMethod has className — use it for declaring type
-                        class_name = descriptor.get('className')
-                        if class_name:
-                            module_name = descriptor.get('moduleName')
-                            if module_name and module_name != 'builtins':
-                                return self._create_class_type(f"{module_name}.{class_name}")
-                            return self._create_class_type(class_name)
+                        if descriptor.get('className'):
+                            return self._class_reference(descriptor)
                         module_name = descriptor.get('moduleName')
                         if module_name and module_name != 'builtins':
                             return self._create_class_type(module_name)
@@ -1163,6 +1159,24 @@ class PythonTypeMapping:
         self._declaring_type_id_cache[type_id] = result
         return result
 
+    def _class_reference(self, descriptor: Dict[str, Any]) -> JavaType.Class:
+        """Resolve a descriptor's class through its classLiteral so annotation,
+        expression, and declaring-type positions all share one enriched object."""
+        class_name = descriptor.get('className', '')
+        module_name = descriptor.get('moduleName')
+        if module_name and module_name != 'builtins':
+            fqn = f"{module_name}.{class_name}"
+        else:
+            fqn = class_name
+        class_id = descriptor.get('classId')
+        if class_id is None and class_name:
+            class_id = self._class_literal_index.get(class_name)
+        if class_id is not None:
+            resolved = self._resolve_type(class_id)
+            if isinstance(resolved, JavaType.Class) and resolved.fully_qualified_name == fqn:
+                return resolved
+        return self._create_class_type(fqn)
+
     def _declaring_type_from_descriptor(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
         """Extract a declaring type (class/module) from a TypeDescriptor."""
         kind = descriptor.get('kind')
@@ -1172,11 +1186,7 @@ class PythonTypeMapping:
             return self._create_class_type(module_name)
 
         elif kind == 'instance':
-            class_name = descriptor.get('className', '')
-            module_name = descriptor.get('moduleName')
-            if module_name and module_name != 'builtins':
-                return self._create_class_type(f"{module_name}.{class_name}")
-            return self._create_class_type(class_name)
+            return self._class_reference(descriptor)
 
         elif kind == 'typedDict':
             name = descriptor.get('name', '')
@@ -1231,16 +1241,11 @@ class PythonTypeMapping:
                     return self._resolve_declaring_type(member_id)
 
         elif kind == 'classLiteral':
-            class_name = descriptor.get('className', '')
-            return self._create_class_type(class_name)
+            return self._class_reference(descriptor)
 
         elif kind == 'boundMethod':
-            class_name = descriptor.get('className')
-            if class_name:
-                module_name = descriptor.get('moduleName')
-                if module_name and module_name != 'builtins':
-                    return self._create_class_type(f"{module_name}.{class_name}")
-                return self._create_class_type(class_name)
+            if descriptor.get('className'):
+                return self._class_reference(descriptor)
 
         return None
 
@@ -1416,14 +1421,18 @@ class PythonTypeMapping:
         param._type_parameters = [base]
         return param
 
-    def _create_class_type(self, fqn: str) -> JavaType.Class:
-        """Create a JavaType.Class from a fully qualified name."""
+    def _create_class_type(self, fqn: str, shallow: bool = True) -> JavaType.Class:
+        """Create a class type from a fully qualified name. Stubs minted here are
+        body-less references (ShallowClass); pass shallow=False when filling a body."""
         if fqn in self._type_cache:
             cached = self._type_cache[fqn]
             if isinstance(cached, JavaType.Class):
+                if not shallow and type(cached) is JavaType.ShallowClass:
+                    # Promote in place so earlier references see the full class.
+                    cached.__class__ = JavaType.Class
                 return cached
 
-        class_type = JavaType.Class()
+        class_type = JavaType.ShallowClass() if shallow else JavaType.Class()
         class_type._flags_bit_map = 0
         class_type._fully_qualified_name = fqn
         class_type._kind = JavaType.FullyQualified.Kind.Class
@@ -1454,12 +1463,8 @@ class PythonTypeMapping:
         Mirrors the invocation-side logic from _get_declaring_type() to ensure
         declarations and invocations produce matching FQNs.
         """
-        class_name = descriptor.get('className')
-        if class_name:
-            module_name = descriptor.get('moduleName')
-            if module_name and module_name != 'builtins':
-                return self._create_class_type(f"{module_name}.{class_name}")
-            return self._create_class_type(class_name)
+        if descriptor.get('className'):
+            return self._class_reference(descriptor)
         module_name = descriptor.get('moduleName')
         if module_name and module_name != 'builtins':
             return self._create_class_type(module_name)
