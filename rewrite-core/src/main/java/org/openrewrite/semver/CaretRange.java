@@ -32,13 +32,13 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class CaretRange extends LatestRelease {
     private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
 
-    /** The npm caret grammar; unlike {@link #CARET_RANGE_PATTERN}, no 4th component, wildcards allowed. */
+    // The npm caret grammar; unlike CARET_RANGE_PATTERN, no 4th component, wildcards allowed.
     private static final Pattern NODE_CARET_PATTERN = Pattern.compile("^(?:\\^)" + NodeComparand.XRANGE_PLAIN + "$");
 
     private final String upperExclusive;
     private final String lower;
 
-    /** Non-null when this instance applies exact npm semantics, which live on the delegate. */
+    // Non-null in npm mode; evaluation delegates to it.
     private final @Nullable UnionRange node;
 
     private CaretRange(String lower, String upperExclusive, @Nullable String metadataPattern) {
@@ -128,7 +128,6 @@ public class CaretRange extends LatestRelease {
         return "*".equals(part) || "x".equals(part) || "X".equals(part) ? null : part;
     }
 
-    /** A caret range with exact npm semantics ({@code ^0.0.3} -> {@code >=0.0.3 <0.0.4-0}: the left-most non-zero element pins), for the {@link Semver.Ecosystem#NODE} chain. */
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         if (!NODE_CARET_PATTERN.matcher(pattern.trim()).matches()) {
             return Validated.invalid("caretRange", pattern, "not a node caret range");
@@ -140,7 +139,7 @@ public class CaretRange extends LatestRelease {
         return Validated.valid("caretRange", new CaretRange(node, metadataPattern));
     }
 
-    /** Port of node-semver {@code range.js} {@code replaceCaret}; non-caret tokens pass through. */
+    // Port of node-semver range.js replaceCaret; non-caret tokens pass through.
     static String replaceCaret(String token, boolean incPre) {
         Matcher m = NODE_CARET_PATTERN.matcher(token);
         if (!m.matches()) {

@@ -32,11 +32,7 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
-    /**
-     * The npm x-range grammar ({@code 1.2.x}, {@code 1.2}, {@code >=1.2}, {@code *}); unlike
-     * {@link #X_RANGE_PATTERN}, no {@code +} wildcard, no 4th component, optional operator.
-     * Groups: operator, major, minor, patch, prerelease.
-     */
+    // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
     private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + NodeComparand.XRANGE_PLAIN + "$");
 
     private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
@@ -46,7 +42,7 @@ public class XRange extends LatestRelease {
     private final String patch;
     private final String micro;
 
-    /** Non-null when this instance applies exact npm semantics, which live on the delegate. */
+    // Non-null in npm mode; evaluation delegates to it.
     private final @Nullable UnionRange node;
 
     XRange(String major, String minor, String patch, String micro, @Nullable String metadataPattern) {
@@ -135,10 +131,7 @@ public class XRange extends LatestRelease {
         return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
     }
 
-    /**
-     * An x-range with exact npm semantics, for the {@link Semver.Ecosystem#NODE} chain. Requires an
-     * operator or a wildcard/partial component, so bare exact versions fall through to {@link UnionRange}.
-     */
+    // Requires an operator or a wildcard/partial component; bare exact versions fall through to UnionRange.
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         Matcher m = NODE_X_RANGE_PATTERN.matcher(pattern.trim());
         if (!m.matches() || (m.group(1).isEmpty() &&
@@ -152,7 +145,7 @@ public class XRange extends LatestRelease {
         return Validated.valid("xRange", new XRange(node, metadataPattern));
     }
 
-    /** Port of node-semver {@code range.js} {@code replaceXRange}; tokens without wildcard or partial components pass through. */
+    // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
     static String replaceXRange(String token, boolean incPre) {
         Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
         if (!m.matches()) {
@@ -209,7 +202,7 @@ public class XRange extends LatestRelease {
         return token;
     }
 
-    /** node-semver's star replacement: a bare or operator-prefixed {@code *} collapses to the ANY clause. */
+    // node-semver's star replacement: a bare or operator-prefixed * collapses to the ANY clause.
     static String replaceStar(String token) {
         return NODE_STAR_PATTERN.matcher(token).matches() ? "" : token;
     }

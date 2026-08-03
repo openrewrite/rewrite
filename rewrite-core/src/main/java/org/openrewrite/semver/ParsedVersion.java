@@ -51,10 +51,8 @@ import static org.openrewrite.semver.VersionComparator.RELEASE_PATTERN;
  */
 final class ParsedVersion {
 
-    /** A numeric component with no leading zeros, per node-semver {@code re.js}; shared with the npm range grammar. */
+    // node-semver re.js grammar fragments, shared with the npm range classes.
     static final String NUMERIC_ID = "0|[1-9]\\d*";
-
-    /** A prerelease identifier: numeric (no leading zeros) or alphanumeric. */
     static final String PRERELEASE_ID = "(?:" + NUMERIC_ID + "|\\d*[a-zA-Z-][0-9a-zA-Z-]*)";
 
     // Port of node-semver re.js FULL (major.minor.patch, no leading zeros, prerelease and build split).
@@ -215,7 +213,6 @@ final class ParsedVersion {
         return preReleaseEnding;
     }
 
-    /** Whether the version matched the strict SemVer 2.0.0 grammar. */
     boolean isStrictSemver() {
         return strictSemver;
     }
@@ -232,7 +229,10 @@ final class ParsedVersion {
         return strictPatch;
     }
 
-    /** The strict view's prerelease identifiers, each a {@code Long} or a {@code String}; empty when none or not strict. */
+    /**
+     * @return the strict view's prerelease identifiers, each a {@code Long} (numeric) or a
+     * {@code String} (alphanumeric); empty when there is none or the version is not strict.
+     */
     List<Object> strictPrerelease() {
         return strictPrerelease;
     }
@@ -241,7 +241,10 @@ final class ParsedVersion {
         return !strictPrerelease.isEmpty();
     }
 
-    /** The canonical strict rendering: {@code v} prefix and whitespace dropped, build metadata retained. */
+    /**
+     * @return the canonical strict rendering: {@code v} prefix and whitespace dropped, build
+     * metadata retained.
+     */
     String strictToString() {
         StringBuilder sb = new StringBuilder();
         sb.append(strictMajor).append('.').append(strictMinor).append('.').append(strictPatch);

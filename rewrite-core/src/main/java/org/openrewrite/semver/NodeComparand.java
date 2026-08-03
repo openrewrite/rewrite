@@ -22,14 +22,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * A single primitive npm range clause, ported from node-semver's {@code Comparator}: an operator
- * ({@code < <= > >= =}) applied to a concrete strict-SemVer version, or the ANY clause produced by
- * {@code *}/{@code x}/an empty range. All npm range sugar desugars into these primitives. Also
- * hosts the npm grammar fragments the range classes' rewrites share.
+ * A primitive npm range clause, ported from node-semver's {@code Comparator}: an operator applied
+ * to a version, or the ANY clause from {@code *}/{@code x}/an empty range. Also hosts the npm
+ * grammar fragments the range classes share.
  */
 final class NodeComparand {
 
-    /** A component in npm's x-range position: numeric, or an {@code x}/{@code X}/{@code *} wildcard. */
     static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
 
     private static final String PRERELEASE_GROUP =
@@ -37,7 +35,7 @@ final class NodeComparand {
 
     private static final String BUILD = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)";
 
-    /** node-semver {@code XRANGEPLAIN}. Four capture groups: major, minor, patch, prerelease. */
+    // node-semver XRANGEPLAIN; groups: major, minor, patch, prerelease.
     static final String XRANGE_PLAIN =
             "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
                     PRERELEASE_GROUP + "?" + BUILD + "?)?)?";
@@ -72,8 +70,7 @@ final class NodeComparand {
     }
 
     /**
-     * @return the parsed comparand, or {@code null} if the token is not a valid comparator (which
-     * invalidates the whole range).
+     * @return the parsed comparand, or {@code null}, which invalidates the whole range.
      */
     static @Nullable NodeComparand parse(String token) {
         String t = token.trim();
@@ -152,15 +149,11 @@ final class NodeComparand {
         return (op == Op.EQ ? "" : op.symbol) + version.strictToString();
     }
 
-    /** Whether {@code id} is a wildcard or absent x-range component. */
     static boolean isX(@Nullable String id) {
         return id == null || "x".equalsIgnoreCase(id) || "*".equals(id);
     }
 
-    /**
-     * {@code num + 1}, for desugared exclusive upper bounds. Total for any numeric input: a result
-     * beyond {@code long} range fails strict parsing later, invalidating the range as node does.
-     */
+    // num + 1; a result beyond long range fails strict parsing later, invalidating the range as node does.
     static String incr(String num) {
         return new BigInteger(num).add(BigInteger.ONE).toString();
     }

@@ -35,7 +35,9 @@ public class Semver {
      * but invalid npm; {@code ^16.8.0 || ^17.0.0} is npm-only), so callers say which they want.
      */
     public enum Ecosystem {
-        /** The historical Maven/Gradle-flavored interpretation. */
+        /**
+         * The historical Maven/Gradle-flavored interpretation.
+         */
         MAVEN,
 
         /**

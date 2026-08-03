@@ -24,18 +24,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An npm/node-semver range: an OR ({@code ||}) of AND-groups of {@link NodeComparand} primitives.
- * The parse pipeline is a direct port of node-semver's {@code classes/range.js}, delegating the
- * caret/tilde/x-range/hyphen rewrites to the corresponding range classes and preserving npm's
- * {@code -0} upper-bound convention ({@code ^1.2.3} -> {@code >=1.2.3 <2.0.0-0}).
- * <p>
- * {@link #test} applies node's prerelease gating: unless {@code includePrerelease}, a prerelease
- * satisfies an AND-group only if some comparand in that group names the same
- * {@code [major,minor,patch]} tuple and itself carries a prerelease.
- * <p>
- * Terminal member of the {@link Semver.Ecosystem#NODE} chain (unions, AND-groups, primitive
- * comparators, exacts); single-token sugar dispatches to the range classes, which delegate their
- * npm-mode evaluation back to an instance of this class.
+ * An npm range as node-semver models it: an OR ({@code ||}) of AND-groups of {@link NodeComparand}
+ * clauses, parsed by a direct port of node's {@code classes/range.js}. A prerelease only satisfies
+ * a group when some clause names the same major.minor.patch tuple with a prerelease of its own,
+ * unless {@code includePrerelease}.
  */
 class UnionRange implements VersionComparator {
 
@@ -173,10 +165,6 @@ class UnionRange implements VersionComparator {
         return true;
     }
 
-    /**
-     * Whether {@code version} is a strict SemVer version admitted by this range (with gating) and
-     * matching the metadata pattern when given. The npm-mode range classes delegate isValid here.
-     */
     boolean isValidVersion(String version, @Nullable String metadataPattern) {
         ParsedVersion v = ParsedVersion.parse(version);
         if (!v.isStrictSemver() || !test(v)) {
