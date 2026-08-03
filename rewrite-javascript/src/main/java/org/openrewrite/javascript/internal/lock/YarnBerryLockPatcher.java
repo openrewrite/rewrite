@@ -15,8 +15,12 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -31,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 /**
  * Byte-exact patcher for a Yarn Berry {@code yarn.lock} (the {@code __metadata:}-headed YAML format). The file
@@ -152,10 +157,63 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                 body.append("    ").append(key).append(": \"npm:").append(dep.getValue()).append("\"\n");
             }
         }
+        appendPeerBlocks(body, edit);
         body.append("  checksum: ").append(edit.getNewBerryChecksum()).append('\n');
         body.append("  languageName: node\n");
         body.append("  linkType: hard\n");
         return LockYaml.graft(body.toString(), descriptor);
+    }
+
+    /**
+     * A fresh entry's {@code peerDependencies}/{@code peerDependenciesMeta} blocks, copied verbatim between
+     * {@code dependencies} and {@code checksum}. Peer ranges keep yarn's syml quoting (raw when safe, else
+     * JSON-quoted); a meta entry that is not the {@code {optional: <boolean>}} shape yarn normalizes to defers.
+     */
+    private static void appendPeerBlocks(StringBuilder body, PackageEdit edit) {
+        EntryMetadata md = edit.getMetadata();
+        if (md == null) {
+            return;
+        }
+        if (md.getPeerDependencies() != null && !md.getPeerDependencies().isEmpty()) {
+            body.append("  peerDependencies:\n");
+            for (Map.Entry<String, String> peer : new TreeMap<>(md.getPeerDependencies()).entrySet()) {
+                String key = peer.getKey().startsWith("@") ? "\"" + peer.getKey() + "\"" : peer.getKey();
+                body.append("    ").append(key).append(": ").append(symlScalar(peer.getValue())).append('\n');
+            }
+        }
+        JsonNode meta = md.getPeerDependenciesMeta();
+        if (meta != null && meta.isObject() && meta.size() > 0) {
+            List<String> names = new ArrayList<>();
+            meta.fieldNames().forEachRemaining(names::add);
+            Collections.sort(names);
+            body.append("  peerDependenciesMeta:\n");
+            for (String name : names) {
+                JsonNode entry = meta.get(name);
+                JsonNode optional = entry == null ? null : entry.get("optional");
+                if (entry == null || !entry.isObject() || optional == null || !optional.isBoolean()) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            "peerDependenciesMeta." + name + " is not a simple {optional: <boolean>}");
+                }
+                String key = name.startsWith("@") ? "\"" + name + "\"" : name;
+                body.append("    ").append(key).append(":\n");
+                body.append("      optional: ").append(optional.booleanValue()).append('\n');
+            }
+        }
+    }
+
+    /** Yarn's syml stringifier emits a scalar raw when it matches this, else JSON-quotes it (yarnpkg/parsers). */
+    private static final Pattern SYML_SAFE = Pattern.compile(
+            "^(?![-?:,\\]\\[{}#&*!|>'\"%@` \\t\\r\\n]).([ \\t]*(?![,\\]\\[{}:# \\t\\r\\n]).)*$");
+
+    private static String symlScalar(String value) {
+        if (SYML_SAFE.matcher(value).matches()) {
+            return value;
+        }
+        try {
+            return new ObjectMapper().writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not serialize peer range " + value);
+        }
     }
 
     private Yaml.Mapping insertImporterEdge(Yaml.Mapping root, PackageEdit edit, String constraint) {
@@ -165,19 +223,52 @@ public final class YarnBerryLockPatcher implements LockPatcher {
             return root;
         }
         Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
-        Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(importerBody, edit.getScope());
-        if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding the first " + edit.getScope() + " to a berry importer is deferred");
-        }
-        Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
         // A scoped key must be quoted in YAML (@ is a reserved indicator); yarn quotes it too.
         String depKey = name.startsWith("@") ? "\"" + name + "\"" : name;
-        Yaml.Mapping.Entry depEntry = LockYaml.graft(
-                edit.getScope() + ":\n  " + depKey + ": \"npm:" + constraint + "\"\n", edit.getScope(), name);
-        deps = insertEntrySorted(deps, depEntry, name, 0);
-        importerBody = LockYaml.replaceEntry(importerBody, edit.getScope(), scopeEntry.withValue(deps));
+        // Berry merges every dependency scope into the workspace entry's one `dependencies` block.
+        Yaml.Mapping.Entry depsEntry = LockYaml.findEntry(importerBody, "dependencies");
+        if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
+            // First dependency of the workspace: the block sits right after `resolution`.
+            Yaml.Mapping.Entry block = LockYaml.graft(
+                    "x:\n  dependencies:\n    " + depKey + ": \"npm:" + constraint + "\"\n", "x", "dependencies");
+            importerBody = insertAfter(importerBody, "resolution", block);
+        } else {
+            Yaml.Mapping deps = (Yaml.Mapping) depsEntry.getValue();
+            Yaml.Mapping.Entry depEntry = LockYaml.graft(
+                    "dependencies:\n  " + depKey + ": \"npm:" + constraint + "\"\n", "dependencies", name);
+            deps = insertEntrySorted(deps, depEntry, name, 0);
+            importerBody = LockYaml.replaceEntry(importerBody, "dependencies", depsEntry.withValue(deps));
+        }
+        if ("optionalDependencies".equals(edit.getScope())) {
+            importerBody = flagOptionalDependency(importerBody, name, depKey);
+        }
         return LockYaml.replaceEntry(root, LockYaml.keyOf(importer), importer.withValue(importerBody));
+    }
+
+    /** Flag a root-declared optionalDependencies member in the workspace entry's dependenciesMeta block. */
+    private Yaml.Mapping flagOptionalDependency(Yaml.Mapping importerBody, String name, String depKey) {
+        Yaml.Mapping.Entry metaEntry = LockYaml.findEntry(importerBody, "dependenciesMeta");
+        if (metaEntry == null || !(metaEntry.getValue() instanceof Yaml.Mapping)) {
+            Yaml.Mapping.Entry block = LockYaml.graft(
+                    "x:\n  dependenciesMeta:\n    " + depKey + ":\n      optional: true\n", "x", "dependenciesMeta");
+            return insertAfter(importerBody, "dependencies", block);
+        }
+        Yaml.Mapping meta = (Yaml.Mapping) metaEntry.getValue();
+        Yaml.Mapping.Entry flag = LockYaml.graft(
+                "dependenciesMeta:\n  " + depKey + ":\n    optional: true\n", "dependenciesMeta", name);
+        meta = insertEntrySorted(meta, flag, name, 0);
+        return LockYaml.replaceEntry(importerBody, "dependenciesMeta", metaEntry.withValue(meta));
+    }
+
+    private static Yaml.Mapping insertAfter(Yaml.Mapping mapping, String afterKey, Yaml.Mapping.Entry entry) {
+        List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
+        for (int i = 0; i < entries.size(); i++) {
+            if (afterKey.equals(LockYaml.keyOf(entries.get(i)))) {
+                entries.add(i + 1, entry);
+                return mapping.withEntries(entries);
+            }
+        }
+        throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no " + afterKey + " field to insert after");
     }
 
     private Yaml.Mapping applyBump(Yaml.Mapping root, PackageEdit edit, @Nullable String editedPackageJson) {

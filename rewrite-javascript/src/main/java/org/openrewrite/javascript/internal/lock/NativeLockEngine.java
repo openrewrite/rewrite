@@ -213,7 +213,7 @@ public final class NativeLockEngine {
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
         LockResolver resolver = LockResolvers.forPackageManager(pm);
-        boolean diffs = pm == PackageManager.Npm || pm == PackageManager.Pnpm;
+        boolean diffs = pm == PackageManager.Npm || pm == PackageManager.Pnpm || pm == PackageManager.YarnBerry;
         if ((!diffs && resolver == null) ||
                 !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
             throw surgical;
@@ -229,6 +229,9 @@ public final class NativeLockEngine {
             }
             if (pm == PackageManager.Pnpm) {
                 return resolveAndPatchPnpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            }
+            if (pm == PackageManager.YarnBerry) {
+                return resolveAndPatchYarnBerry(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
             ResolveRequest request = new ResolveRequest(
                     Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
@@ -256,6 +259,48 @@ public final class NativeLockEngine {
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
                 PackageManager.Npm, editedPackageJson, edits);
         return Result.success(new NpmLockPatcher().patch(editSet));
+    }
+
+    /**
+     * Resolve the closure seeded by the existing berry lock, diff it, and patch only the difference. Untouched
+     * entries keep their recorded checksums; only fresh or moved entries reproduce theirs from the tarball.
+     */
+    private static Result resolveAndPatchYarnBerry(String editedPackageJson, String existingLock,
+                                                   @Nullable Path packageJsonPath, NodeRegistries registries,
+                                                   NpmRegistryClient client) {
+        Registry registry = new NpmRegistryAdapter(registries, client);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock))
+                .build(Collections.singletonMap("", editedPackageJson));
+        List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
+        for (LockEditSet.PackageEdit edit : edits) {
+            if (edit.getNewResolved() != null) {
+                edits = enrichBerryChecksums(edits, existingLock, registries, client);
+                break;
+            }
+        }
+        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnBerry, packageJsonPath),
+                PackageManager.YarnBerry, editedPackageJson, edits);
+        return Result.success(new YarnBerryLockPatcher().patch(editSet));
+    }
+
+    /** The versions the berry lock already resolves, by name (each entry's {@code name@npm:version} resolution). */
+    private static Map<String, Set<String>> lockedVersionsBerry(String lock) {
+        Map<String, Set<String>> locked = new LinkedHashMap<>();
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            for (Object value : ((Map<?, ?>) loaded).values()) {
+                if (value instanceof Map) {
+                    Object resolution = ((Map<?, ?>) value).get("resolution");
+                    String res = resolution == null ? null : String.valueOf(resolution);
+                    int npm = res == null ? -1 : res.lastIndexOf("@npm:");
+                    if (npm > 0) {
+                        locked.computeIfAbsent(res.substring(0, npm), k -> new LinkedHashSet<>())
+                                .add(res.substring(npm + "@npm:".length()));
+                    }
+                }
+            }
+        }
+        return locked;
     }
 
     /** Resolve the closure seeded by the existing pnpm lock, diff it, and patch only the difference. */

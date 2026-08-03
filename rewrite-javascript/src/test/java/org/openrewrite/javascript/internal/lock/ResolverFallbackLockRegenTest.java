@@ -71,22 +71,6 @@ class ResolverFallbackLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
-    void berryWholeManifestReconcileFallsBackToResolver() {
-        // No pre-edit manifest to scope a surgical patch: the surgical tier defers (RESOLUTION_REQUIRED) and the
-        // resolver reproduces the whole berry lock from scratch, reproducing every checksum from the tarball bytes.
-        String dir = "lock/yarn-berry/resolve-clean";
-        String[][] pkgs = {{"is-odd", "3.0.1"}, {"is-number", "6.0.0"}, {"ms", "2.1.3"}};
-        routePackages(dir, pkgs);
-        routeTarballs(dir, pkgs);
-        // The berry resolver reads only __metadata (version + cacheKey) from the existing lock.
-        String existingLock = "__metadata:\n  version: 8\n  cacheKey: 10c0\n";
-        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry,
-                resource(dir + "/pkg"), null, existingLock, null, Paths.get("package.json"), ctx);
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(resource(dir + "/after"));
-    }
-
-    @Test
     void workspaceStaysDeferredRatherThanTruncated() {
         // The resolver reproduces a single importer; resolving just one manifest of a multi-importer workspace would
         // drop the siblings. The engine must keep such an edit deferred (a Failure), never emit a truncated lock.

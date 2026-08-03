@@ -27,7 +27,6 @@ public final class LockResolvers {
 
     private static final BunResolver BUN = new BunResolver();
     private static final YarnClassicResolver YARN_CLASSIC = new YarnClassicResolver();
-    private static final YarnBerryResolver YARN_BERRY = new YarnBerryResolver();
 
     private LockResolvers() {
     }
@@ -36,7 +35,6 @@ public final class LockResolvers {
         switch (pm) {
             case Bun:         return BUN;
             case YarnClassic: return YARN_CLASSIC;
-            case YarnBerry:   return YARN_BERRY;
             default:          return null;
         }
     }
