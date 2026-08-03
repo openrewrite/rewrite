@@ -36,7 +36,7 @@ public class Semver {
      */
     public enum Ecosystem {
         /**
-         * The historical Maven/Gradle-flavored interpretation.
+         * The Maven/Gradle-flavored interpretation used throughout the JVM ecosystem.
          */
         MAVEN,
 
@@ -74,9 +74,8 @@ public class Semver {
     }
 
     /**
-     * Validates the given version against an optional pattern under the historical
-     * {@link Ecosystem#MAVEN} interpretation. See {@link #validate(String, String, Ecosystem)} for
-     * npm-exact semantics.
+     * Validates the given version against an optional pattern under {@link Ecosystem#MAVEN}
+     * semantics. See {@link #validate(String, String, Ecosystem)} for npm-exact semantics.
      * <p>
      * The {@code metadataPattern} is interpreted first as a regular expression. If that fails to
      * compile, it is treated as a glob (where {@code *} matches any run of characters and {@code ?}
