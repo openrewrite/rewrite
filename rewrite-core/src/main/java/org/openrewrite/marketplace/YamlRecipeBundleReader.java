@@ -33,9 +33,20 @@ public class YamlRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final YamlResourceLoader yamlLoader;
 
+    /**
+     * Category path to file every recipe under, shallowest to deepest. When empty each recipe
+     * takes the path inferred from its own name.
+     */
+    private final List<CategoryDescriptor> categoryOverride;
+
     public YamlRecipeBundleReader(RecipeBundle bundle, InputStream yamlLoader, URI source, Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {
+        this(bundle, yamlLoader, source, properties, marketplace, resolvers, emptyList());
+    }
+
+    public YamlRecipeBundleReader(RecipeBundle bundle, InputStream yamlLoader, URI source, Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers, List<CategoryDescriptor> categoryOverride) {
         this.yamlLoader = new YamlResourceLoader(yamlLoader, source, properties, marketplace, resolvers);
         this.bundle = bundle;
+        this.categoryOverride = categoryOverride;
     }
 
     @Override
@@ -46,7 +57,9 @@ public class YamlRecipeBundleReader implements RecipeBundleReader {
 
         RecipeMarketplace marketplace = new RecipeMarketplace();
         for (RecipeListing listing : yamlLoader.listRecipeListings(bundle)) {
-            marketplace.install(listing, inferCategoriesFromName(env, listing.getName()));
+            marketplace.install(listing, categoryOverride.isEmpty() ?
+                    inferCategoriesFromName(env, listing.getName()) :
+                    categoryOverride);
         }
 
         return marketplace;
