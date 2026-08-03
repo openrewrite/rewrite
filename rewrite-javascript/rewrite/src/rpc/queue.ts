@@ -130,6 +130,30 @@ export class RpcSendQueue {
         return result;
     }
 
+    /**
+     * Send a bare list (no enclosing object) and return the complete batch terminated by
+     * END_OF_OBJECT. Used by self-contained responses like DependencyTypes, where the peer
+     * drains one list of ref-deduplicated elements rather than a tree.
+     */
+    async generateList<T>(after: T[] | undefined,
+                          id: (value: T) => any,
+                          onChange: (value: T) => Promise<any>): Promise<RpcObjectData[]> {
+        await this.sendList(after, undefined, id, onChange);
+        return this.finish();
+    }
+
+    /**
+     * Terminate a hand-composed batch: append END_OF_OBJECT and return the accumulated data,
+     * resetting the queue. Lets a caller emit several {@link sendList}s into one stream that the
+     * peer drains as consecutive lists (e.g. DependencyTypes sends its FQN list then its type list).
+     */
+    finish(): RpcObjectData[] {
+        const result = this.q;
+        result.push({state: RpcObjectState.END_OF_OBJECT});
+        this.q = [];
+        return result;
+    }
+
     private put(d: RpcObjectData): void {
         if (this.trace) {
             d.trace = trace("Sender");

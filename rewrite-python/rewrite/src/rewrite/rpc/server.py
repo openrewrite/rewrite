@@ -26,6 +26,7 @@ import csv
 import json
 import logging
 import os
+import re
 import select
 import sys
 import tempfile
@@ -43,7 +44,7 @@ try:
 except ImportError:  # not available on Windows
     resource = None
 
-from rewrite.discovery import RecipeAttribution, RecipeName
+from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
 # overflow the default recursion limit (1000) during RPC serialization.
@@ -462,6 +463,11 @@ def _infer_project_root(inputs: list) -> Optional[str]:
     return None
 
 
+# The dependency environment of the most recent parse; DependencyTypes resolves
+# pip coordinates against it.
+_last_dependency_path: Optional[str] = None
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     import tempfile
@@ -479,6 +485,9 @@ def handle_parse(params: dict) -> List[str]:
     # reaching into third-party packages resolve (e.g. a first-party class
     # extending pydantic.BaseModel). The handler never provisions deps itself.
     dependency_path = params.get('dependencyPath')
+    if dependency_path:
+        global _last_dependency_path
+        _last_dependency_path = dependency_path
     results = []
 
     # If no relativeTo provided, try to infer from absolute input paths
@@ -563,6 +572,9 @@ def handle_parse_project(params: dict) -> List[dict]:
     language_level = options.get('languageLevel')
     # Caller-provisioned dependency environment for ty-types (see handle_parse).
     dependency_path = params.get('dependencyPath')
+    if dependency_path:
+        global _last_dependency_path
+        _last_dependency_path = dependency_path
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
@@ -607,6 +619,309 @@ def handle_parse_project(params: dict) -> List[dict]:
             ty_client.shutdown()
 
     return results
+
+
+def _richness(cls) -> int:
+    """A classLiteral's completeness, used to keep the fullest of several
+    same-FQN descriptors ty may emit for one class. Supertypes, interfaces, and
+    type parameters count too, so a supertype-rich descriptor isn't dropped for
+    a method-rich one.
+    """
+    n = (len(getattr(cls, '_methods', None) or [])
+         + len(getattr(cls, '_members', None) or [])
+         + len(getattr(cls, '_interfaces', None) or [])
+         + len(getattr(cls, '_type_parameters', None) or []))
+    if getattr(cls, '_supertype', None) is not None:
+        n += 1
+    return n
+
+
+def _artifact_files(path: Path) -> List[str]:
+    """The package's own .py/.pyi sources, with each stub (.pyi) ordered ahead of
+    its runtime sibling (.py) so the stub wins same-id/same-richness dedup."""
+    files = [f for f in path.rglob('*') if f.suffix in ('.py', '.pyi')]
+    files.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
+    return [str(f) for f in files]
+
+
+def _site_packages(virtual_env):
+    """The venv's site-packages dir (Unix ``lib/pythonX.Y/site-packages`` or Windows ``Lib``)."""
+    if not virtual_env:
+        return None
+    venv = Path(virtual_env)
+    lib = venv / "lib"
+    if lib.is_dir():
+        for p in sorted(lib.glob("python*")):
+            sp = p / "site-packages"
+            if sp.is_dir():
+                return str(sp)
+    win = venv / "Lib" / "site-packages"
+    return str(win) if win.is_dir() else None
+
+
+def _module_name(fp: str, root: str) -> str:
+    """The dotted module of ``fp`` relative to ``root`` (site-packages): e.g.
+    ``google/cloud/storage/client.py`` -> ``google.cloud.storage.client`` (``__init__`` dropped)."""
+    try:
+        rel = Path(fp).resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return Path(fp).stem
+    parts = list(rel.with_suffix('').parts)
+    if parts and parts[-1] == '__init__':
+        parts = parts[:-1]
+    return '.'.join(parts)
+
+
+def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any],
+                        processed_ids: Set[int]) -> None:
+    """Collect the complete JavaType.Class for every class one package defines.
+
+    ty has no module enumeration, so walk the package's own .py/.pyi, run the
+    per-file type extraction, and keep the classLiteral descriptors whose module
+    is the package's own — mapping each via the classLiteral branch of
+    PythonTypeMapping, which builds a full class (supertypes, methods, members).
+
+    ``processed_ids`` holds ty's session-stable type ids already enumerated. ty
+    deduplicates descriptors across a session and back-fills them into later
+    files' registries, so without this a class defined early is re-mapped once
+    per subsequent file — O(files x classes) work ``by_fqn`` only ever discarded.
+    Reset it per ty session (ids restart) but share it across the session's files.
+    """
+    from rewrite.python.type_mapping import PythonTypeMapping
+    from rewrite.java import JavaType
+
+    path = Path(artifact)
+    if path.is_dir():
+        files = _artifact_files(path)
+    elif path.suffix in ('.py', '.pyi'):
+        files = [str(path)]
+    else:
+        return
+
+    for fp in files:
+        own_module = _module_name(fp, root)
+        try:
+            with open(fp, 'r', encoding='utf-8') as fh:
+                source = fh.read()
+        except OSError:
+            continue
+        try:
+            mapping = PythonTypeMapping(source, file_path=fp, ty_client=client)
+        except Exception:
+            logger.warning("ExportedTypes: type mapping failed for %s", fp, exc_info=True)
+            continue
+        # A non-empty file with no node index means ty returned nothing for it
+        # (its 30s timeout, or an error) — surface it per-file rather than only
+        # in the final aggregate count.
+        if source.strip() and not mapping._node_index:
+            logger.warning("ExportedTypes: ty returned no types for %s", fp)
+            continue
+        for tid, descriptor in mapping._type_registry.items():
+            if tid in processed_ids:
+                continue
+            if descriptor.get('kind') != 'classLiteral':
+                continue
+            module_name = descriptor.get('moduleName') or ''
+            # Keep only classes defined in this file's own module — precise per-file scoping so ty's
+            # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
+            # and a dist sharing a namespace-package dir contributes only its own types.
+            if module_name != own_module:
+                continue
+            processed_ids.add(tid)
+            try:
+                java_type = mapping._descriptor_to_java_type(descriptor)
+            except Exception:
+                continue
+            if not isinstance(java_type, JavaType.Class):
+                continue
+            fqn = java_type.fully_qualified_name
+            if not fqn:
+                continue
+            existing = by_fqn.get(fqn)
+            if existing is None or _richness(java_type) > _richness(existing):
+                by_fqn[fqn] = java_type
+
+
+# DependencyTypes pages its (potentially hundreds-of-MB) response: the full list is
+# built once and handed back in _DEPENDENCY_TYPES_BATCH_SIZE slices across the client's
+# repeated identical requests. 1000 matches the Java/JS RewriteRpc default.
+_DEPENDENCY_TYPES_BATCH_SIZE = 1000
+_dependency_types_pending: Dict[tuple, List[dict]] = {}
+
+
+def _typeshed_stdlib_dir() -> Path:
+    """The typeshed ``stdlib`` dir named by REWRITE_PYTHON_TYPESHED, which may point
+    at the checkout root or at stdlib itself (verified by its ``VERSIONS`` file)."""
+    env = os.environ.get('REWRITE_PYTHON_TYPESHED')
+    if not env:
+        raise ValueError("REWRITE_PYTHON_TYPESHED is not set; cannot resolve standard-library modules")
+    # ty canonicalizes paths internally; a symlinked root would break own-module attribution.
+    root = Path(env).resolve()
+    if (root / 'stdlib' / 'VERSIONS').is_file():
+        return root / 'stdlib'
+    if root.name == 'stdlib' and (root / 'VERSIONS').is_file():
+        return root
+    raise ValueError(f"no typeshed stdlib/VERSIONS under {env}")
+
+
+def _requested_python_version(value: Any) -> Optional[str]:
+    """The value if it looks like a Python minor version ("3.12"), else None."""
+    return value if isinstance(value, str) and re.fullmatch(r'\d+\.\d+', value) else None
+
+
+def _write_stdlib_ty_config(stdlib: Path, python_version: Optional[str]) -> str:
+    """Throwaway ty.toml dir pointing ty's typeshed at the checkout so it resolves as the
+    stdlib and names modules os, not stdlib.os — matching the parser's stdlib attribution."""
+    version = _requested_python_version(python_version) \
+              or '%d.%d' % (sys.version_info.major, sys.version_info.minor)
+    ty_config_dir = tempfile.mkdtemp(prefix='ty-stdlib-')
+    with open(os.path.join(ty_config_dir, 'ty.toml'), 'w') as f:
+        f.write('[environment]\ntypeshed = "%s"\npython-version = "%s"\n'
+                % (str(stdlib.parent), version))
+    return ty_config_dir
+
+
+def _dist_info_dir(site_packages: Path, name: str, version: str) -> Path:
+    """The coordinate's dist-info dir: the exact ``<name>-<version>.dist-info``, else
+    any whose dist name part normalizes to the requested name."""
+    exact = site_packages / f"{name}-{version}.dist-info"
+    if exact.is_dir():
+        return exact
+    target = _normalize_package_name(name)
+    for cand in site_packages.glob('*.dist-info'):
+        dist_name = cand.name[:-len('.dist-info')].rpartition('-')[0]
+        if dist_name and _normalize_package_name(dist_name) == target:
+            return cand
+    raise ValueError(f"{name}=={version} is not installed in the dependency environment")
+
+
+def _resolve_dist_artifacts(name: str, version: str, site_packages: Path) -> List[str]:
+    """The dist's own .py/.pyi files from its RECORD (entries outside site-packages
+    dropped); a RECORD-less dist falls back to its import package dir(s)."""
+    dist_info = _dist_info_dir(site_packages, name, version)
+    sp = site_packages.resolve()
+    record = dist_info / 'RECORD'
+    if record.is_file():
+        try:
+            with open(record, newline='', encoding='utf-8') as fh:
+                own = []
+                for row in csv.reader(fh):
+                    if not row or not row[0].endswith(('.py', '.pyi')):
+                        continue
+                    p = (site_packages / row[0]).resolve()
+                    if p.is_file() and p.is_relative_to(sp):
+                        own.append(p)
+                # Stubs ahead of runtime siblings, matching _artifact_files ordering.
+                own.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
+                return [str(f) for f in own]
+        except OSError:
+            pass
+    try:
+        tops = [t.strip() for t in (dist_info / 'top_level.txt').read_text(encoding='utf-8').splitlines()
+                if t.strip()]
+    except OSError:
+        tops = []
+    own = []
+    for top in tops or [_normalize_package_name(name)]:
+        if (site_packages / top).is_dir():
+            own.append(str(site_packages / top))
+        elif (site_packages / f"{top}.py").is_file():
+            own.append(str(site_packages / f"{top}.py"))
+    return own
+
+
+def _build_exported_types_data(own_artifacts: List[str], root: str, virtual_env: Optional[str],
+                               stdlib: Optional[Path],
+                               python_version: Optional[str] = None) -> List[dict]:
+    """Enumerate the public types ``own_artifacts`` define into the full ref-deduplicated
+    RpcObjectData list terminated by END_OF_OBJECT (see ``handle_dependency_types``).
+    ``root`` anchors module names: the typeshed stdlib dir, or the venv's site-packages
+    so dotted paths resolve fully (e.g. google.cloud.storage for a namespace package)."""
+    import shutil
+    from rewrite.python.ty_client import TyTypesClient
+    from rewrite.rpc.send_queue import RpcSendQueue, RpcObjectState
+    from rewrite.rpc.python_sender import PythonRpcSender
+
+    ty_config_dir = None
+    if stdlib is not None:
+        ty_config_dir = _write_stdlib_ty_config(stdlib, python_version)
+        ty_project_root = ty_config_dir
+    else:
+        ty_project_root = root
+
+    by_fqn: Dict[str, Any] = {}
+    if root and os.path.isdir(root):
+        client = None
+        try:
+            try:
+                client = TyTypesClient(virtual_env=virtual_env)
+                client.initialize(ty_project_root)
+            except (ImportError, RuntimeError):
+                client = None
+            if client is not None and client.is_available:
+                processed_ids: Set[int] = set()  # ty type ids are per-session
+                for artifact in own_artifacts:
+                    _enumerate_artifact(artifact, root, client, by_fqn, processed_ids)
+        finally:
+            if client is not None:
+                client.shutdown()
+            if ty_config_dir is not None:
+                shutil.rmtree(ty_config_dir, ignore_errors=True)
+
+    types = list(by_fqn.values())
+    logger.info(f"ExportedTypes: {len(own_artifacts)} own artifacts -> {len(types)} types")
+
+    q = RpcSendQueue('org.openrewrite.java.tree.JavaType$Class')
+    sender = PythonRpcSender()
+    # FQN strings first, so the caller can tell the types this package defines from references up front.
+    q.send_list(list(by_fqn.keys()), None, lambda s: s, None, as_ref=False)
+    q.send_list(types, None, sender._type_signature,
+                lambda t: sender._visit_type(t, q), as_ref=True)
+    q.put({'state': RpcObjectState.END_OF_OBJECT})
+    return q.q
+
+
+def handle_dependency_types(params: dict) -> List[dict]:
+    """Handle a DependencyTypes request: enumerate the public types of one dependency, named by
+    its pip coordinate (a null version names a standard-library module), streamed back terminated
+    by END_OF_OBJECT. Built once, returned in ``_DEPENDENCY_TYPES_BATCH_SIZE`` slices across the
+    client's repeated pulls. An optional ``pythonVersion`` ("3.12") picks the stdlib stub surface.
+    """
+    name = params.get('name')
+    version = params.get('version')
+    # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
+    python_version = _requested_python_version(params.get('pythonVersion'))
+    if not name:
+        raise ValueError("DependencyTypes requires a dependency name")
+
+    key = (name, version, python_version)
+    data = _dependency_types_pending.get(key)
+    if data is None:
+        if version is None:
+            stdlib = _typeshed_stdlib_dir()
+            artifact = stdlib / name
+            if not artifact.is_dir():
+                artifact = stdlib / f"{name}.pyi"
+                if not artifact.is_file():
+                    raise ValueError(f"standard-library module {name!r} not found in typeshed at {stdlib}")
+            data = _build_exported_types_data([str(artifact)], str(stdlib), None, stdlib,
+                                              python_version=python_version)
+        else:
+            dependency_path = _last_dependency_path or os.environ.get('VIRTUAL_ENV')
+            if not dependency_path:
+                raise ValueError("no dependency environment: parse with dependencyPath or set VIRTUAL_ENV")
+            site_packages = _site_packages(dependency_path)
+            if site_packages is None:
+                raise ValueError(f"no site-packages under {dependency_path}")
+            own_artifacts = _resolve_dist_artifacts(name, version, Path(site_packages))
+            data = _build_exported_types_data(own_artifacts, site_packages, dependency_path, None)
+        _dependency_types_pending[key] = data
+
+    batch = data[:_DEPENDENCY_TYPES_BATCH_SIZE]
+    del data[:_DEPENDENCY_TYPES_BATCH_SIZE]
+    if not data:
+        del _dependency_types_pending[key]
+    return batch
 
 
 def handle_get_object(params: dict) -> List[dict]:
@@ -2079,6 +2394,7 @@ def handle_request(method: str, params: dict) -> Any:
     handlers = {
         'Parse': handle_parse,
         'ParseProject': handle_parse_project,
+        'DependencyTypes': handle_dependency_types,
         'GetObject': handle_get_object,
         'GetLanguages': handle_get_languages,
         'Print': handle_print,

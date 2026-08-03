@@ -132,12 +132,12 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
-                            out = Markup.warn(out, new RuntimeException(
+                            return Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }

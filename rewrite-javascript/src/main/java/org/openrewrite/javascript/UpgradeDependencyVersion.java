@@ -180,12 +180,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
-                            out = Markup.warn(out, new RuntimeException(
+                            return Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }

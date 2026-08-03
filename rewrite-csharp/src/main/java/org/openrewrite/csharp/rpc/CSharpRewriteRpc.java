@@ -25,6 +25,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
@@ -32,6 +34,9 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -188,6 +193,34 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+    }
+
+    /**
+     * Enumerate the public API of {@code ownAssemblies} into {@code JavaType}, resolving
+     * symbols against {@code referenceAssemblies} (the reference closure — other packages'
+     * assemblies plus the BCL). Returns one {@link org.openrewrite.java.tree.JavaType.FullyQualified}
+     * per top-level public type the own assemblies define, with complete members and methods;
+     * types they reference but don't define come back shallow (FQN only), for the caller to resolve.
+     * <p>
+     * Streaming: the engine sends the FQNs the own assemblies define first ({@code onFqns}, so the
+     * caller knows which names this package defines up front), then each defined type ({@code onType}) as
+     * a ref-deduplicated object stream (the same wire format {@code getObject} uses) so a shared type
+     * is transferred once and the caller never holds the whole list. A fresh ref space per call keeps it
+     * self-contained.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
     }
 
     public static Builder builder() {

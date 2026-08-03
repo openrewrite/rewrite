@@ -751,7 +751,11 @@ public class PackageJsonHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(packageJson.printAll(), originalPackageJsonContent,
+        // Print without markers: a Markup.warn from an earlier failed run must not corrupt the manifest
+        // handed to regeneration.
+        String content = packageJson.printAll(
+                new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        return regen.regenerate(content, originalPackageJsonContent,
                 capturedLockContent, marker, packageJson.getSourcePath(), ctx);
     }
 }

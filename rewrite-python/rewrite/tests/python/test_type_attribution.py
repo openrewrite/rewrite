@@ -2144,6 +2144,84 @@ class TestDeclarationDeclaringType:
             _cleanup_mapping(mapping, tmpdir, client)
 
 
+@requires_ty_types_cli
+class TestDeclaringTypeUnification:
+    """A class referenced in an annotation and reached again as a call
+    receiver's declaring type must be one JavaType.Class object — not the
+    enriched class plus a stray body-less stub at the same FQN."""
+
+    def test_annotation_and_receiver_share_one_class(self):
+        source = '''
+            import os
+
+            def f(p: os.PathLike) -> None:
+                p.__fspath__()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            ann = tree.body[1].args.args[0].annotation  # os.PathLike
+            ann_type = mapping.type(ann)
+            base = ann_type._type if isinstance(ann_type, JavaType.Parameterized) else ann_type
+            call = tree.body[1].body[0].value  # p.__fspath__()
+            mt = mapping.method_invocation_type(call)
+            assert mt is not None
+            assert mt._declaring_type is base, \
+                "declaring type must reuse the annotation's class, not mint a stub"
+            assert getattr(mt._declaring_type, '_methods', None), \
+                "declaring type should carry the enriched class body"
+            assert not isinstance(mt._declaring_type, JavaType.ShallowClass), \
+                "a class with a body must never be typed ShallowClass"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_class_object_receiver_declaring_type_is_qualified(self):
+        """A classLiteral receiver's declaring type keeps its module qualifier."""
+        source = '''
+            import os
+
+            os.PathLike.register(bytes)
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            mt = mapping.method_invocation_type(call)
+            assert mt is not None
+            assert mt._declaring_type is not None
+            assert mt._declaring_type.fully_qualified_name == 'os.PathLike'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_module_reference_is_shallow_class(self):
+        """A module used as a declaring type never gets a body, so it stays a
+        ShallowClass reference stub."""
+        source = '''
+            import os
+
+            os.getcwd()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            mt = mapping.method_invocation_type(tree.body[1].value)
+            assert mt is not None
+            assert isinstance(mt._declaring_type, JavaType.ShallowClass)
+            assert mt._declaring_type.fully_qualified_name == 'os'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_unresolved_reference_is_shallow_class(self):
+        """An instance reference that resolves to no class body falls back to an
+        FQN-only stub, minted as ShallowClass."""
+        mapping = PythonTypeMapping('x = 1')
+        mapping._type_registry[1] = {
+            'kind': 'instance',
+            'className': 'Widget',
+            'moduleName': 'missing_dep',
+        }
+        t = mapping._resolve_type(1)
+        assert isinstance(t, JavaType.ShallowClass)
+        assert t.fully_qualified_name == 'missing_dep.Widget'
+
+
 class TestCyclicTypeResolution:
     """Tests that FQN-deduplicated types don't produce self-referential supertypes.
 
@@ -3263,6 +3341,8 @@ class TestTypedDictMembers:
         cls, mapping, tmpdir, client = self._value_type(src)
         try:
             assert isinstance(cls, JavaType.Class)
+            assert not isinstance(cls, JavaType.ShallowClass), \
+                "a TypedDict gets members filled in, so it must be a full Class"
             assert cls.fully_qualified_name.endswith('Movie')
             by_name = {v._name: v for v in (cls._members or [])}
             assert by_name['name']._type == JavaType.Primitive.String

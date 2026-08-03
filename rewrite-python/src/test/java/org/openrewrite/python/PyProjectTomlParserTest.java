@@ -226,6 +226,44 @@ class PyProjectTomlParserTest {
     }
 
     @Test
+    void resolvesFromInstalledEnvWithoutLockFile(@TempDir Path tempDir) throws Exception {
+        String pyprojectToml = """
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          dependencies = ["click>=8.0"]
+          """;
+        Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
+
+        // A provisioned venv whose installed dists are the resolution (no lock file, no uv run).
+        Path venv = tempDir.resolve(".venv");
+        Path sitePackages = venv.resolve("lib/python3.12/site-packages");
+        Files.createDirectories(sitePackages.resolve("click-8.1.7.dist-info"));
+        Files.createDirectories(sitePackages.resolve("colorama-0.4.6.dist-info"));
+
+        PyProjectTomlParser parser = new PyProjectTomlParser(Collections.emptyMap(), venv);
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
+        List<SourceFile> parsed = parser.parseInputs(
+          Collections.singletonList(input),
+          tempDir,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        Toml.Document doc = (Toml.Document) parsed.get(0);
+        PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getResolvedDependencies())
+          .extracting(r -> r.getName() + "==" + r.getVersion())
+          .containsExactly("click==8.1.7", "colorama==0.4.6");
+
+        // The declared dependency links to its resolved entry.
+        Dependency click = marker.getDependencies().get(0);
+        assertThat(click.getResolved()).isNotNull();
+        assertThat(click.getResolved().getVersion()).isEqualTo("8.1.7");
+    }
+
+    @Test
     void skipsUvResolutionWhenPoetryLockExists(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]

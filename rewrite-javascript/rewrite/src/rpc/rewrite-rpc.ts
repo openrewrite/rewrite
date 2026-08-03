@@ -19,6 +19,7 @@ import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tre
 import {Recipe} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
+    DependencyTypes,
     Generate,
     GenerateResponse,
     GetObject,
@@ -142,6 +143,7 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
+        DependencyTypes.handle(this.connection, options?.batchSize || 1000, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, recipeOrigin, options.logger, options.metricsCsv);
 
