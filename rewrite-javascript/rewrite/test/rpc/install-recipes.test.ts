@@ -16,7 +16,7 @@
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
-import {RecipeMarketplace} from "../../src";
+import {RecipeDescriptor, RecipeMarketplace} from "../../src";
 import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
 
@@ -381,18 +381,15 @@ describe("InstallRecipes", () => {
         test("GetMarketplace recipeCount counts transitive sub-recipes", async () => {
             // recipeCount must be 1 + every transitive recipeList entry, not just direct children —
             // the host uses it as a marketplace sort key.
+            const desc = (name: string, recipeList: RecipeDescriptor[] = []): RecipeDescriptor => ({
+                name, displayName: name, instanceName: name, description: "", tags: [],
+                estimatedEffortPerOccurrence: 5, options: [], preconditions: [],
+                recipeList, dataTables: [], maintainers: [], contributors: [], examples: []
+            });
+
             const marketplace = new RecipeMarketplace();
             await marketplace.install(
-                class CompositeRecipe {
-                    async descriptor() {
-                        return {
-                            name: "composite.root", displayName: "Root", description: "",
-                            recipeList: [
-                                {name: "composite.middle", recipeList: [{name: "composite.leaf", recipeList: []}]}
-                            ]
-                        };
-                    }
-                },
+                desc("composite.root", [desc("composite.middle", [desc("composite.leaf")])]),
                 [{displayName: "Composite"}]
             );
 
