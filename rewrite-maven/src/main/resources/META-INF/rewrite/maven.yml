@@ -62,12 +62,14 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.MigrateToMaven4
 displayName: Migrate to Maven 4
-description: Migrates Maven POMs from Maven 3 to Maven 4, addressing breaking changes and deprecations. This recipe updates property expressions, lifecycle phases, removes duplicate plugin declarations, upgrades plugins known to fail under Maven 4, and replaces removed properties to ensure compatibility with Maven 4.
+description: Migrates Maven POMs from Maven 3 to Maven 4, addressing breaking changes and deprecations. This recipe updates property expressions, lifecycle phases, removes duplicate plugin and dependency declarations, upgrades plugins known to fail under Maven 4, switches repository URLs to HTTPS, and replaces removed properties to ensure compatibility with Maven 4.
 recipeList:
   - org.openrewrite.maven.cleanup.PrefixlessExpressions
   - org.openrewrite.maven.ReplaceRemovedRootDirectoryProperties
   - org.openrewrite.maven.ReplaceDeprecatedLifecyclePhases
   - org.openrewrite.maven.RemoveDuplicatePluginDeclarations
+  - org.openrewrite.maven.RemoveDuplicateDependencies
+  - org.openrewrite.maven.security.UseHttpsForRepositories
   - org.openrewrite.maven.UpgradePluginsForMaven4
   - org.openrewrite.maven.UpgradeToModelVersion410
   - org.openrewrite.maven.ReplaceModulesWithSubprojects
@@ -145,7 +147,7 @@ description: >-
   [`mvnup upgrade --plugins`](https://maven.apache.org/tools/mvnup.html) as a floor while accepting any newer release
   within the same major version. Plugins already at or above that floor are upgraded to the latest such release;
   plugins that declare no version are left alone. `quarkus-maven-plugin` is held at its floor, as its version is
-  coupled to the Quarkus platform BOM.
+  coupled to the Quarkus platform BOM. Plugin dependencies known to break Maven 4 are upgraded as well.
 recipeList:
   - org.openrewrite.maven.ChangePluginGroupIdAndArtifactId:
       oldGroupId: org.scala-tools
@@ -229,6 +231,10 @@ recipeList:
       groupId: io.quarkus.platform
       artifactId: quarkus-maven-plugin
       newVersion: 3.26.0
+  - org.openrewrite.maven.UpgradeDependencyVersion:
+      groupId: org.codehaus.mojo
+      artifactId: extra-enforcer-rules
+      newVersion: "[1.4,2.0.0)"
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.ReplaceModulesWithSubprojects

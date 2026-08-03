@@ -850,8 +850,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         return afterFile.withMarkers(afterFile.getMarkers().computeByType(
                 RecipesThatMadeChanges.create(recipeStack),
                 (r1, r2) -> {
-                    r1.getRecipes().addAll(r2.getRecipes());
-                    return r1;
+                    List<List<Recipe>> merged = new ArrayList<>(r1.getRecipes());
+                    merged.addAll(r2.getRecipes());
+                    return r1.withRecipes(merged);
                 })
         );
     }

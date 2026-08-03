@@ -273,6 +273,12 @@ public interface Xml extends Tree {
 
         Markers markers;
         String name;
+
+        /**
+         * The instruction's data, which the XML specification makes optional: {@code <?target?>}
+         * carries a target but no data, so this is {@code null}.
+         */
+        @Nullable
         CharData processingInstructions;
 
         /**
