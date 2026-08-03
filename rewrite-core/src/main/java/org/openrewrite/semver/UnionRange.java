@@ -24,22 +24,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An npm/node-semver range: a top-level OR ({@code ||}) of AND-groups, each a list of
- * {@link NodeComparand} primitives. The parse pipeline is a direct port of node-semver's
- * {@code classes/range.js}: hyphen, caret ({@code ^}), tilde ({@code ~}), x-range
- * ({@code x}/{@code *}) and star desugaring — each rewrite living on the corresponding range class
- * ({@link HyphenRange}, {@link CaretRange}, {@link TildeRange}, {@link XRange}) — including npm's
- * {@code -0} upper-bound convention (e.g. {@code ^1.2.3} desugars to {@code >=1.2.3 <2.0.0-0}),
- * which excludes {@code 2.0.0-alpha}.
+ * An npm/node-semver range: an OR ({@code ||}) of AND-groups of {@link NodeComparand} primitives.
+ * The parse pipeline is a direct port of node-semver's {@code classes/range.js}, delegating the
+ * caret/tilde/x-range/hyphen rewrites to the corresponding range classes and preserving npm's
+ * {@code -0} upper-bound convention ({@code ^1.2.3} -> {@code >=1.2.3 <2.0.0-0}).
  * <p>
- * {@link #test} applies node's prerelease-inclusion rule: a prerelease candidate satisfies an
- * AND-group only if some comparand in that group names the same {@code [major,minor,patch]} tuple
- * <em>and</em> itself carries a prerelease (unless {@code includePrerelease} is set).
+ * {@link #test} applies node's prerelease gating: unless {@code includePrerelease}, a prerelease
+ * satisfies an AND-group only if some comparand in that group names the same
+ * {@code [major,minor,patch]} tuple and itself carries a prerelease.
  * <p>
- * In the {@link Semver.Ecosystem#NODE NODE} selector chain this class is the terminal member,
- * handling what no single range class does: unions, space-separated AND-groups, primitive
- * comparators and exact versions. Single-token sugar dispatches to the range classes themselves,
- * which delegate their npm-mode evaluation back to an instance of this class.
+ * Terminal member of the {@link Semver.Ecosystem#NODE} chain (unions, AND-groups, primitive
+ * comparators, exacts); single-token sugar dispatches to the range classes, which delegate their
+ * npm-mode evaluation back to an instance of this class.
  */
 class UnionRange implements VersionComparator {
 
@@ -178,9 +174,8 @@ class UnionRange implements VersionComparator {
     }
 
     /**
-     * Whether {@code version} is a strict SemVer version admitted by this range (with prerelease
-     * gating) and, when a metadata pattern is given, whose qualifier matches it. The npm-mode range
-     * classes delegate their {@code isValid} here.
+     * Whether {@code version} is a strict SemVer version admitted by this range (with gating) and
+     * matching the metadata pattern when given. The npm-mode range classes delegate isValid here.
      */
     boolean isValidVersion(String version, @Nullable String metadataPattern) {
         ParsedVersion v = ParsedVersion.parse(version);

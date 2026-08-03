@@ -32,20 +32,13 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class CaretRange extends LatestRelease {
     private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
 
-    /**
-     * The npm caret grammar: up to three components, wildcards permitted, an optional prerelease.
-     * Distinct from the Maven-flavored {@link #CARET_RANGE_PATTERN}, which admits a 4th component
-     * that npm rejects.
-     */
+    /** The npm caret grammar; unlike {@link #CARET_RANGE_PATTERN}, no 4th component, wildcards allowed. */
     private static final Pattern NODE_CARET_PATTERN = Pattern.compile("^(?:\\^)" + NodeComparand.XRANGE_PLAIN + "$");
 
     private final String upperExclusive;
     private final String lower;
 
-    /**
-     * Non-null when this instance interprets its pattern with exact npm semantics; the desugared
-     * clause set and prerelease gating live on the delegate.
-     */
+    /** Non-null when this instance applies exact npm semantics, which live on the delegate. */
     private final @Nullable UnionRange node;
 
     private CaretRange(String lower, String upperExclusive, @Nullable String metadataPattern) {
@@ -135,11 +128,7 @@ public class CaretRange extends LatestRelease {
         return "*".equals(part) || "x".equals(part) || "X".equals(part) ? null : part;
     }
 
-    /**
-     * Builds a caret range with exact npm/node-semver semantics, e.g. {@code ^1.2.3} means
-     * {@code >=1.2.3 <2.0.0-0} and {@code ^0.0.3} means {@code >=0.0.3 <0.0.4-0} (the left-most
-     * non-zero element pins). Used by the {@link Semver.Ecosystem#NODE} selector chain.
-     */
+    /** A caret range with exact npm semantics ({@code ^0.0.3} -> {@code >=0.0.3 <0.0.4-0}: the left-most non-zero element pins), for the {@link Semver.Ecosystem#NODE} chain. */
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         if (!NODE_CARET_PATTERN.matcher(pattern.trim()).matches()) {
             return Validated.invalid("caretRange", pattern, "not a node caret range");
@@ -151,10 +140,7 @@ public class CaretRange extends LatestRelease {
         return Validated.valid("caretRange", new CaretRange(node, metadataPattern));
     }
 
-    /**
-     * Port of node-semver {@code range.js} {@code replaceCaret}: rewrites a single npm caret token
-     * into its primitive comparator desugaring, leaving non-caret tokens untouched.
-     */
+    /** Port of node-semver {@code range.js} {@code replaceCaret}; non-caret tokens pass through. */
     static String replaceCaret(String token, boolean incPre) {
         Matcher m = NODE_CARET_PATTERN.matcher(token);
         if (!m.matches()) {

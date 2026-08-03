@@ -39,11 +39,9 @@ public interface VersionComparator extends Comparator<String> {
     int compare(@Nullable String currentVersion, String v1, String v2);
 
     /**
-     * The highest of {@code availableVersions} this selector admits (per {@link #isValid} with no
-     * current version), by this comparator's ordering. The winner is returned in its original
-     * spelling and the first-seen candidate wins ties, so selection is deterministic for a fixed
-     * iteration order. Unlike {@link #upgrade}, the result is not constrained to exceed any current
-     * version.
+     * The highest of {@code availableVersions} this selector admits, in its original spelling,
+     * first-seen candidate winning ties. Unlike {@link #upgrade}, not constrained to exceed a
+     * current version.
      */
     default Optional<String> maxSatisfying(Collection<String> availableVersions) {
         String best = null;

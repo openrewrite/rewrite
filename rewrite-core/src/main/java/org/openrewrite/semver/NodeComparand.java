@@ -22,22 +22,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * A single primitive npm range clause: an operator ({@code < <= > >= =}) applied to a concrete
- * strict-SemVer version, or the special ANY clause (matches every version) produced by
- * {@code *}/{@code x}/an empty range. Ported from node-semver's {@code Comparator}. All npm range
- * sugar ({@code ^ ~ x hyphen} and bare versions) desugars into these primitives — the caret, tilde,
- * x-range and hyphen rewrites live on {@link CaretRange}, {@link TildeRange}, {@link XRange} and
- * {@link HyphenRange} beside their Maven-flavored interpretations, and {@link UnionRange} assembles
- * the resulting clauses into an OR of AND-groups.
- * <p>
- * This class also hosts the npm grammar fragments those rewrites share.
+ * A single primitive npm range clause, ported from node-semver's {@code Comparator}: an operator
+ * ({@code < <= > >= =}) applied to a concrete strict-SemVer version, or the ANY clause produced by
+ * {@code *}/{@code x}/an empty range. All npm range sugar desugars into these primitives. Also
+ * hosts the npm grammar fragments the range classes' rewrites share.
  */
 final class NodeComparand {
 
-    /**
-     * A version component in npm's "x-range" position: a numeric identifier or an
-     * {@code x}/{@code X}/{@code *} wildcard.
-     */
+    /** A component in npm's x-range position: numeric, or an {@code x}/{@code X}/{@code *} wildcard. */
     static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
 
     private static final String PRERELEASE_GROUP =
@@ -45,11 +37,7 @@ final class NodeComparand {
 
     private static final String BUILD = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)";
 
-    /**
-     * node-semver {@code XRANGEPLAIN}: major, optional minor, optional patch, optional
-     * prerelease/build, any component possibly a wildcard. Four capture groups: major, minor, patch,
-     * prerelease.
-     */
+    /** node-semver {@code XRANGEPLAIN}. Four capture groups: major, minor, patch, prerelease. */
     static final String XRANGE_PLAIN =
             "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
                     PRERELEASE_GROUP + "?" + BUILD + "?)?)?";
@@ -164,18 +152,14 @@ final class NodeComparand {
         return (op == Op.EQ ? "" : op.symbol) + version.strictToString();
     }
 
-    /**
-     * @return whether {@code id} is a wildcard (or absent) component of an x-range position.
-     */
+    /** Whether {@code id} is a wildcard or absent x-range component. */
     static boolean isX(@Nullable String id) {
         return id == null || "x".equalsIgnoreCase(id) || "*".equals(id);
     }
 
     /**
-     * The numeric component one greater than {@code num}, used when desugaring sugar into an
-     * exclusive upper bound. Total for any numeric input: a component beyond {@code long} range
-     * yields a bound that later fails strict parsing, invalidating the range (node-semver likewise
-     * rejects such components).
+     * {@code num + 1}, for desugared exclusive upper bounds. Total for any numeric input: a result
+     * beyond {@code long} range fails strict parsing later, invalidating the range as node does.
      */
     static String incr(String num) {
         return new BigInteger(num).add(BigInteger.ONE).toString();

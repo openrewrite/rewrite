@@ -31,10 +31,9 @@ public class HyphenRange extends LatestRelease {
     private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)\\s*-\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)");
 
     /**
-     * The npm hyphen grammar: two x-range plain versions joined by a whitespace-delimited hyphen.
-     * Distinct from the Maven-flavored {@link #HYPHEN_RANGE_PATTERN}, which admits 4th components
-     * and hyphens without surrounding whitespace. Groups 1-5 are the "from" bound and its
-     * major/minor/patch/prerelease; groups 6-10 the "to" bound.
+     * The npm hyphen grammar; unlike {@link #HYPHEN_RANGE_PATTERN}, no 4th components, whitespace
+     * around the hyphen required. Groups 1-5 are the "from" bound and its major/minor/patch/prerelease;
+     * groups 6-10 the "to" bound.
      */
     private static final Pattern NODE_HYPHEN_PATTERN = Pattern.compile(
             "^\\s*(" + NodeComparand.XRANGE_PLAIN + ")\\s+-\\s+(" + NodeComparand.XRANGE_PLAIN + ")\\s*$");
@@ -42,10 +41,7 @@ public class HyphenRange extends LatestRelease {
     private final String upper;
     private final String lower;
 
-    /**
-     * Non-null when this instance interprets its pattern with exact npm semantics; the desugared
-     * clause set and prerelease gating live on the delegate.
-     */
+    /** Non-null when this instance applies exact npm semantics, which live on the delegate. */
     private final @Nullable UnionRange node;
 
     private HyphenRange(String lower, String upper, @Nullable String metadataPattern) {
@@ -80,11 +76,7 @@ public class HyphenRange extends LatestRelease {
         return Validated.valid("hyphenRange", new HyphenRange(matcher.group(1), matcher.group(5), metadataPattern));
     }
 
-    /**
-     * Builds a hyphen range with exact npm/node-semver semantics, where partial bounds desugar by
-     * expansion (e.g. {@code 1.2 - 2.3} means {@code >=1.2.0 <2.4.0-0}). Used by the
-     * {@link Semver.Ecosystem#NODE} selector chain.
-     */
+    /** A hyphen range with exact npm semantics ({@code 1.2 - 2.3} -> {@code >=1.2.0 <2.4.0-0}), for the {@link Semver.Ecosystem#NODE} chain. */
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         if (!NODE_HYPHEN_PATTERN.matcher(pattern.trim()).matches()) {
             return Validated.invalid("hyphenRange", pattern, "not a node hyphen range");
@@ -96,10 +88,7 @@ public class HyphenRange extends LatestRelease {
         return Validated.valid("hyphenRange", new HyphenRange(node, metadataPattern));
     }
 
-    /**
-     * Port of node-semver {@code range.js} {@code hyphenReplace}: rewrites an npm hyphen range into
-     * its pair of primitive comparators, leaving non-hyphen groups untouched.
-     */
+    /** Port of node-semver {@code range.js} {@code hyphenReplace}; non-hyphen groups pass through. */
     static String hyphenReplace(String group, boolean incPre) {
         Matcher m = NODE_HYPHEN_PATTERN.matcher(group);
         if (!m.matches()) {

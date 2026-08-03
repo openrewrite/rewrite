@@ -32,21 +32,14 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class TildeRange extends LatestRelease {
     private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
-    /**
-     * The npm tilde grammar: up to three components, wildcards permitted, an optional prerelease.
-     * Distinct from the Maven-flavored {@link #TILDE_RANGE_PATTERN}, which admits a 4th component
-     * that npm rejects.
-     */
+    /** The npm tilde grammar; unlike {@link #TILDE_RANGE_PATTERN}, no 4th component, wildcards allowed. */
     private static final Pattern NODE_TILDE_PATTERN = Pattern.compile("^(?:~>?)" + NodeComparand.XRANGE_PLAIN + "$");
 
     private final String upperExclusive;
     private final String lower;
     private final boolean requireRelease;
 
-    /**
-     * Non-null when this instance interprets its pattern with exact npm semantics; the desugared
-     * clause set and prerelease gating live on the delegate.
-     */
+    /** Non-null when this instance applies exact npm semantics, which live on the delegate. */
     private final @Nullable UnionRange node;
 
     private TildeRange(String lower, String upperExclusive, @Nullable String metadataPattern, boolean requireRelease) {
@@ -109,10 +102,7 @@ public class TildeRange extends LatestRelease {
         return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern, requireRelease));
     }
 
-    /**
-     * Builds a tilde range with exact npm/node-semver semantics, e.g. {@code ~1.2.3} means
-     * {@code >=1.2.3 <1.3.0-0}. Used by the {@link Semver.Ecosystem#NODE} selector chain.
-     */
+    /** A tilde range with exact npm semantics ({@code ~1.2.3} -> {@code >=1.2.3 <1.3.0-0}), for the {@link Semver.Ecosystem#NODE} chain. */
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         if (!NODE_TILDE_PATTERN.matcher(pattern.trim()).matches()) {
             return Validated.invalid("tildeRange", pattern, "not a node tilde range");
@@ -124,10 +114,7 @@ public class TildeRange extends LatestRelease {
         return Validated.valid("tildeRange", new TildeRange(node, metadataPattern));
     }
 
-    /**
-     * Port of node-semver {@code range.js} {@code replaceTilde}: rewrites a single npm tilde token
-     * into its primitive comparator desugaring, leaving non-tilde tokens untouched.
-     */
+    /** Port of node-semver {@code range.js} {@code replaceTilde}; non-tilde tokens pass through. */
     static String replaceTilde(String token, boolean incPre) {
         Matcher m = NODE_TILDE_PATTERN.matcher(token);
         if (!m.matches()) {

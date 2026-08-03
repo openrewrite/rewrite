@@ -33,10 +33,9 @@ public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
     /**
-     * The npm x-range grammar: an optional comparator operator and a version whose components may be
-     * wildcards or absent ({@code 1.2.x}, {@code 1.2}, {@code >=1.2}, {@code <1}, {@code *}).
-     * Distinct from the Maven-flavored {@link #X_RANGE_PATTERN}: npm has no {@code +} wildcard and
-     * at most three components. Groups: operator, major, minor, patch, prerelease.
+     * The npm x-range grammar ({@code 1.2.x}, {@code 1.2}, {@code >=1.2}, {@code *}); unlike
+     * {@link #X_RANGE_PATTERN}, no {@code +} wildcard, no 4th component, optional operator.
+     * Groups: operator, major, minor, patch, prerelease.
      */
     private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + NodeComparand.XRANGE_PLAIN + "$");
 
@@ -47,10 +46,7 @@ public class XRange extends LatestRelease {
     private final String patch;
     private final String micro;
 
-    /**
-     * Non-null when this instance interprets its pattern with exact npm semantics; the desugared
-     * clause set and prerelease gating live on the delegate.
-     */
+    /** Non-null when this instance applies exact npm semantics, which live on the delegate. */
     private final @Nullable UnionRange node;
 
     XRange(String major, String minor, String patch, String micro, @Nullable String metadataPattern) {
@@ -132,19 +128,16 @@ public class XRange extends LatestRelease {
     }
 
     /**
-     * @return whether {@code segment} is an X-range wildcard: {@code *}, {@code x}, {@code X}, or {@code +}.
-     * This is the Maven/Gradle-flavored notion; npm's (no {@code +}) is {@link NodeComparand#isX}.
+     * @return whether {@code segment} is a Maven/Gradle-flavored wildcard: {@code *}, {@code x},
+     * {@code X}, or {@code +}. npm's notion (no {@code +}) is {@link NodeComparand#isX}.
      */
     static boolean isWildcard(String segment) {
         return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
     }
 
     /**
-     * Builds an x-range with exact npm/node-semver semantics: wildcard and partial versions
-     * ({@code 1.2.x}, {@code 1.2}, {@code 1}, {@code *}) and comparator-plus-partial forms
-     * ({@code >=1.2}, {@code <1} meaning {@code <1.0.0-0}, {@code >1} meaning {@code >=2.0.0}).
-     * Bare exact versions carry neither an operator nor a wildcard and are left to the terminal
-     * {@link UnionRange} member of the {@link Semver.Ecosystem#NODE} chain.
+     * An x-range with exact npm semantics, for the {@link Semver.Ecosystem#NODE} chain. Requires an
+     * operator or a wildcard/partial component, so bare exact versions fall through to {@link UnionRange}.
      */
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         Matcher m = NODE_X_RANGE_PATTERN.matcher(pattern.trim());
@@ -159,11 +152,7 @@ public class XRange extends LatestRelease {
         return Validated.valid("xRange", new XRange(node, metadataPattern));
     }
 
-    /**
-     * Port of node-semver {@code range.js} {@code replaceXRange}: rewrites a single npm x-range
-     * token (wildcard or partial components, with or without a comparator operator) into its
-     * primitive comparator desugaring, leaving other tokens untouched.
-     */
+    /** Port of node-semver {@code range.js} {@code replaceXRange}; tokens without wildcard or partial components pass through. */
     static String replaceXRange(String token, boolean incPre) {
         Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
         if (!m.matches()) {
@@ -220,10 +209,7 @@ public class XRange extends LatestRelease {
         return token;
     }
 
-    /**
-     * Collapses a bare or operator-prefixed {@code *} token to the empty (match-anything) clause,
-     * per node-semver's star replacement.
-     */
+    /** node-semver's star replacement: a bare or operator-prefixed {@code *} collapses to the ANY clause. */
     static String replaceStar(String token) {
         return NODE_STAR_PATTERN.matcher(token).matches() ? "" : token;
     }

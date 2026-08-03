@@ -30,25 +30,17 @@ import java.util.regex.Pattern;
 public class Semver {
 
     /**
-     * The versioning semantics a selector string should be interpreted under. The same string can be
-     * valid in both ecosystems with different meanings ({@code ~1.2.3.4} is a valid Maven tilde
-     * range but invalid npm; {@code ^16.8.0 || ^17.0.0} is a valid npm union but invalid Maven), so
-     * callers say which they want.
+     * The versioning semantics a selector string should be interpreted under. The same string can
+     * be valid in both ecosystems with different meanings ({@code ~1.2.3.4} is a valid Maven tilde
+     * but invalid npm; {@code ^16.8.0 || ^17.0.0} is npm-only), so callers say which they want.
      */
     public enum Ecosystem {
-        /**
-         * The historical Maven/Gradle-flavored interpretation: 4th/5th numeric components, the
-         * {@code .RELEASE}/{@code .FINAL}/{@code .GA} suffixes, {@code [1.5,2)} interval notation,
-         * Gradle {@code +} dynamic versions, and a qualifier ladder for prerelease ordering.
-         */
+        /** The historical Maven/Gradle-flavored interpretation. */
         MAVEN,
 
         /**
-         * Exact npm/node-semver semantics: strict SemVer 2.0.0 versions (three components,
-         * section 11 prerelease precedence, build metadata ignored), npm's range grammar including
-         * {@code ||} unions, space-separated intersections, x-ranges and partials, {@code -0}
-         * exclusive upper bounds, and npm's prerelease gating rule. The {@code latest.*} selector
-         * keywords remain available.
+         * Exact npm/node-semver semantics: strict SemVer 2.0.0 versions and npm's full range
+         * grammar, with the {@code latest.*} selector keywords still available.
          */
         NODE
     }
@@ -102,11 +94,9 @@ public class Semver {
     /**
      * Validates the given version selector against an optional metadata pattern under the given
      * ecosystem's semantics. Under {@link Ecosystem#NODE}, the {@code latest.*} selector keywords
-     * are recognized and everything else must be a valid npm range ({@code ^1.2.3},
-     * {@code >=1.2.9 <2.0.0}, {@code ^16.8.0 || ^17.0.0}, {@code 1.2.x}, {@code 1.2.3 - 2},
-     * {@code *}, ...); strings that are not npm ranges — dist-tags like {@code latest}, protocol
-     * specifiers like {@code workspace:*} or {@code npm:foo@1.2.3}, git URLs, Maven-only shapes like
-     * {@code ~1.2.3.4} or {@code [1.5,2)} — are invalid.
+     * are recognized and everything else must be a valid npm range: dist-tags ({@code latest}),
+     * protocol specifiers ({@code workspace:*}, {@code npm:foo@1.2.3}), git URLs, and Maven-only
+     * shapes ({@code ~1.2.3.4}, {@code [1.5,2)}) are invalid.
      */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern, Ecosystem ecosystem) {
         CacheKey key = new CacheKey(toVersion, metadataPattern, ecosystem);
@@ -155,9 +145,8 @@ public class Semver {
     }
 
     /**
-     * Whether {@code version} is admitted by {@code selector} under the given ecosystem's
-     * semantics; {@code false} when the selector is invalid (mirroring node-semver, where a
-     * non-range constraint satisfies nothing).
+     * Whether {@code version} is admitted by {@code selector}; {@code false} when the selector is
+     * invalid, mirroring node-semver.
      */
     public static boolean satisfies(String version, String selector, Ecosystem ecosystem) {
         Validated<VersionComparator> validated = validate(selector, null, ecosystem);
@@ -169,9 +158,8 @@ public class Semver {
     }
 
     /**
-     * The highest of {@code versions} admitted by {@code selector} under the given ecosystem's
-     * semantics, returned in its original spelling (the first-seen candidate wins ties);
-     * {@code null} when the selector is invalid or nothing satisfies it.
+     * The highest of {@code versions} admitted by {@code selector}, in its original spelling
+     * (first-seen candidate wins ties); {@code null} when the selector is invalid or nothing satisfies.
      */
     public static @Nullable String maxSatisfying(Collection<String> versions, String selector, Ecosystem ecosystem) {
         Validated<VersionComparator> validated = validate(selector, null, ecosystem);
@@ -184,10 +172,8 @@ public class Semver {
 
     /**
      * Compares two concrete versions under the given ecosystem's precedence rules.
-     * {@link Ecosystem#NODE} applies SemVer 2.0.0 section 11 (build metadata ignored) and throws
-     * {@link IllegalArgumentException} if either version is not strict SemVer;
-     * {@link Ecosystem#MAVEN} applies the Maven-flavored ordering (suffix normalization and the
-     * qualifier ladder) and is total over arbitrary strings.
+     * {@link Ecosystem#NODE} throws {@link IllegalArgumentException} if either version is not
+     * strict SemVer; {@link Ecosystem#MAVEN} is total over arbitrary strings.
      */
     public static int compare(String v1, String v2, Ecosystem ecosystem) {
         if (ecosystem == Ecosystem.NODE) {

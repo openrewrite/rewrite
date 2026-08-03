@@ -28,19 +28,11 @@ import static org.openrewrite.semver.VersionComparator.PRE_RELEASE_ENDING;
 import static org.openrewrite.semver.VersionComparator.RELEASE_PATTERN;
 
 /**
- * The cached result of parsing a version string, offering two views of the same input:
- * <ul>
- * <li>The <em>Maven-flavored</em> view: a match against {@link VersionComparator#RELEASE_PATTERN}
- * (and {@link VersionComparator#PRE_RELEASE_ENDING}), which accepts 4th/5th numeric components and
- * fuses prerelease and build metadata into a single qualifier.</li>
- * <li>The <em>strict SemVer 2.0.0</em> view: a match against the node-semver {@code FULL} grammar
- * ({@code major.minor.patch[-prerelease][+build]}, no leading zeros, exactly three numeric
- * components, an optional {@code v} prefix and surrounding whitespace tolerated). Prerelease
- * identifiers are kept as a list for the semver.org section 11 precedence comparison implemented by
- * {@link #comparePrecedence(ParsedVersion)}.</li>
- * </ul>
- * Neither grammar subsumes the other ({@code 1.2.3.4} matches only the release pattern,
- * {@code v1.2.3} only the strict one), so both are computed for every parse.
+ * The cached result of parsing a version string, offering two views of the same input: the
+ * Maven-flavored {@link VersionComparator#RELEASE_PATTERN} match and the strict SemVer 2.0.0 view
+ * (node-semver's {@code FULL} grammar, with the prerelease identifier list kept for
+ * {@link #comparePrecedence}). Neither grammar subsumes the other ({@code 1.2.3.4} matches only the
+ * release pattern, {@code v1.2.3} only the strict one), so both are computed for every parse.
  * <p>
  * Version selection evaluates a selector against the <em>full</em> published version list of a
  * dependency. Without caching, every candidate allocates a fresh {@link Matcher} (and its
@@ -59,15 +51,10 @@ import static org.openrewrite.semver.VersionComparator.RELEASE_PATTERN;
  */
 final class ParsedVersion {
 
-    /**
-     * A single numeric component with no leading zeros, per the node-semver {@code re.js} grammar.
-     * Shared with the npm range grammar in {@link NodeComparand} and the range classes.
-     */
+    /** A numeric component with no leading zeros, per node-semver {@code re.js}; shared with the npm range grammar. */
     static final String NUMERIC_ID = "0|[1-9]\\d*";
 
-    /**
-     * A single prerelease identifier: numeric (no leading zeros) or alphanumeric.
-     */
+    /** A prerelease identifier: numeric (no leading zeros) or alphanumeric. */
     static final String PRERELEASE_ID = "(?:" + NUMERIC_ID + "|\\d*[a-zA-Z-][0-9a-zA-Z-]*)";
 
     // Port of node-semver re.js FULL (major.minor.patch, no leading zeros, prerelease and build split).
@@ -228,10 +215,7 @@ final class ParsedVersion {
         return preReleaseEnding;
     }
 
-    /**
-     * @return whether the version matched the strict SemVer 2.0.0 grammar (exactly three numeric
-     * components without leading zeros, optional prerelease and build metadata).
-     */
+    /** Whether the version matched the strict SemVer 2.0.0 grammar. */
     boolean isStrictSemver() {
         return strictSemver;
     }
@@ -248,11 +232,7 @@ final class ParsedVersion {
         return strictPatch;
     }
 
-    /**
-     * @return the prerelease identifiers of the strict view, each a {@code Long} (numeric
-     * identifier) or a {@code String} (alphanumeric identifier); empty when there is no prerelease
-     * or the version is not strict SemVer.
-     */
+    /** The strict view's prerelease identifiers, each a {@code Long} or a {@code String}; empty when none or not strict. */
     List<Object> strictPrerelease() {
         return strictPrerelease;
     }
@@ -261,10 +241,7 @@ final class ParsedVersion {
         return !strictPrerelease.isEmpty();
     }
 
-    /**
-     * The canonical rendering of the strict view ({@code v} prefix and surrounding whitespace
-     * dropped, build metadata retained).
-     */
+    /** The canonical strict rendering: {@code v} prefix and whitespace dropped, build metadata retained. */
     String strictToString() {
         StringBuilder sb = new StringBuilder();
         sb.append(strictMajor).append('.').append(strictMinor).append('.').append(strictPatch);
@@ -278,13 +255,8 @@ final class ParsedVersion {
     }
 
     /**
-     * SemVer 2.0.0 section 11 precedence: numeric fields compare numerically, a version with a
-     * prerelease has lower precedence than the same version without, prerelease identifiers compare
-     * identifier-by-identifier (numeric identifiers numerically and lower than alphanumeric ones,
-     * alphanumeric ones in ASCII order, a longer identifier list winning when the shared prefix
-     * ties), and build metadata is ignored entirely.
-     * <p>
-     * Both versions must be {@linkplain #isStrictSemver() strict}.
+     * SemVer 2.0.0 section 11 precedence; build metadata ignored. Both versions must be
+     * {@linkplain #isStrictSemver() strict}.
      */
     int comparePrecedence(ParsedVersion o) {
         int c = Long.compare(strictMajor, o.strictMajor);
@@ -326,8 +298,7 @@ final class ParsedVersion {
 
     // node-semver compareIdentifiers: numeric < alphanumeric; numerics compare as numbers, others as ASCII.
     /**
-     * Strict SemVer precedence over version strings, for callers that must fail loudly on
-     * non-semver input (node-semver's {@code compare} contract).
+     * Strict SemVer precedence over version strings; node-semver's {@code compare} contract.
      *
      * @throws IllegalArgumentException if either version is not strict SemVer
      */
@@ -341,11 +312,10 @@ final class ParsedVersion {
     }
 
     /**
-     * A total order over arbitrary strings for {@link VersionComparator} integration: strict SemVer
-     * pairs compare by {@linkplain #comparePrecedence precedence}, any strict version sorts above any
-     * non-semver string, and non-semver strings compare lexicographically. This keeps default
-     * methods like {@link VersionComparator#upgrade} safe when the current "version" is itself a
-     * range expression (as in a package.json dependency constraint).
+     * A total order over arbitrary strings: strict pairs by {@linkplain #comparePrecedence
+     * precedence}, strict above non-semver, non-semver lexicographic. Keeps
+     * {@link VersionComparator#upgrade} safe when the current "version" is itself a range
+     * expression, as in a package.json constraint.
      */
     static int compareLenient(String v1, String v2) {
         ParsedVersion a = parse(v1);
