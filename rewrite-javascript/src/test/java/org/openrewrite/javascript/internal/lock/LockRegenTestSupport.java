@@ -134,28 +134,36 @@ abstract class LockRegenTestSupport {
     protected void assertPnpmReproduces(String pkgResource, String lockResource) throws Exception {
         Path tmp = Files.createTempDirectory("pnpm-regen-record");
         try {
-            Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
-            Process process = new ProcessBuilder("pnpm", "install", "--lockfile-only", "--no-color")
-                    .directory(tmp.toFile())
-                    .redirectOutput(tmp.resolve("pnpm.log").toFile())
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("pnpm install timed out for " + pkgResource);
-            }
-            String generated = new String(Files.readAllBytes(tmp.resolve("pnpm-lock.yaml")), StandardCharsets.UTF_8);
-            assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
+            pnpmInstallInto(tmp, pkgResource, lockResource);
         } finally {
-            try (Stream<Path> walk = Files.walk(tmp)) {
-                walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
+            deleteRecursively(tmp);
         }
+    }
+
+    /** Verify a two-phase incremental golden pair with real pnpm (see {@link #assertNpmReproducesIncremental}). */
+    protected void assertPnpmReproducesIncremental(String dir) throws Exception {
+        Path tmp = Files.createTempDirectory("pnpm-regen-record");
+        try {
+            pnpmInstallInto(tmp, dir + "/pkg-before", dir + "/before");
+            pnpmInstallInto(tmp, dir + "/pkg", dir + "/after");
+        } finally {
+            deleteRecursively(tmp);
+        }
+    }
+
+    private void pnpmInstallInto(Path tmp, String pkgResource, String lockResource) throws Exception {
+        Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("pnpm", "install", "--lockfile-only", "--no-color")
+                .directory(tmp.toFile())
+                .redirectOutput(tmp.resolve("pnpm.log").toFile())
+                .redirectErrorStream(true)
+                .start();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("pnpm install timed out for " + pkgResource);
+        }
+        String generated = new String(Files.readAllBytes(tmp.resolve("pnpm-lock.yaml")), StandardCharsets.UTF_8);
+        assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
     }
 
     protected void assertBunReproduces(String pkgResource, String lockResource) throws Exception {

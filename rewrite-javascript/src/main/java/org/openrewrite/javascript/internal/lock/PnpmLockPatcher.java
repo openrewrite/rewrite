@@ -88,7 +88,7 @@ public final class PnpmLockPatcher implements LockPatcher {
                 continue;
             }
             if (edit.getKind() == CONTENT_FORK) {
-                root = applyContentFork(root, edit, major, newConstraints);
+                root = applyContentFork(root, edit, major, newConstraints, addedVersions);
                 continue;
             }
             if (edit.getKind() == FORCED_MOVE) {
@@ -301,7 +301,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             if (newSpecifier != null) {
                 body = LockYaml.setScalar(body, "specifier", newSpecifier);
             }
-            body = LockYaml.setScalar(body, "version", edit.getNewVersion());
+            body = LockYaml.setScalar(body, "version", versionRef(edit));
             Yaml.Mapping patchedDeps = replaceEntryValue(deps, edit.getName(), body);
             return replaceEntryValue(scopes, scope, patchedDeps);
         }
@@ -309,6 +309,11 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no importer entry for " + edit.getName());
         }
         return scopes;
+    }
+
+    /** The importer/snapshot reference form of the target version: peer-suffixed when peers apply. */
+    private static String versionRef(PackageEdit edit) {
+        return edit.getNewVersionRef() != null ? edit.getNewVersionRef() : edit.getNewVersion();
     }
 
     private Yaml.Mapping patchPackages(Yaml.Mapping root, PackageEdit edit, int major, boolean removal) {
@@ -515,37 +520,14 @@ public final class PnpmLockPatcher implements LockPatcher {
      * and retarget only the importer edge, leaving the old version's entries in place for the reverse-dependent
      * that still resolves to it. Unlike a normal bump it renames nothing.
      */
-    private Yaml.Mapping applyContentFork(Yaml.Mapping root, PackageEdit edit, int major, Map<String, String> newConstraints) {
+    private Yaml.Mapping applyContentFork(Yaml.Mapping root, PackageEdit edit, int major,
+                                          Map<String, String> newConstraints, Map<String, String> addedVersions) {
         if (major < 9) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "a pnpm content-fork below lockfileVersion 9 is not yet supported");
         }
-        if (edit.getNewIntegrity() == null) {
-            throw fail(Reason.UNSUPPORTED_ENTRY_TYPE, edit.getName(), edit.getName() + " has no registry integrity");
-        }
         requireSupportedWriteThrough(edit);
-        String key = edit.getName() + "@" + edit.getNewVersion();
-
-        Yaml.Mapping packages = section(root, "packages");
-        if (packages == null) {
-            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no packages section");
-        }
-        if (LockYaml.findEntry(packages, key) != null) {
-            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
-        }
-        packages = insertEntrySorted(packages, buildPackagesEntry(edit, key), key);
-        root = replaceEntryValue(root, "packages", packages);
-
-        Yaml.Mapping snapshots = section(root, "snapshots");
-        if (snapshots == null) {
-            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no snapshots section");
-        }
-        if (LockYaml.findEntry(snapshots, key) != null) {
-            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present in snapshots; dedupe required");
-        }
-        snapshots = insertEntrySorted(snapshots, buildSnapshotEntry(edit, key, Collections.emptyMap()), key);
-        root = replaceEntryValue(root, "snapshots", snapshots);
-
+        root = insertGraphEntries(root, edit, addedVersions);
         return patchImporter(root, edit, false, newConstraints);
     }
 
@@ -562,31 +544,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "adding to a pnpm lockfileVersion below 9 is not yet supported");
         }
-        if (edit.getNewIntegrity() == null) {
-            throw fail(Reason.UNSUPPORTED_ENTRY_TYPE, edit.getName(), edit.getName() + " has no registry integrity");
-        }
-        String key = edit.getName() + "@" + edit.getNewVersion();
-
-        Yaml.Mapping packages = section(root, "packages");
-        if (packages == null) {
-            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no packages section");
-        }
-        if (LockYaml.findEntry(packages, key) != null) {
-            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
-        }
-        packages = insertEntrySorted(packages, buildPackagesEntry(edit, key), key);
-        root = replaceEntryValue(root, "packages", packages);
-
-        Yaml.Mapping snapshots = section(root, "snapshots");
-        if (snapshots == null) {
-            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "pnpm-lock.yaml has no snapshots section");
-        }
-        if (LockYaml.findEntry(snapshots, key) != null) {
-            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present in snapshots; dedupe required");
-        }
-        snapshots = insertEntrySorted(snapshots, buildSnapshotEntry(edit, key, addedVersions), key);
-        root = replaceEntryValue(root, "snapshots", snapshots);
-
+        root = insertGraphEntries(root, edit, addedVersions);
         String specifier = newConstraints.get(edit.getName());
         if (specifier != null) {
             root = insertImporterEdge(root, edit, specifier);
@@ -594,36 +552,109 @@ public final class PnpmLockPatcher implements LockPatcher {
         return root;
     }
 
-    private Yaml.Mapping.Entry buildPackagesEntry(PackageEdit edit, String key) {
-        StringBuilder body = new StringBuilder("packages:\n  ").append(key).append(":\n")
+    /** Insert a member's {@code packages} + {@code snapshots} entries, creating a missing section outright. */
+    private Yaml.Mapping insertGraphEntries(Yaml.Mapping root, PackageEdit edit, Map<String, String> addedVersions) {
+        if (edit.getNewIntegrity() == null) {
+            throw fail(Reason.UNSUPPORTED_ENTRY_TYPE, edit.getName(), edit.getName() + " has no registry integrity");
+        }
+        String key = edit.getName() + "@" + edit.getNewVersion();
+        String snapKey = edit.getName() + "@" + versionRef(edit);
+
+        Yaml.Mapping packages = section(root, "packages");
+        if (packages == null) {
+            root = insertRootSection(root, "packages",
+                    LockYaml.graft(packagesEntryText(edit, key, "\n  "), "packages"));
+        } else {
+            if (LockYaml.findEntry(packages, key) != null) {
+                throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), key + " already present; dedupe required");
+            }
+            packages = insertEntrySorted(packages,
+                    LockYaml.graft(packagesEntryText(edit, key, "  "), "packages", key), key);
+            root = replaceEntryValue(root, "packages", packages);
+        }
+
+        Yaml.Mapping snapshots = section(root, "snapshots");
+        if (snapshots == null) {
+            return insertRootSection(root, "snapshots",
+                    LockYaml.graft(snapshotEntryText(edit, snapKey, addedVersions, "\n  "), "snapshots"));
+        }
+        if (LockYaml.findEntry(snapshots, snapKey) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), snapKey + " already present in snapshots; dedupe required");
+        }
+        snapshots = insertEntrySorted(snapshots,
+                LockYaml.graft(snapshotEntryText(edit, snapKey, addedVersions, "  "), "snapshots", snapKey), snapKey);
+        return replaceEntryValue(root, "snapshots", snapshots);
+    }
+
+    private String packagesEntryText(PackageEdit edit, String key, String entryPrefix) {
+        StringBuilder body = new StringBuilder("packages:\n").append(entryPrefix).append(yamlToken(key)).append(":\n")
                 .append("    resolution: {integrity: ").append(edit.getNewIntegrity()).append('}');
         EntryMetadata wt = edit.getMetadata();
         if (wt != null && wt.getEngines() != null) {
             requireQuotableEngines(edit.getName(), wt.getEngines());
             body.append("\n    engines: ").append(renderEngines(wt.getEngines()));
         }
+        if (wt != null && wt.getPeerDependencies() != null) {
+            body.append("\n    peerDependencies:");
+            List<String> peerNames = new ArrayList<>(wt.getPeerDependencies().keySet());
+            Collections.sort(peerNames);
+            for (String peerName : peerNames) {
+                body.append("\n      ").append(yamlToken(peerName)).append(": ")
+                        .append(yamlToken(wt.getPeerDependencies().get(peerName)));
+            }
+        }
         body.append('\n');
-        return LockYaml.graft(body.toString(), "packages", key);
+        return body.toString();
     }
 
-    private Yaml.Mapping.Entry buildSnapshotEntry(PackageEdit edit, String key, Map<String, String> addedVersions) {
+    private String snapshotEntryText(PackageEdit edit, String snapKey, Map<String, String> addedVersions,
+                                     String entryPrefix) {
         Map<String, String> deps = edit.getNewDependencies();
-        if (deps == null || deps.isEmpty()) {
-            return LockYaml.graft("snapshots:\n  " + key + ": {}\n", "snapshots", key);
+        EntryMetadata md = edit.getMetadata();
+        boolean optional = md != null && Boolean.TRUE.equals(md.getOptional());
+        StringBuilder body = new StringBuilder("snapshots:\n").append(entryPrefix).append(yamlToken(snapKey)).append(':');
+        if ((deps == null || deps.isEmpty()) && !optional) {
+            return body.append(" {}\n").toString();
         }
-        List<String> names = new ArrayList<>(deps.keySet());
-        Collections.sort(names);
-        StringBuilder body = new StringBuilder("snapshots:\n  ").append(key).append(":\n    dependencies:");
-        for (String dep : names) {
-            String resolved = addedVersions.get(dep);
-            if (resolved == null) {
-                throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                        edit.getName() + " depends on " + dep + " which is not part of the added closure");
+        if (deps != null && !deps.isEmpty()) {
+            List<String> names = new ArrayList<>(deps.keySet());
+            Collections.sort(names);
+            body.append("\n    dependencies:");
+            for (String dep : names) {
+                // A closure sibling added in the same edit set resolves through it; anything else carries the
+                // reference the diff already resolved.
+                String resolved = addedVersions.getOrDefault(dep, deps.get(dep));
+                if (resolved == null) {
+                    throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                            edit.getName() + " depends on " + dep + " with no resolved reference");
+                }
+                body.append("\n      ").append(yamlToken(dep)).append(": ").append(resolved);
             }
-            body.append("\n      ").append(dep).append(": ").append(resolved);
         }
-        body.append('\n');
-        return LockYaml.graft(body.toString(), "snapshots", key);
+        if (optional) {
+            body.append("\n    optional: true");
+        }
+        return body.append('\n').toString();
+    }
+
+    /** Root section order in a pnpm lock; a created section slots in with pnpm's blank-line prefix. */
+    private static final List<String> ROOT_SECTIONS =
+            Arrays.asList("lockfileVersion", "settings", "importers", "packages", "snapshots");
+
+    private static Yaml.Mapping insertRootSection(Yaml.Mapping root, String name, Yaml.Mapping.Entry sectionEntry) {
+        int order = ROOT_SECTIONS.indexOf(name);
+        List<Yaml.Mapping.Entry> entries = new ArrayList<>(root.getEntries());
+        int idx = 0;
+        while (idx < entries.size()) {
+            String k = LockYaml.keyOf(entries.get(idx));
+            int ko = k == null ? -1 : ROOT_SECTIONS.indexOf(k);
+            if (ko > order) {
+                break;
+            }
+            idx++;
+        }
+        entries.add(idx, sectionEntry.withPrefix("\n\n"));
+        return root.withEntries(entries);
     }
 
     private Yaml.Mapping insertImporterEdge(Yaml.Mapping root, PackageEdit edit, String specifier) {
@@ -637,21 +668,33 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (importer == null || !(importer.getValue() instanceof Yaml.Mapping)) {
             throw fail(Reason.MALFORMED_LOCK, edit.getName(), "no importer '" + dir + "'");
         }
-        Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
         String scope = edit.getScope();
+        String name = edit.getName();
+        String body = "importers:\n  " + dir + ":\n    " + scope + ":\n      " + yamlToken(name) +
+                ":\n        specifier: " + specifier + "\n        version: " + versionRef(edit) + '\n';
+
+        Yaml.Mapping importerBody = (Yaml.Mapping) importer.getValue();
+        if (importerBody.getEntries().isEmpty()) {
+            // A dependency-less importer is the flow-empty `{}`; the first declaration replaces it wholesale.
+            Yaml.Mapping.Entry grafted = LockYaml.graft(body, "importers", dir);
+            return replaceEntryValue(root, "importers", replaceEntryValue(importers, dir, grafted.getValue()));
+        }
         Yaml.Mapping.Entry scopeEntry = LockYaml.findEntry(importerBody, scope);
-        if (scopeEntry == null || !(scopeEntry.getValue() instanceof Yaml.Mapping)) {
-            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                    "adding the first " + scope + " to importer '" + dir + "' is not yet supported");
+        if (scopeEntry == null) {
+            // First dependency of this scope: insert the whole scope block at its canonical position.
+            Yaml.Mapping.Entry grafted = LockYaml.graft(body, "importers", dir, scope);
+            importerBody = insertEntrySorted(importerBody, grafted, scope);
+            return replaceEntryValue(root, "importers", replaceEntryValue(importers, dir, importerBody));
+        }
+        if (!(scopeEntry.getValue() instanceof Yaml.Mapping)) {
+            throw fail(Reason.MALFORMED_LOCK, edit.getName(), "importer scope " + scope + " is not a mapping");
         }
         Yaml.Mapping deps = (Yaml.Mapping) scopeEntry.getValue();
-        if (LockYaml.findEntry(deps, edit.getName()) != null) {
-            throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), edit.getName() + " is already declared in " + scope);
+        if (LockYaml.findEntry(deps, name) != null) {
+            throw fail(Reason.RESOLUTION_REQUIRED, name, name + " is already declared in " + scope);
         }
-        String body = "importers:\n  " + dir + ":\n    " + scope + ":\n      " + edit.getName() +
-                ":\n        specifier: " + specifier + "\n        version: " + edit.getNewVersion() + '\n';
-        Yaml.Mapping.Entry depEntry = LockYaml.graft(body, "importers", dir, scope, edit.getName());
-        deps = insertEntrySorted(deps, depEntry, edit.getName());
+        Yaml.Mapping.Entry depEntry = LockYaml.graft(body, "importers", dir, scope, name);
+        deps = insertEntrySorted(deps, depEntry, name);
         importerBody = replaceEntryValue(importerBody, scope, deps);
         return replaceEntryValue(root, "importers", replaceEntryValue(importers, dir, importerBody));
     }
@@ -685,8 +728,8 @@ public final class PnpmLockPatcher implements LockPatcher {
     private static Map<String, String> addedVersions(List<PackageEdit> edits) {
         Map<String, String> versions = new LinkedHashMap<>();
         for (PackageEdit edit : edits) {
-            if (edit.getKind() == ADD && edit.getNewVersion() != null) {
-                versions.put(edit.getName(), edit.getNewVersion());
+            if ((edit.getKind() == ADD || edit.getKind() == CONTENT_FORK) && edit.getNewVersion() != null) {
+                versions.put(edit.getName(), versionRef(edit));
             }
         }
         return versions;
@@ -708,6 +751,11 @@ public final class PnpmLockPatcher implements LockPatcher {
                         name + " engine constraint '" + value + "' is not single-quoted by pnpm; native add deferred");
             }
         }
+    }
+
+    /** A YAML key/scalar as pnpm renders it: bare when plain, single-quoted otherwise (e.g. a scoped {@code @name}). */
+    private static String yamlToken(String s) {
+        return isPlainYamlScalar(s) ? s : "'" + s + "'";
     }
 
     /** Whether {@code s} is a YAML plain scalar pnpm would emit unquoted (no leading indicator, no {@code :}/{@code #}). */

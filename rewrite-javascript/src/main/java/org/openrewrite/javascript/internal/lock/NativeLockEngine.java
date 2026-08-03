@@ -213,7 +213,8 @@ public final class NativeLockEngine {
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
         LockResolver resolver = LockResolvers.forPackageManager(pm);
-        if ((pm != PackageManager.Npm && resolver == null) ||
+        boolean diffs = pm == PackageManager.Npm || pm == PackageManager.Pnpm;
+        if ((!diffs && resolver == null) ||
                 !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
             throw surgical;
         }
@@ -225,6 +226,9 @@ public final class NativeLockEngine {
         try {
             if (pm == PackageManager.Npm) {
                 return resolveAndPatchNpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            }
+            if (pm == PackageManager.Pnpm) {
+                return resolveAndPatchPnpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
             ResolveRequest request = new ResolveRequest(
                     Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
@@ -252,6 +256,36 @@ public final class NativeLockEngine {
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
                 PackageManager.Npm, editedPackageJson, edits);
         return Result.success(new NpmLockPatcher().patch(editSet));
+    }
+
+    /** Resolve the closure seeded by the existing pnpm lock, diff it, and patch only the difference. */
+    private static Result resolveAndPatchPnpm(String editedPackageJson, String existingLock,
+                                              @Nullable Path packageJsonPath, NodeRegistries registries,
+                                              NpmRegistryClient client) {
+        Registry registry = new NpmRegistryAdapter(registries, client);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock))
+                .build(Collections.singletonMap("", editedPackageJson));
+        List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
+        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
+                PackageManager.Pnpm, editedPackageJson, edits);
+        return Result.success(new PnpmLockPatcher().patch(editSet));
+    }
+
+    /** The versions the pnpm lock already resolves, by name (bare {@code packages} keys). */
+    private static Map<String, Set<String>> lockedVersionsPnpm(String lock) {
+        Map<String, Set<String>> locked = new LinkedHashMap<>();
+        Object loaded = new Yaml().load(lock);
+        Object packages = loaded instanceof Map ? ((Map<?, ?>) loaded).get("packages") : null;
+        if (packages instanceof Map) {
+            for (Object key : ((Map<?, ?>) packages).keySet()) {
+                String k = String.valueOf(key);
+                int at = k.lastIndexOf('@');
+                if (at > 0) {
+                    locked.computeIfAbsent(k.substring(0, at), x -> new LinkedHashSet<>()).add(k.substring(at + 1));
+                }
+            }
+        }
+        return locked;
     }
 
     /** The versions the lock already installs, keyed by tree-slot name (an alias seeds under its slot). */

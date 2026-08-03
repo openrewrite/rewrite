@@ -21,7 +21,6 @@ import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.resolve.BunResolver;
 import org.openrewrite.javascript.internal.lock.resolve.LockResolver;
-import org.openrewrite.javascript.internal.lock.resolve.PnpmResolver;
 import org.openrewrite.javascript.internal.lock.resolve.ResolveRequest;
 import org.openrewrite.javascript.internal.lock.resolve.YarnClassicResolver;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -69,17 +68,6 @@ class ResolverFallbackLockRegenTest extends LockRegenTestSupport {
         String preEdit = "{ \"name\": \"f\", \"version\": \"1.0.0\", \"dependencies\": { \"debug\": \"2.6.9\" } }";
         String preEditLock = new YarnClassicResolver().resolve(request(preEdit));
         assertForkFallback(PackageManager.YarnClassic, dir, preEdit, preEditLock);
-    }
-
-    @Test
-    void pnpmForkAddFallsBackToResolver() {
-        // pre-edit declares is-odd@^3.0.1 (is-number@6.0.0 transitive); adding is-number@^7.0.0 forks is-number.
-        // The surgical add defers ("already present in the lock"); the resolver reproduces the content-fork.
-        String dir = "lock/pnpm/resolve-fork";
-        routePackages(dir, new String[][]{{"is-odd", "3.0.1"}, {"is-number", "6.0.0"}, {"is-number", "7.0.0"}});
-        String preEdit = "{\"name\":\"g-fork\",\"version\":\"1.0.0\",\"dependencies\":{\"is-odd\":\"^3.0.1\"}}";
-        String preEditLock = new PnpmResolver().resolve(request(preEdit));
-        assertForkFallback(PackageManager.Pnpm, dir, preEdit, preEditLock);
     }
 
     @Test

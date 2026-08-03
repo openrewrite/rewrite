@@ -25,7 +25,6 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
  */
 public final class LockResolvers {
 
-    private static final PnpmResolver PNPM = new PnpmResolver();
     private static final BunResolver BUN = new BunResolver();
     private static final YarnClassicResolver YARN_CLASSIC = new YarnClassicResolver();
     private static final YarnBerryResolver YARN_BERRY = new YarnBerryResolver();
@@ -35,7 +34,6 @@ public final class LockResolvers {
 
     public static @Nullable LockResolver forPackageManager(PackageManager pm) {
         switch (pm) {
-            case Pnpm:        return PNPM;
             case Bun:         return BUN;
             case YarnClassic: return YARN_CLASSIC;
             case YarnBerry:   return YARN_BERRY;

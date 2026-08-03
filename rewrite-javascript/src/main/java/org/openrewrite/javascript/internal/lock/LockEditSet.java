@@ -93,6 +93,10 @@ public class LockEditSet {
         @Nullable
         String newConstraint;
 
+        /** pnpm's peer-suffixed form of {@link #newVersion} ({@code version(peer@version)…}) for snapshot keys and references. */
+        @Nullable
+        String newVersionRef;
+
         /** The declared scope this dependency was matched in (e.g. {@code dependencies}, {@code devDependencies}). */
         String scope;
 
