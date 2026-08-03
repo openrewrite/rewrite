@@ -20,7 +20,7 @@ from typing import Optional, Set
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded
 from rewrite.java.tree import Identifier, Import, MethodDeclaration, Space
-from rewrite.python.import_utils import get_qualid_name, get_name_string
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -99,7 +99,37 @@ class RemoveImport(PythonVisitor):
 
         # Collect all used identifiers (excluding import statements)
         used = self._collect_used_identifiers(cu)
-        return target_name in used
+        if target_name not in used:
+            return False
+
+        # Removable anyway if another import already binds the name (what ChangeType leaves behind),
+        # since that binding shadows this one and the references keep resolving through it.
+        return not self._bound_by_another_import(cu, target_name)
+
+    def _bound_by_another_import(self, cu: CompilationUnit, target_name: str) -> bool:
+        """True when some import other than the one being removed binds ``target_name``."""
+        for stmt in cu.statements:
+            if isinstance(stmt, MultiImport):
+                from_name = get_name_string(stmt.from_) if stmt.from_ is not None else None
+                for imp in stmt.names:
+                    if self._binds_other(imp, from_name, target_name):
+                        return True
+            elif isinstance(stmt, Import):
+                if self._binds_other(stmt, None, target_name):
+                    return True
+        return False
+
+    def _binds_other(self, imp: Import, from_name: Optional[str], target_name: str) -> bool:
+        """True when ``imp`` binds ``target_name`` and is not the import being removed."""
+        alias = get_alias_name(imp)
+        qualid = get_qualid_name(imp.qualid)
+        bound = alias or (qualid if from_name is not None else qualid.split('.')[0])
+        if bound != target_name:
+            return False
+        # Same module and same name means this *is* the import we were asked to remove.
+        if self.name is None:
+            return from_name is not None or qualid != self.module
+        return from_name != self.module or qualid != self.name
 
     def _collect_used_identifiers(self, cu: CompilationUnit) -> Set[str]:
         """Collect all identifiers used in the code (excluding imports)."""
@@ -140,18 +170,24 @@ class RemoveImport(PythonVisitor):
         collector.visit(cu, None)
         return used
 
+    @staticmethod
+    def _prefix_to_inherit(stmt, index: int) -> Optional[Space]:
+        """The removed statement's prefix only when worth rescuing (comments, or the file's leading
+        prefix), since otherwise it is blank-line separation the next statement already carries."""
+        return stmt.prefix if (index == 0 or stmt.prefix.comments) else None
+
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
         new_padded_stmts = []
         changed = False
         removed_prefix = None
 
-        for padded in cu.padding.statements:
+        for index, padded in enumerate(cu.padding.statements):
             stmt = padded.element
             if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
                 result = self._process_single_import(stmt)
                 if result is None:
-                    removed_prefix = stmt.prefix
+                    removed_prefix = self._prefix_to_inherit(stmt, index)
                     changed = True
                 else:
                     if removed_prefix is not None:
@@ -167,7 +203,7 @@ class RemoveImport(PythonVisitor):
                 if result is None:
                     # Remove the entire statement; remember its prefix
                     # so the next statement can inherit it if needed
-                    removed_prefix = stmt.prefix
+                    removed_prefix = self._prefix_to_inherit(stmt, index)
                     changed = True
                 else:
                     if result is not stmt:

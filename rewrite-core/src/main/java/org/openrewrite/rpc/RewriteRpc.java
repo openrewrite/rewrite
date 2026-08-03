@@ -42,6 +42,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -75,7 +76,8 @@ public class RewriteRpc {
     /**
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
-     * between two processes.
+     * between two processes. Note these do not need to be ConcurrentHashMap as
+     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager
      */
     @VisibleForTesting
     final Map<String, Object> remoteObjects = new HashMap<>();
@@ -372,6 +374,15 @@ public class RewriteRpc {
     }
 
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        return visit(tree, visitorName, null, p, cursor);
+    }
+
+    /**
+     * Run a remote visitor that takes constructor arguments (e.g. the peer's own {@code AddImport}),
+     * or {@code null} {@code visitorOptions} when it takes none.
+     */
+    public <P> @Nullable Tree visit(Tree tree, String visitorName, @Nullable Map<String, Object> visitorOptions,
+                                    P p, @Nullable Cursor cursor) {
         ensureDataTableStoreSent();
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(tree.getId().toString(), tree);
@@ -381,7 +392,7 @@ public class RewriteRpc {
 
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
                 (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
-        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
+        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, visitorOptions,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
         VisitResponse response = p instanceof ExecutionContext
                 ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
