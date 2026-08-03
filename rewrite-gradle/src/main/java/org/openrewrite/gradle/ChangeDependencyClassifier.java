@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -33,7 +32,9 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -96,7 +97,7 @@ public class ChangeDependencyClassifier extends Recipe {
 
                 G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
                 if (g != cu) {
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
+                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject, ctx)));
                 }
                 return g;
             }
@@ -278,36 +279,30 @@ public class ChangeDependencyClassifier extends Recipe {
                 return m;
             }
 
-            private GradleProject updateGradleModel(GradleProject gp) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    if (!StringUtils.isBlank(configuration) && !configuration.equals(gdc.getName())) {
-                        newNameToConfiguration.put(gdc.getName(), gdc);
-                        continue;
+            private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
+                if (!StringUtils.isBlank(configuration)) {
+                    if (gp.getConfiguration(configuration) == null) {
+                        return gp;
                     }
-
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId()) && !Objects.equals(requested.getClassifier(), newClassifier)) {
-                            return requested.withClassifier(newClassifier);
-                        }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId()) && !Objects.equals(resolved.getClassifier(), newClassifier)) {
-                            return resolved.withClassifier(newClassifier);
-                        }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
+                    return gp.mapConfiguration(configuration,
+                            conf -> conf.mapDependencies(requested -> {
+                                if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())
+                                        && !Objects.equals(requested.getClassifier(), newClassifier)) {
+                                    return requested.withClassifier(newClassifier);
+                                }
+                                return requested;
+                            }, gp.getMavenRepositories(), ctx),
+                            ctx);
                 }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+                return gp.mapConfigurations(
+                        conf -> conf.mapDependencies(requested -> {
+                            if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())
+                                    && !Objects.equals(requested.getClassifier(), newClassifier)) {
+                                return requested.withClassifier(newClassifier);
+                            }
+                            return requested;
+                        }, gp.getMavenRepositories(), ctx),
+                        ctx);
             }
         });
     }

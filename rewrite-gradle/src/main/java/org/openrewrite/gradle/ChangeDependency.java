@@ -26,7 +26,6 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -36,15 +35,17 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -52,14 +53,6 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulator> {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
-
-    // Individual dependencies tend to appear in several places within a given dependency graph.
-    // Minimize the number of allocations by caching the updated dependencies.
-    @EqualsAndHashCode.Exclude
-    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new ConcurrentHashMap<>();
-
-    @EqualsAndHashCode.Exclude
-    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new ConcurrentHashMap<>();
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -166,7 +159,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     private boolean isGlobPattern() {
         return oldGroupId.contains("*") || oldGroupId.contains("?") ||
-               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+                oldArtifactId.contains("*") || oldArtifactId.contains("?");
     }
 
     public static class Accumulator {
@@ -294,7 +287,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()){
+                if (!maybeGp.isPresent()) {
                     return sourceFile;
                 }
                 for (GradleDependencyConfiguration c : maybeGp.get().getConfigurations()) {
@@ -331,17 +324,13 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         .artifactId(oldArtifactId);
 
                 Optional<GradleDependency> maybeDep = gradleDependencyMatcher.get(getCursor());
-                if (!maybeDep.isPresent()) {
-                    return m;
-                }
-
-                return updateDependency(m, maybeDep.get(), ctx);
+                return maybeDep.map(gradleDependency -> updateDependency(m, gradleDependency, ctx)).orElse(m);
             }
 
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
-                if (!canUpdateVariable(v.getSimpleName())) {
+                if (!ChangeDependency.this.canSafelyUpdateVariable(v.getSimpleName(), depMatcher, acc)) {
                     return v;
                 }
                 Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
@@ -356,10 +345,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                 }
                 return v;
-            }
-
-            private boolean canUpdateVariable(String varName) {
-                return ChangeDependency.this.canUpdateVariable(varName, depMatcher, acc);
             }
 
             private J.MethodInvocation updateDependency(J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
@@ -377,7 +362,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
 
                 String varName = dep.getVersionVariable();
-                if (varName != null && !canUpdateVariable(varName)) {
+                if (varName != null && !ChangeDependency.this.canSafelyUpdateVariable(varName, depMatcher, acc)) {
                     Object scanResult = acc.versionVariableUpdates.get(varName);
                     if (scanResult instanceof MavenDownloadingException) {
                         return ((MavenDownloadingException) scanResult).warn(m);
@@ -408,77 +393,36 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             }
 
             private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            requested = updatedRequested.computeIfAbsent(requested, r -> {
-                                GroupArtifactVersion gav = r.getGav();
-                                if (newGroupId != null) {
-                                    gav = gav.withGroupId(newGroupId);
-                                }
-                                if (newArtifactId != null) {
-                                    gav = gav.withArtifactId(newArtifactId);
-                                }
-                                if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                    try {
-                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                                .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
-                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                            gav = gav.withVersion(resolvedVersion);
-                                        }
-                                    } catch (MavenDownloadingException e) {
-                                        // Failure already in `metadataFailures`
+                return gp.mapConfigurations(configuration ->
+                                configuration.mapDependencies(requested -> {
+                                    if (!depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                                        return requested;
                                     }
-                                }
-                                if (gav != r.getGav()) {
-                                    r = r.withGav(gav);
-                                }
-                                return r;
-                            });
-                        }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
-                        assert resolved != null;
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            resolved = updatedResolved.computeIfAbsent(resolved, r -> {
-                                ResolvedGroupArtifactVersion gav = r.getGav();
-                                if (newGroupId != null) {
-                                    gav = gav.withGroupId(newGroupId);
-                                }
-                                if (newArtifactId != null) {
-                                    gav = gav.withArtifactId(newArtifactId);
-                                }
-                                if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                    try {
-                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                                .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
-                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                            gav = gav.withVersion(resolvedVersion);
-                                        }
-                                    } catch (MavenDownloadingException e) {
-                                        // Failure already in `metadataFailures`
+
+                                    GroupArtifactVersion gav = requested.getGav();
+                                    if (newGroupId != null) {
+                                        gav = gav.withGroupId(newGroupId);
                                     }
-                                }
-                                if (gav != r.getGav()) {
-                                    r = r.withGav(gav);
-                                }
-                                return r;
-                            });
-                        }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
-                }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+                                    if (newArtifactId != null) {
+                                        gav = gav.withArtifactId(newArtifactId);
+                                    }
+                                    if (!StringUtils.isBlank(newVersion) &&
+                                            (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                                        try {
+                                            String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                                    .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), configuration.getName(),
+                                                            newVersion, versionPattern, ctx);
+                                            if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
+                                                gav = gav.withVersion(resolvedVersion);
+                                            }
+                                        } catch (MavenDownloadingException ignored) {
+                                            // Failure is already recorded in metadataFailures.
+                                        }
+                                    }
+                                    return gav == requested.getGav() ? requested : requested.withGav(gav);
+                                }, gp.getMavenRepositories(), ctx),
+                        ctx
+                );
             }
         });
 
@@ -501,7 +445,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         return new PropertiesVisitor<ExecutionContext>() {
                             @Override
                             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                                if (!canUpdateVariable(entry.getKey(), propsMatcher, acc)) {
+                                if (!canSafelyUpdateVariable(entry.getKey(), propsMatcher, acc)) {
                                     return entry;
                                 }
                                 Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
@@ -525,7 +469,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         };
     }
 
-    private boolean canUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
+    private boolean canSafelyUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
         Set<GroupArtifact> usages = acc.versionVariableUsages.get(varName);
         if (usages == null) {
             return true;
