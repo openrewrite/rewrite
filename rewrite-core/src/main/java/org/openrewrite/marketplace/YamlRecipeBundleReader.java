@@ -32,11 +32,6 @@ import static java.util.Collections.*;
 public class YamlRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final YamlResourceLoader yamlLoader;
-
-    /**
-     * Category path to file every recipe under, shallowest to deepest. When empty each recipe
-     * takes the path inferred from its own name.
-     */
     private final List<CategoryDescriptor> categoryOverride;
 
     public YamlRecipeBundleReader(RecipeBundle bundle, InputStream yamlLoader, URI source, Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {

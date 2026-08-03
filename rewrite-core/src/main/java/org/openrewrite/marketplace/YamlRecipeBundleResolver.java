@@ -34,11 +34,6 @@ public class YamlRecipeBundleResolver implements RecipeBundleResolver {
     private final Properties properties;
     private final RecipeMarketplace marketplace;
     private final Collection<RecipeBundleResolver> resolvers;
-
-    /**
-     * Category path to file every recipe under, shallowest to deepest. When empty each recipe
-     * takes the path inferred from its own name.
-     */
     private final List<CategoryDescriptor> categoryOverride;
 
     public YamlRecipeBundleResolver(Properties properties, RecipeMarketplace marketplace,
