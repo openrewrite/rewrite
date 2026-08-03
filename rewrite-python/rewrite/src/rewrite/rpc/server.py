@@ -1443,12 +1443,21 @@ def _collect_marketplace_rows(
         for _recipe_name, (recipe_desc, _recipe_class) in category.recipes.items():
             if recipe_filter is not None and recipe_desc.name not in recipe_filter:
                 continue
-            existing = next((r for r in rows if r['descriptor']['name'] == recipe_desc.name), None)
+            existing = next((r for r in rows if r['name'] == recipe_desc.name), None)
             if existing:
                 existing['categoryPaths'].append(current_path)
             else:
+                # Emit listing-weight fields only: the host builds a RecipeListing from these without
+                # materializing recipes, and fetches the full descriptor lazily via PrepareRecipe.
+                # recipeCount collapses the transitive recipeList the host would otherwise only count.
                 rows.append({
-                    'descriptor': _recipe_descriptor_to_dict(recipe_desc),
+                    'name': recipe_desc.name,
+                    'displayName': recipe_desc.display_name,
+                    'description': recipe_desc.description,
+                    'estimatedEffortPerOccurrence': recipe_desc.estimated_effort_per_occurrence,
+                    'options': _options_to_dicts(recipe_desc),
+                    'dataTables': recipe_desc.data_tables,
+                    'recipeCount': _count_recipes(recipe_desc),
                     'categoryPaths': [current_path],
                     'packageName': _attribution.package_for(recipe_desc.name),
                 })
@@ -1495,6 +1504,34 @@ def _delegate_descriptor(name: str) -> dict:
     }
 
 
+def _options_to_dicts(descriptor) -> List[dict]:
+    """Convert a descriptor's own (non-recursive) options to dicts for JSON serialization."""
+    return [
+        {
+            'name': name,
+            'value': _serialize_value(value),
+            'displayName': opt.display_name,
+            'description': opt.description,
+            'example': opt.example,
+            'required': opt.required,
+            'valid': opt.valid,
+        }
+        for name, value, opt in descriptor.options
+    ]
+
+
+def _count_recipes(descriptor) -> int:
+    """Return 1 (this recipe) plus every transitive entry in its recipe_list.
+
+    The host uses this as a sort key in place of the recursive recipeList it would otherwise
+    walk to compute it.
+    """
+    count = 1
+    for sub in descriptor.recipe_list:
+        count += _count_recipes(sub)
+    return count
+
+
 def _recipe_descriptor_to_dict(descriptor) -> dict:
     """Convert a RecipeDescriptor to a dict for JSON serialization."""
     return {
@@ -1503,18 +1540,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
         'description': descriptor.description,
         'tags': descriptor.tags,
         'estimatedEffortPerOccurrence': descriptor.estimated_effort_per_occurrence,
-        'options': [
-            {
-                'name': name,
-                'value': _serialize_value(value),
-                'displayName': opt.display_name,
-                'description': opt.description,
-                'example': opt.example,
-                'required': opt.required,
-                'valid': opt.valid,
-            }
-            for name, value, opt in descriptor.options
-        ],
+        'options': _options_to_dicts(descriptor),
         'preconditions': [],
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
         'dataTables': descriptor.data_tables,

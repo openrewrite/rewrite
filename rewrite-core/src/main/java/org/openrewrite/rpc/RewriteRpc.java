@@ -176,7 +176,7 @@ public class RewriteRpc {
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return GetMarketplaceResponse.fromMarketplace(marketplace, RewriteRpc.this.resolvers);
+                return GetMarketplaceResponse.fromMarketplace(marketplace);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {

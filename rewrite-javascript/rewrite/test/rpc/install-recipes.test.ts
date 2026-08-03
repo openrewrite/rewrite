@@ -372,10 +372,35 @@ describe("InstallRecipes", () => {
                 const getMarketplace = captureGetMarketplace(marketplace, recipeOrigin);
                 const rows = await getMarketplace();
 
-                const row = rows.find(r => r.descriptor.name === "row.recipe");
+                const row = rows.find(r => r.name === "row.recipe");
                 expect(row).toBeDefined();
                 expect(row!.packageName).toBe("@example/recipes");
             }, {unsafeCleanup: true});
+        });
+
+        test("GetMarketplace recipeCount counts transitive sub-recipes", async () => {
+            // recipeCount must be 1 + every transitive recipeList entry, not just direct children —
+            // the host uses it as a marketplace sort key.
+            const marketplace = new RecipeMarketplace();
+            await marketplace.install(
+                class CompositeRecipe {
+                    async descriptor() {
+                        return {
+                            name: "composite.root", displayName: "Root", description: "",
+                            recipeList: [
+                                {name: "composite.middle", recipeList: [{name: "composite.leaf", recipeList: []}]}
+                            ]
+                        };
+                    }
+                },
+                [{displayName: "Composite"}]
+            );
+
+            const getMarketplace = captureGetMarketplace(marketplace, new Map());
+            const rows = await getMarketplace();
+
+            const row = rows.find(r => r.name === "composite.root");
+            expect(row?.recipeCount).toBe(3); // root + middle + leaf
         });
 
         test("attributes npm-installed recipes to their package", async () => {

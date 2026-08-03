@@ -19,5 +19,5 @@ def test_registry_is_first_wins_on_duplicate_name():
     m.install(_recipe("org.example.X", "second"), [CategoryDescriptor(display_name="Test")])
 
     rows = _collect_marketplace_rows(m)
-    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.X")
-    assert row["descriptor"]["description"] == "first"  # first registration wins, not overwritten
+    row = next(r for r in rows if r["name"] == "org.example.X")
+    assert row["description"] == "first"  # first registration wins, not overwritten

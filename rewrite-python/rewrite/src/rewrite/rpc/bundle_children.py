@@ -10,6 +10,14 @@ from rewrite.rpc import venv_manager
 from rewrite.rpc.child_connection import ChildConnection, child_command
 
 
+def _row_name(row: dict) -> str:
+    """The recipe name of a GetMarketplace row. Lightweight rows carry it at the top level;
+    older rows only carried a nested ``descriptor``, so fall back to that."""
+    name = row.get("name")
+    if name is not None:
+        return name
+    return row["descriptor"]["name"]
+
 
 class BundleChildren:
     def __init__(self, python_executable, venvs_root, upstream, *, spawn=None, venv_ops=None):
@@ -69,14 +77,14 @@ class BundleChildren:
         rows = self._ensure_child(bundle_dist).request("GetMarketplace", {})
         self._descriptors[bundle_dist] = rows
         for row in rows:
-            self._owner.setdefault(row["descriptor"]["name"], bundle_dist)  # first-wins
+            self._owner.setdefault(_row_name(row), bundle_dist)  # first-wins
         return rows
 
     def marketplace(self):
         merged, seen = [], set()
         for rows in self._descriptors.values():
             for row in rows:
-                name = row["descriptor"]["name"]
+                name = _row_name(row)
                 if name in seen:
                     continue
                 seen.add(name)

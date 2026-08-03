@@ -704,9 +704,20 @@ public class RewriteRpcServer
         {
             if (!rowByRecipeId.TryGetValue(descriptor.Name, out var row))
             {
+                // Emit listing-weight fields only: the host builds its marketplace from these without
+                // the full recursive descriptor, which it fetches lazily per recipe via PrepareRecipe.
+                // RecipeCount collapses the transitive RecipeList the host would otherwise only count.
                 row = new GetMarketplaceResponseRow
                 {
-                    Descriptor = RecipeDescriptorDto.FromDescriptor(descriptor),
+                    Name = descriptor.Name,
+                    DisplayName = descriptor.DisplayName,
+                    Description = descriptor.Description,
+                    EstimatedEffortPerOccurrence = descriptor.EstimatedEffortPerOccurrence is { } ts
+                        ? System.Xml.XmlConvert.ToString(ts) // ISO-8601 duration (e.g. "PT5M")
+                        : null,
+                    Options = descriptor.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
+                    DataTables = descriptor.DataTables.Select(DataTableDescriptorDto.FromDescriptor).ToList(),
+                    RecipeCount = CountRecipes(descriptor),
                     CategoryPaths = [],
                     PackageName = _recipeOrigin.GetValueOrDefault(descriptor.Name)
                 };
@@ -719,6 +730,18 @@ public class RewriteRpcServer
         {
             CollectRecipes(rowByRecipeId, child, currentPath);
         }
+    }
+
+    // Returns 1 (this recipe) plus every transitive entry in its RecipeList. The host uses this as a
+    // sort key in place of the recursive RecipeList it would otherwise walk to compute it.
+    private static int CountRecipes(RecipeDescriptor descriptor)
+    {
+        var count = 1;
+        foreach (var sub in descriptor.RecipeList)
+        {
+            count += CountRecipes(sub);
+        }
+        return count;
     }
 
     [JsonRpcMethod("InstallRecipes", UseSingleObjectParameterDeserialization = true)]
@@ -2176,7 +2199,23 @@ public class EvictRequest
 
 public class GetMarketplaceResponseRow
 {
-    public RecipeDescriptorDto Descriptor { get; set; } = null!;
+    // Listing-weight fields (Name through RecipeCount) carry everything the host needs to list the
+    // marketplace without materializing recipes. Up-to-date engines populate these and leave
+    // Descriptor null; the host fetches the full descriptor lazily per recipe via PrepareRecipe.
+    public string? Name { get; set; }
+    public string? DisplayName { get; set; }
+    public string? Description { get; set; }
+
+    [JsonConverter(typeof(DurationWireConverter))]
+    public string? EstimatedEffortPerOccurrence { get; set; }
+    public List<OptionDescriptorDto> Options { get; set; } = [];
+    public List<DataTableDescriptorDto> DataTables { get; set; } = [];
+    // 1 + every transitive RecipeList entry; the host uses it as a sort key.
+    public int RecipeCount { get; set; }
+
+    // Retained for backward compatibility with peers that still emit the full recursive descriptor,
+    // but nullable and no longer emitted here — prefer the lightweight fields above.
+    public RecipeDescriptorDto? Descriptor { get; set; }
     public List<List<CategoryDescriptorDto>> CategoryPaths { get; set; } = [];
     public string? PackageName { get; set; }
 }
@@ -2283,6 +2322,45 @@ public class OptionDescriptorDto
             Valid = d.Valid?.ToList(),
             Required = d.Required,
             Value = d.Value
+        };
+    }
+}
+
+public class DataTableDescriptorDto
+{
+    public string Name { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<ColumnDescriptorDto> Columns { get; set; } = [];
+
+    public static DataTableDescriptorDto FromDescriptor(DataTableDescriptor d)
+    {
+        return new DataTableDescriptorDto
+        {
+            Name = d.Name,
+            DisplayName = d.DisplayName,
+            Description = d.Description,
+            Columns = d.Columns.Select(ColumnDescriptorDto.FromDescriptor).ToList()
+        };
+    }
+}
+
+public class ColumnDescriptorDto
+{
+    public string Name { get; set; } = "";
+    // C#'s ColumnDescriptor carries no column type; emit an empty string so the wire field
+    // (which the Java peer's ColumnDescriptor treats as non-null) is present.
+    public string Type { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+
+    public static ColumnDescriptorDto FromDescriptor(ColumnDescriptor d)
+    {
+        return new ColumnDescriptorDto
+        {
+            Name = d.Name,
+            DisplayName = d.DisplayName,
+            Description = d.Description
         };
     }
 }
