@@ -60,7 +60,8 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         }
         // Mirror the host the siblings use rather than force-rewriting to yarnpkg: a lock already on
         // registry.npmjs.org must stay there, or the new entry's host won't match a real yarn install.
-        mirrorToYarnpkg = content.contains(YarnLock.YARN_REGISTRY);
+        // A block-less lock has no siblings; yarn's own default is the yarnpkg mirror.
+        mirrorToYarnpkg = !content.contains(YarnLock.NPM_REGISTRY);
         droppedTargets.clear();
         List<PackageEdit> adds = new ArrayList<>();
         for (PackageEdit edit : edits.getEdits()) {
@@ -474,7 +475,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
     }
 
     /** Split a merged header on {@code ", "} while respecting the double-quotes yarn wraps special selectors in. */
-    private static List<String> splitSelectors(String header) {
+    static List<String> splitSelectors(String header) {
         List<String> out = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         boolean inQuote = false;
@@ -520,6 +521,10 @@ public final class YarnClassicLockPatcher implements LockPatcher {
 
         static Blocks parse(String content) {
             int first = firstBlockOffset(content);
+            if (first < 0) {
+                // A dependency-less lock is just the header; a first insert appends after it.
+                return new Blocks(content, new ArrayList<>(), true);
+            }
             String prefix = content.substring(0, first);
             String rest = content.substring(first);
             boolean trailing = rest.endsWith("\n");
@@ -541,7 +546,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
                 }
                 offset += line.length() + 1;
             }
-            throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no yarn blocks found");
+            return -1;
         }
 
         String get(int i) {
@@ -619,6 +624,10 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         }
 
         String reconstruct() {
+            if (blocks.isEmpty()) {
+                // What yarn itself writes for a dependency-less project: the bare header.
+                return prefix;
+            }
             return prefix + String.join("\n\n", blocks) + (trailingNewline ? "\n" : "");
         }
     }

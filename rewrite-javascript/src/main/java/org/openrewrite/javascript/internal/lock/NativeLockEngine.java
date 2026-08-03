@@ -212,11 +212,7 @@ public final class NativeLockEngine {
     private static Result resolverFallback(PackageManager pm, EngineFailure surgical, String editedPackageJson,
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
-        LockResolver resolver = LockResolvers.forPackageManager(pm);
-        boolean diffs = pm == PackageManager.Npm || pm == PackageManager.Pnpm ||
-                pm == PackageManager.YarnBerry || pm == PackageManager.Bun;
-        if ((!diffs && resolver == null) ||
-                !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
+        if (!RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
             throw surgical;
         }
         // A single edited manifest resolves as a single importer. For a workspace that would drop the sibling
@@ -237,9 +233,7 @@ public final class NativeLockEngine {
             if (pm == PackageManager.Bun) {
                 return resolveAndPatchBun(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
-            ResolveRequest request = new ResolveRequest(
-                    Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
-            return Result.success(resolver.resolve(request));
+            return resolveAndPatchYarnClassic(editedPackageJson, existingLock, packageJsonPath, registries, client);
         } catch (NodeRegistryException nre) {
             // The deeper closure walk hit a registry/environment error the per-dependency path did not need to
             // reach; it produced no better answer, so return that deferral unchanged (no wrong lock either way).
@@ -301,6 +295,44 @@ public final class NativeLockEngine {
                         locked.computeIfAbsent(res.substring(0, npm), k -> new LinkedHashSet<>())
                                 .add(res.substring(npm + "@npm:".length()));
                     }
+                }
+            }
+        }
+        return locked;
+    }
+
+    /**
+     * The classic-yarn variant of {@link #resolveAndPatchNpm}: resolve the closure seeded by the existing
+     * yarn.lock, diff against its flat blocks, and patch only the difference.
+     */
+    private static Result resolveAndPatchYarnClassic(String editedPackageJson, String existingLock,
+                                                     @Nullable Path packageJsonPath, NodeRegistries registries,
+                                                     NpmRegistryClient client) {
+        Registry registry = new NpmRegistryAdapter(registries, client);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock))
+                .build(Collections.singletonMap("", editedPackageJson));
+        List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
+        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
+                PackageManager.YarnClassic, editedPackageJson, edits);
+        return Result.success(new YarnClassicLockPatcher().patch(editSet));
+    }
+
+    /** The versions the lock already resolves, scanned from every {@code name@range:} header's version line. */
+    private static Map<String, Set<String>> lockedVersionsYarnClassic(String lock) {
+        Map<String, Set<String>> locked = new LinkedHashMap<>();
+        String name = null;
+        for (String line : lock.split("\n")) {
+            if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0)) && line.charAt(0) != '#' &&
+                    line.trim().endsWith(":")) {
+                String selector = unquote(line.trim().substring(0, line.trim().length() - 1).split(",")[0].trim());
+                int at = selector.lastIndexOf('@');
+                name = at > 0 ? selector.substring(0, at) : null;
+            } else if (name != null) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("version ")) {
+                    locked.computeIfAbsent(name, k -> new LinkedHashSet<>())
+                            .add(unquote(trimmed.substring("version ".length()).trim()));
+                    name = null;
                 }
             }
         }
