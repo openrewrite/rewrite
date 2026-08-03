@@ -109,11 +109,11 @@ public final class LockFileRegeneration {
      * present, else the plain error message and the recipe's target package.
      */
     public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
-                                        Path packageJsonPath, Result result, @Nullable String fallbackPackageName) {
+                                        Path packageJsonPath, Result result, @Nullable String defaultPackageName) {
         Failure failure = result.getFailure();
         table.insertRow(ctx, new NodeLockRegenerationFailures.Row(
                 packageJsonPath.toString(),
-                failure != null && failure.getPackageName() != null ? failure.getPackageName() : fallbackPackageName,
+                failure != null && failure.getPackageName() != null ? failure.getPackageName() : defaultPackageName,
                 failure != null ? failure.getReason().toString() : null,
                 failure != null ? failure.getDetail() : String.valueOf(result.getErrorMessage())));
     }

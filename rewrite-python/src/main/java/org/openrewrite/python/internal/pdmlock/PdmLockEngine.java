@@ -42,7 +42,7 @@ import java.util.*;
 
 /**
  * Regenerates pdm.lock natively from an edited pyproject.toml. Scope (v1) mirrors the poetry engine:
- * a surgical version change of one or more direct dependencies that resolve to a leaf package (no
+ * an in-place version change of one or more direct dependencies that resolve to a leaf package (no
  * dependency edges and no extras), where the closure is provably unchanged. Everything else fails
  * loud with {@link Reason#RESOLUTION_REQUIRED} so a real relock never disagrees.
  */
