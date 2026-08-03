@@ -72,7 +72,7 @@ class PnpmLockPatcherTest {
     }
 
     @Test
-    void v9EnginesWriteThroughBump() {
+    void v9EnginesBumpPatchesInPlace() {
         Map<String, String> engines = new LinkedHashMap<>();
         engines.put("node", ">=0.12.0");
         String patched = bump("v9-engines", PackageEdit.builder()
@@ -165,7 +165,7 @@ class PnpmLockPatcherTest {
     }
 
     @Test
-    void licenseWriteThroughFailsLoud() {
+    void licenseChangeFailsLoud() {
         assertThatThrownBy(() -> bump("v9", PackageEdit.builder()
                 .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213).scope("dependencies")
                 .metadata(EntryMetadata.builder().license("MIT").build()).build()))
@@ -176,7 +176,7 @@ class PnpmLockPatcherTest {
     }
 
     @Test
-    void deprecatedWriteThroughFailsLoud() {
+    void deprecatedChangeFailsLoud() {
         assertThatThrownBy(() -> bump("v9", PackageEdit.builder()
                 .name("ms").oldVersion("2.1.2").newVersion("2.1.3").newIntegrity(MS_213).scope("dependencies")
                 .metadata(EntryMetadata.builder().deprecated("no longer maintained").build()).build()))

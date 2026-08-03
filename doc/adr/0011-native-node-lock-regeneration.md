@@ -4,7 +4,9 @@ Date: 2026-07-28
 
 ## Status
 
-Proposed
+Proposed. Amended 2026-08-02: whole-closure resolution landed as lock-seeded resolution plus
+per-format graph-to-lock diffs feeding the same in-place patchers, superseding
+[ADR 0012](0012-native-lock-resolvers.md)'s separate whole-file resolver design.
 
 ## Context
 
@@ -77,13 +79,23 @@ byte preserved); and **fail loud, never guess** — when it cannot prove the res
 records a structured, per-package failure. Byte-equivalence with a subsequent real install is the
 target, since the package managers themselves do minimal updates.
 
-The provably-safe subset (Phase A) is a **strict layout whitelist**: a version change of a package
-that is not fork/peer-duplicated in the lock, whose new version's `dependencies` are unchanged and
-already satisfied, with no change to `peerDependencies` / `peerDependenciesMeta` /
-`optionalDependencies` / `os` / `cpu` / `libc` / `bundleDependencies` / `hasInstallScript`. Non-layout
-metadata (`engines`, `license`, `deprecated`, `bin`) is **written through** rather than failing loud.
-Removals of leaf/orphan entries are supported. Adds, closure-changing upgrades, and anything failing
-the whitelist fail loud (`RESOLUTION_REQUIRED`) pending the Phase B hoisting-aware resolver.
+Regeneration is one idea applied at two scopes: **resolve the new dependency set, then edit the lock
+file in place**. The per-dependency scope diffs the two manifests, proves each changed dependency's
+closure effect (the strict layout whitelist below), and hands `PackageEdit`s to the format's
+`LockPatcher`. When that proof cannot be made (`RESOLUTION_REQUIRED`), the engine resolves the
+**whole closure** instead — seeded by the existing lock, so a locked version that still satisfies its
+range is kept exactly as a real incremental install would keep it — and diffs the resolved graph
+against the existing lock into the same `PackageEdit`s for the same patcher. There is no whole-file
+serialization: untouched entries keep their bytes because the lossless trees preserve everything the
+edits do not name, and only what actually changed is ever verified or rewritten.
+
+The per-dependency whitelist: a version change of a package that is not fork/peer-duplicated in the
+lock, whose new version's `dependencies` are unchanged and already satisfied, with no change to
+`peerDependencies` / `peerDependenciesMeta` / `optionalDependencies` / `os` / `cpu` / `libc` /
+`bundleDependencies` / `hasInstallScript`. Non-layout metadata (`engines`, `license`, `deprecated`,
+entry flags) is patched in place rather than failing loud. Removals of leaf/orphan entries are
+supported. Everything else routes to the whole-closure scope, which itself fails loud on any
+difference its format's patcher cannot express byte-exact.
 
 ### Architecture
 
@@ -106,10 +118,18 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
   runs the closure-safe proof over the raw lock (not the lossy adapters), resolves versions
   minimal-update (keep the locked version if it still satisfies, else max-satisfying), honors
   overrides/resolutions, builds a `LockEditSet`, and dispatches to the format's `LockPatcher`.
+- **Whole-closure resolution** — `NpmGraphBuilder` resolves the closure from the importer manifest
+  (regular/dev/optional scopes, satisfied peers, npm 7+ peer auto-install, `npm:` aliases),
+  preferring a locked version that still satisfies its range over the registry maximum;
+  `ResolutionGraph` / `ResolvedNode` are the plain value model. A per-format graph-to-lock diff
+  (`NpmLockDiff`, `PnpmLockDiff`, `BunLockDiff`, `YarnClassicLockDiff`, `YarnBerryLockDiff`) matches
+  the graph to the lock's own keys — hoisted `node_modules` slots, `name@version` content addresses,
+  flat selector blocks, or merged descriptors — and expresses the difference as `PackageEdit`s.
 - **`LockPatcher`** per format — `NpmLockPatcher` (v2 + v3, workspaces, via rewrite-json),
   `PnpmLockPatcher` (v9 + v6, workspaces, via rewrite-yaml; v5.4 fails loud), `YarnClassicLockPatcher`
   (targeted text patch with merged-header split), `BunLockPatcher` (JSONC via rewrite-json),
-  `YarnBerryLockPatcher` (parse-only, fails loud `CHECKSUM_UNAVAILABLE`).
+  `YarnBerryLockPatcher` (via rewrite-yaml; each moving entry's `checksum` reproduced from its
+  tarball by `BerryZipChecksum`, untouched entries keeping theirs).
 
 ### Failure model
 
@@ -127,9 +147,9 @@ The shell-out path is deleted; `PackageManagerExecutor` survives only for `Depen
 
 | Phase | Scope | Status |
 |---|---|---|
-| **A** | Registry client + discovery/creds, isolated node-semver, `NativeLockEngine` with the strict layout whitelist, and byte-exact patchers for npm (v2/v3), pnpm (v9/v6), yarn-classic, and bun, all with full workspace support; failure model + data table; recipe wiring; PM-free E2E tests against goldens recorded from real installs. Yarn Berry is parse-only (fail-loud). | Implemented |
-| **A-follow** | Yarn Berry checksum reproduction (tarball fetch + yarn's normalized-zip hash), isolated so a yarn-version bump touches only that module; npm `engines`/`bin` write-through; pnpm v5.4. | Deferred |
-| **B** | Hoisting-aware resolver for adds and closure-changing upgrades. | Deferred (fail loud in A; size against a corpus first) |
+| **A** | Registry client + discovery/creds, isolated node-semver, `NativeLockEngine` with the strict layout whitelist, and byte-exact patchers for npm (v2/v3), pnpm (v9/v6), yarn-classic, and bun, all with full workspace support; failure model + data table; recipe wiring; PM-free E2E tests against goldens recorded from real installs. | Implemented |
+| **A-follow** | Yarn Berry checksum reproduction (tarball fetch + yarn's normalized-zip hash). | Implemented |
+| **B** | Whole-closure regeneration for adds and closure-changing upgrades. | Implemented as lock-seeded resolution plus per-format graph-to-lock diffs feeding the same patchers; two-phase incremental fixtures (a real before lock, then the real incremental after) pin the bytes |
 
 ## Testing strategy
 

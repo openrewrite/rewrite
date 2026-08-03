@@ -4,7 +4,13 @@ Date: 2026-08-01
 
 ## Status
 
-Proposed
+Superseded by [ADR 0011](0011-native-node-lock-regeneration.md), amended 2026-08-02.
+
+The whole-file resolvers and serializers this ADR introduced were deleted. What survives is the
+resolution graph (`NpmGraphBuilder`, `ResolutionGraph`), now seeded by the existing lock and diffed
+against it per format, feeding the same in-place patchers — one idea at two scopes rather than two
+tiers. The interface, the from-scratch serializers, and the fallback mechanics described below no
+longer exist.
 
 ## Context
 

@@ -43,7 +43,7 @@ import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.K
 
 /**
  * Patches a {@code bun.lock} (JSONC). Bun's text lock round-trips byte-for-byte through the rewrite-json LST,
- * so the patch is surgical {@link Json.Literal} replacement: each moving package's {@code packages} tuple
+ * so the patch is targeted {@link Json.Literal} replacement: each moving package's {@code packages} tuple
  * locator ({@code "name@ver"}, element 0) and integrity (element 3) are rewritten and its {@code workspaces[dir]}
  * constraint re-pinned. Bun stores integrity only (no {@code resolved} URL), so element 1 and the metadata (2) stay.
  */

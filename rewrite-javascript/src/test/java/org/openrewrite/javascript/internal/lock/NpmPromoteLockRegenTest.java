@@ -61,8 +61,8 @@ class NpmPromoteLockRegenTest extends LockRegenTestSupport {
 
     @Test
     void promoteDevToProductionV2ResolvedByFallback() {
-        // A v2 dev→prod promotion clears "dev": true in the packages entry AND the legacy tree; the surgical
-        // patcher defers on the legacy clear, but the resolver fallback resolves the whole closure from scratch —
+        // A v2 dev→prod promotion clears "dev": true in the packages entry AND the legacy tree; the per-dependency
+        // patcher defers on the legacy clear, but whole-closure resolution seeded by the lock covers it —
         // ms (promoted, now prod) unflagged, the surviving devDependency humanize-ms still dev — byte-exact.
         String dir = "lock/npm/promote-dev-v2";
         routes.put(REG + "ms", resource(dir + "/http/ms"));

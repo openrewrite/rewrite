@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.resolve;
+package org.openrewrite.javascript.internal.lock;
 
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.Set;
 
 /**
- * The registry surface a resolver needs: the published versions of a package and a single version's manifest.
+ * The registry surface dependency resolution needs: the published versions of a package and a single version's manifest.
  * Decouples the resolution algorithm from {@code NpmRegistryClient}/HTTP so graph builders unit-test against a
  * fake with no network.
  */

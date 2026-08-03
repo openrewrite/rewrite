@@ -18,8 +18,6 @@ package org.openrewrite.javascript.internal.lock;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.resolve.ResolutionGraph;
-import org.openrewrite.javascript.internal.lock.resolve.ResolvedNode;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;

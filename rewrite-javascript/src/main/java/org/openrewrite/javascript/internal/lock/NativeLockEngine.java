@@ -28,13 +28,6 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
-import org.openrewrite.javascript.internal.lock.resolve.LockResolver;
-import org.openrewrite.javascript.internal.lock.resolve.LockResolvers;
-import org.openrewrite.javascript.internal.lock.resolve.NpmGraphBuilder;
-import org.openrewrite.javascript.internal.lock.resolve.NpmRegistryAdapter;
-import org.openrewrite.javascript.internal.lock.resolve.Registry;
-import org.openrewrite.javascript.internal.lock.resolve.ResolutionGraph;
-import org.openrewrite.javascript.internal.lock.resolve.ResolveRequest;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -66,14 +59,17 @@ import java.util.Set;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
- * The shared, package-manager-agnostic orchestrator for native lock regeneration. It diffs the pre-edit and
- * post-edit {@code package.json} to scope the change to the declared dependencies the recipe touched, proves
- * each moving dependency leaves the resolved closure unchanged (the strict layout whitelist), resolves the
- * target version against the registry, and hands a proven {@link LockEditSet} to the format's {@link LockPatcher}.
+ * The shared, package-manager-agnostic orchestrator for native lock regeneration: resolve the new dependency
+ * set, then edit the lock file in place. The per-dependency scope diffs the pre-edit and post-edit
+ * {@code package.json}, proves each moving dependency leaves the resolved closure unchanged (the strict layout
+ * whitelist), resolves the target version against the registry, and hands a proven {@link LockEditSet} to the
+ * format's {@link LockPatcher}. When that proof cannot be made, the whole closure is resolved instead — seeded
+ * by the existing lock so still-satisfying versions stay put — and diffed against the lock into the same edits
+ * for the same patcher.
  * <p>
- * Everything outside the whitelist fails loud with a structured {@link Failure} and no lock; there is no
- * shell-out fallback (it would leak registry credentials). The one tolerance is the write-through metadata tier
- * ({@code engines}/{@code license}/{@code deprecated}/{@code bin}) a real bump patches without reshaping the tree.
+ * Anything neither scope can express byte-exactly fails loud with a structured {@link Failure} and no lock;
+ * there is no shell-out (it would leak registry credentials). Non-layout entry metadata
+ * ({@code engines}/{@code license}/{@code deprecated}/flags) is patched without reshaping the tree.
  * Reads over the raw lock and manifests use Jackson/SnakeYAML directly, never the lossy adapter normalization.
  */
 public final class NativeLockEngine {
@@ -93,11 +89,11 @@ public final class NativeLockEngine {
             "dependencies", "devDependencies", "peerDependencies", "optionalDependencies");
 
     /**
-     * The cannot-reshape deferrals the from-scratch {@link LockResolver} may still reproduce byte-exact. Genuine
-     * input/environment failures (malformed lock/manifest, registry/auth/not-found) are deliberately absent — the
-     * resolver cannot fix those, so they stay fail-loud.
+     * The cannot-reshape deferrals whole-closure resolution may still reproduce byte-exact. Genuine
+     * input/environment failures (malformed lock/manifest, registry/auth/not-found) are deliberately absent —
+     * resolving more would not fix those, so they stay fail-loud.
      */
-    private static final Set<Reason> RESOLVER_FALLBACK_REASONS =
+    private static final Set<Reason> RESOLVABLE_REASONS =
             EnumSet.of(Reason.RESOLUTION_REQUIRED, Reason.CHECKSUM_UNAVAILABLE);
 
     private NativeLockEngine() {
@@ -139,28 +135,28 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no existing lock file to update");
         }
 
-        // Built once and shared by both the surgical patch tier and the resolver fallback.
+        // Built once and shared by the per-dependency and whole-closure scopes.
         NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, Environment.SYSTEM);
         NpmRegistryClient client = NodeExecutionContextView.view(ctx).getRegistryClient();
 
         try {
-            return surgicalRegenerate(pm, editedPackageJson, originalPackageJson, existingLock,
+            return patchEditedDependencies(pm, editedPackageJson, originalPackageJson, existingLock,
                     packageJsonPath, registries, client);
-        } catch (EngineFailure surgical) {
-            return resolverFallback(pm, surgical, editedPackageJson, existingLock, packageJsonPath, registries, client);
+        } catch (EngineFailure perDependency) {
+            return resolveAndPatch(pm, perDependency, editedPackageJson, existingLock, packageJsonPath, registries, client);
         } catch (RecipeRunException rre) {
             // A patcher failing loud from inside a rewrite-json/yaml visitor wraps its EngineFailure; unwrap it
-            // so a cannot-reshape deferral still routes through the resolver fallback.
-            EngineFailure surgical = engineFailureCause(rre);
-            if (surgical == null) {
+            // so a cannot-reshape deferral still routes to whole-closure resolution.
+            EngineFailure perDependency = engineFailureCause(rre);
+            if (perDependency == null) {
                 throw rre;
             }
-            return resolverFallback(pm, surgical, editedPackageJson, existingLock, packageJsonPath, registries, client);
+            return resolveAndPatch(pm, perDependency, editedPackageJson, existingLock, packageJsonPath, registries, client);
         }
     }
 
-    /** The fast surgical patch tier: diff the declared deps, prove the closure is unchanged, and patch in place. */
-    private static Result surgicalRegenerate(PackageManager pm, String editedPackageJson,
+    /** The per-dependency scope: diff the declared deps, prove the closure is unchanged, and patch in place. */
+    private static Result patchEditedDependencies(PackageManager pm, String editedPackageJson,
                                              @Nullable String originalPackageJson, String existingLock,
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
@@ -203,22 +199,22 @@ public final class NativeLockEngine {
     }
 
     /**
-     * The resolver fallback tier: when the surgical patch defers because it cannot reshape the closure, resolve the
-     * whole closure from scratch with the package manager's {@link LockResolver}. The resolver is
-     * byte-exact-or-fail-loud, so this never yields a lock a real install would disagree with; when it also defers,
-     * its (deeper) failure propagates and is returned. A genuine input/environment deferral the resolver cannot fix
-     * (or a package manager without a resolver) rethrows the surgical failure unchanged.
+     * The whole-closure scope: when the per-dependency proof defers because it cannot reshape the closure,
+     * resolve the full closure seeded by the existing lock, diff it against the lock, and hand the same kind of
+     * edits to the same patcher. Byte-exact-or-fail-loud either way, so this never yields a lock a real install
+     * would disagree with; when the deeper attempt also defers, its failure propagates (its detail is closer to
+     * the real blocker). A genuine input/environment deferral rethrows the per-dependency failure unchanged.
      */
-    private static Result resolverFallback(PackageManager pm, EngineFailure surgical, String editedPackageJson,
+    private static Result resolveAndPatch(PackageManager pm, EngineFailure perDependency, String editedPackageJson,
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
-        if (!RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
-            throw surgical;
+        if (!RESOLVABLE_REASONS.contains(perDependency.failure.getReason())) {
+            throw perDependency;
         }
         // A single edited manifest resolves as a single importer. For a workspace that would drop the sibling
         // importers and write a truncated lock, so keep those deferred (return the per-dependency failure).
         if (isMultiPackageProject(pm, editedPackageJson, existingLock, packageJsonPath)) {
-            throw surgical;
+            throw perDependency;
         }
         try {
             if (pm == PackageManager.Npm) {
@@ -237,7 +233,7 @@ public final class NativeLockEngine {
         } catch (NodeRegistryException nre) {
             // The deeper closure walk hit a registry/environment error the per-dependency path did not need to
             // reach; it produced no better answer, so return that deferral unchanged (no wrong lock either way).
-            throw surgical;
+            throw perDependency;
         }
         // An EngineFailure from the deeper attempt propagates: its reason/detail is preferred.
     }
@@ -432,7 +428,7 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Whether the project has more than the single root importer the resolver reproduces. A workspace root manifest
+     * Whether the project has more than the single root importer whole-closure resolution reproduces. A workspace root manifest
      * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers}, npm/bun
      * workspace importer entries, berry {@code @workspace:} headers). yarn.lock is flat and cannot be told apart, so
      * a manifest in a sub-directory is treated as a member conservatively.
@@ -444,7 +440,7 @@ public final class NativeLockEngine {
                 return true;
             }
         } catch (RuntimeException ignored) {
-            // Unparseable here: let the resolver's own gates decide rather than misclassify.
+            // Unparseable here: let the resolution's own gates decide rather than misclassify.
         }
         if (pm == PackageManager.YarnClassic && packageJsonPath != null) {
             Path parent = packageJsonPath.getParent();
@@ -655,7 +651,7 @@ public final class NativeLockEngine {
         // providers still satisfy the new ranges is written through rather than deferred (npm only).
         boolean depsEqual = dependenciesEqual(oldManifest, newManifest);
         LockEditSet.EntryMetadata surfaces =
-                proveSurfacesAndWriteThrough(pm, name, oldManifest, newManifest, existingLock, depsEqual);
+                diffEntryMetadata(pm, name, oldManifest, newManifest, existingLock, depsEqual);
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
@@ -965,7 +961,7 @@ public final class NativeLockEngine {
                 .newShasum(dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .metadata(writeThrough(PackageManager.Npm, oldManifest, newManifest))
+                .metadata(metadataDelta(PackageManager.Npm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .kind(FORCED_MOVE)
@@ -1147,7 +1143,7 @@ public final class NativeLockEngine {
                 .newVersion(target)
                 .newIntegrity(dist.getIntegrity())
                 .newDependencies(newManifest.getDependencies())
-                .metadata(writeThrough(PackageManager.Pnpm, oldManifest, newManifest))
+                .metadata(metadataDelta(PackageManager.Pnpm, oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .kind(FORCED_MOVE)
@@ -2225,7 +2221,7 @@ public final class NativeLockEngine {
 
     /**
      * The strict layout whitelist for a bump, minus the {@code dependencies} surface (the cascade handles that):
-     * the two manifests must agree on every other closure-affecting surface; only the write-through tier
+     * the two manifests must agree on every other closure-affecting surface; only non-layout entry metadata
      * (engines/license/deprecated/bin) may differ.
      */
     private static void proveNonDependencySurfacesUnchanged(String name, VersionManifest oldM, VersionManifest newM) {
@@ -2257,7 +2253,7 @@ public final class NativeLockEngine {
      * satisfying version (an absent optional peer counts as satisfied), and no peer that flips to optional could let
      * npm GC its provider — each such provider is a root-anchored dependency npm never prunes. Anything else defers.
      */
-    private static LockEditSet.@Nullable EntryMetadata proveSurfacesAndWriteThrough(
+    private static LockEditSet.@Nullable EntryMetadata diffEntryMetadata(
             PackageManager pm, String name, VersionManifest oldM, VersionManifest newM, String lock, boolean depsEqual) {
         provePlatformSurfacesUnchanged(name, oldM, newM);
         requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
@@ -2265,7 +2261,7 @@ public final class NativeLockEngine {
         boolean peerChanged = !Objects.equals(normalize(oldM.getPeerDependencies()), normalize(newM.getPeerDependencies()));
         boolean peerMetaChanged =
                 !Objects.equals(normalize(oldM.getPeerDependenciesMeta()), normalize(newM.getPeerDependenciesMeta()));
-        LockEditSet.EntryMetadata base = writeThrough(pm, oldM, newM);
+        LockEditSet.EntryMetadata base = metadataDelta(pm, oldM, newM);
         if (!peerChanged && !peerMetaChanged) {
             return base;
         }
@@ -2524,7 +2520,7 @@ public final class NativeLockEngine {
      * A re-scoped fork bump's dedupe guard: every reverse-dependent that currently forks {@code name} (its
      * recorded constraint excludes the old top-level version, so it holds its own nested copy) must also exclude
      * the bumped {@code target}. A requirer that now accepts the target would have npm dedupe its nest up into the
-     * new top-level — a reshape the surgical bump cannot express — so any such case fails loud.
+     * new top-level — a reshape the per-dependency bump cannot express — so any such case fails loud.
      */
     private static void requireForksStayForkedNpm(String name, String oldVersion, String target, String lock) {
         for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
@@ -2878,7 +2874,7 @@ public final class NativeLockEngine {
         return paren >= 0 ? k.substring(0, paren) : k;
     }
 
-    private static LockEditSet.@Nullable EntryMetadata writeThrough(PackageManager pm, VersionManifest oldM, VersionManifest newM) {
+    private static LockEditSet.@Nullable EntryMetadata metadataDelta(PackageManager pm, VersionManifest oldM, VersionManifest newM) {
         LockEditSet.EntryMetadata.EntryMetadataBuilder b = LockEditSet.EntryMetadata.builder();
         boolean any = false;
         if (!Objects.equals(normalize(oldM.getEngines()), normalize(newM.getEngines()))) {
@@ -2904,7 +2900,7 @@ public final class NativeLockEngine {
             if (funding != null && !funding.isTextual()) {
                 // npm reshapes object/array funding; only the string form is byte-reproducible (as leaf adds gate).
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newM.getName(),
-                        newM.getName() + " funding changed to a non-string form; native write-through is not supported");
+                        newM.getName() + " funding changed to a non-string form the entry patch does not rewrite");
             }
             b.funding(normalizeFunding(funding));
             b.fundingChanged(true);

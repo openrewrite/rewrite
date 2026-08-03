@@ -19,8 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.resolve.ResolutionGraph;
-import org.openrewrite.javascript.internal.lock.resolve.ResolvedNode;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 import org.yaml.snakeyaml.Yaml;
 

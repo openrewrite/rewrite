@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.resolve;
+package org.openrewrite.javascript.internal.lock;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 import org.openrewrite.semver.NodeSemver;
@@ -35,7 +34,7 @@ import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RE
  * {@code peerDependencies} as long as every non-optional peer is already satisfied by a resolved node (a
  * top-level dependency or a normal dependency of some node) at a version its range admits — the peer is then a
  * constraint already met and adds no node. A missing non-optional peer is npm's auto-install: when it is enabled
- * (only the npm resolver; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
+ * (npm only; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
  * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
  * missing-peer shape fails loud. An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
  * placed by the alias name, reproduced only when self-contained (no un-aliased copy of the same package, no peer
@@ -51,8 +50,8 @@ public final class NpmGraphBuilder {
 
     /**
      * npm 7+ auto-installs a missing non-optional peer. Only the npm serialization places such a node byte-exact, so
-     * it is enabled solely for the npm resolver; the pnpm/bun/yarn resolvers share this builder but keep the classic
-     * deferral (their serializers would not reproduce an auto-installed peer node).
+     * it is enabled solely for npm; the other package managers share this builder but keep the classic
+     * deferral (their locks would not reproduce an auto-installed peer node).
      */
     private final boolean autoInstallPeers;
 
@@ -431,7 +430,7 @@ public final class NpmGraphBuilder {
      * shape (auto-install disabled, a dev/optional closure, a non-leaf peer, an interacting multi-requirer peer, an
      * unfetchable peer, or a peer present at a non-satisfying / forked version) fails loud with the classic deferral
      * so no serializer emits a peer layout it cannot reproduce. An optional peer (per {@code peerDependenciesMeta})
-     * may be absent; the root importer carries no meta here (the resolver defers that), so its peers are all required.
+     * may be absent; the root importer carries no meta here (that shape defers), so its peers are all required.
      *
      * @return the node keys of the auto-installed peers (they carry no dev/optional flag in the all-prod closure).
      */

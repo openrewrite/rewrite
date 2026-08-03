@@ -86,7 +86,7 @@ class NpmFundingLockRegenTest extends LockRegenTestSupport {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's deeper from-scratch attempt also defers on the funding entry shape (its detail is preferred).
+        // The deeper whole-closure attempt also defers on the funding entry shape (its detail is preferred).
         assertThat(result.getFailure().getDetail()).contains("declares funding");
     }
 

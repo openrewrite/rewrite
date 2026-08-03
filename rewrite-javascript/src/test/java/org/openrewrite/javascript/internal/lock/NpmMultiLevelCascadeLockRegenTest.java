@@ -43,7 +43,7 @@ class NpmMultiLevelCascadeLockRegenTest extends LockRegenTestSupport {
         // Bump ansi-styles ^3.2.1 -> ^4.0.0: ansi-styles 3.2.1 -> 4.3.0 moves its color-convert edge
         // ^1.9.0 -> ^2.0.1, forcing color-convert 1.9.3 -> 2.0.1; color-convert 2.0.1 in turn moves its
         // color-name edge 1.1.3 -> ~1.1.4, forcing the leaf color-name 1.1.3 -> 1.1.4. Three levels move, each
-        // a single-requirer in-range clean-closure bump (write-through: ansi-styles engines+funding,
+        // a single-requirer in-range clean-closure bump (metadata patched in place: ansi-styles engines+funding,
         // color-convert engines added).
         assertCascadeByteExact("lock/npm/cascade-multilevel",
                 new String[][]{{"ansi-styles", "3.2.1", "4.3.0"}, {"color-convert", "1.9.3", "2.0.1"},

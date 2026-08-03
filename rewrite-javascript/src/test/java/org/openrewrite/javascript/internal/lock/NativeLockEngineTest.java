@@ -108,7 +108,7 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
         // The resolver made the deeper attempt and defers: the new transitive's non-optional peer is unsatisfied,
-        // so npm would auto-install it (the harder tail). Its detail is preferred over the surgical message.
+        // so npm would auto-install it (the harder tail). Its detail is preferred over the per-dependency message.
         assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
@@ -163,8 +163,8 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void npmEnginesWriteThrough() {
-        // An engines-only delta (write-through tier) is patched, not failed loud: the npm patcher rewrites the
+    void npmEnginesPatchedInPlace() {
+        // An engines-only delta is patched, not failed loud: the npm patcher rewrites the
         // entry's `engines` object to the new value at npm's field position. (Byte-exact goldens for engines
         // live in NpmOrphanPruneLockRegenTest#enginesChangeV3.)
         routes.put("https://registry.npmjs.org/lodash",
@@ -202,7 +202,7 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void npmBinWriteThroughNotYetSupported() {
+    void npmBinChangeNotYetPatched() {
         // A `bin` delta still fails loud (npm normalizes string/object bin; needs a real golden to pin bytes).
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
@@ -234,7 +234,7 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's from-scratch attempt also defers on the bin entry shape (its detail is preferred).
+        // The deeper whole-closure attempt also defers on the bin entry shape (its detail is preferred).
         assertThat(result.getFailure().getDetail()).contains("changed its bin");
     }
 
@@ -392,7 +392,7 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver's from-scratch attempt also defers on the bundleDependencies shape (its detail is preferred).
+        // The deeper whole-closure attempt also defers on the bundleDependencies shape (its detail is preferred).
         assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("entry shape not yet patched");
     }
 
@@ -566,7 +566,7 @@ class NativeLockEngineTest {
 
     // --- closure surfaces (each fails loud individually) -----------------
 
-    // The expected detail is the resolver's from-scratch deferral (preferred over the surgical message): a leaf
+    // The expected detail is the deeper whole-closure deferral (preferred over the per-dependency message): a leaf
     // surface it cannot yet reproduce reports "declares <field>".
     @Test
     void osChangeFailsLoud() {
@@ -590,8 +590,8 @@ class NativeLockEngineTest {
 
     @Test
     void optionalDependenciesChangeFailsLoud() {
-        // The surgical patcher defers on the optional-add; the resolver fallback would resolve a real optional
-        // dependency, but here the added `x` is unresolvable (no route), so the surgical defer stands.
+        // The per-dependency patch defers on the optional-add; whole-closure resolution would resolve a real optional
+        // dependency, but here the added `x` is unresolvable (no route), so the per-dependency deferral stands.
         assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "optionalDependencies changed");
     }
 
@@ -671,7 +671,7 @@ class NativeLockEngineTest {
     void forkedBumpThatWouldDedupeNestFailsLoud() {
         // `wrapper` pins lodash 4.17.21 exactly (excludes the current top-level 4.17.20, so it forks a nested
         // copy). Bumping the direct lodash to 4.17.21 would let wrapper's requirement resolve to the new top-level
-        // and npm would dedupe the nest away — a reshape the surgical bump cannot express, so it defers.
+        // and npm would dedupe the nest away — a reshape the per-dependency bump cannot express, so it defers.
         routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
 
         String lock = "{\n" +

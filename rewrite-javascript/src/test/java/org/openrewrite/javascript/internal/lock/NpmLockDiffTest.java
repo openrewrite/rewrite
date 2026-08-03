@@ -17,9 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
-import org.openrewrite.javascript.internal.lock.resolve.NpmGraphBuilder;
-import org.openrewrite.javascript.internal.lock.resolve.Registry;
-import org.openrewrite.javascript.internal.lock.resolve.ResolutionGraph;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;

@@ -917,7 +917,7 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         if (wt.getBin() != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " bin metadata changed; native write-through is not supported");
+                    name + " bin metadata changed to a form the entry patch does not rewrite");
         }
         if (wt.isEnginesChanged()) {
             entry = writeEngines(name, packages, entry, wt.getEngines());

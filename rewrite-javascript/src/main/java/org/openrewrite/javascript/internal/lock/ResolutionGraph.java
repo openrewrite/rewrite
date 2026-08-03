@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.resolve;
+package org.openrewrite.javascript.internal.lock;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;

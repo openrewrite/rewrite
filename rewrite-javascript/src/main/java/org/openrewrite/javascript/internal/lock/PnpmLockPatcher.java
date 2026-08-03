@@ -249,7 +249,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     private Yaml.Mapping applyEdit(Yaml.Mapping root, PackageEdit edit, int major, Map<String, String> newConstraints) {
         boolean removal = edit.getNewVersion() == null;
         if (!removal) {
-            requireSupportedWriteThrough(edit);
+            requireSupportedMetadata(edit);
         }
         root = patchImporter(root, edit, removal, newConstraints);
         root = patchPackages(root, edit, major, removal);
@@ -438,7 +438,7 @@ public final class PnpmLockPatcher implements LockPatcher {
     }
 
     /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled, so fail loud rather than silently drop them. */
-    private void requireSupportedWriteThrough(PackageEdit edit) {
+    private void requireSupportedMetadata(PackageEdit edit) {
         EntryMetadata wt = edit.getMetadata();
         if (wt == null) {
             return;
@@ -448,7 +448,7 @@ public final class PnpmLockPatcher implements LockPatcher {
                         wt.getBin() != null ? "bin" : null;
         if (changed != null) {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                    edit.getName() + " " + changed + " metadata changed; native write-through is not supported for pnpm");
+                    edit.getName() + " " + changed + " metadata changed; the pnpm entry cannot be rewritten in place (not yet patched)");
         }
     }
 
@@ -465,7 +465,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "a pnpm cascade move below lockfileVersion 9 is not yet supported");
         }
-        requireSupportedWriteThrough(edit);
+        requireSupportedMetadata(edit);
         root = patchPackages(root, edit, major, false);
         root = patchSnapshots(root, edit, false);
         return retargetSnapshotReferences(root, edit.getName(), edit.getOldVersion(), edit.getNewVersion());
@@ -526,7 +526,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(),
                     "a pnpm content-fork below lockfileVersion 9 is not yet supported");
         }
-        requireSupportedWriteThrough(edit);
+        requireSupportedMetadata(edit);
         root = insertGraphEntries(root, edit, addedVersions);
         return patchImporter(root, edit, false, newConstraints);
     }

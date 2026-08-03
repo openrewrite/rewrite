@@ -56,7 +56,7 @@ class NpmOrphanPruneLockRegenTest extends LockRegenTestSupport {
                 new String[][]{{"semver", "7.6.0", "7.8.5"}});
     }
 
-    // --- byte-exact engines write-through (T13) --------------------------
+    // --- byte-exact engines patching (T13) --------------------------
 
     @Test
     void enginesChangeV3() {

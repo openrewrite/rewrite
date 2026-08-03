@@ -89,7 +89,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("needy", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The surgical tier defers because npm would auto-install the missing non-optional peer (harder tail).
+        // The per-dependency proof defers because npm would auto-install the missing non-optional peer (harder tail).
         assertThat(result.getFailure().getDetail()).contains("peer vue is not installed");
     }
 
@@ -107,7 +107,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
         Result result = bump("picky", "^1.0.0", "^2.0.0");
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The installed provider no longer satisfies the narrowed peer range; the surgical tier defers.
+        // The installed provider no longer satisfies the narrowed peer range; the per-dependency proof defers.
         assertThat(result.getFailure().getDetail()).contains("does not satisfy the new range");
     }
 
@@ -115,8 +115,8 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
     void peerFlipsToOptionalUnanchoredProviderFailsLoud() {
         // The new version marks the required `helper` peer optional. Its provider is only a transitively installed
         // entry (not a root dependency), so npm may GC it once it is no longer required, and writing the meta through
-        // would leave the stale provider behind; the surgical tier defers. The manifest declares `workspaces` so the
-        // resolver fallback stands down and the surgical decision itself surfaces.
+        // would leave the stale provider behind; the per-dependency proof defers. The manifest declares `workspaces` so the
+        // whole-closure resolution stands down (a workspace) and the per-dependency decision itself surfaces.
         routes.put(REG + "flippy", "{\"name\":\"flippy\",\"dist-tags\":{\"latest\":\"2.0.0\"},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
         routes.put(REG + "flippy/1.0.0",
                 "{\"name\":\"flippy\",\"version\":\"1.0.0\",\"peerDependencies\":{\"helper\":\"^1.0.0\"}}");
@@ -140,7 +140,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
                 lock, null, Paths.get("package.json"), ctx);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The now-optional peer's provider is not root-anchored, so npm may prune it; the surgical guard defers.
+        // The now-optional peer's provider is not root-anchored, so npm may prune it; the per-dependency guard defers.
         assertThat(result.getFailure().getDetail()).contains("may prune it");
     }
 
@@ -171,7 +171,7 @@ class NpmPeerSurfaceLockRegenTest extends LockRegenTestSupport {
                 lock, null, Paths.get("package.json"), ctx);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // Dropping a peer may let npm GC a provider auto-installed only for it; the surgical peer guard defers.
+        // Dropping a peer may let npm GC a provider auto-installed only for it; the per-dependency peer guard defers.
         assertThat(result.getFailure().getDetail()).contains("peerDependencies changed");
     }
 
