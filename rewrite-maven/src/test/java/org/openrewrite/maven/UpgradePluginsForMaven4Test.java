@@ -346,4 +346,60 @@ class UpgradePluginsForMaven4Test implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeIncompatiblePluginDependency() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-enforcer-plugin</artifactId>
+                              <version>3.5.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.codehaus.mojo</groupId>
+                                      <artifactId>extra-enforcer-rules</artifactId>
+                                      <version>1.3</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            spec -> spec.after(actual -> """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-enforcer-plugin</artifactId>
+                              <version>%s</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.codehaus.mojo</groupId>
+                                      <artifactId>extra-enforcer-rules</artifactId>
+                                      <version>%s</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """.formatted(
+              selectedVersion(actual, "<artifactId>maven-enforcer-plugin</artifactId>\\s*<version>(3\\.\\d+\\.\\d+)</version>", "[3.5.0,4.0.0)"),
+              selectedVersion(actual, "<artifactId>extra-enforcer-rules</artifactId>\\s*<version>(1\\.\\d+(?:\\.\\d+)?)</version>", "[1.4,2.0.0)")))
+          )
+        );
+    }
 }
