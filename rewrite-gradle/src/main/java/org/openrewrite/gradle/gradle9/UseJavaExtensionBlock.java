@@ -71,11 +71,7 @@ public class UseJavaExtensionBlock extends Recipe {
                 // Top-level `sourceCompatibility` / `targetCompatibility` assignments delegate to the removed
                 // `JavaPluginConvention`; move them into a `java { }` block at the root of the build script.
                 G.CompilationUnit cu = (G.CompilationUnit) visited;
-                // Hold onto the list; each `getStatements()` call builds a new one, so comparing
-                // against a second call would never detect the unchanged case.
-                List<Statement> statements = cu.getStatements();
-                List<Statement> mapped = moveCompatibility(statements, ctx);
-                return mapped == statements ? cu : cu.withStatements(mapped);
+                return cu.withStatements(moveCompatibility(cu.getStatements(), ctx));
             }
 
             @Override
