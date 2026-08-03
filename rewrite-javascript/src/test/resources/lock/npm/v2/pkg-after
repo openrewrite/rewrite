@@ -1,7 +1,0 @@
-{
-  "name": "npm-lock-v2",
-  "version": "1.0.0",
-  "dependencies": {
-    "is-odd": "3.0.1"
-  }
-}

@@ -1,8 +1,0 @@
-{
-  "name": "badd",
-  "version": "1.0.0",
-  "packageManager": "yarn@4.5.3",
-  "dependencies": {
-    "is-odd": "3.0.1"
-  }
-}

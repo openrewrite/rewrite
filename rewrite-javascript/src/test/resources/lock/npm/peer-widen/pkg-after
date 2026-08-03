@@ -1,8 +1,0 @@
-{
-  "name": "peer-widen",
-  "version": "1.0.0",
-  "dependencies": {
-    "react": "18.3.1",
-    "use-sync-external-store": "1.4.0"
-  }
-}

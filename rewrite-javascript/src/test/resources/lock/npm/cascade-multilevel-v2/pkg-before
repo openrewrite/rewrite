@@ -1,7 +1,0 @@
-{
-  "name": "npm-multilevel-v2",
-  "version": "1.0.0",
-  "dependencies": {
-    "ansi-styles": "^3.2.1"
-  }
-}

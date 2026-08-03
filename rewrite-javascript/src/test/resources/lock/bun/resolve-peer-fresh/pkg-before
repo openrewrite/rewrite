@@ -1,5 +1,0 @@
-{
-  "name": "resolve-peer-fresh",
-  "version": "1.0.0",
-  "dependencies": { "once": "1.4.0" }
-}

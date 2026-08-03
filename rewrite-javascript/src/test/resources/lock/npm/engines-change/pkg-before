@@ -1,4 +1,0 @@
-{
-  "name": "engines-change","version":"1.0.0",
-  "dependencies": { "has-flag": "3.0.0" }
-}

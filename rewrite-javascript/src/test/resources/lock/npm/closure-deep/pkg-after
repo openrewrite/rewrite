@@ -1,8 +1,0 @@
-{
-  "name": "npm-lock-v3",
-  "version": "1.0.0",
-  "dependencies": {
-    "is-number": "^6.0.0",
-    "ansi-styles": "^4.3.0"
-  }
-}

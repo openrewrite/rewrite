@@ -1,7 +1,0 @@
-{
-  "name": "orphan-prune-semver",
-  "version": "1.0.0",
-  "dependencies": {
-    "semver": "7.8.5"
-  }
-}

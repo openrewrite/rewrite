@@ -1,6 +1,0 @@
-{
-  "name": "cascade-fix",
-  "dependencies": {
-    "debug": "^3.0.0"
-  }
-}

@@ -1,8 +1,0 @@
-{
-  "name": "yarn-closure",
-  "version": "1.0.0",
-  "dependencies": {
-    "is-odd": "^3.0.1",
-    "ms": "^2.1.3"
-  }
-}

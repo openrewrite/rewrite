@@ -1,8 +1,0 @@
-{
-  "name": "resolve-transitive-fork",
-  "version": "1.0.0",
-  "dependencies": {
-    "debug": "2.2.0",
-    "humanize-ms": "1.2.1"
-  }
-}
