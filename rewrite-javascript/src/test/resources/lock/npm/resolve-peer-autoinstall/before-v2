@@ -1,0 +1,12 @@
+{
+  "name": "resolve-peer-autoinstall",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "resolve-peer-autoinstall",
+      "version": "1.0.0"
+    }
+  }
+}

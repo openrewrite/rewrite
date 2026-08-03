@@ -50,7 +50,7 @@ public final class NpmGraphBuilder {
     private final Registry registry;
 
     /**
-     * npm 7+ auto-installs a missing non-optional peer. Only {@link NpmLockWriter} places such a node byte-exact, so
+     * npm 7+ auto-installs a missing non-optional peer. Only the npm serialization places such a node byte-exact, so
      * it is enabled solely for the npm resolver; the pnpm/bun/yarn resolvers share this builder but keep the classic
      * deferral (their serializers would not reproduce an auto-installed peer node).
      */
@@ -162,7 +162,7 @@ public final class NpmGraphBuilder {
      * Resolve a single {@code (name, range)} requirement, deduping to an already-chosen version when one
      * satisfies. A range no chosen version satisfies selects a fresh version; when that means a <em>second</em>
      * version of an already-resolved name it is kept as a fork (both directly-declared and transitive forks
-     * proceed), and the {@link NpmLockWriter} decides which layouts it can reproduce byte-exact.
+     * proceed), and the consumer decides which layouts it can reproduce byte-exact.
      */
     private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
@@ -491,7 +491,7 @@ public final class NpmGraphBuilder {
 
     /**
      * Add each missing non-optional peer as a top-level node (npm 7+ auto-install), gated to the clean slice
-     * {@link NpmLockWriter} reproduces byte-exact. Any un-clean condition defers with the classic peer message.
+     * the npm serialization reproduces byte-exact. Any un-clean condition defers with the classic peer message.
      */
     private Set<String> installMissingPeers(List<String[]> missing, Map<String, VersionManifest> manifests,
                                             Map<String, Set<String>> chosen, List<ImporterDecl> declared) {

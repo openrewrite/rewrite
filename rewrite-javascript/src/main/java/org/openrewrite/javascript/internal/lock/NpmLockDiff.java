@@ -497,7 +497,11 @@ final class NpmLockDiff {
 
         EntryMetadata metadata = moves ? moveMetadata(node, entry, peer) : flagsDelta(node, entry, peer);
         String scope = declaringScope(root, slot);
-        String declared = declaredRange(root, slot);
+        // Only the version the importer edge resolves to carries the declaration; another bound version of the
+        // same slot is a fork member the root does not address.
+        String declared = node.getVersion().equals(root.getResolved().get(slot)) ||
+                (root.getResolved().get(slot) == null && "peerDependencies".equals(scope)) ?
+                declaredRange(root, slot) : null;
         boolean promotion = !moves && declared != null && !inRootScope(lock, scope, slot);
         boolean constraintChanged = declared != null &&
                 !declared.equals(rootScopeValue(lock, scope, slot));
@@ -898,19 +902,25 @@ final class NpmLockDiff {
         return key.substring(NM.length(), key.lastIndexOf("/" + NM));
     }
 
-    /** The scope the root importer declares {@code slot} in, defaulting to {@code dependencies} for a transitive. */
+    /**
+     * The scope the root importer declares {@code slot} in — a resolved scope first, then a root-peer
+     * declaration — defaulting to {@code dependencies} for a transitive.
+     */
     private static String declaringScope(ResolutionGraph.Importer root, String slot) {
         for (Map.Entry<String, Map<String, String>> scope : root.getDeclared().entrySet()) {
             if (scope.getValue().containsKey(slot) && !"peerDependencies".equals(scope.getKey())) {
                 return scope.getKey();
             }
         }
+        if (root.getDeclared().getOrDefault("peerDependencies", Collections.emptyMap()).containsKey(slot)) {
+            return "peerDependencies";
+        }
         return "dependencies";
     }
 
     private static @Nullable String declaredRange(ResolutionGraph.Importer root, String slot) {
         for (Map.Entry<String, Map<String, String>> scope : root.getDeclared().entrySet()) {
-            if (!"peerDependencies".equals(scope.getKey()) && scope.getValue().containsKey(slot)) {
+            if (scope.getValue().containsKey(slot)) {
                 return scope.getValue().get(slot);
             }
         }

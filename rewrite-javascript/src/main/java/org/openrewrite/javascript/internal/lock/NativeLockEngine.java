@@ -355,7 +355,21 @@ public final class NativeLockEngine {
                                                              NodeRegistries registries, NpmRegistryClient client) {
         String name = change.name;
 
+        if ((change.oldConstraint != null && change.oldConstraint.startsWith("npm:")) ||
+                (change.newConstraint != null && change.newConstraint.startsWith("npm:"))) {
+            // An npm:<name>@<range> alias resolves its real package under the declared slot; the per-dependency
+            // path does not model that, so the whole-closure path takes over.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                    name + " is an npm: alias and requires resolution");
+        }
+
         if (change.oldConstraint == null) {
+            if ("optionalDependencies".equals(change.scope) || "peerDependencies".equals(change.scope)) {
+                // A fresh optional or peer declaration marks flags and scopes across the tree (npm 7+ even
+                // auto-installs a missing peer); only whole-closure resolution reproduces that.
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        "adding " + name + " to " + change.scope + " requires resolution");
+            }
             // The added direct dep plus its resolved runtime closure is hoisted against the existing tree;
             // any placement that would move/nest/fork fails loud.
             return resolveClosureAdd(pm, change, existingLock, memberImporterDir, registries, client);

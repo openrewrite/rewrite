@@ -1,0 +1,7 @@
+{
+  "name": "resolve-peer",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "19.2.8"
+  }
+}

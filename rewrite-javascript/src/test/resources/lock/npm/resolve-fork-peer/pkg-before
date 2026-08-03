@@ -1,0 +1,8 @@
+{
+  "name": "resolve-fork-peer",
+  "version": "1.0.0",
+  "dependencies": {
+    "@conciv/serve": "0.0.17",
+    "hono": "4.12.29"
+  }
+}

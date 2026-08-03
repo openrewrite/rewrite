@@ -269,17 +269,17 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     /**
-     * Exact-set the v2 legacy entry's {@code dev}/{@code optional} flags. The legacy serialization of
-     * {@code devOptional}/{@code peer} is not verified, so any involvement defers.
+     * Exact-set the v2 legacy entry's {@code dev}/{@code optional}/{@code peer} flags. The legacy serialization
+     * of {@code devOptional} is not verified, so its involvement defers.
      */
     private Json.JsonObject writeLegacyFlags(String name, Json.JsonObject entry, EntryMetadata md) {
-        if (Boolean.TRUE.equals(md.getDevOptional()) || Boolean.TRUE.equals(md.getPeer()) ||
-                LockJson.member(entry, "devOptional") != null || LockJson.member(entry, "peer") != null) {
+        if (Boolean.TRUE.equals(md.getDevOptional()) || LockJson.member(entry, "devOptional") != null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " devOptional/peer flags in a lockfileVersion 2 legacy tree are not yet supported");
+                    name + " devOptional flags in a lockfileVersion 2 legacy tree are not yet supported");
         }
         entry = writeFlag(entry, "dev", md.getDev());
-        return writeFlag(entry, "optional", md.getOptional());
+        entry = writeFlag(entry, "optional", md.getOptional());
+        return writeFlag(entry, "peer", md.getPeer());
     }
 
     /**
@@ -540,6 +540,14 @@ public final class NpmLockPatcher implements LockPatcher {
         return nl < 0 ? ws : ws.substring(nl + 1);
     }
 
+    /** One indentation unit, inferred from a parent's member indent vs a child's (defaulting to two spaces). */
+    private static String indentUnit(Json.JsonObject parent, String childMemberWs) {
+        String parentWs = LockJson.memberWhitespace(parent);
+        String child = indentOf(childMemberWs);
+        return parentWs != null && child.length() > indentOf(parentWs).length() ?
+                child.substring(indentOf(parentWs).length()) : "  ";
+    }
+
     /** A pending entry member: its key, source value, and whether the value is a JSON object (sorts last). */
     private static final class EntryField {
         final String key;
@@ -571,9 +579,13 @@ public final class NpmLockPatcher implements LockPatcher {
             scope = graftSorted(scope, edit.getName(), jsonEncode(newConstraint), false);
             importer = LockJson.replaceValue(importer, edit.getScope(), scope);
         } else {
-            // First dependency of this scope: create the whole scope object with one member.
+            // First dependency of this scope: create the whole scope object with one member. An importer with no
+            // object-valued member yet (a dependency-less root) derives the inner indent from its own members.
             String fieldWs = nestedMemberWhitespace(importer);
             String closeWs = LockJson.memberWhitespace(importer);
+            if (fieldWs == null && closeWs != null) {
+                fieldWs = "\n" + indentOf(closeWs) + indentUnit(packages, closeWs);
+            }
             if (fieldWs == null) {
                 throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive importer indentation");
             }
@@ -585,37 +597,69 @@ public final class NpmLockPatcher implements LockPatcher {
     }
 
     private Json.JsonObject insertLegacyEntry(Json.JsonObject root, PackageEdit edit) {
+        EntryMetadata md = edit.getMetadata();
+        if (md != null && Boolean.TRUE.equals(md.getDevOptional())) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    edit.getName() + " devOptional flags in a lockfileVersion 2 legacy tree are not yet supported");
+        }
+        if (edit.getNewOptionalDependencies() != null && !edit.getNewOptionalDependencies().isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                    edit.getName() + " declares optionalDependencies; its lockfileVersion 2 legacy entry is not yet supported");
+        }
         Json.JsonObject legacy = LockJson.objectMember(root, "dependencies");
         if (legacy == null) {
-            return root;
-        }
-        // The v2 legacy tree marks dev entries with "dev": true; its byte-exact form for a dev closure
-        // add is not yet verified, so defer rather than emit a maybe-wrong entry.
-        EntryMetadata md = edit.getMetadata();
-        if ("devDependencies".equals(edit.getScope()) || (md != null && Boolean.TRUE.equals(md.getDev()))) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
-                    "adding a devDependency closure to a lockfileVersion 2 lock is not yet supported");
+            // First dependency of a previously dependency-less v2 lock: create the whole legacy section.
+            String closeWs = LockJson.memberWhitespace(root);
+            if (closeWs == null) {
+                throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive legacy tree indentation");
+            }
+            String unit = indentOf(closeWs).isEmpty() ? "  " : indentOf(closeWs);
+            String keyWs = closeWs + unit;
+            String entryText = legacyEntryText(keyWs + unit, keyWs, edit);
+            String sectionText = "{" + keyWs + jsonEncode(edit.getName()) + ": " + entryText + closeWs + "}";
+            return graftSorted(root, "dependencies", sectionText, true);
         }
         String fieldWs = nestedMemberWhitespace(legacy);
         String closeWs = LockJson.memberWhitespace(legacy);
         if (fieldWs == null || closeWs == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, edit.getName(), "cannot derive legacy tree indentation");
         }
+        legacy = graftSorted(legacy, edit.getName(), legacyEntryText(fieldWs, closeWs, edit), true);
+        return LockJson.replaceValue(root, "dependencies", legacy);
+    }
+
+    /**
+     * A minimal v2 legacy entry: version/resolved/integrity, the {@code dev}/{@code optional}/{@code peer}
+     * flags, then {@code requires} — npm emits it whenever the node has any edge, so a peer-only declarer
+     * carries the empty object.
+     */
+    private String legacyEntryText(String fieldWs, String closeWs, PackageEdit edit) {
+        EntryMetadata md = edit.getMetadata();
         List<String> fields = new ArrayList<>();
         fields.add(field(fieldWs, "version", jsonEncode(edit.getNewVersion())));
         fields.add(field(fieldWs, "resolved", jsonEncode(edit.getNewResolved())));
         fields.add(field(fieldWs, "integrity", jsonEncode(edit.getNewIntegrity())));
-        // A dependent records its edges under `requires` (constraints); a leaf transitive has none.
+        if (md != null) {
+            if (Boolean.TRUE.equals(md.getDev())) {
+                fields.add(field(fieldWs, "dev", "true"));
+            }
+            if (Boolean.TRUE.equals(md.getOptional())) {
+                fields.add(field(fieldWs, "optional", "true"));
+            }
+            if (Boolean.TRUE.equals(md.getPeer())) {
+                fields.add(field(fieldWs, "peer", "true"));
+            }
+        }
         if (edit.getNewDependencies() != null && !edit.getNewDependencies().isEmpty()) {
             String keyIndent = indentOf(fieldWs);
             String closeIndent = indentOf(closeWs);
             String unit = keyIndent.length() > closeIndent.length() ? keyIndent.substring(closeIndent.length()) : "  ";
             String requires = renderNode(JSON.valueToTree(edit.getNewDependencies()), keyIndent, unit);
             fields.add(field(fieldWs, "requires", requires));
+        } else if (md != null && md.getPeerDependencies() != null) {
+            fields.add(field(fieldWs, "requires", "{}"));
         }
-        String entryText = "{" + String.join(",", fields) + closeWs + "}";
-        legacy = graftSorted(legacy, edit.getName(), entryText, true);
-        return LockJson.replaceValue(root, "dependencies", legacy);
+        return "{" + String.join(",", fields) + closeWs + "}";
     }
 
     // --- reverse-dependent nest -----------------------------

@@ -25,7 +25,7 @@ import java.util.List;
 
 /**
  * The byte-exact npm {@code package-lock.json} serialization primitives, shared by the surgical
- * {@link NpmLockPatcher} and the {@link org.openrewrite.javascript.internal.lock.resolve.NpmLockWriter}. npm
+ * {@link NpmLockPatcher}. npm
  * serializes through {@code json-stringify-nice}: object keys are ordered by {@link NpmKeyOrder} within a
  * value-kind partition (primitive-valued keys before object-valued ones), values pretty-printed at a fixed
  * two-space step. Both the patcher (inserting one member into a captured LST) and the writer (emitting a whole

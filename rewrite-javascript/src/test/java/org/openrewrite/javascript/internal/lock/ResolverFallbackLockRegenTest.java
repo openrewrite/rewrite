@@ -21,7 +21,6 @@ import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.resolve.BunResolver;
 import org.openrewrite.javascript.internal.lock.resolve.LockResolver;
-import org.openrewrite.javascript.internal.lock.resolve.NpmResolver;
 import org.openrewrite.javascript.internal.lock.resolve.PnpmResolver;
 import org.openrewrite.javascript.internal.lock.resolve.ResolveRequest;
 import org.openrewrite.javascript.internal.lock.resolve.YarnClassicResolver;
@@ -49,17 +48,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * from scratch, checksums included.
  */
 class ResolverFallbackLockRegenTest extends LockRegenTestSupport {
-
-    @Test
-    void npmForkAddFallsBackToResolver() {
-        // pre-edit declares debug@2.6.9 (ms@2.0.0 hoisted top-level); adding ms@2.1.3 forks ms. The surgical add
-        // defers ("promotion would change the version"); the resolver reproduces the fork from scratch.
-        String dir = "lock/npm/resolve-fork";
-        routePackages(dir, new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}, {"ms", "2.1.3"}});
-        String preEdit = "{\"name\":\"resolve-fork\",\"version\":\"1.0.0\",\"dependencies\":{\"debug\":\"2.6.9\"}}";
-        String preEditLock = new NpmResolver().resolve(request(preEdit));
-        assertForkFallback(PackageManager.Npm, dir, preEdit, preEditLock);
-    }
 
     @Test
     void bunForkAddFallsBackToResolver() {

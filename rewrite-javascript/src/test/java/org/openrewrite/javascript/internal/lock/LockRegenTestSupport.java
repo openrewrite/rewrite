@@ -81,28 +81,53 @@ abstract class LockRegenTestSupport {
     protected void assertNpmReproduces(String pkgResource, String lockResource, String lockfileVersion) throws Exception {
         Path tmp = Files.createTempDirectory("npm-regen-record");
         try {
-            Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
-            Process process = new ProcessBuilder("npm", "install", "--package-lock-only",
-                    "--lockfile-version", lockfileVersion, "--no-audit", "--no-fund")
-                    .directory(tmp.toFile())
-                    .redirectOutput(tmp.resolve("npm.log").toFile())
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("npm install timed out for " + pkgResource);
-            }
-            String generated = new String(Files.readAllBytes(tmp.resolve("package-lock.json")), StandardCharsets.UTF_8);
-            assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
+            npmInstallInto(tmp, pkgResource, lockResource, lockfileVersion);
         } finally {
-            try (Stream<Path> walk = Files.walk(tmp)) {
-                walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
+            deleteRecursively(tmp);
+        }
+    }
+
+    /**
+     * Verify a two-phase incremental golden pair: {@code pkg-before} installed from scratch must reproduce the
+     * {@code before} lock, then the edited {@code pkg} installed in the same directory (the before lock present)
+     * must reproduce {@code after} — the incremental truth the engine's resolve-and-patch is held to.
+     */
+    protected void assertNpmReproducesIncremental(String dir, String before, String after,
+                                                  String lockfileVersion) throws Exception {
+        Path tmp = Files.createTempDirectory("npm-regen-record");
+        try {
+            npmInstallInto(tmp, dir + "/pkg-before", dir + "/" + before, lockfileVersion);
+            npmInstallInto(tmp, dir + "/pkg", dir + "/" + after, lockfileVersion);
+        } finally {
+            deleteRecursively(tmp);
+        }
+    }
+
+    private void npmInstallInto(Path tmp, String pkgResource, String lockResource,
+                                String lockfileVersion) throws Exception {
+        Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("npm", "install", "--package-lock-only",
+                "--lockfile-version", lockfileVersion, "--no-audit", "--no-fund")
+                .directory(tmp.toFile())
+                .redirectOutput(tmp.resolve("npm.log").toFile())
+                .redirectErrorStream(true)
+                .start();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("npm install timed out for " + pkgResource);
+        }
+        String generated = new String(Files.readAllBytes(tmp.resolve("package-lock.json")), StandardCharsets.UTF_8);
+        assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
+    }
+
+    private static void deleteRecursively(Path tmp) throws IOException {
+        try (Stream<Path> walk = Files.walk(tmp)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                }
+            });
         }
     }
 
