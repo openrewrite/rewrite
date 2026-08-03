@@ -16,11 +16,9 @@
 package org.openrewrite.javascript.internal.lock;
 
 /**
- * The byte-exact classic {@code yarn.lock} (v1) serialization primitives, shared by the surgical
- * {@link YarnClassicLockPatcher} and the {@link org.openrewrite.javascript.internal.lock.resolve.YarnClassicLockWriter}.
+ * The byte-exact classic {@code yarn.lock} (v1) serialization primitives used by {@link YarnClassicLockPatcher}.
  * yarn's own {@code _stringify} orders keys by {@link #sortAlpha} and quotes only the tokens {@code shouldWrapKey}
- * demands; the tarball host is mirrored to the configured registry. Both the patcher (editing a captured lock) and
- * the writer (emitting a whole file) must reproduce that exactly, so the rules live here once.
+ * demands; the tarball host is mirrored to the configured registry.
  */
 public final class YarnLock {
 

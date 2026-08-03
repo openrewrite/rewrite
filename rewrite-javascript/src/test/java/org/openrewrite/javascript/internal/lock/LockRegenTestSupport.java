@@ -208,29 +208,41 @@ abstract class LockRegenTestSupport {
     protected void assertYarnReproduces(String pkgResource, String lockResource) throws Exception {
         Path tmp = Files.createTempDirectory("yarn-regen-record");
         try {
-            Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
-            ProcessBuilder pb = new ProcessBuilder("yarn", "install", "--ignore-scripts", "--non-interactive", "--no-progress");
-            pb.directory(tmp.toFile());
-            pb.environment().put("YARN_CACHE_FOLDER", tmp.resolve(".cache").toString());
-            pb.redirectOutput(tmp.resolve("yarn.log").toFile());
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("yarn install timed out for " + pkgResource);
-            }
-            String generated = new String(Files.readAllBytes(tmp.resolve("yarn.lock")), StandardCharsets.UTF_8);
-            assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
+            yarnInstallInto(tmp, pkgResource, lockResource);
         } finally {
-            try (Stream<Path> walk = Files.walk(tmp)) {
-                walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
+            deleteRecursively(tmp);
         }
+    }
+
+    /**
+     * Verify a two-phase incremental golden pair: {@code pkg-before} installed from scratch must reproduce the
+     * {@code before} lock, then the edited {@code pkg} installed in the same directory (the before lock and
+     * node_modules present) must reproduce {@code after} — the incremental truth the engine is held to.
+     */
+    protected void assertYarnReproducesIncremental(String dir, String before, String after) throws Exception {
+        Path tmp = Files.createTempDirectory("yarn-regen-record");
+        try {
+            yarnInstallInto(tmp, dir + "/pkg-before", dir + "/" + before);
+            yarnInstallInto(tmp, dir + "/pkg", dir + "/" + after);
+        } finally {
+            deleteRecursively(tmp);
+        }
+    }
+
+    private void yarnInstallInto(Path tmp, String pkgResource, String lockResource) throws Exception {
+        Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
+        ProcessBuilder pb = new ProcessBuilder("yarn", "install", "--ignore-scripts", "--non-interactive", "--no-progress");
+        pb.directory(tmp.toFile());
+        pb.environment().put("YARN_CACHE_FOLDER", tmp.resolve(".cache").toString());
+        pb.redirectOutput(tmp.resolve("yarn.log").toFile());
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("yarn install timed out for " + pkgResource);
+        }
+        String generated = new String(Files.readAllBytes(tmp.resolve("yarn.lock")), StandardCharsets.UTF_8);
+        assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
     }
 
     protected static String resource(String path) {
