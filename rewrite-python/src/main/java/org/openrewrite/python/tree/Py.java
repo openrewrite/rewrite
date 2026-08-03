@@ -1566,6 +1566,17 @@ public interface Py extends J {
         @Getter
         J.Identifier name;
 
+        @Nullable
+        JContainer<J.TypeParameter> typeParameters;
+
+        public @Nullable List<J.TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElements();
+        }
+
+        public TypeAlias withTypeParameters(@Nullable List<J.TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
         JLeftPadded<J> value;
 
         public J getValue() {
@@ -1616,12 +1627,20 @@ public interface Py extends J {
         public static class Padding {
             private final TypeAlias t;
 
+            public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public TypeAlias withTypeParameters(@Nullable JContainer<J.TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, typeParameters, t.value, t.type);
+            }
+
             public JLeftPadded<J> getValue() {
                 return t.value;
             }
 
             public TypeAlias withValue(JLeftPadded<J> assignment) {
-                return t.value == assignment ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, assignment, t.type);
+                return t.value == assignment ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, t.typeParameters, assignment, t.type);
             }
         }
     }

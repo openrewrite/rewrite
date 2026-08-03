@@ -120,7 +120,10 @@ public class FindDependency extends Recipe {
         if (desiredVersion == null) {
             return true;
         }
-        String actualVersion = gradleDependency.getDeclaredVersion();
+        String actualVersion = gradleDependency.getVersion();
+        if (actualVersion == null) {
+            actualVersion = gradleDependency.getDeclaredVersion();
+        }
         if (actualVersion == null) {
             return false;
         }

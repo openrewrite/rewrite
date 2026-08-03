@@ -74,6 +74,22 @@ class LineBreaksTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingCommentsStayOnSameLine() {
+        rewriteRun(
+          xml(
+            """
+              <project>
+                <excludes>
+                  <exclude>a</exclude> <!--comment-->
+                  <exclude>b</exclude><!--comment-->
+                </excludes>
+              </project>
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("CheckTagEmptyBody")
     @Test
     void docTypeDecl() {
