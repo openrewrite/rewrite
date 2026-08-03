@@ -32,10 +32,25 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
+    static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
+
+    // node-semver XRANGEPLAIN; groups: major, minor, patch, prerelease.
+    static final String XRANGE_PLAIN =
+            "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
+                    ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)?)?";
+
+    // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
+    private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
+
+    private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
+
     private final String major;
     private final String minor;
     private final String patch;
     private final String micro;
+
+    // Non-null in npm mode; evaluation delegates to it.
+    private final @Nullable UnionRange node;
 
     XRange(String major, String minor, String patch, String micro, @Nullable String metadataPattern) {
         super(metadataPattern);
@@ -43,10 +58,23 @@ public class XRange extends LatestRelease {
         this.minor = minor;
         this.patch = patch;
         this.micro = micro;
+        this.node = null;
+    }
+
+    private XRange(UnionRange node, @Nullable String metadataPattern) {
+        super(metadataPattern);
+        this.major = "";
+        this.minor = "";
+        this.patch = "";
+        this.micro = "";
+        this.node = node;
     }
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
+        if (node != null) {
+            return node.isValidVersion(version, getMetadataPattern());
+        }
         if (!super.isValid(currentVersion, version)) {
             return false;
         }
@@ -103,14 +131,104 @@ public class XRange extends LatestRelease {
     }
 
     /**
-     * @return whether {@code segment} is an X-range wildcard: {@code *}, {@code x}, {@code X}, or {@code +}.
+     * @return whether {@code segment} is a Maven/Gradle-flavored wildcard: {@code *}, {@code x},
+     * {@code X}, or {@code +}. npm's notion (no {@code +}) is {@link NodeComparand#isX}.
      */
     static boolean isWildcard(String segment) {
         return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
     }
 
+    // npm's wildcard test: x, X, * or an absent component.
+    static boolean isX(@Nullable String id) {
+        return id == null || "x".equalsIgnoreCase(id) || "*".equals(id);
+    }
+
+    // Requires an operator or a wildcard/partial component; bare exact versions fall through to UnionRange.
+    static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(pattern.trim());
+        if (!m.matches() || (m.group(1).isEmpty() &&
+                !(isX(m.group(2)) || isX(m.group(3)) || isX(m.group(4))))) {
+            return Validated.invalid("xRange", pattern, "not a node x-range");
+        }
+        UnionRange node = UnionRange.parse(pattern, false);
+        if (node == null) {
+            return Validated.invalid("xRange", pattern, "not a valid node range");
+        }
+        return Validated.valid("xRange", new XRange(node, metadataPattern));
+    }
+
+    // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
+    static String replaceXRange(String token, boolean incPre) {
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
+        if (!m.matches()) {
+            return token;
+        }
+        String gtlt = m.group(1);
+        String mj = m.group(2), mn = m.group(3), p = m.group(4);
+        boolean xM = isX(mj);
+        boolean xm = xM || isX(mn);
+        boolean xp = xm || isX(p);
+        boolean anyX = xp;
+
+        if ("=".equals(gtlt) && anyX) {
+            gtlt = "";
+        }
+        String pr = incPre ? "-0" : "";
+
+        if (xM) {
+            return (">".equals(gtlt) || "<".equals(gtlt)) ? "<0.0.0-0" : "*";
+        }
+        if (!gtlt.isEmpty() && anyX) {
+            if (xm) {
+                mn = "0";
+            }
+            p = "0";
+            if (">".equals(gtlt)) {
+                gtlt = ">=";
+                if (xm) {
+                    mj = NodeComparand.incr(mj);
+                    mn = "0";
+                } else {
+                    mn = NodeComparand.incr(mn);
+                }
+                p = "0";
+            } else if ("<=".equals(gtlt)) {
+                gtlt = "<";
+                if (xm) {
+                    mj = NodeComparand.incr(mj);
+                } else {
+                    mn = NodeComparand.incr(mn);
+                }
+            }
+            if ("<".equals(gtlt)) {
+                pr = "-0";
+            }
+            return gtlt + mj + "." + mn + "." + p + pr;
+        }
+        if (xm) {
+            return ">=" + mj + ".0.0" + pr + " <" + NodeComparand.incr(mj) + ".0.0-0";
+        }
+        if (xp) {
+            return ">=" + mj + "." + mn + ".0" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+        }
+        return token;
+    }
+
+    // node-semver's star replacement: a bare or operator-prefixed * collapses to the ANY clause.
+    static String replaceStar(String token) {
+        return NODE_STAR_PATTERN.matcher(token).matches() ? "" : token;
+    }
+
+    @Override
+    public String toString() {
+        return node != null ? node.toString() : super.toString();
+    }
+
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
+        if (node != null) {
+            return ParsedVersion.compareLenient(v1, v2);
+        }
         Validated<XRange> maybeXRangeV1 = build(v1, null);
         Validated<XRange> maybeXRangeV2 = build(v2, null);
         if (maybeXRangeV1.isValid() && maybeXRangeV2.isValid()) {
