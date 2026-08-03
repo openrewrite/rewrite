@@ -21,11 +21,21 @@ from typing import Optional
 from rewrite import random_id
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Space
+from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
 from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, pad_right
-from rewrite.python.tree import CompilationUnit, MultiImport
+from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
 from rewrite.python.visitor import PythonVisitor
+
+
+def _is_module_docstring(padded_stmts: list) -> bool:
+    """True when the file opens with a module docstring -- a bare string expression."""
+    if not padded_stmts:
+        return False
+    stmt = padded_stmts[0].element
+    if not isinstance(stmt, ExpressionStatement):
+        return False
+    return isinstance(stmt.expression, Literal) and isinstance(stmt.expression.value, str)
 
 
 class ImportStyle(Enum):
@@ -303,13 +313,14 @@ class AddImport(PythonVisitor):
         """Add a new import statement to the compilation unit."""
         new_import = self._create_multi_import()
 
-        # Find insertion point (after existing imports)
-        insert_idx = 0
+        # Insert after the module docstring (which must stay first) and any existing imports.
         padded_stmts = list(cu.padding.statements)
-        for i, padded in enumerate(padded_stmts):
-            if isinstance(padded.element, (Import, MultiImport)):
+        header = 1 if _is_module_docstring(padded_stmts) else 0
+        insert_idx = header
+        for i in range(header, len(padded_stmts)):
+            if isinstance(padded_stmts[i].element, (Import, MultiImport)):
                 insert_idx = i + 1
-            elif insert_idx > 0:
+            elif insert_idx > header:
                 break  # Stop after we've passed the import section
 
         # Insert the new import at the padding level

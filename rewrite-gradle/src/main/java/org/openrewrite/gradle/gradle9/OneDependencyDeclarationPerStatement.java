@@ -44,23 +44,17 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class OneDependencyDeclarationPerStatement extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Use one dependency declaration per statement";
-    }
+    final String displayName = "Use one dependency declaration per statement";
 
-    @Override
-    public String getDescription() {
-        return "The Gradle Groovy DSL accepts multiple coordinates in a single configuration call " +
-                "(e.g. `implementation 'a:b:1.0', 'c:d:2.0'`), but the Kotlin DSL does not. " +
-                "Gradle's best practices recommend declaring a single dependency per statement; " +
-                "see the [Gradle dependency best practices](https://docs.gradle.org/current/userguide/best_practices_dependencies.html). " +
-                "This recipe splits multi-coordinate Groovy DSL configuration calls into one call per coordinate. " +
-                "Run this as a cleanup pass before other dependency-aware recipes (e.g. `UpgradeDependencyVersion`, " +
-                "`ChangeDependency`, `RemoveDependency`): those recipes use the `GradleDependency` trait, which only " +
-                "inspects the first argument of a configuration call. Coordinates in later positions are invisible " +
-                "to them until this recipe reshapes the source into one declaration per statement.";
-    }
+    final String description = "The Gradle Groovy DSL accepts multiple coordinates in a single configuration call " +
+            "(e.g. `implementation 'a:b:1.0', 'c:d:2.0'`), but the Kotlin DSL does not. " +
+            "Gradle's best practices recommend declaring a single dependency per statement; " +
+            "see the [Gradle dependency best practices](https://docs.gradle.org/current/userguide/best_practices_dependencies.html). " +
+            "This recipe splits multi-coordinate Groovy DSL configuration calls into one call per coordinate. " +
+            "Run this as a cleanup pass before other dependency-aware recipes (e.g. `UpgradeDependencyVersion`, " +
+            "`ChangeDependency`, `RemoveDependency`): those recipes use the `GradleDependency` trait, which only " +
+            "inspects the first argument of a configuration call. Coordinates in later positions are invisible " +
+            "to them until this recipe reshapes the source into one declaration per statement.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -95,6 +89,12 @@ public class OneDependencyDeclarationPerStatement extends Recipe {
                     if (m.getSelect() != null) {
                         return s;
                     }
+                    // `DependencyHandler.add(configuration, notation)` and its provider variants take the
+                    // configuration name as their first argument, so their arguments are not all coordinates
+                    String methodName = m.getSimpleName();
+                    if ("add".equals(methodName) || "addProvider".equals(methodName) || "addProviderConvertible".equals(methodName)) {
+                        return s;
+                    }
                     List<Expression> args = m.getArguments();
                     if (args.size() < 2) {
                         return s;
@@ -119,16 +119,22 @@ public class OneDependencyDeclarationPerStatement extends Recipe {
                     Space stmtPrefix = s.getPrefix();
                     Space subsequentPrefix = Space.build(stmtPrefix.getLastWhitespace(), emptyList());
 
+                    // The space-delimited form separates the coordinate from the method name, but the
+                    // parenthesized form does not; reusing the original first argument's prefix keeps both right
+                    Space argPrefix = args.get(0).getPrefix();
+
                     List<Statement> split = new ArrayList<>(args.size());
                     for (int i = 0; i < args.size(); i++) {
-                        Expression coord = args.get(i).withPrefix(Space.format(" "));
+                        Expression coord = args.get(i).withPrefix(argPrefix);
+                        // Every split beyond the first needs its own id; reusing the original invocation's
+                        // id leaves duplicate ids in the enclosing block, which later recipes choke on.
+                        J.MethodInvocation mi = (i == 0 ? m : m.withId(Tree.randomId()))
+                                .withArguments(singletonList(coord));
                         boolean isLast = i == args.size() - 1;
                         if (isLast && wrappedInReturn) {
-                            J.MethodInvocation innerMi = m.withArguments(singletonList(coord));
-                            split.add(((J.Return) s).withPrefix(subsequentPrefix).withExpression(innerMi));
+                            split.add(((J.Return) s).withPrefix(subsequentPrefix).withExpression(mi));
                         } else {
-                            Space prefix = i == 0 ? stmtPrefix : subsequentPrefix;
-                            split.add(m.withPrefix(prefix).withArguments(singletonList(coord)));
+                            split.add(mi.withPrefix(i == 0 ? stmtPrefix : subsequentPrefix));
                         }
                     }
                     return split;

@@ -1,8 +1,25 @@
-# Transcribed from npm/node-semver test/fixtures/range-exclude.js (MIT), tag v7.6.3.
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Transcribed from the npm/node-semver test fixture test/fixtures/range-exclude.js at tag v7.6.3.
+# node-semver is copyright (c) Isaac Z. Schlueter and Contributors, licensed under the ISC
+# License; see LICENSE-node-semver in this directory.
 # Rows where satisfies(version, range[, includePrerelease]) is FALSE. Many exercise node's
 # prerelease-inclusion guard: a prerelease is rejected unless a comparator names its exact
 # major.minor.patch tuple AND itself carries a prerelease.
-# Column 3 options tag: empty = strict, `loose` = skipped (out of Phase-A scope).
+# Column 3 options tag: empty = strict, `loose` = skipped (loose parsing is unsupported).
 # Each row: range<TAB>version<TAB>options. Fields are tab-separated; \t \n \r \\ escaped.
 1.0.0 - 2.0.0	2.2.3
 ^1.2.3	2.0.0
