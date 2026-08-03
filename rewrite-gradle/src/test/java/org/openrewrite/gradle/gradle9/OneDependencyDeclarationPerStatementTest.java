@@ -67,6 +67,41 @@ class OneDependencyDeclarationPerStatementTest implements RewriteTest {
     }
 
     @Test
+    void splitsParenthesizedCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('com.google.guava:guava:30.0-jre', 'org.apache.commons:commons-lang3:3.12.0')
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('com.google.guava:guava:30.0-jre')
+                  implementation('org.apache.commons:commons-lang3:3.12.0')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void splitsWhenSecondCoordinateUsesVersionVariable() {
         rewriteRun(
           buildGradle(
