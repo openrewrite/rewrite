@@ -23,29 +23,16 @@ import java.util.regex.Pattern;
 
 /**
  * A primitive npm range clause, ported from node-semver's {@code Comparator}: an operator applied
- * to a version, or the ANY clause from {@code *}/{@code x}/an empty range. Also hosts the npm
- * grammar fragments the range classes share.
+ * to a version, or the ANY clause from {@code *}/{@code x}/an empty range.
  */
 final class NodeComparand {
-
-    static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
-
-    private static final String PRERELEASE_GROUP =
-            "(?:-(" + ParsedVersion.PRERELEASE_ID + "(?:\\." + ParsedVersion.PRERELEASE_ID + ")*))";
-
-    private static final String BUILD = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)";
-
-    // node-semver XRANGEPLAIN; groups: major, minor, patch, prerelease.
-    static final String XRANGE_PLAIN =
-            "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
-                    PRERELEASE_GROUP + "?" + BUILD + "?)?)?";
 
     // node-semver re.js COMPARATOR: optional operator, optional whitespace, then a full version.
     // Only groups 1 (operator) and 2 (version) are read; the prerelease group inside is unused.
     private static final Pattern COMPARATOR = Pattern.compile(
             "^((?:<|>)?=?)\\s*(v?" +
                     "(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")" +
-                    PRERELEASE_GROUP + "?" + BUILD + "?)$");
+                    ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)$");
 
     enum Op {
         LT("<"), LTE("<="), GT(">"), GTE(">="), EQ("=");
@@ -147,10 +134,6 @@ final class NodeComparand {
         }
         // node-semver renders "=" and "" operators as just the version.
         return (op == Op.EQ ? "" : op.symbol) + version.strictToString();
-    }
-
-    static boolean isX(@Nullable String id) {
-        return id == null || "x".equalsIgnoreCase(id) || "*".equals(id);
     }
 
     // num + 1; a result beyond long range fails strict parsing later, invalidating the range as node does.

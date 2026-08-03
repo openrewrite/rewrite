@@ -32,7 +32,7 @@ public class HyphenRange extends LatestRelease {
 
     // The npm hyphen grammar; groups 1-5 = "from" bound and its major/minor/patch/prerelease, 6-10 = "to".
     private static final Pattern NODE_HYPHEN_PATTERN = Pattern.compile(
-            "^\\s*(" + NodeComparand.XRANGE_PLAIN + ")\\s+-\\s+(" + NodeComparand.XRANGE_PLAIN + ")\\s*$");
+            "^\\s*(" + XRange.XRANGE_PLAIN + ")\\s+-\\s+(" + XRange.XRANGE_PLAIN + ")\\s*$");
 
     private final String upper;
     private final String lower;
@@ -95,13 +95,13 @@ public class HyphenRange extends LatestRelease {
     }
 
     private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr, boolean incPre) {
-        if (NodeComparand.isX(fM)) {
+        if (XRange.isX(fM)) {
             return "";
         }
-        if (NodeComparand.isX(fm)) {
+        if (XRange.isX(fm)) {
             return ">=" + fM + ".0.0" + (incPre ? "-0" : "");
         }
-        if (NodeComparand.isX(fp)) {
+        if (XRange.isX(fp)) {
             return ">=" + fM + "." + fm + ".0" + (incPre ? "-0" : "");
         }
         if (fpr != null) {
@@ -111,13 +111,13 @@ public class HyphenRange extends LatestRelease {
     }
 
     private static String hyphenTo(String to, String tM, String tm, String tp, @Nullable String tpr, boolean incPre) {
-        if (NodeComparand.isX(tM)) {
+        if (XRange.isX(tM)) {
             return "";
         }
-        if (NodeComparand.isX(tm)) {
+        if (XRange.isX(tm)) {
             return "<" + NodeComparand.incr(tM) + ".0.0-0";
         }
-        if (NodeComparand.isX(tp)) {
+        if (XRange.isX(tp)) {
             return "<" + tM + "." + NodeComparand.incr(tm) + ".0-0";
         }
         if (tpr != null) {

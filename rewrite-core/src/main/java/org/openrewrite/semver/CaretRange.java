@@ -33,7 +33,7 @@ public class CaretRange extends LatestRelease {
     private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
 
     // The npm caret grammar; unlike CARET_RANGE_PATTERN, no 4th component, wildcards allowed.
-    private static final Pattern NODE_CARET_PATTERN = Pattern.compile("^(?:\\^)" + NodeComparand.XRANGE_PLAIN + "$");
+    private static final Pattern NODE_CARET_PATTERN = Pattern.compile("^(?:\\^)" + XRange.XRANGE_PLAIN + "$");
 
     private final String upperExclusive;
     private final String lower;
@@ -147,13 +147,13 @@ public class CaretRange extends LatestRelease {
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
         String z = incPre ? "-0" : "";
-        if (NodeComparand.isX(mj)) {
+        if (XRange.isX(mj)) {
             return "";
         }
-        if (NodeComparand.isX(mn)) {
+        if (XRange.isX(mn)) {
             return ">=" + mj + ".0.0" + z + " <" + NodeComparand.incr(mj) + ".0.0-0";
         }
-        if (NodeComparand.isX(p)) {
+        if (XRange.isX(p)) {
             return "0".equals(mj) ?
                     ">=" + mj + "." + mn + ".0" + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0" :
                     ">=" + mj + "." + mn + ".0" + z + " <" + NodeComparand.incr(mj) + ".0.0-0";

@@ -54,6 +54,8 @@ final class ParsedVersion {
     // node-semver re.js grammar fragments, shared with the npm range classes.
     static final String NUMERIC_ID = "0|[1-9]\\d*";
     static final String PRERELEASE_ID = "(?:" + NUMERIC_ID + "|\\d*[a-zA-Z-][0-9a-zA-Z-]*)";
+    static final String PRERELEASE_GROUP = "(?:-(" + PRERELEASE_ID + "(?:\\." + PRERELEASE_ID + ")*))";
+    static final String BUILD = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)";
 
     // Port of node-semver re.js FULL (major.minor.patch, no leading zeros, prerelease and build split).
     private static final Pattern STRICT_PATTERN = Pattern.compile(

@@ -33,7 +33,7 @@ public class TildeRange extends LatestRelease {
     private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     // The npm tilde grammar; unlike TILDE_RANGE_PATTERN, no 4th component, wildcards allowed.
-    private static final Pattern NODE_TILDE_PATTERN = Pattern.compile("^(?:~>?)" + NodeComparand.XRANGE_PLAIN + "$");
+    private static final Pattern NODE_TILDE_PATTERN = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN + "$");
 
     private final String upperExclusive;
     private final String lower;
@@ -121,13 +121,13 @@ public class TildeRange extends LatestRelease {
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
         String z = incPre ? "-0" : "";
-        if (NodeComparand.isX(mj)) {
+        if (XRange.isX(mj)) {
             return "";
         }
-        if (NodeComparand.isX(mn)) {
+        if (XRange.isX(mn)) {
             return ">=" + mj + ".0.0" + z + " <" + NodeComparand.incr(mj) + ".0.0-0";
         }
-        if (NodeComparand.isX(p)) {
+        if (XRange.isX(p)) {
             return ">=" + mj + "." + mn + ".0" + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
         if (pr != null) {

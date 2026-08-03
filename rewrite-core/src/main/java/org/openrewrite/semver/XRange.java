@@ -32,8 +32,15 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
+    static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
+
+    // node-semver XRANGEPLAIN; groups: major, minor, patch, prerelease.
+    static final String XRANGE_PLAIN =
+            "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
+                    ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)?)?";
+
     // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
-    private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + NodeComparand.XRANGE_PLAIN + "$");
+    private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
 
     private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
 
@@ -131,11 +138,16 @@ public class XRange extends LatestRelease {
         return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
     }
 
+    // npm's wildcard test: x, X, * or an absent component.
+    static boolean isX(@Nullable String id) {
+        return id == null || "x".equalsIgnoreCase(id) || "*".equals(id);
+    }
+
     // Requires an operator or a wildcard/partial component; bare exact versions fall through to UnionRange.
     static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
         Matcher m = NODE_X_RANGE_PATTERN.matcher(pattern.trim());
         if (!m.matches() || (m.group(1).isEmpty() &&
-                !(NodeComparand.isX(m.group(2)) || NodeComparand.isX(m.group(3)) || NodeComparand.isX(m.group(4))))) {
+                !(isX(m.group(2)) || isX(m.group(3)) || isX(m.group(4))))) {
             return Validated.invalid("xRange", pattern, "not a node x-range");
         }
         UnionRange node = UnionRange.parse(pattern, false);
@@ -153,9 +165,9 @@ public class XRange extends LatestRelease {
         }
         String gtlt = m.group(1);
         String mj = m.group(2), mn = m.group(3), p = m.group(4);
-        boolean xM = NodeComparand.isX(mj);
-        boolean xm = xM || NodeComparand.isX(mn);
-        boolean xp = xm || NodeComparand.isX(p);
+        boolean xM = isX(mj);
+        boolean xm = xM || isX(mn);
+        boolean xp = xm || isX(p);
         boolean anyX = xp;
 
         if ("=".equals(gtlt) && anyX) {
