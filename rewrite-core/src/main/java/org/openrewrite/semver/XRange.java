@@ -32,10 +32,26 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
+    /**
+     * The npm x-range grammar: an optional comparator operator and a version whose components may be
+     * wildcards or absent ({@code 1.2.x}, {@code 1.2}, {@code >=1.2}, {@code <1}, {@code *}).
+     * Distinct from the Maven-flavored {@link #X_RANGE_PATTERN}: npm has no {@code +} wildcard and
+     * at most three components. Groups: operator, major, minor, patch, prerelease.
+     */
+    private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + NodeComparand.XRANGE_PLAIN + "$");
+
+    private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
+
     private final String major;
     private final String minor;
     private final String patch;
     private final String micro;
+
+    /**
+     * Non-null when this instance interprets its pattern with exact npm semantics; the desugared
+     * clause set and prerelease gating live on the delegate.
+     */
+    private final @Nullable UnionRange node;
 
     XRange(String major, String minor, String patch, String micro, @Nullable String metadataPattern) {
         super(metadataPattern);
@@ -43,10 +59,23 @@ public class XRange extends LatestRelease {
         this.minor = minor;
         this.patch = patch;
         this.micro = micro;
+        this.node = null;
+    }
+
+    private XRange(UnionRange node, @Nullable String metadataPattern) {
+        super(metadataPattern);
+        this.major = "";
+        this.minor = "";
+        this.patch = "";
+        this.micro = "";
+        this.node = node;
     }
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
+        if (node != null) {
+            return node.isValidVersion(version, getMetadataPattern());
+        }
         if (!super.isValid(currentVersion, version)) {
             return false;
         }
@@ -104,13 +133,111 @@ public class XRange extends LatestRelease {
 
     /**
      * @return whether {@code segment} is an X-range wildcard: {@code *}, {@code x}, {@code X}, or {@code +}.
+     * This is the Maven/Gradle-flavored notion; npm's (no {@code +}) is {@link NodeComparand#isX}.
      */
     static boolean isWildcard(String segment) {
         return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
     }
 
+    /**
+     * Builds an x-range with exact npm/node-semver semantics: wildcard and partial versions
+     * ({@code 1.2.x}, {@code 1.2}, {@code 1}, {@code *}) and comparator-plus-partial forms
+     * ({@code >=1.2}, {@code <1} meaning {@code <1.0.0-0}, {@code >1} meaning {@code >=2.0.0}).
+     * Bare exact versions carry neither an operator nor a wildcard and are left to the terminal
+     * {@link UnionRange} member of the {@link Semver.Ecosystem#NODE} chain.
+     */
+    static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(pattern.trim());
+        if (!m.matches() || (m.group(1).isEmpty() &&
+                !(NodeComparand.isX(m.group(2)) || NodeComparand.isX(m.group(3)) || NodeComparand.isX(m.group(4))))) {
+            return Validated.invalid("xRange", pattern, "not a node x-range");
+        }
+        UnionRange node = UnionRange.parse(pattern, false);
+        if (node == null) {
+            return Validated.invalid("xRange", pattern, "not a valid node range");
+        }
+        return Validated.valid("xRange", new XRange(node, metadataPattern));
+    }
+
+    /**
+     * Port of node-semver {@code range.js} {@code replaceXRange}: rewrites a single npm x-range
+     * token (wildcard or partial components, with or without a comparator operator) into its
+     * primitive comparator desugaring, leaving other tokens untouched.
+     */
+    static String replaceXRange(String token, boolean incPre) {
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
+        if (!m.matches()) {
+            return token;
+        }
+        String gtlt = m.group(1);
+        String mj = m.group(2), mn = m.group(3), p = m.group(4);
+        boolean xM = NodeComparand.isX(mj);
+        boolean xm = xM || NodeComparand.isX(mn);
+        boolean xp = xm || NodeComparand.isX(p);
+        boolean anyX = xp;
+
+        if ("=".equals(gtlt) && anyX) {
+            gtlt = "";
+        }
+        String pr = incPre ? "-0" : "";
+
+        if (xM) {
+            return (">".equals(gtlt) || "<".equals(gtlt)) ? "<0.0.0-0" : "*";
+        }
+        if (!gtlt.isEmpty() && anyX) {
+            if (xm) {
+                mn = "0";
+            }
+            p = "0";
+            if (">".equals(gtlt)) {
+                gtlt = ">=";
+                if (xm) {
+                    mj = NodeComparand.incr(mj);
+                    mn = "0";
+                } else {
+                    mn = NodeComparand.incr(mn);
+                }
+                p = "0";
+            } else if ("<=".equals(gtlt)) {
+                gtlt = "<";
+                if (xm) {
+                    mj = NodeComparand.incr(mj);
+                } else {
+                    mn = NodeComparand.incr(mn);
+                }
+            }
+            if ("<".equals(gtlt)) {
+                pr = "-0";
+            }
+            return gtlt + mj + "." + mn + "." + p + pr;
+        }
+        if (xm) {
+            return ">=" + mj + ".0.0" + pr + " <" + NodeComparand.incr(mj) + ".0.0-0";
+        }
+        if (xp) {
+            return ">=" + mj + "." + mn + ".0" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+        }
+        return token;
+    }
+
+    /**
+     * Collapses a bare or operator-prefixed {@code *} token to the empty (match-anything) clause,
+     * per node-semver's star replacement.
+     */
+    static String replaceStar(String token) {
+        return NODE_STAR_PATTERN.matcher(token).matches() ? "" : token;
+    }
+
+    @Override
+    public String toString() {
+        return node != null ? node.toString() : super.toString();
+    }
+
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
+        if (node != null) {
+            return ParsedVersion.compareLenient(v1, v2);
+        }
         Validated<XRange> maybeXRangeV1 = build(v1, null);
         Validated<XRange> maybeXRangeV2 = build(v2, null);
         if (maybeXRangeV1.isValid() && maybeXRangeV2.isValid()) {

@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Pattern;
@@ -29,12 +30,37 @@ import java.util.regex.Pattern;
 public class Semver {
 
     /**
-     * Memoizes {@link #validate(String, String)} keyed on its {@code (toVersion, metadataPattern)}
-     * arguments. A version selector is a recipe parameter, so it is constant for the duration of a
-     * run yet {@code validate} is otherwise re-invoked for every dependency and every visit. Each
-     * invocation runs the full chain of selector-detection regexes (one {@code Pattern.matcher} per
-     * comparator type), which dominates {@code java.util.regex} CPU time during large recipe runs.
-     * Caching collapses the thousands of repeated calls to one computation per distinct selector.
+     * The versioning semantics a selector string should be interpreted under. The same string can be
+     * valid in both ecosystems with different meanings ({@code ~1.2.3.4} is a valid Maven tilde
+     * range but invalid npm; {@code ^16.8.0 || ^17.0.0} is a valid npm union but invalid Maven), so
+     * callers say which they want.
+     */
+    public enum Ecosystem {
+        /**
+         * The historical Maven/Gradle-flavored interpretation: 4th/5th numeric components, the
+         * {@code .RELEASE}/{@code .FINAL}/{@code .GA} suffixes, {@code [1.5,2)} interval notation,
+         * Gradle {@code +} dynamic versions, and a qualifier ladder for prerelease ordering.
+         */
+        MAVEN,
+
+        /**
+         * Exact npm/node-semver semantics: strict SemVer 2.0.0 versions (three components,
+         * section 11 prerelease precedence, build metadata ignored), npm's range grammar including
+         * {@code ||} unions, space-separated intersections, x-ranges and partials, {@code -0}
+         * exclusive upper bounds, and npm's prerelease gating rule. The {@code latest.*} selector
+         * keywords remain available.
+         */
+        NODE
+    }
+
+    /**
+     * Memoizes {@link #validate(String, String, Ecosystem)} keyed on its
+     * {@code (toVersion, metadataPattern, ecosystem)} arguments. A version selector is a recipe
+     * parameter, so it is constant for the duration of a run yet {@code validate} is otherwise
+     * re-invoked for every dependency and every visit. Each invocation runs the full chain of
+     * selector-detection regexes (one {@code Pattern.matcher} per comparator type), which dominates
+     * {@code java.util.regex} CPU time during large recipe runs. Caching collapses the thousands of
+     * repeated calls to one computation per distinct selector.
      * <p>
      * Both valid <em>and</em> invalid results are cached: an {@link Validated} carries its validation
      * errors, and re-deriving them is just as costly. The cached {@link VersionComparator}
@@ -42,6 +68,8 @@ public class Semver {
      * {@link java.util.concurrent.ForkJoinPool} that runs recipes is safe.
      */
     private static final Map<CacheKey, Validated<VersionComparator>> VALIDATE_CACHE = LruCache.bounded(1_024);
+
+    private static final LatestRelease MAVEN_PRECEDENCE = new LatestRelease(null);
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isVersion(@Nullable String version) {
@@ -52,7 +80,9 @@ public class Semver {
     }
 
     /**
-     * Validates the given version against an optional pattern.
+     * Validates the given version against an optional pattern under the historical
+     * {@link Ecosystem#MAVEN} interpretation. See {@link #validate(String, String, Ecosystem)} for
+     * npm-exact semantics.
      * <p>
      * The {@code metadataPattern} is interpreted first as a regular expression. If that fails to
      * compile, it is treated as a glob (where {@code *} matches any run of characters and {@code ?}
@@ -66,23 +96,50 @@ public class Semver {
      * @return the validation result
      */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern) {
-        CacheKey key = new CacheKey(toVersion, metadataPattern);
+        return validate(toVersion, metadataPattern, Ecosystem.MAVEN);
+    }
+
+    /**
+     * Validates the given version selector against an optional metadata pattern under the given
+     * ecosystem's semantics. Under {@link Ecosystem#NODE}, the {@code latest.*} selector keywords
+     * are recognized and everything else must be a valid npm range ({@code ^1.2.3},
+     * {@code >=1.2.9 <2.0.0}, {@code ^16.8.0 || ^17.0.0}, {@code 1.2.x}, {@code 1.2.3 - 2},
+     * {@code *}, ...); strings that are not npm ranges — dist-tags like {@code latest}, protocol
+     * specifiers like {@code workspace:*} or {@code npm:foo@1.2.3}, git URLs, Maven-only shapes like
+     * {@code ~1.2.3.4} or {@code [1.5,2)} — are invalid.
+     */
+    public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern, Ecosystem ecosystem) {
+        CacheKey key = new CacheKey(toVersion, metadataPattern, ecosystem);
         Validated<VersionComparator> cached = VALIDATE_CACHE.get(key);
         if (cached != null) {
             return cached;
         }
-        Validated<VersionComparator> result = doValidate(toVersion, metadataPattern);
+        Validated<VersionComparator> result = doValidate(toVersion, metadataPattern, ecosystem);
         VALIDATE_CACHE.put(key, result);
         return result;
     }
 
-    private static Validated<VersionComparator> doValidate(String toVersion, @Nullable String metadataPattern) {
+    private static Validated<VersionComparator> doValidate(String toVersion, @Nullable String metadataPattern, Ecosystem ecosystem) {
         String canonicalPattern = canonicalizeMetadataPattern(metadataPattern);
-        return Validated.<VersionComparator, String>testNone(
+        Validated<VersionComparator> metadataValidation = Validated.<VersionComparator, String>testNone(
                 "metadataPattern",
                 "must be a valid regular expression or glob",
                 metadataPattern, metadata -> metadata == null || canonicalPattern != null
-        ).and(Validated.<VersionComparator>none()
+        );
+        if (ecosystem == Ecosystem.NODE) {
+            return metadataValidation.and(Validated.<VersionComparator>none()
+                    .or(LatestRelease.buildLatestRelease(toVersion, canonicalPattern))
+                    .or(LatestIntegration.build(toVersion, canonicalPattern))
+                    .or(LatestMinor.build(toVersion, canonicalPattern))
+                    .or(LatestPatch.build(toVersion, canonicalPattern))
+                    .or(HyphenRange.buildNode(toVersion, canonicalPattern))
+                    .or(XRange.buildNode(toVersion, canonicalPattern))
+                    .or(TildeRange.buildNode(toVersion, canonicalPattern))
+                    .or(CaretRange.buildNode(toVersion, canonicalPattern))
+                    .or(UnionRange.build(toVersion, canonicalPattern))
+            );
+        }
+        return metadataValidation.and(Validated.<VersionComparator>none()
                 .or(LatestRelease.buildLatestRelease(toVersion, canonicalPattern))
                 .or(LatestIntegration.build(toVersion, canonicalPattern))
                 .or(LatestMinor.build(toVersion, canonicalPattern))
@@ -97,6 +154,48 @@ public class Semver {
         );
     }
 
+    /**
+     * Whether {@code version} is admitted by {@code selector} under the given ecosystem's
+     * semantics; {@code false} when the selector is invalid (mirroring node-semver, where a
+     * non-range constraint satisfies nothing).
+     */
+    public static boolean satisfies(String version, String selector, Ecosystem ecosystem) {
+        Validated<VersionComparator> validated = validate(selector, null, ecosystem);
+        if (!validated.isValid()) {
+            return false;
+        }
+        //noinspection DataFlowIssue
+        return validated.getValue().isValid(null, version);
+    }
+
+    /**
+     * The highest of {@code versions} admitted by {@code selector} under the given ecosystem's
+     * semantics, returned in its original spelling (the first-seen candidate wins ties);
+     * {@code null} when the selector is invalid or nothing satisfies it.
+     */
+    public static @Nullable String maxSatisfying(Collection<String> versions, String selector, Ecosystem ecosystem) {
+        Validated<VersionComparator> validated = validate(selector, null, ecosystem);
+        if (!validated.isValid()) {
+            return null;
+        }
+        //noinspection DataFlowIssue
+        return validated.getValue().maxSatisfying(versions).orElse(null);
+    }
+
+    /**
+     * Compares two concrete versions under the given ecosystem's precedence rules.
+     * {@link Ecosystem#NODE} applies SemVer 2.0.0 section 11 (build metadata ignored) and throws
+     * {@link IllegalArgumentException} if either version is not strict SemVer;
+     * {@link Ecosystem#MAVEN} applies the Maven-flavored ordering (suffix normalization and the
+     * qualifier ladder) and is total over arbitrary strings.
+     */
+    public static int compare(String v1, String v2, Ecosystem ecosystem) {
+        if (ecosystem == Ecosystem.NODE) {
+            return ParsedVersion.compareStrict(v1, v2);
+        }
+        return MAVEN_PRECEDENCE.compare(null, v1, v2);
+    }
+
     @EqualsAndHashCode
     private static final class CacheKey {
         private final String toVersion;
@@ -104,9 +203,12 @@ public class Semver {
         @Nullable
         private final String metadataPattern;
 
-        private CacheKey(String toVersion, @Nullable String metadataPattern) {
+        private final Ecosystem ecosystem;
+
+        private CacheKey(String toVersion, @Nullable String metadataPattern, Ecosystem ecosystem) {
             this.toVersion = toVersion;
             this.metadataPattern = metadataPattern;
+            this.ecosystem = ecosystem;
         }
     }
 

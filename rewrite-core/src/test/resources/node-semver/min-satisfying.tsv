@@ -1,0 +1,8 @@
+# Transcribed from npm/node-semver test/fixtures/min-satisfying.js (MIT), tag v7.6.3.
+# minSatisfying(versions, range) returns the lowest listed version satisfying the range.
+# Column 1 is space-joined versions. Column 4 options: empty = strict, `loose` = skipped.
+# Each row: versions<TAB>range<TAB>expected<TAB>options. Tab-separated; \t \n \r \\ escaped.
+1.2.3 1.2.4	1.2	1.2.3
+1.2.4 1.2.3	1.2	1.2.3
+1.2.3 1.2.4 1.2.5 1.2.6	~1.2.3	1.2.3
+0.9.0 1.0.0 1.1.0 2.0.0	^1.0.0	1.0.0

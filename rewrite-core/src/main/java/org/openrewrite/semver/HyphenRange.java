@@ -30,17 +30,43 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class HyphenRange extends LatestRelease {
     private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)\\s*-\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)");
 
+    /**
+     * The npm hyphen grammar: two x-range plain versions joined by a whitespace-delimited hyphen.
+     * Distinct from the Maven-flavored {@link #HYPHEN_RANGE_PATTERN}, which admits 4th components
+     * and hyphens without surrounding whitespace. Groups 1-5 are the "from" bound and its
+     * major/minor/patch/prerelease; groups 6-10 the "to" bound.
+     */
+    private static final Pattern NODE_HYPHEN_PATTERN = Pattern.compile(
+            "^\\s*(" + NodeComparand.XRANGE_PLAIN + ")\\s+-\\s+(" + NodeComparand.XRANGE_PLAIN + ")\\s*$");
+
     private final String upper;
     private final String lower;
+
+    /**
+     * Non-null when this instance interprets its pattern with exact npm semantics; the desugared
+     * clause set and prerelease gating live on the delegate.
+     */
+    private final @Nullable UnionRange node;
 
     private HyphenRange(String lower, String upper, @Nullable String metadataPattern) {
         super(metadataPattern);
         this.lower = lower;
         this.upper = upper;
+        this.node = null;
+    }
+
+    private HyphenRange(UnionRange node, @Nullable String metadataPattern) {
+        super(metadataPattern);
+        this.lower = "";
+        this.upper = "";
+        this.node = node;
     }
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
+        if (node != null) {
+            return node.isValidVersion(version, getMetadataPattern());
+        }
         return super.isValid(currentVersion, version) &&
                 super.compare(currentVersion, version, upper) <= 0 &&
                 super.compare(currentVersion, version, lower) >= 0;
@@ -54,8 +80,81 @@ public class HyphenRange extends LatestRelease {
         return Validated.valid("hyphenRange", new HyphenRange(matcher.group(1), matcher.group(5), metadataPattern));
     }
 
+    /**
+     * Builds a hyphen range with exact npm/node-semver semantics, where partial bounds desugar by
+     * expansion (e.g. {@code 1.2 - 2.3} means {@code >=1.2.0 <2.4.0-0}). Used by the
+     * {@link Semver.Ecosystem#NODE} selector chain.
+     */
+    static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
+        if (!NODE_HYPHEN_PATTERN.matcher(pattern.trim()).matches()) {
+            return Validated.invalid("hyphenRange", pattern, "not a node hyphen range");
+        }
+        UnionRange node = UnionRange.parse(pattern, false);
+        if (node == null) {
+            return Validated.invalid("hyphenRange", pattern, "not a valid node range");
+        }
+        return Validated.valid("hyphenRange", new HyphenRange(node, metadataPattern));
+    }
+
+    /**
+     * Port of node-semver {@code range.js} {@code hyphenReplace}: rewrites an npm hyphen range into
+     * its pair of primitive comparators, leaving non-hyphen groups untouched.
+     */
+    static String hyphenReplace(String group, boolean incPre) {
+        Matcher m = NODE_HYPHEN_PATTERN.matcher(group);
+        if (!m.matches()) {
+            return group;
+        }
+        String from = hyphenFrom(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), incPre);
+        String to = hyphenTo(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10), incPre);
+        return (from + " " + to).trim();
+    }
+
+    private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr, boolean incPre) {
+        if (NodeComparand.isX(fM)) {
+            return "";
+        }
+        if (NodeComparand.isX(fm)) {
+            return ">=" + fM + ".0.0" + (incPre ? "-0" : "");
+        }
+        if (NodeComparand.isX(fp)) {
+            return ">=" + fM + "." + fm + ".0" + (incPre ? "-0" : "");
+        }
+        if (fpr != null) {
+            return ">=" + from;
+        }
+        return ">=" + from + (incPre ? "-0" : "");
+    }
+
+    private static String hyphenTo(String to, String tM, String tm, String tp, @Nullable String tpr, boolean incPre) {
+        if (NodeComparand.isX(tM)) {
+            return "";
+        }
+        if (NodeComparand.isX(tm)) {
+            return "<" + NodeComparand.incr(tM) + ".0.0-0";
+        }
+        if (NodeComparand.isX(tp)) {
+            return "<" + tM + "." + NodeComparand.incr(tm) + ".0-0";
+        }
+        if (tpr != null) {
+            return "<=" + tM + "." + tm + "." + tp + "-" + tpr;
+        }
+        if (incPre) {
+            return "<" + tM + "." + tm + "." + NodeComparand.incr(tp) + "-0";
+        }
+        return "<=" + to;
+    }
+
+    @Override
+    public String toString() {
+        return node != null ? node.toString() : super.toString();
+    }
+
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
+        if (node != null) {
+            return ParsedVersion.compareLenient(v1, v2);
+        }
         Validated<HyphenRange> maybeHyphenRangeV1 = build(v1, null);
         Validated<HyphenRange> maybeHyphenRangeV2 = build(v2, null);
         if (maybeHyphenRangeV1.isValid() && maybeHyphenRangeV2.isValid()) {

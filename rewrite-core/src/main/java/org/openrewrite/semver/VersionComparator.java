@@ -38,6 +38,23 @@ public interface VersionComparator extends Comparator<String> {
 
     int compare(@Nullable String currentVersion, String v1, String v2);
 
+    /**
+     * The highest of {@code availableVersions} this selector admits (per {@link #isValid} with no
+     * current version), by this comparator's ordering. The winner is returned in its original
+     * spelling and the first-seen candidate wins ties, so selection is deterministic for a fixed
+     * iteration order. Unlike {@link #upgrade}, the result is not constrained to exceed any current
+     * version.
+     */
+    default Optional<String> maxSatisfying(Collection<String> availableVersions) {
+        String best = null;
+        for (String candidate : availableVersions) {
+            if (isValid(null, candidate) && (best == null || compare(null, candidate, best) > 0)) {
+                best = candidate;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
     default Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
         boolean seen = false;
         String best = null;
