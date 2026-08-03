@@ -475,6 +475,56 @@ def test_prepare_recipe_returns_whole_child_tree(monkeypatch):
     assert [c["descriptor"]["name"] for c in response["recipeList"]] == ["org.example.Leaf"]
 
 
+def test_prepare_recipe_same_type_children_preserve_distinct_options(monkeypatch):
+    """A composite whose recipe_list() yields multiple instances of the same recipe class with
+    different option values must keep each prepared child's own id and options, rather than
+    collapsing them."""
+    import rewrite.rpc.server as server
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite import Recipe, CategoryDescriptor
+    from rewrite.recipe import option
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class _SetsText(Recipe):
+        text: str = field(default=None, metadata=option(
+            display_name="Text", description="Text value."))
+
+        @property
+        def name(self): return "org.example.SetsText"
+        @property
+        def display_name(self): return "Sets text"
+        @property
+        def description(self): return "A recipe with a text option."
+
+    class _CompositeSameType(Recipe):
+        @property
+        def name(self): return "org.example.CompositeSameType"
+        @property
+        def display_name(self): return "Composite with same-type children"
+        @property
+        def description(self): return "A composite with distinct-option children of one type."
+
+        def recipe_list(self):
+            return [_SetsText(text="a"), _SetsText(text="b"), _SetsText(text="c")]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_CompositeSameType, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    response = server.handle_prepare_recipe({"id": "org.example.CompositeSameType"})
+
+    children = response["recipeList"]
+    assert [c["descriptor"]["name"] for c in children] == ["org.example.SetsText"] * 3
+
+    ids = [c["id"] for c in children]
+    assert len(set(ids)) == 3
+
+    def text_of(child):
+        return next(o["value"] for o in child["descriptor"]["options"] if o["name"] == "text")
+    assert [text_of(c) for c in children] == ["a", "b", "c"]
+
+
 def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
     """A child drops its receive refs for a file when the broadcast Evict reaches it, so the facade
     must return its send-ref numbering to exactly the pre-file value. If the facade kept advancing,
