@@ -363,7 +363,7 @@ class MigrateToMaven4Test implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-              <project>
+              <project xmlns="http://maven.apache.org/POM/4.1.0">
                   <modelVersion>4.1.0</modelVersion>
                   <groupId>com.example</groupId>
                   <artifactId>my-app</artifactId>
