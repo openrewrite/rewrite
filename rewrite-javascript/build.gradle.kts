@@ -358,5 +358,7 @@ val syncLockFixtures = tasks.register("syncLockFixtures") {
         }
     }
 }
-sourceSets.named("test") { resources.srcDir(lockFixturesDir) }
-tasks.named("processTestResources") { dependsOn(syncLockFixtures) }
+tasks.named<ProcessResources>("processTestResources") {
+    dependsOn(syncLockFixtures)
+    from(lockFixturesDir)
+}
