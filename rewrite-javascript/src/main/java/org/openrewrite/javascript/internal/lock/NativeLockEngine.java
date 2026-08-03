@@ -37,7 +37,7 @@ import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.semver.Semver;
 import org.yaml.snakeyaml.Yaml;
 
 import java.nio.file.Path;
@@ -57,6 +57,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
+import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
  * The shared, package-manager-agnostic orchestrator for native lock regeneration: resolve the new dependency
@@ -755,11 +756,11 @@ public final class NativeLockEngine {
                     newTransitives.put(dep, constraint);
                     continue;
                 }
-                if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
+                if (isUnsupportedProtocol(constraint) || !Semver.validate(constraint, null, NODE).isValid()) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                             dep + " is constrained by an unresolvable range: " + constraint);
                 }
-                if (NodeSemver.satisfies(cur, constraint)) {
+                if (Semver.satisfies(cur, constraint, NODE)) {
                     continue; // kept edge already satisfied by the installed version (constraint re-pin only)
                 }
                 if (!resolvedKey.equals("node_modules/" + dep)) {
@@ -1020,12 +1021,12 @@ public final class NativeLockEngine {
         for (String candidate : published) {
             boolean ok = true;
             for (String c : constraints) {
-                if (!NodeSemver.satisfies(candidate, c)) {
+                if (!Semver.satisfies(candidate, c, NODE)) {
                     ok = false;
                     break;
                 }
             }
-            if (ok && (best == null || NodeSemver.compare(candidate, best) > 0)) {
+            if (ok && (best == null || Semver.compare(candidate, best, NODE) > 0)) {
                 best = candidate;
             }
         }
@@ -1078,11 +1079,11 @@ public final class NativeLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                         dep + " is resolved with a peer suffix (" + cur + "); resolution required");
             }
-            if (isUnsupportedProtocol(constraint) || !NodeSemver.validRange(constraint)) {
+            if (isUnsupportedProtocol(constraint) || !Semver.validate(constraint, null, NODE).isValid()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                         dep + " is constrained by an unresolvable range: " + constraint);
             }
-            if (!NodeSemver.satisfies(cur, constraint)) {
+            if (!Semver.satisfies(cur, constraint, NODE)) {
                 moves.add(resolveForcedMovePnpm(rootName, rootOldVersion, dep, cur, constraint,
                         existingLock, registries, client));
             }
@@ -1185,8 +1186,8 @@ public final class NativeLockEngine {
         VersionManifest refManifest = client.getManifest(registries.registryFor(refName), refName, refVersion);
         Map<String, String> refDeps = refManifest.getDependencies();
         String refConstraint = refDeps == null ? null : refDeps.get(name);
-        if (refConstraint == null || !NodeSemver.validRange(refConstraint) ||
-                NodeSemver.satisfies(targetVersion, refConstraint)) {
+        if (refConstraint == null || !Semver.validate(refConstraint, null, NODE).isValid() ||
+                Semver.satisfies(targetVersion, refConstraint, NODE)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, refName + " accepts " + name + "@" +
                     targetVersion + " (constraint " + refConstraint + "); pnpm would dedupe, not fork; deferred");
         }
@@ -1835,7 +1836,7 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
                     rootName + " is present at multiple versions; promoting it may fork (deferred)");
         }
-        if (!NodeSemver.satisfies(locked.iterator().next(), rootConstraint)) {
+        if (!Semver.satisfies(locked.iterator().next(), rootConstraint, NODE)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
                     locked.iterator().next() + " which excludes " + rootConstraint + " (yarn would fork); deferred");
         }
@@ -2021,7 +2022,7 @@ public final class NativeLockEngine {
 
     /** Whether an already-placed {@code version} satisfies a new {@code constraint} (proven dedup only). */
     private static boolean existingSatisfies(String version, String constraint) {
-        return NodeSemver.validRange(constraint) && NodeSemver.satisfies(version, constraint);
+        return Semver.validate(constraint, null, NODE).isValid() && Semver.satisfies(version, constraint, NODE);
     }
 
     /** Every installed {@code node_modules/...} entry (keyed by full path), the candidate set for hoisting resolution. */
@@ -2092,8 +2093,8 @@ public final class NativeLockEngine {
     private static String resolveAddedVersion(NpmRegistryClient client, NodeRegistry registry,
                                               String name, String constraint) {
         AbbreviatedPackument packument = client.getPackument(registry, name);
-        if (NodeSemver.validRange(constraint)) {
-            String best = NodeSemver.maxSatisfying(packument.getVersions(), constraint);
+        if (Semver.validate(constraint, null, NODE).isValid()) {
+            String best = Semver.maxSatisfying(packument.getVersions(), constraint, NODE);
             if (best != null) {
                 return best;
             }
@@ -2206,12 +2207,12 @@ public final class NativeLockEngine {
     private static String resolveTarget(NpmRegistryClient client, NodeRegistries registries,
                                         String name, String oldVersion, String newConstraint) {
         // Minimal-update: keep the already-locked version when it still satisfies the new range.
-        if (NodeSemver.satisfies(oldVersion, newConstraint)) {
+        if (Semver.satisfies(oldVersion, newConstraint, NODE)) {
             return oldVersion;
         }
         NodeRegistry registry = registries.registryFor(name);
         Set<String> published = client.getPackument(registry, name).getVersions();
-        String best = NodeSemver.maxSatisfying(published, newConstraint);
+        String best = Semver.maxSatisfying(published, newConstraint, NODE);
         if (best == null) {
             throw new EngineFailure(Reason.VERSION_NOT_FOUND, name,
                     "no published version of " + name + " satisfies " + newConstraint);
@@ -2392,7 +2393,7 @@ public final class NativeLockEngine {
                         " is present at multiple versions " + installed + "; cannot prove the graph is unchanged");
             }
             String v = installed.iterator().next();
-            if (!(NodeSemver.validRange(range) && NodeSemver.satisfies(v, range))) {
+            if (!(Semver.validate(range, null, NODE).isValid() && Semver.satisfies(v, range, NODE))) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer + "@" + v +
                         " does not satisfy the new range " + range + "; resolving a new provider is not yet supported");
             }
@@ -2528,7 +2529,7 @@ public final class NativeLockEngine {
                 continue;
             }
             String c = firstExcludingConstraint((Map<?, ?>) e.getValue(), name, oldVersion);
-            if (c != null && NodeSemver.satisfies(target, c)) {
+            if (c != null && Semver.satisfies(target, c, NODE)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " forked under " + e.getKey() +
                         " (" + c + ") would dedupe into the bumped " + target + "; deferred");
             }
@@ -2543,7 +2544,7 @@ public final class NativeLockEngine {
             return false;
         }
         Object v = ((Map<?, ?>) nested).get("version");
-        return v != null && NodeSemver.validRange(constraint) && NodeSemver.satisfies(String.valueOf(v), constraint);
+        return v != null && Semver.validate(constraint, null, NODE).isValid() && Semver.satisfies(String.valueOf(v), constraint, NODE);
     }
 
     /** Whether some importer or installed entry pins {@code name} at exactly {@code version} (so its top slot cannot move). */
@@ -2569,7 +2570,7 @@ public final class NativeLockEngine {
             Object scopeMap = entry.get(scope);
             if (scopeMap instanceof Map) {
                 Object c = ((Map<?, ?>) scopeMap).get(name);
-                if (c instanceof String && NodeSemver.validRange((String) c) && !NodeSemver.satisfies(target, (String) c)) {
+                if (c instanceof String && Semver.validate((String) c, null, NODE).isValid() && !Semver.satisfies(target, (String) c, NODE)) {
                     return (String) c;
                 }
             }
@@ -2750,7 +2751,7 @@ public final class NativeLockEngine {
             return;
         }
         String range = ((String) value).substring("npm:".length());
-        if (NodeSemver.validRange(range) && !NodeSemver.satisfies(targetVersion, range)) {
+        if (Semver.validate(range, null, NODE).isValid() && !Semver.satisfies(targetVersion, range, NODE)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " is required by " + dependent + " at " + value + " which excludes " + targetVersion);
         }
@@ -2816,8 +2817,8 @@ public final class NativeLockEngine {
             return;
         }
         Object constraint = ((Map<?, ?>) constraintMap).get(name);
-        if (constraint instanceof String && NodeSemver.validRange((String) constraint) &&
-                !NodeSemver.satisfies(targetVersion, (String) constraint)) {
+        if (constraint instanceof String && Semver.validate((String) constraint, null, NODE).isValid() &&
+                !Semver.satisfies(targetVersion, (String) constraint, NODE)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " is required by " + dependent + " at " + constraint + " which excludes " + targetVersion);
         }
@@ -3259,11 +3260,11 @@ public final class NativeLockEngine {
             if (locked.size() > 1) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " is present at multiple versions; deferred");
             }
-            if (isUnsupportedProtocol(newConstraint) || !NodeSemver.validRange(newConstraint)) {
+            if (isUnsupportedProtocol(newConstraint) || !Semver.validate(newConstraint, null, NODE).isValid()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " has an unresolvable range: " + newConstraint);
             }
             String cur = locked.iterator().next();
-            if (NodeSemver.satisfies(cur, newConstraint)) {
+            if (Semver.satisfies(cur, newConstraint, NODE)) {
                 if (!newConstraint.equals(oldDeps.get(dep))) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                             dep + " constraint changed without a version move (selector reselect) not yet supported");
@@ -3425,12 +3426,12 @@ public final class NativeLockEngine {
             if (locked.size() > 1) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " is present at multiple versions; deferred");
             }
-            if (isUnsupportedProtocol(newConstraint) || !NodeSemver.validRange(newConstraint)) {
+            if (isUnsupportedProtocol(newConstraint) || !Semver.validate(newConstraint, null, NODE).isValid()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " has an unresolvable range: " + newConstraint);
             }
             String cur = locked.iterator().next();
             // Still satisfied: the bumped parent's own metadata records the new range, so no separate move.
-            if (NodeSemver.satisfies(cur, newConstraint)) {
+            if (Semver.satisfies(cur, newConstraint, NODE)) {
                 continue;
             }
             moves.add(resolveForcedMoveBun(rootName, dep, cur, newConstraint, lock, registries, client));

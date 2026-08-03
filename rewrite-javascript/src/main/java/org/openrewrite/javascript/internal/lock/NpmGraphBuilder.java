@@ -20,11 +20,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
 import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RESOLUTION_REQUIRED;
+import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
  * Builds the {@link ResolutionGraph} for the npm resolution of a closure: every package resolves to a single
@@ -166,13 +167,13 @@ public final class NpmGraphBuilder {
     private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
-        String deduped = NodeSemver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range);
+        String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
         }
         String version = lockedSatisfying(name, range);
         if (version == null) {
-            version = NodeSemver.maxSatisfying(registry.versions(name), range);
+            version = Semver.maxSatisfying(registry.versions(name), range, NODE);
         }
         if (version == null) {
             throw new EngineFailure(RESOLUTION_REQUIRED, name, "no version of " + name + " satisfies " + range);
@@ -189,7 +190,7 @@ public final class NpmGraphBuilder {
 
     /** The highest already-locked version of {@code name} that {@code range} admits, or {@code null}. */
     private @Nullable String lockedSatisfying(String name, String range) {
-        return NodeSemver.maxSatisfying(lockedVersions.getOrDefault(name, Collections.emptySet()), range);
+        return Semver.maxSatisfying(lockedVersions.getOrDefault(name, Collections.emptySet()), range, NODE);
     }
 
     /**
@@ -218,13 +219,13 @@ public final class NpmGraphBuilder {
      */
     private String selectAlias(String aliasName, String realName, String range, Map<String, Set<String>> chosen,
                                Map<String, VersionManifest> manifests, Deque<String[]> work) {
-        String deduped = NodeSemver.maxSatisfying(chosen.getOrDefault(aliasName, Collections.emptySet()), range);
+        String deduped = Semver.maxSatisfying(chosen.getOrDefault(aliasName, Collections.emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
         }
         String version = lockedSatisfying(aliasName, range);
         if (version == null) {
-            version = NodeSemver.maxSatisfying(registry.versions(realName), range);
+            version = Semver.maxSatisfying(registry.versions(realName), range, NODE);
         }
         if (version == null) {
             throw new EngineFailure(RESOLUTION_REQUIRED, realName, "no version of " + realName + " satisfies " + range);
@@ -247,7 +248,7 @@ public final class NpmGraphBuilder {
                 range = alias.range;
             }
         }
-        return NodeSemver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range);
+        return Semver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range, NODE);
     }
 
     /** Parse an {@code npm:<name>@<range>} alias, or {@code null} when the target is not a registry range. */
@@ -258,7 +259,7 @@ public final class NpmGraphBuilder {
             return null;
         }
         String range = body.substring(at + 1);
-        if (range.isEmpty() || !NodeSemver.validRange(range)) {
+        if (range.isEmpty() || !Semver.validate(range, null, NODE).isValid()) {
             return null;
         }
         return new Alias(body.substring(0, at), range);
@@ -478,7 +479,7 @@ public final class NpmGraphBuilder {
                     " resolves to multiple versions " + resolved + " (peer fork not yet resolved)");
         }
         String v = resolved.iterator().next();
-        if (!NodeSemver.validRange(range) || !NodeSemver.satisfies(v, range)) {
+        if (!Semver.validate(range, null, NODE).isValid() || !Semver.satisfies(v, range, NODE)) {
             throw new EngineFailure(RESOLUTION_REQUIRED, requirer, requirer + " peer " + peerName + "@" +
                     v + " does not satisfy " + range + " (peer re-resolution not yet resolved)");
         }
@@ -528,7 +529,7 @@ public final class NpmGraphBuilder {
         try {
             String version = lockedSatisfying(peerName, range);
             if (version == null) {
-                version = NodeSemver.maxSatisfying(registry.versions(peerName), range);
+                version = Semver.maxSatisfying(registry.versions(peerName), range, NODE);
             }
             if (version == null) {
                 return null;

@@ -109,11 +109,11 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
   proxy that the default sender cannot honor fail loud rather than silently mis-handshake.
 - **Registry client** (`internal.registry`) — the two-step fetch above, with a per-run cache; only
   moving packages are fetched (their dependencies are already in the lock), so there is no N+1.
-- **node-semver** — new `NodeVersion` / `NodeComparator` / `NodeRange` / `NodeSemver` classes added to
-  `org.openrewrite.semver`, reusing only the version parser primitives; Maven's `LatestRelease`
-  comparator and `Semver.validate` chain are untouched. Range parsing is a separate entry point, never
-  routed through the Maven chain. Gated by node-semver's own conformance fixtures **and** the existing
-  Maven/Gradle semver suites staying green.
+- **node-semver** — exact npm/node-semver semantics through the existing `org.openrewrite.semver`
+  family: `Semver.validate`/`satisfies`/`maxSatisfying`/`compare` take an `Ecosystem.NODE` argument
+  that selects npm's range grammar and SemVer 2.0.0 precedence over `TildeRange`/`CaretRange`/`XRange`/
+  `HyphenRange`, leaving the Maven paths untouched. Gated by node-semver's own conformance fixtures
+  **and** the existing Maven/Gradle semver suites staying green.
 - **`NativeLockEngine`** — diffs the pre-edit and post-edit `package.json` to the recipe's edit set,
   runs the closure-safe proof over the raw lock (not the lossy adapters), resolves versions
   minimal-update (keep the locked version if it still satisfies, else max-satisfying), honors

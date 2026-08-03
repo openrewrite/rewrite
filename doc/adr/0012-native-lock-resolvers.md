@@ -40,8 +40,8 @@ public interface LockResolver {
 }
 ```
 
-**Reuse, do not reinvent.** All version/constraint work is delegated to rewrite-core's existing node-semver
-(`NodeSemver`, `NodeRange`, `NodeComparator`, `NodeVersion`) — a corpus-tested constraint-satisfaction system.
+**Reuse, do not reinvent.** All version/constraint work is delegated to rewrite-core's `Semver` family
+under `Ecosystem.NODE` — a corpus-tested constraint-satisfaction system.
 Package metadata is the existing `VersionManifest`; the registry is `NpmRegistryClient`; byte-exact writing
 reuses `LockJson`/`LockYaml` and the field-ordering already proven in the patchers. The resolver adds only
 what is genuinely new: the resolution graph and the per-PM resolve/layout algorithms.
