@@ -213,7 +213,8 @@ public final class NativeLockEngine {
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
         LockResolver resolver = LockResolvers.forPackageManager(pm);
-        boolean diffs = pm == PackageManager.Npm || pm == PackageManager.Pnpm || pm == PackageManager.YarnBerry;
+        boolean diffs = pm == PackageManager.Npm || pm == PackageManager.Pnpm ||
+                pm == PackageManager.YarnBerry || pm == PackageManager.Bun;
         if ((!diffs && resolver == null) ||
                 !RESOLVER_FALLBACK_REASONS.contains(surgical.failure.getReason())) {
             throw surgical;
@@ -232,6 +233,9 @@ public final class NativeLockEngine {
             }
             if (pm == PackageManager.YarnBerry) {
                 return resolveAndPatchYarnBerry(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            }
+            if (pm == PackageManager.Bun) {
+                return resolveAndPatchBun(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
             ResolveRequest request = new ResolveRequest(
                     Collections.singletonMap("", editedPackageJson), existingLock, registries, client);
@@ -333,6 +337,23 @@ public final class NativeLockEngine {
         return locked;
     }
 
+    /**
+     * The bun analogue of {@link #resolveAndPatchNpm}: resolve the closure seeded by the existing bun.lock
+     * (bun keeps a satisfying locked version, like npm, but does not auto-install missing peers), diff the
+     * graph against the lock, and patch only the difference.
+     */
+    private static Result resolveAndPatchBun(String editedPackageJson, String existingLock,
+                                             @Nullable Path packageJsonPath, NodeRegistries registries,
+                                             NpmRegistryClient client) {
+        Registry registry = new NpmRegistryAdapter(registries, client);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock))
+                .build(Collections.singletonMap("", editedPackageJson));
+        List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
+        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
+                PackageManager.Bun, editedPackageJson, edits);
+        return Result.success(new BunLockPatcher().patch(editSet));
+    }
+
     /** The versions the lock already installs, keyed by tree-slot name (an alias seeds under its slot). */
     private static Map<String, Set<String>> lockedVersionsNpm(String lock) {
         Map<String, Set<String>> locked = new LinkedHashMap<>();
@@ -348,6 +369,34 @@ public final class NativeLockEngine {
             }
         }
         return locked;
+    }
+
+    /** The versions the bun.lock already installs, keyed by tree-slot name (the key's last package segment). */
+    private static Map<String, Set<String>> lockedVersionsBun(String lock) {
+        Map<String, Set<String>> locked = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
+            List<?> tuple = tupleOf(e.getValue());
+            if (tuple != null && !tuple.isEmpty() && tuple.get(0) instanceof String) {
+                String locator = (String) tuple.get(0);
+                int at = locator.lastIndexOf('@');
+                if (at > 0) {
+                    locked.computeIfAbsent(bunSlotName(e.getKey()), k -> new LinkedHashSet<>())
+                            .add(locator.substring(at + 1));
+                }
+            }
+        }
+        return locked;
+    }
+
+    /** The package name a bun {@code packages} key addresses: its last path segment, {@code @scope/}-aware. */
+    private static String bunSlotName(String key) {
+        int lastSlash = key.lastIndexOf('/');
+        if (lastSlash < 0) {
+            return key;
+        }
+        int prevSlash = key.lastIndexOf('/', lastSlash - 1);
+        String tail = key.substring(prevSlash + 1);
+        return tail.startsWith("@") ? tail : key.substring(lastSlash + 1);
     }
 
     /**

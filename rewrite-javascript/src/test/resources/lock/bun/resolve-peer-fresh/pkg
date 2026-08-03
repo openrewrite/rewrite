@@ -1,0 +1,9 @@
+{
+  "name": "resolve-peer-fresh",
+  "version": "1.0.0",
+  "dependencies": {
+    "once": "1.4.0",
+    "react": "19.2.8",
+    "use-sync-external-store": "1.4.0"
+  }
+}

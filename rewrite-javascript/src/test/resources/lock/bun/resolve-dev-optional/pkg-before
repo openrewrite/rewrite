@@ -1,0 +1,5 @@
+{
+  "name": "resolve-devopt",
+  "version": "1.0.0",
+  "dependencies": { "once": "1.4.0" }
+}

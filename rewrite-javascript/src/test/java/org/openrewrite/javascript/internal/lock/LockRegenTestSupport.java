@@ -169,28 +169,40 @@ abstract class LockRegenTestSupport {
     protected void assertBunReproduces(String pkgResource, String lockResource) throws Exception {
         Path tmp = Files.createTempDirectory("bun-regen-record");
         try {
-            Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
-            Process process = new ProcessBuilder("bun", "install", "--lockfile-only", "--no-progress")
-                    .directory(tmp.toFile())
-                    .redirectOutput(tmp.resolve("bun.log").toFile())
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IllegalStateException("bun install timed out for " + pkgResource);
-            }
-            String generated = new String(Files.readAllBytes(tmp.resolve("bun.lock")), StandardCharsets.UTF_8);
-            assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
+            bunInstallInto(tmp, pkgResource, lockResource);
         } finally {
-            try (Stream<Path> walk = Files.walk(tmp)) {
-                walk.sorted(Comparator.reverseOrder()).forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {
-                    }
-                });
-            }
+            deleteRecursively(tmp);
         }
+    }
+
+    /**
+     * Verify a two-phase incremental golden pair: {@code pkg-before} installed from scratch must reproduce the
+     * {@code before} lock, then the edited {@code pkg} installed in the same directory (the before lock present)
+     * must reproduce {@code after} — the incremental truth the engine's resolve-and-patch is held to.
+     */
+    protected void assertBunReproducesIncremental(String dir, String before, String after) throws Exception {
+        Path tmp = Files.createTempDirectory("bun-regen-record");
+        try {
+            bunInstallInto(tmp, dir + "/pkg-before", dir + "/" + before);
+            bunInstallInto(tmp, dir + "/pkg", dir + "/" + after);
+        } finally {
+            deleteRecursively(tmp);
+        }
+    }
+
+    private void bunInstallInto(Path tmp, String pkgResource, String lockResource) throws Exception {
+        Files.write(tmp.resolve("package.json"), resource(pkgResource).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("bun", "install", "--lockfile-only", "--no-progress")
+                .directory(tmp.toFile())
+                .redirectOutput(tmp.resolve("bun.log").toFile())
+                .redirectErrorStream(true)
+                .start();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("bun install timed out for " + pkgResource);
+        }
+        String generated = new String(Files.readAllBytes(tmp.resolve("bun.lock")), StandardCharsets.UTF_8);
+        assertThat(generated).as(pkgResource + " -> " + lockResource).isEqualTo(resource(lockResource));
     }
 
     protected void assertYarnReproduces(String pkgResource, String lockResource) throws Exception {

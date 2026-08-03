@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
-import org.openrewrite.javascript.internal.lock.resolve.BunResolver;
 import org.openrewrite.javascript.internal.lock.resolve.LockResolver;
 import org.openrewrite.javascript.internal.lock.resolve.ResolveRequest;
 import org.openrewrite.javascript.internal.lock.resolve.YarnClassicResolver;
@@ -39,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * entirely OFFLINE on an edit the surgical path cannot reshape, and asserts the returned lock is BYTE-IDENTICAL to
  * the resolver golden under {@code lock/<pm>/resolve-*}.
  * <p>
- * For npm, pnpm, bun and classic yarn the edit introduces a FORK: the pre-edit lock (a clean closure produced by
+ * For pnpm and classic yarn the edit introduces a FORK: the pre-edit lock (a clean closure produced by
  * the same resolver) already installs the package at one version, and the edit adds a second, incompatible one. The
  * surgical tier defers ("would fork") and — since a surgical patch can never fork — a byte-exact fork lock proves
  * the resolver produced it. Yarn Berry has no fork resolver fixture yet, so its test triggers the fallback via a
@@ -47,17 +46,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * from scratch, checksums included.
  */
 class ResolverFallbackLockRegenTest extends LockRegenTestSupport {
-
-    @Test
-    void bunForkAddFallsBackToResolver() {
-        // pre-edit declares debug@2.6.9 (ms@2.0.0 hoisted); adding ms@2.1.3 forks. The surgical add defers
-        // ("bun would fork"); the resolver reproduces the fork from scratch.
-        String dir = "lock/bun/resolve-fork";
-        routePackages(dir, new String[][]{{"debug", "2.6.9"}, {"ms", "2.0.0"}, {"ms", "2.1.3"}});
-        String preEdit = "{\"name\":\"resolve-fork\",\"version\":\"1.0.0\",\"dependencies\":{\"debug\":\"2.6.9\"}}";
-        String preEditLock = new BunResolver().resolve(request(preEdit));
-        assertForkFallback(PackageManager.Bun, dir, preEdit, preEditLock);
-    }
 
     @Test
     void yarnClassicForkAddFallsBackToResolver() {

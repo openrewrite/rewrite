@@ -1,7 +1,7 @@
 {
-  "name": "resolve-fix",
+  "name": "resolve-peer",
   "version": "1.0.0",
   "dependencies": {
-    "is-odd": "^3.0.1"
+    "react": "19.2.8"
   }
 }

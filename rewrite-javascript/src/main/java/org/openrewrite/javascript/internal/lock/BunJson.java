@@ -22,12 +22,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The byte-exact bun {@code bun.lock} (JSONC) serialization primitives, shared by the surgical
- * {@link BunLockPatcher} and the {@link org.openrewrite.javascript.internal.lock.resolve.BunLockWriter}. bun's
- * package entries are compact single-line tuples {@code ["name@ver", "", <metadata>, "<sri>"]} whose metadata is
- * {@code {}} or an object carrying (in bun's order) {@code dependencies}, {@code peerDependencies} and
- * {@code optionalPeers}, each map ASCII-sorted. Both the patcher (splicing one member into a captured LST) and the
- * writer (emitting a whole file) reproduce that shape, so the rules live here once.
+ * The byte-exact bun {@code bun.lock} (JSONC) serialization primitives {@link BunLockPatcher} splices into a
+ * captured LST. bun's package entries are compact single-line tuples {@code ["name@ver", "", <metadata>, "<sri>"]}
+ * whose metadata is {@code {}} or an object carrying (in bun's order) {@code dependencies},
+ * {@code peerDependencies} and {@code optionalPeers}, each map ASCII-sorted.
  */
 public final class BunJson {
 

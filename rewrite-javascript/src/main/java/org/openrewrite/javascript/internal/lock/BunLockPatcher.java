@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
@@ -47,6 +48,11 @@ import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.K
  * constraint re-pinned. Bun stores integrity only (no {@code resolved} URL), so element 1 and the metadata (2) stay.
  */
 public final class BunLockPatcher implements LockPatcher {
+
+    private static final String UNIT = "  ";
+    /** Workspace scopes in the order bun writes them. */
+    private static final List<String> SCOPE_ORDER =
+            Arrays.asList("dependencies", "devDependencies", "optionalDependencies", "peerDependencies");
 
     @Override
     public String patch(LockEditSet edits) {
@@ -117,9 +123,24 @@ public final class BunLockPatcher implements LockPatcher {
                     (Json.JsonObject) document.getValue(), promotions, edits.getEditedPackageJson()));
         }
 
+        // A bump binding to a dependency the root did not declare before (a fork add's in-place bump) has no
+        // workspace member for the visitor to rewrite; insert the newly declared edge afterward.
+        List<PackageEdit> newlyDeclared = new ArrayList<>();
+        for (PackageEdit edit : rewrites) {
+            if (edit.getNewVersion() != null &&
+                    LockManifests.declaredConstraint(edits.getEditedPackageJson(), edit.getScope(), edit.getName()) != null &&
+                    !hasWorkspaceConstraint((Json.JsonObject) document.getValue(), edit)) {
+                newlyDeclared.add(edit);
+            }
+        }
+
         Json.Document patched = (Json.Document) new BunVisitor(rewrites, edits.getEditedPackageJson())
                 .visitNonNull(document, 0);
 
+        if (!newlyDeclared.isEmpty()) {
+            patched = patched.withValue(insertWorkspaceConstraints(
+                    (Json.JsonObject) patched.getValue(), newlyDeclared, edits.getEditedPackageJson()));
+        }
         if (!relocateNests.isEmpty()) {
             patched = patched.withValue(applyNests((Json.JsonObject) patched.getValue(), relocateNests, nestedTuples));
         }
@@ -197,21 +218,51 @@ public final class BunLockPatcher implements LockPatcher {
             }
             Json.JsonObject scope = LockJson.objectMember(importer, add.getScope());
             if (scope == null) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, add.getName(),
-                        "adding a new " + add.getScope() + " scope to bun.lock is not yet supported");
+                importer = insertScope(importer, add.getScope(), add.getName(), constraint);
+            } else {
+                String ws = LockJson.memberWhitespace(scope);
+                if (ws == null) {
+                    throw new EngineFailure(Reason.MALFORMED_LOCK, add.getName(), "cannot derive workspace indentation");
+                }
+                List<JsonRightPadded<Json>> members =
+                        insertSorted(new ArrayList<>(scope.getPadding().getMembers()), buildLiteralMember(add.getName(), constraint));
+                members = normalizePrefixes(members, ws, ws);
+                importer = LockJson.replaceValue(importer, add.getScope(), scope.getPadding().withMembers(members));
             }
-            String ws = LockJson.memberWhitespace(scope);
-            if (ws == null) {
-                throw new EngineFailure(Reason.MALFORMED_LOCK, add.getName(), "cannot derive workspace indentation");
-            }
-            List<JsonRightPadded<Json>> members =
-                    insertSorted(new ArrayList<>(scope.getPadding().getMembers()), buildLiteralMember(add.getName(), constraint));
-            members = normalizePrefixes(members, ws, ws);
-            scope = scope.getPadding().withMembers(members);
-            importer = LockJson.replaceValue(importer, add.getScope(), scope);
             workspaces = LockJson.replaceValue(workspaces, importerKey, importer);
         }
         return LockJson.replaceValue(root, "workspaces", workspaces);
+    }
+
+    /**
+     * Create a missing workspace scope holding its first constraint, in bun's member order: {@code name}
+     * first, then the scopes in canonical order.
+     */
+    private static Json.JsonObject insertScope(Json.JsonObject importer, String scopeName, String depName,
+                                               String constraint) {
+        String ws = LockJson.memberWhitespace(importer);
+        if (ws == null) {
+            throw new EngineFailure(Reason.MALFORMED_LOCK, depName, "cannot derive workspace indentation");
+        }
+        Json.Member member = parseMember(quote(scopeName) + ": {" + ws + UNIT +
+                quote(depName) + ": " + quote(constraint) + "," + ws + "}");
+        List<JsonRightPadded<Json>> members = new ArrayList<>(importer.getPadding().getMembers());
+        int newOrder = SCOPE_ORDER.indexOf(scopeName);
+        int idx = members.size();
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            if (!(el instanceof Json.Member)) {
+                idx = i; // before the trailing comma placeholder
+                break;
+            }
+            String key = LockJson.literal(((Json.Member) el).getKey());
+            if (key != null && SCOPE_ORDER.indexOf(key) > newOrder) {
+                idx = i;
+                break;
+            }
+        }
+        members.add(idx, new JsonRightPadded<>(member, Space.EMPTY, Markers.EMPTY));
+        return importer.getPadding().withMembers(normalizePrefixes(members, ws, ws));
     }
 
     // --- reverse-dependent nest ---------------------------------
@@ -277,8 +328,31 @@ public final class BunLockPatcher implements LockPatcher {
         }
         String locator = add.getName() + "@" + add.getNewVersion();
         String tuple = "[" + quote(locator) + ", " + quote("") + ", " +
-                renderMetadata(add.getNewDependencies()) + ", " + quote(integrity) + "]";
+                addMetadataSource(add) + ", " + quote(integrity) + "]";
         return parseMember(quote(key) + ": " + tuple);
+    }
+
+    /** An add's tuple metadata: its dependency map plus any peer surface carried on the edit. */
+    private static String addMetadataSource(PackageEdit add) {
+        LockEditSet.EntryMetadata md = add.getMetadata();
+        return BunJson.renderMetadata(add.getNewDependencies(),
+                md == null ? null : md.getPeerDependencies(),
+                md == null ? null : optionalPeerNames(md.getPeerDependenciesMeta()));
+    }
+
+    /** The names bun flattens into {@code optionalPeers}: peers flagged optional in the meta, ASCII-sorted. */
+    private static @Nullable List<String> optionalPeerNames(@Nullable JsonNode meta) {
+        if (meta == null || !meta.isObject()) {
+            return null;
+        }
+        List<String> names = new ArrayList<>();
+        meta.fields().forEachRemaining(e -> {
+            if (e.getValue().path("optional").asBoolean(false)) {
+                names.add(e.getKey());
+            }
+        });
+        names.sort(null);
+        return names.isEmpty() ? null : names;
     }
 
     /** A tuple printed as source with its leading prefix stripped, so it re-grafts cleanly under a fresh key. */
@@ -304,6 +378,14 @@ public final class BunLockPatcher implements LockPatcher {
         return members;
     }
 
+    /** Whether {@code workspaces[importer].<scope>.<name>} exists for the edit. */
+    private static boolean hasWorkspaceConstraint(Json.JsonObject root, PackageEdit edit) {
+        Json.JsonObject workspaces = LockJson.objectMember(root, "workspaces");
+        String importerKey = edit.getImporterDir() == null ? "" : edit.getImporterDir();
+        Json.JsonObject scope = LockJson.objectMember(LockJson.objectMember(workspaces, importerKey), edit.getScope());
+        return scope != null && LockJson.member(scope, edit.getName()) != null;
+    }
+
     private static boolean hasMemberKey(List<JsonRightPadded<Json>> members, String key) {
         for (JsonRightPadded<Json> rp : members) {
             if (rp.getElement() instanceof Json.Member && key.equals(LockJson.literal(((Json.Member) rp.getElement()).getKey()))) {
@@ -321,7 +403,7 @@ public final class BunLockPatcher implements LockPatcher {
         }
         String locator = add.getName() + "@" + add.getNewVersion();
         String tuple = "[" + quote(locator) + ", " + quote("") + ", " +
-                renderMetadata(add.getNewDependencies()) + ", " + quote(integrity) + "]";
+                addMetadataSource(add) + ", " + quote(integrity) + "]";
         return parseMember(quote(add.getName()) + ": " + tuple);
     }
 
@@ -389,11 +471,6 @@ public final class BunLockPatcher implements LockPatcher {
             members.set(newLast, members.get(newLast).withAfter(lastAfter));
         }
         return obj.getPadding().withMembers(members);
-    }
-
-    /** bun's compact single-line metadata: {@code {}} or {@code { "dependencies": { "<dep>": "<range>", … } }}. */
-    private static String renderMetadata(@Nullable Map<String, String> deps) {
-        return BunJson.renderMetadata(deps);
     }
 
     private static String renderInlineMap(Map<String, String> map) {
