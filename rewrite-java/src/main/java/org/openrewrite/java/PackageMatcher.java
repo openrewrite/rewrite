@@ -52,13 +52,19 @@ public class PackageMatcher implements Reference.Matcher {
         if (targetPackage == null) {
             return false;
         }
-        if (value.equals(targetPackage)) {
-            return true;
-        }
-        if (!value.startsWith(targetPackage + ".") || value.length() <= targetPackage.length() + 1) {
-            return false;
-        }
-        return recursive || Character.isUpperCase(value.charAt(targetPackage.length() + 1));
+        return value.equals(targetPackage) ||
+               value.startsWith(targetPackage + ".") && (recursive || namesTypeDirectlyIn(value, targetPackage));
+    }
+
+    /**
+     * Whether the segment following {@code pkg} names a type rather than a subpackage, inferred from
+     * a leading capital. A dotted string alone cannot say where the package ends, so this convention
+     * is what the reference model already uses to tell {@link Reference.Kind#TYPE} from
+     * {@link Reference.Kind#PACKAGE} when the providers in rewrite-properties, rewrite-yaml,
+     * rewrite-xml and the service-provider reader build these references in the first place.
+     */
+    private boolean namesTypeDirectlyIn(String value, String pkg) {
+        return value.length() > pkg.length() + 1 && Character.isUpperCase(value.charAt(pkg.length() + 1));
     }
 
     @Override
@@ -71,7 +77,7 @@ public class PackageMatcher implements Reference.Matcher {
             if (value.equals(oldValue)) {
                 return newValue;
             } else if (value.startsWith(oldValue)) {
-                if (recursive || value.length() > oldValue.length() + 1 && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
+                if (recursive || namesTypeDirectlyIn(value, oldValue)) {
                     return newValue + value.substring(oldValue.length());
                 }
             }
