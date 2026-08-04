@@ -523,7 +523,30 @@ class ChangePropertyKeyTest implements RewriteTest {
             """
               spring:
                 elasticsearch:
-                    restclient.sniffer.interval: 1
+                  restclient.sniffer.interval: 1
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/353")
+    @Test
+    void relocatedPropertyKeepsIndentationOfSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.b.c.d", "a.b.c2.d", true, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: 1
+                  e: 2
+              """,
+            """
+              a:
+                b:
+                  e: 2
+                  c2.d: 1
               """
           )
         );

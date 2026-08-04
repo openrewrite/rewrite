@@ -323,9 +323,10 @@ class PythonRpcReceiver:
 
     def _visit_type_alias(self, ta: TypeAlias, q: RpcReceiveQueue) -> TypeAlias:
         name = q.receive(ta.name)
+        type_parameters = q.receive(ta.padding.type_parameters, lambda c: self._receive_container(c, q) if c else None)
         value = q.receive(ta.padding.value)
         type_ = q.receive(ta.type)
-        return replace_if_changed(ta, name=name, value=value, type=type_)
+        return replace_if_changed(ta, name=name, type_parameters=type_parameters, value=value, type=type_)
 
     def _visit_yield_from(self, yf: YieldFrom, q: RpcReceiveQueue) -> YieldFrom:
         expression = q.receive(yf.expression)

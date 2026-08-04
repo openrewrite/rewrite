@@ -687,6 +687,37 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    /**
+     * The XML specification makes a processing instruction's data optional:
+     * {@code PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'}.
+     */
+    @Test
+    void processingInstructionWithoutData() {
+        rewriteRun(
+          xml(
+            """
+              <?xml-stylesheet?>
+              <execution>
+                  <?m2e?>
+              </execution>
+              """
+          )
+        );
+    }
+
+    @Test
+    void processingInstructionWithOnlyWhitespaceAfterTarget() {
+        rewriteRun(
+          xml(
+            """
+              <execution>
+                  <?m2e ?>
+              </execution>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
     @Test
     void utf8BOMCharacters() {

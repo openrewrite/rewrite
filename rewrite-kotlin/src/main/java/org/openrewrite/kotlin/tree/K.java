@@ -1335,7 +1335,7 @@ public interface K extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) withMethodDeclaration(methodDeclaration.withType(type));
+            return (T) this; // type must be changed on method declaration
         }
     }
 

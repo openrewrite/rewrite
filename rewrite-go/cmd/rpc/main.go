@@ -38,6 +38,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/grafana/pyroscope-go"
+	"golang.org/x/mod/module"
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
@@ -86,6 +87,17 @@ type server struct {
 	batchSize     int
 
 	inProgressGetObjects map[string]*getObjectTransfer
+
+	// Built exported-types batches awaiting drain, keyed by dependency coordinate.
+	// Each DependencyTypes call returns one batchSize slice and pops it; the Java
+	// client re-sends the same request until the list is exhausted. Unguarded
+	// because RPC dispatch is strictly serial (see the loop in main), like
+	// inProgressGetObjects above.
+	pendingDependencyTypes map[string][]rpc.RpcObjectData
+
+	// Root dir of the most recently parsed project, so versioned dependency
+	// coordinates can resolve against its vendor/ tree.
+	lastProjectDir string
 
 	// Separate state for reverse GetObject (Java→Go) to avoid conflating
 	// with forward direction state
@@ -219,6 +231,7 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
+		pendingDependencyTypes:       make(map[string][]rpc.RpcObjectData),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
@@ -488,6 +501,8 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 		result, rpcErr = s.handleTraceGetObject(req.Params)
 	case "ParseProject":
 		result, rpcErr = s.handleParseProject(req.Params)
+	case "DependencyTypes":
+		result, rpcErr = s.handleDependencyTypes(req.Params)
 	default:
 		rpcErr = &rpcError{
 			Code:    -32601,
@@ -2258,6 +2273,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	}
 
 	s.logger.Printf("ParseProject: path=%s", req.ProjectPath)
+	s.lastProjectDir = req.ProjectPath
 
 	// Discover all .go files AND every go.mod in the project tree.
 	type discovered struct {
@@ -2611,6 +2627,119 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 
 	s.logger.Printf("ParseProject: parsed %d sources across %d module(s)", len(items), len(mods))
 	return items, nil
+}
+
+type dependencyRequest struct {
+	ModulePath string `json:"modulePath"`
+	Version    string `json:"version"` // empty = absent: modulePath is a stdlib import path
+}
+
+type typeListHolder struct {
+	types []java.FullyQualified
+}
+
+// resolveDependencyDir maps a dependency coordinate to its on-disk source dir: a versionless
+// coordinate is a stdlib import path under $GOROOT/src; a versioned one resolves against the
+// parsed project's vendor/ tree first, then the module cache.
+func (s *server) resolveDependencyDir(modulePath, version string) (string, error) {
+	if version == "" {
+		goroot := os.Getenv("GOROOT")
+		if goroot == "" {
+			goroot = runtime.GOROOT()
+		}
+		dir := filepath.Join(goroot, "src", filepath.FromSlash(modulePath))
+		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+			return "", fmt.Errorf("no stdlib source for %q under %s", modulePath, filepath.Join(goroot, "src"))
+		}
+		return dir, nil
+	}
+	if s.lastProjectDir != "" {
+		// Only a vendored dir that kept its go.mod is enumerable (go mod vendor strips them);
+		// otherwise fall through to the module cache.
+		vendored := filepath.Join(s.lastProjectDir, "vendor", filepath.FromSlash(modulePath))
+		if fi, err := os.Stat(vendored); err == nil && fi.IsDir() {
+			if _, err := os.Stat(filepath.Join(vendored, "go.mod")); err == nil {
+				return vendored, nil
+			}
+		}
+	}
+	escPath, err := module.EscapePath(modulePath)
+	if err != nil {
+		return "", fmt.Errorf("invalid module path %q: %v", modulePath, err)
+	}
+	escVer, err := module.EscapeVersion(version)
+	if err != nil {
+		return "", fmt.Errorf("invalid module version %q: %v", version, err)
+	}
+	dir := filepath.Join(goparser.GoModCache(), escPath+"@"+escVer)
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return "", fmt.Errorf("module %s@%s not found in vendor tree or module cache", modulePath, version)
+	}
+	return dir, nil
+}
+
+// handleDependencyTypes enumerates one dependency's public API, resolving its module coordinate
+// to a source dir, and streams it back as ref-deduplicated RpcObjectData terminated by
+// END_OF_OBJECT. Paginated across the client's repeated identical requests: the full list is
+// built once, cached by coordinate, and handed back one batchSize slice per call until drained
+// (the Java RpcReceiveQueue re-sends when its batch empties).
+func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) {
+	var req dependencyRequest
+	if err := json.Unmarshal(params, &req); err != nil {
+		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
+	}
+
+	key := req.ModulePath + "\x00" + req.Version
+	data, cached := s.pendingDependencyTypes[key]
+	if !cached {
+		dir, err := s.resolveDependencyDir(req.ModulePath, req.Version)
+		if err != nil {
+			return nil, &rpcError{Code: -32603, Message: err.Error()}
+		}
+		s.logger.Printf("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
+		types := goparser.ExportedTypes([]string{dir}, nil)
+
+		q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
+			data = append(data, batch...)
+		}, rpc.NewReferenceMap())
+		sender := rpc.NewJavaTypeSender()
+		// FQN strings first, so the caller can tell the types this package defines from references up front.
+		fqns := make([]any, len(types))
+		for i, t := range types {
+			fqns[i] = t.GetFullyQualifiedName()
+		}
+		q.GetAndSendList(fqns, func(any) []any { return fqns }, func(v any) any { return v }, nil)
+		q.GetAndSendListAsRef(&typeListHolder{types: types},
+			func(v any) []any { return fullyQualifiedSlice(v.(*typeListHolder).types) },
+			func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+			func(v any) { sender.Visit(v.(java.JavaType), q) })
+		q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
+		q.Flush()
+		s.logger.Printf("DependencyTypes: %d types, %d items", len(types), len(data))
+	}
+
+	n := s.batchSize
+	if n > len(data) {
+		n = len(data)
+	}
+	batch, rest := data[:n], data[n:]
+	if len(rest) == 0 {
+		delete(s.pendingDependencyTypes, key)
+	} else {
+		s.pendingDependencyTypes[key] = rest
+	}
+	return batch, nil
+}
+
+func fullyQualifiedSlice(in []java.FullyQualified) []any {
+	if in == nil {
+		return nil
+	}
+	out := make([]any, len(in))
+	for i, t := range in {
+		out[i] = t
+	}
+	return out
 }
 
 // treeIdentical compares two tree nodes by pointer identity.

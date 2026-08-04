@@ -190,6 +190,9 @@ func (r *JavaTypeReceiver) VisitVariable(v *java.JavaTypeVariable, p any) java.J
 // receiveAsType receives a ref-tracked type from the queue.
 func receiveAsType[T java.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before T) T {
 	result := q.Receive(before, func(v any) any {
+		if v == nil {
+			return nil
+		}
 		return r.Visit(v.(java.JavaType), q)
 	})
 	if result == nil {
@@ -250,6 +253,9 @@ func receiveAsFullyQualified(r *JavaTypeReceiver, q *ReceiveQueue, before java.F
 		beforeAny = before
 	}
 	result := q.Receive(beforeAny, func(v any) any {
+		if v == nil {
+			return nil
+		}
 		return r.Visit(v.(java.JavaType), q)
 	})
 	if result == nil {

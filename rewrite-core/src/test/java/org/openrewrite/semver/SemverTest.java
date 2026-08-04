@@ -26,6 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.semver.Semver.Ecosystem.MAVEN;
+import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 class SemverTest {
     @Test
@@ -104,6 +106,58 @@ class SemverTest {
           .isInstanceOf(ExactVersion.class);
         assertThat(Semver.validate("=1.5-1", null).getValue())
           .isInstanceOf(ExactVersion.class);
+    }
+
+    @Test
+    void validToVersionNode() {
+        assertThat(Semver.validate("latest.release", null, NODE).getValue())
+          .isInstanceOf(LatestRelease.class);
+        assertThat(Semver.validate("latest.integration", null, NODE).getValue())
+          .isInstanceOf(LatestIntegration.class);
+        assertThat(Semver.validate("1.2.3 - 2", null, NODE).getValue())
+          .isInstanceOf(HyphenRange.class);
+        assertThat(Semver.validate("1.x", null, NODE).getValue())
+          .isInstanceOf(XRange.class);
+        assertThat(Semver.validate(">=1.2", null, NODE).getValue())
+          .isInstanceOf(XRange.class);
+        assertThat(Semver.validate("~1.2.3", null, NODE).getValue())
+          .isInstanceOf(TildeRange.class);
+        assertThat(Semver.validate("^1.2.3", null, NODE).getValue())
+          .isInstanceOf(CaretRange.class);
+        assertThat(Semver.validate("^16.8.0 || ^17.0.0", null, NODE).getValue())
+          .isInstanceOf(UnionRange.class);
+        assertThat(Semver.validate(">=1.2.9 <2.0.0", null, NODE).getValue())
+          .isInstanceOf(UnionRange.class);
+        assertThat(Semver.validate("1.5.1", null, NODE).getValue())
+          .isInstanceOf(UnionRange.class);
+    }
+
+    @Test
+    void sameSelectorMeansDifferentThingsPerEcosystem() {
+        // Valid Maven shapes that are not npm ranges.
+        assertThat(Semver.validate("~1.2.3.4", null, MAVEN).isValid()).isTrue();
+        assertThat(Semver.validate("~1.2.3.4", null, NODE).isValid()).isFalse();
+        assertThat(Semver.validate("[1.5,2)", null, MAVEN).isValid()).isTrue();
+        assertThat(Semver.validate("[1.5,2)", null, NODE).isValid()).isFalse();
+        assertThat(Semver.validate("2.+", null, MAVEN).isValid()).isTrue();
+        assertThat(Semver.validate("2.+", null, NODE).isValid()).isFalse();
+        // The Maven catch-all admits opaque "exact versions" that npm rejects.
+        assertThat(Semver.validate("beta", null, MAVEN).isValid()).isTrue();
+        assertThat(Semver.validate("beta", null, NODE).isValid()).isFalse();
+        // Valid npm shapes the Maven chain rejects.
+        assertThat(Semver.validate("^16.8.0 || ^17.0.0", null, MAVEN).isValid()).isFalse();
+        assertThat(Semver.validate("^16.8.0 || ^17.0.0", null, NODE).isValid()).isTrue();
+        assertThat(Semver.validate("1 - 2.x", null, MAVEN).isValid()).isFalse();
+        assertThat(Semver.validate("1 - 2.x", null, NODE).isValid()).isTrue();
+    }
+
+    @Test
+    void cachesValidationResultsPerEcosystem() {
+        Validated<VersionComparator> maven = Semver.validate("^1.5", null);
+        assertThat(Semver.validate("^1.5", null, MAVEN)).isSameAs(maven);
+        Validated<VersionComparator> node = Semver.validate("^1.5", null, NODE);
+        assertThat(node).isNotSameAs(maven);
+        assertThat(Semver.validate("^1.5", null, NODE)).isSameAs(node);
     }
 
     @Test

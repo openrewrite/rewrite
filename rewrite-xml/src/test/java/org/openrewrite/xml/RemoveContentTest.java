@@ -112,4 +112,84 @@ class RemoveContentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingCommentKeepsItsOwnLine() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(1), false, false));
+                  return super.visitDocument(x, ctx);
+              }
+          }).withMaxCycles(1)),
+          xml(
+            """
+              <dependency>
+                  <groupId>group</groupId>
+                  <version/><!-- why version -->
+              </dependency>
+              """,
+            """
+              <dependency>
+                  <groupId>group</groupId>
+                  <!-- why version -->
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void precedingCommentOnTheLineOfAnEarlierSiblingIsRetained() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(2), false, true));
+                  return super.visitDocument(x, ctx);
+              }
+          }).withMaxCycles(1)),
+          xml(
+            """
+              <dependency>
+                  <groupId>group</groupId> <!-- why group -->
+                  <version/>
+              </dependency>
+              """,
+            """
+              <dependency>
+                  <groupId>group</groupId> <!-- why group -->
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void precedingCommentOnItsOwnLineIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(2), false, true));
+                  return super.visitDocument(x, ctx);
+              }
+          }).withMaxCycles(1)),
+          xml(
+            """
+              <dependency>
+                  <groupId>group</groupId>
+                  <!-- why version -->
+                  <version/>
+              </dependency>
+              """,
+            """
+              <dependency>
+                  <groupId>group</groupId>
+              </dependency>
+              """
+          )
+        );
+    }
 }

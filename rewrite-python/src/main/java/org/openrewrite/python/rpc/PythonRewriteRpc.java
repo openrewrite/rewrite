@@ -20,19 +20,23 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -288,8 +292,27 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
         }
 
-        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, ctx);
+        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, dependencyPath, ctx);
         return Stream.concat(rpcStream, manifestStream);
+    }
+
+    /**
+     * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
+     * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
     }
 
     private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -315,7 +338,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             return null;
         }
 
-        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
+        List<PythonResolutionResult.Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
 
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
         String path = effectiveRelativeTo.relativize(setupPyPath).toString();
@@ -341,7 +364,8 @@ public class PythonRewriteRpc extends RewriteRpc {
         );
     }
 
-    private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+    private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo,
+                                             @Nullable Path dependencyPath, ExecutionContext ctx) {
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
 
         // Priority: pyproject.toml > Pipfile > setup.cfg > requirements.txt
@@ -350,7 +374,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
         if (Files.exists(pyprojectPath)) {
             Parser.Input pyprojectInput = Parser.Input.fromFile(pyprojectPath);
-            Stream<SourceFile> result = new PyProjectTomlParser().parseInputs(
+            Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
                     Collections.singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
             Path uvLockPath = projectPath.resolve("uv.lock");

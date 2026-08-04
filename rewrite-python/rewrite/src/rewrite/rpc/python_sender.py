@@ -290,6 +290,7 @@ class PythonRpcSender:
 
     def _visit_type_alias(self, ta: TypeAlias, q: 'RpcSendQueue') -> None:
         q.get_and_send(ta, lambda x: x.name, lambda el: self._visit(el, q))
+        q.get_and_send(ta, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q) if c else None)
         q.get_and_send(ta, lambda x: x.padding.value, lambda el: self._visit_left_padded(el, q))
         q.get_and_send_as_ref(ta, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 

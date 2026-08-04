@@ -1156,9 +1156,28 @@ class ParserVisitor(ast.NodeVisitor):
 
         # Use __convert_match_pattern to handle parentheses (GROUP patterns)
         pattern = self.__convert_match_pattern(node.pattern)
-        if isinstance(pattern, py.MatchCase) and node.guard:
+        if node.guard:
             guard = self.__pad_left(self.__source_before('if'), self.__convert(node.guard))
-            pattern = pattern.padding.replace(guard=guard)
+            if isinstance(pattern, py.MatchCase):
+                pattern = pattern.padding.replace(guard=guard)
+            else:
+                kind = (py.MatchCase.Pattern.Kind.CAPTURE if isinstance(node.pattern, ast.MatchAs)
+                        else py.MatchCase.Pattern.Kind.VALUE)
+                pattern = py.MatchCase(
+                    random_id(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    py.MatchCase.Pattern(
+                        random_id(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        kind,
+                        JContainer(Space.EMPTY, [self.__pad_right(pattern, Space.EMPTY)], Markers.EMPTY),
+                        None
+                    ),
+                    guard,
+                    None
+                )
 
         return j.Case(
             random_id(),
@@ -1403,7 +1422,7 @@ class ParserVisitor(ast.NodeVisitor):
                             Markers.EMPTY,
                             cast(j.Identifier, self.__convert_name(kwd)),
                             _EMPTY_LIST,
-                            self.__pad_left(self.__source_before('='), self.__convert(node.kwd_patterns[i])),
+                            self.__pad_left(self.__source_before('='), self.__convert_match_pattern(node.kwd_patterns[i])),
                             None
                         ), Space.EMPTY)
                     ]
