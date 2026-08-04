@@ -83,14 +83,12 @@ public class PropertiesCommentService extends CommentService {
             return file;
         }
         Properties.Content element = content.get(idx);
-        // The first line of a file carries no leading newline; every later line is separated from the
-        // previous one by the newline rendered as its own prefix.
-        String commentPrefix = idx == 0 ? "" : "\n";
-        Properties.Comment comment = new Properties.Comment(randomId(), commentPrefix, Markers.EMPTY,
+        // The comment takes over the element's prefix, so it lands exactly where the element was.
+        String prefix = element.getPrefix();
+        Properties.Comment comment = new Properties.Comment(randomId(), prefix, Markers.EMPTY,
                 Properties.Comment.Delimiter.HASH_TAG, NEWLINE.matcher(text).replaceAll(" "));
-        // Push the element onto the line below the comment when it shared the comment's line.
-        Properties.Content newElement = element.getPrefix().contains("\n") ?
-                element : (Properties.Content) element.withPrefix("\n" + element.getPrefix());
+        String indent = prefix.substring(prefix.lastIndexOf('\n') + 1);
+        Properties.Content newElement = (Properties.Content) element.withPrefix(lineSeparator(file) + indent);
         List<Properties.Content> newContent = new ArrayList<>(content);
         newContent.set(idx, newElement);
         newContent.add(idx, comment);
@@ -142,6 +140,21 @@ public class PropertiesCommentService extends CommentService {
             }
         }
         return file.withContent(newContent);
+    }
+
+    private static String lineSeparator(Properties.File file) {
+        if (file.getEof().indexOf('\r') >= 0) {
+            return "\r\n";
+        }
+        // The parser splits on '\n', so a comment line's trailing CR lands in its message rather than
+        // in the next element's prefix.
+        for (Properties.Content c : file.getContent()) {
+            if (c.getPrefix().indexOf('\r') >= 0 ||
+                    c instanceof Properties.Comment && ((Properties.Comment) c).getMessage().indexOf('\r') >= 0) {
+                return "\r\n";
+            }
+        }
+        return "\n";
     }
 
     private static Properties.@Nullable File parentFile(Cursor cursor) {
