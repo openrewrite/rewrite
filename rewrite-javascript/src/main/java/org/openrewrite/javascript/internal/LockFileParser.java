@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
@@ -47,10 +49,9 @@ import java.util.Map;
  * {@code name@version} and indexes it by lock-file path; pass two populates the
  * dependency lists, resolving each request Node-style (nearest
  * {@code node_modules} walking up from the dependent's path) with a semver
- * fallback for paths the walk cannot reach. The dependency lists are mutable
- * {@link ArrayList}s populated after construction, which is what allows cyclic
- * graphs to be represented with an otherwise immutable model; instances never
- * escape this class until fully linked.
+ * fallback for paths the walk cannot reach. The lists are filled in place after
+ * construction, per the linkage contract on {@link ResolvedDependency};
+ * instances never escape this class until fully linked.
  */
 public final class LockFileParser {
 
@@ -64,7 +65,11 @@ public final class LockFileParser {
     public static class ParseResult {
         List<ResolvedDependency> all;
         Map<String, ResolvedDependency> topLevel;
+
+        @Getter(AccessLevel.NONE)
         Map<String, ResolvedDependency> byPath;
+
+        @Getter(AccessLevel.NONE)
         Map<String, List<ResolvedDependency>> byName;
 
         /**
@@ -73,7 +78,60 @@ public final class LockFileParser {
          * transitive links inside {@link #getAll()}.
          */
         public @Nullable ResolvedDependency resolve(String name, String versionConstraint) {
-            return LockFileParser.resolve(name, versionConstraint, "", byPath, byName);
+            return resolve(name, versionConstraint, "");
+        }
+
+        /**
+         * Resolves a dependency name from a given path context using Node.js-style
+         * resolution: nearest {@code node_modules} first, then walking up to parent
+         * directories. Falls back to semver matching among all versions of the name
+         * for paths the walk cannot reach (the yarn/pnpm adapters park duplicate
+         * versions under synthetic paths that are not on any walk-up chain).
+         */
+        @Nullable ResolvedDependency resolve(String name, String versionConstraint, String contextPath) {
+            String currentPath = contextPath;
+            while (true) {
+                String candidatePath = currentPath.isEmpty()
+                        ? "node_modules/" + name
+                        : currentPath + "/node_modules/" + name;
+                ResolvedDependency resolved = byPath.get(candidatePath);
+                if (resolved != null) {
+                    return resolved;
+                }
+                if (currentPath.isEmpty()) {
+                    break;
+                }
+                int lastNodeModules = currentPath.lastIndexOf("/node_modules/");
+                currentPath = lastNodeModules < 0 ? "" : currentPath.substring(0, lastNodeModules);
+            }
+
+            List<ResolvedDependency> candidates = byName.get(name);
+            if (candidates == null || candidates.isEmpty()) {
+                return null;
+            }
+            if (candidates.size() == 1) {
+                return candidates.get(0);
+            }
+            Validated<VersionComparator> constraint =
+                    Semver.validate(versionConstraint, null, Semver.Ecosystem.NODE);
+            if (constraint.isValid()) {
+                for (ResolvedDependency candidate : candidates) {
+                    if (candidate.getVersion() != null &&
+                            constraint.getValue().isValid(null, candidate.getVersion())) {
+                        return candidate;
+                    }
+                }
+            }
+            // No version satisfies the constraint: fall back to the highest version.
+            ResolvedDependency max = candidates.get(0);
+            for (int i = 1; i < candidates.size(); i++) {
+                ResolvedDependency candidate = candidates.get(i);
+                if (candidate.getVersion() != null && (max.getVersion() == null ||
+                        VERSION_PRECEDENCE.compare(null, candidate.getVersion(), max.getVersion()) > 0)) {
+                    max = candidate;
+                }
+            }
+            return max;
         }
     }
 
@@ -111,7 +169,8 @@ public final class LockFileParser {
             JsonNode body = entry.getValue();
             String version = body.path("version").asText(null);
 
-            ResolvedDependency dep = byNameAndVersion.get(name + "@" + version);
+            String nameAndVersion = name + "@" + version;
+            ResolvedDependency dep = byNameAndVersion.get(nameAndVersion);
             if (dep == null) {
                 dep = new ResolvedDependency(
                         name, version,
@@ -121,7 +180,7 @@ public final class LockFileParser {
                         emptyListIfPresent(body.get("optionalDependencies")),
                         readStringMap(body.get("engines")),
                         body.path("license").asText(null));
-                byNameAndVersion.put(name + "@" + version, dep);
+                byNameAndVersion.put(nameAndVersion, dep);
                 byName.computeIfAbsent(name, k -> new ArrayList<>()).add(dep);
                 all.add(dep);
                 creatorEntries.add(entry);
@@ -132,6 +191,8 @@ public final class LockFileParser {
             }
         });
 
+        ParseResult result = new ParseResult(all, topLevel, byPath, byName);
+
         // Pass 2: populate the dependency lists, linking each request to its
         // resolution from the dependent's own path context.
         Map<String, Dependency> dependencyCache = new HashMap<>();
@@ -139,16 +200,12 @@ public final class LockFileParser {
             String pathKey = entry.getKey();
             JsonNode body = entry.getValue();
             ResolvedDependency dep = byPath.get(pathKey);
-            fillDependencies(dep.getDependencies(), body.get("dependencies"),
-                    pathKey, byPath, byName, dependencyCache);
-            fillDependencies(dep.getDevDependencies(), body.get("devDependencies"),
-                    pathKey, byPath, byName, dependencyCache);
-            fillDependencies(dep.getPeerDependencies(), body.get("peerDependencies"),
-                    pathKey, byPath, byName, dependencyCache);
-            fillDependencies(dep.getOptionalDependencies(), body.get("optionalDependencies"),
-                    pathKey, byPath, byName, dependencyCache);
+            fillDependencies(dep.getDependencies(), body.get("dependencies"), pathKey, result, dependencyCache);
+            fillDependencies(dep.getDevDependencies(), body.get("devDependencies"), pathKey, result, dependencyCache);
+            fillDependencies(dep.getPeerDependencies(), body.get("peerDependencies"), pathKey, result, dependencyCache);
+            fillDependencies(dep.getOptionalDependencies(), body.get("optionalDependencies"), pathKey, result, dependencyCache);
         }
-        return new ParseResult(all, topLevel, byPath, byName);
+        return result;
     }
 
     /**
@@ -186,8 +243,7 @@ public final class LockFileParser {
     private static void fillDependencies(@Nullable List<Dependency> target,
                                          @Nullable JsonNode node,
                                          String contextPath,
-                                         Map<String, ResolvedDependency> byPath,
-                                         Map<String, List<ResolvedDependency>> byName,
+                                         ParseResult result,
                                          Map<String, Dependency> dependencyCache) {
         if (target == null || node == null || !node.isObject()) {
             return;
@@ -195,7 +251,7 @@ public final class LockFileParser {
         node.fields().forEachRemaining(e -> {
             String name = e.getKey();
             String constraint = e.getValue().asText("");
-            ResolvedDependency resolved = resolve(name, constraint, contextPath, byPath, byName);
+            ResolvedDependency resolved = result.resolve(name, constraint, contextPath);
             // Reuse Dependency instances (see the @JsonIdentityInfo contract on
             // Dependency): identical requests resolving identically share one object.
             String cacheKey = name + '@' + constraint + '@' +
@@ -203,63 +259,6 @@ public final class LockFileParser {
             target.add(dependencyCache.computeIfAbsent(cacheKey,
                     k -> new Dependency(name, constraint, resolved)));
         });
-    }
-
-    /**
-     * Resolves a dependency name from a given path context using Node.js-style
-     * resolution: nearest {@code node_modules} first, then walking up to parent
-     * directories. Falls back to semver matching among all versions of the name
-     * for paths the walk cannot reach (the yarn/pnpm adapters park duplicate
-     * versions under synthetic paths that are not on any walk-up chain).
-     */
-    private static @Nullable ResolvedDependency resolve(String name,
-                                                        String versionConstraint,
-                                                        String contextPath,
-                                                        Map<String, ResolvedDependency> byPath,
-                                                        Map<String, List<ResolvedDependency>> byName) {
-        String currentPath = contextPath;
-        while (true) {
-            String candidatePath = currentPath.isEmpty()
-                    ? "node_modules/" + name
-                    : currentPath + "/node_modules/" + name;
-            ResolvedDependency resolved = byPath.get(candidatePath);
-            if (resolved != null) {
-                return resolved;
-            }
-            if (currentPath.isEmpty()) {
-                break;
-            }
-            int lastNodeModules = currentPath.lastIndexOf("/node_modules/");
-            currentPath = lastNodeModules < 0 ? "" : currentPath.substring(0, lastNodeModules);
-        }
-
-        List<ResolvedDependency> candidates = byName.get(name);
-        if (candidates == null || candidates.isEmpty()) {
-            return null;
-        }
-        if (candidates.size() == 1) {
-            return candidates.get(0);
-        }
-        Validated<VersionComparator> constraint =
-                Semver.validate(versionConstraint, null, Semver.Ecosystem.NODE);
-        if (constraint.isValid()) {
-            for (ResolvedDependency candidate : candidates) {
-                if (candidate.getVersion() != null &&
-                        constraint.getValue().isValid(null, candidate.getVersion())) {
-                    return candidate;
-                }
-            }
-        }
-        // No version satisfies the constraint: fall back to the highest version.
-        ResolvedDependency max = candidates.get(0);
-        for (int i = 1; i < candidates.size(); i++) {
-            ResolvedDependency candidate = candidates.get(i);
-            if (candidate.getVersion() != null && (max.getVersion() == null ||
-                    VERSION_PRECEDENCE.compare(null, candidate.getVersion(), max.getVersion()) > 0)) {
-                max = candidate;
-            }
-        }
-        return max;
     }
 
     private static @Nullable Map<String, String> readStringMap(@Nullable JsonNode node) {

@@ -201,8 +201,11 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      * Represents a resolved dependency from package-lock.json.
      * This is what was actually installed (name + resolved version + its own dependencies).
      * <p>
-     * Each ResolvedDependency's dependency arrays contain Dependency objects (requests),
-     * which can be looked up in NodeResolutionResult.resolvedDependencies to find their resolved versions.
+     * Each ResolvedDependency's dependency arrays contain Dependency objects (requests)
+     * whose {@link Dependency#getResolved()} pointers reference other ResolvedDependency
+     * instances of the same graph, so the graph is navigable to arbitrary depth and may
+     * contain cycles. Producers uphold this by filling each instance's lists in place
+     * after construction rather than replacing instances with copies.
      */
     @Value
     @With
