@@ -37,3 +37,36 @@ recipeList:
   - org.openrewrite.gradle.gradle9.UseProjectDependencyInsteadOfModuleCoordinates
   # DomainObjectCollection.findAll(Closure) is deprecated in 9.4 in favor of matching(Spec)
   - org.openrewrite.gradle.gradle9.UseMatchingInsteadOfFindAll
+  # Develocity plugin versions before 4.0 rely on the parent-project property lookup deprecated in 9.6
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: com.gradle.develocity
+      newVersion: 4.x
+  # PMD's targetJdk is deprecated in 9.6 and has no replacement
+  - org.openrewrite.gradle.gradle9.RemovePmdTargetJdk
+  # CreateStartScripts.exitEnvironmentVar became a no-op and is deprecated in 9.6
+  - org.openrewrite.gradle.gradle9.RemoveExitEnvironmentVar
+  # RepositoryHandler.flatDir(Map) / mavenCentral(Map) are deprecated in 9.6 in favor of the Action overloads
+  - org.openrewrite.gradle.gradle9.UseRepositoryHandlerActionOverloads
+  # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
+  - org.openrewrite.gradle.gradle9.MigrateIsolatedProjectsProperties
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.gradle9.MigrateIsolatedProjectsProperties
+displayName: Rename the incubating `org.gradle.unsafe.isolated-projects` properties
+description: >-
+  Gradle 9.7 promotes the Isolated Projects feature flags out of the `unsafe` namespace and deprecates the legacy
+  property names. `org.gradle.unsafe.isolated-projects` becomes `org.gradle.isolated-projects` and
+  `org.gradle.unsafe.isolated-projects.diagnostics` becomes `org.gradle.isolated-projects.diagnostics`. The legacy
+  names still work as aliases, but will be removed in a future release.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: '**/gradle.properties'
+recipeList:
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.isolated-projects.diagnostics
+      newPropertyKey: org.gradle.isolated-projects.diagnostics
+      relaxedBinding: false
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.isolated-projects
+      newPropertyKey: org.gradle.isolated-projects
+      relaxedBinding: false
