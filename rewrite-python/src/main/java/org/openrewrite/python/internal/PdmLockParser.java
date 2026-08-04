@@ -21,7 +21,6 @@ import org.openrewrite.python.internal.pdmlock.PdmLockFormatException;
 import org.openrewrite.python.internal.pdmlock.PdmLockPackage;
 import org.openrewrite.python.internal.pdmlock.PdmLockReader;
 import org.openrewrite.python.internal.pep508.Pep508Requirement;
-import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.io.IOException;
@@ -30,11 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Extracts resolved-dependency information from pdm.lock for overlay onto the
@@ -66,52 +61,22 @@ public class PdmLockParser {
             return Collections.emptyList();
         }
 
-        Set<String> knownNames = new HashSet<>();
-        List<List<String>> edges = new ArrayList<>(lock.getPackages().size());
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(lock.getPackages().size());
         for (PdmLockPackage pkg : lock.getPackages()) {
-            knownNames.add(PythonResolutionResult.normalizeName(pkg.getName()));
-            List<String> names = new ArrayList<>();
+            String source = pkg.getVcsUrl() != null ? pkg.getVcsUrl() :
+                    pkg.getUrl() != null ? pkg.getUrl() : pkg.getPath();
+            List<String> depNames = new ArrayList<>();
             if (pkg.getDependencies() != null) {
                 for (String dep : pkg.getDependencies()) {
                     Pep508Requirement req = Pep508Requirement.parse(dep);
                     if (req != null) {
-                        names.add(req.getName());
+                        depNames.add(req.getName());
                     }
                 }
             }
-            edges.add(names);
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    pkg.getName(), pkg.getVersion(), source, depNames));
         }
-
-        // Pass 1: create all entries, each with a dependencies list to fill in
-        // pass 2 (or null when no edge resolves to a locked package).
-        List<ResolvedDependency> resolved = new ArrayList<>(lock.getPackages().size());
-        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
-        for (int i = 0; i < lock.getPackages().size(); i++) {
-            PdmLockPackage pkg = lock.getPackages().get(i);
-            String source = pkg.getVcsUrl() != null ? pkg.getVcsUrl() :
-                    pkg.getUrl() != null ? pkg.getUrl() : pkg.getPath();
-            boolean anyResolvable = edges.get(i).stream()
-                    .anyMatch(name -> knownNames.contains(PythonResolutionResult.normalizeName(name)));
-            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(), source,
-                    anyResolvable ? new ArrayList<>() : null);
-            resolved.add(entry);
-            byName.putIfAbsent(PythonResolutionResult.normalizeName(pkg.getName()), entry);
-        }
-
-        // Pass 2: fill each entry's list in place with the shared instances, per
-        // the linkage contract on ResolvedDependency#getDependencies().
-        for (int i = 0; i < resolved.size(); i++) {
-            ResolvedDependency entry = resolved.get(i);
-            if (entry.getDependencies() == null) {
-                continue;
-            }
-            for (String name : edges.get(i)) {
-                ResolvedDependency child = byName.get(PythonResolutionResult.normalizeName(name));
-                if (child != null) {
-                    entry.getDependencies().add(child);
-                }
-            }
-        }
-        return resolved;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 }

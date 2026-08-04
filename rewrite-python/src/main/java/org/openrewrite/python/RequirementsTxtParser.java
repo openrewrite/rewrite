@@ -21,6 +21,7 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -203,46 +204,13 @@ public class RequirementsTxtParser implements Parser {
             return resolved;
         }
 
-        // Read METADATA for each package up front, so each entry can be built with
-        // the right dependencies shape (a list to fill in pass 2, or null when no
-        // requirement resolves to an installed package).
-        Set<String> knownNames = new HashSet<>();
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(resolved.size());
         for (ResolvedDependency r : resolved) {
-            knownNames.add(PythonResolutionResult.normalizeName(r.getName()));
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    r.getName(), r.getVersion(), r.getSource(),
+                    readRequiresDist(sitePackages, r.getName(), r.getVersion())));
         }
-        List<List<String>> requiredNamesPerPackage = new ArrayList<>(resolved.size());
-        for (ResolvedDependency r : resolved) {
-            requiredNamesPerPackage.add(readRequiresDist(sitePackages, r.getName(), r.getVersion()));
-        }
-
-        // Pass 1: build entries and the name→entry map
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
-        for (int i = 0; i < resolved.size(); i++) {
-            ResolvedDependency r = resolved.get(i);
-            boolean anyResolvable = requiredNamesPerPackage.get(i).stream()
-                    .anyMatch(name -> knownNames.contains(PythonResolutionResult.normalizeName(name)));
-            ResolvedDependency entry = anyResolvable ? r.withDependencies(new ArrayList<>()) : r;
-            linked.add(entry);
-            byNormalizedName.put(PythonResolutionResult.normalizeName(entry.getName()), entry);
-        }
-
-        // Pass 2: fill each entry's list in place with the shared instances, per
-        // the linkage contract on ResolvedDependency#getDependencies().
-        for (int i = 0; i < linked.size(); i++) {
-            ResolvedDependency entry = linked.get(i);
-            if (entry.getDependencies() == null) {
-                continue;
-            }
-            for (String reqName : requiredNamesPerPackage.get(i)) {
-                ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(reqName));
-                if (dep != null) {
-                    entry.getDependencies().add(dep);
-                }
-            }
-        }
-
-        return linked;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 
     private static @Nullable Path findSitePackages(Path workspace) {

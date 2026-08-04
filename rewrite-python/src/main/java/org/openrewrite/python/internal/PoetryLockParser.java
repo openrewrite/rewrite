@@ -22,7 +22,6 @@ import org.openrewrite.python.internal.poetrylock.PoetryLockPackage;
 import org.openrewrite.python.internal.poetrylock.PoetryLockReader;
 import org.openrewrite.python.internal.poetrylock.PoetryLockSource;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.io.IOException;
@@ -31,11 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Extracts resolved-dependency information from poetry.lock for overlay onto the
@@ -67,40 +62,19 @@ public class PoetryLockParser {
             return Collections.emptyList();
         }
 
-        Set<String> knownNames = new HashSet<>();
-        for (PoetryLockPackage pkg : lock.getPackages()) {
-            knownNames.add(PythonResolutionResult.normalizeName(pkg.getName()));
-        }
-
-        // Pass 1: create all entries, each with a dependencies list to fill in
-        // pass 2 (or null when no edge resolves to a locked package).
-        List<ResolvedDependency> resolved = new ArrayList<>(lock.getPackages().size());
-        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(lock.getPackages().size());
         for (PoetryLockPackage pkg : lock.getPackages()) {
             PoetryLockSource source = pkg.getSource();
-            boolean anyResolvable = pkg.getDependencies() != null && pkg.getDependencies().stream()
-                    .anyMatch(dep -> knownNames.contains(PythonResolutionResult.normalizeName(dep.getName())));
-            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(),
-                    source != null ? source.getUrl() : null,
-                    anyResolvable ? new ArrayList<>() : null);
-            resolved.add(entry);
-            byName.put(PythonResolutionResult.normalizeName(pkg.getName()), entry);
-        }
-
-        // Pass 2: fill each entry's list in place with the shared instances, per
-        // the linkage contract on ResolvedDependency#getDependencies().
-        for (int i = 0; i < resolved.size(); i++) {
-            ResolvedDependency entry = resolved.get(i);
-            if (entry.getDependencies() == null) {
-                continue;
-            }
-            for (PoetryLockDependency dep : lock.getPackages().get(i).getDependencies()) {
-                ResolvedDependency child = byName.get(PythonResolutionResult.normalizeName(dep.getName()));
-                if (child != null) {
-                    entry.getDependencies().add(child);
+            List<String> depNames = new ArrayList<>();
+            if (pkg.getDependencies() != null) {
+                for (PoetryLockDependency dep : pkg.getDependencies()) {
+                    depNames.add(dep.getName());
                 }
             }
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    pkg.getName(), pkg.getVersion(),
+                    source != null ? source.getUrl() : null, depNames));
         }
-        return resolved;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 }

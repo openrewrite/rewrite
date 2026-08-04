@@ -100,23 +100,8 @@ public class UvLockParser {
         return extractPackages(doc);
     }
 
-    /**
-     * Two-pass extraction:
-     * 1. Create all ResolvedDependency objects, indexed by normalized name
-     * 2. Fill each entry's dependency list in place with the shared instances,
-     * per the linkage contract on {@link ResolvedDependency#getDependencies()}
-     * <p>
-     * Python resolution is flat (one version per package), so each dependency
-     * name maps to exactly one ResolvedDependency.
-     */
     private static List<ResolvedDependency> extractPackages(Toml.Document doc) {
-        // Scan: collect raw package data so each entry can be constructed with the
-        // right dependencies shape (a list to fill in pass 2, or null when no dep
-        // name resolves to a locked package).
-        List<String[]> raw = new ArrayList<>();
-        List<List<String>> rawDeps = new ArrayList<>();
-        Set<String> knownNames = new HashSet<>();
-
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>();
         for (TomlValue value : doc.getValues()) {
             if (!(value instanceof Toml.Table)) {
                 continue;
@@ -132,39 +117,10 @@ public class UvLockParser {
                 continue;
             }
 
-            raw.add(new String[]{name, version, extractSource(table)});
-            rawDeps.add(extractDependencyNames(table));
-            knownNames.add(PythonResolutionResult.normalizeName(name));
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    name, version, extractSource(table), extractDependencyNames(table)));
         }
-
-        // Pass 1: Create all resolved entries
-        List<ResolvedDependency> resolved = new ArrayList<>(raw.size());
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
-        for (int i = 0; i < raw.size(); i++) {
-            String[] pkg = raw.get(i);
-            boolean anyResolvable = rawDeps.get(i).stream()
-                    .anyMatch(depName -> knownNames.contains(PythonResolutionResult.normalizeName(depName)));
-            ResolvedDependency entry = new ResolvedDependency(pkg[0], pkg[1], pkg[2],
-                    anyResolvable ? new ArrayList<>() : null);
-            resolved.add(entry);
-            byNormalizedName.put(PythonResolutionResult.normalizeName(pkg[0]), entry);
-        }
-
-        // Pass 2: Link transitive dependencies
-        for (int i = 0; i < resolved.size(); i++) {
-            ResolvedDependency entry = resolved.get(i);
-            if (entry.getDependencies() == null) {
-                continue;
-            }
-            for (String depName : rawDeps.get(i)) {
-                ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(depName));
-                if (dep != null) {
-                    entry.getDependencies().add(dep);
-                }
-            }
-        }
-
-        return resolved;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 
     /**
