@@ -199,6 +199,118 @@ class AddPropertyCommentTest implements RewriteTest {
     }
 
     @Test
+    void shouldAddCommentBeforeFirstPropertyOfCrlfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "cucumber.publish.quiet",
+            "myComment",
+            false
+          )),
+          properties(
+            "cucumber.publish.quiet=true\r\n" +
+            "cucumber.options=--format pretty",
+            "# myComment\r\n" +
+            "cucumber.publish.quiet=true\r\n" +
+            "cucumber.options=--format pretty"
+          )
+        );
+    }
+
+    @Test
+    void shouldAddCommentBeforeLaterPropertyOfCrlfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "cucumber.options",
+            "myComment",
+            false
+          )),
+          properties(
+            "cucumber.publish.quiet=true\r\n" +
+            "cucumber.options=--format pretty\r\n",
+            "cucumber.publish.quiet=true\r\n" +
+            "# myComment\r\n" +
+            "cucumber.options=--format pretty\r\n"
+          )
+        );
+    }
+
+    @Test
+    void shouldAddCommentAfterExistingCommentOfCrlfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "cucumber.options",
+            "myComment",
+            false
+          )),
+          properties(
+            "# existing\r\n" +
+            "cucumber.options=--format pretty",
+            "# existing\r\n" +
+            "# myComment\r\n" +
+            "cucumber.options=--format pretty"
+          )
+        );
+    }
+
+    @Test
+    void shouldUseCrlfWhenAddingToMixedEndingsFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "yyy",
+            "myComment",
+            false
+          )),
+          properties(
+            "xxx=true\r\n" +
+            "yyy=true\n" +
+            "zzz=true\r\n",
+            "xxx=true\r\n" +
+            "# myComment\r\n" +
+            "yyy=true\n" +
+            "zzz=true\r\n"
+          )
+        );
+    }
+
+    @Test
+    void shouldKeepBlankLineAboveComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "yyy",
+            "myComment",
+            false
+          )),
+          properties(
+            "xxx=true\n" +
+            "\n" +
+            "yyy=true\n",
+            "xxx=true\n" +
+            "\n" +
+            "# myComment\n" +
+            "yyy=true\n"
+          )
+        );
+    }
+
+    @Test
+    void shouldKeepIndentationOfCommentedProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPropertyComment(
+            "yyy",
+            "myComment",
+            false
+          )),
+          properties(
+            "xxx=true\n" +
+            "  yyy=true\n",
+            "xxx=true\n" +
+            "  # myComment\n" +
+            "  yyy=true\n"
+          )
+        );
+    }
+
+    @Test
     void shouldASkipCommentOutProperty() {
         rewriteRun(
           spec -> spec.recipe(new AddPropertyComment(
