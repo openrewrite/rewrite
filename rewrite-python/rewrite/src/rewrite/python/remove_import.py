@@ -39,6 +39,12 @@ class RemoveImportOptions:
     only_if_unused: bool = True
 
 
+def prefix_to_inherit(stmt, index: int) -> Optional[Space]:
+    """The removed statement's prefix only when worth rescuing (comments, or the file's leading
+    prefix), since otherwise it is blank-line separation the next statement already carries."""
+    return stmt.prefix if (index == 0 or stmt.prefix.comments) else None
+
+
 def maybe_remove_import(visitor: PythonVisitor, options: RemoveImportOptions) -> None:
     """Register a RemoveImport visitor to remove an import statement.
 
@@ -170,12 +176,6 @@ class RemoveImport(PythonVisitor):
         collector.visit(cu, None)
         return used
 
-    @staticmethod
-    def _prefix_to_inherit(stmt, index: int) -> Optional[Space]:
-        """The removed statement's prefix only when worth rescuing (comments, or the file's leading
-        prefix), since otherwise it is blank-line separation the next statement already carries."""
-        return stmt.prefix if (index == 0 or stmt.prefix.comments) else None
-
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
         new_padded_stmts = []
@@ -187,7 +187,7 @@ class RemoveImport(PythonVisitor):
             if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
                 result = self._process_single_import(stmt)
                 if result is None:
-                    removed_prefix = self._prefix_to_inherit(stmt, index)
+                    removed_prefix = prefix_to_inherit(stmt, index)
                     changed = True
                 else:
                     if removed_prefix is not None:
@@ -203,7 +203,7 @@ class RemoveImport(PythonVisitor):
                 if result is None:
                     # Remove the entire statement; remember its prefix
                     # so the next statement can inherit it if needed
-                    removed_prefix = self._prefix_to_inherit(stmt, index)
+                    removed_prefix = prefix_to_inherit(stmt, index)
                     changed = True
                 else:
                     if result is not stmt:
