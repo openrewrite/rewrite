@@ -504,6 +504,71 @@ class TestChangeImport:
             )
         )
 
+    def test_emptied_first_import_no_leading_blank_line(self):
+        """Emptying the file's first import must not leave a leading blank line."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from collections import Mapping
+                from collections.abc import Callable
+                d: Mapping = {}
+                """,
+                """
+                from collections.abc import Callable, Mapping
+                d: Mapping = {}
+                """,
+            )
+        )
+
+    def test_incrementally_emptied_import_no_leading_blank_line(self):
+        """Successive ChangeImports that empty a multi-name import one name at a
+        time must not leave a leading blank line."""
+        spec = RecipeSpec().with_recipes(
+            ChangeImport(old_module='collections', old_name='Callable', new_module='collections.abc'),
+            ChangeImport(old_module='collections', old_name='Mapping', new_module='collections.abc'),
+            ChangeImport(old_module='collections', old_name='Sequence', new_module='collections.abc'),
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from collections import Callable, Mapping, Sequence
+                d: Mapping = {}
+                """,
+                """
+                from collections.abc import Callable, Mapping, Sequence
+                d: Mapping = {}
+                """,
+            )
+        )
+
+    def test_emptied_import_preserves_leading_comment(self):
+        """A comment in the removed import's prefix moves to the next statement."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                # comment
+                from collections import Mapping
+                from collections.abc import Callable
+                d: Mapping = {}
+                """,
+                """
+                # comment
+                from collections.abc import Callable, Mapping
+                d: Mapping = {}
+                """,
+            )
+        )
+
     def test_both_from_import_and_direct_import(self):
         """When a file has both 'from X import name' and 'import X', handle without duplicates."""
         spec = RecipeSpec(recipe=ChangeImport(
@@ -522,7 +587,11 @@ class TestChangeImport:
                 """,
                 # The old from-import is removed and new one added after
                 # existing imports; import fractions is preserved.
-                # Leading newline is inherited from the removed from-import's prefix.
-                "\n\nimport fractions\nfrom math import gcd\n\nresult = gcd(12, 8)\n",
+                """
+                import fractions
+                from math import gcd
+
+                result = gcd(12, 8)
+                """,
             )
         )
