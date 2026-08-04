@@ -18,6 +18,7 @@ package main
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -116,5 +117,78 @@ func TestPrepareRecipeReturnsWholeChildTree(t *testing.T) {
 	}
 	if got := pr.RecipeList[0].Descriptor.Name; got != "org.openrewrite.go.test.Leaf" {
 		t.Errorf("expected child Leaf, got %q", got)
+	}
+}
+
+// goSetsText carries a text option value; distinct instances hold distinct values.
+type goSetsText struct {
+	recipe.Base
+	Text string
+}
+
+func (*goSetsText) Name() string        { return "org.openrewrite.go.test.SetsText" }
+func (*goSetsText) DisplayName() string { return "Sets text" }
+func (*goSetsText) Description() string { return "A recipe with a text option." }
+func (r *goSetsText) Options() []recipe.OptionDescriptor {
+	return []recipe.OptionDescriptor{recipe.Option("text", "Text", "Text value.").WithValue(r.Text)}
+}
+
+type goCompositeSameType struct{ recipe.Base }
+
+func (*goCompositeSameType) Name() string        { return "org.openrewrite.go.test.CompositeSameType" }
+func (*goCompositeSameType) DisplayName() string { return "Composite with same-type children" }
+func (*goCompositeSameType) Description() string {
+	return "A composite with distinct-option children of one type."
+}
+func (*goCompositeSameType) RecipeList() []recipe.Recipe {
+	return []recipe.Recipe{
+		&goSetsText{Text: "a"},
+		&goSetsText{Text: "b"},
+		&goSetsText{Text: "c"},
+	}
+}
+
+// A composite whose RecipeList() yields multiple instances of the same recipe class with different
+// option values must keep each prepared child's own id and options, rather than collapsing them.
+func TestPrepareRecipeSameTypeChildrenPreserveDistinctOptions(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.registry.Register(&goCompositeSameType{})
+
+	params, err := json.Marshal(prepareRecipeRequest{ID: "org.openrewrite.go.test.CompositeSameType"})
+	if err != nil {
+		t.Fatalf("marshal prepare request: %v", err)
+	}
+	resp, rpcErr := s.handlePrepareRecipe(params)
+	if rpcErr != nil {
+		t.Fatalf("handlePrepareRecipe error: %+v", rpcErr)
+	}
+
+	pr := resp.(prepareRecipeResponse)
+	if len(pr.RecipeList) != 3 {
+		t.Fatalf("expected 3 prepared children, got %d", len(pr.RecipeList))
+	}
+
+	ids := map[string]bool{}
+	var texts []any
+	for _, child := range pr.RecipeList {
+		if got := child.Descriptor.Name; got != "org.openrewrite.go.test.SetsText" {
+			t.Errorf("expected child SetsText, got %q", got)
+		}
+		ids[child.ID] = true
+		for _, opt := range child.Descriptor.Options {
+			if opt.Name == "text" {
+				texts = append(texts, opt.Value)
+			}
+		}
+	}
+
+	// Each child is prepared as its own instance (distinct id)...
+	if len(ids) != 3 {
+		t.Errorf("expected 3 distinct child ids, got %d", len(ids))
+	}
+	// ...retaining its own distinct option value, in the order the composite declared them.
+	want := []any{"a", "b", "c"}
+	if !reflect.DeepEqual(texts, want) {
+		t.Errorf("expected child option values %v, got %v", want, texts)
 	}
 }
