@@ -149,6 +149,26 @@ public interface Toml extends Tree {
         List<TomlValue> values;
         Space eof;
 
+        /**
+         * Finds a top-level table with the supplied name.
+         *
+         * @param name the table name to find
+         * @return the matching table, or {@code null} when it is absent
+         */
+        public @Nullable Table findTable(String name) {
+            for (TomlValue value : values) {
+                if (!(value instanceof Table)) {
+                    continue;
+                }
+                Table table = (Table) value;
+                Identifier tableName = table.getName();
+                if (tableName != null && name.equals(tableName.getName())) {
+                    return table;
+                }
+            }
+            return null;
+        }
+
         @Override
         public <P> Toml acceptToml(TomlVisitor<P> v, P p) {
             return v.visitDocument(this, p);
@@ -329,6 +349,30 @@ public interface Toml extends Tree {
 
         public List<Toml> getValues() {
             return TomlRightPadded.getElements(values);
+        }
+
+        public @Nullable KeyValue find(String key) {
+            for (Toml value : getValues()) {
+                if (!(value instanceof KeyValue)) {
+                    continue;
+                }
+                KeyValue keyValue = (KeyValue) value;
+                if (!(keyValue.getKey() instanceof Identifier) ||
+                        !key.equals(((Identifier) keyValue.getKey()).getName())) {
+                    continue;
+                }
+                return keyValue;
+            }
+            return null;
+        }
+
+        public @Nullable String getString(String key) {
+            KeyValue keyValue = find(key);
+            if (keyValue == null || !(keyValue.getValue() instanceof Literal)) {
+                return null;
+            }
+            Object value = ((Literal) keyValue.getValue()).getValue();
+            return value instanceof String ? (String) value : null;
         }
 
         public Table withValues(List<Toml> values) {
