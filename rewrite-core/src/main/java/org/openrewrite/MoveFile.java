@@ -84,11 +84,6 @@ public class MoveFile extends Recipe {
         };
     }
 
-    /**
-     * Resolve the destination path for a source file given the same options that {@link MoveFile} accepts.
-     * Returns {@code null} when the source file does not match, when the destination would equal the source,
-     * or when the move would escape the project root. Shared with {@link CopyFile}.
-     */
     static @Nullable Path computeNewSourcePath(String originalSourcePath, @Nullable String folder, @Nullable String fileMatcher, String moveTo) {
         Path sourcePath = Paths.get(separatorsToSystem(originalSourcePath));
         boolean isWindowsPath = originalSourcePath.equals(separatorsToWindows(originalSourcePath));
