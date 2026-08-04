@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The resolved dependency closure, a plain value model each {@link LockResolver} produces and each package
+ * The resolved dependency closure, a plain value model {@link NpmGraphBuilder} produces and each package
  * manager's serializer consumes. It captures <em>what</em> was resolved — the workspace importers with their
  * declared and resolved edges, and every distinct {@code name@version} node with its own resolved edges — but
  * not <em>where</em> anything is placed. Layout (npm/bun hoisting, pnpm content-addressing, yarn descriptors) is

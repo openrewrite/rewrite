@@ -4,9 +4,13 @@ Date: 2026-07-28
 
 ## Status
 
-Proposed. Amended 2026-08-02: whole-closure resolution landed as lock-seeded resolution plus
-per-format graph-to-lock diffs feeding the same in-place patchers, superseding
-[ADR 0012](0012-native-lock-resolvers.md)'s separate whole-file resolver design.
+Accepted. Originally proposed 2026-07-28 for the surgical-patch scope only (Phase A below). The
+whole-closure scope (Phase B) was first built, then amended 2026-08-02: an interim design ran a
+separate `LockResolver` per format — its own whole-file resolve-and-serialize path bolted on beside
+the surgical patchers as a second tier. It converged on the same graph model (`NpmGraphBuilder` /
+`ResolutionGraph`) this ADR already used, so the two tiers were consolidated into the single
+lock-seeded design below: one idea, resolve the new dependency set and edit the lock in place,
+applied at two scopes rather than kept as two tiers.
 
 ## Context
 
