@@ -326,8 +326,11 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
         /**
          * Direct dependencies of this resolved package. Each entry is a reference
-         * to another {@code ResolvedDependency} in the flat resolution list.
-         * Null when the package has no dependencies in the lock file.
+         * to another {@code ResolvedDependency} in the flat resolution list, so the
+         * graph is navigable to arbitrary depth and may contain cycles. Parsers
+         * uphold this by filling each entry's list in place after construction
+         * rather than replacing entries with copies. Null when the package has no
+         * dependencies in the lock file.
          */
         @Nullable List<ResolvedDependency> dependencies;
 

@@ -203,29 +203,43 @@ public class RequirementsTxtParser implements Parser {
             return resolved;
         }
 
-        // Pass 1: build name→entry map
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
+        // Read METADATA for each package up front, so each entry can be built with
+        // the right dependencies shape (a list to fill in pass 2, or null when no
+        // requirement resolves to an installed package).
+        Set<String> knownNames = new HashSet<>();
         for (ResolvedDependency r : resolved) {
-            byNormalizedName.put(PythonResolutionResult.normalizeName(r.getName()), r);
+            knownNames.add(PythonResolutionResult.normalizeName(r.getName()));
+        }
+        List<List<String>> requiredNamesPerPackage = new ArrayList<>(resolved.size());
+        for (ResolvedDependency r : resolved) {
+            requiredNamesPerPackage.add(readRequiresDist(sitePackages, r.getName(), r.getVersion()));
         }
 
-        // Pass 2: read METADATA for each package, link dependencies
+        // Pass 1: build entries and the name→entry map
         List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency r : resolved) {
-            List<String> requiredNames = readRequiresDist(sitePackages, r.getName(), r.getVersion());
-            if (requiredNames.isEmpty()) {
-                linked.add(r);
+        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
+        for (int i = 0; i < resolved.size(); i++) {
+            ResolvedDependency r = resolved.get(i);
+            boolean anyResolvable = requiredNamesPerPackage.get(i).stream()
+                    .anyMatch(name -> knownNames.contains(PythonResolutionResult.normalizeName(name)));
+            ResolvedDependency entry = anyResolvable ? r.withDependencies(new ArrayList<>()) : r;
+            linked.add(entry);
+            byNormalizedName.put(PythonResolutionResult.normalizeName(entry.getName()), entry);
+        }
+
+        // Pass 2: fill each entry's list in place with the shared instances, per
+        // the linkage contract on ResolvedDependency#getDependencies().
+        for (int i = 0; i < linked.size(); i++) {
+            ResolvedDependency entry = linked.get(i);
+            if (entry.getDependencies() == null) {
                 continue;
             }
-
-            List<ResolvedDependency> deps = new ArrayList<>();
-            for (String reqName : requiredNames) {
+            for (String reqName : requiredNamesPerPackage.get(i)) {
                 ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(reqName));
                 if (dep != null) {
-                    deps.add(dep);
+                    entry.getDependencies().add(dep);
                 }
             }
-            linked.add(r.withDependencies(deps.isEmpty() ? null : deps));
         }
 
         return linked;

@@ -220,6 +220,55 @@ class RequirementsTxtParserTest {
     }
 
     @Test
+    void linkDependenciesFromMetadataLinksDeepChains(@TempDir Path tempDir) throws Exception {
+        Path sitePackages = tempDir.resolve(".venv/lib/python3.12/site-packages");
+
+        Path aDist = sitePackages.resolve("a-1.0.0.dist-info");
+        Files.createDirectories(aDist);
+        Files.write(aDist.resolve("METADATA"), """
+                Metadata-Version: 2.4
+                Name: a
+                Version: 1.0.0
+                Requires-Dist: b>=1.0
+                """.getBytes(StandardCharsets.UTF_8));
+
+        Path bDist = sitePackages.resolve("b-1.0.0.dist-info");
+        Files.createDirectories(bDist);
+        Files.write(bDist.resolve("METADATA"), """
+                Metadata-Version: 2.4
+                Name: b
+                Version: 1.0.0
+                Requires-Dist: c>=1.0
+                """.getBytes(StandardCharsets.UTF_8));
+
+        Path cDist = sitePackages.resolve("c-1.0.0.dist-info");
+        Files.createDirectories(cDist);
+        Files.write(cDist.resolve("METADATA"), """
+                Metadata-Version: 2.4
+                Name: c
+                Version: 1.0.0
+                """.getBytes(StandardCharsets.UTF_8));
+
+        List<ResolvedDependency> resolved = RequirementsTxtParser.parseFreezeLines("""
+                a==1.0.0
+                b==1.0.0
+                c==1.0.0
+                """);
+
+        List<ResolvedDependency> linked = RequirementsTxtParser.linkDependenciesFromMetadata(resolved, tempDir);
+
+        assertThat(linked).hasSize(3);
+        ResolvedDependency a = linked.get(0);
+        ResolvedDependency b = linked.get(1);
+        ResolvedDependency c = linked.get(2);
+        // Children must be the graph's own instances, so navigation via
+        // getDependencies() works at arbitrary depth.
+        assertThat(a.getDependencies().get(0)).isSameAs(b);
+        assertThat(b.getDependencies().get(0)).isSameAs(c);
+        assertThat(a.getDependencies().get(0).getDependencies().get(0)).isSameAs(c);
+    }
+
+    @Test
     void markerContainsDependenciesFromFreeze() {
         assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 

@@ -30,9 +30,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Extracts resolved-dependency information from pdm.lock for overlay onto the
@@ -64,44 +66,52 @@ public class PdmLockParser {
             return Collections.emptyList();
         }
 
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
-        Map<String, List<String>> edges = new LinkedHashMap<>();
-
+        Set<String> knownNames = new HashSet<>();
+        List<List<String>> edges = new ArrayList<>(lock.getPackages().size());
         for (PdmLockPackage pkg : lock.getPackages()) {
-            String source = pkg.getVcsUrl() != null ? pkg.getVcsUrl() :
-                    pkg.getUrl() != null ? pkg.getUrl() : pkg.getPath();
-            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(), source, null);
-            resolved.add(entry);
-            byName.putIfAbsent(PythonResolutionResult.normalizeName(pkg.getName()), entry);
+            knownNames.add(PythonResolutionResult.normalizeName(pkg.getName()));
+            List<String> names = new ArrayList<>();
             if (pkg.getDependencies() != null) {
-                List<String> names = new ArrayList<>();
                 for (String dep : pkg.getDependencies()) {
                     Pep508Requirement req = Pep508Requirement.parse(dep);
                     if (req != null) {
                         names.add(req.getName());
                     }
                 }
-                edges.putIfAbsent(PythonResolutionResult.normalizeName(pkg.getName()), names);
             }
+            edges.add(names);
         }
 
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency entry : resolved) {
-            List<String> names = edges.get(PythonResolutionResult.normalizeName(entry.getName()));
-            if (names == null) {
-                linked.add(entry);
+        // Pass 1: create all entries, each with a dependencies list to fill in
+        // pass 2 (or null when no edge resolves to a locked package).
+        List<ResolvedDependency> resolved = new ArrayList<>(lock.getPackages().size());
+        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
+        for (int i = 0; i < lock.getPackages().size(); i++) {
+            PdmLockPackage pkg = lock.getPackages().get(i);
+            String source = pkg.getVcsUrl() != null ? pkg.getVcsUrl() :
+                    pkg.getUrl() != null ? pkg.getUrl() : pkg.getPath();
+            boolean anyResolvable = edges.get(i).stream()
+                    .anyMatch(name -> knownNames.contains(PythonResolutionResult.normalizeName(name)));
+            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(), source,
+                    anyResolvable ? new ArrayList<>() : null);
+            resolved.add(entry);
+            byName.putIfAbsent(PythonResolutionResult.normalizeName(pkg.getName()), entry);
+        }
+
+        // Pass 2: fill each entry's list in place with the shared instances, per
+        // the linkage contract on ResolvedDependency#getDependencies().
+        for (int i = 0; i < resolved.size(); i++) {
+            ResolvedDependency entry = resolved.get(i);
+            if (entry.getDependencies() == null) {
                 continue;
             }
-            List<ResolvedDependency> deps = new ArrayList<>();
-            for (String name : names) {
-                ResolvedDependency dep = byName.get(PythonResolutionResult.normalizeName(name));
-                if (dep != null) {
-                    deps.add(dep);
+            for (String name : edges.get(i)) {
+                ResolvedDependency child = byName.get(PythonResolutionResult.normalizeName(name));
+                if (child != null) {
+                    entry.getDependencies().add(child);
                 }
             }
-            linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
         }
-        return linked;
+        return resolved;
     }
 }

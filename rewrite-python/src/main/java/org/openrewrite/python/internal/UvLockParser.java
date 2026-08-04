@@ -102,17 +102,20 @@ public class UvLockParser {
 
     /**
      * Two-pass extraction:
-     * 1. Create all ResolvedDependency objects (without transitive deps linked)
-     * 2. Link transitive dependencies by looking up names in the resolved map
+     * 1. Create all ResolvedDependency objects, indexed by normalized name
+     * 2. Fill each entry's dependency list in place with the shared instances,
+     * per the linkage contract on {@link ResolvedDependency#getDependencies()}
      * <p>
      * Python resolution is flat (one version per package), so each dependency
      * name maps to exactly one ResolvedDependency.
      */
     private static List<ResolvedDependency> extractPackages(Toml.Document doc) {
-        // Pass 1: Create all resolved entries and collect raw dependency names per package
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
-        Map<String, List<String>> rawDepsPerPackage = new LinkedHashMap<>();
+        // Scan: collect raw package data so each entry can be constructed with the
+        // right dependencies shape (a list to fill in pass 2, or null when no dep
+        // name resolves to a locked package).
+        List<String[]> raw = new ArrayList<>();
+        List<List<String>> rawDeps = new ArrayList<>();
+        Set<String> knownNames = new HashSet<>();
 
         for (TomlValue value : doc.getValues()) {
             if (!(value instanceof Toml.Table)) {
@@ -129,37 +132,39 @@ public class UvLockParser {
                 continue;
             }
 
-            String source = extractSource(table);
-            List<String> depNames = extractDependencyNames(table);
+            raw.add(new String[]{name, version, extractSource(table)});
+            rawDeps.add(extractDependencyNames(table));
+            knownNames.add(PythonResolutionResult.normalizeName(name));
+        }
 
-            ResolvedDependency entry = new ResolvedDependency(name, version, source, null);
+        // Pass 1: Create all resolved entries
+        List<ResolvedDependency> resolved = new ArrayList<>(raw.size());
+        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
+        for (int i = 0; i < raw.size(); i++) {
+            String[] pkg = raw.get(i);
+            boolean anyResolvable = rawDeps.get(i).stream()
+                    .anyMatch(depName -> knownNames.contains(PythonResolutionResult.normalizeName(depName)));
+            ResolvedDependency entry = new ResolvedDependency(pkg[0], pkg[1], pkg[2],
+                    anyResolvable ? new ArrayList<>() : null);
             resolved.add(entry);
-            byNormalizedName.put(PythonResolutionResult.normalizeName(name), entry);
-            if (!depNames.isEmpty()) {
-                rawDepsPerPackage.put(PythonResolutionResult.normalizeName(name), depNames);
-            }
+            byNormalizedName.put(PythonResolutionResult.normalizeName(pkg[0]), entry);
         }
 
         // Pass 2: Link transitive dependencies
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency entry : resolved) {
-            String normalizedName = PythonResolutionResult.normalizeName(entry.getName());
-            List<String> depNames = rawDepsPerPackage.get(normalizedName);
-            if (depNames != null) {
-                List<ResolvedDependency> deps = new ArrayList<>();
-                for (String depName : depNames) {
-                    ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(depName));
-                    if (dep != null) {
-                        deps.add(dep);
-                    }
+        for (int i = 0; i < resolved.size(); i++) {
+            ResolvedDependency entry = resolved.get(i);
+            if (entry.getDependencies() == null) {
+                continue;
+            }
+            for (String depName : rawDeps.get(i)) {
+                ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(depName));
+                if (dep != null) {
+                    entry.getDependencies().add(dep);
                 }
-                linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
-            } else {
-                linked.add(entry);
             }
         }
 
-        return linked;
+        return resolved;
     }
 
     /**
