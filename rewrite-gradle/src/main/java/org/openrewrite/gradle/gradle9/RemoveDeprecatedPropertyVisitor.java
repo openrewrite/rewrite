@@ -26,33 +26,34 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.function.Predicate;
 
+import static java.util.Arrays.asList;
+
 /**
- * Deletes a configuration property that Gradle deprecated without offering a replacement, in whichever of the
- * equivalent Gradle DSL spellings it is written: {@code prop = value}, the Groovy setter-call {@code prop value},
- * {@code prop.set(value)} and {@code setProp(value)}.
- * <p>
- * A property name alone is too weak a signal to delete on, so a removal additionally requires the surrounding
- * configuration block to identify the plugin or task type that owns the property. {@code contextToken} is tested
- * against the method names, receivers, type references and string arguments of every enclosing method invocation,
- * so it sees {@code pmd} in {@code pmd { }}, {@code Pmd} in {@code tasks.withType(Pmd) { }} and {@code pmdMain}
- * in {@code tasks.named("pmdMain") { }} alike.
+ * Deletes a configuration property Gradle deprecated without offering a replacement, written as any of
+ * {@code prop = value}, {@code prop value}, {@code prop.set(value)} or {@code setProp(value)}, and only where
+ * {@code ownerToken} matches the surrounding configuration block that identifies the owning plugin or task.
  */
 @RequiredArgsConstructor
 class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContext> {
 
     private static final String REMOVED_STATEMENT = "removedDeprecatedProperty";
 
+    private static final Set<String> TASK_CREATING_METHODS =
+            new HashSet<>(asList("create", "maybeCreate", "register", "task"));
+
     private final String propertyName;
-    private final Predicate<String> contextToken;
+    private final Predicate<String> ownerToken;
 
     @Override
     public @Nullable J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
         J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
-        if (isStatement() && assignsProperty(a.getVariable())) {
-            return removeStatement();
+        if (isDeletableStatement() && assignsProperty(a.getVariable())) {
+            return deleteAndRecordRemoval();
         }
         return a;
     }
@@ -60,75 +61,81 @@ class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContext> {
     @Override
     public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
         J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-        if (isStatement() && m.getArguments().size() == 1 && setsProperty(m)) {
-            return removeStatement();
+        if (isDeletableStatement() && m.getArguments().size() == 1 && !(m.getArguments().get(0) instanceof J.Lambda) &&
+                setsProperty(m)) {
+            return deleteAndRecordRemoval();
         }
-        return removeIfEmptiedConfigurationBlock(m);
+        return deleteIfLeftEmptyByRemoval(m);
+    }
+
+    @Override
+    public @Nullable J visitReturn(J.Return retrn, ExecutionContext ctx) {
+        J.Return r = (J.Return) super.visitReturn(retrn, ctx);
+        if (retrn.getExpression() != null && r.getExpression() == null) {
+            return null;
+        }
+        return r;
     }
 
     private boolean setsProperty(J.MethodInvocation m) {
         if (m.getSelect() == null) {
             return (propertyName.equals(m.getSimpleName()) || setterName().equals(m.getSimpleName())) &&
-                    inConfigurationContext();
+                    isInsideOwnerBlock();
         }
         if ("set".equals(m.getSimpleName())) {
             return assignsProperty(m.getSelect());
         }
-        return setterName().equals(m.getSimpleName()) && namesContext(m.getSelect());
+        return setterName().equals(m.getSimpleName()) && namesOwner(m.getSelect());
     }
 
     private boolean assignsProperty(Expression variable) {
         if (variable instanceof J.Identifier) {
-            return propertyName.equals(((J.Identifier) variable).getSimpleName()) && inConfigurationContext();
+            return propertyName.equals(((J.Identifier) variable).getSimpleName()) && isInsideOwnerBlock();
         }
         if (variable instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) variable;
             return propertyName.equals(fieldAccess.getSimpleName()) &&
-                    (namesContext(fieldAccess.getTarget()) || inConfigurationContext());
+                    (namesOwner(fieldAccess.getTarget()) || isInsideOwnerBlock());
         }
         return false;
     }
 
-    private boolean namesContext(@Nullable Expression expression) {
+    private boolean namesOwner(@Nullable Expression expression) {
         if (expression instanceof J.Identifier) {
-            return contextToken.test(((J.Identifier) expression).getSimpleName());
+            return ownerToken.test(((J.Identifier) expression).getSimpleName());
         }
         if (expression instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) expression;
-            return contextToken.test(fieldAccess.getSimpleName()) || namesContext(fieldAccess.getTarget());
+            return ownerToken.test(fieldAccess.getSimpleName()) || namesOwner(fieldAccess.getTarget());
         }
         if (expression instanceof J.MethodInvocation) {
-            return describesContext((J.MethodInvocation) expression);
+            return identifiesOwner((J.MethodInvocation) expression);
         }
         return false;
     }
 
-    private boolean inConfigurationContext() {
+    private boolean isInsideOwnerBlock() {
         Iterator<Object> enclosing = getCursor().getParentTreeCursor()
                 .getPath(J.MethodInvocation.class::isInstance);
         while (enclosing.hasNext()) {
-            if (describesContext((J.MethodInvocation) enclosing.next())) {
+            if (identifiesOwner((J.MethodInvocation) enclosing.next())) {
                 return true;
             }
         }
         return false;
     }
 
-    /**
-     * Whether an invocation identifies the plugin or task owning the property, either by its own name, by its
-     * receiver, or by an argument naming the type or task as {@code withType(Pmd)} and {@code named("pmdMain")} do.
-     */
-    private boolean describesContext(J.MethodInvocation m) {
-        if (contextToken.test(m.getSimpleName()) || namesContext(m.getSelect())) {
+    private boolean identifiesOwner(J.MethodInvocation m) {
+        if (ownerToken.test(m.getSimpleName()) || namesOwner(m.getSelect())) {
             return true;
         }
         for (Expression argument : m.getArguments()) {
             if (argument instanceof J.Literal) {
                 Object value = ((J.Literal) argument).getValue();
-                if (value instanceof String && contextToken.test((String) value)) {
+                if (value instanceof String && ownerToken.test((String) value)) {
                     return true;
                 }
-            } else if (!(argument instanceof J.Lambda) && namesContext(unwrapClassLiteral(argument))) {
+            } else if (!(argument instanceof J.Lambda) && namesOwner(unwrapClassLiteral(argument))) {
                 return true;
             }
         }
@@ -146,49 +153,31 @@ class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContext> {
         return "set" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
     }
 
-    /**
-     * Whether this element can be deleted outright, which is true when it is one of the statements of a block or,
-     * as top level configuration in a build script is, one of the statements of the compilation unit. Groovy and
-     * Kotlin both wrap statement-position expressions in a transparent statement node, and Groovy additionally
-     * wraps the last statement of a closure in an implicit {@link J.Return}; both have to be looked through.
-     */
-    private boolean isStatement() {
+    private boolean isDeletableStatement() {
         Cursor parent = getCursor().getParentTreeCursor();
-        while (parent.getValue() instanceof G.ExpressionStatement ||
-                parent.getValue() instanceof K.ExpressionStatement ||
-                parent.getValue() instanceof K.StatementExpression ||
-                parent.getValue() instanceof J.Return) {
+        while (isTransparentStatementWrapper(parent.getValue())) {
             parent = parent.getParentTreeCursor();
         }
         return parent.getValue() instanceof J.Block || parent.getValue() instanceof JavaSourceFile;
     }
 
-    /**
-     * Removing the expression of an implicit return leaves a bare {@code return}, so drop the whole return.
-     */
-    @Override
-    public @Nullable J visitReturn(J.Return retrn, ExecutionContext ctx) {
-        J.Return r = (J.Return) super.visitReturn(retrn, ctx);
-        if (retrn.getExpression() != null && r.getExpression() == null) {
-            return null;
-        }
-        return r;
+    private static boolean isTransparentStatementWrapper(Object tree) {
+        return tree instanceof G.ExpressionStatement ||
+                tree instanceof K.ExpressionStatement ||
+                tree instanceof K.StatementExpression ||
+                tree instanceof J.Return;
     }
 
-    private @Nullable J removeStatement() {
-        Cursor parent = getCursor().getParentTreeCursor();
-        parent.putMessageOnFirstEnclosing(J.MethodInvocation.class, REMOVED_STATEMENT, true);
+    private @Nullable J deleteAndRecordRemoval() {
+        getCursor().getParentTreeCursor()
+                .putMessageOnFirstEnclosing(J.MethodInvocation.class, REMOVED_STATEMENT, true);
         return null;
     }
 
-    /**
-     * Deleting the last statement of a configuration block leaves behind an empty {@code pmd { }} that only existed
-     * to hold the removed property, so drop the block too. Blocks that were already empty are left alone, so the
-     * recipe never reports a change on a build that had nothing to migrate.
-     */
-    private @Nullable J removeIfEmptiedConfigurationBlock(J.MethodInvocation m) {
-        if (!Boolean.TRUE.equals(getCursor().getMessage(REMOVED_STATEMENT)) || !isStatement() ||
-                m.getArguments().isEmpty() || !describesContext(m)) {
+    private @Nullable J deleteIfLeftEmptyByRemoval(J.MethodInvocation m) {
+        if (!Boolean.TRUE.equals(getCursor().getMessage(REMOVED_STATEMENT)) || !isDeletableStatement() ||
+                m.getArguments().isEmpty() || TASK_CREATING_METHODS.contains(m.getSimpleName()) ||
+                !identifiesOwner(m)) {
             return m;
         }
         Expression last = m.getArguments().get(m.getArguments().size() - 1);

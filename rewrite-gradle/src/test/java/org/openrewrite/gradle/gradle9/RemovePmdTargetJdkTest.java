@@ -216,6 +216,38 @@ class RemovePmdTargetJdkTest implements RewriteTest {
     }
 
     @Test
+    void keepsTaskRegistrationLeftEmpty() {
+        rewriteRun(
+          buildGradle(
+            """
+              tasks.register('pmdCustom', Pmd) {
+                  targetJdk = TargetJdk.VERSION_1_7
+              }
+              """,
+            """
+              tasks.register('pmdCustom', Pmd) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotTouchClosureNamedLikeTheProperty() {
+        rewriteRun(
+          buildGradle(
+            """
+              pmd {
+                  targetJdk {
+                      println 'hi'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotTouchUnrelatedTargetJdk() {
         rewriteRun(
           buildGradle(

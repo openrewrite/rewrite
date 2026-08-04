@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
@@ -49,19 +50,21 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        // The Map overloads only exist in the Groovy DSL, so GroovyVisitor's inability to visit Kotlin scripts is the
-        // scoping this recipe wants.
+        // The Map overloads only exist in the Groovy DSL, so GroovyVisitor skipping Kotlin scripts is the scoping this wants.
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+
+            private @Nullable GradleParser parser;
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!"flatDir".equals(m.getSimpleName()) && !"mavenCentral".equals(m.getSimpleName())) {
                     return m;
                 }
-                if (!inRepositoriesBlock()) {
+                if (!isInsideRepositoriesBlock()) {
                     return m;
                 }
-                List<G.MapEntry> entries = mapNotation(m.getArguments());
+                List<G.MapEntry> entries = mapNotationEntries(m.getArguments());
                 if (entries == null) {
                     return m;
                 }
@@ -76,7 +79,7 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                 return buildActionInvocation(m, configuration, ctx);
             }
 
-            private boolean inRepositoriesBlock() {
+            private boolean isInsideRepositoriesBlock() {
                 for (Iterator<Object> path = getCursor().getPath(J.MethodInvocation.class::isInstance); path.hasNext(); ) {
                     if ("repositories".equals(((J.MethodInvocation) path.next()).getSimpleName())) {
                         return true;
@@ -85,7 +88,7 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                 return false;
             }
 
-            private @Nullable List<G.MapEntry> mapNotation(List<Expression> arguments) {
+            private @Nullable List<G.MapEntry> mapNotationEntries(List<Expression> arguments) {
                 if (arguments.isEmpty()) {
                     return null;
                 }
@@ -105,10 +108,10 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
             private @Nullable String toConfigurationStatement(String repository, G.MapEntry entry) {
                 String key = keyName(entry);
                 if ("name".equals(key)) {
-                    return "name = " + print(entry.getValue());
+                    return "name = " + sourceOf(entry.getValue());
                 }
                 if ("dirs".equals(key) && "flatDir".equals(repository)) {
-                    return "dirs " + dirsArguments(entry.getValue());
+                    return "dirs " + spreadListIntoVarargs(entry.getValue());
                 }
                 return null;
             }
@@ -123,50 +126,41 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                 return null;
             }
 
-            /**
-             * {@code dirs} takes varargs on the repository, so a list of directories becomes an argument list rather
-             * than a single list argument.
-             */
-            private String dirsArguments(Expression value) {
+            private String spreadListIntoVarargs(Expression value) {
                 if (value instanceof G.ListLiteral) {
                     StringJoiner arguments = new StringJoiner(", ");
                     for (Expression element : ((G.ListLiteral) value).getElements()) {
-                        arguments.add(print(element));
+                        arguments.add(sourceOf(element));
                     }
                     return arguments.toString();
                 }
-                return print(value);
+                return sourceOf(value);
             }
 
-            private String print(Expression expression) {
+            private String sourceOf(Expression expression) {
                 return expression.printTrimmed(getCursor());
             }
 
             private J buildActionInvocation(J.MethodInvocation original, List<String> configuration, ExecutionContext ctx) {
-                String indent = indentOf();
+                String indent = indentOfEnclosingLine();
                 StringBuilder snippet = new StringBuilder(original.getSimpleName()).append(" {\n");
                 for (String statement : configuration) {
                     snippet.append(indent).append("    ").append(statement).append('\n');
                 }
                 snippet.append(indent).append("}\n");
 
-                G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
-                        .parse(ctx, snippet.toString())
-                        .findFirst()
-                        .orElse(null);
-                if (parsed == null || parsed.getStatements().isEmpty()) {
+                if (parser == null) {
+                    parser = GradleParser.builder().build();
+                }
+                SourceFile parsed = parser.parse(ctx, snippet.toString()).findFirst().orElse(null);
+                if (!(parsed instanceof G.CompilationUnit) || ((G.CompilationUnit) parsed).getStatements().isEmpty()) {
                     return original;
                 }
-                Statement replacement = parsed.getStatements().get(0);
+                Statement replacement = ((G.CompilationUnit) parsed).getStatements().get(0);
                 return replacement.withPrefix(original.getPrefix());
             }
 
-            /**
-             * The indentation the replacement's body and closing brace have to line up with. The whitespace is not
-             * necessarily on the invocation itself: Groovy wraps the last statement of a closure in an implicit
-             * return, which is then what carries the line break and indentation.
-             */
-            private String indentOf() {
+            private String indentOfEnclosingLine() {
                 for (Iterator<Object> path = getCursor().getPath(); path.hasNext(); ) {
                     Object value = path.next();
                     if (value instanceof J.Block || value instanceof G.CompilationUnit) {

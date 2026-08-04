@@ -111,6 +111,23 @@ class RemoveExitEnvironmentVarTest implements RewriteTest {
     }
 
     @Test
+    void keepsTaskRegistrationLeftEmpty() {
+        rewriteRun(
+          buildGradle(
+            """
+              tasks.register('adminStartScripts', CreateStartScripts) {
+                  exitEnvironmentVar = 'MY_APP_EXIT_CONST'
+              }
+              """,
+            """
+              tasks.register('adminStartScripts', CreateStartScripts) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void setterInvocation() {
         rewriteRun(
           buildGradle(
