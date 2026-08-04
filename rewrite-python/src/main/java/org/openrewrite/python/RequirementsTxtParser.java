@@ -21,6 +21,7 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -203,32 +204,13 @@ public class RequirementsTxtParser implements Parser {
             return resolved;
         }
 
-        // Pass 1: build name→entry map
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(resolved.size());
         for (ResolvedDependency r : resolved) {
-            byNormalizedName.put(PythonResolutionResult.normalizeName(r.getName()), r);
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    r.getName(), r.getVersion(), r.getSource(),
+                    readRequiresDist(sitePackages, r.getName(), r.getVersion())));
         }
-
-        // Pass 2: read METADATA for each package, link dependencies
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency r : resolved) {
-            List<String> requiredNames = readRequiresDist(sitePackages, r.getName(), r.getVersion());
-            if (requiredNames.isEmpty()) {
-                linked.add(r);
-                continue;
-            }
-
-            List<ResolvedDependency> deps = new ArrayList<>();
-            for (String reqName : requiredNames) {
-                ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(reqName));
-                if (dep != null) {
-                    deps.add(dep);
-                }
-            }
-            linked.add(r.withDependencies(deps.isEmpty() ? null : deps));
-        }
-
-        return linked;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 
     private static @Nullable Path findSitePackages(Path workspace) {

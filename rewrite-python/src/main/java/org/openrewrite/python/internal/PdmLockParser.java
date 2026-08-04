@@ -30,9 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Extracts resolved-dependency information from pdm.lock for overlay onto the
@@ -64,44 +62,22 @@ public class PdmLockParser {
             return Collections.emptyList();
         }
 
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
-        Map<String, List<String>> edges = new LinkedHashMap<>();
-
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(lock.getPackages().size());
         for (PdmLockPackage pkg : lock.getPackages()) {
             String source = pkg.getVcsUrl() != null ? pkg.getVcsUrl() :
                     pkg.getUrl() != null ? pkg.getUrl() : pkg.getPath();
-            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(), source, null);
-            resolved.add(entry);
-            byName.putIfAbsent(PythonResolutionResult.normalizeName(pkg.getName()), entry);
+            List<String> depNames = new ArrayList<>();
             if (pkg.getDependencies() != null) {
-                List<String> names = new ArrayList<>();
                 for (String dep : pkg.getDependencies()) {
                     Pep508Requirement req = Pep508Requirement.parse(dep);
                     if (req != null) {
-                        names.add(req.getName());
+                        depNames.add(req.getName());
                     }
                 }
-                edges.putIfAbsent(PythonResolutionResult.normalizeName(pkg.getName()), names);
             }
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    pkg.getName(), pkg.getVersion(), source, depNames));
         }
-
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency entry : resolved) {
-            List<String> names = edges.get(PythonResolutionResult.normalizeName(entry.getName()));
-            if (names == null) {
-                linked.add(entry);
-                continue;
-            }
-            List<ResolvedDependency> deps = new ArrayList<>();
-            for (String name : names) {
-                ResolvedDependency dep = byName.get(PythonResolutionResult.normalizeName(name));
-                if (dep != null) {
-                    deps.add(dep);
-                }
-            }
-            linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
-        }
-        return linked;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 }

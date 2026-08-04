@@ -15,14 +15,19 @@
  */
 package org.openrewrite.python.internal;
 
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -86,5 +91,64 @@ public final class PythonResolutionLinker {
             result.put(entry.getKey(), link(entry.getValue(), resolved));
         }
         return result;
+    }
+
+    /**
+     * Flat per-package data extracted from a lock file or installed-package
+     * metadata, before graph linking.
+     */
+    @Value
+    public static class UnlinkedPackage {
+        String name;
+        @Nullable String version;
+        @Nullable String source;
+        List<String> dependencyNames;
+    }
+
+    /**
+     * Builds the linked graph from flat package data, upholding the aliasing contract
+     * documented on {@link ResolvedDependency}. Dependency names that resolve to no
+     * package are dropped, leaving a null dependencies list when none resolve. Where the
+     * same normalized name appears more than once, dependents link to the first occurrence.
+     */
+    public static List<ResolvedDependency> buildGraph(List<UnlinkedPackage> packages) {
+        List<String> normalizedNames = new ArrayList<>(packages.size());
+        List<List<String>> normalizedDepNames = new ArrayList<>(packages.size());
+        Set<String> knownNames = new HashSet<>();
+        for (UnlinkedPackage pkg : packages) {
+            String normalized = PythonResolutionResult.normalizeName(pkg.getName());
+            normalizedNames.add(normalized);
+            knownNames.add(normalized);
+            List<String> depNames = new ArrayList<>(pkg.getDependencyNames().size());
+            for (String depName : pkg.getDependencyNames()) {
+                depNames.add(PythonResolutionResult.normalizeName(depName));
+            }
+            normalizedDepNames.add(depNames);
+        }
+
+        List<ResolvedDependency> resolved = new ArrayList<>(packages.size());
+        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
+        for (int i = 0; i < packages.size(); i++) {
+            UnlinkedPackage pkg = packages.get(i);
+            boolean anyResolvable = normalizedDepNames.get(i).stream().anyMatch(knownNames::contains);
+            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(),
+                    pkg.getSource(), anyResolvable ? new ArrayList<>() : null);
+            resolved.add(entry);
+            byName.putIfAbsent(normalizedNames.get(i), entry);
+        }
+
+        for (int i = 0; i < resolved.size(); i++) {
+            ResolvedDependency entry = resolved.get(i);
+            if (entry.getDependencies() == null) {
+                continue;
+            }
+            for (String depName : normalizedDepNames.get(i)) {
+                ResolvedDependency child = byName.get(depName);
+                if (child != null) {
+                    entry.getDependencies().add(child);
+                }
+            }
+        }
+        return resolved;
     }
 }
