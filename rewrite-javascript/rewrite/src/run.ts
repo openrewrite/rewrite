@@ -49,12 +49,12 @@ export class Result {
 type RecipeLists = WeakMap<Recipe, Recipe[]>;
 
 async function subRecipes(recipe: Recipe, recipeLists: RecipeLists): Promise<Recipe[]> {
-    let subRecipes = recipeLists.get(recipe);
-    if (subRecipes === undefined) {
-        subRecipes = await recipe.recipeList();
-        recipeLists.set(recipe, subRecipes);
+    let resolved = recipeLists.get(recipe);
+    if (resolved === undefined) {
+        resolved = await recipe.recipeList();
+        recipeLists.set(recipe, resolved);
     }
-    return subRecipes;
+    return resolved;
 }
 
 async function hasScanningRecipe(recipe: Recipe, recipeLists: RecipeLists): Promise<boolean> {
@@ -115,17 +115,16 @@ export async function* scheduleRunStreaming(
     const cursor = rootCursor();
     const recipeLists: RecipeLists = new WeakMap();
     const isScanning = await hasScanningRecipe(recipe, recipeLists);
+    const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
 
     if (isScanning) {
         // For scanning recipes, pull files from the generator and scan them immediately.
         // Files are stored for the later edit phase.
         const files: SourceFile[] = [];
-        const iterable = Array.isArray(before) ? before : before;
-        const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
 
         // Phase 1: Pull files from generator and scan each immediately
         let scanCount = 0;
-        for await (const b of iterable) {
+        for await (const b of before) {
             files.push(b);
             scanCount++;
             onProgress?.('scanning', scanCount, knownTotal, b.sourcePath);
@@ -172,10 +171,8 @@ export async function* scheduleRunStreaming(
         }
     } else {
         // For non-scanning recipes, process files immediately as they come in
-        const iterable = Array.isArray(before) ? before : before;
-        const knownTotal = Array.isArray(before) ? before.length : -1; // -1 = unknown total
         let processCount = 0;
-        for await (const b of iterable) {
+        for await (const b of before) {
             processCount++;
             onProgress?.('processing', processCount, knownTotal, b.sourcePath);
             const editedB = await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
