@@ -40,28 +40,47 @@ export class Result {
     }
 }
 
-async function hasScanningRecipe(recipe: Recipe): Promise<boolean> {
+/**
+ * Recipes commonly instantiate their sub-recipes inside `recipeList()`, so calling it more
+ * than once yields different instances. A scanning sub-recipe would then hold a different
+ * accumulator in every phase and for every source file. Resolving each recipe list once per
+ * run keeps sub-recipe identity, and therefore accumulator identity, stable.
+ */
+type RecipeLists = WeakMap<Recipe, Recipe[]>;
+
+async function subRecipes(recipe: Recipe, recipeLists: RecipeLists): Promise<Recipe[]> {
+    let subRecipes = recipeLists.get(recipe);
+    if (subRecipes === undefined) {
+        subRecipes = await recipe.recipeList();
+        recipeLists.set(recipe, subRecipes);
+    }
+    return subRecipes;
+}
+
+async function hasScanningRecipe(recipe: Recipe, recipeLists: RecipeLists): Promise<boolean> {
     if (recipe instanceof ScanningRecipe) return true;
-    for (const item of (await recipe.recipeList())) {
-        if (await hasScanningRecipe(item)) return true;
+    for (const item of (await subRecipes(recipe, recipeLists))) {
+        if (await hasScanningRecipe(item, recipeLists)) return true;
     }
     return false;
 }
 
-async function recurseRecipeList<T>(recipe: Recipe, initial: T, fn: (recipe: Recipe, t: T) => Promise<T | undefined>): Promise<T | undefined> {
+async function recurseRecipeList<T>(recipe: Recipe, initial: T, recipeLists: RecipeLists, fn: (recipe: Recipe, t: T) => Promise<T | undefined>): Promise<T | undefined> {
     let t: T | undefined = await fn(recipe, initial);
-    for (const subRecipe of await recipe.recipeList()) {
+    for (const subRecipe of await subRecipes(recipe, recipeLists)) {
         if (t === undefined) {
             return undefined;
         }
-        t = await recurseRecipeList(subRecipe, t, fn);
+        t = await recurseRecipeList(subRecipe, t, recipeLists, fn);
     }
     return t;
 }
 
-async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext): Promise<void> {
+async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext, recipeLists: RecipeLists): Promise<void> {
     await recipe.onComplete(ctx);
-    (await recipe.recipeList()).forEach(r => recursiveOnComplete(r, ctx));
+    for (const subRecipe of await subRecipes(recipe, recipeLists)) {
+        await recursiveOnComplete(subRecipe, ctx, recipeLists);
+    }
 }
 
 export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: ExecutionContext): Promise<RecipeRun> {
@@ -94,7 +113,8 @@ export async function* scheduleRunStreaming(
     onProgress?: ProgressCallback
 ): AsyncGenerator<Result, void, undefined> {
     const cursor = rootCursor();
-    const isScanning = await hasScanningRecipe(recipe);
+    const recipeLists: RecipeLists = new WeakMap();
+    const isScanning = await hasScanningRecipe(recipe, recipeLists);
 
     if (isScanning) {
         // For scanning recipes, pull files from the generator and scan them immediately.
@@ -110,18 +130,22 @@ export async function* scheduleRunStreaming(
             scanCount++;
             onProgress?.('scanning', scanCount, knownTotal, b.sourcePath);
 
-            // Scan this file immediately
-            await recurseRecipeList(recipe, b, async (recipe, b2) => {
+            // Scan this file immediately. Scanning must not modify the tree, so the visit
+            // result is discarded and the original file is passed on to the next recipe in
+            // the list. Returning `undefined` here would abort traversal of the remainder
+            // of the recipe list, leaving nested scanners unrun.
+            await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
-                    return (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor)
+                    await (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor);
                 }
+                return b2;
             });
         }
 
         const totalFiles = files.length;
 
         // Phase 2: Collect generated files
-        const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
+        const generated = (await recurseRecipeList(recipe, [] as SourceFile[], recipeLists, async (recipe, generated) => {
             if (recipe instanceof ScanningRecipe) {
                 generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
             }
@@ -132,7 +156,7 @@ export async function* scheduleRunStreaming(
         for (let i = 0; i < files.length; i++) {
             const b = files[i];
             onProgress?.('processing', i + 1, totalFiles, b.sourcePath);
-            const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            const editedB = await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
             // Always yield a result so the caller knows when each file is processed
             yield new Result(b, editedB !== b ? editedB : b);
             // Clear array entry to allow GC to free memory for this file
@@ -141,7 +165,7 @@ export async function* scheduleRunStreaming(
 
         // Phase 4: Edit generated files and yield results
         for (const g of generated) {
-            const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
+            const editedG = await recurseRecipeList(recipe, g, recipeLists, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx, cursor));
             if (editedG) {
                 yield new Result(undefined, editedG);
             }
@@ -154,11 +178,11 @@ export async function* scheduleRunStreaming(
         for await (const b of iterable) {
             processCount++;
             onProgress?.('processing', processCount, knownTotal, b.sourcePath);
-            const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
+            const editedB = await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx, cursor));
             // Always yield a result so the caller knows when each file is processed
             yield new Result(b, editedB !== b ? editedB : b);
         }
     }
 
-    await recursiveOnComplete(recipe, ctx);
+    await recursiveOnComplete(recipe, ctx, recipeLists);
 }
