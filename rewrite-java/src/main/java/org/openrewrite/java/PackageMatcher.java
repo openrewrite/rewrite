@@ -39,12 +39,26 @@ public class PackageMatcher implements Reference.Matcher {
     @Override
     public boolean matchesReference(Reference reference) {
         if (reference.getKind() == Reference.Kind.TYPE || reference.getKind() == Reference.Kind.PACKAGE) {
-            String recursivePackageNamePrefix = targetPackage + ".";
-            if (reference.getValue().equals(targetPackage) || recursive && reference.getValue().startsWith(recursivePackageNamePrefix)) {
-                return true;
-            }
+            return matchesValue(reference.getValue());
         }
         return false;
+    }
+
+    /**
+     * Matches the target package itself and, when non-recursive, types declared directly in it.
+     * Subpackages and the types in them match only when recursive.
+     */
+    boolean matchesValue(String value) {
+        if (targetPackage == null) {
+            return false;
+        }
+        if (value.equals(targetPackage)) {
+            return true;
+        }
+        if (!value.startsWith(targetPackage + ".") || value.length() <= targetPackage.length() + 1) {
+            return false;
+        }
+        return recursive || Character.isUpperCase(value.charAt(targetPackage.length() + 1));
     }
 
     @Override
