@@ -22,7 +22,6 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.semver.LatestRelease;
@@ -38,20 +37,9 @@ import java.util.Map;
 
 /**
  * Parses an npm {@code package-lock.json} v3-format string into a fully linked
- * graph of {@link ResolvedDependency} instances: each nested {@link Dependency}
- * request carries a {@code resolved} pointer, so the graph is navigable to
- * arbitrary depth via {@link Dependency#getResolved()}. The Bun, yarn, and pnpm
- * lock formats are reduced to the same npm v3 shape upstream by their
- * respective adapters, so this parser handles all PMs.
- * <p>
- * Linking mirrors the TypeScript-side {@code parseResolutions} two-pass
- * approach: pass one creates one {@link ResolvedDependency} per distinct
- * {@code name@version} and indexes it by lock-file path; pass two populates the
- * dependency lists, resolving each request Node-style (nearest
- * {@code node_modules} walking up from the dependent's path) with a semver
- * fallback for paths the walk cannot reach. The lists are filled in place after
- * construction, per the linkage contract on {@link ResolvedDependency};
- * instances never escape this class until fully linked.
+ * graph of {@link ResolvedDependency} instances, navigable to arbitrary depth.
+ * The Bun, yarn, and pnpm lock formats are reduced to the same npm v3 shape
+ * upstream by their respective adapters, so this parser handles all PMs.
  */
 public final class LockFileParser {
 
@@ -74,20 +62,17 @@ public final class LockFileParser {
 
         /**
          * Resolve a dependency request made from the project root (a declared
-         * dependency in package.json), using the same semantics as the
-         * transitive links inside {@link #getAll()}.
+         * dependency in package.json), with the same semantics as the transitive
+         * links inside the graph.
          */
         public @Nullable ResolvedDependency resolve(String name, String versionConstraint) {
             return resolve(name, versionConstraint, "");
         }
 
-        /**
-         * Resolves a dependency name from a given path context using Node.js-style
-         * resolution: nearest {@code node_modules} first, then walking up to parent
-         * directories. Falls back to semver matching among all versions of the name
-         * for paths the walk cannot reach (the yarn/pnpm adapters park duplicate
-         * versions under synthetic paths that are not on any walk-up chain).
-         */
+        // Node-style resolution: nearest node_modules first, then walking up. Falls back
+        // to semver matching among all versions of the name for paths the walk cannot
+        // reach, since the yarn/pnpm adapters park duplicate versions under synthetic
+        // paths that are not on any walk-up chain.
         @Nullable ResolvedDependency resolve(String name, String versionConstraint, String contextPath) {
             String currentPath = contextPath;
             while (true) {
@@ -229,10 +214,8 @@ public final class LockFileParser {
                 && pathKey.indexOf("/node_modules/", "node_modules/".length()) < 0;
     }
 
-    /**
-     * A mutable list to be populated in pass 2, or null when the entry does not
-     * declare this scope (the model uses null, not an empty list, for absent scopes).
-     */
+    // A mutable list to be populated in pass 2, or null when the entry does not declare
+    // this scope (the model uses null, not an empty list, for absent scopes).
     private static @Nullable List<Dependency> emptyListIfPresent(@Nullable JsonNode node) {
         if (node == null || !node.isObject() || node.isEmpty()) {
             return null;

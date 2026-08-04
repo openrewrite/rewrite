@@ -717,9 +717,8 @@ public class PackageJsonHelper {
 
     /**
      * Apply a recipe-specific edit to a package.json, refresh its declared-deps
-     * marker, and (when the marker carries a {@link NodeResolutionResult#getPackageManager()
-     * package manager} and a lock was captured at scan time) regenerate the lock
-     * file content via {@link LockFileRegeneration}.
+     * marker, and (when the marker carries a package manager and a lock was captured
+     * at scan time) regenerate the lock file content via {@link LockFileRegeneration}.
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
