@@ -320,6 +320,16 @@ class TestExportedTypes:
             f.write(FIXTURE)
         return pkg
 
+    def _enumerate(self, root, artifact) -> dict:
+        client = TyTypesClient()
+        assert client.initialize(str(root))
+        by_fqn: dict = {}
+        try:
+            _enumerate_artifact(str(artifact), str(root), client, by_fqn, set())
+        finally:
+            client.shutdown()
+        return by_fqn
+
     def test_enumerates_own_types_with_methods(self):
         root = tempfile.mkdtemp(prefix="rewrite-exported-types-")
         try:
@@ -342,6 +352,98 @@ class TestExportedTypes:
             assert {"find", "save"} <= repo_methods
         finally:
             shutil.rmtree(root, ignore_errors=True)
+
+    def test_enumerates_module_level_functions_and_constants(self, tmp_path):
+        # A dependency's public API includes module-level functions (click.echo)
+        # and constants (os.sep), not just classes. Parse-time attribution gives
+        # such a reference the *module* as its declaring type (a JavaType.Class
+        # named after the module), so the enumeration must define that module
+        # type — with the function as a method and the constant as a member —
+        # for the consumer's defined-FQN set to cover it.
+        pkg = tmp_path / "toplib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text(
+            'GREETING = "hello"\n'
+            "TIMEOUT: float\n\n"
+            "def shout(text: str) -> str:\n"
+            "    return text.upper()\n\n"
+            "class Thing:\n"
+            "    def run(self) -> None:\n        ...\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        assert "toplib.Thing" in by_fqn
+
+        module_type = by_fqn.get("toplib")
+        assert isinstance(module_type, JavaType.Class), \
+            "module-level symbols lost: no type defined for module 'toplib'"
+        assert "shout" in {m._name for m in (module_type._methods or [])}
+        member_names = {v._name for v in (module_type._members or [])}
+        assert "GREETING" in member_names
+        assert "TIMEOUT" in member_names  # annotation-only, stub-style declaration
+        # The class stays under its own FQN, not on the module type.
+        assert "Thing" not in {m._name for m in (module_type._methods or [])}
+
+    def test_module_type_includes_reexports_under_binding_names(self, tmp_path):
+        # click-style layout: the API is defined in a submodule and re-exported by
+        # the package __init__. Parse-time attribution declares `relib.echo(...)`
+        # under the *package* module type, so the enumeration must surface the
+        # re-exported bindings there (under the imported-as name), while a
+        # re-exported class keeps its defining FQN.
+        pkg = tmp_path / "relib"
+        pkg.mkdir()
+        (pkg / "utils.py").write_text(
+            'SEP = "/"\n\n'
+            "def echo(message: str) -> None:\n"
+            "    print(message)\n\n"
+            "class Widget:\n"
+            "    def draw(self) -> None:\n        ...\n")
+        (pkg / "__init__.py").write_text(
+            "from relib.utils import echo, SEP, Widget\n"
+            "from relib.utils import echo as shout\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        package_type = by_fqn.get("relib")
+        assert isinstance(package_type, JavaType.Class)
+        method_names = {m._name for m in (package_type._methods or [])}
+        assert "echo" in method_names
+        assert "shout" in method_names  # aliased re-export binds under its alias
+        assert "Widget" not in method_names
+        assert "SEP" in {v._name for v in (package_type._members or [])}
+
+        # The defining submodule gets its own module type; the class its own FQN.
+        utils_type = by_fqn.get("relib.utils")
+        assert isinstance(utils_type, JavaType.Class)
+        assert "echo" in {m._name for m in (utils_type._methods or [])}
+        assert "relib.utils.Widget" in by_fqn
+
+    def test_module_type_respects_public_api_convention(self, tmp_path):
+        # Without __all__, underscore names are private; with __all__, it is the
+        # public surface — even for names the underscore rule would hide.
+        pkg = tmp_path / "conv"
+        pkg.mkdir()
+        (pkg / "__init__.py").touch()
+        (pkg / "noall.py").write_text(
+            "VISIBLE = 1\n_HIDDEN = 2\n\n"
+            "def visible() -> None:\n    ...\n\n"
+            "def _hidden() -> None:\n    ...\n")
+        (pkg / "withall.py").write_text(
+            '__all__ = ["_special"]\n\n'
+            "def _special() -> None:\n    ...\n\n"
+            "def other() -> None:\n    ...\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        noall = by_fqn.get("conv.noall")
+        assert isinstance(noall, JavaType.Class)
+        assert {m._name for m in (noall._methods or [])} == {"visible"}
+        assert {v._name for v in (noall._members or [])} == {"VISIBLE"}
+
+        withall = by_fqn.get("conv.withall")
+        assert isinstance(withall, JavaType.Class)
+        assert {m._name for m in (withall._methods or [])} == {"_special"}
+        assert not withall._members  # __all__ itself is not public API
 
     def test_own_module_filter_excludes_sibling(self):
         # "clickhouse" shares the "click" prefix but not the "click." boundary,
