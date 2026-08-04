@@ -106,13 +106,10 @@ public final class PythonResolutionLinker {
     }
 
     /**
-     * Builds the linked {@link ResolvedDependency} graph from flat package data,
-     * per the linkage contract on {@link ResolvedDependency#getDependencies()}:
-     * each entry's dependencies list references the graph's own instances, filled
-     * in place after construction, and is null when none of the entry's dependency
-     * names resolve to a package in {@code packages}. When the same normalized name
-     * appears more than once (e.g. per-target lock entries), dependents link to the
-     * first occurrence.
+     * Builds the linked graph from flat package data, upholding the aliasing contract
+     * documented on {@link ResolvedDependency}. Dependency names that resolve to no
+     * package are dropped, leaving a null dependencies list when none resolve. Where the
+     * same normalized name appears more than once, dependents link to the first occurrence.
      */
     public static List<ResolvedDependency> buildGraph(List<UnlinkedPackage> packages) {
         List<String> normalizedNames = new ArrayList<>(packages.size());

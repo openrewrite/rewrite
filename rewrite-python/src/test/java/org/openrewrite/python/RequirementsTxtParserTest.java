@@ -261,8 +261,6 @@ class RequirementsTxtParserTest {
         ResolvedDependency a = linked.get(0);
         ResolvedDependency b = linked.get(1);
         ResolvedDependency c = linked.get(2);
-        // Children must be the graph's own instances, so navigation via
-        // getDependencies() works at arbitrary depth.
         assertThat(a.getDependencies().get(0)).isSameAs(b);
         assertThat(b.getDependencies().get(0)).isSameAs(c);
         assertThat(a.getDependencies().get(0).getDependencies().get(0)).isSameAs(c);

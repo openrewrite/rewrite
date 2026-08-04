@@ -21,6 +21,7 @@ import org.openrewrite.python.internal.pdmlock.PdmLockFormatException;
 import org.openrewrite.python.internal.pdmlock.PdmLockPackage;
 import org.openrewrite.python.internal.pdmlock.PdmLockReader;
 import org.openrewrite.python.internal.pep508.Pep508Requirement;
+import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.io.IOException;

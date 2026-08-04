@@ -22,6 +22,7 @@ import org.openrewrite.python.internal.poetrylock.PoetryLockPackage;
 import org.openrewrite.python.internal.poetrylock.PoetryLockReader;
 import org.openrewrite.python.internal.poetrylock.PoetryLockSource;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.io.IOException;

@@ -306,11 +306,13 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     }
 
     /**
-     * A resolved (locked) dependency from uv.lock.
+     * A resolved (locked) dependency from a lock file.
      * <p>
      * Python resolution is flat: each package name appears exactly once with one version.
-     * The {@code dependencies} list links directly to other {@code ResolvedDependency}
-     * instances (self-referential, like Maven's model), enabling graph traversal.
+     * The {@code dependencies} list references other {@code ResolvedDependency} instances of
+     * the same graph, so the graph is navigable to arbitrary depth and may contain cycles.
+     * Producers uphold this by filling each instance's list in place after construction
+     * rather than replacing instances with copies.
      */
     @Value
     @With
@@ -325,12 +327,8 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
         @Nullable String source;
 
         /**
-         * Direct dependencies of this resolved package. Each entry is a reference
-         * to another {@code ResolvedDependency} in the flat resolution list, so the
-         * graph is navigable to arbitrary depth and may contain cycles. Anyone
-         * producing or modifying the graph must preserve this instance sharing —
-         * fill lists in place after construction rather than replacing entries with
-         * copies. Null when the package has no dependencies in the lock file.
+         * Direct dependencies of this resolved package. Null when the package has no
+         * dependencies in the lock file.
          */
         @Nullable List<ResolvedDependency> dependencies;
 
