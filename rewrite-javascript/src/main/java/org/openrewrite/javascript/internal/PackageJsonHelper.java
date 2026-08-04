@@ -282,35 +282,15 @@ public class PackageJsonHelper {
         }
         LockFileParser.ParseResult parsed = LockFileParser.parse(npmV3);
 
-        // Relink declared deps.
-        List<NodeResolutionResult.Dependency> deps =
-                relink(marker.getDependencies(), parsed.getTopLevel());
-        List<NodeResolutionResult.Dependency> devDeps =
-                relink(marker.getDevDependencies(), parsed.getTopLevel());
-        List<NodeResolutionResult.Dependency> peerDeps =
-                relink(marker.getPeerDependencies(), parsed.getTopLevel());
-        List<NodeResolutionResult.Dependency> optionalDeps =
-                relink(marker.getOptionalDependencies(), parsed.getTopLevel());
-        List<NodeResolutionResult.Dependency> bundledDeps =
-                relink(marker.getBundledDependencies(), parsed.getTopLevel());
-
-        // Relink transitive deps inside each ResolvedDependency.
-        List<NodeResolutionResult.ResolvedDependency> all = new ArrayList<>();
-        for (NodeResolutionResult.ResolvedDependency r : parsed.getAll()) {
-            all.add(r
-                    .withDependencies(relink(r.getDependencies(), parsed.getTopLevel()))
-                    .withDevDependencies(relink(r.getDevDependencies(), parsed.getTopLevel()))
-                    .withPeerDependencies(relink(r.getPeerDependencies(), parsed.getTopLevel()))
-                    .withOptionalDependencies(relink(r.getOptionalDependencies(), parsed.getTopLevel())));
-        }
-
+        // Relink declared deps into the parsed graph; the graph itself is
+        // already fully linked (transitive deps included) by LockFileParser.
         NodeResolutionResult updated = marker
-                .withDependencies(deps)
-                .withDevDependencies(devDeps)
-                .withPeerDependencies(peerDeps)
-                .withOptionalDependencies(optionalDeps)
-                .withBundledDependencies(bundledDeps)
-                .withResolvedDependencies(all);
+                .withDependencies(relink(marker.getDependencies(), parsed))
+                .withDevDependencies(relink(marker.getDevDependencies(), parsed))
+                .withPeerDependencies(relink(marker.getPeerDependencies(), parsed))
+                .withOptionalDependencies(relink(marker.getOptionalDependencies(), parsed))
+                .withBundledDependencies(relink(marker.getBundledDependencies(), parsed))
+                .withResolvedDependencies(parsed.getAll());
         return pkg.withMarkers(pkg.getMarkers().setByType(updated));
     }
 
@@ -329,13 +309,13 @@ public class PackageJsonHelper {
 
     private static @Nullable List<NodeResolutionResult.Dependency> relink(
             @Nullable List<NodeResolutionResult.Dependency> deps,
-            Map<String, NodeResolutionResult.ResolvedDependency> topLevel) {
+            LockFileParser.ParseResult parsed) {
         if (deps == null) {
             return null;
         }
         List<NodeResolutionResult.Dependency> out = new ArrayList<>(deps.size());
         for (NodeResolutionResult.Dependency d : deps) {
-            out.add(d.withResolved(topLevel.get(d.getName())));
+            out.add(d.withResolved(parsed.resolve(d.getName(), d.getVersionConstraint())));
         }
         return out;
     }
@@ -737,9 +717,8 @@ public class PackageJsonHelper {
 
     /**
      * Apply a recipe-specific edit to a package.json, refresh its declared-deps
-     * marker, and (when the marker carries a {@link NodeResolutionResult#getPackageManager()
-     * package manager} and a lock was captured at scan time) regenerate the lock
-     * file content via {@link LockFileRegeneration}.
+     * marker, and (when the marker carries a package manager and a lock was captured
+     * at scan time) regenerate the lock file content via {@link LockFileRegeneration}.
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
