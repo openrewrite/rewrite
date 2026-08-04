@@ -86,22 +86,24 @@ public final class PythonResolutionLinker {
     public static PythonResolutionResult updateResolvedVersions(PythonResolutionResult marker,
                                                                 Map<String, String> versionUpdates) {
         List<ResolvedDependency> resolved = marker.getResolvedDependencies();
-        boolean changed = resolved.stream().anyMatch(dep -> {
-            String newVersion = versionUpdates.get(PythonResolutionResult.normalizeName(dep.getName()));
-            return newVersion != null && !newVersion.equals(dep.getVersion());
-        });
-        if (!changed) {
+        if (resolved.stream().noneMatch(dep -> updatedVersion(dep, versionUpdates) != null)) {
             return marker;
         }
         List<UnlinkedPackage> packages = new ArrayList<>(resolved.size());
         for (ResolvedDependency dep : resolved) {
-            String newVersion = versionUpdates.get(PythonResolutionResult.normalizeName(dep.getName()));
+            String newVersion = updatedVersion(dep, versionUpdates);
             List<String> depNames = dep.getDependencies() == null ? emptyList() :
                     dep.getDependencies().stream().map(ResolvedDependency::getName).collect(Collectors.toList());
             packages.add(new UnlinkedPackage(dep.getName(),
                     newVersion != null ? newVersion : dep.getVersion(), dep.getSource(), depNames));
         }
         return relink(marker, buildGraph(packages));
+    }
+
+    /** The updated version for {@code dep}, or null when {@code versionUpdates} leaves it unchanged. */
+    private static @Nullable String updatedVersion(ResolvedDependency dep, Map<String, String> versionUpdates) {
+        String newVersion = versionUpdates.get(PythonResolutionResult.normalizeName(dep.getName()));
+        return newVersion == null || newVersion.equals(dep.getVersion()) ? null : newVersion;
     }
 
     public static List<Dependency> link(List<Dependency> deps, List<ResolvedDependency> resolved) {
