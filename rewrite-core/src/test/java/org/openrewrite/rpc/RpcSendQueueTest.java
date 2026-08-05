@@ -18,6 +18,7 @@ package org.openrewrite.rpc;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.AccessMode;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -25,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.rpc.RpcObjectData.State.ADD;
 
 class RpcSendQueueTest {
 
@@ -72,6 +74,27 @@ class RpcSendQueueTest {
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void changedRefSlotIsReAddedInsteadOfChanged() {
+        List<RpcObjectData> sent = new ArrayList<>();
+        RpcSendQueue q = new RpcSendQueue(100, sent::addAll, new IdentityHashMap<>(), null, false);
+
+        String t1 = "T1";
+        String t2 = "T2";
+
+        q.send(Reference.asRef(t1), null, null);
+        q.send(Reference.asRef(t2), Reference.asRef(t1), null);
+        // A repeat of the same transition dedups against the ref registered by the re-add
+        q.send(Reference.asRef(t2), Reference.asRef(t1), null);
+        q.flush();
+
+        assertThat(sent).containsExactly(
+          new RpcObjectData(ADD, null, "T1", 1, false),
+          new RpcObjectData(ADD, null, "T2", 2, false),
+          new RpcObjectData(ADD, null, null, 2, false)
+        );
     }
 
     @Test

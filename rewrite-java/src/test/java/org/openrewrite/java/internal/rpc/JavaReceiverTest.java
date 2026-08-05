@@ -18,8 +18,10 @@ package org.openrewrite.java.internal.rpc;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -77,6 +79,47 @@ class JavaReceiverTest {
         assertThat(received.getName().getType())
                 .as("Name identifier type must survive the sender/receiver round trip")
                 .isNotNull();
+    }
+
+    @Test
+    void changingOneSlotOfSharedTypeLeavesOtherSlotsUntouched() {
+        // given: two arguments whose type attribution is one and the same JavaType instance
+        JavaType.ShallowClass sharedType = JavaType.ShallowClass.build("java.util.List");
+        J.Identifier a = new J.Identifier(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                Collections.emptyList(), "a", sharedType, null
+        );
+        J.Identifier b = new J.Identifier(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                Collections.emptyList(), "b", sharedType, null
+        );
+        J.MethodInvocation original = new J.MethodInvocation(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                null, null,
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        Collections.emptyList(), "foo", null, null),
+                JContainer.build(Space.EMPTY,
+                        new ArrayList<>(List.of(JRightPadded.build((Expression) a), JRightPadded.build((Expression) b))),
+                        Markers.EMPTY),
+                null
+        );
+        sq.send(original, null, null);
+        sq.flush();
+        J.MethodInvocation receivedBefore = rq.receive(null);
+
+        // when: a recipe changes only argument `a`'s type to a different instance of the same class
+        J.MethodInvocation after = original.withArguments(List.of(
+                a.withType(JavaType.ShallowClass.build("java.util.ArrayList")), b));
+        sq.send(after, original, null);
+        sq.flush();
+        J.MethodInvocation received = rq.receive(receivedBefore);
+
+        // then
+        assertThat(((JavaType.FullyQualified) received.getArguments().get(0).getType()).getFullyQualifiedName())
+                .isEqualTo("java.util.ArrayList");
+        assertThat(((JavaType.FullyQualified) received.getArguments().get(1).getType()).getFullyQualifiedName())
+                .as("The unchanged slot aliases the receiver's cached instance, which must not be mutated")
+                .isEqualTo("java.util.List");
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {
