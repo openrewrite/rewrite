@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -120,6 +121,42 @@ class JavaReceiverTest {
         assertThat(((JavaType.FullyQualified) received.getArguments().get(1).getType()).getFullyQualifiedName())
                 .as("The unchanged slot aliases the receiver's cached instance, which must not be mutated")
                 .isEqualTo("java.util.List");
+    }
+
+    @Test
+    void diffOfDistinctCyclicTypeGraphsRoundTripsWithCycleIntact() {
+        // given: two isomorphic but distinct instances of a cyclic type graph
+        // (node -> interfaces -> parameterized -> typeParameters -> node), as arise when
+        // the same type is materialized twice with different reference identity
+        JavaType.Class node1 = cyclicNode();
+        JavaType.Class node2 = cyclicNode();
+        sq.send(Reference.asRef(node1), null, () -> new JavaTypeSender().visit(node1, sq));
+        sq.flush();
+        JavaType.Class received1 = rq.receive(null, t -> (JavaType.Class) new JavaTypeReceiver().visit(t, rq));
+
+        // when: the slot's value changes to the other instance; the send must terminate
+        // (a delta walk without cycle handling would recurse forever) and the receiver
+        // must close the cycle by identity through its ref table
+        sq.send(Reference.asRef(node2), Reference.asRef(node1), () -> new JavaTypeSender().visit(node2, sq));
+        sq.flush();
+        JavaType.Class received2 = rq.receive(received1, t -> (JavaType.Class) new JavaTypeReceiver().visit(t, rq));
+
+        // then
+        assertThat(received2).isNotSameAs(received1);
+        JavaType.Parameterized iface = (JavaType.Parameterized) received2.getInterfaces().get(0);
+        assertThat(iface.getTypeParameters().get(0))
+                .as("The received graph's back edge must resolve to the enclosing node itself")
+                .isSameAs(received2);
+    }
+
+    private JavaType.Class cyclicNode() {
+        JavaType.ShallowClass iface = JavaType.ShallowClass.build("com.example.ISelf");
+        JavaType.Parameterized param = new JavaType.Parameterized(null, iface, null);
+        JavaType.Class node = new JavaType.Class(null, 1, "com.example.Node", JavaType.FullyQualified.Kind.Class,
+                null, null, null, null, null, null, null);
+        node.unsafeSet(null, null, null, null, List.of(param), null, null);
+        param.unsafeSet(iface, List.of(node));
+        return node;
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {
