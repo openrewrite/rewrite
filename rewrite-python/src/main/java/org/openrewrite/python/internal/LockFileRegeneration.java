@@ -32,8 +32,8 @@ import java.util.Map;
 /**
  * Regenerates a lock file from an edited dependencies file. Both {@code uv}
  * ({@link #UV}) and {@code pipenv} ({@link #PIPENV}) projects regenerate their lock
- * natively, without executing the package manager: the existing lock is surgically
- * updated by consulting the project's package index over the network.
+ * natively, without executing the package manager: the existing lock is updated in
+ * place by consulting the project's package index over the network.
  */
 public abstract class LockFileRegeneration {
 
@@ -126,11 +126,11 @@ public abstract class LockFileRegeneration {
      * error message (and the recipe's target package) otherwise.
      */
     public static void insertFailureRow(ExecutionContext ctx, PythonLockRegenerationFailures table,
-                                        Path depsPath, Result result, @Nullable String fallbackPackageName) {
+                                        Path depsPath, Result result, @Nullable String defaultPackageName) {
         Failure failure = result.getFailure();
         table.insertRow(ctx, new PythonLockRegenerationFailures.Row(
                 depsPath.toString(),
-                failure != null && failure.getPackageName() != null ? failure.getPackageName() : fallbackPackageName,
+                failure != null && failure.getPackageName() != null ? failure.getPackageName() : defaultPackageName,
                 failure != null ? failure.getReason().toString() : null,
                 failure != null ? failure.getDetail() : String.valueOf(result.getErrorMessage())));
     }

@@ -30,10 +30,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Overlays resolved-dependency information from a parsed lock file onto a
- * {@link PythonResolutionResult} marker. Pyproject and Pipfile have different
- * sets of declared-dependency fields, so two entry points are exposed.
+ * {@link PythonResolutionResult} marker. The pyproject and pipfile entry points
+ * differ only in package-manager handling.
  */
 public final class PythonResolutionLinker {
 
@@ -41,16 +43,32 @@ public final class PythonResolutionLinker {
     }
 
     /**
-     * Apply pyproject-shaped resolution: link dependencies, build-requires,
-     * optional-dependencies, dependency-groups, constraint-dependencies, and
-     * override-dependencies. Sets the package manager to {@code pm}, the resolver
-     * whose lock this overlay came from.
+     * Apply pyproject-shaped resolution and set the package manager to {@code pm},
+     * the resolver whose lock this overlay came from.
      */
     public static PythonResolutionResult applyPyproject(PythonResolutionResult marker,
                                                         List<ResolvedDependency> resolvedDeps,
                                                         PackageManager pm) {
+        return relink(marker, resolvedDeps).withPackageManager(pm);
+    }
+
+    /**
+     * Apply pipfile-shaped resolution. The package manager is left unchanged
+     * ({@code createMarker} already sets it to {@link PackageManager#Pipenv}).
+     */
+    public static PythonResolutionResult applyPipfile(PythonResolutionResult marker,
+                                                      List<ResolvedDependency> resolvedDeps) {
+        return relink(marker, resolvedDeps);
+    }
+
+    /**
+     * Replace the marker's resolved graph and relink every declared-dependency
+     * field against it; linking an empty field is a no-op, so this covers all
+     * marker shapes.
+     */
+    private static PythonResolutionResult relink(PythonResolutionResult marker,
+                                                 List<ResolvedDependency> resolvedDeps) {
         marker = marker.withResolvedDependencies(resolvedDeps);
-        marker = marker.withPackageManager(pm);
         marker = marker.withDependencies(link(marker.getDependencies(), resolvedDeps));
         marker = marker.withBuildRequires(link(marker.getBuildRequires(), resolvedDeps));
         marker = marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));
@@ -61,16 +79,31 @@ public final class PythonResolutionLinker {
     }
 
     /**
-     * Apply pipfile-shaped resolution: link {@code [packages]} and
-     * {@code [dev-packages]}. The package manager is left unchanged ({@code createMarker}
-     * already sets it to {@link PackageManager#Pipenv}).
+     * Rebuild the resolved graph with updated versions via {@link #buildGraph} and relink
+     * all declared-dependency {@code resolved} pointers. Keys of {@code versionUpdates} are
+     * normalized package names. Returns the same marker when no version changes.
      */
-    public static PythonResolutionResult applyPipfile(PythonResolutionResult marker,
-                                                      List<ResolvedDependency> resolvedDeps) {
-        marker = marker.withResolvedDependencies(resolvedDeps);
-        marker = marker.withDependencies(link(marker.getDependencies(), resolvedDeps));
-        marker = marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));
-        return marker;
+    public static PythonResolutionResult updateResolvedVersions(PythonResolutionResult marker,
+                                                                Map<String, String> versionUpdates) {
+        List<ResolvedDependency> resolved = marker.getResolvedDependencies();
+        if (resolved.stream().noneMatch(dep -> updatedVersion(dep, versionUpdates) != null)) {
+            return marker;
+        }
+        List<UnlinkedPackage> packages = new ArrayList<>(resolved.size());
+        for (ResolvedDependency dep : resolved) {
+            String newVersion = updatedVersion(dep, versionUpdates);
+            List<String> depNames = dep.getDependencies() == null ? emptyList() :
+                    dep.getDependencies().stream().map(ResolvedDependency::getName).collect(Collectors.toList());
+            packages.add(new UnlinkedPackage(dep.getName(),
+                    newVersion != null ? newVersion : dep.getVersion(), dep.getSource(), depNames));
+        }
+        return relink(marker, buildGraph(packages));
+    }
+
+    /** The updated version for {@code dep}, or null when {@code versionUpdates} leaves it unchanged. */
+    private static @Nullable String updatedVersion(ResolvedDependency dep, Map<String, String> versionUpdates) {
+        String newVersion = versionUpdates.get(PythonResolutionResult.normalizeName(dep.getName()));
+        return newVersion == null || newVersion.equals(dep.getVersion()) ? null : newVersion;
     }
 
     public static List<Dependency> link(List<Dependency> deps, List<ResolvedDependency> resolved) {

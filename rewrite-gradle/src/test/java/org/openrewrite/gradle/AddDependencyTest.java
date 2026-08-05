@@ -2118,6 +2118,110 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doesNotDuplicateCommentsPrecedingTheFollowingDependency() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentsWhenInsertingBetweenDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api "commons-lang:commons-lang:2.6"
+
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api "commons-lang:commons-lang:2.6"
+
+                    implementation "com.google.guava:guava:29.0-jre"
+
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }

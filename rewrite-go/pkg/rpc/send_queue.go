@@ -114,6 +114,12 @@ func (q *SendQueue) Send(after, before any, onChange func(any)) {
 		q.add(after, onChange)
 	} else if isNilValue(afterVal) {
 		q.Put(RpcObjectData{State: Delete})
+	} else if IsRef(after) {
+		// A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+		// instance may be aliased by any number of other slots and source files. A CHANGE would
+		// be applied to that shared instance in place, corrupting every alias, so the new value
+		// is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+		q.add(after, onChange)
 	} else {
 		vt := getValueType(afterVal)
 		var val any
@@ -173,7 +179,9 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 				}
 				if sameIdentity(aBefore, a) {
 					q.Put(RpcObjectData{State: NoChange})
-				} else if isNilValue(aBefore) || !sameType(a, aBefore) {
+				} else if asRef || isNilValue(aBefore) || !sameType(a, aBefore) {
+					// Type changed, or a ref-deduplicated item, which is always re-added
+					// rather than CHANGEd (see Send)
 					if asRef {
 						q.add(AsRef(a), onChangeRun)
 					} else {

@@ -114,16 +114,31 @@ public class RpcSendQueue {
 
         if (beforeVal == afterVal) {
             put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+        } else if (afterVal instanceof List && beforeVal instanceof List) {
+            // The concrete List implementation class (e.g. List.of vs ArrayList) is irrelevant
+            // to the diff: two non-null lists always diff as CHANGE, because sendList emits
+            // positions into the before list while the receiver's ADD path starts from an empty one.
+            sendChange(afterVal, beforeVal, onChange);
         } else if (beforeVal == null || (afterVal != null && afterVal.getClass() != beforeVal.getClass())) {
             // Treat as ADD when before is null OR types differ (it's a new object, not a change)
             add(after, onChange);
         } else if (afterVal == null) {
             put(new RpcObjectData(DELETE, null, null, null, trace));
+        } else if (after instanceof Reference) {
+            // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+            // instance may be aliased by any number of other slots and source files. A CHANGE would
+            // be applied to that shared instance in place, corrupting every alias, so the new value
+            // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+            add(after, onChange);
         } else {
-            RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
-            doChange(afterVal, beforeVal, onChange, afterCodec);
+            sendChange(afterVal, beforeVal, onChange);
         }
+    }
+
+    private void sendChange(Object afterVal, Object beforeVal, @Nullable Runnable onChange) {
+        RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+        put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
+        doChange(afterVal, beforeVal, onChange, afterCodec);
     }
 
     <T> void sendList(@Nullable List<T> after,
@@ -145,8 +160,9 @@ public class RpcSendQueue {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
                         put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
-                    } else if (aBefore == null || anAfter.getClass() != aBefore.getClass()) {
-                        // Type changed - treat as ADD
+                    } else if (asRef || aBefore == null || anAfter.getClass() != aBefore.getClass()) {
+                        // Type changed - treat as ADD. Ref-deduplicated items are also always
+                        // re-added rather than CHANGEd (see send()).
                         add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                     } else {
                         put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));

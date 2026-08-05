@@ -390,7 +390,7 @@ class PackageJsonHelperTest {
                 withMarker,
                 d -> PackageJsonHelper.addDependency(d, "uuid", "^9.0.0", "dependencies"),
                 null,
-                null);
+                new InMemoryExecutionContext());
 
         assertThat(result.isChanged()).isTrue();
         NodeResolutionResult after = result.getModifiedPackageJson().getMarkers()

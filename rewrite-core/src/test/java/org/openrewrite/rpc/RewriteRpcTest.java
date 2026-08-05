@@ -259,6 +259,25 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedVisitBackToRequestOriginator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = client.visit((SourceFile) tree, DispatchBackToOriginator.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return requireNonNull(t);
+              }
+          })),
+          text(
+            "Hello Jon!",
+            "Hello World!"
+          )
+        );
+    }
+
     @Disabled("Print requires bidirectional RPC (GetObject callback) which deadlocks in the in-process test setup. " +
               "Works correctly when calling to a real subprocess (e.g., Java to Python/JS).")
     @Test
@@ -634,6 +653,14 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public PlainText visitText(PlainText text, Integer p) {
             return text.withText("Hello World!");
+        }
+    }
+
+    static class DispatchBackToOriginator extends PlainTextVisitor<Integer> {
+        @Override
+        public PlainText visitText(PlainText text, Integer p) {
+            RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
+            return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
         }
     }
 

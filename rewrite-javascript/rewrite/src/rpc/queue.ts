@@ -187,6 +187,12 @@ export class RpcSendQueue {
                 await this.add(after, onChange);
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
+            } else if (isRef(after)) {
+                // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+                // instance may be aliased by any number of other slots and source files. A CHANGE would
+                // be applied to that shared instance in place, corrupting every alias, so the new value
+                // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+                await this.add(after, onChange);
             } else {
                 let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
                 this.put({state: RpcObjectState.CHANGE, value: onChange || afterCodec ? undefined : after});
@@ -215,8 +221,9 @@ export class RpcSendQueue {
                     const aBefore = before?.[beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
-                    } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
-                        // Type changed - treat as ADD
+                    } else if (anAfter !== undefined && (isRef(anAfter) || this.typesAreDifferent(anAfter, aBefore))) {
+                        // Type changed - treat as ADD. Ref-deduplicated items are also always
+                        // re-added rather than CHANGEd (see send()).
                         await this.add(anAfter, onChangeRun);
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
