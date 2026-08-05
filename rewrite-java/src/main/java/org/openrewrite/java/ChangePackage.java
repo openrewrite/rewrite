@@ -168,36 +168,39 @@ public class ChangePackage extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J f = super.visitFieldAccess(fieldAccess, ctx);
 
-            if (((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
-                Cursor parent = getCursor().getParent();
-                if (parent != null &&
-                    // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
-                    (!(parent.getValue() instanceof J.FieldAccess) ||
-                     (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName)))) &&
-                    (isRecursive() || qualifiesTypeDirectlyInOldPackage(parent))) {
-
-                    f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
-                            .withPrefix(f.getPrefix());
+            if (!((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
+                return f;
+            }
+            Cursor parent = getCursor().getParent();
+            if (parent == null) {
+                return f;
+            }
+            if (parent.getValue() instanceof J.FieldAccess) {
+                J.FieldAccess enclosing = (J.FieldAccess) parent.getValue();
+                if (enclosing.isFullyQualifiedClassReference(newPackageName)) {
+                    // Already rewritten to the new package.
+                    return f;
+                }
+                if (!isRecursive() && !namesTypeDirectlyInOldPackage(enclosing)) {
+                    // Leading segments of a subpackage-qualified name such as oldPackageName.sub.Type.
+                    return f;
                 }
             }
-            return f;
+            return TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
+                    .withPrefix(f.getPrefix());
         }
 
         /**
-         * Whether this occurrence of {@code oldPackageName} qualifies a type declared directly in it,
-         * as opposed to being the leading segments of a subpackage-qualified name such as
-         * {@code oldPackageName.sub.Type}. Only the former may be renamed when non-recursive.
+         * Whether the name enclosing this occurrence of {@code oldPackageName} is a type declared
+         * directly in it, rather than a subpackage. Uses the same leading-capital convention as
+         * {@link PackageMatcher} where type attribution is unavailable.
          */
-        private boolean qualifiesTypeDirectlyInOldPackage(Cursor parent) {
-            if (!(parent.getValue() instanceof J.FieldAccess)) {
-                return true;
-            }
-            J.FieldAccess qualified = (J.FieldAccess) parent.getValue();
-            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualified.getType());
+        private boolean namesTypeDirectlyInOldPackage(J.FieldAccess enclosing) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(enclosing.getType());
             if (fq != null) {
                 return oldPackageName.equals(fq.getPackageName());
             }
-            String nextSegment = qualified.getSimpleName();
+            String nextSegment = enclosing.getSimpleName();
             return "*".equals(nextSegment) ||
                    !nextSegment.isEmpty() && Character.isUpperCase(nextSegment.charAt(0));
         }

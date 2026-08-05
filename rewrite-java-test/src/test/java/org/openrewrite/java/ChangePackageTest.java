@@ -597,10 +597,11 @@ class ChangePackageTest implements RewriteTest {
         );
 
         @Test
-        void javaSourceWithOnlySubpackageReference() {
+        void nullRecursiveIsNonRecursiveForEverySourceKind() {
             rewriteRun(
               spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", null))
                 .parser(cucumber),
+              // Only a subpackage type: untouched.
               java(
                 """
                   import cucumber.api.java.en.Given;
@@ -610,21 +611,14 @@ class ChangePackageTest implements RewriteTest {
                       void given() {}
                   }
                   """
-              )
-            );
-        }
-
-        @Test
-        void javaSourceWithSubpackageAndDirectReference() {
-            rewriteRun(
-              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", null))
-                .parser(cucumber),
+              ),
+              // Both: the type directly in the old package moves, the subpackage one stays put.
               java(
                 """
                   import cucumber.api.java.Before;
                   import cucumber.api.java.en.Given;
 
-                  class A {
+                  class B {
                       @Before
                       void before() {}
 
@@ -636,7 +630,7 @@ class ChangePackageTest implements RewriteTest {
                   import io.cucumber.java.Before;
                   import cucumber.api.java.en.Given;
 
-                  class A {
+                  class B {
                       @Before
                       void before() {}
 
@@ -644,12 +638,29 @@ class ChangePackageTest implements RewriteTest {
                       void given() {}
                   }
                   """
+              ),
+              properties(
+                """
+                  given=cucumber.api.java.en.Given
+                  """,
+                spec -> spec.path("application.properties")
+              ),
+              properties(
+                """
+                  before=cucumber.api.java.Before
+                  given=cucumber.api.java.en.Given
+                  """,
+                """
+                  before=io.cucumber.java.Before
+                  given=cucumber.api.java.en.Given
+                  """,
+                spec -> spec.path("application-extra.properties")
               )
             );
         }
 
         @Test
-        void javaSourceWithOnlySubpackageReferenceOptingIn() {
+        void recursiveOptsIntoSubpackagesForEverySourceKind() {
             rewriteRun(
               spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", true))
                 .parser(cucumber),
@@ -670,45 +681,7 @@ class ChangePackageTest implements RewriteTest {
                       void given() {}
                   }
                   """
-              )
-            );
-        }
-
-        @Test
-        void referenceSourceWithOnlySubpackageReference() {
-            rewriteRun(
-              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", null)),
-              properties(
-                """
-                  given=cucumber.api.java.en.Given
-                  """,
-                spec -> spec.path("application.properties")
-              )
-            );
-        }
-
-        @Test
-        void referenceSourceWithSubpackageAndDirectReference() {
-            rewriteRun(
-              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", null)),
-              properties(
-                """
-                  before=cucumber.api.java.Before
-                  given=cucumber.api.java.en.Given
-                  """,
-                """
-                  before=io.cucumber.java.Before
-                  given=cucumber.api.java.en.Given
-                  """,
-                spec -> spec.path("application.properties")
-              )
-            );
-        }
-
-        @Test
-        void referenceSourceWithOnlySubpackageReferenceOptingIn() {
-            rewriteRun(
-              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", true)),
+              ),
               properties(
                 """
                   given=cucumber.api.java.en.Given
