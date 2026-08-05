@@ -143,8 +143,13 @@ public class RpcSendQueue
         {
             Put(new RpcObjectData { State = NO_CHANGE });
         }
-        else if (beforeVal == null || (afterVal != null && afterVal.GetType() != beforeVal.GetType()))
+        else if (beforeVal == null || (afterVal != null && afterVal.GetType() != beforeVal.GetType() &&
+                                       !(afterVal is System.Collections.IList && beforeVal is System.Collections.IList)))
         {
+            // The concrete list implementation class (e.g. List<T> vs T[]) is exempt from
+            // the type comparison: two non-null lists must diff as CHANGE, because SendList
+            // emits positions into the before list while the receiver's ADD path starts
+            // from an empty one.
             Add(after!, onChange);
         }
         else if (afterVal == null)
@@ -164,7 +169,7 @@ public class RpcSendQueue
         }
     }
 
-    private void SendList<T>(IList<T>? after, IList<T>? before,
+    internal void SendList<T>(IList<T>? after, IList<T>? before,
                               Func<T, object> id, Action<T>? onChange, bool asRef)
     {
         Send(after, before, () =>
