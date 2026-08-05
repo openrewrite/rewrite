@@ -143,13 +143,16 @@ public class RpcSendQueue
         {
             Put(new RpcObjectData { State = NO_CHANGE });
         }
-        else if (beforeVal == null || (afterVal != null && afterVal.GetType() != beforeVal.GetType() &&
-                                       !(afterVal is System.Collections.IList && beforeVal is System.Collections.IList)))
+        else if (afterVal is System.Collections.IList && beforeVal is System.Collections.IList)
         {
-            // The concrete list implementation class (e.g. List<T> vs T[]) is exempt from
-            // the type comparison: two non-null lists must diff as CHANGE, because SendList
+            // The concrete list implementation class (e.g. List<T> vs T[]) is irrelevant
+            // to the diff: two non-null lists always diff as CHANGE, because SendList
             // emits positions into the before list while the receiver's ADD path starts
             // from an empty one.
+            SendChange(afterVal, beforeVal, onChange);
+        }
+        else if (beforeVal == null || (afterVal != null && afterVal.GetType() != beforeVal.GetType()))
+        {
             Add(after!, onChange);
         }
         else if (afterVal == null)
@@ -158,15 +161,20 @@ public class RpcSendQueue
         }
         else
         {
-            var afterCodec = GetCodecFor(afterVal);
-            Put(new RpcObjectData
-            {
-                State = CHANGE,
-                ValueType = GetValueType(afterVal),
-                Value = onChange == null && afterCodec == null ? afterVal : null
-            });
-            DoChange(afterVal, beforeVal, onChange, afterCodec);
+            SendChange(afterVal, beforeVal, onChange);
         }
+    }
+
+    private void SendChange(object afterVal, object beforeVal, Action? onChange)
+    {
+        var afterCodec = GetCodecFor(afterVal);
+        Put(new RpcObjectData
+        {
+            State = CHANGE,
+            ValueType = GetValueType(afterVal),
+            Value = onChange == null && afterCodec == null ? afterVal : null
+        });
+        DoChange(afterVal, beforeVal, onChange, afterCodec);
     }
 
     internal void SendList<T>(IList<T>? after, IList<T>? before,

@@ -114,20 +114,25 @@ public class RpcSendQueue {
 
         if (beforeVal == afterVal) {
             put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
-        } else if (beforeVal == null || (afterVal != null && afterVal.getClass() != beforeVal.getClass() &&
-                                         !(afterVal instanceof List && beforeVal instanceof List))) {
-            // Treat as ADD when before is null OR types differ (it's a new object, not a change).
-            // The concrete List implementation class (e.g. List.of vs ArrayList) is exempt from
-            // the type comparison: two non-null lists must diff as CHANGE, because sendList emits
+        } else if (afterVal instanceof List && beforeVal instanceof List) {
+            // The concrete List implementation class (e.g. List.of vs ArrayList) is irrelevant
+            // to the diff: two non-null lists always diff as CHANGE, because sendList emits
             // positions into the before list while the receiver's ADD path starts from an empty one.
+            sendChange(afterVal, beforeVal, onChange);
+        } else if (beforeVal == null || (afterVal != null && afterVal.getClass() != beforeVal.getClass())) {
+            // Treat as ADD when before is null OR types differ (it's a new object, not a change)
             add(after, onChange);
         } else if (afterVal == null) {
             put(new RpcObjectData(DELETE, null, null, null, trace));
         } else {
-            RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
-            doChange(afterVal, beforeVal, onChange, afterCodec);
+            sendChange(afterVal, beforeVal, onChange);
         }
+    }
+
+    private void sendChange(Object afterVal, Object beforeVal, @Nullable Runnable onChange) {
+        RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+        put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
+        doChange(afterVal, beforeVal, onChange, afterCodec);
     }
 
     <T> void sendList(@Nullable List<T> after,
