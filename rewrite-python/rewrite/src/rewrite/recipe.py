@@ -286,14 +286,14 @@ class Recipe(ABC):
             # visit result is discarded and the original file is passed on to the
             # next recipe in the list. Returning None here would abort traversal
             # of the remainder of the recipe list, leaving nested scanners unrun.
-            def scan_one(recipe: Recipe, b: SourceFile) -> SourceFile:
+            def scan_one(recipe: Recipe, source: SourceFile) -> SourceFile:
                 if isinstance(recipe, ScanningRecipe):
-                    recipe.scanner(recipe.accumulator(cursor, ctx)).visit(b, ctx, cursor)
-                return b
+                    recipe.scanner(recipe.accumulator(cursor, ctx)).visit(source, ctx, cursor)
+                return source
 
             # edit() is used only to iterate the source files; scan_one returns
             # each file unchanged, so the returned source set is the same
-            after.edit(lambda b: _recurse_recipe_list(self, b, recipe_lists, scan_one))
+            after.edit(lambda source: _recurse_recipe_list(self, source, recipe_lists, scan_one))
 
             # Phase 2: collect generated files
             def generate_one(recipe: Recipe, generated: List[SourceFile]) -> List[SourceFile]:
@@ -305,10 +305,10 @@ class Recipe(ABC):
 
         # Phase 3: edit all files, including generated ones. An editor returning
         # None deletes the file and stops later recipes from visiting it.
-        def edit_one(recipe: Recipe, b: SourceFile) -> Optional[SourceFile]:
-            return recipe.editor().visit(b, ctx, cursor)
+        def edit_one(recipe: Recipe, source: SourceFile) -> Optional[SourceFile]:
+            return recipe.editor().visit(source, ctx, cursor)
 
-        after = after.edit(lambda b: _recurse_recipe_list(self, b, recipe_lists, edit_one))
+        after = after.edit(lambda source: _recurse_recipe_list(self, source, recipe_lists, edit_one))
         return after.get_changeset()
 
 
@@ -388,15 +388,13 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
         per-instance key, so all phases of a run share it while separate runs
         (each with a fresh root cursor) start from initial_value().
         """
-        root = cursor
-        while root.parent is not None:
-            root = root.parent
+        root = cursor.root
         key = f"org.openrewrite.recipe.acc.{id(self)}"
-        if root.messages is None or key not in root.messages:
-            root.put_message(key, self.initial_value(ctx))
-        messages = root.messages
-        assert messages is not None
-        return cast(T, messages[key])
+        if root.messages is not None and key in root.messages:
+            return cast(T, root.messages[key])
+        acc = self.initial_value(ctx)
+        root.put_message(key, acc)
+        return acc
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         """
@@ -429,7 +427,7 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
 # rather than by recipe (dataclass-based recipes are unhashable); every keyed recipe stays
 # referenced through the cached lists (the root through the caller), so ids cannot be
 # recycled during the run.
-_RecipeLists = dict[int, List[Recipe]]
+_RecipeLists = dict[int, list[Recipe]]
 
 
 def _sub_recipes(recipe: Recipe, recipe_lists: _RecipeLists) -> List[Recipe]:
