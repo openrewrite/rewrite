@@ -117,6 +117,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
         return new TomlIsoVisitor<ExecutionContext>() {
             private @Nullable GradleVersionCatalog catalog;
             private Map<String, String> referencedVersions = java.util.Collections.emptyMap();
+            private Map<String, MavenDownloadingException> resolutionFailures = java.util.Collections.emptyMap();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -128,11 +129,8 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
                 catalog = GradleVersionCatalog.from(getCursor(), document);
                 referencedVersions = java.util.Collections.emptyMap();
-                try {
-                    referencedVersions = catalog.safeVersionRefReplacements(update, ctx);
-                } catch (MavenDownloadingException e) {
-                    return e.warn(document);
-                }
+                resolutionFailures = new LinkedHashMap<>();
+                referencedVersions = catalog.safeVersionRefReplacements(update, ctx, resolutionFailures);
                 return super.visitDocument(document, ctx);
             }
 
@@ -140,6 +138,11 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
                 Cursor kvCursor = new Cursor(getCursor().getParent(), kv);
+                String versionRef = versionRef(kv);
+                MavenDownloadingException resolutionFailure = resolutionFailures.get(versionRef);
+                if (resolutionFailure != null) {
+                    return resolutionFailure.warn(kv);
+                }
 
                 GradleVersionCatalogDependency dependency = new GradleVersionCatalogDependency.Matcher()
                         .get(kvCursor).orElse(null);
@@ -186,25 +189,28 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
             }
         }
 
-        indexConsumers(document.findTable("libraries"), consumers);
-        indexConsumers(document.findTable("plugins"), consumers);
+        indexConsumers(cursor, document.findTable("libraries"), consumers);
+        indexConsumers(cursor, document.findTable("plugins"), consumers);
         return new GradleVersionCatalog(cursor, declaredVersions, consumers);
     }
 
-    private static void indexConsumers(Toml.@Nullable Table table, Map<String, List<VersionRefConsumer>> consumers) {
+    private static void indexConsumers(Cursor documentCursor, Toml.@Nullable Table table,
+                                       Map<String, List<VersionRefConsumer>> consumers) {
         if (table == null) {
             return;
         }
         boolean library = "libraries".equals(table.getName() == null ? null : table.getName().getName());
+        Cursor tableCursor = new Cursor(documentCursor, table);
         for (Toml value : table.getValues()) {
             if (!(value instanceof Toml.KeyValue)) {
                 continue;
             }
             Toml.KeyValue keyValue = (Toml.KeyValue) value;
+            Cursor keyValueCursor = new Cursor(tableCursor, keyValue);
             GradleVersionCatalogDependency dependency = library ?
-                    GradleVersionCatalogDependency.Matcher.extract(keyValue, null, null) : null;
+                    new GradleVersionCatalogDependency.Matcher().get(keyValueCursor).orElse(null) : null;
             GradleVersionCatalogPlugin plugin = library ? null :
-                    GradleVersionCatalogPlugin.Matcher.extract(keyValue, null);
+                    new GradleVersionCatalogPlugin.Matcher().get(keyValueCursor).orElse(null);
             String versionRef = versionRef(keyValue);
             if (versionRef == null) {
                 continue;
@@ -220,7 +226,8 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
     }
 
     private Map<String, String> safeVersionRefReplacements(
-            VersionCatalogUpdate update, ExecutionContext ctx) throws MavenDownloadingException {
+            VersionCatalogUpdate update, ExecutionContext ctx,
+            Map<String, MavenDownloadingException> resolutionFailures) {
         Map<String, String> replacements = new LinkedHashMap<>();
         for (Map.Entry<String, List<VersionRefConsumer>> entry : versionRefConsumers.entrySet()) {
             String currentVersion = declaredVersions.get(entry.getKey());
@@ -234,7 +241,14 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
                     safe = false;
                     break;
                 }
-                String selected = update.selectReferencedVersion(consumer, currentVersion, ctx);
+                String selected;
+                try {
+                    selected = update.selectReferencedVersion(consumer, currentVersion, ctx);
+                } catch (MavenDownloadingException e) {
+                    resolutionFailures.put(entry.getKey(), e);
+                    safe = false;
+                    break;
+                }
                 if (selected == null || replacement != null && !replacement.equals(selected)) {
                     safe = false;
                     break;

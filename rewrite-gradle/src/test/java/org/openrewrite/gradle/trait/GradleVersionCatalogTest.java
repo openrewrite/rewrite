@@ -19,7 +19,10 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
@@ -106,6 +109,8 @@ class GradleVersionCatalogTest implements RewriteTest {
         );
         assertThat(state.selections).isEqualTo(1);
         assertThat(state.consumerVersion).isEqualTo("2.0");
+        assertThat(state.consumerSourceFile).isNotNull();
+        assertThat(state.consumerTable).isNotNull();
     }
 
     @Test
@@ -123,6 +128,80 @@ class GradleVersionCatalogTest implements RewriteTest {
         );
         assertThat(state.selections).isZero();
         assertThat(state.consumerVersion).isNull();
+    }
+
+    @Test
+    void continuesAfterSharedVersionResolutionFailure() {
+        CatalogTestState state = new CatalogTestState();
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> GradleVersionCatalog.visitor(
+                  new GradleVersionCatalog.VersionCatalogUpdate() {
+                      @Override
+                      public String selectReferencedVersion(
+                              GradleVersionCatalog.@NonNull VersionRefConsumer consumer,
+                              @NonNull String currentVersion, @NonNull ExecutionContext ctx)
+                              throws MavenDownloadingException {
+                          if ("broken".equals(consumer.getVersionRef())) {
+                              throw new MavenDownloadingException("resolution failed", null,
+                                      new GroupArtifactVersion("org.example", "broken", currentVersion));
+                          }
+                          state.selections++;
+                          return "2.0";
+                      }
+
+                      @Override
+                      public Toml.@NonNull KeyValue updateDependency(
+                              @NonNull GradleVersionCatalogDependency dependency,
+                              String referencedVersion, @NonNull ExecutionContext ctx) {
+                          if (referencedVersion == null) {
+                              state.directDependencies++;
+                          }
+                          return dependency.getTree();
+                      }
+
+                      @Override
+                      public Toml.@NonNull KeyValue updatePlugin(
+                              @NonNull GradleVersionCatalogPlugin plugin,
+                              String referencedVersion, @NonNull ExecutionContext ctx) {
+                          if (referencedVersion == null) {
+                              state.directPlugins++;
+                          }
+                          return plugin.getTree();
+                      }
+                  }))),
+          toml(
+            """
+              [versions]
+              broken = "1.0"
+              healthy = "1.0"
+
+              [libraries]
+              failed = { group = "org.example", name = "failed", version.ref = "broken" }
+              valid = { group = "org.example", name = "valid", version.ref = "healthy" }
+              direct = "org.example:direct:1.0"
+
+              [plugins]
+              direct = { id = "org.example.direct", version = "1.0" }
+              """,
+            """
+              [versions]
+              broken = "1.0"
+              healthy = "2.0"
+
+              [libraries]
+              ~~(org.example:broken:1.0 failed. resolution failed)~~>failed = { group = "org.example", name = "failed", version.ref = "broken" }
+              valid = { group = "org.example", name = "valid", version.ref = "healthy" }
+              direct = "org.example:direct:1.0"
+
+              [plugins]
+              direct = { id = "org.example.direct", version = "1.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+        assertThat(state.selections).isPositive();
+        assertThat(state.directDependencies).isPositive();
+        assertThat(state.directPlugins).isPositive();
     }
 
     @Test
@@ -223,6 +302,10 @@ class GradleVersionCatalogTest implements RewriteTest {
         private int selections;
         private int catalogMatches;
         private String consumerVersion;
+        private SourceFile consumerSourceFile;
+        private Toml.Table consumerTable;
+        private int directDependencies;
+        private int directPlugins;
     }
 
     static class MatchingCatalogRecipe extends Recipe {
@@ -282,6 +365,8 @@ class GradleVersionCatalogTest implements RewriteTest {
                                                       @NonNull String currentVersion, @NonNull ExecutionContext ctx) {
                     if ("1.0".equals(currentVersion)) {
                         state.selections++;
+                        state.consumerSourceFile = consumer.getDependency().getCursor().firstEnclosing(SourceFile.class);
+                        state.consumerTable = consumer.getDependency().getCursor().firstEnclosing(Toml.Table.class);
                         return "2.0";
                     }
                     return null;
