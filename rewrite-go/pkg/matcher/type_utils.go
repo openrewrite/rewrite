@@ -124,11 +124,9 @@ func IsNumeric(t java.JavaType) bool {
 			return true
 		}
 	}
-	fqn := GetFullyQualifiedName(t)
-	switch fqn {
-	case "int", "int8", "int16", "int32", "int64",
-		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
-		"float32", "float64", "byte", "rune":
+	// Go's unsigned integers have no Java primitive; they map to named types.
+	switch GetFullyQualifiedName(t) {
+	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
 		return true
 	}
 	return false
@@ -137,16 +135,13 @@ func IsNumeric(t java.JavaType) bool {
 func IsInt(t java.JavaType) bool {
 	if p, ok := t.(*java.JavaTypePrimitive); ok {
 		switch p.Keyword {
-		case "int", "int8", "int16", "int32", "int64",
-			"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
-			"byte", "rune":
+		case "int", "long", "short", "byte":
 			return true
 		}
 	}
+	// Go's unsigned integers have no Java primitive; they map to named types.
 	switch GetFullyQualifiedName(t) {
-	case "int", "int8", "int16", "int32", "int64",
-		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
-		"byte", "rune":
+	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
 		return true
 	}
 	return false
