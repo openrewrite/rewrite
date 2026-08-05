@@ -13,166 +13,170 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Java;
-
 namespace OpenRewrite.Core;
 
 /// <summary>
-/// Runs a recipe (and its sub-recipes) against a set of source files,
-/// collecting before/after results. Handles composite recipes by recursing
-/// through <see cref="Recipe.GetRecipeList"/>.
+/// Runs a recipe (and its sub-recipes) against a set of source files, collecting
+/// before/after results. When any recipe in the tree is an <see cref="IScanningRecipe"/>
+/// the run is phased: every scanner visits every file, then generated files are collected,
+/// and only then do editors run — so scanners observe the source set in its unedited state
+/// and generated files are edited like any other source. Structured after the TypeScript
+/// scheduler (rewrite-javascript/rewrite/src/run.ts) to keep the implementations aligned.
 /// </summary>
 public static class RecipeScheduler
 {
     public static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx)
     {
-        var currentSources = new List<SourceFile>(sources);
+        var state = new RunState(ctx);
+        var results = new List<Result>();
 
-        RunRecipe(recipe, currentSources, ctx);
-
-        return BuildResults(sources, currentSources);
-    }
-
-    private static void RunRecipe(
-        Recipe recipe,
-        List<SourceFile> currentSources,
-        ExecutionContext ctx)
-    {
-        // Pre-order traversal, as in Java's RecipeRunCycle/RecipeStack: the recipe's own
-        // visitor (or scan/generate/edit lifecycle) runs first, then its recipe list.
-        ApplyResults(EditSources(recipe, currentSources, ctx), currentSources);
-
-        foreach (var subRecipe in recipe.GetRecipeList())
+        if (HasScanningRecipe(recipe, state))
         {
-            RunRecipe(subRecipe, currentSources, ctx);
-        }
-    }
-
-    private static List<Result> EditSources(
-        Recipe recipe,
-        List<SourceFile> sources,
-        ExecutionContext ctx)
-    {
-        if (recipe is IScanningRecipe scanning)
-        {
-            var acc = scanning.InitialValue(ctx);
-
-            // Phase 1: Scan
-            var scanner = scanning.Scanner(acc);
+            // Phase 1: Scan — every scanner visits every file. Scanning must not modify
+            // the tree, so the visit result is discarded and the original file is passed
+            // on to the next recipe in the list.
             foreach (var source in sources)
             {
-                scanner.Visit(source, ctx);
+                RecurseRecipeList(recipe, source, state, (r, s) =>
+                {
+                    if (r is IScanningRecipe scanning)
+                    {
+                        scanning.Scanner(state.Accumulator(scanning)).Visit(s, ctx);
+                    }
+                    return s;
+                });
             }
 
-            // Phase 2: Generate
-            var generated = scanning.Generate(acc, ctx).ToList();
-
-            // Phase 3: Edit
-            var results = VisitAll(scanning.Editor(acc), sources, ctx);
-
-            foreach (var gen in generated)
+            // Phase 2: Collect generated files
+            var generated = RecurseRecipeList(recipe, new List<SourceFile>(), state, (r, g) =>
             {
-                results.Add(new Result(null, gen));
-            }
+                if (r is IScanningRecipe scanning)
+                {
+                    g.AddRange(scanning.Generate(state.Accumulator(scanning), ctx));
+                }
+                return g;
+            })!;
 
-            return results;
+            // Phase 3: Edit existing files
+            EditAll(recipe, sources, state, results);
+
+            // Phase 4: Edit generated files, including by the generating recipe's own editor
+            foreach (var source in generated)
+            {
+                var after = EditFile(recipe, source, state);
+                if (after != null)
+                {
+                    results.Add(new Result(null, after));
+                }
+            }
         }
-
-        var visitor = recipe.GetVisitor();
-        if (visitor is NoopVisitor<ExecutionContext>)
+        else
         {
-            // The default visitor is a no-op, so recipes that don't override it
-            // (typically composites) need no traversal of the source set.
-            return [];
-        }
-
-        return VisitAll(visitor, sources, ctx);
-    }
-
-    private static List<Result> VisitAll(
-        ITreeVisitor<ExecutionContext> visitor,
-        List<SourceFile> sources,
-        ExecutionContext ctx)
-    {
-        var results = new List<Result>();
-        foreach (var source in sources)
-        {
-            var after = visitor.Visit(source, ctx);
-            if (after == null)
-            {
-                results.Add(new Result(source, null));
-            }
-            else if (after is SourceFile sf && !ReferenceEquals(source, after))
-            {
-                results.Add(new Result(source, sf));
-            }
+            EditAll(recipe, sources, state, results);
         }
 
         return results;
     }
 
-    private static void ApplyResults(List<Result> results, List<SourceFile> currentSources)
+    private static void EditAll(Recipe recipe, List<SourceFile> sources, RunState state, List<Result> results)
     {
-        foreach (var result in results)
+        foreach (var source in sources)
         {
-            var before = result.Before;
-            if (before != null)
+            var after = EditFile(recipe, source, state);
+            if (!ReferenceEquals(source, after))
             {
-                if (result.After != null)
-                {
-                    var i = currentSources.FindIndex(s => s.Id == before.Id);
-                    if (i >= 0)
-                    {
-                        currentSources[i] = result.After;
-                    }
-                }
-                else
-                {
-                    currentSources.RemoveAll(s => s.Id == before.Id);
-                }
-            }
-            else if (result.After != null)
-            {
-                currentSources.Add(result.After);
+                results.Add(new Result(source, after));
             }
         }
+    }
+
+    private static SourceFile? EditFile(Recipe recipe, SourceFile source, RunState state)
+    {
+        return RecurseRecipeList(recipe, source, state, (r, s) =>
+        {
+            var visitor = r is IScanningRecipe scanning
+                ? scanning.Editor(state.Accumulator(scanning))
+                : r.GetVisitor();
+            if (visitor is NoopVisitor<ExecutionContext>)
+            {
+                // The default visitor is a no-op, so recipes that don't override it
+                // (typically composites) need no visit.
+                return s;
+            }
+
+            var after = visitor.Visit(s, state.Ctx);
+            return after == null ? null : after as SourceFile ?? s;
+        });
     }
 
     /// <summary>
-    /// Diffs the source set as parsed against its state after the run, pairing files by id:
-    /// same id with a different tree → changed, id only present before → deleted, id only
-    /// present after → generated. Because only the initial and final states are compared,
-    /// <see cref="Result.Before"/> is always the originally parsed source no matter how many
-    /// recipes edited the file, and a generated file that a later recipe deleted yields no
-    /// result at all. Relies on visitors preserving <see cref="SourceFile.Id"/> across edits.
+    /// Pre-order fold over the recipe tree: the recipe itself is visited first, then its
+    /// recipe list. A null callback result short-circuits the remaining traversal — in the
+    /// edit phase that is how a deleted file stops being visited.
     /// </summary>
-    private static List<Result> BuildResults(List<SourceFile> before, List<SourceFile> after)
+    private static T? RecurseRecipeList<T>(Recipe recipe, T initial, RunState state, Func<Recipe, T, T?> fn)
+        where T : class
     {
-        var results = new List<Result>();
-        var afterById = after.ToDictionary(s => s.Id);
-        foreach (var beforeSource in before)
+        var t = fn(recipe, initial);
+        foreach (var subRecipe in state.SubRecipes(recipe))
         {
-            if (afterById.Remove(beforeSource.Id, out var afterSource))
+            if (t == null)
             {
-                if (!ReferenceEquals(beforeSource, afterSource))
-                {
-                    results.Add(new Result(beforeSource, afterSource));
-                }
+                return null;
             }
-            else
+            t = RecurseRecipeList(subRecipe, t, state, fn);
+        }
+        return t;
+    }
+
+    private static bool HasScanningRecipe(Recipe recipe, RunState state)
+    {
+        if (recipe is IScanningRecipe)
+        {
+            return true;
+        }
+        foreach (var subRecipe in state.SubRecipes(recipe))
+        {
+            if (HasScanningRecipe(subRecipe, state))
             {
-                results.Add(new Result(beforeSource, null));
+                return true;
             }
         }
+        return false;
+    }
 
-        foreach (var afterSource in after)
+    /// <summary>
+    /// Per-run state. Recipes commonly instantiate their sub-recipes inside
+    /// <see cref="Recipe.GetRecipeList"/>, so calling it more than once yields different
+    /// instances, and a scanning sub-recipe would then be handed a different accumulator in
+    /// every phase. Resolving each recipe list once per run keeps sub-recipe identity — and
+    /// therefore accumulator identity — stable.
+    /// </summary>
+    private sealed class RunState(ExecutionContext ctx)
+    {
+        public ExecutionContext Ctx { get; } = ctx;
+
+        private readonly Dictionary<Recipe, List<Recipe>> _recipeLists = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<IScanningRecipe, object> _accumulators = new(ReferenceEqualityComparer.Instance);
+
+        public List<Recipe> SubRecipes(Recipe recipe)
         {
-            if (afterById.ContainsKey(afterSource.Id))
+            if (!_recipeLists.TryGetValue(recipe, out var subRecipes))
             {
-                results.Add(new Result(null, afterSource));
+                subRecipes = recipe.GetRecipeList();
+                _recipeLists[recipe] = subRecipes;
             }
+            return subRecipes;
         }
 
-        return results;
+        public object Accumulator(IScanningRecipe recipe)
+        {
+            if (!_accumulators.TryGetValue(recipe, out var acc))
+            {
+                acc = recipe.InitialValue(Ctx);
+                _accumulators[recipe] = acc;
+            }
+            return acc;
+        }
     }
 }

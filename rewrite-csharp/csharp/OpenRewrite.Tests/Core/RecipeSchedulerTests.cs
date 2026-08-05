@@ -88,6 +88,47 @@ public class RecipeSchedulerTests
     }
 
     [Fact]
+    public void ScannersSeeSourcesBeforeAnySiblingEdits()
+    {
+        // The scan phase runs over the whole recipe tree before any editor runs, so the
+        // scanner observes the class under its original name even though an earlier
+        // sibling renames it.
+        var results = RecipeScheduler.Run(
+            new Composite(new Rename("A", "B"), new AppendScannedNames()),
+            [Parse("class A { }", "a.cs")],
+            new ExecutionContext());
+
+        var result = Assert.Single(results);
+        Assert.Equal("class B_A { }", Print(result.After!));
+    }
+
+    [Fact]
+    public void GeneratedFilesAreVisitedByTheGeneratingRecipesOwnEditor()
+    {
+        var results = RecipeScheduler.Run(
+            new CountingScanningRecipe { GenerateFile = true },
+            [Parse("class C { }", "c.cs")],
+            new ExecutionContext());
+
+        var generated = Assert.Single(results, r => r.Before == null);
+        Assert.Equal("class G1 { }", Print(generated.After!));
+    }
+
+    [Fact]
+    public void SubRecipeInstancesAreStableAcrossPhases()
+    {
+        // GetRecipeList() constructs the child inline; the scan and edit phases must
+        // still share one accumulator.
+        var results = RecipeScheduler.Run(
+            new InliningComposite(),
+            [Parse("class A { }", "a.cs")],
+            new ExecutionContext());
+
+        var result = Assert.Single(results);
+        Assert.Equal("class A1 { }", Print(result.After!));
+    }
+
+    [Fact]
     public void ResultBeforeIsOriginalSourceAfterChainedEdits()
     {
         var original = Parse("class A { }", "a.cs");
@@ -177,6 +218,48 @@ public class RecipeSchedulerTests
                 return cd.WithName(cd.Name.WithSimpleName(cd.Name.SimpleName + acc.Count));
             }
         }
+    }
+
+    /// <summary>
+    /// Collects every class name during the scan phase, then appends the sorted collected
+    /// names to each class name during the edit phase — making it observable which state
+    /// of the sources the scanner saw.
+    /// </summary>
+    private class AppendScannedNames : ScanningRecipe<SortedSet<string>>
+    {
+        public override string DisplayName => "Append scanned names";
+        public override string Description => "Appends the class names collected while scanning to each class name.";
+
+        public override SortedSet<string> GetInitialValue(ExecutionContext ctx) => [];
+
+        public override ITreeVisitor<ExecutionContext> GetScanner(SortedSet<string> acc) => new NameCollector(acc);
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor(SortedSet<string> acc) => new NameAppender(acc);
+
+        private class NameCollector(SortedSet<string> acc) : CSharpVisitor<ExecutionContext>
+        {
+            public override J VisitClassDeclaration(ClassDeclaration cd, ExecutionContext ctx)
+            {
+                acc.Add(cd.Name.SimpleName);
+                return cd;
+            }
+        }
+
+        private class NameAppender(SortedSet<string> acc) : CSharpVisitor<ExecutionContext>
+        {
+            public override J VisitClassDeclaration(ClassDeclaration cd, ExecutionContext ctx)
+            {
+                return cd.WithName(cd.Name.WithSimpleName(cd.Name.SimpleName + "_" + string.Join("", acc)));
+            }
+        }
+    }
+
+    private class InliningComposite : OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Inlining composite";
+        public override string Description => "Instantiates its sub-recipes inside `GetRecipeList()`.";
+
+        public override List<OpenRewrite.Core.Recipe> GetRecipeList() => [new CountingScanningRecipe()];
     }
 
     private class Rename(string from, string to, params OpenRewrite.Core.Recipe[] children) : OpenRewrite.Core.Recipe
