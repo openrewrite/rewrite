@@ -16,6 +16,9 @@
 package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Marker;
 
 import java.nio.file.AccessMode;
 import java.util.IdentityHashMap;
@@ -69,6 +72,28 @@ class RpcSendQueueTest {
         }, new IdentityHashMap<>(), null, false);
 
         q.sendList(after, before, Function.identity(), null, false);
+        q.flush();
+
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void changedListElementWithoutCodecIsInlined() throws Exception {
+        BuildTool before = new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.0");
+        BuildTool after = before.withVersion("8.0");
+
+        CountDownLatch latch = new CountDownLatch(1);
+        RpcSendQueue q = new RpcSendQueue(10, t -> {
+            assertThat(t).containsExactly(
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, false),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0), null, false),
+              // codec-less elements carry their value inline on CHANGE
+              new RpcObjectData(RpcObjectData.State.CHANGE, BuildTool.class.getName(), after, null, false)
+            );
+            latch.countDown();
+        }, new IdentityHashMap<>(), null, false);
+
+        q.sendList(List.of(after), List.of(before), Marker::getId, null, false);
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();

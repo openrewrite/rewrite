@@ -36,6 +36,31 @@ def test_opaque_value_with_nested_fields_round_trips():
     assert _round_trip(opaque) == opaque
 
 
+def test_changed_opaque_list_element_round_trips():
+    # A codec-less list element (e.g. a Java-origin opaque marker) that changes but
+    # keeps its id diffs as CHANGE rather than ADD.
+    before = [{'kind': 'org.openrewrite.marker.BuildTool', 'id': 'm1', 'version': '7.0'}]
+    after = [{'kind': 'org.openrewrite.marker.BuildTool', 'id': 'm1', 'version': '8.0'}]
+
+    q = RpcSendQueue(None)
+    q.send_list(after, before, lambda m: m['id'])
+    q.q.append({'state': 'END_OF_OBJECT'})
+    data = q.q
+    it = iter([data])
+
+    def pull_batch():
+        try:
+            batch = next(it)
+            if batch and batch[-1].get('state') == 'END_OF_OBJECT':
+                batch = batch[:-1]
+            return batch
+        except StopIteration:
+            return []
+
+    received = RpcReceiveQueue({}, None, pull_batch).receive_list(before, None)
+    assert received == after
+
+
 def test_plain_dict_is_not_mistaken_for_opaque():
     # An ordinary dict (no 'kind') must not be tagged with a type -- unchanged from before the fix.
     assert RpcSendQueue(None)._get_value_type({'a': 1, 'b': 'two'}) is None

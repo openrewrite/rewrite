@@ -197,13 +197,16 @@ public class RpcSendQueue
                     }
                     else
                     {
+                        var afterCodec = GetCodecFor(anAfter!);
+                        // Without an onChange callback or codec, no property messages follow, so the
+                        // value must travel inline (as in Send) or the receiver keeps the stale element
                         Put(new RpcObjectData
                         {
                             State = CHANGE,
-                            ValueType = GetValueType(anAfter)
+                            ValueType = GetValueType(anAfter),
+                            Value = onChangeRun == null && afterCodec == null ? anAfter : null
                         });
-                        DoChange(anAfter, aBefore, onChangeRun,
-                                 GetCodecFor(anAfter!));
+                        DoChange(anAfter, aBefore, onChangeRun, afterCodec);
                     }
                 }
             }
