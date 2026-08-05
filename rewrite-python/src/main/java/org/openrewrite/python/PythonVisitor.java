@@ -98,7 +98,13 @@ public class PythonVisitor<P> extends JavaVisitor<P>
     public J visitExceptionType(Py.ExceptionType exceptionType, P p) {
         exceptionType = exceptionType.withPrefix(visitSpace(exceptionType.getPrefix(), PySpace.Location.EXCEPTION_TYPE_PREFIX, p));
         exceptionType = exceptionType.withMarkers(visitMarkers(exceptionType.getMarkers(), p));
-        return exceptionType.withExpression(visitAndCast(exceptionType.getExpression(), p));
+        return exceptionType.withExpression((Expression) visitTypeNameIfNameTree(visitAndCast(exceptionType.getExpression(), p), p));
+    }
+
+    // Python type positions hold `Expression`/`J` children (to allow e.g. `None`, subscripts, or forward-reference
+    // strings), so only route the ones that are actually name trees through `visitTypeName`
+    private @Nullable J visitTypeNameIfNameTree(@Nullable J j, P p) {
+        return j instanceof NameTree ? visitTypeName((NameTree) j, p) : j;
     }
 
     public J visitLiteralType(Py.LiteralType literalType, P p) {
@@ -116,7 +122,7 @@ public class PythonVisitor<P> extends JavaVisitor<P>
     public J visitTypeHint(Py.TypeHint typeHint, P p) {
         typeHint = typeHint.withPrefix(visitSpace(typeHint.getPrefix(), PySpace.Location.TYPE_HINT_PREFIX, p));
         typeHint = typeHint.withMarkers(visitMarkers(typeHint.getMarkers(), p));
-        return typeHint.withTypeTree(visitAndCast(typeHint.getTypeTree(), p));
+        return typeHint.withTypeTree((Expression) visitTypeNameIfNameTree(visitAndCast(typeHint.getTypeTree(), p), p));
     }
 
     public J visitCompilationUnit(Py.CompilationUnit compilationUnit, P p) {
@@ -140,7 +146,7 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         expressionTypeTree = (Py.ExpressionTypeTree) tempExpression;
         expressionTypeTree = expressionTypeTree.withMarkers(visitMarkers(expressionTypeTree.getMarkers(), p));
-        return expressionTypeTree.withReference(visitAndCast(expressionTypeTree.getReference(), p));
+        return expressionTypeTree.withReference(visitTypeNameIfNameTree(visitAndCast(expressionTypeTree.getReference(), p), p));
     }
 
     public J visitStatementExpression(Py.StatementExpression statementExpression, P p) {
@@ -286,7 +292,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         typeAlias = (Py.TypeAlias) tempStatement;
         typeAlias = typeAlias.withMarkers(visitMarkers(typeAlias.getMarkers(), p));
         typeAlias = typeAlias.withName(visitAndCast(typeAlias.getName(), p));
-        return typeAlias.getPadding().withValue(visitLeftPadded(typeAlias.getPadding().getValue(), PyLeftPadded.Location.TYPE_ALIAS_VALUE, p));
+        typeAlias = typeAlias.getPadding().withValue(visitLeftPadded(typeAlias.getPadding().getValue(), PyLeftPadded.Location.TYPE_ALIAS_VALUE, p));
+        return typeAlias.getPadding().withValue(typeAlias.getPadding().getValue().withElement(visitTypeNameIfNameTree(typeAlias.getPadding().getValue().getElement(), p)));
     }
 
     public J visitYieldFrom(Py.YieldFrom yieldFrom, P p) {
@@ -310,7 +317,8 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         }
         unionType = (Py.UnionType) tempExpression;
         unionType = unionType.withMarkers(visitMarkers(unionType.getMarkers(), p));
-        return unionType.getPadding().withTypes(ListUtils.map(unionType.getPadding().getTypes(), el -> visitRightPadded(el, PyRightPadded.Location.UNION_TYPE_TYPES, p)));
+        unionType = unionType.getPadding().withTypes(ListUtils.map(unionType.getPadding().getTypes(), el -> visitRightPadded(el, PyRightPadded.Location.UNION_TYPE_TYPES, p)));
+        return unionType.getPadding().withTypes(ListUtils.map(unionType.getPadding().getTypes(), el -> el.withElement((Expression) visitTypeNameIfNameTree(el.getElement(), p))));
     }
 
     public J visitVariableScope(Py.VariableScope variableScope, P p) {
