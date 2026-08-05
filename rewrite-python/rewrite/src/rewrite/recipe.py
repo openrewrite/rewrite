@@ -25,6 +25,7 @@ from typing import (
     TYPE_CHECKING,
     TypeVar,
     Generic,
+    cast,
 )
 
 if TYPE_CHECKING:
@@ -271,22 +272,7 @@ class Recipe(ABC):
         """
         from rewrite.visitor import Cursor
 
-        lss = self._run_internal(before, ctx, Cursor(None, Cursor.ROOT_VALUE))
-        return lss.get_changeset()
-
-    def _run_internal(
-        self, before: LargeSourceSet, ctx: ExecutionContext, root: Cursor
-    ) -> LargeSourceSet:
-        """
-        Internal implementation of recipe execution.
-
-        Applies this recipe's editor to each source file, then recursively
-        applies any child recipes from recipe_list().
-        """
-        after = before.edit(lambda source: self.editor().visit(source, ctx, root))
-        for recipe in self.recipe_list():
-            after = recipe._run_internal(after, ctx, root)
-        return after
+        return _RecipeRun(ctx, Cursor(None, Cursor.ROOT_VALUE)).run(self, before).get_changeset()
 
 
 T = TypeVar("T")
@@ -357,14 +343,118 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
         """
         return []
 
+    def accumulator(self, cursor: Cursor, ctx: ExecutionContext) -> T:
+        """
+        Get this recipe instance's accumulator, creating it on first access.
+
+        The accumulator is stored in the root cursor's messages under a
+        per-instance key, so all phases of a run share it while separate runs
+        (each with a fresh root cursor) start from initial_value().
+        """
+        root = cursor
+        while root.parent is not None:
+            root = root.parent
+        key = f"org.openrewrite.recipe.acc.{id(self)}"
+        if root.messages is None or key not in root.messages:
+            root.put_message(key, self.initial_value(ctx))
+        messages = root.messages
+        assert messages is not None
+        return cast(T, messages[key])
+
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         """
-        Internal implementation - delegates to scanner and editor_with_data.
+        Internal implementation - delegates to editor_with_data() with the
+        current run's accumulator.
 
         Do not override this method. Override scanner() and editor_with_data()
         instead.
         """
-        # This will be set up by the recipe scheduler
         from rewrite.visitor import TreeVisitor
 
-        return TreeVisitor.noop()
+        recipe = self
+
+        class _AccumulatorEditor(TreeVisitor):
+            _delegate: Optional[TreeVisitor[Any, ExecutionContext]] = None
+
+            def visit(self, tree, p, parent=None):
+                if self._delegate is None:
+                    cursor = parent if parent is not None else self._cursor
+                    self._delegate = recipe.editor_with_data(recipe.accumulator(cursor, p))
+                return self._delegate.visit(tree, p, parent)
+
+        return _AccumulatorEditor()
+
+
+class _RecipeRun:
+    """
+    A single scheduled run of a recipe over a set of source files.
+
+    Mirrors the Java ``RecipeRunCycle`` lifecycle: every source file is
+    scanned by every ``ScanningRecipe`` in the recipe tree, then new files
+    are generated, then all files (including generated ones) are edited.
+    """
+
+    def __init__(self, ctx: ExecutionContext, root: Cursor):
+        self._ctx = ctx
+        self._root = root
+        # Recipes commonly instantiate their sub-recipes inline in recipe_list(),
+        # so each call yields new instances. Resolving each recipe's list once per
+        # run keeps sub-recipe identity — and therefore scanning-recipe accumulator
+        # identity — stable across the scan, generate, and edit phases. Keyed by
+        # id() because dataclass-based recipes are unhashable; every keyed recipe
+        # stays referenced through the cached lists (the root through the caller),
+        # so ids cannot be recycled during the run.
+        self._recipe_lists: dict[int, List[Recipe]] = {}
+
+    def run(self, recipe: Recipe, before: LargeSourceSet) -> LargeSourceSet:
+        after = before
+        if self._has_scanning_recipe(recipe):
+            # edit() is used only to iterate the source files; _scan returns
+            # each file unchanged, so the returned source set is the same
+            after.edit(lambda source: self._scan(recipe, source))
+            generated = self._recurse(recipe, [], self._generate_one)
+            after = after.generate(generated)
+        return after.edit(lambda source: self._recurse(recipe, source, self._edit_one))
+
+    def _scan(self, recipe: Recipe, source: SourceFile) -> SourceFile:
+        return self._recurse(recipe, source, self._scan_one)
+
+    def _scan_one(self, recipe: Recipe, source: SourceFile) -> SourceFile:
+        if isinstance(recipe, ScanningRecipe):
+            scanner = recipe.scanner(recipe.accumulator(self._root, self._ctx))
+            # Scanning must not modify the tree, so the visit result is discarded
+            # and the original file is passed on to the next recipe; in particular
+            # a scanner returning None must not halt the traversal.
+            scanner.visit(source, self._ctx, self._root)
+        return source
+
+    def _generate_one(self, recipe: Recipe, generated: List[SourceFile]) -> List[SourceFile]:
+        if isinstance(recipe, ScanningRecipe):
+            generated.extend(recipe.generate(recipe.accumulator(self._root, self._ctx), self._ctx))
+        return generated
+
+    def _edit_one(self, recipe: Recipe, source: SourceFile) -> Optional[SourceFile]:
+        # None deletes the file and, via _recurse's short-circuit, stops
+        # later recipes from visiting it
+        return recipe.editor().visit(source, self._ctx, self._root)
+
+    def _recurse(self, recipe: Recipe, t, fn):
+        """Apply fn to every recipe in the tree in pre-order, threading t through."""
+        t = fn(recipe, t)
+        for sub_recipe in self._sub_recipes(recipe):
+            if t is None:
+                return None
+            t = self._recurse(sub_recipe, t, fn)
+        return t
+
+    def _sub_recipes(self, recipe: Recipe) -> List[Recipe]:
+        resolved = self._recipe_lists.get(id(recipe))
+        if resolved is None:
+            resolved = recipe.recipe_list()
+            self._recipe_lists[id(recipe)] = resolved
+        return resolved
+
+    def _has_scanning_recipe(self, recipe: Recipe) -> bool:
+        if isinstance(recipe, ScanningRecipe):
+            return True
+        return any(self._has_scanning_recipe(r) for r in self._sub_recipes(recipe))
