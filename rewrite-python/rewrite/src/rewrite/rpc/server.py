@@ -674,7 +674,9 @@ def _module_name(fp: str, root: str) -> str:
 
 def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any],
                         processed_ids: Set[int]) -> None:
-    """Collect the complete JavaType.Class for every class one package defines.
+    """Collect the complete JavaType.Class for every class one package defines,
+    plus a synthetic per-module class carrying its module-level functions and
+    constants (see ``PythonTypeMapping.module_type``).
 
     ty has no module enumeration, so walk the package's own .py/.pyi, run the
     per-file type extraction, and keep the classLiteral descriptors whose module
@@ -740,6 +742,12 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
             existing = by_fqn.get(fqn)
             if existing is None or _richness(java_type) > _richness(existing):
                 by_fqn[fqn] = java_type
+        # One module type per module FQN: the first file defines it, which the
+        # stub-first file ordering makes the .pyi when one exists.
+        if own_module not in by_fqn:
+            module_type = mapping.module_type(own_module)
+            if module_type is not None:
+                by_fqn[own_module] = module_type
 
 
 # DependencyTypes pages its (potentially hundreds-of-MB) response: the full list is

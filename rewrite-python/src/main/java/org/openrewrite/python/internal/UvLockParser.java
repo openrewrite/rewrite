@@ -100,20 +100,8 @@ public class UvLockParser {
         return extractPackages(doc);
     }
 
-    /**
-     * Two-pass extraction:
-     * 1. Create all ResolvedDependency objects (without transitive deps linked)
-     * 2. Link transitive dependencies by looking up names in the resolved map
-     * <p>
-     * Python resolution is flat (one version per package), so each dependency
-     * name maps to exactly one ResolvedDependency.
-     */
     private static List<ResolvedDependency> extractPackages(Toml.Document doc) {
-        // Pass 1: Create all resolved entries and collect raw dependency names per package
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
-        Map<String, List<String>> rawDepsPerPackage = new LinkedHashMap<>();
-
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>();
         for (TomlValue value : doc.getValues()) {
             if (!(value instanceof Toml.Table)) {
                 continue;
@@ -129,37 +117,10 @@ public class UvLockParser {
                 continue;
             }
 
-            String source = extractSource(table);
-            List<String> depNames = extractDependencyNames(table);
-
-            ResolvedDependency entry = new ResolvedDependency(name, version, source, null);
-            resolved.add(entry);
-            byNormalizedName.put(PythonResolutionResult.normalizeName(name), entry);
-            if (!depNames.isEmpty()) {
-                rawDepsPerPackage.put(PythonResolutionResult.normalizeName(name), depNames);
-            }
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    name, version, extractSource(table), extractDependencyNames(table)));
         }
-
-        // Pass 2: Link transitive dependencies
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency entry : resolved) {
-            String normalizedName = PythonResolutionResult.normalizeName(entry.getName());
-            List<String> depNames = rawDepsPerPackage.get(normalizedName);
-            if (depNames != null) {
-                List<ResolvedDependency> deps = new ArrayList<>();
-                for (String depName : depNames) {
-                    ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(depName));
-                    if (dep != null) {
-                        deps.add(dep);
-                    }
-                }
-                linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
-            } else {
-                linked.add(entry);
-            }
-        }
-
-        return linked;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 
     /**

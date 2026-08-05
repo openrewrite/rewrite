@@ -31,9 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Extracts resolved-dependency information from poetry.lock for overlay onto the
@@ -65,41 +63,19 @@ public class PoetryLockParser {
             return Collections.emptyList();
         }
 
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        Map<String, ResolvedDependency> byName = new LinkedHashMap<>();
-        Map<String, List<String>> edges = new LinkedHashMap<>();
-
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(lock.getPackages().size());
         for (PoetryLockPackage pkg : lock.getPackages()) {
             PoetryLockSource source = pkg.getSource();
-            ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(),
-                    source != null ? source.getUrl() : null, null);
-            resolved.add(entry);
-            byName.put(PythonResolutionResult.normalizeName(pkg.getName()), entry);
+            List<String> depNames = new ArrayList<>();
             if (pkg.getDependencies() != null) {
-                List<String> names = new ArrayList<>();
                 for (PoetryLockDependency dep : pkg.getDependencies()) {
-                    names.add(dep.getName());
-                }
-                edges.put(PythonResolutionResult.normalizeName(pkg.getName()), names);
-            }
-        }
-
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency entry : resolved) {
-            List<String> names = edges.get(PythonResolutionResult.normalizeName(entry.getName()));
-            if (names == null) {
-                linked.add(entry);
-                continue;
-            }
-            List<ResolvedDependency> deps = new ArrayList<>();
-            for (String name : names) {
-                ResolvedDependency dep = byName.get(PythonResolutionResult.normalizeName(name));
-                if (dep != null) {
-                    deps.add(dep);
+                    depNames.add(dep.getName());
                 }
             }
-            linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    pkg.getName(), pkg.getVersion(),
+                    source != null ? source.getUrl() : null, depNames));
         }
-        return linked;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 }
