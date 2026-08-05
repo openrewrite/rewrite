@@ -156,3 +156,55 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 		t.Errorf("ModulePath: want %q, got %q", "example.com/empty", got.ModulePath)
 	}
 }
+
+// diffRoundTripMarkers serializes `after` as a delta against `before` and
+// applies the delta on the receiver, mirroring how a modified tree's markers
+// travel back to the peer.
+func diffRoundTripMarkers(t *testing.T, before, after java.Markers) java.Markers {
+	t.Helper()
+	var messages []RpcObjectData
+	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
+		messages = append(messages, batch...)
+	}, NewReferenceMap())
+	sendQ.Send(after, before, func(_ any) { SendMarkersCodec(after, sendQ) })
+	sendQ.Flush()
+
+	delivered := false
+	recvQ := NewReceiveQueue(make(map[int]any), func() []RpcObjectData {
+		if delivered {
+			return nil
+		}
+		delivered = true
+		return messages
+	})
+	result := recvQ.Receive(before, func(v any) any { return receiveMarkersCodec(recvQ, v.(java.Markers)) })
+	return result.(java.Markers)
+}
+
+func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
+	// A codec-less GenericMarker (e.g. BuildTool) that changes but keeps its
+	// id diffs as CHANGE rather than ADD.
+	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	mk := func(version string) java.GenericMarker {
+		return java.GenericMarker{
+			Ident:    id,
+			JavaType: "org.openrewrite.marker.BuildTool",
+			Data:     map[string]any{"id": id.String(), "type": "Gradle", "version": version},
+		}
+	}
+	markersID := uuid.New()
+	before := java.Markers{ID: markersID, Entries: []java.Marker{mk("7.0")}}
+	after := java.Markers{ID: markersID, Entries: []java.Marker{mk("8.0")}}
+
+	got := diffRoundTripMarkers(t, before, after)
+	if len(got.Entries) != 1 {
+		t.Fatalf("entries: want 1, got %d", len(got.Entries))
+	}
+	gm, ok := got.Entries[0].(java.GenericMarker)
+	if !ok {
+		t.Fatalf("entry is %T, want java.GenericMarker", got.Entries[0])
+	}
+	if gm.Data["version"] != "8.0" {
+		t.Errorf("version: want %q, got %v", "8.0", gm.Data["version"])
+	}
+}
