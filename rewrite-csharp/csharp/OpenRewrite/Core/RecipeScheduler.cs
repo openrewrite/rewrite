@@ -40,18 +40,14 @@ public static class RecipeScheduler
         Dictionary<Guid, Result> allResults,
         ExecutionContext ctx)
     {
-        var recipeList = recipe.GetRecipeList();
-        if (recipeList.Count > 0)
+        // Pre-order traversal, as in Java's RecipeRunCycle/RecipeStack: the recipe's own
+        // visitor (or scan/generate/edit lifecycle) runs first, then its recipe list.
+        var results = EditSources(recipe, currentSources, ctx);
+        ApplyResults(results, currentSources, allResults);
+
+        foreach (var subRecipe in recipe.GetRecipeList())
         {
-            foreach (var subRecipe in recipeList)
-            {
-                RunRecipe(subRecipe, currentSources, allResults, ctx);
-            }
-        }
-        else
-        {
-            var results = EditSources(recipe, currentSources, ctx);
-            ApplyResults(results, currentSources, allResults);
+            RunRecipe(subRecipe, currentSources, allResults, ctx);
         }
     }
 
@@ -119,7 +115,26 @@ public static class RecipeScheduler
         {
             if (result.Before != null)
             {
-                allResults[result.Before.Id] = result;
+                // An earlier recipe may already have recorded a result for this file, in which
+                // case result.Before is that recipe's after tree. The final result must pair
+                // the file's original state with the latest after.
+                if (allResults.TryGetValue(result.Before.Id, out var existing))
+                {
+                    if (existing.Before == null && result.After == null)
+                    {
+                        // A generated file that a later recipe deleted never existed
+                        allResults.Remove(result.Before.Id);
+                    }
+                    else
+                    {
+                        allResults[result.Before.Id] = new Result(existing.Before, result.After);
+                    }
+                }
+                else
+                {
+                    allResults[result.Before.Id] = result;
+                }
+
                 if (result.After != null)
                 {
                     for (var i = 0; i < currentSources.Count; i++)
