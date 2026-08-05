@@ -91,10 +91,6 @@ def maybe_add_import(visitor: PythonVisitor, options: AddImportOptions) -> None:
         # Add: from typing import *
         maybe_add_import(visitor, AddImportOptions(module='typing', name='*'))
     """
-    # builtins are always available; only import them under an explicit alias
-    if options.module == 'builtins' and options.alias is None:
-        return
-
     # Check for duplicate registrations
     if visitor._after_visit is None:
         visitor._after_visit = []
@@ -127,6 +123,10 @@ class AddImport(PythonVisitor):
         self.only_if_referenced = options.only_if_referenced
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
+        # builtins are always available; only import them under an explicit alias
+        if self.module == 'builtins' and self.alias is None:
+            return cu
+
         # A bare builtin name (e.g. `list` when ChangeType retargets a type to a builtin) is
         # not a module, so there is no import that could bind it.
         if self.name is None and '.' not in self.module and hasattr(builtins, self.module):
