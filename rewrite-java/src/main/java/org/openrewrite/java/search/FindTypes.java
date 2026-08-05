@@ -172,11 +172,18 @@ public class FindTypes extends Recipe {
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+            Object parent = getCursor().getParentOrThrow().getValue();
+            // An identifier is only subsumed by an enclosing parameterized type when that type is itself the
+            // match (see `visitParameterizedType`). The identifier can be the sole matching node, e.g. in
+            // Python `items: List[str]` the parameterized type is attributed as builtin `list` while the
+            // `List` identifier is attributed as `typing.List`.
+            boolean matchingParameterizedTypeParent = parent instanceof J.ParameterizedType &&
+                    parameterizedTypeMatches((J.ParameterizedType) parent);
             if (ident.getType() != null &&
                     getCursor().firstEnclosing(J.Import.class) == null &&
                     getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
+                    !matchingParameterizedTypeParent &&
+                    !(parent instanceof J.ArrayType)) {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
@@ -184,6 +191,24 @@ public class FindTypes extends Recipe {
                 }
             }
             return super.visitIdentifier(ident, ctx);
+        }
+
+        @Override
+        public J visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            // In Java trees a matching parameterized type is also marked via `visitTypeName`, invoked by the
+            // JavaVisitor parent (idempotently with this). Parents in other languages may visit it as a plain
+            // expression (e.g. Python's `Py.TypeHint`), so mark it here to uphold the invariant that
+            // `visitIdentifier` relies on: a matching parameterized type is always marked as a whole.
+            J.ParameterizedType pt = (J.ParameterizedType) super.visitParameterizedType(type, ctx);
+            if (parameterizedTypeMatches(pt) && getCursor().firstEnclosing(J.Import.class) == null) {
+                return found(pt, ctx);
+            }
+            return pt;
+        }
+
+        private boolean parameterizedTypeMatches(J.ParameterizedType type) {
+            return typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType,
+                    TypeUtils.asFullyQualified(type.getType()));
         }
 
         @Override
