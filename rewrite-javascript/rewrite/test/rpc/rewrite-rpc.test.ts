@@ -280,6 +280,25 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("sameTypeChildrenPreserveDistinctOptions", async () => {
+        // A composite whose recipeList() yields multiple instances of the same recipe class with
+        // different option values must keep each prepared child its own options, rather than
+        // collapsing them.
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.same-type-children");
+        const descriptor = await recipe.descriptor();
+
+        expect(descriptor.recipeList.map(r => r.name)).toEqual([
+            "org.openrewrite.example.text.change-text",
+            "org.openrewrite.example.text.change-text",
+            "org.openrewrite.example.text.change-text"
+        ]);
+
+        const texts = descriptor.recipeList.map(
+            r => r.options.find(o => o.name === "text")?.value
+        );
+        expect(texts).toEqual(["a", "b", "c"]);
+    });
+
     test("preparing an unknown recipe id delegates to the host instead of failing", async () => {
         // When the host builds RpcRecipe.getRecipeList() it re-prepares every child by
         // id over RPC. A child that delegates to a Java recipe (e.g. Angular's

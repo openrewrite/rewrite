@@ -28,7 +28,7 @@ import ast
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..java import JavaType
 
@@ -97,6 +97,36 @@ _PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
     JavaType.Primitive.Boolean: 'bool',
     JavaType.Primitive.None_: 'None',
 }
+
+# ty-types descriptor kinds that map to JavaType.Method
+_FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
+
+
+def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
+    """The names ``__all__`` declares via top-level literal list/tuple assignments
+    (plain, annotated, or augmented), or None when the module has no such ``__all__``."""
+    names: Optional[Set[str]] = None
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign):
+            targets, value = stmt.targets, stmt.value
+        elif isinstance(stmt, (ast.AnnAssign, ast.AugAssign)):
+            targets, value = [stmt.target], stmt.value
+        else:
+            continue
+        if not isinstance(value, (ast.List, ast.Tuple)):
+            continue
+        if any(isinstance(t, ast.Name) and t.id == '__all__' for t in targets):
+            if names is None:
+                names = set()
+            names.update(elt.value for elt in value.elts
+                         if isinstance(elt, ast.Constant) and isinstance(elt.value, str))
+    return names
+
+
+def _is_public(name: str, all_names: Optional[Set[str]]) -> bool:
+    """Whether ``name`` is part of the module's public surface: membership in
+    ``__all__`` when declared, else the non-underscore convention."""
+    return name in all_names if all_names is not None else not name.startswith('_')
 
 
 class PythonTypeMapping:
@@ -477,7 +507,7 @@ class PythonTypeMapping:
             module_name = descriptor.get('moduleName', '')
             return self._create_class_type(module_name)
 
-        elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
+        elif kind in _FUNCTION_KINDS:
             # Use structured return type if available
             return_type_id = descriptor.get('returnType')
             if return_type_id is not None:
@@ -552,7 +582,7 @@ class PythonTypeMapping:
                     if member_type_id is None:
                         continue
                     member_desc = self._type_registry.get(member_type_id)
-                    if member_desc and member_desc.get('kind') in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
+                    if member_desc and member_desc.get('kind') in _FUNCTION_KINDS:
                         method = self._create_method_from_descriptor(member_desc, class_type)
                         if method:
                             methods.append(method)
@@ -781,7 +811,7 @@ class PythonTypeMapping:
     def _is_variable_descriptor(self, descriptor: Dict[str, Any]) -> bool:
         """Check if a type descriptor represents a variable (not a function, class, or module)."""
         kind = descriptor.get('kind')
-        return kind not in ('function', 'boundMethod', 'callable', 'wrapperDescriptor', 'module', 'classLiteral')
+        return kind not in _FUNCTION_KINDS and kind not in ('module', 'classLiteral')
 
     def name_type_info(self, node: ast.Name) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
         """Get expression type and variable type for a name reference.
@@ -842,7 +872,7 @@ class PythonTypeMapping:
         type_id = self._lookup_type_id(node)
         if type_id is not None:
             descriptor = self._type_registry.get(type_id)
-            if descriptor and descriptor.get('kind') in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
+            if descriptor and descriptor.get('kind') in _FUNCTION_KINDS:
                 # If the descriptor has parameters/returnType, use them directly
                 params = descriptor.get('parameters')
                 ret_id = descriptor.get('returnType')
@@ -909,6 +939,75 @@ class PythonTypeMapping:
             _parameter_types=param_types if param_types else None,
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
+
+    def module_type(self, module_fqn: str) -> Optional[JavaType.Class]:
+        """A JavaType.Class for the module itself: FQN = the module name, public
+        top-level functions as methods, public top-level constants as members.
+
+        This is the definition half of how the type model represents module-level
+        API — attribution declares a reference like ``click.echo`` or ``os.sep``
+        under a class named after the module (see
+        ``_declaring_type_from_descriptor``), so an enumeration of the module's
+        public types must define that class for such references to resolve.
+        Re-exported bindings (``from .utils import echo`` in ``__init__.py``) are
+        included under their binding name, since attribution names them the same
+        way; re-exported classes are not — a class reference keeps its defining
+        FQN. The public surface is ``__all__`` when declared, else the
+        non-underscore names. Returns None when the module has no public
+        module-level symbols.
+        """
+        try:
+            tree = ast.parse(self._source)
+        except SyntaxError:
+            return None
+
+        all_names = _module_all_names(tree)
+        # Shallow until a body is found: promotion would advertise a defined
+        # (rather than merely referenced) class even for an empty module.
+        module_class = self._create_class_type(module_fqn)
+        methods: Dict[str, JavaType.Method] = {}
+        members: Dict[str, JavaType.Variable] = {}
+
+        def add_binding(name: str, node: ast.AST) -> None:
+            if not _is_public(name, all_names) or name in methods or name in members:
+                return
+            type_id = self._lookup_type_id(node)
+            descriptor = self._type_registry.get(type_id)
+            if descriptor is None:
+                return
+            if descriptor.get('kind') in _FUNCTION_KINDS:
+                method = self._create_method_from_descriptor(descriptor, module_class, name=name)
+                if method is not None:
+                    methods[name] = method
+            elif self._is_variable_descriptor(descriptor):
+                member_type = self._resolve_type(type_id)
+                if member_type is not None:
+                    members[name] = JavaType.Variable(
+                        _name=name, _type=member_type, _owner=module_class)
+            # classLiteral / module bindings keep their own FQN — not module members.
+
+        for stmt in tree.body:
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                add_binding(stmt.name, stmt)
+            elif isinstance(stmt, ast.Assign):
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        add_binding(target.id, target)
+            elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                add_binding(stmt.target.id, stmt.target)
+            elif isinstance(stmt, ast.ImportFrom):
+                for alias in stmt.names:
+                    if alias.name != '*':
+                        add_binding(alias.asname or alias.name, alias)
+            # plain `import x` binds a module object, never module-level API
+
+        if not methods and not members:
+            return None
+        # Promote in place, so references minted earlier from this file share the instance.
+        module_class = self._create_class_type(module_fqn, shallow=False)
+        module_class._methods = list(methods.values()) or None
+        module_class._members = list(members.values()) or None
+        return module_class
 
     def method_invocation_type(self, node: ast.Call) -> Optional[JavaType.Method]:
         """Get the method type for a function/method call.
@@ -1105,7 +1204,7 @@ class PythonTypeMapping:
                     kind = descriptor.get('kind')
                     if kind == 'module':
                         return self._create_class_type(descriptor.get('moduleName', ''))
-                    elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
+                    elif kind in _FUNCTION_KINDS:
                         # boundMethod has className — use it for declaring type
                         if descriptor.get('className'):
                             return self._class_reference(descriptor)
@@ -1366,9 +1465,11 @@ class PythonTypeMapping:
         return None
 
     def _create_method_from_descriptor(self, descriptor: Dict[str, Any],
-                                        declaring_type: JavaType.FullyQualified) -> Optional[JavaType.Method]:
-        """Create a JavaType.Method from a ty-types function/boundMethod descriptor."""
-        name = descriptor.get('name', '')
+                                        declaring_type: JavaType.FullyQualified,
+                                        name: Optional[str] = None) -> Optional[JavaType.Method]:
+        """Create a JavaType.Method from a ty-types function/boundMethod descriptor.
+        ``name`` overrides the descriptor's own name (e.g. for aliased re-exports)."""
+        name = name or descriptor.get('name', '')
         if not name:
             return None
 
