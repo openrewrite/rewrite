@@ -21,14 +21,11 @@ namespace OpenRewrite.Tests.Rpc;
 
 public class ChangedMarkerRoundTripTest
 {
-    /// <summary>
-    /// A codec-less marker (e.g. RecipesThatMadeChanges) that changes but keeps its id
-    /// diffs as CHANGE in the markers list rather than ADD.
-    /// </summary>
     [Fact]
     public void ChangedMarkerWithSameIdRoundTrips()
     {
         var markerId = Guid.NewGuid();
+        // RecipesThatMadeChanges has no IRpcCodec, so its field values travel inline
         var beforeMarker = new RecipesThatMadeChanges { Id = markerId, Recipes = "before" };
         var afterMarker = new RecipesThatMadeChanges { Id = markerId, Recipes = "after" };
         var before = new Markers(Guid.NewGuid(), [beforeMarker]);

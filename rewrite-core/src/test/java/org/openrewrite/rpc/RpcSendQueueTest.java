@@ -21,13 +21,13 @@ import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Marker;
 
 import java.nio.file.AccessMode;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.rpc.RpcObjectData.State.ADD;
 
 class RpcSendQueueTest {
 
@@ -97,6 +97,53 @@ class RpcSendQueueTest {
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void changedRefSlotIsReAddedInsteadOfChanged() {
+        List<RpcObjectData> sent = new ArrayList<>();
+        RpcSendQueue q = new RpcSendQueue(100, sent::addAll, new IdentityHashMap<>(), null, false);
+
+        String t1 = "T1";
+        String t2 = "T2";
+
+        q.send(Reference.asRef(t1), null, null);
+        q.send(Reference.asRef(t2), Reference.asRef(t1), null);
+        // A repeat of the same transition dedups against the ref registered by the re-add
+        q.send(Reference.asRef(t2), Reference.asRef(t1), null);
+        q.flush();
+
+        assertThat(sent).containsExactly(
+          new RpcObjectData(ADD, null, "T1", 1, false),
+          new RpcObjectData(ADD, null, "T2", 2, false),
+          new RpcObjectData(ADD, null, null, 2, false)
+        );
+    }
+
+    @Test
+    void listImplementationClassMayDiffer() {
+        List<String> before = new ArrayList<>(List.of("A", "B"));
+        List<String> after = List.of("A");
+
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    @Test
+    void listImplementationClassMayDifferReverse() {
+        List<String> before = List.of("A");
+        List<String> after = new ArrayList<>(List.of("A", "B"));
+
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    private List<String> roundTripList(List<String> after, List<String> before) {
+        Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
+        RpcSendQueue sq = new RpcSendQueue(1, batches::addLast, new IdentityHashMap<>(), null, false);
+        RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
+
+        sq.sendList(after, before, Function.identity(), null, false);
+        sq.flush();
+        return rq.receiveList(before, null);
     }
 
     @Test

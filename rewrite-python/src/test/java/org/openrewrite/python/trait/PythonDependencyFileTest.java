@@ -162,6 +162,25 @@ class PythonDependencyFileTest implements RewriteTest {
         }
 
         @Test
+        void relinksGraphAndDeclaredPointersAfterUpdate() {
+            ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null,
+              singletonList(certifi));
+            Dependency declared = new Dependency("requests", ">=2.28.0", null, null, requests);
+            PythonResolutionResult marker = createMarker(singletonList(declared), Arrays.asList(requests, certifi));
+
+            Map<String, String> updates = Map.of("requests", "2.31.0", "certifi", "2025.1.31");
+            PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
+
+            ResolvedDependency newRequests = updated.getResolvedDependency("requests");
+            ResolvedDependency newCertifi = updated.getResolvedDependency("certifi");
+            assertThat(newRequests.getVersion()).isEqualTo("2.31.0");
+            assertThat(newCertifi.getVersion()).isEqualTo("2025.1.31");
+            assertThat(newRequests.getDependencies().get(0)).isSameAs(newCertifi);
+            assertThat(updated.getDependencies().get(0).getResolved()).isSameAs(newRequests);
+        }
+
+        @Test
         void returnsOriginalWhenNoChanges() {
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
             PythonResolutionResult marker = createMarker(emptyList(), singletonList(requests));

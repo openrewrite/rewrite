@@ -10,14 +10,13 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
 import java.util.regex.Pattern;
-
-import static org.openrewrite.internal.ListUtils.map;
 
 /**
  * Trait for Python dependency files (pyproject.toml, requirements.txt, etc.).
@@ -160,21 +159,12 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     }
 
     /**
-     * Update the resolved dependency versions in a marker to reflect version changes.
-     * Returns the same marker if no changes were needed.
+     * Update the resolved dependency versions in a marker; see
+     * {@link PythonResolutionLinker#updateResolvedVersions} for the contract.
      */
     static PythonResolutionResult updateResolvedVersions(
             PythonResolutionResult marker, Map<String, String> versionUpdates) {
-        List<PythonResolutionResult.ResolvedDependency> resolved = marker.getResolvedDependencies();
-        List<PythonResolutionResult.ResolvedDependency> updated = map(resolved, dep -> {
-            String normalizedName = PythonResolutionResult.normalizeName(dep.getName());
-            String newVersion = versionUpdates.get(normalizedName);
-            if (newVersion != null && !newVersion.equals(dep.getVersion())) {
-                return dep.withVersion(newVersion);
-            }
-            return dep;
-        });
-        return updated == resolved ? marker : marker.withResolvedDependencies(updated);
+        return PythonResolutionLinker.updateResolvedVersions(marker, versionUpdates);
     }
 
     class Matcher extends SimpleTraitMatcher<PythonDependencyFile> {

@@ -1158,6 +1158,26 @@ def _register_marker_codecs():
     )
 
 
+def _register_execution_context_codec():
+    """Codec for execution contexts crossing the RPC boundary (e.g. Java
+    fetching the ``p`` of a Visit from a Python host via GetObject).
+
+    Mirrors Java's ``ExecutionContext.rpcSend``/``rpcReceive`` defaults and the
+    JavaScript ``executionContextCodec``: the wire carries no properties, the
+    receiver reconstructs the context from ``valueType`` alone.
+    """
+    from rewrite import InMemoryExecutionContext
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
+
+    register_codec_with_both_names(
+        'org.openrewrite.InMemoryExecutionContext',
+        InMemoryExecutionContext,
+        lambda ctx, q: ctx,
+        lambda: InMemoryExecutionContext(),
+        lambda ctx, q: None,
+    )
+
+
 # ============================================================================
 # Codec registration - registers all AST, support, and marker types
 # ============================================================================
@@ -2217,3 +2237,4 @@ _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
 _register_python_marker_codecs()  # Python-specific markers including PrintSyntax, ExecSyntax
 _register_python_resolution_result_codecs()  # PythonResolutionResult and nested types
+_register_execution_context_codec()

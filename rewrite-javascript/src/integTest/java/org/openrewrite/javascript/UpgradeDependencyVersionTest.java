@@ -16,8 +16,11 @@
 package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -34,7 +37,17 @@ import static org.openrewrite.javascript.Assertions.npm;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.test.SourceSpecs.text;
 
+/**
+ * PM-gated parity cross-check: exercises the recipe against a real {@code npm} workspace. Native
+ * PM-free regeneration is covered by {@code UpgradeDependencyVersionLockRegenTest} in {@code src/test};
+ * this suite skips when npm is not on the PATH.
+ */
 class UpgradeDependencyVersionTest implements RewriteTest {
+
+    @BeforeEach
+    void requirePackageManager() {
+        Assumptions.assumeTrue(PackageManagerExecutor.NPM.find() != null, "npm not installed");
+    }
 
     @Test
     void upgradesExactMatch(@TempDir Path tempDir) {

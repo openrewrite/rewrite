@@ -117,6 +117,18 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_builtin_name_is_not_imported(self):
+        """A bare builtin name (e.g. from ChangeType retargeting to `list`) is not a module;
+        adding an import for it is a no-op."""
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('list')))
+        spec.rewrite_run(
+            python(
+                """
+                x: list[int] = []
+                """,
+            )
+        )
+
     def test_only_if_referenced(self):
         """Don't add import when the name is not referenced and only_if_referenced=True."""
         class AddJoinVisitor(PythonVisitor[ExecutionContext]):

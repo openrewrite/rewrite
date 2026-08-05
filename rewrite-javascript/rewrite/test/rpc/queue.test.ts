@@ -31,6 +31,27 @@ describe("RPC queues", () => {
         ]);
     });
 
+    test("a changed ref slot is re-added instead of changed", async () => {
+        const spaceA = {kind: Json.Kind.Space, comments: [], whitespace: " "};
+        const spaceB = {kind: Json.Kind.Space, comments: [], whitespace: "  "};
+        const queue = new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false);
+
+        await queue.generate(asRef(spaceA), undefined);
+
+        // A changed ref slot is re-added under a fresh ref, never CHANGEd (see RpcSendQueue.send)
+        const reAdd = await queue.generate(asRef(spaceB), asRef(spaceA));
+        expect(reAdd[0].state).toBe(RpcObjectState.ADD);
+        expect(reAdd[0].ref).toBe(1);
+        expect(reAdd[0].valueType).toBe(Json.Kind.Space);
+
+        // A repeat of the same transition dedups against the ref registered by the re-add
+        const refOnly = await queue.generate(asRef(spaceB), asRef(spaceA));
+        expect(refOnly).toEqual([
+            {state: RpcObjectState.ADD, ref: 1},
+            {state: RpcObjectState.END_OF_OBJECT},
+        ]);
+    });
+
     test("changePropertyType", async () => {
         // Test changing a property from one type to another type
         // This simulates a recipe that changes the type of an object assigned to a property

@@ -182,8 +182,6 @@ func diffRoundTripMarkers(t *testing.T, before, after java.Markers) java.Markers
 }
 
 func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
-	// A codec-less GenericMarker (e.g. BuildTool) that changes but keeps its
-	// id diffs as CHANGE rather than ADD.
 	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
 	mk := func(version string) java.GenericMarker {
 		return java.GenericMarker{

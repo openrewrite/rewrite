@@ -154,9 +154,8 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 
 // hydrateGenericMarker applies a message's inline data map to a codec-less
 // GenericMarker. Such markers travel as `{valueType, value=map}` with no
-// sub-field messages (matching every other language's send queue); without
-// hydration the marker's fields would be silently dropped on ADD and a changed
-// marker would keep its stale fields on CHANGE.
+// sub-field messages (matching every other language's send queue), so this is
+// the only place their fields cross the wire.
 func hydrateGenericMarker(before any, value any) any {
 	if gm, ok := before.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
 		if dataMap, ok := value.(map[string]any); ok {
