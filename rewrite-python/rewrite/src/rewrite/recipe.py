@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
+    Callable,
     List,
     Optional,
     TYPE_CHECKING,
@@ -263,6 +264,10 @@ class Recipe(ABC):
         """
         Run this recipe on a set of source files.
 
+        Executes the scan/generate/edit lifecycle: every source file is
+        scanned by every ScanningRecipe in the recipe tree, then new files
+        are generated, then all files (including generated ones) are edited.
+
         Args:
             before: The source files to transform
             ctx: The execution context
@@ -272,7 +277,39 @@ class Recipe(ABC):
         """
         from rewrite.visitor import Cursor
 
-        return _RecipeRun(ctx, Cursor(None, Cursor.ROOT_VALUE)).run(self, before).get_changeset()
+        cursor = Cursor(None, Cursor.ROOT_VALUE)
+        recipe_lists: _RecipeLists = {}
+
+        after = before
+        if _has_scanning_recipe(self, recipe_lists):
+            # Phase 1: scan each file. Scanning must not modify the tree, so the
+            # visit result is discarded and the original file is passed on to the
+            # next recipe in the list. Returning None here would abort traversal
+            # of the remainder of the recipe list, leaving nested scanners unrun.
+            def scan_one(recipe: Recipe, b: SourceFile) -> SourceFile:
+                if isinstance(recipe, ScanningRecipe):
+                    recipe.scanner(recipe.accumulator(cursor, ctx)).visit(b, ctx, cursor)
+                return b
+
+            # edit() is used only to iterate the source files; scan_one returns
+            # each file unchanged, so the returned source set is the same
+            after.edit(lambda b: _recurse_recipe_list(self, b, recipe_lists, scan_one))
+
+            # Phase 2: collect generated files
+            def generate_one(recipe: Recipe, generated: List[SourceFile]) -> List[SourceFile]:
+                if isinstance(recipe, ScanningRecipe):
+                    generated.extend(recipe.generate(recipe.accumulator(cursor, ctx), ctx))
+                return generated
+
+            after = after.generate(_recurse_recipe_list(self, [], recipe_lists, generate_one))
+
+        # Phase 3: edit all files, including generated ones. An editor returning
+        # None deletes the file and stops later recipes from visiting it.
+        def edit_one(recipe: Recipe, b: SourceFile) -> Optional[SourceFile]:
+            return recipe.editor().visit(b, ctx, cursor)
+
+        after = after.edit(lambda b: _recurse_recipe_list(self, b, recipe_lists, edit_one))
+        return after.get_changeset()
 
 
 T = TypeVar("T")
@@ -385,76 +422,44 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
         return _AccumulatorEditor()
 
 
-class _RecipeRun:
+# Recipes commonly instantiate their sub-recipes inside recipe_list(), so calling it more
+# than once yields different instances. A scanning sub-recipe would then hold a different
+# accumulator in every phase and for every source file. Resolving each recipe list once per
+# run keeps sub-recipe identity, and therefore accumulator identity, stable. Keyed by id()
+# rather than by recipe (dataclass-based recipes are unhashable); every keyed recipe stays
+# referenced through the cached lists (the root through the caller), so ids cannot be
+# recycled during the run.
+_RecipeLists = dict[int, List[Recipe]]
+
+
+def _sub_recipes(recipe: Recipe, recipe_lists: _RecipeLists) -> List[Recipe]:
+    resolved = recipe_lists.get(id(recipe))
+    if resolved is None:
+        resolved = recipe.recipe_list()
+        recipe_lists[id(recipe)] = resolved
+    return resolved
+
+
+def _has_scanning_recipe(recipe: Recipe, recipe_lists: _RecipeLists) -> bool:
+    if isinstance(recipe, ScanningRecipe):
+        return True
+    return any(_has_scanning_recipe(r, recipe_lists) for r in _sub_recipes(recipe, recipe_lists))
+
+
+def _recurse_recipe_list(
+    recipe: Recipe,
+    initial: T,
+    recipe_lists: _RecipeLists,
+    fn: Callable[[Recipe, T], Optional[T]],
+) -> Optional[T]:
+    """Apply fn to every recipe in the tree in pre-order, threading the value through.
+
+    A None result short-circuits the remaining traversal (a deleted file
+    stops being visited).
     """
-    A single scheduled run of a recipe over a set of source files.
-
-    Mirrors the Java ``RecipeRunCycle`` lifecycle: every source file is
-    scanned by every ``ScanningRecipe`` in the recipe tree, then new files
-    are generated, then all files (including generated ones) are edited.
-    """
-
-    def __init__(self, ctx: ExecutionContext, root: Cursor):
-        self._ctx = ctx
-        self._root = root
-        # Recipes commonly instantiate their sub-recipes inline in recipe_list(),
-        # so each call yields new instances. Resolving each recipe's list once per
-        # run keeps sub-recipe identity — and therefore scanning-recipe accumulator
-        # identity — stable across the scan, generate, and edit phases. Keyed by
-        # id() because dataclass-based recipes are unhashable; every keyed recipe
-        # stays referenced through the cached lists (the root through the caller),
-        # so ids cannot be recycled during the run.
-        self._recipe_lists: dict[int, List[Recipe]] = {}
-
-    def run(self, recipe: Recipe, before: LargeSourceSet) -> LargeSourceSet:
-        after = before
-        if self._has_scanning_recipe(recipe):
-            # edit() is used only to iterate the source files; _scan returns
-            # each file unchanged, so the returned source set is the same
-            after.edit(lambda source: self._scan(recipe, source))
-            generated = self._recurse(recipe, [], self._generate_one)
-            after = after.generate(generated)
-        return after.edit(lambda source: self._recurse(recipe, source, self._edit_one))
-
-    def _scan(self, recipe: Recipe, source: SourceFile) -> SourceFile:
-        return self._recurse(recipe, source, self._scan_one)
-
-    def _scan_one(self, recipe: Recipe, source: SourceFile) -> SourceFile:
-        if isinstance(recipe, ScanningRecipe):
-            scanner = recipe.scanner(recipe.accumulator(self._root, self._ctx))
-            # Scanning must not modify the tree, so the visit result is discarded
-            # and the original file is passed on to the next recipe; in particular
-            # a scanner returning None must not halt the traversal.
-            scanner.visit(source, self._ctx, self._root)
-        return source
-
-    def _generate_one(self, recipe: Recipe, generated: List[SourceFile]) -> List[SourceFile]:
-        if isinstance(recipe, ScanningRecipe):
-            generated.extend(recipe.generate(recipe.accumulator(self._root, self._ctx), self._ctx))
-        return generated
-
-    def _edit_one(self, recipe: Recipe, source: SourceFile) -> Optional[SourceFile]:
-        # None deletes the file and, via _recurse's short-circuit, stops
-        # later recipes from visiting it
-        return recipe.editor().visit(source, self._ctx, self._root)
-
-    def _recurse(self, recipe: Recipe, t, fn):
-        """Apply fn to every recipe in the tree in pre-order, threading t through."""
-        t = fn(recipe, t)
-        for sub_recipe in self._sub_recipes(recipe):
-            if t is None:
-                return None
-            t = self._recurse(sub_recipe, t, fn)
-        return t
-
-    def _sub_recipes(self, recipe: Recipe) -> List[Recipe]:
-        resolved = self._recipe_lists.get(id(recipe))
-        if resolved is None:
-            resolved = recipe.recipe_list()
-            self._recipe_lists[id(recipe)] = resolved
-        return resolved
-
-    def _has_scanning_recipe(self, recipe: Recipe) -> bool:
-        if isinstance(recipe, ScanningRecipe):
-            return True
-        return any(self._has_scanning_recipe(r) for r in self._sub_recipes(recipe))
+    t = fn(recipe, initial)
+    for sub_recipe in _sub_recipes(recipe, recipe_lists):
+        if t is None:
+            return None
+        t = _recurse_recipe_list(sub_recipe, t, recipe_lists, fn)
+    return t
