@@ -16,7 +16,7 @@
 
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
-from rewrite.python.add_import import AddImportOptions, maybe_add_import
+from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
@@ -339,6 +339,24 @@ class TestMaybeAddImport:
                 """
                 from builtins import list as _list
                 x = 1
+                """,
+            )
+        )
+
+
+class TestAddImportVisitor:
+    """Tests for AddImport constructed directly (bypassing maybe_add_import),
+    as the RPC server does for Java-initiated ``maybeAddImport`` calls."""
+
+    def test_skips_builtins_import(self):
+        """e.g. Java's ChangeType retargeting a type to ``builtins.list`` must
+        not add ``from builtins import list``."""
+        spec = RecipeSpec(recipe=from_visitor(AddImport(AddImportOptions(
+            module='builtins', name='list', only_if_referenced=False))))
+        spec.rewrite_run(
+            python(
+                """
+                x: list = []
                 """,
             )
         )

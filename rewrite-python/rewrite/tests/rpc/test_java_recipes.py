@@ -33,10 +33,6 @@ from rewrite.test import RecipeSpec, python
 class TestChangeType:
     """Tests for the ChangeType Java recipe wrapper."""
 
-    @pytest.mark.xfail(strict=False, reason=(
-        "import removal requires the PythonImportService fallback to the "
-        "serving RPC connection (PythonRewriteRpc.get() is null when Python "
-        "spawned the JVM); remove this marker when that fix lands"))
     def test_change_type_with_unqualified_target(self, java_rpc):
         """Test changing a type reference to an unqualified target name
         (contrast ``builtins.list`` in the type-attribution test below).
@@ -70,10 +66,6 @@ class TestChangeType:
         )
 
 
-    @pytest.mark.xfail(strict=False, reason=(
-        "requires the PythonImportService fallback plus the ref-slot re-ADD "
-        "diff semantics (#8392) and the ShallowClass.build owning-class fix "
-        "(#8391); remove this marker when all three land"))
     def test_change_simple_type_updates_type_attribution(self, java_rpc):
         """The renamed identifiers must also carry the *new* JavaType, so that
         downstream type-driven logic (``uses_type``, MethodMatcher, a second
