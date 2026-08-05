@@ -173,10 +173,8 @@ public class FindTypes extends Recipe {
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
             Object parent = getCursor().getParentOrThrow().getValue();
-            // An identifier is only subsumed by an enclosing parameterized type when that type is itself the
-            // match (see `visitParameterizedType`). The identifier can be the sole matching node, e.g. in
-            // Python `items: List[str]` the parameterized type is attributed as builtin `list` while the
-            // `List` identifier is attributed as `typing.List`.
+            // The identifier can be the sole matching node, e.g. in Python `items: List[str]` only the
+            // `List` identifier is attributed `typing.List`; the parameterized type is builtin `list`
             boolean matchingParameterizedTypeParent = parent instanceof J.ParameterizedType &&
                     parameterizedTypeMatches((J.ParameterizedType) parent);
             if (ident.getType() != null &&
@@ -195,10 +193,8 @@ public class FindTypes extends Recipe {
 
         @Override
         public J visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
-            // In Java trees a matching parameterized type is also marked via `visitTypeName`, invoked by the
-            // JavaVisitor parent (idempotently with this). Parents in other languages may visit it as a plain
-            // expression (e.g. Python's `Py.TypeHint`), so mark it here to uphold the invariant that
-            // `visitIdentifier` relies on: a matching parameterized type is always marked as a whole.
+            // Non-Java parents (e.g. Python's `Py.TypeHint`) may not route the type through `visitTypeName`;
+            // in Java trees this is idempotent with the parent's `visitTypeName` call
             J.ParameterizedType pt = (J.ParameterizedType) super.visitParameterizedType(type, ctx);
             if (parameterizedTypeMatches(pt) && getCursor().firstEnclosing(J.Import.class) == null) {
                 return found(pt, ctx);
