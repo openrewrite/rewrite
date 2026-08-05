@@ -108,21 +108,6 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 			before = msg.Value
 		} else {
 			before = newObj(*msg.ValueType)
-			// Hydrate GenericMarker.Data from the inline value when the
-			// sender shipped a codec-less marker as `{ADD, valueType, value=map}`
-			// (matches what every other language's send queue does). Without
-			// this, the marker's fields would be silently dropped.
-			if gm, ok := before.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
-				if dataMap, ok := msg.Value.(map[string]any); ok {
-					gm.Data = dataMap
-					if idStr, ok := dataMap["id"].(string); ok {
-						if parsed, err := uuid.Parse(idStr); err == nil {
-							gm.Ident = parsed
-						}
-					}
-					before = gm
-				}
-			}
 		}
 		if ref != nil {
 			// Store before deserialization to handle cycles
@@ -139,6 +124,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		if isNilValue(before) && msg.ValueType != nil {
 			before = newObj(*msg.ValueType)
 		}
+		before = hydrateGenericMarker(before, msg.Value)
 		var after any
 		if onChange != nil {
 			after = onChange(before)
@@ -164,6 +150,25 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 	default:
 		panic(fmt.Sprintf("unsupported state: %v", msg.State))
 	}
+}
+
+// hydrateGenericMarker applies a message's inline data map to a codec-less
+// GenericMarker. Such markers travel as `{valueType, value=map}` with no
+// sub-field messages (matching every other language's send queue), so this is
+// the only place their fields cross the wire.
+func hydrateGenericMarker(before any, value any) any {
+	if gm, ok := before.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+		if dataMap, ok := value.(map[string]any); ok {
+			gm.Data = dataMap
+			if idStr, ok := dataMap["id"].(string); ok {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					gm.Ident = parsed
+				}
+			}
+			return gm
+		}
+	}
+	return before
 }
 
 func (q *ReceiveQueue) ReceiveAndGet(before any, mapping func(any) any) any {

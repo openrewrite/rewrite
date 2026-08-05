@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Checksum;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
@@ -108,6 +110,19 @@ class RpcReceiveQueueTest {
 
         assertThat(received).isInstanceOf(Checksum.class);
         assertThat(((Checksum) received).getAlgorithm()).isEqualTo("SHA-256");
+    }
+
+    @Test
+    void changedMarkerWithSameIdRoundTrips() {
+        BuildTool buildTool = new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.0");
+        Markers before = Markers.build(List.of(buildTool));
+        Markers after = before.withMarkers(List.of(buildTool.withVersion("8.0")));
+
+        sq.send(after, before, null);
+        Markers received = rq.receive(before);
+
+        assertThat(received.findFirst(BuildTool.class)).hasValueSatisfying(bt ->
+          assertThat(bt.getVersion()).isEqualTo("8.0"));
     }
 
     @Test

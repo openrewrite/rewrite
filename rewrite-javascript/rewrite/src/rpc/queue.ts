@@ -226,8 +226,11 @@ export class RpcSendQueue {
                         // re-added rather than CHANGEd (see send()).
                         await this.add(anAfter, onChangeRun);
                     } else {
-                        this.put({state: RpcObjectState.CHANGE});
-                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
+                        const afterCodec = onChangeRun ? undefined : RpcCodecs.forInstance(anAfter, this.sourceFileType);
+                        // Without an onChange callback or codec, no property messages follow, so the
+                        // value must travel inline (as in send()) or the receiver keeps the stale element
+                        this.put({state: RpcObjectState.CHANGE, value: onChangeRun || afterCodec ? undefined : anAfter});
+                        await this.doChange(anAfter, aBefore, onChangeRun, afterCodec);
                     }
                 }
             }

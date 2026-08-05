@@ -186,8 +186,12 @@ class RpcSendQueue:
                         # rather than CHANGEd (see _send_as_ref)
                         add_fn(item, wrapped)
                     else:
-                        self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item)})
-                        self._do_change(item, a_before, wrapped)
+                        codec = self._get_rpc_codec(item)
+                        # Without an on_change callback or codec, no property messages follow, so the
+                        # value must travel inline (as in send()) or the receiver keeps the stale element
+                        value = None if wrapped is not None or codec is not None else self._get_primitive_value(item)
+                        self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item), 'value': value})
+                        self._do_change(item, a_before, wrapped, codec)
 
         if before is None:
             # ADD for new list

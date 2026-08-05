@@ -176,6 +176,8 @@ public class RpcSendQueue
     private void SendChange(object afterVal, object beforeVal, Action? onChange)
     {
         var afterCodec = GetCodecFor(afterVal);
+        // Without an onChange callback or codec, no property messages follow, so the
+        // value must travel inline or the receiver keeps the stale object
         Put(new RpcObjectData
         {
             State = CHANGE,
@@ -220,13 +222,7 @@ public class RpcSendQueue
                     }
                     else
                     {
-                        Put(new RpcObjectData
-                        {
-                            State = CHANGE,
-                            ValueType = GetValueType(anAfter)
-                        });
-                        DoChange(anAfter, aBefore, onChangeRun,
-                                 GetCodecFor(anAfter!));
+                        SendChange(anAfter!, aBefore!, onChangeRun);
                     }
                 }
             }

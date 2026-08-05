@@ -86,6 +86,22 @@ describe("RPC queues", () => {
         expect(received.value.kind).not.toBe(beforeWrapper.value.kind);
     });
 
+    test("changed list element without a codec round-trips", async () => {
+        // Markers like GitProvenance or BuildTool have no codec; a changed marker
+        // that keeps its id diffs as CHANGE rather than ADD
+        const before = [{kind: "org.openrewrite.marker.BuildTool", id: "m1", type: "Gradle", version: "7.0"}];
+        const after = [{...before[0], version: "8.0"}];
+
+        const sq = new RpcSendQueue(new ReferenceMap(), undefined, false);
+        await sq.sendList(after, before, m => m.id);
+        const batch = sq.finish();
+
+        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const received = await rq.receiveList(before);
+
+        expect(received![0].version).toBe("8.0");
+    });
+
     test("detects missing codec on receiver side", async () => {
         // given
         const batch: RpcObjectData[] = [

@@ -137,6 +137,8 @@ public class RpcSendQueue {
 
     private void sendChange(Object afterVal, Object beforeVal, @Nullable Runnable onChange) {
         RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+        // Without an onChange callback or codec, no property messages follow, so the
+        // value must travel inline or the receiver keeps the stale object
         put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
         doChange(afterVal, beforeVal, onChange, afterCodec);
     }
@@ -165,8 +167,7 @@ public class RpcSendQueue {
                         // re-added rather than CHANGEd (see send()).
                         add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                     } else {
-                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));
-                        doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
+                        sendChange(anAfter, aBefore, onChangeRun);
                     }
                 }
             }
