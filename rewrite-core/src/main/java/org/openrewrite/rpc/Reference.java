@@ -27,7 +27,15 @@ import static java.util.Objects.requireNonNull;
 @Getter
 public class Reference {
     @Nullable
-    private Object value;
+    private final Object value;
+
+    protected Reference() {
+        this.value = null;
+    }
+
+    private Reference(@Nullable Object value) {
+        this.value = value;
+    }
 
     /**
      * @param t Any instance.
@@ -36,9 +44,7 @@ public class Reference {
      * before and after references at the same time, so they must not share state.
      */
     public static Reference asRef(@Nullable Object t) {
-        Reference ref = new Reference();
-        ref.value = t;
-        return ref;
+        return new Reference(t);
     }
 
     /**

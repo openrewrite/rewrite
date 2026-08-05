@@ -15,12 +15,14 @@
  */
 package org.openrewrite.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.AccessMode;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +95,56 @@ class RpcSendQueueTest {
           new RpcObjectData(ADD, null, "T2", 2, false),
           new RpcObjectData(ADD, null, null, 2, false)
         );
+    }
+
+    @Test
+    void deletedRefSlotIsSent() {
+        RefSlotDiff diff = diffRefSlot("java.util.List", null);
+        assertThat(diff.data())
+          .extracting(RpcObjectData::getState)
+          .containsExactly(RpcObjectData.State.CHANGE, RpcObjectData.State.DELETE);
+        assertThat(diff.consumed()).isNull();
+    }
+
+    @Test
+    void identicalRefSlotIsNoChange() {
+        Object type = new Object();
+        RefSlotDiff diff = diffRefSlot(type, type);
+        assertThat(diff.data())
+          .extracting(RpcObjectData::getState)
+          .containsExactly(RpcObjectData.State.CHANGE, RpcObjectData.State.NO_CHANGE);
+        assertThat(diff.consumed()).isNull();
+    }
+
+    @Test
+    void changedRefSlotOfDifferentClassIsAdded() {
+        RefSlotDiff diff = diffRefSlot(1, "java.util.ArrayList");
+        assertThat(diff.data())
+          .extracting(RpcObjectData::getState)
+          .containsExactly(RpcObjectData.State.CHANGE, RpcObjectData.State.ADD);
+        assertThat(diff.consumed()).isEqualTo("java.util.ArrayList");
+    }
+
+    /**
+     * Diffs one ref-wrapped slot between a before and an after holder. The slot is emitted
+     * from within the holders' own diff (send &rarr; onChange &rarr; getAndSend), which is what
+     * seeds the queue's before context; a bare getAndSend would diff against null and always ADD.
+     */
+    private RefSlotDiff diffRefSlot(@Nullable Object beforeValue, @Nullable Object afterValue) {
+        List<RpcObjectData> data = new ArrayList<>();
+        RpcSendQueue q = new RpcSendQueue(100, data::addAll, new IdentityHashMap<>(), null, false);
+        Holder after = new Holder(afterValue);
+        AtomicReference<Object> consumed = new AtomicReference<>();
+        q.send(after, new Holder(beforeValue), () ->
+          q.getAndSend(after, h -> Reference.asRef(h.value), v -> consumed.set(Reference.getValue(v))));
+        q.flush();
+        return new RefSlotDiff(data, consumed.get());
+    }
+
+    private record RefSlotDiff(List<RpcObjectData> data, @Nullable Object consumed) {
+    }
+
+    private record Holder(@Nullable Object value) {
     }
 
     @Test
