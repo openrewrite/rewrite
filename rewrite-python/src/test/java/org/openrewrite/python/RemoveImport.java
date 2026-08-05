@@ -22,9 +22,8 @@ import org.openrewrite.marker.SearchResult;
 
 /**
  * Test stand-in for the Python-side {@code rewrite.python.remove_import.RemoveImport} visitor,
- * which registers under this fully-qualified name. Lets a JVM peer play the Python host in RPC
- * tests: instead of editing imports it marks the tree with the (module, name) pair it was asked
- * to remove, so tests can assert the dispatch arrived with the right options.
+ * which registers under this fully-qualified name. Marks the tree with the (module, name) pair
+ * it was asked to remove, so tests can assert the dispatch arrived with the right options.
  */
 public class RemoveImport extends JavaVisitor<Object> {
     public String module;

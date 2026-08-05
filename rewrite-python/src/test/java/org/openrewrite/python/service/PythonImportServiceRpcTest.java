@@ -44,9 +44,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Exercises the Python-hosted topology in-process: the "host" peer plays the Python process that
- * owns the {@link Py.CompilationUnit} and requests a visit; the "server" peer plays the JVM it
- * spawned. The JVM then holds no {@link org.openrewrite.python.rpc.PythonRewriteRpc} handle, so
- * {@link PythonImportService} must dispatch import edits back over the serving connection.
+ * owns the tree, the "server" peer the spawned JVM, which has no
+ * {@link org.openrewrite.python.rpc.PythonRewriteRpc} handle.
  */
 class PythonImportServiceRpcTest {
     RewriteRpc host;
@@ -78,9 +77,8 @@ class PythonImportServiceRpcTest {
         Py.CompilationUnit cu = new Py.CompilationUnit(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Paths.get("test.py"), null, null, false, null, emptyList(), emptyList(), Space.EMPTY);
 
-        // The host asks the server to run a visitor that queues a maybeRemoveImport; the
-        // resulting org.openrewrite.python.RemoveImport dispatch lands back on the host, whose
-        // test stand-in marks the tree with the (module, name) pair it received.
+        // The maybeRemoveImport queued on the server dispatches org.openrewrite.python.RemoveImport
+        // back to the host, where the test stand-in receives it.
         Tree after = host.visit(cu, RemovesTypingList.class.getName(), 0);
 
         assertThat(after).isInstanceOf(Py.CompilationUnit.class);

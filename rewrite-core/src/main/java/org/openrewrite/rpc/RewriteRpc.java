@@ -268,20 +268,17 @@ public class RewriteRpc {
     }
 
     /**
-     * The {@link RewriteRpc} over which the request currently being handled on this thread
-     * arrived, or {@code null} when the thread is not handling an RPC request. Visitors
-     * instantiated on behalf of a remote peer use this to dispatch follow-up visits back to
-     * that peer — the owner of the tree being visited — when this process is the spawned
-     * server and so holds no process-manager handle to the peer (e.g. Python- or JS-hosted
-     * recipe runs delegating to Java recipes).
+     * The instance the request currently being handled on this thread arrived on, or
+     * {@code null} outside request handling. Lets a visitor dispatch follow-up visits back
+     * to the requesting peer when this process is the spawned server and has no other
+     * handle to it.
      */
     public static @Nullable RewriteRpc current() {
         return CURRENT.get();
     }
 
     /**
-     * Runs {@code work} with this instance discoverable via {@link #current()}. Request
-     * handlers wrap the execution of remotely requested work in this.
+     * Runs {@code work} with this instance discoverable via {@link #current()}.
      */
     public <T> T withCurrent(Callable<T> work) throws Exception {
         RewriteRpc previous = CURRENT.get();
