@@ -172,11 +172,16 @@ public class FindTypes extends Recipe {
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+            Object parent = getCursor().getParentOrThrow().getValue();
+            // The identifier can be the sole matching node, e.g. in Python `items: List[str]` only the
+            // `List` identifier is attributed `typing.List`; the parameterized type is builtin `list`
+            boolean matchingParameterizedTypeParent = parent instanceof J.ParameterizedType &&
+                    parameterizedTypeMatches((J.ParameterizedType) parent);
             if (ident.getType() != null &&
                     getCursor().firstEnclosing(J.Import.class) == null &&
                     getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
+                    !matchingParameterizedTypeParent &&
+                    !(parent instanceof J.ArrayType)) {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
@@ -184,6 +189,22 @@ public class FindTypes extends Recipe {
                 }
             }
             return super.visitIdentifier(ident, ctx);
+        }
+
+        @Override
+        public J visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            // Non-Java parents (e.g. Python's `Py.TypeHint`) may not route the type through `visitTypeName`;
+            // in Java trees this is idempotent with the parent's `visitTypeName` call
+            J.ParameterizedType pt = (J.ParameterizedType) super.visitParameterizedType(type, ctx);
+            if (parameterizedTypeMatches(pt) && getCursor().firstEnclosing(J.Import.class) == null) {
+                return found(pt, ctx);
+            }
+            return pt;
+        }
+
+        private boolean parameterizedTypeMatches(J.ParameterizedType type) {
+            return typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType,
+                    TypeUtils.asFullyQualified(type.getType()));
         }
 
         @Override
