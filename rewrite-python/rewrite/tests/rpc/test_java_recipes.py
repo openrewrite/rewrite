@@ -33,8 +33,19 @@ from rewrite.test import RecipeSpec, python
 class TestChangeType:
     """Tests for the ChangeType Java recipe wrapper."""
 
-    def test_change_simple_type(self, java_rpc):
-        """Test changing a simple type reference."""
+    @pytest.mark.xfail(strict=False, reason=(
+        "import removal requires the PythonImportService fallback to the "
+        "serving RPC connection (PythonRewriteRpc.get() is null when Python "
+        "spawned the JVM); remove this marker when that fix lands"))
+    def test_change_type_with_unqualified_target(self, java_rpc):
+        """Test changing a type reference to an unqualified target name
+        (contrast ``builtins.list`` in the type-attribution test below).
+
+        The unused ``from typing import List`` is removed: Java's ChangeType
+        retires Python imports through ``PythonImportService``, which reaches
+        the Python-side import visitors over the serving RPC connection when
+        the JVM is the spawned server, as in this Python-hosted topology.
+        """
         from rewrite.python import ChangeType
 
         spec = RecipeSpec(
@@ -55,6 +66,68 @@ class TestChangeType:
                 def foo(items: list[str]) -> list[int]:
                     pass
                 """
+            )
+        )
+
+
+    @pytest.mark.xfail(strict=False, reason=(
+        "requires the PythonImportService fallback plus the ref-slot re-ADD "
+        "diff semantics (#8392) and the ShallowClass.build owning-class fix "
+        "(#8391); remove this marker when all three land"))
+    def test_change_simple_type_updates_type_attribution(self, java_rpc):
+        """The renamed identifiers must also carry the *new* JavaType, so that
+        downstream type-driven logic (``uses_type``, MethodMatcher, a second
+        recipe in a composite) matches on ``builtins.list``. As a consequence,
+        a second run over the output must be a no-op: every former
+        ``typing.List`` reference is already typed ``builtins.list``.
+        """
+        from rewrite import InMemoryExecutionContext
+        from rewrite.java.support_types import JavaType
+        from rewrite.python import ChangeType
+        from rewrite.python.visitor import PythonVisitor
+
+        def assert_types(source_file):
+            list_idents = []
+
+            class CollectTypes(PythonVisitor):
+                def visit_identifier(self, identifier, p):
+                    if identifier.simple_name == "list":
+                        list_idents.append(identifier)
+                    return identifier
+
+            CollectTypes().visit(source_file, None)
+            assert len(list_idents) == 2, \
+                f"expected 2 'list' identifiers, found {len(list_idents)}"
+            for ident in list_idents:
+                t = ident.type
+                assert isinstance(t, JavaType.FullyQualified), \
+                    f"identifier 'list' has type {t!r}"
+                assert t.fully_qualified_name == "builtins.list", \
+                    f"identifier 'list' still typed as {t.fully_qualified_name}"
+
+            editor = spec.recipe.recipe_list()[0].editor()
+            run2 = editor.visit(source_file, InMemoryExecutionContext())
+            assert run2 is source_file, "second run should be a no-op"
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List
+
+                def foo(items: List[str]) -> List[int]:
+                    pass
+                """,
+                """
+                def foo(items: list[str]) -> list[int]:
+                    pass
+                """,
+                after_recipe=assert_types,
             )
         )
 
@@ -94,14 +167,20 @@ class TestAddLiteralMethodArgument:
     """Tests for the AddLiteralMethodArgument Java recipe wrapper."""
 
     def test_add_argument(self, java_rpc):
-        """Test adding a literal argument to a method call."""
+        """Test adding a literal argument to a method call.
+
+        The method pattern matches against the *declared* signature, where
+        ``datetime.now`` carries its optional ``tz`` parameter — hence
+        ``(..)`` rather than ``()``. A str option is inserted as a string
+        literal, i.e. quoted.
+        """
         from rewrite.python import AddLiteralMethodArgument
 
         spec = RecipeSpec(
             recipe=AddLiteralMethodArgument(
-                method_pattern="datetime.datetime now()",
+                method_pattern="datetime.datetime now(..)",
                 argument_index=0,
-                literal="datetime.UTC"
+                literal="UTC"
             )
         )
         spec.rewrite_run(
@@ -114,7 +193,7 @@ class TestAddLiteralMethodArgument:
                 """
                 from datetime import datetime
 
-                now = datetime.now(datetime.UTC)
+                now = datetime.now("UTC")
                 """
             )
         )

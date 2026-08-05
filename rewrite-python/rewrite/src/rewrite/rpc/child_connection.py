@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sysconfig
+import traceback
 from importlib import metadata
 from pathlib import Path
 
@@ -145,8 +146,12 @@ class ChildConnection:
                     result = self._upstream(callback_method, msg.get("params", {}))
                     self._write({"jsonrpc": "2.0", "id": child_id, "result": result})
                 except Exception as e:
+                    # Carry the traceback in `data` — the same field the child's own
+                    # error responses use — so the failing side is diagnosable from
+                    # the other end of the wire.
                     self._write({"jsonrpc": "2.0", "id": child_id,
-                                 "error": {"code": -32603, "message": str(e)}})
+                                 "error": {"code": -32603, "message": str(e),
+                                           "data": traceback.format_exc()}})
 
     def close(self) -> None:
         try:

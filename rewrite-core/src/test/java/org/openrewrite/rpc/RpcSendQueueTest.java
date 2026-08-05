@@ -18,9 +18,7 @@ package org.openrewrite.rpc;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.AccessMode;
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -95,6 +93,32 @@ class RpcSendQueueTest {
           new RpcObjectData(ADD, null, "T2", 2, false),
           new RpcObjectData(ADD, null, null, 2, false)
         );
+    }
+
+    @Test
+    void listImplementationClassMayDiffer() {
+        List<String> before = new ArrayList<>(List.of("A", "B"));
+        List<String> after = List.of("A");
+
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    @Test
+    void listImplementationClassMayDifferReverse() {
+        List<String> before = List.of("A");
+        List<String> after = new ArrayList<>(List.of("A", "B"));
+
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    private List<String> roundTripList(List<String> after, List<String> before) {
+        Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
+        RpcSendQueue sq = new RpcSendQueue(1, batches::addLast, new IdentityHashMap<>(), null, false);
+        RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
+
+        sq.sendList(after, before, Function.identity(), null, false);
+        sq.flush();
+        return rq.receiveList(before, null);
     }
 
     @Test
