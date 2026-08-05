@@ -125,19 +125,11 @@ class RpcSendQueue:
             self.put({'state': RpcObjectState.DELETE})
             return
 
-        # Changed value — update ref tracking so `after` is recognized if seen again
-        before_id = id(before)
-        entry = self.refs.get(before_id)
-        if entry is not None and entry[0] is before:
-            ref_num = entry[1]
-            del self.refs[before_id]
-            self.refs[id(after)] = (after, ref_num)
-
-        value_type = self._get_value_type(after)
-        codec = self._get_rpc_codec(after)
-        value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
-        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
-        self._do_change(after, before, on_change, codec)
+        # A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+        # instance may be aliased by any number of other slots and source files. A CHANGE would
+        # be applied to that shared instance in place, corrupting every alias, so the new value
+        # is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+        self._add_as_ref(after, on_change)
 
     def send_list(self, after: Optional[List], before: Optional[List],
                   id_getter: Callable[[Any], Any],
@@ -189,7 +181,9 @@ class RpcSendQueue:
                     a_before = before[before_pos] if before else None
                     if a_before is item:
                         self.put({'state': RpcObjectState.NO_CHANGE})
-                    elif a_before is None or type(item) != type(a_before):
+                    elif as_ref or a_before is None or type(item) != type(a_before):
+                        # Type changed, or a ref-deduplicated item, which is always re-added
+                        # rather than CHANGEd (see _send_as_ref)
                         add_fn(item, wrapped)
                     else:
                         self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item)})

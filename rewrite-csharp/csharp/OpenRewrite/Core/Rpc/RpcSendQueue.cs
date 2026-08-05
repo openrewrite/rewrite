@@ -159,6 +159,14 @@ public class RpcSendQueue
         {
             Put(new RpcObjectData { State = DELETE });
         }
+        else if (after is Reference)
+        {
+            // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+            // instance may be aliased by any number of other slots and source files. A CHANGE would
+            // be applied to that shared instance in place, corrupting every alias, so the new value
+            // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+            Add(after!, onChange);
+        }
         else
         {
             SendChange(afterVal, beforeVal, onChange);
@@ -204,8 +212,10 @@ public class RpcSendQueue
                     {
                         Put(new RpcObjectData { State = NO_CHANGE });
                     }
-                    else if (aBefore == null || anAfter!.GetType() != aBefore.GetType())
+                    else if (asRef || aBefore == null || anAfter!.GetType() != aBefore.GetType())
                     {
+                        // Type changed, or a ref-deduplicated item, which is always re-added
+                        // rather than CHANGEd (see Send)
                         Add(asRef ? Reference.AsRef(anAfter) : anAfter!, onChangeRun);
                     }
                     else
