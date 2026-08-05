@@ -29,7 +29,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
     implementation(project(":rewrite-maven"))
 
     compileOnly(project(":rewrite-test"))
