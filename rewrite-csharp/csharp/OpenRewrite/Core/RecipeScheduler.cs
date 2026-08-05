@@ -26,28 +26,25 @@ public static class RecipeScheduler
 {
     public static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx)
     {
-        var allResults = new Dictionary<Guid, Result>();
         var currentSources = new List<SourceFile>(sources);
 
-        RunRecipe(recipe, currentSources, allResults, ctx);
+        RunRecipe(recipe, currentSources, ctx);
 
-        return allResults.Values.ToList();
+        return BuildResults(sources, currentSources);
     }
 
     private static void RunRecipe(
         Recipe recipe,
         List<SourceFile> currentSources,
-        Dictionary<Guid, Result> allResults,
         ExecutionContext ctx)
     {
         // Pre-order traversal, as in Java's RecipeRunCycle/RecipeStack: the recipe's own
         // visitor (or scan/generate/edit lifecycle) runs first, then its recipe list.
-        var results = EditSources(recipe, currentSources, ctx);
-        ApplyResults(results, currentSources, allResults);
+        ApplyResults(EditSources(recipe, currentSources, ctx), currentSources);
 
         foreach (var subRecipe in recipe.GetRecipeList())
         {
-            RunRecipe(subRecipe, currentSources, allResults, ctx);
+            RunRecipe(subRecipe, currentSources, ctx);
         }
     }
 
@@ -81,7 +78,15 @@ public static class RecipeScheduler
             return results;
         }
 
-        return VisitAll(recipe.GetVisitor(), sources, ctx);
+        var visitor = recipe.GetVisitor();
+        if (visitor is NoopVisitor<ExecutionContext>)
+        {
+            // The default visitor is a no-op, so recipes that don't override it
+            // (typically composites) need no traversal of the source set.
+            return [];
+        }
+
+        return VisitAll(visitor, sources, ctx);
     }
 
     private static List<Result> VisitAll(
@@ -106,56 +111,68 @@ public static class RecipeScheduler
         return results;
     }
 
-    private static void ApplyResults(
-        List<Result> results,
-        List<SourceFile> currentSources,
-        Dictionary<Guid, Result> allResults)
+    private static void ApplyResults(List<Result> results, List<SourceFile> currentSources)
     {
         foreach (var result in results)
         {
-            if (result.Before != null)
+            var before = result.Before;
+            if (before != null)
             {
-                // An earlier recipe may already have recorded a result for this file, in which
-                // case result.Before is that recipe's after tree. The final result must pair
-                // the file's original state with the latest after.
-                if (allResults.TryGetValue(result.Before.Id, out var existing))
-                {
-                    if (existing.Before == null && result.After == null)
-                    {
-                        // A generated file that a later recipe deleted never existed
-                        allResults.Remove(result.Before.Id);
-                    }
-                    else
-                    {
-                        allResults[result.Before.Id] = new Result(existing.Before, result.After);
-                    }
-                }
-                else
-                {
-                    allResults[result.Before.Id] = result;
-                }
-
                 if (result.After != null)
                 {
-                    for (var i = 0; i < currentSources.Count; i++)
+                    var i = currentSources.FindIndex(s => s.Id == before.Id);
+                    if (i >= 0)
                     {
-                        if (currentSources[i].Id == result.Before.Id)
-                        {
-                            currentSources[i] = result.After;
-                            break;
-                        }
+                        currentSources[i] = result.After;
                     }
                 }
                 else
                 {
-                    currentSources.RemoveAll(s => s.Id == result.Before.Id);
+                    currentSources.RemoveAll(s => s.Id == before.Id);
                 }
             }
             else if (result.After != null)
             {
-                allResults[result.After.Id] = result;
                 currentSources.Add(result.After);
             }
         }
+    }
+
+    /// <summary>
+    /// Diffs the source set as parsed against its state after the run, pairing files by id:
+    /// same id with a different tree → changed, id only present before → deleted, id only
+    /// present after → generated. Because only the initial and final states are compared,
+    /// <see cref="Result.Before"/> is always the originally parsed source no matter how many
+    /// recipes edited the file, and a generated file that a later recipe deleted yields no
+    /// result at all. Relies on visitors preserving <see cref="SourceFile.Id"/> across edits.
+    /// </summary>
+    private static List<Result> BuildResults(List<SourceFile> before, List<SourceFile> after)
+    {
+        var results = new List<Result>();
+        var afterById = after.ToDictionary(s => s.Id);
+        foreach (var beforeSource in before)
+        {
+            if (afterById.Remove(beforeSource.Id, out var afterSource))
+            {
+                if (!ReferenceEquals(beforeSource, afterSource))
+                {
+                    results.Add(new Result(beforeSource, afterSource));
+                }
+            }
+            else
+            {
+                results.Add(new Result(beforeSource, null));
+            }
+        }
+
+        foreach (var afterSource in after)
+        {
+            if (afterById.ContainsKey(afterSource.Id))
+            {
+                results.Add(new Result(null, afterSource));
+            }
+        }
+
+        return results;
     }
 }
