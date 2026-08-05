@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
@@ -49,6 +50,7 @@ public class BatchVisit implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<BatchVisit> {
+        private final RewriteRpc rpc;
         private final Map<String, Object> localObjects;
         private final PreparedRecipeCache preparedRecipes;
         private final BiFunction<String, @Nullable String, ?> getObject;
@@ -56,6 +58,11 @@ public class BatchVisit implements RpcRequest {
 
         @Override
         protected Object handle(BatchVisit request) throws Exception {
+            // Make this connection discoverable via RewriteRpc.current() while the visitors run.
+            return rpc.withCurrent(() -> doHandle(request));
+        }
+
+        private Object doHandle(BatchVisit request) {
             Tree tree = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
             Object p = getVisitorP(request);
             Cursor cursor = getCursor.apply(request.getCursor(), request.getSourceFileType());

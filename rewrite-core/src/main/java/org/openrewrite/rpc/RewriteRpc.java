@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -63,6 +64,8 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  */
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
+    private static final ThreadLocal<@Nullable RewriteRpc> CURRENT = new ThreadLocal<>();
+
     private final JsonRpc jsonRpc;
     private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
@@ -167,9 +170,9 @@ public class RewriteRpc {
             }
             return o;
         };
-        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
+        jsonRpc.rpc("Visit", new Visit.Handler(this, localObjects, preparedRecipes,
                 getRecipeObject, this::getCursor));
-        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(localObjects, preparedRecipes,
+        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(this, localObjects, preparedRecipes,
                 getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 getRecipeObject));
@@ -262,6 +265,33 @@ public class RewriteRpc {
         });
 
         jsonRpc.bind();
+    }
+
+    /**
+     * The instance the request currently being handled on this thread arrived on, or
+     * {@code null} outside request handling. Lets a visitor dispatch follow-up visits back
+     * to the requesting peer when this process is the spawned server and has no other
+     * handle to it.
+     */
+    public static @Nullable RewriteRpc current() {
+        return CURRENT.get();
+    }
+
+    /**
+     * Runs {@code work} with this instance discoverable via {@link #current()}.
+     */
+    public <T> T withCurrent(Callable<T> work) throws Exception {
+        RewriteRpc previous = CURRENT.get();
+        CURRENT.set(this);
+        try {
+            return work.call();
+        } finally {
+            if (previous == null) {
+                CURRENT.remove();
+            } else {
+                CURRENT.set(previous);
+            }
+        }
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
