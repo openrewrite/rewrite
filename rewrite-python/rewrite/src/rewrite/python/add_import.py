@@ -14,6 +14,7 @@
 
 """AddImport visitor for Python import handling."""
 
+import builtins
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -126,6 +127,11 @@ class AddImport(PythonVisitor):
         self.only_if_referenced = options.only_if_referenced
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
+        # A bare builtin name (e.g. `list` when ChangeType retargets a type to a builtin) is
+        # not a module, so there is no import that could bind it.
+        if self.name is None and '.' not in self.module and hasattr(builtins, self.module):
+            return cu
+
         # Check if import already exists
         if self._import_exists(cu):
             return cu

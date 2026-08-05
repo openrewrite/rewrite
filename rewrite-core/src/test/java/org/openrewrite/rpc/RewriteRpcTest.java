@@ -259,6 +259,32 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    /**
+     * A visitor running inside a Visit request handler can discover the {@link RewriteRpc} the
+     * request arrived on via {@link RewriteRpc#current()} and dispatch a follow-up visit back to
+     * the requesting peer, which owns the tree. This is how Java-side visitors reach the host's
+     * own visitors when the JVM is the spawned server (e.g. Python-hosted recipe runs dispatching
+     * {@code org.openrewrite.python.AddImport} back to Python).
+     */
+    @Test
+    void nestedVisitBackToRequestOriginator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = client.visit((SourceFile) tree, DispatchBackToOriginator.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return requireNonNull(t);
+              }
+          })),
+          text(
+            "Hello Jon!",
+            "Hello World!"
+          )
+        );
+    }
+
     @Disabled("Print requires bidirectional RPC (GetObject callback) which deadlocks in the in-process test setup. " +
               "Works correctly when calling to a real subprocess (e.g., Java to Python/JS).")
     @Test
@@ -565,6 +591,18 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public PlainText visitText(PlainText text, Integer p) {
             return text.withText("Hello World!");
+        }
+    }
+
+    /**
+     * Runs on the peer handling a Visit request and delegates the actual change to a visitor on
+     * the requesting peer via {@link RewriteRpc#current()}.
+     */
+    static class DispatchBackToOriginator extends PlainTextVisitor<Integer> {
+        @Override
+        public PlainText visitText(PlainText text, Integer p) {
+            RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
+            return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
         }
     }
 
