@@ -187,13 +187,13 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitImport(J.Import import_, ExecutionContext ctx) {
-            // Collect alias import information here
-            // If there is an existing import with an alias, we need to add a target import with an alias accordingly.
-            // If there is an existing import without an alias, we need to add a target import with an alias accordingly.
-            if (hasSameFQN(import_, originalType)) {
-                if (import_.getAlias() != null) {
-                    importAlias = import_.getAlias();
-                }
+            // An alias on the original type has to be reused for the target import, or references to
+            // it stop resolving. Imports nested in a block (a function body, an `if TYPE_CHECKING:`)
+            // bind a narrower scope than the file-level import that would be added in their place,
+            // so only file-level ones are considered.
+            if (import_.getAlias() != null && getCursor().firstEnclosing(J.Block.class) == null &&
+                    hasSameFQN(import_, originalType)) {
+                importAlias = import_.getAlias();
             }
 
             // visitCompilationUnit() handles changing the imports.
