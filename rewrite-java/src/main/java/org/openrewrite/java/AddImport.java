@@ -157,7 +157,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                             member != null, Markers.EMPTY),
                     TypeTree.build(fullyQualifiedName +
                             (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
-                    null);
+                    // Java has no import alias to print, so this stays null there; it carries the
+                    // alias for languages that share this visitor and do print one, such as Groovy.
+                    alias == null ? null : new JLeftPadded<>(Space.SINGLE_SPACE,
+                            new J.Identifier(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                                    emptyList(), alias, null, null),
+                            Markers.EMPTY));
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
