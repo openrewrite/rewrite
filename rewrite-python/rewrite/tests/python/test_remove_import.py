@@ -481,21 +481,6 @@ class TestCanonicalRemoveImport:
             )
         )
 
-    def test_remove_module_by_canonical_membership(self):
-        """Removing all imports of a module also matches members whose
-        canonical declaring module is the requested one."""
-        self._remover('posixpath').rewrite_run(
-            python(
-                """
-                from os.path import join
-                x = 1
-                """,
-                """
-                x = 1
-                """,
-            )
-        )
-
     def test_remove_module_binding_by_canonical_fqn(self):
         """`from os import path` binds the module canonically named os.path."""
         self._remover('os.path').rewrite_run(
@@ -516,6 +501,19 @@ class TestCanonicalRemoveImport:
             python(
                 """
                 from os.path import exists
+                x = 1
+                """,
+            )
+        )
+
+    def test_whole_module_removal_spares_canonically_related_members(self):
+        """`typing` is the canonical home of many re-exports, so a whole-module
+        request must match only bindings of the module itself — not every member
+        that happens to be declared there."""
+        self._remover('typing').rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
                 x = 1
                 """,
             )

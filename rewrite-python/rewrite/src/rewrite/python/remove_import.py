@@ -275,14 +275,12 @@ class RemoveImport(PythonVisitor):
         return self._prune_names(multi, new_padded)
 
     def _canonical_module_matches(self, imp: Import) -> bool:
-        """True when ``imp`` canonically is the requested module (``from os
-        import path`` for ``os.path``) or a symbol canonically declared in it
-        (``from os.path import join`` for ``posixpath``)."""
-        fqn = get_canonical_fqn(imp)
-        if fqn is None:
-            return False
-        return fqn == self.module or \
-            ('.' in fqn and fqn.rsplit('.', 1)[0] == self.module)
+        """True when ``imp`` binds the requested module itself (``from os import
+        path`` for ``os.path``). Membership is deliberately not enough: a module
+        is the canonical home of every symbol re-exported through it, so
+        matching members would sweep up imports written against other modules.
+        """
+        return get_canonical_fqn(imp) == self.module
 
     def _remove_name_from_import(self, multi: MultiImport) -> Optional[MultiImport]:
         """Remove a specific name from a 'from X import a, b, c' statement.
