@@ -1472,6 +1472,38 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void normalizesRepositoryThatDropsAnonymousRequests() {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            // Close without a status line, as an authenticating gateway may do, so the probe
+                            // sees a connection failure rather than a 401 it could recognize as "server exists"
+                            return new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mockRepo.start();
+                MavenRepository repository = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build();
+
+                MavenRepository normalized = new MavenPomDownloader(emptyMap(), ctx)
+                  .normalizeRepository(repository, MavenExecutionContextView.view(ctx), null);
+
+                assertThat(normalized).isNotNull();
+                assertThat(MavenExecutionContextView.view(ctx).getUnreachableEndpoints()).isEmpty();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void authenticatesPreemptivelyAfterCredentialsRequired() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try (MockWebServer mockRepo = getMockServer()) {

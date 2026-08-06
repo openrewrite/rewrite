@@ -1015,28 +1015,44 @@ public class MavenPomDownloader {
             httpsUri += "/";
         }
 
-        HttpSender.Request.Builder request = httpSender.options(httpsUri);
-
-        ReachabilityResult reachability = reachable(applyTimeoutToRequest(repository, request));
+        ReachabilityResult reachability = reachable(repository, HttpSender.Method.OPTIONS, httpsUri);
         if (reachability.isSuccess()) {
             return repository.withUri(httpsUri);
         }
-        reachability = reachable(applyTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
+        reachability = reachable(repository, HttpSender.Method.HEAD, httpsUri);
         if (reachability.isReachable()) {
             return repository.withUri(httpsUri);
         }
         if (!originalUrl.equals(httpsUri)) {
-            reachability = reachable(applyTimeoutToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
+            reachability = reachable(repository, HttpSender.Method.OPTIONS, originalUrl);
             if (reachability.isSuccess()) {
                 return repository.withUri(originalUrl);
             }
-            reachability = reachable(applyTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
+            reachability = reachable(repository, HttpSender.Method.HEAD, originalUrl);
             if (reachability.isReachable()) {
                 return repository.withUri(originalUrl);
             }
         }
         // Won't be null if server is unreachable
         throw Objects.requireNonNull(reachability.throwable);
+    }
+
+    /**
+     * Probes {@code url} to establish whether the repository host answers at all. Anonymous first, as every
+     * other request is, but a host that refuses unauthenticated requests without answering them — a connection
+     * reset or a dropped TLS handshake rather than a 401 — must not be written off as unreachable until tried with credentials. A repository declared to be behind authentication is often exactly the
+     */
+    private ReachabilityResult reachable(MavenRepository repository, HttpSender.Method method, String url) {
+        ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, newRequest(method, url)));
+        if (anonymous.isReachable() || !hasAuthentication(repository)) {
+            return anonymous;
+        }
+        ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, newRequest(method, url)));
+        return authenticated.isReachable() ? authenticated : anonymous;
+    }
+
+    private HttpSender.Request.Builder newRequest(HttpSender.Method method, String url) {
+        return httpSender.newRequest(url).withMethod(method);
     }
 
     @Value
