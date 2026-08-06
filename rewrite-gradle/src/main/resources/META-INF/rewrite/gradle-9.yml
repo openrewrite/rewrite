@@ -55,13 +55,19 @@ name: org.openrewrite.gradle.gradle9.MigrateIsolatedProjectsProperties
 displayName: Rename the incubating `org.gradle.unsafe.isolated-projects` properties
 description: >-
   Gradle 9.7 promotes the Isolated Projects feature flags out of the `unsafe` namespace and deprecates the legacy
-  property names. `org.gradle.unsafe.isolated-projects` becomes `org.gradle.isolated-projects` and
-  `org.gradle.unsafe.isolated-projects.diagnostics` becomes `org.gradle.isolated-projects.diagnostics`. The legacy
-  names still work as aliases, but will be removed in a future release.
+  property names. `org.gradle.unsafe.isolated-projects` becomes `org.gradle.isolated-projects`,
+  `org.gradle.unsafe.isolated-projects.diagnostics` becomes `org.gradle.isolated-projects.diagnostics` and
+  `org.gradle.unsafe.isolated-projects.dangerously-ignore-problems` becomes
+  `org.gradle.isolated-projects.dangerously-ignore-problems`. The legacy names still work as aliases, but will be
+  removed in a future release.
 preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: '**/gradle.properties'
 recipeList:
+  - org.openrewrite.properties.ChangePropertyKey:
+      oldPropertyKey: org.gradle.unsafe.isolated-projects.dangerously-ignore-problems
+      newPropertyKey: org.gradle.isolated-projects.dangerously-ignore-problems
+      relaxedBinding: false
   - org.openrewrite.properties.ChangePropertyKey:
       oldPropertyKey: org.gradle.unsafe.isolated-projects.diagnostics
       newPropertyKey: org.gradle.isolated-projects.diagnostics
