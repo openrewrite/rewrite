@@ -15,11 +15,18 @@
  */
 package org.openrewrite.javascript.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -168,12 +175,18 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      * <p>
      * When the same name+versionConstraint appears multiple times, the same
      * Dependency instance is reused. This enables reference deduplication
-     * during RPC serialization.
+     * during RPC serialization. See {@link ResolvedDependency} for why both types are built
+     * through a no-arg creator.
      */
-    @Value
+    @Getter
+    @EqualsAndHashCode
+    @ToString
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @AllArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static class Dependency implements RpcCodec<Dependency> {
+    public static final class Dependency implements RpcCodec<Dependency> {
         String name;              // Package name (e.g., "react")
         String versionConstraint; // Version constraint (e.g., "^18.2.0")
 
@@ -205,22 +218,37 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      * whose {@code resolved} pointers reference other ResolvedDependency instances of the
      * same graph, so the graph is navigable to arbitrary depth and may contain cycles.
      * Producers uphold this by filling each instance's lists in place after construction
-     * rather than replacing instances with copies.
+     * rather than replacing instances with copies. Both this type and {@link Dependency} are built
+     * through a no-arg creator so Jackson binds the {@code @ref} id before reading nested values;
+     * a property-based creator cannot resolve a back-reference into an instance still being built.
      */
-    @Value
+    @Getter
+    @EqualsAndHashCode
+    @ToString
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @AllArgsConstructor
+    @NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+    public static final class ResolvedDependency implements RpcCodec<ResolvedDependency> {
         @ToString.Include
         String name;    // Package name (e.g., "react")
 
         @ToString.Include
         String version; // Actual resolved version (e.g., "18.3.1")
 
-        // This package's own dependency requests
+        // This package's own dependency requests. Excluded from equality, which recurses around a
+        // cycle; name and version already identify a resolution uniquely.
+        @EqualsAndHashCode.Exclude
         @Nullable List<Dependency> dependencies;
+
+        @EqualsAndHashCode.Exclude
         @Nullable List<Dependency> devDependencies;
+
+        @EqualsAndHashCode.Exclude
         @Nullable List<Dependency> peerDependencies;
+
+        @EqualsAndHashCode.Exclude
         @Nullable List<Dependency> optionalDependencies;
 
         // Node/npm version requirements for this package
