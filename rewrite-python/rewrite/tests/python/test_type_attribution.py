@@ -3459,3 +3459,68 @@ class TestPydanticModelMembers:
         # Methods still populate.
         assert cls._methods is not None
         assert 'greeting' in [m._name for m in cls._methods]
+
+
+@requires_ty_types_cli
+class TestImportNameAttribution:
+    """Each import name's qualid carries the canonical type of the symbol it
+    binds (``from os.path import join`` binds ``posixpath.join``), which is
+    what lets the import machinery match imports by canonical FQN in addition
+    to the written path."""
+
+    @staticmethod
+    def _first_import(cu):
+        from rewrite.python.tree import MultiImport
+        stmt = cu.statements[0]
+        if isinstance(stmt, MultiImport):
+            return stmt.names[0]
+        return stmt
+
+    def _qualid_type(self, src):
+        cu, tmpdir, client = _parse_with_types({'m.py': src})
+        try:
+            return self._first_import(cu).qualid.type
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_reexported_function(self):
+        t = self._qualid_type('from os.path import join\n')
+        assert isinstance(t, JavaType.Method), f"expected Method, got {t!r}"
+        assert t.name == 'join'
+        assert t.declaring_type.fully_qualified_name == 'posixpath'
+
+    def test_reexported_function_with_alias(self):
+        t = self._qualid_type('from os.path import join as j\n')
+        assert isinstance(t, JavaType.Method), f"expected Method, got {t!r}"
+        assert t.name == 'join'
+        assert t.declaring_type.fully_qualified_name == 'posixpath'
+
+    def test_reexported_class(self):
+        t = self._qualid_type('from collections.abc import Iterable\n')
+        assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+        assert t.fully_qualified_name == 'typing.Iterable'
+
+    def test_plain_module_import(self):
+        t = self._qualid_type('import os\n')
+        assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+        assert t.fully_qualified_name == 'os'
+
+    def test_plain_dotted_module_import(self):
+        # ty types the Alias binding as just the root package `os`
+        t = self._qualid_type('import os.path\n')
+        assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+        assert t.fully_qualified_name == 'os.path'
+
+    def test_plain_dotted_module_import_with_alias(self):
+        t = self._qualid_type('import os.path as osp\n')
+        assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+        assert t.fully_qualified_name == 'os.path'
+
+    def test_from_import_of_module(self):
+        t = self._qualid_type('from os import path\n')
+        assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+        assert t.fully_qualified_name == 'os.path'
+
+    def test_unresolvable_import_stays_untyped(self):
+        t = self._qualid_type('from nonexistent_module_xyz import something\n')
+        assert t is None or isinstance(t, JavaType.Unknown)

@@ -424,3 +424,99 @@ class TestMaybeRemoveImport:
                 after_recipe=_assert_ids_accessible,
             )
         )
+
+
+class TestCanonicalRemoveImport:
+    """A requested (module, name) also matches an import by its canonical FQN
+    (``os.path.join`` is canonically ``posixpath.join``), not just by its
+    written path."""
+
+    @staticmethod
+    def _remover(module, name=None):
+        class RemoveVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module=module, name=name, only_if_unused=False))
+                return super().visit_compilation_unit(cu, p)
+
+        return RecipeSpec(recipe=from_visitor(RemoveVisitor()))
+
+    def test_remove_reexported_function_by_canonical_fqn(self):
+        self._remover('posixpath', 'join').rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_remove_reexported_class_by_canonical_fqn(self):
+        self._remover('typing', 'Iterable').rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_canonical_removal_keeps_other_names(self):
+        self._remover('posixpath', 'join').rewrite_run(
+            python(
+                """
+                from os.path import exists, join
+                x = 1
+                """,
+                """
+                from os.path import exists
+                x = 1
+                """,
+            )
+        )
+
+    def test_remove_module_by_canonical_membership(self):
+        """Removing all imports of a module also matches members whose
+        canonical declaring module is the requested one."""
+        self._remover('posixpath').rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_remove_module_binding_by_canonical_fqn(self):
+        """`from os import path` binds the module canonically named os.path."""
+        self._remover('os.path').rewrite_run(
+            python(
+                """
+                from os import path
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_canonical_mismatch_is_not_removed(self):
+        """os.path.exists is canonically genericpath.exists, not posixpath.exists."""
+        self._remover('posixpath', 'exists').rewrite_run(
+            python(
+                """
+                from os.path import exists
+                x = 1
+                """,
+            )
+        )
