@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
@@ -175,8 +176,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      * <p>
      * When the same name+versionConstraint appears multiple times, the same
      * Dependency instance is reused. This enables reference deduplication
-     * during RPC serialization. See {@link ResolvedDependency} for why both types are built
-     * through a no-arg creator.
+     * during RPC serialization. See {@link ResolvedDependency} for why both types are mutable.
      */
     @Getter
     @EqualsAndHashCode
@@ -198,15 +198,15 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         public void rpcSend(Dependency after, RpcSendQueue q) {
             q.getAndSend(after, Dependency::getName);
             q.getAndSend(after, Dependency::getVersionConstraint);
-            q.getAndSend(after, Dependency::getResolved);
+            q.getAndSend(after, d -> asRef(d.getResolved()));
         }
 
         @Override
         public Dependency rpcReceive(Dependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersionConstraint(q.receive(before.versionConstraint))
-                    .withResolved(q.receive(before.resolved));
+            before.name = q.receive(before.name);
+            before.versionConstraint = q.receive(before.versionConstraint);
+            before.resolved = q.receive(before.resolved);
+            return before;
         }
     }
 
@@ -218,10 +218,11 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
      * whose {@code resolved} pointers reference other ResolvedDependency instances of the
      * same graph, so the graph is navigable to arbitrary depth and may contain cycles.
      * Producers uphold this by filling each instance's lists in place after construction
-     * rather than replacing instances with copies. Both this type and {@link Dependency} are built
-     * through a no-arg creator so Jackson binds the {@code @ref} id before reading nested values;
-     * a property-based creator cannot resolve a back-reference into an instance still being built.
+     * rather than replacing instances with copies.
      */
+    // Mutable behind a no-arg creator so a cycle can close while an instance is still being
+    // populated: Jackson binds the @ref id, and rpcReceive fills the instance the receive
+    // queue registered for that ref, before either reads nested values.
     @Getter
     @EqualsAndHashCode
     @ToString
@@ -279,26 +280,14 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
 
         @Override
         public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
-            before = before
-                    .withName(q.receive(before.name));
-            before = before
-                    .withVersion(q.receive(before.version));
-            before = before
-                    .withDependencies(q.receiveList(before.dependencies,
-                            dep -> dep.rpcReceive(dep, q)));
-            before = before
-                    .withDevDependencies(q.receiveList(before.devDependencies,
-                            dep -> dep.rpcReceive(dep, q)));
-            before = before
-                    .withPeerDependencies(q.receiveList(before.peerDependencies,
-                            dep -> dep.rpcReceive(dep, q)));
-            before = before
-                    .withOptionalDependencies(q.receiveList(before.optionalDependencies,
-                            dep -> dep.rpcReceive(dep, q)));
-            before = before
-                    .withEngines(q.receive(before.engines));
-            before = before
-                    .withLicense(q.receive(before.license));
+            before.name = q.receive(before.name);
+            before.version = q.receive(before.version);
+            before.dependencies = q.receiveList(before.dependencies, dep -> dep.rpcReceive(dep, q));
+            before.devDependencies = q.receiveList(before.devDependencies, dep -> dep.rpcReceive(dep, q));
+            before.peerDependencies = q.receiveList(before.peerDependencies, dep -> dep.rpcReceive(dep, q));
+            before.optionalDependencies = q.receiveList(before.optionalDependencies, dep -> dep.rpcReceive(dep, q));
+            before.engines = q.receive(before.engines);
+            before.license = q.receive(before.license);
             return before;
         }
     }
