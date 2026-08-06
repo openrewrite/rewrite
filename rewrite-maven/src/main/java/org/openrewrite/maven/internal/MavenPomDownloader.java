@@ -1082,10 +1082,10 @@ public class MavenPomDownloader {
 
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
         String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
-        // If this host has already required credentials in this session, authenticate preemptively rather than
-        // paying another anonymous round-trip. Otherwise probe anonymously first.
+        // If this host has already required authentication in this session, authenticate preemptively rather
+        // than paying another anonymous round-trip. Otherwise probe anonymously first.
         String endpoint = endpointOrNull(URI.create(jarUrl));
-        boolean preemptive = hasCredentials(repo) && endpoint != null &&
+        boolean preemptive = hasAuthentication(repo) && endpoint != null &&
                              ctx.getAuthenticationRequiredEndpoints().contains(endpoint);
         try {
             try {
@@ -1099,7 +1099,7 @@ public class MavenPomDownloader {
                 });
             } catch (FailsafeException failsafeException) {
                 Throwable cause = failsafeException.getCause();
-                if (cause instanceof HttpSenderResponseException && !preemptive && hasCredentials(repo) &&
+                if (cause instanceof HttpSenderResponseException && !preemptive && hasAuthentication(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
                         HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
@@ -1126,16 +1126,16 @@ public class MavenPomDownloader {
      * credentials once the server challenges the anonymous request with a 4xx.
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
-        // If this host has already required credentials in this session, authenticate preemptively rather than
-        // paying another anonymous round-trip. Otherwise request anonymously first.
+        // If this host has already required authentication in this session, authenticate preemptively rather
+        // than paying another anonymous round-trip. Otherwise request anonymously first.
         String endpoint = endpointOrNull(URI.create(uriString));
-        if (hasCredentials(repo) && endpoint != null && ctx.getAuthenticationRequiredEndpoints().contains(endpoint)) {
+        if (hasAuthentication(repo) && endpoint != null && ctx.getAuthenticationRequiredEndpoints().contains(endpoint)) {
             return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
         }
         try {
             return sendRequest(applyTimeoutToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
-            if (hasCredentials(repo) && e.isClientSideException()) {
+            if (hasAuthentication(repo) && e.isClientSideException()) {
                 return retryRequestWithCredentials(repo, uriString, e);
             } else {
                 throw e;
@@ -1195,21 +1195,36 @@ public class MavenPomDownloader {
      */
     private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         applyTimeoutToRequest(repository, request);
-        if (mavenSettings != null && mavenSettings.getServers() != null) {
-            for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
-                MavenSettings.ServerConfiguration configuration = server.getConfiguration();
-                if (server.getId().equals(repository.getId()) && configuration != null &&
-                    configuration.getHttpHeaders() != null) {
-                    for (MavenSettings.HttpHeader header : configuration.getHttpHeaders()) {
-                        request.withHeader(header.getName(), header.getValue());
-                    }
-                }
-            }
+        for (MavenSettings.HttpHeader header : resolveHttpHeaders(repository)) {
+            request.withHeader(header.getName(), header.getValue());
         }
         if (hasCredentials(repository)) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
+    }
+
+    /**
+     * Whether an authenticated request to this repository would differ from an anonymous one at all, and so
+     * whether retrying with authentication after a 4xx is worth a round-trip. A {@code <server>} may carry
+     * only {@code <httpHeaders>} (a bearer token or PAT) with no username or password, which authenticates
+     * just as much as basic credentials do. Mirrors {@code MavenArtifactDownloader#hasAuthentication}.
+     */
+    private boolean hasAuthentication(MavenRepository repository) {
+        return hasCredentials(repository) || !resolveHttpHeaders(repository).isEmpty();
+    }
+
+    private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {
+        if (mavenSettings != null && mavenSettings.getServers() != null) {
+            for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
+                MavenSettings.ServerConfiguration configuration = server.getConfiguration();
+                if (server.getId().equals(repository.getId()) && configuration != null &&
+                    configuration.getHttpHeaders() != null) {
+                    return configuration.getHttpHeaders();
+                }
+            }
+        }
+        return emptyList();
     }
 
     private static boolean hasCredentials(MavenRepository repository) {
