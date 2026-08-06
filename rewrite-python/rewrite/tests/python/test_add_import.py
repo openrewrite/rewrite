@@ -149,6 +149,27 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_ignores_identifiers_in_imports(self):
+        """``pathlib`` occurs only as the module of the existing aliased import."""
+        class AddPathlibVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_add_import(self, AddImportOptions(
+                    module='pathlib',
+                    only_if_referenced=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(AddPathlibVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                import pathlib as o
+
+                x = o.sep
+                """,
+            )
+        )
+
     def test_merge_into_existing_from_import(self):
         """Merge a new name into an existing 'from X import ...' statement.
 
