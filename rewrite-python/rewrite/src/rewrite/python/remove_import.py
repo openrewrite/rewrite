@@ -20,7 +20,7 @@ from typing import Optional, Set
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded
 from rewrite.java.tree import Identifier, Import, MethodDeclaration, Space
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -256,12 +256,11 @@ class RemoveImport(PythonVisitor):
         """Remove an entire module import (import X or from X import ...)."""
         if multi.from_ is not None:
             # This is a "from X import Y" statement
-            from_name = get_name_string(multi.from_)
-            if from_name != self.module:
-                return multi
+            syntactic = get_name_string(multi.from_) == self.module
             new_padded = [
                 padded_imp for padded_imp in multi.padding.names.padding.elements
-                if not self._is_removable(padded_imp.element,
+                if not (syntactic or self._canonical_module_matches(padded_imp.element))
+                or not self._is_removable(padded_imp.element,
                                           get_qualid_name(padded_imp.element.qualid))
             ]
         else:
@@ -275,19 +274,32 @@ class RemoveImport(PythonVisitor):
 
         return self._prune_names(multi, new_padded)
 
+    def _canonical_module_matches(self, imp: Import) -> bool:
+        """True when ``imp`` binds the requested module itself (``from os import
+        path`` for ``os.path``). Membership is deliberately not enough: a module
+        is the canonical home of every symbol re-exported through it, so
+        matching members would sweep up imports written against other modules.
+        """
+        return get_canonical_fqn(imp) == self.module
+
     def _remove_name_from_import(self, multi: MultiImport) -> Optional[MultiImport]:
-        """Remove a specific name from a 'from X import a, b, c' statement."""
+        """Remove a specific name from a 'from X import a, b, c' statement.
+
+        A member matches when written module and name match, or when its
+        canonical FQN equals the requested ``module.name``.
+        """
         if multi.from_ is None:
             return multi  # Not a "from" import
 
-        from_name = get_name_string(multi.from_)
-        if from_name != self.module:
-            return multi  # Different module
+        syntactic = get_name_string(multi.from_) == self.module
+        target_fqn = f"{self.module}.{self.name}"
 
         new_padded = []
         for padded_imp in multi.padding.names.padding.elements:
             name = get_qualid_name(padded_imp.element.qualid)
-            if name != self.name or not self._is_removable(padded_imp.element, name):
+            matches = (syntactic and name == self.name) or \
+                get_canonical_fqn(padded_imp.element) == target_fqn
+            if not matches or not self._is_removable(padded_imp.element, name):
                 new_padded.append(padded_imp)
 
         return self._prune_names(multi, new_padded)

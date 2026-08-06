@@ -24,7 +24,7 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, pad_right
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn, pad_right
 from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -174,10 +174,14 @@ class AddImport(PythonVisitor):
             if multi.from_ is None:
                 return False  # This is not a "from" import
             from_name = get_name_string(multi.from_)
-            if from_name != self.module:
-                return False
             for imp in multi.names:
-                if self._import_name_matches(imp, self.name, self.alias):
+                if from_name == self.module and self._import_name_matches(imp, self.name, self.alias):
+                    return True
+                # A member canonically matching the requested module.name
+                # satisfies the request too — provided it binds the same name,
+                # so references to the requested name resolve through it.
+                if get_canonical_fqn(imp) == f"{self.module}.{self.name}" and \
+                        (get_alias_name(imp) or get_qualid_name(imp.qualid)) == (self.alias or self.name):
                     return True
         return False
 

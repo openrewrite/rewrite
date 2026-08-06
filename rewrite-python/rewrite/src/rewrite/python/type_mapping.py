@@ -855,6 +855,32 @@ class PythonTypeMapping:
             return expr_type, JavaType.Variable(_name=node.attr, _type=expr_type, _owner=receiver_type)
         return expr_type, None
 
+    def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
+        """The canonical type of the symbol an import name binds, named at its
+        definition site (``from os.path import join`` yields a Method declared
+        in ``posixpath``). Functions become a whole :class:`JavaType.Method`,
+        not the return type expression positions use, so that callers can
+        derive an FQN from declaring type plus name.
+        """
+        type_id = self._lookup_type_id(node)
+        if type_id is None:
+            return None
+        descriptor = self._type_registry.get(type_id)
+        if descriptor is None:
+            return None
+        kind = descriptor.get('kind')
+        if kind == 'module':
+            module_name = descriptor.get('moduleName', '')
+            # ty types a non-aliased dotted `import a.b.c` as the bound root
+            # package `a`, while the qualid names the full dotted path.
+            if not node.asname and '.' in node.name and node.name != module_name:
+                module_name = node.name
+            return self._create_class_type(module_name) if module_name else None
+        if kind in _FUNCTION_KINDS:
+            return self._create_method_from_descriptor(
+                descriptor, self._get_declaration_declaring_type(descriptor))
+        return self._resolve_type(type_id)
+
     def method_declaration_type(self, node: ast.FunctionDef) -> Optional[JavaType.Method]:
         """Get the method type for a function/method declaration.
 

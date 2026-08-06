@@ -595,3 +595,36 @@ class TestChangeImport:
                 """,
             )
         )
+
+
+class TestChangeImportLeavesUnrelatedImports:
+    """ChangeImport schedules a whole-module RemoveImport for the old module,
+    which must not reach imports the recipe was never asked about."""
+
+    def test_unrelated_canonically_related_import_survives(self):
+        """`Iterable` is canonically typing.Iterable, but the file imports it
+        from collections.abc and the recipe only concerns typing.List."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='List',
+            new_module='mytypes',
+            new_name='List',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                import typing
+
+                def f(x: Iterable) -> typing.List:
+                    return []
+                """,
+                """
+                from collections.abc import Iterable
+                import mytypes
+
+                def f(x: Iterable) -> mytypes.List:
+                    return []
+                """,
+            )
+        )

@@ -360,3 +360,62 @@ class TestAddImportVisitor:
                 """,
             )
         )
+
+
+class TestCanonicalAddImportDedup:
+    """An existing import already satisfies a requested (module, name) when
+    its canonical FQN matches (``os.path.join`` is canonically
+    ``posixpath.join``), not just when its written path does."""
+
+    def test_canonical_request_matches_written_from_import(self):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'join'))).rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = join('a', 'b')
+                """,
+            )
+        )
+
+    def test_canonical_request_matches_written_class_import(self):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'Iterable'))).rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                def f(x: Iterable): ...
+                """,
+            )
+        )
+
+    def test_canonical_match_requires_same_bound_name(self):
+        """An aliased binding does not satisfy a request for the plain name."""
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'join'))).rewrite_run(
+            python(
+                """
+                from os.path import join as j
+                x = 1
+                """,
+                """
+                from os.path import join as j
+                from posixpath import join
+                x = 1
+                """,
+            )
+        )
+
+    def test_canonical_mismatch_still_adds(self):
+        """os.path.exists is canonically genericpath.exists, so a posixpath
+        request is a different symbol and gets its own import."""
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'exists'))).rewrite_run(
+            python(
+                """
+                from os.path import exists
+                x = 1
+                """,
+                """
+                from os.path import exists
+                from posixpath import exists
+                x = 1
+                """,
+            )
+        )
