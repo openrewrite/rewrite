@@ -85,6 +85,10 @@ public class MoveFile extends Recipe {
     }
 
     static @Nullable Path computeNewSourcePath(String originalSourcePath, @Nullable String folder, @Nullable String fileMatcher, String moveTo) {
+        return computeNewSourcePath(originalSourcePath, folder, fileMatcher, moveTo, null);
+    }
+
+    static @Nullable Path computeNewSourcePath(String originalSourcePath, @Nullable String folder, @Nullable String fileMatcher, String moveTo, @Nullable String destinationFilename) {
         Path sourcePath = Paths.get(separatorsToSystem(originalSourcePath));
         boolean isWindowsPath = originalSourcePath.equals(separatorsToWindows(originalSourcePath));
         boolean isUnixPath = originalSourcePath.equals(separatorsToUnix(originalSourcePath));
@@ -104,7 +108,14 @@ public class MoveFile extends Recipe {
             destination = getFilePatternTarget(sourcePath, fileMatcher, normalizedMoveTo);
         }
         if (destination != null && !destination.equals(sourcePath)) {
-            destination = destination.resolve(sourcePath.getFileName().toString());
+            String fileName;
+            if (StringUtils.isNullOrEmpty(destinationFilename)) {
+                fileName = sourcePath.getFileName().toString();
+                destination = destination.resolve(fileName);
+            } else {
+                fileName = destinationFilename;
+                destination = destination.resolve(fileName).normalize();
+            }
             if (!destination.equals(sourcePath)) {
                 if (isFileOnRoot) {
                     return Paths.get(separatorsToSystem(destination.toString()));

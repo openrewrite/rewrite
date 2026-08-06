@@ -29,7 +29,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void copyToRelativeToUnixFileName() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "../resources")),
+          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "../resources", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/renameMe/application.yml")
@@ -47,7 +47,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void copyRelativeToUnixFolderName() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile("src/main/renameMe", null, "../resources")),
+          spec -> spec.recipe(new CopyFile("src/main/renameMe", null, "../resources", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/renameMe/nested/deeply/application.yml")
@@ -63,7 +63,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void copyFilesToUnixSubDirectory() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "profiles")),
+          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "profiles", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/resources/application.yml")
@@ -79,7 +79,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void copyFolderToUnixSubDirectory() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile("src/main", null, "nested")),
+          spec -> spec.recipe(new CopyFile("src/main", null, "nested", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/resources/application.yml")
@@ -95,7 +95,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void copyFilesToExactUnixPath() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "/profiles")),
+          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "/profiles", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/resources/application.yml")
@@ -111,7 +111,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void originalIsPreserved() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "**/application.yml", "../profiles")),
+          spec -> spec.recipe(new CopyFile(null, "**/application.yml", "../profiles", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/resources/application.yml")
@@ -127,7 +127,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void ignoreNonMatchingFiles() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "**/renameMe/application*.yml", "../resources")),
+          spec -> spec.recipe(new CopyFile(null, "**/renameMe/application*.yml", "../resources", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/renameMe/application.yaml") // extension is wrong
@@ -142,7 +142,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void ignoreNonMatchingFolders() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile("src/main/renameMe", null, "../profiles")),
+          spec -> spec.recipe(new CopyFile("src/main/renameMe", null, "../profiles", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/.renameMe/application.yaml")
@@ -157,7 +157,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void rootFiles() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "*.yml", "src/main/resources")),
+          spec -> spec.recipe(new CopyFile(null, "*.yml", "src/main/resources", null)),
           text(
             "hello: world",
             spec -> spec.path("application.yml")
@@ -173,7 +173,7 @@ class CopyFileTest implements RewriteTest {
     @Test
     void copyToWindowsPath() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "src/**/application*.yml", "..\\profiles")),
+          spec -> spec.recipe(new CopyFile(null, "src/**/application*.yml", "..\\profiles", null)),
           text(
             "hello: world",
             spec -> spec.path("src\\main\\renameMe\\application.yml")
@@ -187,9 +187,48 @@ class CopyFileTest implements RewriteTest {
     }
 
     @Test
+    void copyWithDestinationFilename() {
+        rewriteRun(
+          spec -> spec.recipe(new CopyFile(null, "**/application.yml", ".", "test.yml")),
+          text(
+            "hello: world",
+            spec -> spec.path("src/main/resources/application.yml")
+          ),
+          text(
+            null,
+            "hello: world",
+            spec -> spec.path("src/main/resources/test.yml")
+          )
+        );
+    }
+
+    @Test
+    void copyWithDestinationFilenameToOtherFolder() {
+        rewriteRun(
+          spec -> spec.recipe(new CopyFile(null, "**/application.yml", "../profiles", "test.yml")),
+          text(
+            "hello: world",
+            spec -> spec.path("src/main/resources/application.yml")
+          ),
+          text(
+            null,
+            "hello: world",
+            spec -> spec.path("src/main/profiles/test.yml")
+          )
+        );
+    }
+
+    @Test
+    void destinationFilenameRejectedWithFolder() {
+        assertThat(new CopyFile("src/main/resources", null, "../profiles", "test.yml")
+          .validate()
+          .isInvalid()).isTrue();
+    }
+
+    @Test
     void copyMultipleFiles() {
         rewriteRun(
-          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "../profiles")),
+          spec -> spec.recipe(new CopyFile(null, "**/application*.yml", "../profiles", null)),
           text(
             "hello: world",
             spec -> spec.path("src/main/resources/application.yml")
