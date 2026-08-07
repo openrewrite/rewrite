@@ -206,9 +206,25 @@ class AddImport(PythonVisitor):
             def __init__(self):
                 super().__init__()
                 self.found = False
+                self.in_import = False
+
+            def visit_import(self, import_: Import, p) -> J:
+                # Identifiers in import statements are bindings, not references.
+                self.in_import = True
+                try:
+                    return super().visit_import(import_, p)
+                finally:
+                    self.in_import = False
+
+            def visit_multi_import(self, multi: MultiImport, p) -> J:
+                self.in_import = True
+                try:
+                    return super().visit_multi_import(multi, p)
+                finally:
+                    self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if ident.simple_name == target_name:
+                if not self.in_import and ident.simple_name == target_name:
                     self.found = True
                 return ident
 

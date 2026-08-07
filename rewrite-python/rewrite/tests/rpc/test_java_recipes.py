@@ -66,6 +66,152 @@ class TestChangeType:
         )
 
 
+    def test_change_type_preserves_import_alias(self, java_rpc):
+        """The alias carries over to the new import, so usages of ``L`` need no
+        rewriting."""
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List as L
+
+                def foo(items: L[str]) -> L[int]:
+                    pass
+                """,
+                """
+                from builtins import list as L
+
+                def foo(items: L[str]) -> L[int]:
+                    pass
+                """
+            )
+        )
+
+
+    def test_change_type_preserves_alias_of_reexported_import(self, java_rpc):
+        """``collections.abc.Iterable`` is attributed as ``typing.Iterable``, so the
+        recipe names a type this source never spells. Miss the alias here and the
+        old import is retired with nothing left to bind ``I``.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.Iterable",
+                new_fully_qualified_type_name="typing.Sequence"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable as I
+
+                def f(it: I) -> None:
+                    pass
+                """,
+                """
+                from typing import Sequence as I
+
+                def f(it: I) -> None:
+                    pass
+                """
+            )
+        )
+
+
+    def test_change_type_preserves_alias_of_plain_module_import(self, java_rpc):
+        """A standalone ``import <module> as <alias>`` parses as a plain
+        ``J.Import`` rather than a ``Py.MultiImport`` — a second shape the alias
+        lookup has to cover.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="os",
+                new_fully_qualified_type_name="pathlib"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                import os as o
+
+                x = o.sep
+                """,
+                """
+                import pathlib as o
+
+                x = o.sep
+                """
+            )
+        )
+
+
+    def test_change_type_ignores_function_local_aliased_import(self, java_rpc):
+        """A function-local import binds a name the top-level import machinery
+        does not manage, so the file's text stays unchanged.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            ),
+            # ChangeType updates the type attribution of the local usages — an
+            # LST change with no printed-output change.
+            allow_empty_diff=True,
+        )
+        spec.rewrite_run(
+            python(
+                """
+                def foo():
+                    from typing import List as L
+                    items: L[int] = []
+                    return items
+                """
+            )
+        )
+
+
+    def test_change_type_ignores_type_checking_aliased_import(self, java_rpc):
+        """Same for an import under ``if TYPE_CHECKING:``, the common way to keep
+        typing-only imports out of the runtime path.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            ),
+            allow_empty_diff=True,
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from __future__ import annotations
+
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List as L
+
+                def foo(items: L[int]) -> None:
+                    pass
+                """
+            )
+        )
+
+
     def test_change_simple_type_updates_type_attribution(self, java_rpc):
         """The renamed identifiers must also carry the *new* JavaType, so that
         downstream type-driven logic (``uses_type``, MethodMatcher, a second
