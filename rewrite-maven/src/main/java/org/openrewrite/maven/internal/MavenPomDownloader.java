@@ -1008,12 +1008,7 @@ public class MavenPomDownloader {
         // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
         // This regex accepts any capitalization of the letters in "http"
         String originalUrl = repository.getUri();
-        String httpsUri = originalUrl.toLowerCase().startsWith("http:") ?
-                repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
-                repository.getUri();
-        if (!httpsUri.endsWith("/")) {
-            httpsUri += "/";
-        }
+        String httpsUri = normalizedRepositoryUri(originalUrl);
 
         ReachabilityResult reachability = reachable(repository, HttpSender.Method.OPTIONS, httpsUri);
         if (reachability.isSuccess()) {
@@ -1035,6 +1030,20 @@ public class MavenPomDownloader {
         }
         // Won't be null if server is unreachable
         throw Objects.requireNonNull(reachability.throwable);
+    }
+
+    /**
+     * The URI form {@link #normalizeRepository(MavenRepository)} prefers: https over http, with a trailing
+     * slash so artifact paths can be appended directly. Since that is the form a reachable repository is
+     * normalized to, it is also the URI recorded on the POMs it serves. Exposed so callers keyed on that URI
+     * — a {@link org.openrewrite.maven.cache.MavenPomCache} matching a downloaded POM back to the repository
+     * declaration it came from, for one — can derive it without reimplementing the rule and drifting from it.
+     */
+    public static String normalizedRepositoryUri(String uri) {
+        String httpsUri = uri.toLowerCase().startsWith("http:") ?
+                uri.replaceFirst("[hH][tT][tT][pP]://", "https://") :
+                uri;
+        return httpsUri.endsWith("/") ? httpsUri : httpsUri + "/";
     }
 
     /**
