@@ -1049,19 +1049,17 @@ public class MavenPomDownloader {
     /**
      * Probes {@code url} to establish whether the repository host answers at all. Anonymous first, as every
      * other request is, but a host that refuses unauthenticated requests without answering them — a connection
-     * reset or a dropped TLS handshake rather than a 401 — must not be written off as unreachable until tried with credentials. A repository declared to be behind authentication is often exactly the
+     * reset or a dropped TLS handshake rather than a 401 — must not be written off as unreachable until tried
+     * with credentials. A repository declared to be behind authentication is often exactly such a host, so when
+     * credentials are configured the probe is retried with them before concluding the repository is unreachable.
      */
     private ReachabilityResult reachable(MavenRepository repository, HttpSender.Method method, String url) {
-        ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, newRequest(method, url)));
+        ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
         if (anonymous.isReachable() || !hasAuthentication(repository)) {
             return anonymous;
         }
-        ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, newRequest(method, url)));
+        ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
         return authenticated.isReachable() ? authenticated : anonymous;
-    }
-
-    private HttpSender.Request.Builder newRequest(HttpSender.Method method, String url) {
-        return httpSender.newRequest(url).withMethod(method);
     }
 
     @Value
