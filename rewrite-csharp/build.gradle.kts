@@ -476,6 +476,15 @@ if (project.hasProperty("nugetApiKey")) {
     tasks.named("publish") {
         dependsOn(csharpPublish)
     }
+} else if (!System.getenv("AWS_ACCESS_KEY_ID").isNullOrEmpty()) {
+    // No NuGet key, but CI is publishing to the Code Genome Project: its publish-cgp-packages
+    // action uploads whatever is sitting in dist/, and only csharpPack puts it there. Pack but
+    // don't push — the nuget.org push stays gated on nuget.org's own credential. The AWS check
+    // mirrors RewriteCgpPublishPlugin's gate, so a local build with neither credential is
+    // untouched and never invokes `dotnet pack`.
+    tasks.named("publish") {
+        dependsOn(csharpPack)
+    }
 }
 
 // ============================================

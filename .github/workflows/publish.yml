@@ -18,6 +18,11 @@ jobs:
       java_version: |
         25
         21
+      # As in ci.yml — the same artifacts, on the release path. An `-rc.` tag needs no special
+      # casing here: the action reads the version out of the artifact and tags a prerelease
+      # `kind=snapshot` so the bucket's 180-day lifecycle rule can reclaim it.
+      cgp_pypi_artifacts: rewrite-python/rewrite/dist/*
+      cgp_nuget_artifacts: rewrite-csharp/csharp/dist/*.nupkg
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}

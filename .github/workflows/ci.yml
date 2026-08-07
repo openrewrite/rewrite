@@ -25,6 +25,12 @@ jobs:
       java_version: |
         25
         21
+      # Mirror the sidecar packages `publish` just built into the Code Genome Project package
+      # repositories, alongside PyPI and nuget.org. Name and version are read from the wheel /
+      # .nupkg themselves, so no version handoff is involved. The npm sidecar is mirrored from
+      # npm-publish.yml instead, where the dist-tag is decided.
+      cgp_pypi_artifacts: rewrite-python/rewrite/dist/*
+      cgp_nuget_artifacts: rewrite-csharp/csharp/dist/*.nupkg
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}

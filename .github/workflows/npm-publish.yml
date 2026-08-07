@@ -84,6 +84,9 @@ jobs:
 
       # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
       # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
+      # `publish.yml` also fires on `v<x.y.z>-rc.<n>` tags, and a release candidate
+      # must not claim `latest` ahead of the actual latest release — so an `-rc.`
+      # tag goes to `next` alongside the snapshots.
       # Otherwise this is the `ci`-triggered snapshot path: publish the exact version string
       # handed off above (= the version embedded in the ci run's jar), and publish to
       # dist-tag `next`.
@@ -94,7 +97,11 @@ jobs:
         run: |
           if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
             echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-            echo "dist_tag=latest"  >> "$GITHUB_OUTPUT"
+            if [[ "$TAG" == *-rc.* ]]; then
+              echo "dist_tag=next"   >> "$GITHUB_OUTPUT"
+            else
+              echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           V=''
@@ -136,3 +143,19 @@ jobs:
             exit 0
           fi
           npm publish "$TGZ" --tag "$DIST_TAG"
+
+      # Mirror the same tarball into the Code Genome Project npm repository. Runs
+      # unconditionally after the step above, including when that step skipped the version as an
+      # npmjs duplicate: on first rollout every version already on npmjs is absent from CGP and
+      # still has to backfill, and the dist-tag pointer is exactly what a skipped version is
+      # missing. `dist_tag` is the same steps.ver output `npm publish --tag` used, so the two
+      # registries cannot disagree about what `latest`/`next` mean. The action reads the name
+      # and version out of the tarball, so no version handoff is involved and the existing
+      # published-snapshot-version → -PnpmPublishVersion plumbing above is untouched.
+      - uses: openrewrite/gh-automation/.github/actions/publish-cgp-packages@main
+        with:
+          ecosystem: npm
+          artifacts: rewrite-javascript/build/distributions/openrewrite-rewrite-*.tgz
+          dist_tag: ${{ steps.ver.outputs.dist_tag }}
+          aws_access_key_id: ${{ secrets.CGP_AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.CGP_AWS_SECRET_ACCESS_KEY }}
