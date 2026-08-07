@@ -560,12 +560,21 @@ def handle_parse(params: dict) -> List[str]:
     return results
 
 
+# Never-source dirs (caches, venvs, VCS, dependency trees, build output); caller exclusions extend, not replace.
+DEFAULT_PARSE_EXCLUSIONS = [
+    '__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne',
+    'node_modules', '.pytest_cache', '.mypy_cache', 'build', 'dist', 'target',
+]
+
+
 def handle_parse_project(params: dict) -> List[dict]:
     """Handle a ParseProject RPC request."""
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
+    exclusions = DEFAULT_PARSE_EXCLUSIONS + [
+        excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
+    ]
     relative_to = params.get('relativeTo') or project_path
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
