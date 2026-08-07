@@ -238,8 +238,8 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         @ToString.Include
         String version; // Actual resolved version (e.g., "18.3.1")
 
-        // This package's own dependency requests. Excluded from equality, which recurses around a
-        // cycle; name and version already identify a resolution uniquely.
+        // This package's own dependency requests. Excluded from equality so it terminates on a
+        // cyclic graph; name and version already identify a resolution uniquely.
         @EqualsAndHashCode.Exclude
         @Nullable List<Dependency> dependencies;
 

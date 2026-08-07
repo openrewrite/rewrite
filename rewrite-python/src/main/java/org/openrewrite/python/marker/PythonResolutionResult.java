@@ -350,8 +350,8 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
         /**
          * Direct dependencies of this resolved package. Null when the package has no
-         * dependencies in the lock file. Excluded from equality and toString, which recurse
-         * around a cycle; name and version already identify a resolution uniquely.
+         * dependencies in the lock file. Excluded from equality and toString so they terminate on
+         * a cyclic graph; name and version already identify a resolution uniquely.
          */
         @EqualsAndHashCode.Exclude
         @ToString.Exclude
