@@ -769,8 +769,6 @@ public class RewriteRpc {
 
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
             // which spawns helper threads that can leak per-thread RewriteRpc state.
-            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate. Use nanoTime 
-            // as Thread.sleep(1) is imprecise.
             long pollIntervalMs = 1;
             long livenessIntervalNanos = TimeUnit.MILLISECONDS.toNanos(500);
             long startNanos = System.nanoTime();
