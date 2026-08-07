@@ -22,7 +22,6 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.Value;
 import lombok.With;
@@ -183,7 +182,6 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
     @ToString
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @AllArgsConstructor
-    @NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     public static final class Dependency implements RpcCodec<Dependency> {
@@ -193,6 +191,10 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         // The resolved version of this dependency (from package-lock.json)
         @ToString.Exclude
         @Nullable ResolvedDependency resolved;
+
+        @JsonCreator
+        private Dependency() {
+        }
 
         @Override
         public void rpcSend(Dependency after, RpcSendQueue q) {
@@ -228,7 +230,6 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
     @ToString
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @AllArgsConstructor
-    @NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     public static final class ResolvedDependency implements RpcCodec<ResolvedDependency> {
@@ -257,6 +258,10 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
 
         // SPDX license identifier (e.g., "MIT", "Apache-2.0")
         @Nullable String license;
+
+        @JsonCreator
+        private ResolvedDependency() {
+        }
 
         @Override
         public void rpcSend(ResolvedDependency after, RpcSendQueue q) {

@@ -22,7 +22,6 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.Value;
 import lombok.With;
@@ -288,7 +287,6 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     @ToString
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @AllArgsConstructor
-    @NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
     @With
     public static final class Dependency implements RpcCodec<Dependency> {
         String name;
@@ -298,6 +296,10 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
         @ToString.Exclude
         @Nullable ResolvedDependency resolved;
+
+        @JsonCreator
+        private Dependency() {
+        }
 
         @Override
         public void rpcSend(Dependency after, RpcSendQueue q) {
@@ -336,7 +338,6 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
     @ToString
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @AllArgsConstructor
-    @NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     public static final class ResolvedDependency implements RpcCodec<ResolvedDependency> {
@@ -356,6 +357,10 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
         @EqualsAndHashCode.Exclude
         @ToString.Exclude
         @Nullable List<ResolvedDependency> dependencies;
+
+        @JsonCreator
+        private ResolvedDependency() {
+        }
 
         @Override
         public void rpcSend(ResolvedDependency after, RpcSendQueue q) {
