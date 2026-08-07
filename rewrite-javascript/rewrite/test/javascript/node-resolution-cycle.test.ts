@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {createNodeResolutionResultMarker} from "../../src/javascript";
+import {createNodeResolutionResultMarker, NodeResolutionResult} from "../../src/javascript";
+import {ReferenceMap, RpcReceiveQueue, RpcSendQueue} from "../../src/rpc";
 
 describe("cyclic resolved-dependency graph", () => {
 
@@ -33,6 +34,24 @@ describe("cyclic resolved-dependency graph", () => {
         const b = a.dependencies![0].resolved!;
 
         expect(b.name).toBe("b");
+        expect(b.peerDependencies![0].resolved).toBe(a);
+    });
+
+    test("the cycle survives an RPC round trip", async () => {
+        const sq = new RpcSendQueue(new ReferenceMap(), undefined, false);
+        await sq.send(marker, undefined);
+        const batch = sq.finish();
+
+        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const received = await rq.receive<NodeResolutionResult>(undefined);
+
+        const a = received.dependencies[0].resolved!;
+        expect(a.name).toBe("a");
+        const b = a.dependencies![0].resolved!;
+
+        // The dependency closing the cycle must carry its own state, not a blank placeholder
+        expect(b.peerDependencies![0].name).toBe("a");
+        // ...and resolve to the same instance the graph is navigated from
         expect(b.peerDependencies![0].resolved).toBe(a);
     });
 });
