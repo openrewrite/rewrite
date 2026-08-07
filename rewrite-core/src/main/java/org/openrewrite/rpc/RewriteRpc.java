@@ -45,6 +45,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -768,13 +769,12 @@ public class RewriteRpc {
 
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
             // which spawns helper threads that can leak per-thread RewriteRpc state.
-            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate.
-            long totalTimeoutMs = timeout.toMillis();
             long pollIntervalMs = 1;
-            long livenessIntervalMs = 500;
-            long elapsedMs = 0;
-            long lastLivenessMs = 0;
-            while (elapsedMs < totalTimeoutMs) {
+            long livenessIntervalNanos = TimeUnit.MILLISECONDS.toNanos(500);
+            long startNanos = System.nanoTime();
+            long deadlineNanos = startNanos + TimeUnit.MILLISECONDS.toNanos(timeout.toMillis());
+            long lastLivenessNanos = startNanos;
+            while (System.nanoTime() < deadlineNanos) {
                 JsonRpcSuccess result = future.getNow(null);
                 if (result != null) {
                     return result.getResult(responseType);
@@ -783,10 +783,10 @@ public class RewriteRpc {
                     return future.get().getResult(responseType);
                 }
                 Thread.sleep(pollIntervalMs);
-                elapsedMs += pollIntervalMs;
-                if (elapsedMs - lastLivenessMs >= livenessIntervalMs) {
+                long nowNanos = System.nanoTime();
+                if (nowNanos - lastLivenessNanos >= livenessIntervalNanos) {
                     checkLiveness();
-                    lastLivenessMs = elapsedMs;
+                    lastLivenessNanos = nowNanos;
                 }
             }
 
