@@ -274,6 +274,13 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace("-SNAPSHOT", "-zlocal")
 }
 
+// The nuget.org API key, or null when it is absent *or blank*. Blank is the case that matters: the
+// release workflow sets ORG_GRADLE_PROJECT_nugetApiKey unconditionally, so deleting the secret still
+// defines the property — as an empty string. A hasProperty check would be true, and the push would
+// run with no credential and fail at `dotnet nuget push` instead of cleanly not running at all.
+fun nugetApiKey(): String? =
+    project.findProperty("nugetApiKey")?.toString()?.takeIf { it.isNotBlank() }
+
 val generateVersionTxt by tasks.registering {
     group = "csharp"
     description = "Generate META-INF/rewrite-csharp-version.txt for RPC version pinning"
@@ -354,14 +361,13 @@ val csharpPublish by tasks.registering(Exec::class) {
     workingDir = csharpDir
 
     doFirst {
-        if (!project.hasProperty("nugetApiKey")) {
-            throw GradleException("nugetApiKey property is required for NuGet publishing")
-        }
+        val apiKey = nugetApiKey()
+            ?: throw GradleException("nugetApiKey property is required for NuGet publishing")
         commandLine(
             findDotnet(), "nuget", "push",
             "dist/*.nupkg",
             "--source", "https://api.nuget.org/v3/index.json",
-            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: "",
+            "--api-key", apiKey,
             "--skip-duplicate"
         )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
@@ -479,7 +485,7 @@ tasks.named("publish") {
 
 // The nuget.org push is gated on nuget.org's own credential. Retiring nuget.org is then deleting
 // this block and the secret, which leaves the pack above untouched.
-if (project.hasProperty("nugetApiKey")) {
+if (nugetApiKey() != null) {
     tasks.named("publish") {
         dependsOn(csharpPublish)
     }

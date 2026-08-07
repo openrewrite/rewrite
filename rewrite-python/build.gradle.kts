@@ -342,18 +342,25 @@ val pythonBuild by tasks.registering(Exec::class) {
     }
 }
 
+// The PyPI token, or null when it is absent *or blank*. Blank is the case that matters: the release
+// workflow sets ORG_GRADLE_PROJECT_pypiToken unconditionally, so deleting the secret still defines
+// the property — as an empty string. A hasProperty check would be true, and the push would run with
+// no credential and fail at twine instead of cleanly not running at all.
+fun pypiToken(): String? = project.findProperty("pypiToken")?.toString()?.takeIf { it.isNotBlank() }
+
 // Task to create .pypirc for authentication
 val setupPypirc by tasks.registering {
     group = "python"
     description = "Create .pypirc file for PyPI authentication"
 
     doLast {
-        if (project.hasProperty("pypiToken")) {
+        val token = pypiToken()
+        if (token != null) {
             val pypirc = pythonDir.resolve(".pypirc")
             pypirc.writeText("""
                 [pypi]
                 username = __token__
-                password = ${project.property("pypiToken")}
+                password = $token
             """.trimIndent())
             logger.lifecycle("Created .pypirc for PyPI authentication")
         } else {
@@ -391,7 +398,7 @@ tasks.named("publish") {
 // The PyPI push is gated on PyPI's own credential — the same property setupPypirc keys off, so
 // pythonPublish can never run without the .pypirc twine reads. Retiring PyPI is then deleting
 // this block and the secret, which leaves the dist/ build above untouched.
-if (project.hasProperty("pypiToken")) {
+if (pypiToken() != null) {
     tasks.named("publish") {
         dependsOn(pythonPublish)
     }
