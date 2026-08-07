@@ -382,9 +382,19 @@ val pythonPublish by tasks.registering(Exec::class) {
     }
 }
 
-// Wire into the main publish task
+// The distributable is built whenever we publish, regardless of where it is going: the Code
+// Genome Project mirror uploads dist/ and must not depend on the PyPI push existing.
 tasks.named("publish") {
-    dependsOn(pythonPublish)
+    dependsOn(pythonBuild)
+}
+
+// The PyPI push is gated on PyPI's own credential — the same property setupPypirc keys off, so
+// pythonPublish can never run without the .pypirc twine reads. Retiring PyPI is then deleting
+// this block and the secret, which leaves the dist/ build above untouched.
+if (project.hasProperty("pypiToken")) {
+    tasks.named("publish") {
+        dependsOn(pythonPublish)
+    }
 }
 
 // ============================================

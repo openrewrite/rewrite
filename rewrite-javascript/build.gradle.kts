@@ -245,12 +245,20 @@ testing {
     }
 }
 
-// npm publishing is performed directly by `.github/workflows/npm-publish.yml` (which runs
-// `npm publish <tgz>` against the artifact produced by the `npmPack` task above). The workflow
-// owns version selection (via `-PnpmPublishVersion=<v>`), dist-tag selection (`latest` vs
-// `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
-// package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
-// publish to Sonatype, PyPI, NuGet as before.
+// The tarball is built whenever we publish, regardless of where it is going: the Code Genome
+// Project mirror uploads it from the `ci`/`publish` run and must not depend on the npmjs push
+// existing. There is no npmjs counterpart to the `pythonPublish`/`csharpPublish` gate below,
+// because the npmjs push is not a Gradle task at all — see npm-publish.yml.
+tasks.named("publish") {
+    dependsOn(npmPack)
+}
+
+// The npmjs push is performed directly by `.github/workflows/npm-publish.yml` (which runs
+// `npm publish <tgz>` against its own `npmPack` invocation). The workflow owns version selection
+// (via `-PnpmPublishVersion=<v>`), dist-tag selection (`latest` vs `next`), and the
+// duplicate-publish guard. The dedicated workflow filename is also what the package's npm Trusted
+// Publisher (OIDC) record matches against. CI/release workflows still publish to Sonatype, PyPI,
+// NuGet as before.
 //
 // npm publishing is decoupled from the Maven snapshot publish (it runs in a separate
 // `workflow_run` triggered by `ci`, because npm Trusted Publisher binds to a single workflow
