@@ -18,6 +18,7 @@ package org.openrewrite.maven.internal;
 import dev.failsafe.Failsafe;
 import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
+import dev.failsafe.function.CheckedSupplier;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
@@ -31,6 +32,7 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.cache.MavenMetadataCacheEntry;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -148,17 +150,25 @@ public class MavenPomDownloader {
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
+        return withRetryAndTiming(() -> {
+            try (HttpSender.Response response = httpSender.send(request)) {
+                if (!response.isSuccessful()) {
+                    throw new HttpSenderResponseException(null, response.getCode(),
+                            new String(response.getBodyAsBytes()));
+                }
+                return response.getBodyAsBytes();
+            }
+        });
+    }
+
+    /**
+     * Run an HTTP exchange under the shared retry policy, unwrapping the failsafe/unchecked wrappers
+     * back into the checked exceptions callers handle, and recording the elapsed resolution time.
+     */
+    private <T> T withRetryAndTiming(CheckedSupplier<T> exchange) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
-            return Failsafe.with(retryPolicy).get(() -> {
-                try (HttpSender.Response response = httpSender.send(request)) {
-                    if (!response.isSuccessful()) {
-                        throw new HttpSenderResponseException(null, response.getCode(),
-                                new String(response.getBodyAsBytes()));
-                    }
-                    return response.getBodyAsBytes();
-                }
-            });
+            return Failsafe.with(retryPolicy).get(exchange);
         } catch (FailsafeException failsafeException) {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
                 throw (HttpSenderResponseException) failsafeException.getCause();
@@ -169,6 +179,81 @@ public class MavenPomDownloader {
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
+    }
+
+    /**
+     * Like {@link #requestAsAuthenticatedOrAnonymous} but tailored to metadata: it optionally adds
+     * conditional headers and, unlike {@link #sendRequest}, surfaces a {@code 304 Not Modified} as a
+     * non-error {@link MetadataDownload} (empty body) rather than throwing. Other non-2xx responses
+     * still raise {@link HttpSenderResponseException}, preserving the existing error handling.
+     */
+    private MetadataDownload requestMetadata(MavenRepository repo, String uriString,
+                                             @Nullable MavenMetadataCacheEntry revalidation) throws HttpSenderResponseException, IOException {
+        try {
+            HttpSender.Request.Builder request = applyConditionalHeaders(httpSender.get(uriString), revalidation);
+            return sendMetadataRequest(applyAuthenticationAndTimeoutToRequest(repo, request).build());
+        } catch (HttpSenderResponseException e) {
+            if (hasCredentials(repo) && e.isClientSideException()) {
+                try {
+                    HttpSender.Request.Builder request = applyConditionalHeaders(httpSender.get(uriString), revalidation);
+                    return sendMetadataRequest(request.build());
+                } catch (HttpSenderResponseException retryException) {
+                    throw retryException.isAccessDenied() ? e : retryException;
+                }
+            }
+            throw e;
+        }
+    }
+
+    private static HttpSender.Request.Builder applyConditionalHeaders(HttpSender.Request.Builder request,
+                                                                      @Nullable MavenMetadataCacheEntry revalidation) {
+        if (revalidation != null) {
+            if (revalidation.getEtag() != null) {
+                request.withHeader("If-None-Match", revalidation.getEtag());
+            }
+            if (revalidation.getLastModified() != null) {
+                request.withHeader("If-Modified-Since", revalidation.getLastModified());
+            }
+        }
+        return request;
+    }
+
+    MetadataDownload sendMetadataRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
+        return withRetryAndTiming(() -> {
+            try (HttpSender.Response response = httpSender.send(request)) {
+                int code = response.getCode();
+                if (code == 304) {
+                    // Not Modified: there is no body to read; the caller reuses the cached value.
+                    return new MetadataDownload(code, null, header(response, "ETag"), header(response, "Last-Modified"));
+                }
+                if (!response.isSuccessful()) {
+                    throw new HttpSenderResponseException(null, code, new String(response.getBodyAsBytes()));
+                }
+                return new MetadataDownload(code, response.getBodyAsBytes(), header(response, "ETag"), header(response, "Last-Modified"));
+            }
+        });
+    }
+
+    private static @Nullable String header(HttpSender.Response response, String name) {
+        for (Map.Entry<String, List<String>> entry : response.getHeaders().entrySet()) {
+            if (name.equalsIgnoreCase(entry.getKey())) {
+                List<String> values = entry.getValue();
+                return values == null || values.isEmpty() ? null : values.get(0);
+            }
+        }
+        return null;
+    }
+
+    @Value
+    static class MetadataDownload {
+        int code;
+        byte @Nullable [] body;
+
+        @Nullable
+        String etag;
+
+        @Nullable
+        String lastModified;
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
@@ -267,12 +352,23 @@ public class MavenPomDownloader {
                 continue;
             }
             attemptedUris.add(repo.getUri());
-            Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
+            URI repoUri = URI.create(repo.getUri());
+            MavenMetadataCacheEntry cached = mavenCache.getMavenMetadata(repoUri, gav);
+            // A fresh cache hit (value or negative) is served directly; a miss or an expired entry
+            // leaves result null so the download path below runs (revalidating when validators exist).
+            Optional<MavenMetadata> result = cached == null || cached.isExpired() ? null : Optional.ofNullable(cached.getMetadata());
+            // Validators captured from this iteration's download/304, persisted alongside the metadata so
+            // a later expiry can be revalidated with a conditional GET rather than a full re-download.
+            String fetchedEtag = null;
+            String fetchedLastModified = null;
+            // Whether this iteration produced the value (download, file read, derivation, or 304), so we
+            // only (re)cache freshly obtained values and leave an untouched cache hit alone.
+            boolean produced = false;
             if (result == null) {
                 // Not in the cache, attempt to download it.
                 boolean cacheEmptyResult = false;
                 try {
-                    String scheme = URI.create(repo.getUri()).getScheme();
+                    String scheme = repoUri.getScheme();
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                      requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                      gav.getArtifactId() + '/' +
@@ -285,13 +381,33 @@ public class MavenPomDownloader {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
                                 result = Optional.of(parsed);
+                                produced = true;
                             }
                         }
                     } else {
-                        byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, baseUri + "maven-metadata.xml");
-                        MavenMetadata parsed = MavenMetadata.parse(responseBody);
-                        if (parsed != null) {
-                            result = Optional.of(parsed);
+                        // If an expired entry with a validator was retained, revalidate it with a
+                        // conditional GET so an unchanged metadata can be confirmed by a cheap 304
+                        // instead of re-downloading and re-parsing the body.
+                        MavenMetadataCacheEntry revalidation = cached != null && cached.isExpired() ? cached : null;
+                        MetadataDownload download = requestMetadata(repo, baseUri + "maven-metadata.xml", revalidation);
+                        if (download.getCode() == 304 && revalidation != null && revalidation.getMetadata() != null) {
+                            // Not Modified: reuse the cached value, skipping the parse entirely.
+                            result = Optional.of(revalidation.getMetadata());
+                            fetchedEtag = download.getEtag() != null ? download.getEtag() : revalidation.getEtag();
+                            fetchedLastModified = download.getLastModified() != null ? download.getLastModified() : revalidation.getLastModified();
+                            produced = true;
+                            Counter.builder("rewrite.maven.metadata.revalidated")
+                                    .tag("repositoryUri", repo.getUri())
+                                    .register(Metrics.globalRegistry)
+                                    .increment();
+                        } else {
+                            MavenMetadata parsed = MavenMetadata.parse(download.getBody());
+                            if (parsed != null) {
+                                result = Optional.of(parsed);
+                                fetchedEtag = download.getEtag();
+                                fetchedLastModified = download.getLastModified();
+                                produced = true;
+                            }
                         }
                     }
                 } catch (HttpSenderResponseException e) {
@@ -316,6 +432,7 @@ public class MavenPomDownloader {
                                     .register(Metrics.globalRegistry)
                                     .increment();
                             result = Optional.of(derivedMeta);
+                            produced = true;
                         }
                     } catch (HttpSenderResponseException | MavenDownloadingException | IOException e) {
                         repositoryResponses.put(repo, e.getMessage());
@@ -324,7 +441,7 @@ public class MavenPomDownloader {
                 if (result == null && cacheEmptyResult) {
                     // If there was no fatal failure while attempting to find metadata and there was no metadata retrieved
                     // from the current repo, cache an empty result.
-                    mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
+                    mavenCache.putMavenMetadata(repoUri, gav, MavenMetadataCacheEntry.fresh(null, null, null));
                 }
             } else if (!result.isPresent()) {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
@@ -337,7 +454,11 @@ public class MavenPomDownloader {
                 } else {
                     mavenMetadata = mergeMetadata(mavenMetadata, result.get());
                 }
-                mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, result.get());
+                // Only (re)cache the value this iteration produced; a value served straight from the
+                // cache is left untouched so its stored validators aren't overwritten with nulls.
+                if (produced) {
+                    mavenCache.putMavenMetadata(repoUri, gav, MavenMetadataCacheEntry.fresh(result.get(), fetchedEtag, fetchedLastModified));
+                }
             }
         }
 
