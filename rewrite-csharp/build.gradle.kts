@@ -274,10 +274,9 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace("-SNAPSHOT", "-zlocal")
 }
 
-// The nuget.org API key, or null when it is absent *or blank*. Blank is the case that matters: the
-// release workflow sets ORG_GRADLE_PROJECT_nugetApiKey unconditionally, so deleting the secret still
-// defines the property — as an empty string. A hasProperty check would be true, and the push would
-// run with no credential and fail at `dotnet nuget push` instead of cleanly not running at all.
+// Null when the property is absent OR blank: the release workflow sets
+// ORG_GRADLE_PROJECT_nugetApiKey unconditionally, so a deleted secret still defines it as "" and a
+// hasProperty check would be true — the push would then run with no credential and fail.
 fun nugetApiKey(): String? =
     project.findProperty("nugetApiKey")?.toString()?.takeIf { it.isNotBlank() }
 
@@ -483,8 +482,7 @@ tasks.named("publish") {
     dependsOn(csharpPack)
 }
 
-// The nuget.org push is gated on nuget.org's own credential. Retiring nuget.org is then deleting
-// this block and the secret, which leaves the pack above untouched.
+// Only the push is gated on the credential, so retiring nuget.org is deleting this block.
 if (nugetApiKey() != null) {
     tasks.named("publish") {
         dependsOn(csharpPublish)

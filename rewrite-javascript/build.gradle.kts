@@ -246,9 +246,8 @@ testing {
 }
 
 // The tarball is built whenever we publish, regardless of where it is going: the Code Genome
-// Project mirror uploads it from the `ci`/`publish` run and must not depend on the npmjs push
-// existing. There is no npmjs counterpart to the `pythonPublish`/`csharpPublish` gate below,
-// because the npmjs push is not a Gradle task at all — see npm-publish.yml.
+// Project mirror uploads it and must not depend on the npmjs push, which is not a Gradle task at
+// all (see npm-publish.yml) and so has no credential gate to pair this with.
 tasks.named("publish") {
     dependsOn(npmPack)
 }
