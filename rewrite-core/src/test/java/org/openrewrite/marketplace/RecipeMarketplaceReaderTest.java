@@ -487,6 +487,31 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void mergeLandsEveryCategoryOfABundleNotOnlyTheFirst() {
+        // Interning registers a bundle as its first listing lands, so the already-installed
+        // check has to read a snapshot: a live one would block the bundle's own later
+        // categories. A generated marketplace is exactly this shape -- one bundle, many
+        // categories, and one recipe filed under two of them.
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Bar,Bar,Java
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Baz,Baz,JavaScript
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Bar,Bar,JavaScript
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        target.merge(source);
+
+        assertThat(target.getCategories()).extracting("displayName")
+                .containsExactlyInAnyOrder("Java", "JavaScript");
+        assertThat(findCategory(target.getRoot(), "Java").getRecipes())
+                .extracting(RecipeListing::getName).containsExactly("com.foo.Bar");
+        assertThat(findCategory(target.getRoot(), "JavaScript").getRecipes())
+                .extracting(RecipeListing::getName)
+                .containsExactlyInAnyOrder("com.foo.Bar", "com.foo.Baz");
+    }
+
+    @Test
     void aWhollyBlockedSubtreeGraftsNoEmptyCategories() {
         RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
           ecosystem,packageName,requestedVersion,version,name,displayName,category1
