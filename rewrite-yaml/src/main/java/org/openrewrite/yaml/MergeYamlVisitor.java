@@ -41,10 +41,15 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
+import static org.openrewrite.yaml.MergeYaml.REMOVE_DOCUMENT_PREFIX;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
  * Visitor class to merge two yaml files.
+ * <p>
+ * Apply this visitor to the enclosing {@link Yaml.Documents} or {@link Yaml.Document} rather than to just the block
+ * being merged into; an inline comment that has to move onto a newly inserted element is stored on an element that
+ * follows the merged block, which can be an element much higher in the tree, and is left behind otherwise.
  *
  * @param <P> An input object that is passed to every visit method.
  * @implNote Loops recursively through the documents, for every part a new MergeYamlVisitor instance will be created.
@@ -93,6 +98,25 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     @Override
+    public Yaml visitDocument(Yaml.Document document, P p) {
+        Yaml y = super.visitDocument(document, p);
+        if (!(y instanceof Yaml.Document)) {
+            return y;
+        }
+        Yaml.Document d = (Yaml.Document) y;
+        if (getCursor().getMessage(REMOVE_DOCUMENT_PREFIX, false)) {
+            d = d.withPrefix("");
+        }
+        if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+            d = removeInlineCommentFromEnd(d);
+            if (d.getEnd().getPrefix().isEmpty() && preserveDocumentSeparator(document)) {
+                d = d.withEnd(d.getEnd().withPrefix(linebreak()));
+            }
+        }
+        return d;
+    }
+
+    @Override
     public Yaml visitScalar(Yaml.Scalar existingScalar, P p) {
         if (existing.isScope(existingScalar) && incoming instanceof Yaml.Scalar) {
             return mergeScalar(existingScalar, (Yaml.Scalar) incoming);
@@ -136,7 +160,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
             return mapping;
         }
-        return super.visitMapping(existingMapping, p);
+        Yaml y = super.visitMapping(existingMapping, p);
+        if (y instanceof Yaml.Mapping && getCursor().getMessage(REMOVE_PREFIX, false)) {
+            return removeInlineCommentFromLastEntry((Yaml.Mapping) y);
+        }
+        return y;
     }
 
     private Yaml.Mapping applySiblingBoundaryRepair(Yaml.Mapping mapping, Map<UUID, BoundaryRepair> repairs) {
@@ -224,7 +252,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         ((Yaml.Mapping) ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getBlock()).getEntries().equals(((Yaml.Mapping) existing).getEntries())) {
                     mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, mutatedEntries.ls.get(0).withPrefix("")); // Remove linebreak from first entry
                     mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getPrefix() + afterInsertEntry.getPrefix()));
-                    getCursor().getParentOrThrow().putMessage(REMOVE_PREFIX, true);
+                    getCursor().getParentOrThrow().putMessage(REMOVE_DOCUMENT_PREFIX, true);
                 } else {
                     Yaml.Mapping.Entry firstNewlyAddedEntry = mutatedEntries.ls.get(mutatedEntries.firstNewlyAddedItemIndex);
                     String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
@@ -264,10 +292,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     Yaml.Document doc = c.getValue();
                     // Don't treat document end prefix as comment if it contains a document separator
                     if (!preserveDocumentSeparator(doc)) {
-                        String endPrefix = doc.getEnd().getPrefix();
-                        if (endPrefix != null && endPrefix.contains("#")) {
-                            comment = endPrefix;
-                        }
+                        comment = inlineCommentOf(doc.getEnd().getPrefix());
                     }
                 } else if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
@@ -295,11 +320,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         if (docCursor.getValue() instanceof Yaml.Document) {
                             Yaml.Document doc = docCursor.getValue();
                             if (!preserveDocumentSeparator(doc)) {
-                                String endPrefix = doc.getEnd().getPrefix();
-                                // Only use Document.End prefix if it contains a comment;
-                                // plain trailing whitespace should not be copied as a comment
-                                if (endPrefix != null && endPrefix.contains("#")) {
-                                    comment = endPrefix;
+                                String endComment = inlineCommentOf(doc.getEnd().getPrefix());
+                                if (isNotEmpty(endComment)) {
+                                    comment = endComment;
                                     c = docCursor;
                                 }
                             }
@@ -512,23 +535,41 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
     }
 
+    private static String inlineCommentOf(@Nullable String prefix) {
+        if (prefix == null) {
+            return "";
+        }
+        String[] lines = LINE_BREAK.split(prefix, -1);
+        String firstLine = lines.length > 0 ? lines[0] : "";
+        return firstLine.contains("#") ? firstLine : "";
+    }
+
     /**
-     * Strips an inline comment that is stored as the leading part (before the first line break) of
-     * the last entry's prefix. This is used to remove a trailing comment that was copied onto a
-     * newly-inserted entry, so that the comment is not rendered twice. When the mapping being merged
-     * is nested, the comment lives on a sibling entry of an ancestor mapping that is traversed by the
-     * outer visitor rather than the {@link MergeYamlVisitor}, hence this method is invoked from there.
+     * Strips the inline comment that was copied onto a newly inserted entry from the prefix of the
+     * last entry of the mapping it was copied from, so that it is not rendered twice.
      */
-    static Yaml.Mapping removeInlineCommentFromLastEntry(Yaml.Mapping mapping) {
-        return mapping.withEntries(mapLast(mapping.getEntries(), entry -> {
-            String prefix = entry.getPrefix();
-            String[] lines = LINE_BREAK.split(prefix, -1);
-            if (lines.length <= 1) {
-                return entry;
-            }
-            String linebreak = prefix.contains("\r\n") ? "\r\n" : "\n";
-            return entry.withPrefix(linebreak + String.join(linebreak, Arrays.copyOfRange(lines, 1, lines.length)));
-        }));
+    public static Yaml.Mapping removeInlineCommentFromLastEntry(Yaml.Mapping mapping) {
+        return mapping.withEntries(mapLast(mapping.getEntries(), entry ->
+                entry.withPrefix(removeInlineComment(entry.getPrefix()))));
+    }
+
+    /**
+     * Strips the inline comment from the prefix of the document end, which is where a comment on the
+     * last line of a document is stored. Later lines are retained.
+     */
+    public static Yaml.Document removeInlineCommentFromEnd(Yaml.Document document) {
+        String prefix = document.getEnd().getPrefix();
+        String withoutComment = removeInlineComment(prefix);
+        return prefix.equals(withoutComment) ? document : document.withEnd(document.getEnd().withPrefix(withoutComment));
+    }
+
+    private static String removeInlineComment(String prefix) {
+        String[] lines = LINE_BREAK.split(prefix, -1);
+        if (lines.length <= 1) {
+            return lines.length == 1 && lines[0].contains("#") ? "" : prefix;
+        }
+        String linebreak = prefix.contains("\r\n") ? "\r\n" : "\n";
+        return linebreak + String.join(linebreak, Arrays.copyOfRange(lines, 1, lines.length));
     }
 
     /**

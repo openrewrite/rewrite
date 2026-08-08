@@ -21,16 +21,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
@@ -4268,6 +4271,117 @@ class MergeYamlTest implements RewriteTest {
               key: >-
                 replaced
               after: tail
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void doesNotCopyInlineCommentOfLastLineToInsertedEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.config",
+            //language=yaml
+            """
+              newblock:
+                child:
+                  enabled: false
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+              """,
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+                newblock:
+                  child:
+                    enabled: false
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void keepsCommentOnItsOwnLineAtTheEndOfTheDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.config",
+            //language=yaml
+            """
+              newblock: value
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing: true # inline comment here
+              # standalone comment
+              """,
+            """
+              config:
+                existing: true # inline comment here
+                newblock: value
+              # standalone comment
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void mergeYamlVisitorAppliedToWholeDocument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlVisitor<>() {
+              @Override
+              public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                  Yaml.Mapping root = (Yaml.Mapping) documents.getDocuments().get(0).getBlock();
+                  Yaml.Block config = root.getEntries().get(0).getValue();
+                  //language=yaml
+                  Yaml incoming = MergeYaml.parse("""
+                    newblock:
+                      child:
+                        enabled: false
+                    """);
+                  return new MergeYamlVisitor<ExecutionContext>(config, incoming, false, null, null, null)
+                    .visitNonNull(documents, ctx);
+              }
+          })),
+          yaml(
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+              """,
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+                newblock:
+                  child:
+                    enabled: false
               """
           )
         );
