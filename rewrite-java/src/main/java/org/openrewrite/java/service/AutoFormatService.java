@@ -23,6 +23,8 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.format.BlankLinesVisitor;
 import org.openrewrite.java.format.NormalizeFormatVisitor;
+import org.openrewrite.java.format.SpacesVisitor;
+import org.openrewrite.java.style.SpacesStyle;
 
 @Incubating(since = "8.2.0")
 public class AutoFormatService {
@@ -49,5 +51,15 @@ public class AutoFormatService {
      */
     public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
         return new BlankLinesVisitor<>(sourceFile, stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link SpacesVisitor}. The {@code spacesStyle}
+     * carries Java-specific tuning (e.g. typecast parenthesis padding) that only applies
+     * to languages with C-style casts; languages that reuse {@code J.TypeCast} for other
+     * syntax resolve their own style from {@code sourceFile} instead.
+     */
+    public <P> JavaVisitor<P> spacesVisitor(SourceFile sourceFile, SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
+        return new SpacesVisitor<>(spacesStyle, stopAfter);
     }
 }
