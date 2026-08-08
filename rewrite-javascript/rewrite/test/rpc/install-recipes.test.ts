@@ -16,7 +16,7 @@
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
-import {RecipeMarketplace} from "../../src";
+import {RecipeDescriptor, RecipeMarketplace} from "../../src";
 import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
 
@@ -372,10 +372,32 @@ describe("InstallRecipes", () => {
                 const getMarketplace = captureGetMarketplace(marketplace, recipeOrigin);
                 const rows = await getMarketplace();
 
-                const row = rows.find(r => r.descriptor.name === "row.recipe");
+                const row = rows.find(r => r.name === "row.recipe");
                 expect(row).toBeDefined();
                 expect(row!.packageName).toBe("@example/recipes");
             }, {unsafeCleanup: true});
+        });
+
+        test("GetMarketplace recipeCount counts transitive sub-recipes", async () => {
+            // recipeCount must be 1 + every transitive recipeList entry, not just direct children —
+            // the host uses it as a marketplace sort key.
+            const desc = (name: string, recipeList: RecipeDescriptor[] = []): RecipeDescriptor => ({
+                name, displayName: name, instanceName: name, description: "", tags: [],
+                estimatedEffortPerOccurrence: 5, options: [], preconditions: [],
+                recipeList, dataTables: [], maintainers: [], contributors: [], examples: []
+            });
+
+            const marketplace = new RecipeMarketplace();
+            await marketplace.install(
+                desc("composite.root", [desc("composite.middle", [desc("composite.leaf")])]),
+                [{displayName: "Composite"}]
+            );
+
+            const getMarketplace = captureGetMarketplace(marketplace, new Map());
+            const rows = await getMarketplace();
+
+            const row = rows.find(r => r.name === "composite.root");
+            expect(row?.recipeCount).toBe(3); // root + middle + leaf
         });
 
         test("attributes npm-installed recipes to their package", async () => {

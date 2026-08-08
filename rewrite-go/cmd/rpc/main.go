@@ -1408,8 +1408,19 @@ func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
 	return cols, nil
 }
 
+// marketplaceRow carries listing-weight metadata only: the host builds a RecipeListing from these
+// fields without materializing recipes. The full recursive descriptor is deliberately not shipped —
+// the host fetches it lazily per recipe via the separate PrepareRecipe RPC. RecipeCount collapses
+// the transitive recipeList the host would otherwise only count.
 type marketplaceRow struct {
-	Descriptor    marketplaceDescriptor   `json:"descriptor"`
+	Name                         string                  `json:"name"`
+	DisplayName                  string                  `json:"displayName"`
+	Description                  string                  `json:"description"`
+	EstimatedEffortPerOccurrence *string                 `json:"estimatedEffortPerOccurrence"`
+	Options                      []marketplaceOption     `json:"options"`
+	DataTables                   []any                   `json:"dataTables"`
+	// RecipeCount is 1 + every transitive recipeList entry; the host uses it as a sort key.
+	RecipeCount   int                     `json:"recipeCount"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
 	// PackageName is the package that contributed this recipe (nil when unattributed, e.g. a
 	// local-path install), so the host attributes each row to its own bundle.
@@ -1477,7 +1488,12 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 			packageName = &origin
 		}
 		rows = append(rows, marketplaceRow{
-			Descriptor:    marketplaceDescriptorFromRecipe(desc),
+			Name:          desc.Name,
+			DisplayName:   desc.DisplayName,
+			Description:   desc.Description,
+			Options:       marketplaceOptionsFromRecipe(desc),
+			DataTables:    marketplaceDataTablesFromRecipe(desc),
+			RecipeCount:   countRecipes(desc),
 			CategoryPaths: [][]marketplaceCategory{categoryPath},
 			PackageName:   packageName,
 		})
@@ -1512,7 +1528,18 @@ func delegateDescriptor(name string) marketplaceDescriptor {
 	}
 }
 
-func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
+// countRecipes returns 1 (this recipe) plus every transitive entry in its recipeList. The host uses
+// this as a sort key in place of the recursive recipeList it would otherwise walk to compute it.
+func countRecipes(desc recipe.RecipeDescriptor) int {
+	count := 1
+	for _, sub := range desc.RecipeList {
+		count += countRecipes(sub)
+	}
+	return count
+}
+
+// marketplaceOptionsFromRecipe converts a recipe's own (non-recursive) options to wire format.
+func marketplaceOptionsFromRecipe(desc recipe.RecipeDescriptor) []marketplaceOption {
 	options := make([]marketplaceOption, 0, len(desc.Options))
 	for _, opt := range desc.Options {
 		var example *string
@@ -1534,6 +1561,25 @@ func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDe
 			Valid:       valid,
 		})
 	}
+	return options
+}
+
+// marketplaceDataTablesFromRecipe converts a recipe's own (non-recursive) data tables to wire format.
+func marketplaceDataTablesFromRecipe(desc recipe.RecipeDescriptor) []any {
+	dataTables := make([]any, 0, len(desc.DataTables))
+	for _, dt := range desc.DataTables {
+		dataTables = append(dataTables, marketplaceDataTable{
+			Name:        dt.Name,
+			DisplayName: dt.DisplayName,
+			Description: dt.Description,
+			Columns:     marketplaceColumns(dt.Columns),
+		})
+	}
+	return dataTables
+}
+
+func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
+	options := marketplaceOptionsFromRecipe(desc)
 
 	recipeList := make([]marketplaceDescriptor, 0, len(desc.RecipeList))
 	for _, sub := range desc.RecipeList {
@@ -1545,15 +1591,7 @@ func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDe
 		preconditions = append(preconditions, marketplaceDescriptorFromRecipe(pre))
 	}
 
-	dataTables := make([]any, 0, len(desc.DataTables))
-	for _, dt := range desc.DataTables {
-		dataTables = append(dataTables, marketplaceDataTable{
-			Name:        dt.Name,
-			DisplayName: dt.DisplayName,
-			Description: dt.Description,
-			Columns:     marketplaceColumns(dt.Columns),
-		})
-	}
+	dataTables := marketplaceDataTablesFromRecipe(desc)
 
 	maintainers := make([]any, 0, len(desc.Maintainers))
 	for _, m := range desc.Maintainers {
