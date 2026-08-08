@@ -263,6 +263,29 @@ class RecipeClassLoaderTest {
     }
 
     @Test
+    void serviceInterfacesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
+        // Reproduces the ClassCastException a child-loaded ChangeType hits when it casts
+        // Py.CompilationUnit's parent-loaded PythonImportService to its own ImportService;
+        // see PARENT_DELEGATED_PREFIXES in RecipeClassLoader.
+        Path parentLib = tempDir.resolve("parent");
+        Files.createDirectories(parentLib.resolve("org/openrewrite/java/service"));
+        Files.write(parentLib.resolve("org/openrewrite/java/service/ImportService.class"),
+          stubClass("org/openrewrite/java/service/ImportService"));
+
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("org/openrewrite/java/service"));
+        Files.write(childLib.resolve("org/openrewrite/java/service/ImportService.class"),
+          stubClass("org/openrewrite/java/service/ImportService"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass("org.openrewrite.java.service.ImportService").getClassLoader())
+              .as("service interfaces cross the recipe/parent boundary and must be shared")
+              .isSameAs(parent);
+        }
+    }
+
+    @Test
     void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
