@@ -253,6 +253,8 @@ public class GoRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        // The server relativizes only against this, so without it source paths land on the LST absolute.
+        Path base = relativeTo == null ? projectPath : relativeTo;
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -263,7 +265,7 @@ public class GoRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -277,7 +279,6 @@ public class GoRewriteRpc extends RewriteRpc {
                 if (Quark.class.getName().equals(item.getSourceFileType())) {
                     // Oversize file the Go side declined to parse; build the Quark
                     // locally from its path (plus file attributes) — no content on the wire.
-                    Path base = relativeTo != null ? relativeTo : projectPath;
                     Path sourcePath = Paths.get(Objects.requireNonNull(item.getSourcePath()));
                     action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
                             FileAttributes.fromPath(base.resolve(sourcePath))));

@@ -175,7 +175,8 @@ public class PythonRewriteRpc extends RewriteRpc {
      *
      * @param projectPath Path to the project directory to parse
      * @param exclusions  Optional glob patterns to exclude from parsing
-     * @param relativeTo  Optional path to make source file paths relative to
+     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
+     *                    paths are relative to projectPath.
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
      * @deprecated Use {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)} instead.
@@ -201,7 +202,8 @@ public class PythonRewriteRpc extends RewriteRpc {
      */
     public Stream<SourceFile> parseProject(Path projectPath, ParseProjectOptions options, ExecutionContext ctx) {
         @Nullable List<String> exclusions = options.getExclusions();
-        @Nullable Path relativeTo = options.getRelativeTo();
+        // The server relativizes only against this, so without it source paths land on the LST absolute.
+        Path relativeTo = options.getRelativeTo() == null ? projectPath : options.getRelativeTo();
         @Nullable Path dependencyPath = options.getDependencyPath();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
@@ -227,10 +229,9 @@ public class PythonRewriteRpc extends RewriteRpc {
                 if (Quark.class.getName().equals(item.getSourceFileType())) {
                     // Oversize file the Python side declined to parse; build the Quark
                     // locally from its path (plus file attributes) — no content on the wire.
-                    Path base = relativeTo != null ? relativeTo : projectPath;
                     Path sourcePath = Paths.get(item.getSourcePath());
                     action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
-                            FileAttributes.fromPath(base.resolve(sourcePath))));
+                            FileAttributes.fromPath(relativeTo.resolve(sourcePath))));
                     return true;
                 }
 
