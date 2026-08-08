@@ -24,12 +24,17 @@ cross-file deduplication.
 from __future__ import annotations
 
 import json
+import logging
 import os
-import select
+import queue
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class TyTypesClient:
@@ -66,6 +71,8 @@ class TyTypesClient:
         self._initialized = False
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
+        self._responses: queue.Queue = queue.Queue()
+        self._consecutive_timeouts = 0
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
         #
@@ -117,6 +124,37 @@ class TyTypesClient:
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+
+        # Daemon threads drain both pipes: select() is sockets-only on Windows, and an undrained pipe deadlocks ty once its buffer fills.
+        self._responses = queue.Queue()
+        self._consecutive_timeouts = 0
+        threading.Thread(target=self._drain_stdout, args=(self._process,),
+                         name="ty-types-stdout", daemon=True).start()
+        threading.Thread(target=self._drain_stderr, args=(self._process,),
+                         name="ty-types-stderr", daemon=True).start()
+
+    def _drain_stdout(self, process: subprocess.Popen) -> None:
+        """Read response lines into the queue until EOF; EOF enqueues None."""
+        responses = self._responses
+        stdout = process.stdout
+        while True:
+            line = stdout.readline()
+            if not line:
+                responses.put(None)
+                return
+            try:
+                responses.put(json.loads(line.decode('utf-8')))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.debug("ty-types emitted a non-JSON line on stdout")
+
+    @staticmethod
+    def _drain_stderr(process: subprocess.Popen) -> None:
+        stderr = process.stderr
+        while True:
+            line = stderr.readline()
+            if not line:
+                return
+            logger.debug("ty-types stderr: %s", line.decode('utf-8', 'replace').rstrip())
 
     @staticmethod
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
@@ -183,9 +221,13 @@ class TyTypesClient:
             return Path(ty_types)
         return None
 
+    # Kill the process after this many consecutive timeouts; further requests degrade to None.
+    _MAX_CONSECUTIVE_TIMEOUTS = 3
+
     def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None,
                       timeout: float = 0) -> Optional[Any]:
-        """Send a JSON-RPC request and read the response.
+        """Send a JSON-RPC request and wait for its response from the reader
+        thread's queue.
 
         Args:
             method: The JSON-RPC method name.
@@ -209,29 +251,35 @@ class TyTypesClient:
         try:
             self._process.stdin.write(line.encode('utf-8'))
             self._process.stdin.flush()
+        except (BrokenPipeError, OSError):
+            return None
 
-            if self._process.stdout is None:
+        end = None if timeout <= 0 else time.monotonic() + timeout
+        while True:
+            try:
+                remaining = None if end is None else end - time.monotonic()
+                if remaining is not None and remaining <= 0:
+                    raise queue.Empty
+                response = self._responses.get(timeout=remaining)
+            except queue.Empty:
+                self._consecutive_timeouts += 1
+                if self._consecutive_timeouts >= self._MAX_CONSECUTIVE_TIMEOUTS:
+                    logger.debug("ty-types unresponsive after %d timeouts; shutting it down",
+                                 self._consecutive_timeouts)
+                    self._kill()
                 return None
 
-            if timeout > 0:
-                ready, _, _ = select.select([self._process.stdout], [], [], timeout)
-                if not ready:
-                    return None
-
-            response_line = self._process.stdout.readline().decode('utf-8')
-            if not response_line:
+            if response is None:
+                # EOF sentinel: the process exited.
                 return None
-            response = json.loads(response_line)
-
+            # A response to an abandoned earlier request; drop it and keep waiting.
             if response.get('id') != self._request_id:
-                return None
+                continue
 
+            self._consecutive_timeouts = 0
             if response.get('error') is not None:
                 return None
-
             return response.get('result')
-        except (BrokenPipeError, OSError, json.JSONDecodeError):
-            return None
 
     def initialize(self, project_root: str) -> bool:
         """Initialize the ty-types session with a project root.
@@ -249,7 +297,9 @@ class TyTypesClient:
             self.session_types.clear()
             self._start_process()
 
-        result = self._send_request("initialize", {"projectRoot": project_root})
+        # Bounded so a wedged ty degrades to untyped instead of hanging; large because ty indexes the whole project up front.
+        result = self._send_request("initialize", {"projectRoot": project_root},
+                                    timeout=600)
         if result and result.get("ok"):
             self._initialized = True
             self._project_root = project_root
@@ -296,7 +346,7 @@ class TyTypesClient:
             return
 
         try:
-            self._send_request("shutdown")
+            self._send_request("shutdown", timeout=5)
             self._process.wait(timeout=5)
         except (subprocess.TimeoutExpired, OSError):
             if self._process is not None:
@@ -305,3 +355,15 @@ class TyTypesClient:
             self._process = None
             self._initialized = False
             self._project_root = None
+
+    def _kill(self) -> None:
+        """Forcibly terminate an unresponsive ty-types process."""
+        process = self._process
+        self._process = None
+        self._initialized = False
+        self._project_root = None
+        if process is not None:
+            try:
+                process.kill()
+            except OSError:
+                pass
