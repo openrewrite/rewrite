@@ -28,6 +28,8 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
 @Setter
+@EqualsAndHashCode
+@ToString
 public class RawRepositories {
     @JacksonXmlProperty(localName = "repository")
     @JacksonXmlElementWrapper(useWrapping = false)
@@ -51,6 +53,7 @@ public class RawRepositories {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode
+    @ToString
     @Getter
     public static class ArtifactPolicy {
 
