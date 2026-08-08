@@ -2339,6 +2339,13 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			s.logger.Printf("ParseProject: skip malformed go.mod %s: %v", modPath, err)
 			continue
 		}
+		// modPath is absolute (directory walk), but the marker rides on the LST where paths
+		// are project-root-relative — recipes correlating it with source paths match nothing.
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, relErr := filepath.Rel(*req.RelativeTo, modPath); relErr == nil {
+				mrr.Path = rel
+			}
+		}
 		// If a sibling go.sum exists, populate ResolvedDependencies too.
 		sumPath := filepath.Join(filepath.Dir(modPath), "go.sum")
 		if sumData, err := os.ReadFile(sumPath); err == nil {
