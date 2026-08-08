@@ -103,14 +103,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.TypeNameMatcher",
-            // JavaSourceSet#getTypeFactory crosses the recipe/parent classloader
-            // boundary when JavaTemplate reads it from the enclosing source file's
-            // marker; the interface must be shared so the cast in JavaTemplateParser
-            // succeeds.
             "org.openrewrite.java.internal.JavaTypeFactory",
-            // A language's `service()` override lives in its parent-delegated `tree` package, so
-            // the impl it returns extends the parent's interface. Child-loaded callers such as
-            // ChangeType cast that instance to their own service interface, so it must be shared.
             "org.openrewrite.java.service",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
