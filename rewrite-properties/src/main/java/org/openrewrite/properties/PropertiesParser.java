@@ -64,7 +64,7 @@ public class PropertiesParser implements Parser {
         StringBuilder buff = new StringBuilder();
         String s = source.readFully();
 
-        char prev = '$';
+        int trailingBackslashes = 0;
         boolean isEscapedNewLine = false;
         for (char c : s.toCharArray()) {
             if (isEscapedNewLine) {
@@ -77,7 +77,7 @@ public class PropertiesParser implements Parser {
             }
 
             if (c == '\n') {
-                if (prev == '\\') {
+                if (trailingBackslashes % 2 == 1) {
                     isEscapedNewLine = true;
                     buff.append(c);
                 } else {
@@ -91,7 +91,12 @@ public class PropertiesParser implements Parser {
             } else {
                 buff.append(c);
             }
-            prev = c;
+
+            if (c == '\\') {
+                trailingBackslashes++;
+            } else if (c != '\r') {
+                trailingBackslashes = 0;
+            }
         }
 
         Properties.Content content = extractContent(buff.toString(), prefix);
