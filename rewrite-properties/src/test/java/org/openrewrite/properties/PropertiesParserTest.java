@@ -273,6 +273,147 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @Test
+    void lineContinuationWithWhitespaceBeforeBackslash() {
+        rewriteRun(
+          properties(
+            """
+              # Gradle JVM args with backslash continuations
+              org.gradle.jvmargs=-Xms1g -Xmx4g \\
+                --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED \\
+                --add-exports jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED
+              """,
+            spec -> spec.beforeRecipe(p -> {
+                var entry = (Properties.Entry) p.getContent().get(1);
+                assertThat(entry.getValue().getSource()).isEqualTo(
+                  "-Xms1g -Xmx4g \\\n  --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED \\\n  --add-exports jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED");
+                assertThat(entry.getValue().getText()).isEqualTo(
+                  "-Xms1g -Xmx4g --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @Test
+    void lineContinuationWithCarriageReturn() {
+        rewriteRun(
+          properties(
+            "org.gradle.jvmargs=-Xms1g \\\r\n  -Xmx4g\r\nother=value\r\n",
+            spec -> spec
+              .noTrim()
+              .beforeRecipe(p -> {
+                  assertThat(p.getContent()).hasSize(2);
+                  var entry = (Properties.Entry) p.getContent().getFirst();
+                  assertThat(entry.getValue().getSource()).isEqualTo("-Xms1g \\\r\n  -Xmx4g");
+                  assertThat(entry.getValue().getText()).isEqualTo("-Xms1g -Xmx4g");
+                  assertThat(((Properties.Entry) p.getContent().get(1)).getKey()).isEqualTo("other");
+              })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @Test
+    void escapedBackslashAtEndOfLineDoesNotContinue() {
+        rewriteRun(
+          properties(
+            """
+              path=C:\\\\dir\\\\
+              other=value
+              """,
+            spec -> spec.beforeRecipe(p -> {
+                assertThat(p.getContent()).hasSize(2);
+                assertThat(((Properties.Entry) p.getContent().getFirst()).getValue().getSource()).isEqualTo("C:\\\\dir\\\\");
+                assertThat(((Properties.Entry) p.getContent().get(1)).getKey()).isEqualTo("other");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void commentEndingInBackslashDoesNotContinue(String lineSeparator) {
+        rewriteRun(
+          properties(
+            "# default install dir: C:\\Program Files\\App\\" + lineSeparator + "key=value" + lineSeparator,
+            spec -> spec
+              .noTrim()
+              .beforeRecipe(p -> {
+                  assertThat(p.getContent()).hasSize(2);
+                  assertThat(p.getContent().getFirst()).isInstanceOf(Properties.Comment.class);
+                  assertThat(((Properties.Entry) p.getContent().get(1)).getKey()).isEqualTo("key");
+              })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void blankLineTerminatesContinuedLine(String lineSeparator) {
+        rewriteRun(
+          properties(
+            "key=a \\" + lineSeparator + lineSeparator + "next=value" + lineSeparator,
+            spec -> spec
+              .noTrim()
+              .beforeRecipe(p -> {
+                  assertThat(p.getContent()).hasSize(2);
+                  assertThat(((Properties.Entry) p.getContent().get(1)).getKey()).isEqualTo("next");
+              })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @Test
+    void strayCarriageReturnIsNotPartOfContinuation() {
+        rewriteRun(
+          properties(
+            "key=a\\\r\r\nnext=value\r\n",
+            spec -> spec
+              .noTrim()
+              .beforeRecipe(p -> {
+                  assertThat(p.getContent()).hasSize(2);
+                  assertThat(((Properties.Entry) p.getContent().get(1)).getKey()).isEqualTo("next");
+              })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @Test
+    void escapedBackslashBeforeDelimiterIsNotAnEscapedDelimiter() {
+        rewriteRun(
+          properties(
+            """
+              a\\\\=b
+              """,
+            spec -> spec.beforeRecipe(p -> {
+                var entry = (Properties.Entry) p.getContent().getFirst();
+                assertThat(entry.getKeySource()).isEqualTo("a\\\\");
+                assertThat(entry.getDelimiter()).isEqualTo(Properties.Entry.Delimiter.EQUALS);
+                assertThat(entry.getValue().getText()).isEqualTo("b");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8417")
+    @Test
+    void whitespaceDelimitedEntryIsParsedRegardlessOfLineLength() {
+        rewriteRun(
+          properties(
+            """
+              key vvvvvvvv
+              """,
+            containsValues("vvvvvvvv")
+          )
+        );
+    }
+
     private static Consumer<SourceSpec<Properties.File>> containsValues(String... valueAssertions) {
         return spec -> spec.beforeRecipe(props -> {
             List<String> values = TreeVisitor.collect(new PropertiesVisitor<>() {
