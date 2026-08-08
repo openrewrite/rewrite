@@ -4350,6 +4350,38 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/8416")
     @Test
+    void doesNotCopyInlineCommentOfLastLineWhenCreatingANewKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.newkey",
+            //language=yaml
+            """
+              sub: value
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing: true # inline comment here
+              """,
+            """
+              config:
+                existing: true # inline comment here
+              newkey:
+                sub: value
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
     void mergeYamlVisitorAppliedToWholeDocument() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new YamlVisitor<>() {

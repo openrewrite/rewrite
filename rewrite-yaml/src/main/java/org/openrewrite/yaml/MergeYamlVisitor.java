@@ -548,7 +548,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      * Strips the inline comment that was copied onto a newly inserted entry from the prefix of the
      * last entry of the mapping it was copied from, so that it is not rendered twice.
      */
-    public static Yaml.Mapping removeInlineCommentFromLastEntry(Yaml.Mapping mapping) {
+    static Yaml.Mapping removeInlineCommentFromLastEntry(Yaml.Mapping mapping) {
         return mapping.withEntries(mapLast(mapping.getEntries(), entry ->
                 entry.withPrefix(removeInlineComment(entry.getPrefix()))));
     }
@@ -557,7 +557,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      * Strips the inline comment from the prefix of the document end, which is where a comment on the
      * last line of a document is stored. Later lines are retained.
      */
-    public static Yaml.Document removeInlineCommentFromEnd(Yaml.Document document) {
+    static Yaml.Document removeInlineCommentFromEnd(Yaml.Document document) {
         String prefix = document.getEnd().getPrefix();
         String withoutComment = removeInlineComment(prefix);
         return prefix.equals(withoutComment) ? document : document.withEnd(document.getEnd().withPrefix(withoutComment));

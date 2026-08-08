@@ -144,38 +144,32 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                Yaml.Document d;
                 if ("$".equals(key) || "$.".equals(key)) {
-                    Yaml.Document d = document.withBlock((Yaml.Block)
+                    d = document.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(document.getBlock(), incoming, accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
-                    if (getCursor().getMessage(REMOVE_DOCUMENT_PREFIX, false)) {
-                        d = d.withPrefix("");
+                } else {
+                    d = super.visitDocument(document, ctx);
+                    if ((createNewKeys == null || Boolean.TRUE.equals(createNewKeys)) && d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                        // No matching element found, but check if the key maybe exists in the json path.
+                        String valueKey = maybeKeyFromJsonPath(key);
+                        if (valueKey != null) {
+                            // No matching element already exists, so it must be constructed.
+                            @Language("yml") String snippet;
+                            if (incoming instanceof Yaml.Mapping) {
+                                // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
+                                snippet = valueKey + ":\n  " + yaml.replaceAll("\n", "\n  ");
+                            } else {
+                                // If there is no space between the colon and the value it will not be interpreted as a mapping
+                                snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
+                            }
+                            d = d.withBlock((Yaml.Block)
+                                    new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
+                                            .visitNonNull(d.getBlock(), ctx, getCursor()));
+                        }
                     }
-                    if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                        d = removeInlineCommentFromEnd(d);
-                    }
-                    return d;
-                }
-                Yaml.Document d = super.visitDocument(document, ctx);
-                if ((createNewKeys == null || Boolean.TRUE.equals(createNewKeys)) && d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
-                    // No matching element found, but check if the key maybe exists in the json path.
-                    String valueKey = maybeKeyFromJsonPath(key);
-                    if (valueKey == null) {
-                        return d;
-                    }
-                    // No matching element already exists, so it must be constructed.
-                    @Language("yml") String snippet;
-                    if (incoming instanceof Yaml.Mapping) {
-                        // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
-                        snippet = valueKey + ":\n  " + yaml.replaceAll("\n", "\n  ");
-                    } else {
-                        // If there is no space between the colon and the value it will not be interpreted as a mapping
-                        snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
-                    }
-                    return d.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
-                                    .visitNonNull(d.getBlock(), ctx, getCursor()));
                 }
                 if (getCursor().getMessage(REMOVE_DOCUMENT_PREFIX, false)) {
                     d = d.withPrefix("");
