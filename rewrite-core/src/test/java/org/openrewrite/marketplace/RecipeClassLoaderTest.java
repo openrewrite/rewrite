@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
@@ -263,25 +264,31 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void serviceInterfacesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
+    void servicePackagesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
         // Reproduces the ClassCastException a child-loaded ChangeType hits when it casts
-        // Py.CompilationUnit's parent-loaded PythonImportService to its own ImportService;
-        // see PARENT_DELEGATED_PREFIXES in RecipeClassLoader.
-        Path parentLib = tempDir.resolve("parent");
-        Files.createDirectories(parentLib.resolve("org/openrewrite/java/service"));
-        Files.write(parentLib.resolve("org/openrewrite/java/service/ImportService.class"),
-          stubClass("org/openrewrite/java/service/ImportService"));
+        // Py.CompilationUnit's parent-loaded PythonImportService to its own ImportService.
+        String[] services = {
+          "org/openrewrite/java/service/ImportService",
+          "org/openrewrite/kotlin/service/KotlinImportService"
+        };
 
+        Path parentLib = tempDir.resolve("parent");
         Path childLib = tempDir.resolve("child");
-        Files.createDirectories(childLib.resolve("org/openrewrite/java/service"));
-        Files.write(childLib.resolve("org/openrewrite/java/service/ImportService.class"),
-          stubClass("org/openrewrite/java/service/ImportService"));
+        for (String service : services) {
+            for (Path lib : Arrays.asList(parentLib, childLib)) {
+                Path classFile = lib.resolve(service + ".class");
+                Files.createDirectories(classFile.getParent());
+                Files.write(classFile, stubClass(service));
+            }
+        }
 
         try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
              RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
-            assertThat(classLoader.loadClass("org.openrewrite.java.service.ImportService").getClassLoader())
-              .as("service interfaces cross the recipe/parent boundary and must be shared")
-              .isSameAs(parent);
+            for (String service : services) {
+                assertThat(classLoader.loadClass(service.replace('/', '.')).getClassLoader())
+                  .as("%s crosses the recipe/parent boundary and must be shared", service)
+                  .isSameAs(parent);
+            }
         }
     }
 
