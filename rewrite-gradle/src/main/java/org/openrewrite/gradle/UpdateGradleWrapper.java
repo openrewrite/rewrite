@@ -43,8 +43,11 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -149,6 +152,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+
+        @Nullable
         BuildTool currentMarker;
 
         @Nullable
@@ -184,16 +189,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
-                        Optional<BuildTool> maybeBuildTool = sourceFile.getMarkers().findFirst(BuildTool.class);
-                        if (!maybeBuildTool.isPresent()) {
-                            return false;
-                        }
-                        BuildTool buildTool = maybeBuildTool.get();
-                        if (buildTool.getType() != BuildTool.Type.Gradle) {
-                            return false;
-                        }
-
-                        acc.currentMarker = buildTool;
+                        acc.currentMarker = sourceFile.getMarkers().findFirst(BuildTool.class)
+                                .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
+                                .orElse(null);
                         return true;
                     }
 
@@ -207,20 +205,29 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
 
+                        String currentVersion = acc.currentMarker == null ?
+                                versionFromDistributionUrl(currentDistributionUrl) :
+                                acc.currentMarker.getVersion();
+                        if (currentVersion == null) {
+                            return entry;
+                        }
+
                         String newVersion = isBlank(version) ? "latest.release" : version;
                         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, null).getValue());
-                        if (versionComparator.compare(null, acc.currentMarker.getVersion(), newVersion) > 0) {
+                        if (versionComparator.compare(null, currentVersion, newVersion) > 0) {
                             return entry;
                         }
 
                         GradleWrapper gradleWrapper = getGradleWrapper(currentDistributionUrl, ctx);
                         String gradleWrapperVersion = gradleWrapper.getVersion();
 
-                        int compare = versionComparator.compare(null, acc.currentMarker.getVersion(), gradleWrapperVersion);
+                        int compare = versionComparator.compare(null, currentVersion, gradleWrapperVersion);
                         // maybe we want to update the distribution type or url
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
-                            acc.updatedMarker = acc.currentMarker.withVersion(gradleWrapperVersion);
+                            if (acc.currentMarker != null) {
+                                acc.updatedMarker = acc.currentMarker.withVersion(gradleWrapperVersion);
+                            }
                             return entry;
                         } else if (compare == 0 && !gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
                             acc.needsWrapperUpdate = true;
@@ -352,14 +359,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
                         if (currentMarker.getType() != BuildTool.Type.Gradle) {
-                            return sourceFile;
-                        }
-                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
-                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
-                        if (compare < 0) {
-                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
+                            if (!isWrapperPath(sourceFile.getSourcePath())) {
+                                return sourceFile;
+                            }
                         } else {
-                            return sourceFile;
+                            VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
+                            int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                            if (compare < 0) {
+                                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
+                            } else {
+                                return sourceFile;
+                            }
                         }
                     }
                 }
@@ -396,6 +406,26 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return sourceFile;
             }
         };
+    }
+
+    private static final Pattern DISTRIBUTION_URL_VERSION = Pattern.compile("gradle-(\\d+(?:\\.\\d+)*(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?)-(?:bin|all)\\.zip");
+
+    /**
+     * The version a wrapper declares, read from the {@code distributionUrl} it already points at. Used when no
+     * {@link BuildTool} marker is available, which is the case for any parser that isn't the OpenRewrite Gradle plugin.
+     *
+     * @return the version, or {@code null} when the URL contains no recognizable Gradle version.
+     */
+    private static @Nullable String versionFromDistributionUrl(String distributionUrl) {
+        Matcher matcher = DISTRIBUTION_URL_VERSION.matcher(distributionUrl.replace("\\", ""));
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private static boolean isWrapperPath(Path sourcePath) {
+        return PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH);
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {

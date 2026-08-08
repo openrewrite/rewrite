@@ -604,9 +604,10 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 """),
               spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
             ),
-            mvnw,
-            mvnwCmd,
-            mvnWrapperJarQuark
+            // Each `dir(...)` prefixes the `SourceSpec` instances it is given in place, so these cannot be shared
+            text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)),
+            text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)),
+            other("", spec -> spec.path(WRAPPER_JAR_LOCATION).after(notEmpty))
           ),
           dir("example2",
             properties(
@@ -622,9 +623,9 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 """),
               spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
             ),
-            mvnw,
-            mvnwCmd,
-            mvnWrapperJarQuark
+            text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)),
+            text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)),
+            other("", spec -> spec.path(WRAPPER_JAR_LOCATION).after(notEmpty))
           )
         );
     }
@@ -821,6 +822,180 @@ class UpdateMavenWrapperTest implements RewriteTest {
           mvnw,
           mvnwCmd,
           mvnWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperWithoutBuildToolMarker() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .afterRecipe(run -> {
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
+
+                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
+                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
+
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+              """),
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+              .afterRecipe(mavenWrapperProperties ->
+                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).isEmpty())
+          ),
+          mvnw,
+          mvnwCmd,
+          mvnWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperWithModerneCliBuildToolMarker() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0")))
+            .afterRecipe(run -> {
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
+
+                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
+                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
+
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+              """),
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+              .afterRecipe(mavenWrapperProperties ->
+                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool ->
+                  assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.ModerneCli)))
+          ),
+          mvnw,
+          mvnwCmd,
+          mvnWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperWhenOnlyPropertiesFileCarriesMavenBuildToolMarker() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .afterRecipe(run -> {
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
+
+                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
+                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
+
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+            }),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+              """),
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+              .markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0"))
+              .afterRecipe(mavenWrapperProperties ->
+                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool ->
+                  assertThat(buildTool.getVersion()).isEqualTo("3.8.9")))
+          ),
+          text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)
+            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
+          text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)
+            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
+          other("", spec -> spec.path(WRAPPER_JAR_LOCATION).after(notEmpty)
+            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0")))
+        );
+    }
+
+    @Test
+    void updateWrapperInSubDirectoryWithoutBuildToolMarker() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .afterRecipe(run -> {
+                Path subdir = Path.of("subdir");
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_JAR_LOCATION));
+            }),
+          dir("subdir",
+            properties(
+              withLicenseHeader("""
+                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+                wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+                """),
+              withLicenseHeader("""
+                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+                wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+                distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
+                """),
+              spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+            ),
+            mvnw,
+            mvnWrapperJarQuark
+          )
+        );
+    }
+
+    @Test
+    void doNotDowngradeWithoutBuildToolMarker() {
+        rewriteRun(
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.0/apache-maven-3.9.0-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+          ),
+          text("", spec -> spec.path("mvnw")),
+          text("", spec -> spec.path("mvnw.cmd")),
+          other("", spec -> spec.path(".mvn/wrapper/maven-wrapper.jar"))
+        );
+    }
+
+    @Test
+    void distributionUrlWithoutExtractableVersionAndNoMarkerMakesNoChanges() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, false, null)),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://company.example/repo/maven-distribution.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+          ),
+          text("", spec -> spec.path("mvnw")),
+          text("", spec -> spec.path("mvnw.cmd")),
+          other("", spec -> spec.path(".mvn/wrapper/maven-wrapper.jar"))
         );
     }
 

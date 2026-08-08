@@ -38,11 +38,14 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
+import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -183,23 +186,26 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             return false;
                         }
 
-                        Optional<BuildTool> maybeBuildTool = sourceFile.getMarkers().findFirst(BuildTool.class);
-                        if (!maybeBuildTool.isPresent()) {
-                            return false;
-                        }
-                        BuildTool buildTool = maybeBuildTool.get();
-                        if (buildTool.getType() != BuildTool.Type.Maven) {
+                        BuildTool buildTool = sourceFile.getMarkers().findFirst(BuildTool.class)
+                                .filter(marker -> marker.getType() == BuildTool.Type.Maven)
+                                .orElse(null);
+                        String currentVersion = buildTool == null ?
+                                versionFromDistributionUrl(sourceFile) :
+                                buildTool.getVersion();
+                        if (currentVersion == null) {
                             return false;
                         }
 
                         MavenWrapper mavenWrapper = getMavenWrapper(ctx);
 
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
-                        int compare = versionComparator.compare(null, buildTool.getVersion(), mavenWrapper.getDistributionVersion());
+                        int compare = versionComparator.compare(null, currentVersion, mavenWrapper.getDistributionVersion());
                         // maybe we want to update the distribution url
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
-                            acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
+                            if (buildTool != null) {
+                                acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
+                            }
                             return true;
                         } else {
                             return compare == 0;
@@ -379,14 +385,17 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
                         if (currentMarker.getType() != BuildTool.Type.Maven) {
-                            return sourceFile;
-                        }
-                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
-                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
-                        if (compare < 0) {
-                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
+                            if (!isWrapperPath(sourceFile.getSourcePath())) {
+                                return sourceFile;
+                            }
                         } else {
-                            return sourceFile;
+                            VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
+                            int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                            if (compare < 0) {
+                                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
+                            } else {
+                                return sourceFile;
+                            }
                         }
                     }
                 }
@@ -436,6 +445,35 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 return sourceFile;
             }
         };
+    }
+
+    private static final Pattern DISTRIBUTION_URL_VERSION = Pattern.compile("apache-maven-(\\d+(?:\\.\\d+)*(?:-[A-Za-z0-9][A-Za-z0-9.-]*?)?)-bin\\.(?:zip|tar\\.gz)");
+
+    /**
+     * The Maven version a wrapper declares, read from the {@code distributionUrl} it already points at. Used when no
+     * {@link BuildTool} marker is available, which is the case for any parser that isn't the OpenRewrite Maven plugin.
+     *
+     * @return the version, or {@code null} when the properties file declares no URL with a recognizable Maven version.
+     */
+    private static @Nullable String versionFromDistributionUrl(SourceFile sourceFile) {
+        if (!(sourceFile instanceof Properties.File)) {
+            return null;
+        }
+        for (Properties.Entry entry : FindProperties.find((Properties.File) sourceFile, DISTRIBUTION_URL_KEY, false)) {
+            Matcher matcher = DISTRIBUTION_URL_VERSION.matcher(entry.getValue().getText().replace("\\", ""));
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isWrapperPath(Path sourcePath) {
+        return PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) ||
+               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH);
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {
