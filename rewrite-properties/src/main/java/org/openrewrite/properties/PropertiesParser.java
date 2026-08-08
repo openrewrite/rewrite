@@ -64,11 +64,10 @@ public class PropertiesParser implements Parser {
         StringBuilder buff = new StringBuilder();
         String s = source.readFully();
 
-        int trailingBackslashes = 0;
         boolean isEscapedNewLine = false;
         for (char c : s.toCharArray()) {
             if (isEscapedNewLine) {
-                if (Character.isWhitespace(c)) {
+                if (c != '\n' && c != '\r' && Character.isWhitespace(c)) {
                     buff.append(c);
                     continue;
                 } else {
@@ -77,7 +76,7 @@ public class PropertiesParser implements Parser {
             }
 
             if (c == '\n') {
-                if (trailingBackslashes % 2 == 1) {
+                if (continuesOnNextLine(buff)) {
                     isEscapedNewLine = true;
                     buff.append(c);
                 } else {
@@ -90,12 +89,6 @@ public class PropertiesParser implements Parser {
                 }
             } else {
                 buff.append(c);
-            }
-
-            if (c == '\\') {
-                trailingBackslashes++;
-            } else if (c != '\r') {
-                trailingBackslashes = 0;
             }
         }
 
@@ -118,6 +111,36 @@ public class PropertiesParser implements Parser {
         );
     }
 
+    private static boolean continuesOnNextLine(StringBuilder line) {
+        int end = line.length();
+        if (end > 0 && line.charAt(end - 1) == '\r') {
+            end--;
+        }
+        int backslashes = 0;
+        while (backslashes < end && line.charAt(end - 1 - backslashes) == '\\') {
+            backslashes++;
+        }
+        return backslashes % 2 == 1 && !isComment(line);
+    }
+
+    private static boolean isComment(CharSequence line) {
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                return c == '#' || c == '!';
+            }
+        }
+        return false;
+    }
+
+    private static boolean endsWithEscape(CharSequence text) {
+        int backslashes = 0;
+        while (backslashes < text.length() && text.charAt(text.length() - 1 - backslashes) == '\\') {
+            backslashes++;
+        }
+        return backslashes % 2 == 1;
+    }
+
     private Properties.@Nullable Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
         if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
@@ -137,7 +160,7 @@ public class PropertiesParser implements Parser {
     }
 
     private boolean isDelimitedByWhitespace(String line) {
-        return line.length() >= 3 && !Character.isWhitespace(line.charAt(0)) && !Character.isWhitespace(line.length() - 1) && line.contains(" ");
+        return line.length() >= 3 && !Character.isWhitespace(line.charAt(0)) && !Character.isWhitespace(line.charAt(line.length() - 1)) && line.contains(" ");
     }
 
     private Properties.Comment commentFromLine(String line, String prefix, Properties.Comment.Delimiter delimiter) {
@@ -202,7 +225,6 @@ public class PropertiesParser implements Parser {
                 value = new StringBuilder();
 
         Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
-        char prev = '$';
         State state = State.WHITESPACE_BEFORE_KEY;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
@@ -215,7 +237,7 @@ public class PropertiesParser implements Parser {
                     state = State.KEY;
                 case KEY:
                     if (c == '=' || c == ':') {
-                        if (prev == '\\') {
+                        if (endsWithEscape(key)) {
                             key.append(c);
                             break;
                         } else {
@@ -284,7 +306,6 @@ public class PropertiesParser implements Parser {
                         break;
                     }
             }
-            prev = c;
         }
 
         return new Properties.Entry(
