@@ -103,11 +103,8 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.TypeNameMatcher",
-            // JavaSourceSet#getTypeFactory crosses the recipe/parent classloader
-            // boundary when JavaTemplate reads it from the enclosing source file's
-            // marker; the interface must be shared so the cast in JavaTemplateParser
-            // succeeds.
             "org.openrewrite.java.internal.JavaTypeFactory",
+            "org.openrewrite.java.service",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",
