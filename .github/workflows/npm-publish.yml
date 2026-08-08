@@ -1,6 +1,12 @@
 ---
 name: npm-publish
 
+# npmjs, and nothing else. The Code Genome Project npm mirror used to run from here (it was the
+# only place the dist-tag was known); it now runs from `ci`/`publish` off the tarball `publish`
+# builds, symmetrically with the PyPI and NuGet mirrors. So this workflow exists solely because
+# npm's OIDC Trusted Publishing binds a package to a single workflow filename, and it can be
+# deleted wholesale — file and secret — when npmjs publishing is retired.
+#
 # Publishes after `ci` succeeds for any non-PR event on main (push, manual
 # dispatch, or the daily schedule), or `publish` succeeds for a version tag.
 # This mirrors the Maven snapshot publish in gh-automation's ci-gradle.yml,
@@ -84,6 +90,9 @@ jobs:
 
       # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
       # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
+      # `publish.yml` also fires on `v<x.y.z>-rc.<n>` tags, and a release candidate
+      # must not claim `latest` ahead of the actual latest release — so an `-rc.`
+      # tag goes to `next` alongside the snapshots.
       # Otherwise this is the `ci`-triggered snapshot path: publish the exact version string
       # handed off above (= the version embedded in the ci run's jar), and publish to
       # dist-tag `next`.
@@ -94,7 +103,11 @@ jobs:
         run: |
           if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
             echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-            echo "dist_tag=latest"  >> "$GITHUB_OUTPUT"
+            if [[ "$TAG" == *-rc.* ]]; then
+              echo "dist_tag=next"   >> "$GITHUB_OUTPUT"
+            else
+              echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           V=''

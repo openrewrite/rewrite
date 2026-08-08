@@ -274,6 +274,12 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace("-SNAPSHOT", "-zlocal")
 }
 
+// Null when the property is absent OR blank: the release workflow sets
+// ORG_GRADLE_PROJECT_nugetApiKey unconditionally, so a deleted secret still defines it as "" and a
+// hasProperty check would be true — the push would then run with no credential and fail.
+fun nugetApiKey(): String? =
+    project.findProperty("nugetApiKey")?.toString()?.takeIf { it.isNotBlank() }
+
 val generateVersionTxt by tasks.registering {
     group = "csharp"
     description = "Generate META-INF/rewrite-csharp-version.txt for RPC version pinning"
@@ -354,14 +360,13 @@ val csharpPublish by tasks.registering(Exec::class) {
     workingDir = csharpDir
 
     doFirst {
-        if (!project.hasProperty("nugetApiKey")) {
-            throw GradleException("nugetApiKey property is required for NuGet publishing")
-        }
+        val apiKey = nugetApiKey()
+            ?: throw GradleException("nugetApiKey property is required for NuGet publishing")
         commandLine(
             findDotnet(), "nuget", "push",
             "dist/*.nupkg",
             "--source", "https://api.nuget.org/v3/index.json",
-            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: "",
+            "--api-key", apiKey,
             "--skip-duplicate"
         )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
@@ -471,8 +476,14 @@ tasks.named("publishToMavenLocal") {
     dependsOn(csharpPublishLocal)
 }
 
-// Wire into the main publish task only when the NuGet API key is available
-if (project.hasProperty("nugetApiKey")) {
+// The .nupkg files are packed whenever we publish, regardless of where they are going: the Code
+// Genome Project mirror uploads dist/ and must not depend on the nuget.org push existing.
+tasks.named("publish") {
+    dependsOn(csharpPack)
+}
+
+// Only the push is gated on the credential, so retiring nuget.org is deleting this block.
+if (nugetApiKey() != null) {
     tasks.named("publish") {
         dependsOn(csharpPublish)
     }

@@ -342,18 +342,24 @@ val pythonBuild by tasks.registering(Exec::class) {
     }
 }
 
+// Null when the property is absent OR blank: the release workflow sets ORG_GRADLE_PROJECT_pypiToken
+// unconditionally, so a deleted secret still defines it as "" and a hasProperty check would be
+// true — the push would then run with no credential and fail at twine.
+fun pypiToken(): String? = project.findProperty("pypiToken")?.toString()?.takeIf { it.isNotBlank() }
+
 // Task to create .pypirc for authentication
 val setupPypirc by tasks.registering {
     group = "python"
     description = "Create .pypirc file for PyPI authentication"
 
     doLast {
-        if (project.hasProperty("pypiToken")) {
+        val token = pypiToken()
+        if (token != null) {
             val pypirc = pythonDir.resolve(".pypirc")
             pypirc.writeText("""
                 [pypi]
                 username = __token__
-                password = ${project.property("pypiToken")}
+                password = $token
             """.trimIndent())
             logger.lifecycle("Created .pypirc for PyPI authentication")
         } else {
@@ -382,9 +388,17 @@ val pythonPublish by tasks.registering(Exec::class) {
     }
 }
 
-// Wire into the main publish task
+// The distributable is built whenever we publish, regardless of where it is going: the Code
+// Genome Project mirror uploads dist/ and must not depend on the PyPI push existing.
 tasks.named("publish") {
-    dependsOn(pythonPublish)
+    dependsOn(pythonBuild)
+}
+
+// Only the push is gated on the credential, so retiring PyPI is deleting this block and the secret.
+if (pypiToken() != null) {
+    tasks.named("publish") {
+        dependsOn(pythonPublish)
+    }
 }
 
 // ============================================
