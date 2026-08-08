@@ -115,8 +115,8 @@ public class RecipeMarketplace {
     }
 
     private void bindRecursive(Category category, RecipeBundle bundle) {
-        category.getRecipes().replaceAll(listing -> listing.withBundle(bundle));
-        for (Category child : category.getCategories()) {
+        category.recipes.replaceAll(listing -> listing.withBundle(bundle));
+        for (Category child : category.categories) {
             bindRecursive(child, bundle);
         }
     }
@@ -137,6 +137,21 @@ public class RecipeMarketplace {
 
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
+
+        /**
+         * A view, not a copy. Structural change goes through {@link #install} and
+         * {@link #uninstall}, which keep the bundle registry in step with the tree.
+         */
+        public List<Category> getCategories() {
+            return Collections.unmodifiableList(categories);
+        }
+
+        /**
+         * @see #getCategories()
+         */
+        public List<RecipeListing> getRecipes() {
+            return Collections.unmodifiableList(recipes);
+        }
 
         private void merge(Category category, Set<BundleKey> alreadyInstalled, Set<RecipeListing> added) {
             for (RecipeListing recipe : category.recipes) {

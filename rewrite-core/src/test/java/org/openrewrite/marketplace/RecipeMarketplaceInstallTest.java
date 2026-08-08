@@ -102,6 +102,25 @@ class RecipeMarketplaceInstallTest {
                 .isEqualTo("2.0.0");
     }
 
+    @Test
+    void theCategoryTreeCannotBeEditedThroughItsGetters() {
+        RecipeBundle bundle = new RecipeBundle("maven", "org.example:a", "LATEST", "1.0.0", null);
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        marketplace.install(singleRecipeReader(bundle, "com.foo.Bar"));
+
+        RecipeMarketplace.Category root = marketplace.getRoot();
+        RecipeListing listing = marketplace.findRecipe("com.foo.Bar");
+
+        // Editing the tree directly would leave the bundle registry describing a marketplace
+        // that no longer exists, and can silently mutate a marketplace that is shared or cached.
+        assertThatThrownBy(() -> root.getRecipes().add(listing))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> root.getCategories().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> marketplace.getCategories().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
     private static List<RecipeListing> allListings(RecipeMarketplace.Category category) {
         List<RecipeListing> out = new java.util.ArrayList<>(category.getRecipes());
         for (RecipeMarketplace.Category child : category.getCategories()) {
