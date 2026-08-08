@@ -225,18 +225,10 @@ public interface JS extends J {
         @Override
         @SuppressWarnings("unchecked")
         public <S, T extends S> T service(Class<S> service) {
-            String serviceName = service.getName();
-            try {
-                Class<S> serviceClass;
-                if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(JavaScriptAutoFormatService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
-                }
-                return (T) serviceClass.getConstructor().newInstance();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            if (AutoFormatService.class.getName().equals(service.getName())) {
+                return (T) new JavaScriptAutoFormatService();
             }
+            return JavaSourceFile.super.service(service);
         }
 
         @Transient

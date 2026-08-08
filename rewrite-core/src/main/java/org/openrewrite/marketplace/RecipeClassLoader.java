@@ -104,7 +104,6 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.JavaTypeFactory",
-            "org.openrewrite.java.service",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",
@@ -233,20 +232,22 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // Check for tree/marker/style types using package structure
-        return isTreeMarkerStyleType(className);
+        return isSharedApiType(className);
     }
 
-    private boolean isTreeMarkerStyleType(String className) {
+    private boolean isSharedApiType(String className) {
         String[] parts = className.split("\\.");
         if (parts.length < 4) {
             return false;
         }
 
-        // Check if any package part is tree, marker, or style
+        // `service` covers both halves of the service SPI: a language's `service()` override runs
+        // on the loader that defined its `tree` class and hands the implementation to a
+        // recipe-side caller holding the same interface, so both must resolve to one class.
         for (int i = 2; i < parts.length - 1; i++) {
             String part = parts[i];
-            if ("tree".equals(part) || "marker".equals(part) || "style".equals(part)) {
+            if ("tree".equals(part) || "marker".equals(part) || "style".equals(part) ||
+                "service".equals(part)) {
                 return true;
             }
         }

@@ -345,23 +345,14 @@ public interface K extends J {
         @SuppressWarnings("unchecked")
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
-            try {
-                Class<S> serviceClass;
-                if (KotlinImportService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
-                } else if (ImportService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinImportService.class.getName());
-                } else if (KotlinAutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
-                } else if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinAutoFormatService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
-                }
-                return (T) serviceClass.getConstructor().newInstance();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            if (ImportService.class.getName().equals(serviceName) ||
+                KotlinImportService.class.getName().equals(serviceName)) {
+                return (T) new KotlinImportService();
+            } else if (AutoFormatService.class.getName().equals(serviceName) ||
+                       KotlinAutoFormatService.class.getName().equals(serviceName)) {
+                return (T) new KotlinAutoFormatService();
             }
+            return JavaSourceFile.super.service(service);
         }
     }
 
