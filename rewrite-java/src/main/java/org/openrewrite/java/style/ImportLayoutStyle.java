@@ -37,6 +37,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
@@ -144,6 +145,19 @@ public class ImportLayoutStyle implements JavaStyle {
                                                   J.Import toAdd, J.@Nullable Package pkg,
                                                   Collection<JavaType.FullyQualified> classpath,
                                                   boolean classpathDirty) {
+        return addImport(originalImports, toAdd, pkg, classpath, classpathDirty, null);
+    }
+
+    /**
+     * @param sourceSet when non-null, classpath-derived conflict data is resolved through the
+     *                  source set's per-instance {@link JavaSourceSet#typesInPackage(String)} cache,
+     *                  so the classpath is walked once per source set rather than once per file.
+     */
+    public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
+                                                  J.Import toAdd, J.@Nullable Package pkg,
+                                                  Collection<JavaType.FullyQualified> classpath,
+                                                  boolean classpathDirty,
+                                                  @Nullable JavaSourceSet sourceSet) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
@@ -237,7 +251,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         List<JRightPadded<J.Import>> checkConflicts = new ArrayList<>(originalImports);
         checkConflicts.add(paddedToAdd);
-        boolean isFoldable = new ImportLayoutConflictDetection(classpath, checkConflicts, classpathDirty)
+        boolean isFoldable = new ImportLayoutConflictDetection(classpath, checkConflicts, classpathDirty, sourceSet)
                 .isPackageFoldable(packageOrOuterClassName(paddedToAdd));
 
         // Walk both directions from the insertion point, looking for imports that are in the same block and have the
@@ -349,8 +363,17 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty) {
+        return orderImports(originalImports, classpath, classpathDirty, null);
+    }
+
+    /**
+     * @param sourceSet when non-null, classpath-derived conflict data is resolved through the
+     *                  source set's per-instance {@link JavaSourceSet#typesInPackage(String)} cache,
+     *                  so the classpath is walked once per source set rather than once per file.
+     */
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty, @Nullable JavaSourceSet sourceSet) {
         LayoutState layoutState = new LayoutState();
-        ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports, classpathDirty);
+        ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports, classpathDirty, sourceSet);
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
 
         List<Block> effectiveLayout = getLayout();
@@ -558,6 +581,14 @@ public class ImportLayoutStyle implements JavaStyle {
         private final Collection<JavaType.FullyQualified> classpath;
         private final List<JRightPadded<J.Import>> originalImports;
         private final boolean classpathDirty;
+
+        /**
+         * When non-null, classpath-derived conflict data is resolved through this source set's
+         * per-instance {@link JavaSourceSet#typesInPackage(String)} cache instead of walking the
+         * full classpath for every file. The {@link #classpath} is still retained for the cheap
+         * {@code isEmpty()} guard.
+         */
+        private final @Nullable JavaSourceSet sourceSet;
         private final Set<String> jvmClasspathNames = new HashSet<>();
         private @Nullable Set<String> containsClassNameConflict = null;
 
@@ -566,9 +597,14 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports, boolean classpathDirty) {
+            this(classpath, originalImports, classpathDirty, null);
+        }
+
+        ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports, boolean classpathDirty, @Nullable JavaSourceSet sourceSet) {
             this.classpath = classpath;
             this.originalImports = originalImports;
             this.classpathDirty = classpathDirty;
+            this.sourceSet = sourceSet;
         }
 
         /**
@@ -598,6 +634,12 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         private void setJVMClassNames() {
+            if (sourceSet != null) {
+                for (JavaType.FullyQualified fqn : sourceSet.typesInPackage("java.lang")) {
+                    jvmClasspathNames.add(fqn.getClassName());
+                }
+                return;
+            }
             for (JavaType.FullyQualified fqn : classpath) {
                 // first check `getFullyQualifiedName()` to avoid unnecessary allocations
                 if (fqn.getFullyQualifiedName().startsWith("java.lang.") && "java.lang".equals(fqn.getPackageName())) {
@@ -616,27 +658,65 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .add(anImport.getElement().getPackageName());
             }
 
+            if (sourceSet != null) {
+                // Resolve only the packages actually imported through the per-source-set index,
+                // rather than walking the whole classpath for every file.
+                for (String pkgOrFqn : checkPackageForClasses) {
+                    for (JavaType.FullyQualified t : sourceSet.typesInPackage(pkgOrFqn)) {
+                        nameToPackages.computeIfAbsent(t.getClassName(), p -> new HashSet<>(3)).add(pkgOrFqn);
+                    }
+                    JavaType.FullyQualified outer = findClasspathType(sourceSet, pkgOrFqn);
+                    if (outer != null) {
+                        addStaticMembers(outer, pkgOrFqn, nameToPackages);
+                    }
+                }
+                return nameToPackages;
+            }
+
             for (JavaType.FullyQualified classGraphFqn : classpath) {
                 String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
                     String className = classGraphFqn.getClassName();
                     nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3)).add(packageName);
                 } else if (checkPackageForClasses.contains(classGraphFqn.getFullyQualifiedName())) {
-                    packageName = classGraphFqn.getFullyQualifiedName();
-                    for (JavaType.Variable member : classGraphFqn.getMembers()) {
-                        if (member.hasFlags(Flag.Static)) {
-                            nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(packageName);
-                        }
-                    }
-
-                    for (JavaType.Method method : classGraphFqn.getMethods()) {
-                        if (method.hasFlags(Flag.Static)) {
-                            nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(packageName);
-                        }
-                    }
+                    addStaticMembers(classGraphFqn, classGraphFqn.getFullyQualifiedName(), nameToPackages);
                 }
             }
             return nameToPackages;
+        }
+
+        /**
+         * Record the static members and methods of {@code type} under {@code packageKey} in
+         * {@code nameToPackages}, so a member's simple name maps to every package/outer class that
+         * provides it.
+         */
+        private static void addStaticMembers(JavaType.FullyQualified type, String packageKey, Map<String, Set<String>> nameToPackages) {
+            for (JavaType.Variable member : type.getMembers()) {
+                if (member.hasFlags(Flag.Static)) {
+                    nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(packageKey);
+                }
+            }
+            for (JavaType.Method method : type.getMethods()) {
+                if (method.hasFlags(Flag.Static)) {
+                    nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(packageKey);
+                }
+            }
+        }
+
+        /**
+         * Locate the classpath type whose fully qualified name is {@code fullyQualifiedName} via the
+         * source set's package index. The package is derived the same way {@link JavaType.FullyQualified#getPackageName()}
+         * would, so a default-package (dot-less) name maps to the {@code ""} bucket.
+         */
+        private static JavaType.@Nullable FullyQualified findClasspathType(JavaSourceSet sourceSet, String fullyQualifiedName) {
+            int lastDot = fullyQualifiedName.lastIndexOf('.');
+            String packageName = lastDot < 0 ? "" : fullyQualifiedName.substring(0, lastDot);
+            for (JavaType.FullyQualified t : sourceSet.typesInPackage(packageName)) {
+                if (t.getFullyQualifiedName().equals(fullyQualifiedName)) {
+                    return t;
+                }
+            }
+            return null;
         }
     }
 

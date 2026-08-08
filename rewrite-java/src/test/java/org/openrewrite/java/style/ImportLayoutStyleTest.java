@@ -23,6 +23,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.config.DeclarativeNamedStyles;
 import org.openrewrite.java.OrderImports;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -30,8 +31,10 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,6 +91,63 @@ class ImportLayoutStyleTest implements RewriteTest {
         );
 
         mapper.readValue(mapper.writeValueAsBytes(style), DeclarativeNamedStyles.class);
+    }
+
+    @Test
+    void orderImportsWithSourceSetSuppressesFoldOnJavaLangCollision() {
+        // kotlin.String collides with java.lang.String on the classpath, so kotlin.* must not fold.
+        List<JRightPadded<J.Import>> imports = List.of(
+          imp("kotlin.DeepRecursiveFunction"), imp("kotlin.Function"),
+          imp("kotlin.Lazy"), imp("kotlin.Pair"), imp("kotlin.String"));
+        List<JavaType.FullyQualified> classpath = List.of(
+          JavaType.ShallowClass.build("java.lang.String"),
+          JavaType.ShallowClass.build("kotlin.DeepRecursiveFunction"),
+          JavaType.ShallowClass.build("kotlin.Function"),
+          JavaType.ShallowClass.build("kotlin.Lazy"),
+          JavaType.ShallowClass.build("kotlin.Pair"),
+          JavaType.ShallowClass.build("kotlin.String"));
+        JavaSourceSet sourceSet = new JavaSourceSet(randomId(), "main", classpath, emptyMap());
+        ImportLayoutStyle style = org.openrewrite.java.style.IntelliJ.importLayout();
+
+        List<String> fullWalk = printed(style.orderImports(imports, classpath, false));
+        List<String> cached = printed(style.orderImports(imports, classpath, false, sourceSet));
+
+        assertThat(cached).isEqualTo(fullWalk).noneMatch(s -> s.endsWith(".*"));
+    }
+
+    @Test
+    void orderImportsWithSourceSetFoldsWhenNoConflict() {
+        List<JRightPadded<J.Import>> imports = List.of(
+          imp("java.util.ArrayList"), imp("java.util.List"), imp("java.util.Map"),
+          imp("java.util.Set"), imp("java.util.Collection"), imp("java.util.Objects"));
+        List<JavaType.FullyQualified> classpath = List.of(
+          JavaType.ShallowClass.build("java.util.ArrayList"),
+          JavaType.ShallowClass.build("java.util.List"),
+          JavaType.ShallowClass.build("java.util.Map"),
+          JavaType.ShallowClass.build("java.util.Set"),
+          JavaType.ShallowClass.build("java.util.Collection"),
+          JavaType.ShallowClass.build("java.util.Objects"));
+        JavaSourceSet sourceSet = new JavaSourceSet(randomId(), "main", classpath, emptyMap());
+        ImportLayoutStyle style = org.openrewrite.java.style.IntelliJ.importLayout();
+
+        List<String> fullWalk = printed(style.orderImports(imports, classpath, false));
+        List<String> cached = printed(style.orderImports(imports, classpath, false, sourceSet));
+
+        assertThat(cached).isEqualTo(fullWalk).anyMatch(s -> s.endsWith("java.util.*"));
+    }
+
+    private static JRightPadded<J.Import> imp(String fullyQualifiedName) {
+        return new JRightPadded<>(
+          new J.Import(randomId(), Space.EMPTY, Markers.EMPTY,
+            new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY),
+            TypeTree.build(fullyQualifiedName).withPrefix(Space.SINGLE_SPACE), null),
+          Space.EMPTY, Markers.EMPTY);
+    }
+
+    private static List<String> printed(List<JRightPadded<J.Import>> imports) {
+        return imports.stream()
+          .map(i -> i.getElement().getQualid().printTrimmed())
+          .collect(Collectors.toList());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4196")

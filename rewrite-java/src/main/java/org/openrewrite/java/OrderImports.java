@@ -98,7 +98,7 @@ public class OrderImports extends Recipe {
                 boolean classpathDirty = JavaSourceSet.isDirty(ctx, cu);
 
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
-                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty);
+                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty, sourceSet.orElse(null));
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {
