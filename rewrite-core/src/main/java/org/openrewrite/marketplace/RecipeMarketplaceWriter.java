@@ -71,13 +71,16 @@ public class RecipeMarketplaceWriter {
             boolean hasDataTables = hasAnyDataTables(marketplace.getRoot());
             boolean hasTeam = hasAnyTeam(marketplace);
             boolean hasCategoryDescription = hasAnyCategoryDescription(marketplace.getRoot());
+            boolean hasVersion = hasAnyVersion(marketplace.getRoot());
             List<String> metadataKeys = collectMetadataKeys(marketplace);
 
             List<String> headers = new ArrayList<>();
             headers.add("ecosystem");
             headers.add("packageName");
-            headers.add("requestedVersion");
-            headers.add("version");
+            if (hasVersion) {
+                headers.add("requestedVersion");
+                headers.add("version");
+            }
             headers.add("name");
             headers.add("displayName");
             headers.add("description");
@@ -114,7 +117,8 @@ public class RecipeMarketplaceWriter {
             csv.writeHeaders(headers);
             List<List<String>> rows = new ArrayList<>();
             collectRowsRecursive(rows, marketplace.getRoot(), emptyList(), emptyList(),
-                    maxCategoryDepth, hasOptions, hasDataTables, hasTeam, hasCategoryDescription, metadataKeys);
+                    maxCategoryDepth, hasOptions, hasDataTables, hasTeam, hasCategoryDescription,
+                    hasVersion, metadataKeys);
             rows.sort(CSV_ROW_COMPARATOR);
             for (List<String> row : rows) {
                 csv.writeRow(row.toArray(new String[0]));
@@ -127,15 +131,17 @@ public class RecipeMarketplaceWriter {
     private void collectRowsRecursive(List<List<String>> rows, RecipeMarketplace.Category category,
                                       List<String> categoryPath, List<String> categoryDescriptionPath,
                                       int maxCategoryDepth, boolean hasOptions, boolean hasDataTables, boolean hasTeam,
-                                      boolean hasCategoryDescription,
+                                      boolean hasCategoryDescription, boolean hasVersion,
                                       List<String> metadataKeys) {
         for (RecipeListing recipe : category.getRecipes()) {
             List<String> row = new ArrayList<>();
             RecipeBundle bundle = recipe.getBundle();
             row.add(StringUtils.isBlank(bundle.getPackageEcosystem()) ? "" : bundle.getPackageEcosystem());
             row.add(StringUtils.isBlank(bundle.getPackageName()) ? "" : bundle.getPackageName());
-            row.add(StringUtils.isBlank(bundle.getRequestedVersion()) ? "" : bundle.getRequestedVersion());
-            row.add(StringUtils.isBlank(bundle.getVersion()) ? "" : bundle.getVersion());
+            if (hasVersion) {
+                row.add(StringUtils.isBlank(bundle.getRequestedVersion()) ? "" : bundle.getRequestedVersion());
+                row.add(StringUtils.isBlank(bundle.getVersion()) ? "" : bundle.getVersion());
+            }
             row.add(recipe.getName());
             row.add(recipe.getDisplayName());
             row.add(recipe.getDescription());
@@ -192,7 +198,7 @@ public class RecipeMarketplaceWriter {
             List<String> childDescriptionPath = new ArrayList<>(categoryDescriptionPath);
             childDescriptionPath.add(0, child.getDescription());
             collectRowsRecursive(rows, child, childPath, childDescriptionPath, maxCategoryDepth, hasOptions, hasDataTables,
-                    hasTeam, hasCategoryDescription, metadataKeys);
+                    hasTeam, hasCategoryDescription, hasVersion, metadataKeys);
         }
     }
 
@@ -268,6 +274,27 @@ public class RecipeMarketplaceWriter {
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
             if (hasAnyDataTables(child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Walks the tree rather than {@link RecipeMarketplace#getAllRecipes()}, which is keyed by
+     * recipe name: a bundle whose every listing lost that dedup would have its version invisible
+     * here, making the file's schema depend on which duplicate won a traversal.
+     */
+    private boolean hasAnyVersion(RecipeMarketplace.Category category) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            RecipeBundle bundle = recipe.getBundle();
+            if (StringUtils.isNotBlank(bundle.getVersion()) ||
+                StringUtils.isNotBlank(bundle.getRequestedVersion())) {
+                return true;
+            }
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            if (hasAnyVersion(child)) {
                 return true;
             }
         }

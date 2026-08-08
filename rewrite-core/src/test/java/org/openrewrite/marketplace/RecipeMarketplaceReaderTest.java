@@ -612,7 +612,8 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
-    void versionColumnsAreAlwaysEmitted() {
+    void versionColumnsAreOmittedWhenNoListingHasAVersion() {
+        // The shape of a generated inner recipes.csv: identity, but nothing resolved yet.
         RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
           ecosystem,packageName,name,displayName,category1
           yaml,recipes/team.yml,com.foo.Bar,Bar,Java
@@ -621,7 +622,53 @@ class RecipeMarketplaceReaderTest {
         String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
 
         assertThat(csv.lines().findFirst().orElseThrow())
-                .startsWith("ecosystem,packageName,requestedVersion,version,");
+                .startsWith("ecosystem,packageName,name,");
+    }
+
+    @Test
+    void aGeneratedInnerCsvCarriesNoVersionColumns() {
+        // MavenRecipeMarketplaceGenerator stamps "" rather than null for both versions, so the
+        // contract has to hold for blank as well as absent.
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        marketplace.install(new RecipeListing(marketplace, "com.foo.Bar", "Bar", "Bar does a thing.",
+                null, List.of(), List.of(), 1,
+                new RecipeBundle("maven", "org.example:a", "", "", null)), List.of());
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,name,");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow())
+                .startsWith("maven,org.example:a,com.foo.Bar,");
+    }
+
+    @Test
+    void versionColumnsAreEmittedWhenAnyListingHasAVersion() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:a,LATEST,1.0.0,com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,requestedVersion,version,name,");
+    }
+
+    @Test
+    void aRequestedVersionAloneStillEmitsTheVersionColumns() {
+        // Gating on the resolved version alone would silently drop this row's requestedVersion.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:a,LATEST,,com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,requestedVersion,version,name,");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow())
+                .startsWith("maven,org.example:a,LATEST,,com.foo.Bar,");
     }
 
     @Test
@@ -634,7 +681,7 @@ class RecipeMarketplaceReaderTest {
         String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
 
         assertThat(csv).doesNotContain("null");
-        assertThat(csv.lines().skip(1).findFirst().orElseThrow()).startsWith(",,,,com.foo.Bar,");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow()).startsWith(",,com.foo.Bar,");
     }
 
     @Test
