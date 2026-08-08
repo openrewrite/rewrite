@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 
 import java.lang.annotation.Annotation;
@@ -305,7 +306,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         String[] finalParamNames = paramNames;
         return typeFactory.methodFor(signature,
                 () -> new JavaType.Method(
-                        null, method.getModifiers(), null, "<constructor>",
+                        null, Flag.mapBytecodeAccessFlagsToBitMap(method.getModifiers()), null, "<constructor>",
                         null, finalParamNames, null, null, null, null, null),
                 mappedMethod -> {
             List<JavaType> thrownExceptions = null;
@@ -413,7 +414,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
         return typeFactory.methodFor(signature,
                 () -> new JavaType.Method(
-                        null, method.getModifiers(), null, method.getName(),
+                        null, Flag.mapBytecodeAccessFlagsToBitMap(method.getModifiers()), null, method.getName(),
                         null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
                 mappedMethod -> {
             List<JavaType> thrownExceptions = null;
