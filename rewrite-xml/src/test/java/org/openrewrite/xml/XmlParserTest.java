@@ -96,6 +96,25 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
+    void websphereTableMapping() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <RDBSchema:RDBTable xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:RDBSchema="RDBSchema.xmi" xmi:id="RDBTable_1" name="XBONUS">
+                <database href="META-INF/Schema/SAMPLE.dbxmi#RDBDatabase_1"/>
+                <schema href="META-INF/Schema/SAMPLE_APP.schxmi#RDBSchema_1"/>
+                <columns xmi:type="RDBSchema:RDBColumn" xmi:id="RDBColumn_1" name="ADDR_ID" allowNull="false">
+                  <type xmi:type="RDBSchema:SQLCharacterStringType" xmi:id="SQLCharacterStringType_1" length="250"/>
+                </columns>
+              </RDBSchema:RDBTable>
+              """,
+            spec -> spec.path("ejbModule/META-INF/Schema/XBONUS.tblxmi")
+          )
+        );
+    }
+
+    @Test
     void jsp() {
         rewriteRun(
           xml(
@@ -821,6 +840,10 @@ class XmlParserTest implements RewriteTest {
       "proj.csproj",
       "proj.Csproj",
       "/foo/bar/baz.jsp",
+      "ejbModule/META-INF/Map.mapxmi",
+      "ejbModule/META-INF/Schema/CUSTOMER.tblxmi",
+      "ejbModule/META-INF/Schema/SAMPLE.dbxmi",
+      "ejbModule/META-INF/Schema/SAMPLE_APP.schxmi",
       "packages.config",
       "Packages.config",
       "nuget.config",
