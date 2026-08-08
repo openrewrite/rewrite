@@ -36,7 +36,11 @@ public class TableRowMatcher {
      * @return The string value of the key, or null if not found or not a literal
      */
     public static @Nullable String getKeyValue(Toml.Table table, String key) {
-        return getKeyValue(table.getValues(), key);
+        Toml.KeyValue keyValue = table.find(key);
+        if (keyValue == null || !(keyValue.getValue() instanceof Toml.Literal)) {
+            return null;
+        }
+        return ((Toml.Literal) keyValue.getValue()).getValue().toString();
     }
 
     /**
