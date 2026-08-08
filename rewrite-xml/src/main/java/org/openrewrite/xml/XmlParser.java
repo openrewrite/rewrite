@@ -50,6 +50,11 @@ public class XmlParser implements Parser {
             "jxb",
             "xjb",
             "jsp",
+            // WebSphere/Rational Application Developer object-relational mapping for CMP entity beans
+            "mapxmi",
+            "tblxmi",
+            "dbxmi",
+            "schxmi",
             // Datastage file formats that are all xml under the hood
             "det",
             "pjb",
