@@ -23,6 +23,7 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.GradleWrapperProperties;
 import org.openrewrite.gradle.internal.GradleWrapperScriptLoader;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
@@ -273,10 +274,13 @@ public class GradleWrapper {
      * Can be used in contexts where downloads.gradle.org, normally used for version lookups, is unavailable.
      */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
-        String version = "";
-        Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
-        if (matcher.find()) {
-            version = matcher.group(1);
+        String version = GradleWrapperProperties.versionFromDistributionUrl(fullDistributionUri.toString());
+        if (version == null) {
+            version = "";
+            Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
+            if (matcher.find()) {
+                version = matcher.group(1);
+            }
         }
         return new GradleWrapper(version, new DistributionInfos(fullDistributionUri.toString(), null, null));
     }
