@@ -23,6 +23,7 @@ import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.internal.GradleWrapperProperties;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.tree.G;
@@ -37,20 +38,27 @@ import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.search.FindProperties;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.style.Style;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddDevelocityGradlePlugin extends Recipe {
+public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradlePlugin.WrapperVersions> {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin version",
@@ -123,9 +131,81 @@ public class AddDevelocityGradlePlugin extends Recipe {
         return validated;
     }
 
+    /**
+     * The Gradle version declared by each wrapper in the repository, keyed by the directory the wrapper belongs to
+     * (the repository root is {@link #ROOT}). Scripts resolve against the nearest enclosing wrapper, so an independent
+     * build nested in a subdirectory is never judged by the root wrapper's version.
+     */
+    public static class WrapperVersions {
+        static final Path ROOT = Paths.get("");
+
+        final Map<Path, String> versionsByDirectory = new HashMap<>();
+
+        void put(Path wrapperPropertiesPath, String version) {
+            // The path is known to end in the three segments of `gradle/wrapper/gradle-wrapper.properties`
+            int nameCount = wrapperPropertiesPath.getNameCount();
+            versionsByDirectory.put(nameCount > 3 ? wrapperPropertiesPath.subpath(0, nameCount - 3) : ROOT, version);
+        }
+
+        @Nullable String nearest(Path sourcePath) {
+            if (versionsByDirectory.isEmpty()) {
+                return null;
+            }
+            for (Path dir = sourcePath.getParent(); ; dir = dir.getParent()) {
+                String version = versionsByDirectory.get(dir == null ? ROOT : dir);
+                if (version != null) {
+                    return version;
+                }
+                if (dir == null) {
+                    return null;
+                }
+            }
+        }
+    }
+
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public WrapperVersions getInitialValue(ExecutionContext ctx) {
+        return new WrapperVersions();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(WrapperVersions acc) {
+        return new PropertiesVisitor<ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return super.isAcceptable(sourceFile, ctx) &&
+                       PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH);
+            }
+
+            @Override
+            public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                for (Properties.Entry entry : FindProperties.find(file, "distributionUrl", false)) {
+                    String version = GradleWrapperProperties.versionFromDistributionUrl(entry.getValue().getText());
+                    if (version != null) {
+                        acc.put(file.getSourcePath(), version);
+                        break;
+                    }
+                }
+                return file;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(WrapperVersions acc) {
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
+
+            /**
+             * Prefer the {@link BuildTool} marker the OpenRewrite Gradle plugin attaches, and otherwise fall back to
+             * the version the nearest wrapper declares, so the recipe works on LSTs produced by any other parser.
+             */
+            private @Nullable String gradleVersion(JavaSourceFile cu) {
+                Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
+                if (maybeBuildTool.isPresent() && maybeBuildTool.get().getType() == BuildTool.Type.Gradle) {
+                    return maybeBuildTool.get().getVersion();
+                }
+                return acc.nearest(cu.getSourcePath());
+            }
 
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -141,12 +221,8 @@ public class AddDevelocityGradlePlugin extends Recipe {
             }
 
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
-                if (!maybeBuildTool.isPresent()) {
-                    return cu;
-                }
-                BuildTool buildTool = maybeBuildTool.get();
-                if (buildTool.getType() != BuildTool.Type.Gradle) {
+                String gradleVersion = gradleVersion(cu);
+                if (gradleVersion == null) {
                     return cu;
                 }
                 VersionComparator versionComparator = Semver.validate("(,6)", null).getValue();
@@ -158,7 +234,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     return cu;
                 }
 
-                boolean gradleSixOrLater = versionComparator.compare(null, buildTool.getVersion(), "6.0") >= 0;
+                boolean gradleSixOrLater = versionComparator.compare(null, gradleVersion, "6.0") >= 0;
                 if (gradleSixOrLater && cu.getSourcePath().endsWith("settings.gradle")) {
                     // Newer than 6.0 goes in settings
                     Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
@@ -208,12 +284,8 @@ public class AddDevelocityGradlePlugin extends Recipe {
             }
 
             public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
-                if (!maybeBuildTool.isPresent()) {
-                    return cu;
-                }
-                BuildTool buildTool = maybeBuildTool.get();
-                if (buildTool.getType() != BuildTool.Type.Gradle) {
+                String gradleVersion = gradleVersion(cu);
+                if (gradleVersion == null) {
                     return cu;
                 }
                 VersionComparator versionComparator = Semver.validate("(,6)", null).getValue();
@@ -225,7 +297,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     return cu;
                 }
 
-                boolean gradleSixOrLater = versionComparator.compare(null, buildTool.getVersion(), "6.0") >= 0;
+                boolean gradleSixOrLater = versionComparator.compare(null, gradleVersion, "6.0") >= 0;
                 if (gradleSixOrLater && cu.getSourcePath().endsWith("settings.gradle.kts")) {
                     // Newer than 6.0 goes in settings
                     Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);

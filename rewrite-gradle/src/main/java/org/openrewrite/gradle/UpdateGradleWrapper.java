@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.GradleWrapperProperties;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
@@ -46,8 +47,6 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -206,7 +205,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         acc.currentDistributionUrl = currentDistributionUrl;
 
                         String currentVersion = acc.currentMarker == null ?
-                                versionFromDistributionUrl(currentDistributionUrl) :
+                                GradleWrapperProperties.versionFromDistributionUrl(currentDistributionUrl) :
                                 acc.currentMarker.getVersion();
                         if (currentVersion == null) {
                             return entry;
@@ -406,19 +405,6 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return sourceFile;
             }
         };
-    }
-
-    private static final Pattern DISTRIBUTION_URL_VERSION = Pattern.compile("gradle-(\\d+(?:\\.\\d+)*(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?)-(?:bin|all)\\.zip");
-
-    /**
-     * The version a wrapper declares, read from the {@code distributionUrl} it already points at. Used when no
-     * {@link BuildTool} marker is available, which is the case for any parser that isn't the OpenRewrite Gradle plugin.
-     *
-     * @return the version, or {@code null} when the URL contains no recognizable Gradle version.
-     */
-    private static @Nullable String versionFromDistributionUrl(String distributionUrl) {
-        Matcher matcher = DISTRIBUTION_URL_VERSION.matcher(distributionUrl.replace("\\", ""));
-        return matcher.find() ? matcher.group(1) : null;
     }
 
     private static boolean isWrapperPath(Path sourcePath) {
