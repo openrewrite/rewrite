@@ -60,7 +60,7 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
             return keyValue;
         }
         Toml.Table inline = (Toml.Table) keyValue.getValue();
-        if (inline.find("version") == null) {
+        if (TomlTableValue.find(inline, "version") == null) {
             return keyValue;
         }
         return keyValue.withValue(TomlTableValue.withString(inline, "version", newVersion));
@@ -128,13 +128,13 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
                 return null;
             }
             Toml.Table table = (Toml.Table) keyValue.getValue();
-            String pluginId = table.getString("id");
+            String pluginId = TomlTableValue.getString(table, "id");
             if (pluginId == null || !matches(pluginId, pluginIdPattern)) {
                 return null;
             }
             return new GradleVersionCatalogPlugin(cursor, pluginId,
-                    table.getString("version"),
-                    table.getString("version.ref"));
+                    TomlTableValue.getString(table, "version"),
+                    TomlTableValue.getString(table, "version.ref"));
         }
 
         private static boolean matches(String pluginId, @Nullable String pattern) {

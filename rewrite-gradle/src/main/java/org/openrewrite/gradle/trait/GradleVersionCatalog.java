@@ -17,11 +17,7 @@ package org.openrewrite.gradle.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
@@ -172,26 +168,52 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
     }
 
     private static GradleVersionCatalog from(Cursor cursor, Toml.Document document) {
-        Map<String, String> declaredVersions = new LinkedHashMap<>();
-        Map<String, List<VersionRefConsumer>> consumers = new LinkedHashMap<>();
+        CatalogIndex index = new CatalogIndex(cursor);
+        index.visit(document, 0);
+        return new GradleVersionCatalog(cursor, index.declaredVersions, index.versionRefConsumers);
+    }
 
-        Toml.Table versions = document.findTable("versions");
-        if (versions != null) {
-            for (Toml value : versions.getValues()) {
-                if (!(value instanceof Toml.KeyValue) || !(((Toml.KeyValue) value).getKey() instanceof Toml.Identifier) ||
+    private static final class CatalogIndex extends TomlIsoVisitor<Integer> {
+        private final Cursor documentCursor;
+        private final Map<String, String> declaredVersions = new LinkedHashMap<>();
+        private final Map<String, List<VersionRefConsumer>> versionRefConsumers = new LinkedHashMap<>();
+
+        private CatalogIndex(Cursor documentCursor) {
+            this.documentCursor = documentCursor;
+        }
+
+        @Override
+        public Toml.Table visitTable(Toml.Table table, Integer unused) {
+            Toml.Table t = super.visitTable(table, unused);
+            Toml.Identifier name = t.getName();
+            if (name == null) {
+                return t;
+            }
+
+            if ("versions".equals(name.getName())) {
+                indexVersions(t);
+            } else if ("libraries".equals(name.getName()) || "plugins".equals(name.getName())) {
+                indexConsumers(documentCursor, t, versionRefConsumers);
+            }
+            return t;
+        }
+
+        private void indexVersions(Toml.Table table) {
+            for (Toml value : table.getValues()) {
+                if (!(value instanceof Toml.KeyValue) ||
+                        !(((Toml.KeyValue) value).getKey() instanceof Toml.Identifier) ||
                         !(((Toml.KeyValue) value).getValue() instanceof Toml.Literal)) {
                     continue;
                 }
                 Object version = ((Toml.Literal) ((Toml.KeyValue) value).getValue()).getValue();
                 if (version instanceof String) {
-                    declaredVersions.put(((Toml.Identifier) ((Toml.KeyValue) value).getKey()).getName(), (String) version);
+                    declaredVersions.put(
+                            ((Toml.Identifier) ((Toml.KeyValue) value).getKey()).getName(),
+                            (String) version
+                    );
                 }
             }
         }
-
-        indexConsumers(cursor, document.findTable("libraries"), consumers);
-        indexConsumers(cursor, document.findTable("plugins"), consumers);
-        return new GradleVersionCatalog(cursor, declaredVersions, consumers);
     }
 
     private static void indexConsumers(Cursor documentCursor, Toml.@Nullable Table table,
@@ -222,7 +244,7 @@ public class GradleVersionCatalog implements Trait<Toml.Document> {
 
     private static @Nullable String versionRef(Toml.KeyValue keyValue) {
         return keyValue.getValue() instanceof Toml.Table ?
-                ((Toml.Table) keyValue.getValue()).getString("version.ref") : null;
+                TomlTableValue.getString((Toml.Table) keyValue.getValue(), "version.ref") : null;
     }
 
     private Map<String, String> safeVersionRefReplacements(

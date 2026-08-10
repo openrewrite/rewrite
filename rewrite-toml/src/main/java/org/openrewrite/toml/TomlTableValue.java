@@ -17,6 +17,7 @@ package org.openrewrite.toml;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
@@ -33,6 +34,29 @@ import static org.openrewrite.Tree.randomId;
  */
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TomlTableValue {
+
+    public static Toml.@Nullable KeyValue find(Toml.Table table, String key) {
+        for (Toml value : table.getValues()) {
+            if (!(value instanceof Toml.KeyValue)) {
+                continue;
+            }
+            Toml.KeyValue keyValue = (Toml.KeyValue) value;
+            if (keyValue.getKey() instanceof Toml.Identifier &&
+                    key.equals(((Toml.Identifier) keyValue.getKey()).getName())) {
+                return keyValue;
+            }
+        }
+        return null;
+    }
+
+    public static @Nullable String getString(Toml.Table table, String key) {
+        Toml.KeyValue keyValue = find(table, key);
+        if (keyValue == null || !(keyValue.getValue() instanceof Toml.Literal)) {
+            return null;
+        }
+        Object value = ((Toml.Literal) keyValue.getValue()).getValue();
+        return value instanceof String ? (String) value : null;
+    }
 
     public static String quoted(Toml.Literal literal, String value) {
         String source = literal.getSource();
@@ -54,7 +78,7 @@ public final class TomlTableValue {
      * @return the updated table
      */
     public static Toml.Table withString(Toml.Table table, String key, String value) {
-        Toml.KeyValue matchingKeyValue = table.find(key);
+        Toml.KeyValue matchingKeyValue = find(table, key);
         if (matchingKeyValue == null || !(matchingKeyValue.getValue() instanceof Toml.Literal)) {
             return table;
         }
@@ -80,7 +104,7 @@ public final class TomlTableValue {
      * @return the updated table
      */
     public static Toml.Table withStringOrAdd(Toml.Table table, String key, String value) {
-        if (table.find(key) != null) {
+        if (find(table, key) != null) {
             return withString(table, key, value);
         }
 

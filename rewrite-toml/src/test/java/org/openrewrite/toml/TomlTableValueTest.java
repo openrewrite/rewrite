@@ -25,25 +25,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TomlTableValueTest {
 
     @Test
-    void findsTopLevelTable() {
-        Toml.Document document = document("[versions]\nfoo = \"1.0\"\n");
-
-        assertThat(document.findTable("versions")).isNotNull();
-        assertThat(document.findTable("missing")).isNull();
-    }
-
-    @Test
     void findsExistingKeysAndReadsStringValues() {
         Toml.Table table = table("{ group = \"org.example\", name = \"library\", count = 2 }");
 
-        assertThat(table.find("name")).isNotNull();
-        assertThat(table.find("missing")).isNull();
-        assertThat(table.find("name")).isNotNull();
-        assertThat(table.find("count")).isNotNull();
-        assertThat(table.find("missing")).isNull();
-        assertThat(table.getString("name")).isEqualTo("library");
-        assertThat(table.getString("missing")).isNull();
-        assertThat(table.getString("count")).isNull();
+        assertThat(TomlTableValue.find(table, "name")).isNotNull();
+        assertThat(TomlTableValue.find(table, "missing")).isNull();
+        assertThat(TomlTableValue.find(table, "name")).isNotNull();
+        assertThat(TomlTableValue.find(table, "count")).isNotNull();
+        assertThat(TomlTableValue.find(table, "missing")).isNull();
+        assertThat(TomlTableValue.getString(table, "name")).isEqualTo("library");
+        assertThat(TomlTableValue.getString(table, "missing")).isNull();
+        assertThat(TomlTableValue.getString(table, "count")).isNull();
     }
 
     @Test

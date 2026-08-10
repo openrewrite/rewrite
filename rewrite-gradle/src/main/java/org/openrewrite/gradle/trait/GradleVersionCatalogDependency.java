@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.toml.TomlIsoVisitor;
@@ -46,6 +47,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
     Cursor cursor;
     String groupId;
     String artifactId;
+    @Nullable String module;
     /**
      * Present for entries that carry an explicit {@code version} value.
      */
@@ -60,8 +62,8 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             return false;
         }
         Toml.Table table = (Toml.Table) getTree().getValue();
-        return table.find("version") != null && version == null ||
-                table.find("version.ref") != null && versionRef == null;
+        return TomlTableValue.find(table, "version") != null && version == null ||
+                TomlTableValue.find(table, "version.ref") != null && versionRef == null;
     }
 
     /**
@@ -70,98 +72,161 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
      * String notation is rebuilt while preserving the original quote style; inline-table notation
      * updates or adds a direct {@code version} key. Entries using {@code version.ref} are unchanged.
      */
-    public Toml.KeyValue withVersion(String newVersion) {
-        if (newVersion.equals(version) || versionRef != null) {
-            return getTree();
+    public GradleVersionCatalogDependency withGroup(String newGroupId) {
+        if (newGroupId.equals(groupId)) {
+            return this;
         }
-        Toml.KeyValue kv = getTree();
-        if (kv.getValue() instanceof Toml.Literal) {
-            Toml.Literal literal = (Toml.Literal) kv.getValue();
-            if (!(literal.getValue() instanceof String)) {
-                return kv;
-            }
-            Dependency dependency = DependencyNotation.parse((String) literal.getValue());
-            if (dependency == null) {
-                return kv;
-            }
-            String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(newVersion)));
-            return kv.withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
-        }
-        if (kv.getValue() instanceof Toml.Table) {
-            Toml.Table inline = (Toml.Table) kv.getValue();
-            return kv.withValue(inline.find("version") == null ?
-                    TomlTableValue.withStringOrAdd(inline, "version", newVersion) :
-                    TomlTableValue.withString(inline, "version", newVersion));
-        }
-        return kv;
+        return withUpdatedValue(updateValue(newGroupId, artifactId, version, module),
+                newGroupId, artifactId, module, version, versionRef);
     }
 
-    /**
-     * Updates a library entry's coordinates and, optionally, its direct {@code version} value.
-     * <p>
-     * This method is the primary mutation helper for coordinate-change recipes. It:
-     * <ul>
-     *   <li>Updates the existing coordinate representation ({@code group}/{@code name} or {@code module}) unless
-     *       a requested version change targets an unsupported version declaration.</li>
-     *   <li>If {@code newVersion} is non-null and the entry already has a {@code version} key, updates it.</li>
-     *   <li>If {@code newVersion} is non-null, {@code overrideManagedVersion} is {@code true}, and the entry
-     *       has neither a {@code version} nor a {@code version.ref} key, the {@code version} key is added.</li>
-     * </ul>
-     */
-    public Toml.KeyValue withCoordinatesAndVersion(
-            String newGroupId, String newArtifactId,
-            @Nullable String newVersion, boolean overrideManagedVersion) {
+    public GradleVersionCatalogDependency withName(String newArtifactId) {
+        if (newArtifactId.equals(artifactId)) {
+            return this;
+        }
+        return withUpdatedValue(updateValue(groupId, newArtifactId, version, module),
+                groupId, newArtifactId, module, version, versionRef);
+    }
+
+    public GradleVersionCatalogDependency withModule(String newModule) {
+        if (newModule.indexOf(':') < 0 || newModule.indexOf(':') != newModule.lastIndexOf(':')) {
+            return this;
+        }
+        Dependency dependency = DependencyNotation.parse(newModule);
+        if (dependency == null) {
+            return this;
+        }
+        String newGroupId = dependency.getGroupId();
+        String newArtifactId = dependency.getArtifactId();
+        if (newGroupId == null) {
+            return this;
+        }
+        if (newModule.equals(module)) {
+            return this;
+        }
+        return withUpdatedValue(updateValue(newGroupId, newArtifactId, version, newModule),
+                newGroupId, newArtifactId, newModule, version, versionRef);
+    }
+
+    public GradleVersionCatalogDependency withVersion(String newVersion) {
+        if (newVersion.equals(version) || versionRef != null || hasUnsupportedVersionDeclaration()) {
+            return this;
+        }
+        return withUpdatedValue(updateValue(groupId, artifactId, newVersion, module),
+                groupId, artifactId, module, newVersion, null);
+    }
+
+    private GradleVersionCatalogDependency withUpdatedValue(
+            Toml.KeyValue value, String newGroupId, String newArtifactId,
+            @Nullable String newModule, @Nullable String newVersion, @Nullable String newVersionRef) {
+        return new GradleVersionCatalogDependency(new Cursor(cursor.getParent(), value),
+                newGroupId, newArtifactId, newModule, newVersion, newVersionRef);
+    }
+
+    private Toml.KeyValue updateValue(
+            String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String coordinateModule) {
         if (newVersion != null && hasUnsupportedVersionDeclaration()) {
             return getTree();
         }
+        if (isUnchanged(newGroupId, newArtifactId, newVersion, coordinateModule)) {
+            return getTree();
+        }
         if (getTree().getValue() instanceof Toml.Literal) {
-            Toml.Literal literal = (Toml.Literal) getTree().getValue();
-            if (!(literal.getValue() instanceof String)) {
-                return getTree();
-            }
-            Dependency dependency = DependencyNotation.parse((String) literal.getValue());
-            if (dependency == null) {
-                return getTree();
-            }
-            String version = dependency.getVersion();
-            if (newVersion != null && (version != null || overrideManagedVersion)) {
-                version = newVersion;
-            }
-            String notation = DependencyNotation.toStringNotation(
-                    dependency.withGav(new org.openrewrite.maven.tree.GroupArtifactVersion(
-                            newGroupId, newArtifactId, version)));
-            return getTree().withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
+            return updateLiteralValue((Toml.Literal) getTree().getValue(), newGroupId, newArtifactId, newVersion);
         }
         if (!(getTree().getValue() instanceof Toml.Table)) {
             return getTree();
         }
         Toml.KeyValue kv = getTree();
         Toml.Table inline = (Toml.Table) kv.getValue();
-        if (inline.find("module") != null) {
-            inline = TomlTableValue.withString(inline, "module", newGroupId + ":" + newArtifactId);
-            if (newVersion == null) {
-                return kv.withValue(inline);
-            }
-            if (inline.find("version") != null) {
-                return kv.withValue(TomlTableValue.withString(inline, "version", newVersion));
-            }
-            if (!overrideManagedVersion || inline.find("version.ref") != null) {
-                return kv.withValue(inline);
-            }
-            return kv.withValue(TomlTableValue.withStringOrAdd(inline, "version", newVersion));
+        return coordinateModule == null ?
+                updateGroupNameTable(kv, inline, newGroupId, newArtifactId, newVersion) :
+                updateModuleTable(kv, inline, newGroupId, newArtifactId, newVersion);
+    }
+
+    private Toml.KeyValue updateLiteralValue(
+            Toml.Literal literal, String newGroupId, String newArtifactId, @Nullable String newVersion) {
+        if (!(literal.getValue() instanceof String)) {
+            return getTree();
         }
+        Dependency dependency = DependencyNotation.parse((String) literal.getValue());
+        if (dependency == null) {
+            return getTree();
+        }
+        String dependencyVersion = newVersion == null ? dependency.getVersion() : newVersion;
+        String notation = DependencyNotation.toStringNotation(
+                dependency.withGav(new org.openrewrite.maven.tree.GroupArtifactVersion(
+                        newGroupId, newArtifactId, dependencyVersion)));
+        return getTree().withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
+    }
+
+    private Toml.KeyValue updateModuleTable(
+            Toml.KeyValue kv, Toml.Table inline, String newGroupId, String newArtifactId, @Nullable String newVersion) {
+        if (TomlTableValue.find(inline, "module") == null) {
+            inline = removeGroupAndName(inline);
+            inline = TomlTableValue.withStringOrAdd(inline, "module", newGroupId + ":" + newArtifactId);
+        } else {
+            inline = TomlTableValue.withString(inline, "module", newGroupId + ":" + newArtifactId);
+        }
+        return updateTableVersion(kv, inline, newVersion);
+    }
+
+    private Toml.Table removeGroupAndName(Toml.Table inline) {
+        return inline.withValues(ListUtils.map(inline.getValues(), value -> {
+            if (!(value instanceof Toml.KeyValue)) {
+                return value;
+            }
+            Toml.KeyValue keyValue = (Toml.KeyValue) value;
+            return keyValue.getKey() instanceof Toml.Identifier &&
+                    ("group".equals(((Toml.Identifier) keyValue.getKey()).getName()) ||
+                            "name".equals(((Toml.Identifier) keyValue.getKey()).getName())) ? null : value;
+        }));
+    }
+
+    private Toml.KeyValue updateGroupNameTable(
+            Toml.KeyValue kv, Toml.Table inline, String newGroupId, String newArtifactId, @Nullable String newVersion) {
         inline = TomlTableValue.withString(inline, "group", newGroupId);
         inline = TomlTableValue.withString(inline, "name", newArtifactId);
+        return updateTableVersion(kv, inline, newVersion);
+    }
+
+    private Toml.KeyValue updateTableVersion(Toml.KeyValue kv, Toml.Table inline, @Nullable String newVersion) {
         if (newVersion == null) {
             return kv.withValue(inline);
         }
-        if (inline.find("version") != null) {
+        if (TomlTableValue.find(inline, "version") != null) {
             return kv.withValue(TomlTableValue.withString(inline, "version", newVersion));
         }
-        if (!overrideManagedVersion || inline.find("version.ref") != null) {
+        if (TomlTableValue.find(inline, "version.ref") != null) {
             return kv.withValue(inline);
         }
         return kv.withValue(TomlTableValue.withStringOrAdd(inline, "version", newVersion));
+    }
+
+    private boolean isUnchanged(
+            String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String coordinateModule) {
+        if (getTree().getValue() instanceof Toml.Literal) {
+            Object value = ((Toml.Literal) getTree().getValue()).getValue();
+            if (!(value instanceof String)) {
+                return true;
+            }
+            Dependency dependency = DependencyNotation.parse((String) value);
+            return dependency != null &&
+                    newGroupId.equals(dependency.getGroupId()) &&
+                    newArtifactId.equals(dependency.getArtifactId()) &&
+                    (newVersion == null || newVersion.equals(dependency.getVersion()));
+        }
+        if (!(getTree().getValue() instanceof Toml.Table)) {
+            return true;
+        }
+        Toml.Table table = (Toml.Table) getTree().getValue();
+        if (coordinateModule != null) {
+            return coordinateModule.equals(TomlTableValue.getString(table, "module")) &&
+                    (newVersion == null || newVersion.equals(TomlTableValue.getString(table, "version")));
+        }
+        return newGroupId.equals(TomlTableValue.getString(table, "group")) &&
+                newArtifactId.equals(TomlTableValue.getString(table, "name")) &&
+                (newVersion == null || newVersion.equals(TomlTableValue.getString(table, "version")));
     }
 
     /**
@@ -264,13 +329,14 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                 if (dep == null || !matchesPatterns(dep.getGroupId(), dep.getArtifactId(), groupPattern, artifactPattern)) {
                     return null;
                 }
-                return new GradleVersionCatalogDependency(cursor, dep.getGroupId(), dep.getArtifactId(), dep.getVersion(), null);
+                return new GradleVersionCatalogDependency(cursor, dep.getGroupId(), dep.getArtifactId(), null,
+                        dep.getVersion(), null);
             }
             if (kv.getValue() instanceof Toml.Table) {
                 Toml.Table inline = (Toml.Table) kv.getValue();
-                String groupId = inline.getString("group");
-                String artifactId = inline.getString("name");
-                String module = inline.getString("module");
+                String groupId = TomlTableValue.getString(inline, "group");
+                String artifactId = TomlTableValue.getString(inline, "name");
+                String module = TomlTableValue.getString(inline, "module");
                 if (module != null && (groupId != null || artifactId != null)) {
                     return null;
                 }
@@ -278,9 +344,9 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                     if (!matchesPatterns(groupId, artifactId, groupPattern, artifactPattern)) {
                         return null;
                     }
-                    return new GradleVersionCatalogDependency(cursor, groupId, artifactId,
-                            inline.getString("version"),
-                            inline.getString("version.ref"));
+                    return new GradleVersionCatalogDependency(cursor, groupId, artifactId, null,
+                            TomlTableValue.getString(inline, "version"),
+                            TomlTableValue.getString(inline, "version.ref"));
                 }
                 if (module == null || module.indexOf(':') < 0 || module.indexOf(':') != module.lastIndexOf(':')) {
                     return null;
@@ -292,9 +358,9 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                         !matchesPatterns(depGroupId, depArtifactId, groupPattern, artifactPattern)) {
                     return null;
                 }
-                return new GradleVersionCatalogDependency(cursor, depGroupId, depArtifactId,
-                        inline.getString("version"),
-                        inline.getString("version.ref"));
+                return new GradleVersionCatalogDependency(cursor, depGroupId, depArtifactId, module,
+                        TomlTableValue.getString(inline, "version"),
+                        TomlTableValue.getString(inline, "version.ref"));
             }
             return null;
         }

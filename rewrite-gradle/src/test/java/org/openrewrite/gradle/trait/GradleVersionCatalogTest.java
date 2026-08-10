@@ -221,7 +221,7 @@ class GradleVersionCatalogTest implements RewriteTest {
                     public Toml.@NonNull KeyValue updateDependency(
                             @NonNull GradleVersionCatalogDependency dependency,
                             String referencedVersion, @NonNull ExecutionContext ctx) {
-                        return dependency.withVersion("2.0");
+                        return dependency.withVersion("2.0").getTree();
                     }
                 });
               return new org.openrewrite.toml.TomlIsoVisitor<ExecutionContext>() {

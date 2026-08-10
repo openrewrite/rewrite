@@ -236,7 +236,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -258,7 +258,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -280,7 +280,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -302,7 +302,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -324,7 +324,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -346,7 +346,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -364,7 +364,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -386,7 +386,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
-              .asVisitor(dep -> dep.withVersion("30.1-jre")))),
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
           toml(
             """
               [libraries]
@@ -404,7 +404,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
+              .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").getTree()))),
           toml(
             """
               [libraries]
@@ -426,7 +426,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
+              .asVisitor(dep -> dep.withModule("org.new:new-artifact").getTree()))),
           toml(
             """
               [libraries]
@@ -448,7 +448,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+              .asVisitor(dep -> dep.withModule("org.new:new-artifact").withVersion("2.0").getTree()))),
           toml(
             """
               [libraries]
@@ -470,7 +470,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+              .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").withVersion("2.0").getTree()))),
           toml(
             """
               [libraries]
@@ -492,7 +492,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", false)))),
+              .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").getTree()))),
           toml(
             """
               [libraries]
@@ -514,7 +514,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+              .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").withVersion("2.0").getTree()))),
           toml(
             """
               [libraries]
@@ -530,17 +530,21 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     }
 
     @Test
-    void withCoordinatesAndVersionLeavesRichVersionUnchangedWhenVersionRequested() {
+    void withModulePreservesRichVersionWhenAddingCoordinates() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", "2.0", true)))),
+              .asVisitor(dep -> dep.withModule("org.new:new-artifact").withVersion("2.0").getTree()))),
           toml(
             """
               [libraries]
               my-lib = { module = "org.old:old-artifact", version = { strictly = "1.0" } }
+              """,
+            """
+              [libraries]
+              my-lib = { module = "org.new:new-artifact", version = { strictly = "1.0" } }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
           )
@@ -548,13 +552,13 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     }
 
     @Test
-    void withCoordinatesAndVersionUpdatesCoordinatesWhilePreservingRichVersion() {
+    void withModuleUpdatesCoordinatesWhilePreservingRichVersion() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new GradleVersionCatalogDependency.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
-              .asVisitor(dep -> dep.withCoordinatesAndVersion("org.new", "new-artifact", null, false)))),
+              .asVisitor(dep -> dep.withModule("org.new:new-artifact").getTree()))),
           toml(
             """
               [libraries]
