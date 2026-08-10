@@ -14,9 +14,10 @@
 """TyTypesClient protocol tests against a fake `ty-types --serve`.
 
 The fake server answers per the requested file's name: "slow-<seconds>" delays
-the response and "big" pads it to ~64KB. Every request also writes to stderr,
-so an undrained stderr pipe would wedge it just like the real binary can.
+the response, "big" pads it to ~64KB, "junk" precedes it with a non-object JSON
+line, and "die" makes the server write to stderr and exit non-zero.
 """
+import logging
 import os
 import stat
 import textwrap
@@ -35,16 +36,22 @@ FAKE_SERVER = textwrap.dedent('''\
     for line in sys.stdin:
         req = json.loads(line)
         params = req.get("params") or {}
-        print("handled " + req["method"] + " " * 512, file=sys.stderr, flush=True)
         if req["method"] == "shutdown":
             break
         if req["method"] == "initialize":
             result = {"ok": True}
         else:
             name = params.get("file", "")
+            if "die" in name:
+                print("ty-types panicked", file=sys.stderr, flush=True)
+                sys.exit(3)
             slow = re.search(r"slow-(\\d+(?:\\.\\d+)?)", name)
             if slow:
                 time.sleep(float(slow.group(1)))
+            if "junk" in name:
+                sys.stdout.write("null\\n")
+                sys.stdout.write("[1, 2, 3]\\n")
+                sys.stdout.flush()
             padding = "x" * 65536 if "big" in name else ""
             result = {"types": {"1": {"kind": "class", "name": "str"}}, "pad": padding}
         sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}) + "\\n")
@@ -121,6 +128,31 @@ def test_consecutive_timeouts_shut_the_process_down(client):
         assert client.get_types(f"/some/project/slow-5-{i}.py", timeout=0.05) is None
     assert not client.is_available
     assert client.get_types("/some/project/ok.py", timeout=5) is None
+
+
+def test_junk_stdout_lines_are_skipped(client):
+    assert client.initialize("/some/project")
+    result = client.get_types("/some/project/junk.py", timeout=10)
+    assert result is not None
+    assert result["types"]["1"]["name"] == "str"
+
+
+def test_process_death_marks_the_client_unavailable(client, caplog):
+    assert client.initialize("/some/project")
+    with caplog.at_level(logging.WARNING, logger="rewrite.python.ty_client"):
+        assert client.get_types("/some/project/die.py", timeout=10) is None
+    assert not client.is_available
+    assert "ty-types panicked" in caplog.text
+
+
+def test_initialize_revives_a_killed_client(wedged_client):
+    assert wedged_client.initialize("/some/project")
+    for i in range(TyTypesClient._MAX_CONSECUTIVE_TIMEOUTS):
+        assert wedged_client.get_types(f"/some/project/f{i}.py", timeout=0.05) is None
+    assert not wedged_client.is_available
+
+    assert wedged_client.initialize("/some/project")
+    assert wedged_client.is_available
 
 
 def test_shutdown_when_its_own_request_trips_the_breaker(wedged_client):

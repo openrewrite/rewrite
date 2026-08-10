@@ -29,6 +29,7 @@ import os
 import queue
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -71,6 +72,7 @@ class TyTypesClient:
         self._initialized = False
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
+        self._stderr_path: Optional[Path] = None
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
         #
@@ -88,8 +90,7 @@ class TyTypesClient:
         # ids, lets per-file mappings fall back to the cumulative table for any
         # id missing from their own response, restoring resolution while keeping
         # ty's dedup performance benefit. It is reset whenever a new session
-        # starts (a fresh client, or ``initialize`` with a different root) so no
-        # state leaks across unrelated parses.
+        # starts, since ty's ids start over with it.
         self.session_types: Dict[int, Dict[str, Any]] = {}
 
         self._start_process()
@@ -109,28 +110,33 @@ class TyTypesClient:
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
 
+        # ty writes to stderr only as it dies, so the diagnostics are worth
+        # keeping; a file, unlike a pipe, never blocks the writer.
+        stderr_fd, stderr_path = tempfile.mkstemp(prefix='ty-types-', suffix='.log')
+        self._stderr_path = Path(stderr_path)
         try:
             self._process = subprocess.Popen(
                 [str(binary), '--serve'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=stderr_fd,
                 env=self._subprocess_env(virtual_env=self._virtual_env),
             )
         except FileNotFoundError:
             self._process = None
+            self._discard_stderr()
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+        finally:
+            os.close(stderr_fd)
 
-        # Draining both pipes keeps ty from deadlocking on a full buffer; threads
-        # because a pipe read cannot be bounded on Windows.
+        # An undrained stdout deadlocks ty once its buffer fills, and a pipe
+        # read cannot be bounded on Windows.
         self._responses: queue.Queue = queue.Queue()
         self._consecutive_timeouts = 0
         threading.Thread(target=self._drain_stdout, args=(self._process,),
                          name="ty-types-stdout", daemon=True).start()
-        threading.Thread(target=self._drain_stderr, args=(self._process,),
-                         name="ty-types-stderr", daemon=True).start()
 
     def _drain_stdout(self, process: subprocess.Popen) -> None:
         """Read response lines into the queue until EOF; EOF enqueues None."""
@@ -142,18 +148,41 @@ class TyTypesClient:
                 responses.put(None)
                 return
             try:
-                responses.put(json.loads(line.decode('utf-8')))
+                response = json.loads(line.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.debug("ty-types emitted a non-JSON line on stdout")
+                logger.warning("ty-types emitted a non-JSON line on stdout")
+                continue
+            # A bare ``null`` reads as the EOF sentinel, and no other JSON value carries an id.
+            if isinstance(response, dict):
+                responses.put(response)
+            else:
+                logger.warning("ty-types emitted a non-object JSON line on stdout")
 
-    @staticmethod
-    def _drain_stderr(process: subprocess.Popen) -> None:
-        stderr = process.stderr
-        while True:
-            line = stderr.readline()
-            if not line:
-                return
-            logger.debug("ty-types stderr: %s", line.decode('utf-8', 'replace').rstrip())
+    def _discard_stderr(self) -> None:
+        path, self._stderr_path = self._stderr_path, None
+        if path is not None:
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+    def _stderr_tail(self, limit: int = 2000) -> str:
+        if self._stderr_path is None:
+            return ""
+        try:
+            return self._stderr_path.read_text('utf-8', errors='replace')[-limit:].strip()
+        except OSError:
+            return ""
+
+    def _note_exit(self, process: subprocess.Popen) -> None:
+        """Record that ty exited, surfacing its stderr when the exit was abnormal."""
+        self._initialized = False
+        try:
+            returncode = process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            return
+        if returncode:
+            logger.warning("ty-types exited with code %s: %s", returncode, self._stderr_tail())
 
     @staticmethod
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
@@ -269,7 +298,10 @@ class TyTypesClient:
                 return None
 
             if response is None:
-                # EOF sentinel: the process exited.
+                # EOF sentinel: ty closed stdout, so the session is over.
+                process = self._process
+                if process is not None:
+                    self._note_exit(process)
                 return None
             # A response to an abandoned earlier request; drop it and keep waiting.
             if response.get('id') != self._request_id:
@@ -291,8 +323,7 @@ class TyTypesClient:
 
         if self._initialized:
             self.shutdown()
-            # A different project root means a brand-new ty session whose type
-            # ids start over; drop the accumulated table so ids don't collide.
+        if self._process is None:
             self.session_types.clear()
             self._start_process()
 
@@ -356,6 +387,7 @@ class TyTypesClient:
             self._process = None
             self._initialized = False
             self._project_root = None
+            self._discard_stderr()
 
     def _kill(self) -> None:
         """Forcibly terminate an unresponsive ty-types process."""
@@ -363,6 +395,7 @@ class TyTypesClient:
         self._process = None
         self._initialized = False
         self._project_root = None
+        self._discard_stderr()
         if process is not None:
             try:
                 process.kill()
