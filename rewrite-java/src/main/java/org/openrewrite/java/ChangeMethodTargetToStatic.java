@@ -119,6 +119,85 @@ public class ChangeMethodTargetToStatic extends Recipe {
         }
 
         /**
+         * Java evaluates the expression qualifying a static method invocation and then discards its value,
+         * without a null check. This only drops an expression whose evaluation cannot be observed: a type name,
+         * {@code this} (possibly qualified), or a simple non-volatile variable read (class initialization
+         * aside). As a deliberate exception that preserves the {@code new A().staticMethod()} shape this recipe
+         * exists to rewrite, an instantiation whose arguments are themselves discardable is also dropped, even
+         * though a constructor can run arbitrary code and throw. A method invocation, a dereference, an array
+         * access, a cast or any other expression may mutate state or throw, so the invocation is left alone
+         * instead.
+         */
+        private boolean isSafeToDiscard(@Nullable Expression expression) {
+            Expression expr = Expression.unwrap(expression);
+            if (expr == null || expr instanceof J.Empty || expr instanceof J.Literal) {
+                return true;
+            }
+            if (expr instanceof J.Identifier) {
+                JavaType.Variable fieldType = ((J.Identifier) expr).getFieldType();
+                return fieldType == null || !fieldType.hasFlags(Flag.Volatile);
+            }
+            if (expr instanceof J.FieldAccess) {
+                return isTypeReference(expr);
+            }
+            if (expr instanceof J.NewClass) {
+                // Instantiating a type only to call a static method on it is the case this recipe was written
+                // for, so the instantiation itself is still discarded even though a constructor can throw.
+                // Its arguments are not covered by that, so they have to be discardable in their own right.
+                J.NewClass newClass = (J.NewClass) expr;
+                if (newClass.getBody() != null || newClass.getEnclosing() != null) {
+                    return false;
+                }
+                for (Expression argument : newClass.getArguments()) {
+                    if (!isSafeToDiscard(argument)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * A qualifier that is itself an invocation this recipe rewrites needs no preservation: the recipe's
+         * long-standing treatment of such chains is to collapse them, so that with a fluent
+         * {@code a.Legacy value()} pattern {@code legacy.value().value()} becomes {@code Modern.value()}.
+         * Blocking that collapse would leave the rewritten qualifier behind as the receiver of the outer
+         * call, producing {@code Modern.value().value()}, which no longer resolves once the migrated method
+         * is static on the target type. The qualifier's own receiver is checked recursively, so a chain
+         * rooted in an expression that cannot be discarded is left entirely unchanged instead.
+         */
+        private boolean collapsesOntoTargetType(@Nullable Expression expression) {
+            Expression expr = Expression.unwrap(expression);
+            if (!(expr instanceof J.MethodInvocation)) {
+                return false;
+            }
+            J.MethodInvocation qualifier = (J.MethodInvocation) expr;
+            return !isAlreadyStaticCallOnTargetType(qualifier.getSelect(), qualifier) &&
+                   methodMatcher.matches(qualifier, matchUnknownTypes) &&
+                   (isSafeToDiscard(qualifier.getSelect()) || collapsesOntoTargetType(qualifier.getSelect()));
+        }
+
+        /**
+         * Check if the expression only names a type or is {@code this} (possibly qualified, as in
+         * {@code Outer.this}), so that evaluating it always succeeds without any observable effect. Unlike an
+         * invocation, a member reference evaluates and null checks its qualifier when the reference is created,
+         * so it only replaces a qualifier of that shape with the target type.
+         */
+        private boolean isTypeReference(@Nullable Expression expression) {
+            if (expression instanceof J.Identifier) {
+                J.Identifier identifier = (J.Identifier) expression;
+                return identifier.getFieldType() == null || "this".equals(identifier.getSimpleName());
+            }
+            if (expression instanceof J.FieldAccess) {
+                J.Identifier name = ((J.FieldAccess) expression).getName();
+                return (name.getFieldType() == null || "this".equals(name.getSimpleName())) &&
+                       name.getType() instanceof JavaType.FullyQualified;
+            }
+            return false;
+        }
+
+        /**
          * Transform the method type to reflect the new declaring type and static flag.
          */
         private JavaType.Method transformMethodType(JavaType.Method methodType) {
@@ -140,7 +219,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             Expression select = method.getSelect();
             if (!isAlreadyStaticCallOnTargetType(select, method) &&
-                methodMatcher.matches(method, matchUnknownTypes)) {
+                methodMatcher.matches(method, matchUnknownTypes) &&
+                (isSafeToDiscard(select) || collapsesOntoTargetType(select))) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
@@ -174,7 +254,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
             J.MemberReference m = (J.MemberReference) super.visitMemberReference(memberRef, ctx);
             Expression containing = memberRef.getContaining();
             if (!isAlreadyStaticCallOnTargetType(containing, memberRef) &&
-                methodMatcher.matches(memberRef)) {
+                methodMatcher.matches(memberRef) &&
+                (isTypeReference(containing) || collapsesOntoTargetType(containing))) {
                 JavaType.Method transformedType = null;
                 if (memberRef.getMethodType() != null) {
                     maybeRemoveImport(memberRef.getMethodType().getDeclaringType());
