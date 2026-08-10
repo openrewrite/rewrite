@@ -56,17 +56,6 @@ namespace OpenRewrite.CSharp.NuGet;
 /// </summary>
 public static class NuGetResolver
 {
-    /// <summary>
-    /// Replacement NuGet feeds for defunct dotnet.myget.org sources.
-    /// MyGet was shut down; packages migrated to Azure DevOps Artifacts (dnceng).
-    /// </summary>
-    private static readonly string[] AdditionalNuGetSources =
-    {
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/myget-legacy/nuget/v3/index.json"
-    };
-
     static NuGetResolver()
     {
         // Fail fast on dead feeds (previously passed as env vars to the dotnet child process).
@@ -225,7 +214,6 @@ public static class NuGetResolver
                 // NuGet.targets' internal default already discovers the closure per entry.
                 ["NuGetAudit"] = "false",
                 ["RestoreIgnoreFailedSources"] = "true",
-                ["RestoreAdditionalProjectSources"] = string.Join("%3B", AdditionalNuGetSources),
                 // Avoid restore-time package imports polluting evaluation
                 ["ExcludeRestorePackageImports"] = "true",
             };
@@ -556,9 +544,6 @@ public static class NuGetResolver
             .Where(s => s.IsEnabled)
             .Select(s => Repository.Factory.GetCoreV3(s))
             .ToList();
-        // Replacement feeds for defunct sources, tried after the configured ones.
-        foreach (var url in AdditionalNuGetSources)
-            repositories.Add(Repository.Factory.GetCoreV3(url));
 
         foreach (var identity in identities)
         {
