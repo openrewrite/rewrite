@@ -258,8 +258,6 @@ internal sealed class AssemblyTypeMapping
 
     private JavaType.Method MapMethod(IMethodSymbol symbol, JavaType.Class owner)
     {
-        // Shell-cache before mapping annotations: an attribute applied to an attribute class'
-        // own constructor leads straight back here.
         if (_cache.TryGetValue(symbol, out var cached) && cached is JavaType.Method cachedMethod)
         {
             return cachedMethod;
@@ -278,7 +276,7 @@ internal sealed class AssemblyTypeMapping
             symbol.Parameters.Length > 0 ? symbol.Parameters.Select(p => p.Name).ToList() : null,
             symbol.Parameters.Length > 0 ? symbol.Parameters.Select(p => Map(p.Type)).ToList()! : null,
             null,
-            null, // annotations, set below once this method's shell is cached
+            null,
             null,
             symbol.TypeParameters.Length > 0 ? symbol.TypeParameters.Select(tp => tp.Name).ToList() : null);
         method.Annotations = ListAnnotations(symbol);

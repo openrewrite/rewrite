@@ -160,10 +160,6 @@ internal class CSharpTypeMapping
             ILocalSymbol l => MapVariable(l, l.Name, null, MapType(l.Type)),
             IParameterSymbol p => MapVariable(p, p.Name, null, MapType(p.Type)),
             IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
-            // An event is a member reference like a field or property. Java has no IEventSymbol
-            // counterpart, but JavaType.Variable carries everything a reference to one needs —
-            // name, declaring type, delegate type — and PopulateMembers already lists events that
-            // way, so attributing references the same way keeps the two consistent.
             IEventSymbol evt => MapVariable(evt, evt.Name, MapType(evt.ContainingType), MapType(evt.Type)),
             _ => null
         };
@@ -246,10 +242,6 @@ internal class CSharpTypeMapping
         cls.UnsafeSet(flags, kind, fqn, typeParameters, supertype, owningClass,
             null, interfaces, null, null);
 
-        // Members/methods are populated only once the shell above is in the cache, so a member
-        // whose signature refers back to the declaring type resolves to that shell instead of
-        // recursing forever. Population itself is queued rather than nested (see DrainMemberQueue)
-        // so that the transitive member -> signature type -> its members walk stays iterative.
         _memberQueue.Enqueue((symbol, cls));
         DrainMemberQueue();
 
@@ -292,9 +284,6 @@ internal class CSharpTypeMapping
     /// </summary>
     private void PopulateMembers(INamedTypeSymbol symbol, JavaType.Class cls)
     {
-        // Attributes are mapped here rather than in MapNamedType for the same reason members are:
-        // an attribute class is itself a type, so mapping one re-enters the mapper. Doing it from
-        // inside the drain loop means that re-entry only enqueues, keeping the walk iterative.
         cls.Annotations = ListAnnotations(symbol);
 
         List<JavaType.Variable>? members = null;
@@ -327,19 +316,13 @@ internal class CSharpTypeMapping
 
     private static bool IsCompilerGenerated(ISymbol member)
     {
-        // Mangled names: auto-property backing fields (`<Prop>k__BackingField`), record `<Clone>$`,
-        // iterator/async state machines, etc.
         if (member.Name.Length == 0 || member.Name[0] == '<') return true;
 
         return member switch
         {
-            // Backing field of an auto-property or field-like event.
             IFieldSymbol field => field.AssociatedSymbol != null,
-            // get_/set_/init_/add_/remove_ accessors; the property/event itself is already listed.
-            // Static constructors mirror Java's skipping of static initializer blocks.
             IMethodSymbol method => method.AssociatedSymbol != null ||
                                     method.MethodKind == MethodKind.StaticConstructor,
-            // Nested types are reachable via their own mapping, not through Members/Methods.
             INamedTypeSymbol => true,
             _ => false
         };
@@ -404,15 +387,13 @@ internal class CSharpTypeMapping
             parameterNames,
             parameterTypes,
             null, // thrownExceptions (C# doesn't have checked exceptions)
-            null, // annotations, set below once this method is cached
+            null, // annotations
             null, // defaultValue
             symbol.TypeParameters.Length > 0
                 ? symbol.TypeParameters.Select(tp => tp.Name).ToList()
                 : null
         );
 
-        // Set after the shell is cached and populated: mapping an attribute maps its type, which
-        // can lead back here (an attribute class' own constructor, say).
         method.Annotations = ListAnnotations(symbol);
 
         return method;
@@ -428,8 +409,6 @@ internal class CSharpTypeMapping
             FlagsBitMap = MapFlags(symbol)
         };
         _typeCache[symbol] = variable;
-        // Set after caching, so that an attribute whose mapping leads back to this same symbol
-        // resolves to the shell rather than recursing.
         variable.Annotations = ListAnnotations(symbol);
         return variable;
     }

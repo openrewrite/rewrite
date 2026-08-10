@@ -2155,7 +2155,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
-        // Parse attribute lists
         var attributeLists = new List<AttributeList>();
         foreach (var attrList in node.AttributeLists)
         {
@@ -2246,9 +2245,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             initializer
         );
 
-        // C# attributes are modelled as an AnnotatedStatement wrapper, matching fields, methods
-        // and type declarations. The wrapper owns the declaration's leading whitespace; the space
-        // between the attribute list and the declaration is already held by the first modifier.
         if (attributeLists.Count > 0)
         {
             return new AnnotatedStatement(
@@ -8554,10 +8550,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 );
             }
 
-            // Attribute the outermost ArrayType with the whole array type, so `typeof(int[])` and
-            // an array-typed declaration carry a resolvable type like every other TypeTree does.
-            // Inner levels of a jagged/multi-rank type stay unattributed: the syntax nests the
-            // ranks in the opposite order from the symbol, so there is no per-level type to hand out.
             if (result is ArrayType outermost)
             {
                 result = outermost.WithType(_typeMapping?.Type(arrayType));
@@ -8782,10 +8774,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null
         );
 
-        // Attribute the qualified name itself, so a type written in fully qualified form
-        // (`System.Windows.DependencyProperty x = ...`) carries the same type as the simple
-        // form. Resolves to null for the namespace segments of a qualified name, which is
-        // correct — only the full name denotes a type.
         return new FieldAccess(
             Guid.NewGuid(),
             prefix,

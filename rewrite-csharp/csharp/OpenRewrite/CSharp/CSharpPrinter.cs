@@ -1320,9 +1320,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             p.Append(GetClassKindString(classDecl.ClassKind.Type));
         }
 
-        // Print name. Visit the Identifier rather than appending its SimpleName: VisitIdentifier
-        // emits the prefix and the node's markers, so hand-rolling the two would discard any marker
-        // a search recipe attached to the class name.
+        // Print name
         Visit(classDecl.Name, p);
 
         // Print type parameters (generics) — only print <attrs variance name, ...>

@@ -191,18 +191,11 @@ internal static class AttributeMapping
         switch (constant.Kind)
         {
             case TypedConstantKind.Type:
-                // typeof(X). A null argument (`typeof` cannot be null, but a `Type`-typed element
-                // left at its default can) carries no type to reference.
                 return constant.Value is ITypeSymbol typeValue
                     ? (null, mapType(typeValue))
                     : (null, null);
 
             case TypedConstantKind.Enum:
-                // Java maps an enum-valued element to the enum constant's VarSymbol, i.e. a
-                // JavaType.Variable. Roslyn only carries the underlying numeric value, so the
-                // member has to be recovered from it. A combination of [Flags] members matches no
-                // single member; rather than invent one, the underlying value is kept as the
-                // constant so nothing is silently mis-named.
                 return MapEnumConstant(constant, mapType, mapMember) is { } member
                     ? (null, member)
                     : (constant.Value, null);
@@ -211,11 +204,9 @@ internal static class AttributeMapping
                 return (constant.Value, null);
 
             case TypedConstantKind.Array:
-                // A nested array (jagged attribute arguments are not expressible in C#).
                 return (null, JavaType.Unknown.Instance);
 
             default:
-                // TypedConstantKind.Error - the argument did not compile.
                 return (null, JavaType.Unknown.Instance);
         }
     }

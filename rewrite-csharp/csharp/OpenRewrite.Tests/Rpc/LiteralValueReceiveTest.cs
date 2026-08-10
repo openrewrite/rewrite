@@ -44,8 +44,6 @@ public class LiteralValueReceiveTest
         sendQueue.Send(after, before, () => new JavaSender().Visit(after, sendQueue));
         sendQueue.Flush();
 
-        // Through the JSON wire format, so the value arrives the way a remote peer's message
-        // actually deserializes — as a JsonElement, not a live CLR string.
         var wireData = JsonSerializer.Deserialize<List<RpcObjectData>>(
             JsonSerializer.Serialize(data, RpcJson.Options), RpcJson.Options)!;
         var receiveQueue = new RpcReceiveQueue(wireData, new Dictionary<int, object>(), null);

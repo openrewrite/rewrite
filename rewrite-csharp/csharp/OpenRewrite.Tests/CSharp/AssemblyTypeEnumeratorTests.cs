@@ -104,9 +104,6 @@ public class AssemblyTypeEnumeratorTests
                 FullyQualifiedName: "System.AttributeUsageAttribute"
             });
 
-        // [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
-        // The positional argument resolves to the ValidOn property it feeds; the flags combination
-        // matches no single enum member, so the underlying value is kept rather than mis-named.
         var validOn = Assert.Single(usage.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
             v => v.Element is JavaType.Variable { Name: "ValidOn" });
         Assert.NotNull(validOn.ConstantValue);

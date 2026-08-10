@@ -482,7 +482,6 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.NotNull(holderType.Members);
         Assert.NotNull(holderType.Methods);
 
-        // Fields, properties and events are all reachable by name.
         var count = Assert.Single(holderType.Members!, v => v.Name == "_count");
         Assert.Equal(JavaType.Primitive.Of(JavaType.PrimitiveKind.Int), count.Type);
         Assert.Same(holderType, count.Owner);
@@ -491,8 +490,6 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Equal("System.String", Assert.IsType<JavaType.Class>(name.Type).FullyQualifiedName);
         Assert.Contains(holderType.Members!, v => v.Name == "Changed");
 
-        // The auto-property backing field and the get_/set_/add_/remove_ accessors are
-        // compiler-generated and must not leak into the model.
         Assert.DoesNotContain(holderType.Members!, v => v.Name.StartsWith('<'));
         Assert.DoesNotContain(holderType.Methods!, m => m.Name is "get_Name" or "set_Name"
             or "add_Changed" or "remove_Changed");
@@ -506,11 +503,8 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Equal(["to"], reset.ParameterNames);
         Assert.Same(holderType, reset.DeclaringType);
 
-        // The implicit parameterless constructor is a real member of the type.
         Assert.Contains(holderType.Methods!, m => m.Name == ".ctor");
 
-        // Only declared members: `ToString` is inherited from System.Object and is reachable
-        // through the supertype chain, not through Holder's own member list.
         Assert.DoesNotContain(holderType.Methods!, m => m.Name == "ToString");
         var objectType = Assert.IsType<JavaType.Class>(holderType.Supertype);
         Assert.Equal("System.Object", objectType.FullyQualifiedName);
@@ -520,9 +514,6 @@ public class CSharpTypeMappingTests : RewriteTest
     [Fact]
     public void MetadataClass_DeclaredMembersAndMethodsArePopulated()
     {
-        // WPF types come from a reference assembly with no source, so they exercise the
-        // metadata path of the member mapping. Several WPF recipes need to answer
-        // "does ItemsControl declare a member named ItemsSource, and of what type?".
         var cu = ParseWithSemanticModel("""
             using System.Windows.Controls;
             class Test
@@ -538,12 +529,10 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.NotNull(itemsControl.Members);
         Assert.NotNull(itemsControl.Methods);
 
-        // Instance property declared on ItemsControl.
         var itemsSource = Assert.Single(itemsControl.Members!, v => v.Name == "ItemsSource");
         Assert.Equal("System.Collections.IEnumerable",
             Assert.IsType<JavaType.Class>(itemsSource.Type).FullyQualifiedName);
 
-        // Static dependency-property field declared on ItemsControl.
         var itemsSourceProperty = Assert.Single(itemsControl.Members!,
             v => v.Name == "ItemsSourceProperty");
         Assert.Equal("System.Windows.DependencyProperty",
@@ -551,7 +540,6 @@ public class CSharpTypeMappingTests : RewriteTest
 
         Assert.Contains(itemsControl.Methods!, m => m.Name == "GetItemsOwner");
 
-        // Members declared by a base class are found on that base class, not on ItemsControl.
         Assert.DoesNotContain(itemsControl.Members!, v => v.Name == "Visibility");
         var uiElement = Walk(itemsControl, "System.Windows.UIElement");
         Assert.Contains(uiElement.Members!, v => v.Name == "Visibility");
@@ -598,7 +586,6 @@ public class CSharpTypeMappingTests : RewriteTest
             v => v.Element is JavaType.Variable { Name: "Name" });
         Assert.Equal("first", name.ConstantValue);
         Assert.Null(name.ReferenceValue);
-        // The element resolves to the property on the attribute class, typed as the property is.
         Assert.Equal("MarkerAttribute",
             Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Variable>(name.Element).Owner)
                 .FullyQualifiedName);
@@ -636,19 +623,12 @@ public class CSharpTypeMappingTests : RewriteTest
         var obsolete = Assert.Single(old.Annotations!.OfType<JavaType.Annotation>(),
             a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
 
-        // ObsoleteAttribute(string message, bool error). Positional arguments stay in declaration
-        // order.
         var values = obsolete.Values!.Cast<JavaType.Annotation.SingleElementValue>().ToList();
         Assert.Equal(2, values.Count);
 
-        // `message` names the Message property, so the value is attributed to it.
         Assert.Equal("Message", Assert.IsType<JavaType.Variable>(values[0].Element).Name);
         Assert.Equal("use something else", values[0].ConstantValue);
 
-        // `error` names no property — the property is called IsError — so rather than guessing a
-        // member it does not name, the value's element is the constructor that received it.
-        // Java's ElementValue.getElement() contract is non-null, so a null element would not
-        // survive the RPC round trip.
         var ctor = Assert.IsType<JavaType.Method>(values[1].Element);
         Assert.Equal(".ctor", ctor.Name);
         Assert.Equal("System.ObsoleteAttribute",
@@ -801,8 +781,6 @@ public class CSharpTypeMappingTests : RewriteTest
             }
             """);
 
-        // The declaration and both references — one unqualified from a derived type, one through
-        // `this` — all name the declaring type.
         var occurrences = new IdentifierFinder("Changed").Collect(cu);
         Assert.Equal(3, occurrences.Count);
 

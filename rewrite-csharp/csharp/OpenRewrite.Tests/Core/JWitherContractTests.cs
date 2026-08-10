@@ -44,8 +44,26 @@ public class JWitherContractTests
         return data;
     }
 
+    /// <summary>
+    /// Every concrete <c>Tree</c> in the assembly — not just the J family — because
+    /// <c>SearchResult.Found</c> accepts any <c>Tree</c> (e.g. <c>ParseError</c> in parse-failure
+    /// flows, the Xml family) and throws where the wither is missing.
+    /// </summary>
+    public static TheoryData<Type> TreeNodeTypes()
+    {
+        var data = new TheoryData<Type>();
+        foreach (var type in typeof(global::OpenRewrite.Core.Tree).Assembly.GetTypes())
+        {
+            if (type is { IsClass: true, IsAbstract: false } && typeof(global::OpenRewrite.Core.Tree).IsAssignableFrom(type))
+            {
+                data.Add(type);
+            }
+        }
+        return data;
+    }
+
     [Theory]
-    [MemberData(nameof(NodeTypes))]
+    [MemberData(nameof(TreeNodeTypes))]
     public void ExposesWithMarkers(Type nodeType) =>
         Assert.True(nodeType.GetMethod("WithMarkers", [typeof(Markers)]) != null,
             $"{nodeType.FullName} has no WithMarkers(Markers); markers attached to it would be silently dropped.");

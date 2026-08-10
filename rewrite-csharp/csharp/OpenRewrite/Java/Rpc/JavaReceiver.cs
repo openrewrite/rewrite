@@ -422,10 +422,6 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitLiteral(Literal literal, RpcReceiveQueue q)
     {
-        // Literal.Value is declared object, so the receive queue has no target type and hands
-        // back the raw JsonElement the formatter produced — materialize the scalar (see
-        // MaterializeScalar) or every recipe pattern like `Literal { Value: string s }` silently
-        // stops matching once the tree has crossed the RPC boundary.
         var value = MaterializeScalar(q.Receive(literal.Value));
         var valueSource = q.Receive(literal.ValueSource);
         var unicodeEscapes = q.ReceiveList(literal.UnicodeEscapes, ue => new Literal.UnicodeEscape(

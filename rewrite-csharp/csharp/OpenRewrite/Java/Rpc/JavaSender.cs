@@ -695,12 +695,6 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             case JavaType.Annotation annotation:
                 q.GetAndSend(annotation, a => AsRef(a.AnnotationType),
                     t => VisitType(GetValueNonNull<JavaType>(t), q));
-                // The identity key folds the value in alongside the element: two values of the
-                // same annotation can share an element signature (e.g. two positional arguments
-                // that both fell back to the constructor as their element), and colliding keys
-                // would pair an after-value with the wrong before-value in the list diff. Keys
-                // are sender-local, so this needs no Java-side counterpart and does not change
-                // the wire format.
                 q.GetAndSendListAsRef(
                     annotation,
                     a => a.Values,

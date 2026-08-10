@@ -108,13 +108,9 @@ public class JavaTypeAnnotationRpcTest
         var q = new RpcSendQueue(1024, batch => data.AddRange(batch),
             new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
 
-        // Sent unwrapped, so the walk carries `before` down into the annotation list rather than
-        // re-adding the whole graph the way a Reference-wrapped slot does.
         q.Send(after, before, () => new JavaSender().VisitType(after, q));
         q.Flush();
 
-        // A two-element list whose items both match the before list must produce [0, 1];
-        // [1, 1] means both after-items resolved to the same before-item.
         var positionLists = data
             .Select(d => d.Value)
             .OfType<List<int>>()
@@ -138,8 +134,6 @@ public class JavaTypeAnnotationRpcTest
 
     private static JavaType.Class RoundTrip(JavaType.Class after, JavaType.Class? before = null)
     {
-        // Through the JSON wire format, so that enums, numbers and strings arrive the way the
-        // remote peer would actually see them rather than as live CLR objects.
         var data = JsonSerializer.Deserialize<List<RpcObjectData>>(
             JsonSerializer.Serialize(Send(after, before), RpcJson.Options), RpcJson.Options)!;
         var receiveQueue = new RpcReceiveQueue(data, new Dictionary<int, object>(), null);
@@ -206,8 +200,6 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
 
         var both = FindClassDeclaration((J)returned, "Both");
 
-        // C# -> Java: the description was rendered on the Java side from the annotations Java
-        // received. Both [Part]s, their elements and their values must have arrived intact.
         var marker = both.Markers.FindFirst<SearchResult>();
         Assert.NotNull(marker);
         Assert.Equal(
@@ -215,8 +207,6 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
             "@PartAttribute(Name=PART_B,Type=System.Uri)",
             marker!.Description);
 
-        // Java -> C#: the probe rebuilt the annotations as fresh instances with transformed
-        // string constants, so what this side reads now necessarily crossed the wire back.
         var cls = Assert.IsAssignableFrom<JavaType.Class>(both.Type);
         var parts = cls.Annotations!.OfType<JavaType.Annotation>()
             .Where(a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "PartAttribute" })

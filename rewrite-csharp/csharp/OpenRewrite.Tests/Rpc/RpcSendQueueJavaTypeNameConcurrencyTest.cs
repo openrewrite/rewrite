@@ -62,7 +62,6 @@ public class RpcSendQueueJavaTypeNameConcurrencyTest
         var types = DistinctTypes(400);
         var registered = new ConcurrentBag<Type>();
 
-        // The registrations resize the map repeatedly while the lookups walk it.
         Parallel.For(0, types.Count, new ParallelOptions { MaxDegreeOfParallelism = 8 }, i =>
         {
             RpcSendQueue.RegisterJavaTypeName(types[i], "org.openrewrite.test.Box" + i);

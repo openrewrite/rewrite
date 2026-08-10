@@ -83,10 +83,6 @@ public abstract class RewriteTest
             csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
         }
 
-        // Compile every C# source into ONE compilation, so a type declared in one file is
-        // attributed in another. This mirrors how a real run parses a whole project, and is what
-        // makes multi-file ScanningRecipe tests meaningful — with one compilation per file a
-        // cross-file reference resolves to nothing and the recipe silently sees no type.
         var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
         CSharpCompilation? sharedCompilation = null;
         if (metadataReferences != null)
