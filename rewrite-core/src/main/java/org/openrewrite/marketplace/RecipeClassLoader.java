@@ -100,6 +100,9 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.JavaParser",
             "org.openrewrite.java.Java17Parser",
             "org.openrewrite.java.MethodMatcher",
+            // Named in the shared AnnotationService#matches descriptor, so both loaders must
+            // resolve it to one class.
+            "org.openrewrite.java.AnnotationMatcher",
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.TypeNameMatcher",
