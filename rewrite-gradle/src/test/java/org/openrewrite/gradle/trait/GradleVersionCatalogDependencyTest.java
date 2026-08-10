@@ -442,6 +442,76 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     }
 
     @Test
+    void withGroupRefreshesModuleCoordinate() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> dep.withGroup("org.new").getTree()))),
+          toml(
+            """
+              [libraries]
+              my-lib = { module = "org.old:old-artifact" }
+              """,
+            """
+              [libraries]
+              my-lib = { module = "org.new:old-artifact" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withGroupThenWithModuleUsesUpdatedSemanticCoordinate() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> {
+                  GradleVersionCatalogDependency updated = dep.withGroup("org.new")
+                    .withModule("org.old:old-artifact");
+                  return SearchResult.found(updated.getTree(), updated.getGroupId() + ":" + updated.getArtifactId());
+              }))),
+          toml(
+            """
+              [libraries]
+              my-lib = { module = "org.old:old-artifact" }
+              """,
+            """
+              [libraries]
+              ~~(org.old:old-artifact)~~>my-lib = { module = "org.old:old-artifact" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withNameRefreshesModuleCoordinate() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new GradleVersionCatalogDependency.Matcher()
+              .groupPattern("org.old")
+              .artifactPattern("old-artifact")
+              .asVisitor(dep -> dep.withName("new-artifact").getTree()))),
+          toml(
+            """
+              [libraries]
+              my-lib = { module = "org.old:old-artifact" }
+              """,
+            """
+              [libraries]
+              my-lib = { module = "org.old:new-artifact" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void withInlineCoordinatesAddsVersionToModule() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->

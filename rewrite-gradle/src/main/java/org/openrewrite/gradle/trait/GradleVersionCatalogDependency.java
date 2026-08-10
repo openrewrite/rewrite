@@ -69,7 +69,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             return this;
         }
         return withUpdatedValue(updateValue(newGroupId, artifactId, version, module),
-                newGroupId, artifactId, module, version, versionRef);
+                newGroupId, artifactId, module == null ? null : newGroupId + ":" + artifactId, version, versionRef);
     }
 
     public GradleVersionCatalogDependency withName(String newArtifactId) {
@@ -77,7 +77,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             return this;
         }
         return withUpdatedValue(updateValue(groupId, newArtifactId, version, module),
-                groupId, newArtifactId, module, version, versionRef);
+                groupId, newArtifactId, module == null ? null : groupId + ":" + newArtifactId, version, versionRef);
     }
 
     public GradleVersionCatalogDependency withModule(String newModule) {
@@ -230,7 +230,11 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
         }
         Toml.Table table = (Toml.Table) getTree().getValue();
         if (coordinateModule != null) {
-            return coordinateModule.equals(TomlTableValue.getString(table, "module")) &&
+            String currentModule = TomlTableValue.getString(table, "module");
+            Dependency dependency = currentModule == null ? null : DependencyNotation.parse(currentModule);
+            return dependency != null &&
+                    newGroupId.equals(dependency.getGroupId()) &&
+                    newArtifactId.equals(dependency.getArtifactId()) &&
                     (newVersion == null || newVersion.equals(TomlTableValue.getString(table, "version")));
         }
         return newGroupId.equals(TomlTableValue.getString(table, "group")) &&

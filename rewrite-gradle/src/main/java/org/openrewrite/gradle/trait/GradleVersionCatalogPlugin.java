@@ -77,7 +77,7 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
         }
         Toml.Literal versionLiteral = (Toml.Literal) versionKey.getValue();
         Toml.Table updatedInline = (Toml.Table) new ChangeValue("version",
-                        TomlTableValue.quoted(versionLiteral, newVersion))
+                TomlTableValue.quoted(versionLiteral, newVersion))
                 .getVisitor()
                 .visitNonNull(inline, new InMemoryExecutionContext());
         Toml.KeyValue updated = keyValue.withValue(updatedInline);
@@ -125,39 +125,35 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
             if (tableName == null || !"plugins".equals(tableName.getName())) {
                 return null;
             }
-            return extract(cursor, cursor.getValue(), pluginIdPattern);
-        }
-
-        public static @Nullable GradleVersionCatalogPlugin extract(
-                Toml.KeyValue keyValue, @Nullable String pluginIdPattern) {
-            Cursor cursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), keyValue);
-            return extract(cursor, keyValue, pluginIdPattern);
-        }
-
-        private static @Nullable GradleVersionCatalogPlugin extract(
-                Cursor cursor, Toml.KeyValue keyValue, @Nullable String pluginIdPattern) {
+            Toml.KeyValue keyValue = cursor.getValue();
             if (keyValue.getValue() instanceof Toml.Literal) {
-                Toml.Literal literal = (Toml.Literal) keyValue.getValue();
-                if (!(literal.getValue() instanceof String)) {
-                    return null;
-                }
-                String[] parts = ((String) literal.getValue()).split(":", 2);
-                if (parts.length != 2 || doesNotMatch(parts[0], pluginIdPattern)) {
-                    return null;
-                }
-                return new GradleVersionCatalogPlugin(cursor, parts[0], parts[1], null);
+                return matchLiteral(cursor, (Toml.Literal) keyValue.getValue());
             }
             if (!(keyValue.getValue() instanceof Toml.Table)) {
                 return null;
             }
-            Toml.Table table = (Toml.Table) keyValue.getValue();
-            String pluginId = TomlTableValue.getString(table, "id");
+            return matchTable(cursor, (Toml.Table) keyValue.getValue());
+        }
+
+        private @Nullable GradleVersionCatalogPlugin matchLiteral(Cursor cursor, Toml.Literal literal) {
+            if (!(literal.getValue() instanceof String)) {
+                return null;
+            }
+            String[] parts = ((String) literal.getValue()).split(":", 2);
+            if (parts.length != 2 || doesNotMatch(parts[0], pluginIdPattern)) {
+                return null;
+            }
+            return new GradleVersionCatalogPlugin(cursor, parts[0], parts[1], null);
+        }
+
+        private @Nullable GradleVersionCatalogPlugin matchTable(Cursor cursor, Toml.Table plugin) {
+            String pluginId = TomlTableValue.getString(plugin, "id");
             if (pluginId == null || doesNotMatch(pluginId, pluginIdPattern)) {
                 return null;
             }
             return new GradleVersionCatalogPlugin(cursor, pluginId,
-                    TomlTableValue.getString(table, "version"),
-                    TomlTableValue.getString(table, "version.ref"));
+                    TomlTableValue.getString(plugin, "version"),
+                    TomlTableValue.getString(plugin, "version.ref"));
         }
 
         private static boolean doesNotMatch(String pluginId, @Nullable String pattern) {
