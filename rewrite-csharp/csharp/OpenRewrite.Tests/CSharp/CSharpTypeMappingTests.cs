@@ -557,6 +557,70 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Contains(uiElement.Members!, v => v.Name == "Visibility");
     }
 
+    /// <summary>
+    /// An event reference carries <see cref="JavaType.Variable"/> attribution naming the type that
+    /// declares it, exactly as a field or property reference does. Without it a recipe renaming an
+    /// event has nothing to key an unqualified reference on — the enclosing type is the wrong
+    /// answer as soon as the reference is made from a derived type.
+    /// </summary>
+    [Fact]
+    public void EventReferencesCarryVariableAttribution()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+            class Base
+            {
+                public event EventHandler? Changed;
+            }
+            class Derived : Base
+            {
+                void M()
+                {
+                    Changed += this.OnChanged;
+                    this.Changed += this.OnChanged;
+                }
+
+                void OnChanged(object? sender, EventArgs e) { }
+            }
+            """);
+
+        // The declaration and both references — one unqualified from a derived type, one through
+        // `this` — all name the declaring type.
+        var occurrences = new IdentifierFinder("Changed").Collect(cu);
+        Assert.Equal(3, occurrences.Count);
+
+        foreach (var occurrence in occurrences)
+        {
+            var attribution = Assert.IsType<JavaType.Variable>(occurrence.FieldType);
+            Assert.Equal("Changed", attribution.Name);
+            Assert.Equal("Base", Assert.IsType<JavaType.Class>(attribution.Owner).FullyQualifiedName);
+            Assert.Equal("System.EventHandler",
+                Assert.IsType<JavaType.Class>(attribution.Type).FullyQualifiedName);
+        }
+    }
+
+    private class IdentifierFinder(string name) : CSharpVisitor<int>
+    {
+        private readonly List<Identifier> _found = [];
+
+        public List<Identifier> Collect(CompilationUnit cu)
+        {
+            Cursor = new OpenRewrite.Core.Cursor(null, OpenRewrite.Core.Cursor.ROOT_VALUE);
+            Visit(cu, 0);
+            return _found;
+        }
+
+        public override J VisitIdentifier(Identifier identifier, int p)
+        {
+            if (identifier.SimpleName == name)
+            {
+                _found.Add(identifier);
+            }
+
+            return identifier;
+        }
+    }
+
     private static JavaType.Class Walk(JavaType.Class from, string fullyQualifiedName)
     {
         for (JavaType.Class? c = from; c != null; c = c.Supertype as JavaType.Class)

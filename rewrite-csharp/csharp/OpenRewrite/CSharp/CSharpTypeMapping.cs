@@ -160,6 +160,11 @@ internal class CSharpTypeMapping
             ILocalSymbol l => MapVariable(l, l.Name, null, MapType(l.Type)),
             IParameterSymbol p => MapVariable(p, p.Name, null, MapType(p.Type)),
             IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
+            // An event is a member reference like a field or property. Java has no IEventSymbol
+            // counterpart, but JavaType.Variable carries everything a reference to one needs —
+            // name, declaring type, delegate type — and PopulateMembers already lists events that
+            // way, so attributing references the same way keeps the two consistent.
+            IEventSymbol evt => MapVariable(evt, evt.Name, MapType(evt.ContainingType), MapType(evt.Type)),
             _ => null
         };
     }
