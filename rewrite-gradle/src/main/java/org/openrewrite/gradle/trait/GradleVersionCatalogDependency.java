@@ -18,12 +18,14 @@ package org.openrewrite.gradle.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.toml.ChangeValue;
+import org.openrewrite.toml.DeleteKey;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
 import org.openrewrite.toml.tree.Toml;
@@ -144,36 +146,41 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
         String notation = DependencyNotation.toStringNotation(
                 dependency.withGav(new org.openrewrite.maven.tree.GroupArtifactVersion(
                         newGroupId, newArtifactId, dependencyVersion)));
-        return getTree().withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
+        return (Toml.KeyValue) new ChangeValue(keyName(getTree()), TomlTableValue.quoted(literal, notation))
+                .getVisitor()
+                .visitNonNull(getTree(), new InMemoryExecutionContext());
     }
 
     private Toml.KeyValue updateModuleTable(
             Toml.KeyValue kv, Toml.Table inline, String newGroupId, String newArtifactId, @Nullable String newVersion) {
         if (TomlTableValue.find(inline, "module") == null) {
-            inline = removeGroupAndName(inline);
+            inline = (Toml.Table) new DeleteKey("group")
+                    .getVisitor()
+                    .visitNonNull(inline, new InMemoryExecutionContext());
+            inline = (Toml.Table) new DeleteKey("name")
+                    .getVisitor()
+                    .visitNonNull(inline, new InMemoryExecutionContext());
             inline = TomlTableValue.withStringOrAdd(inline, "module", newGroupId + ":" + newArtifactId);
-        } else {
-            inline = TomlTableValue.withString(inline, "module", newGroupId + ":" + newArtifactId);
+        } else if (TomlTableValue.getString(inline, "module") != null) {
+            inline = (Toml.Table) new ChangeValue("module", quotedValue(inline, "module", newGroupId + ":" + newArtifactId))
+                    .getVisitor()
+                    .visitNonNull(inline, new InMemoryExecutionContext());
         }
         return updateTableVersion(kv, inline, newVersion);
     }
 
-    private Toml.Table removeGroupAndName(Toml.Table inline) {
-        return inline.withValues(ListUtils.map(inline.getValues(), value -> {
-            if (!(value instanceof Toml.KeyValue)) {
-                return value;
-            }
-            Toml.KeyValue keyValue = (Toml.KeyValue) value;
-            return keyValue.getKey() instanceof Toml.Identifier &&
-                    ("group".equals(((Toml.Identifier) keyValue.getKey()).getName()) ||
-                            "name".equals(((Toml.Identifier) keyValue.getKey()).getName())) ? null : value;
-        }));
-    }
-
     private Toml.KeyValue updateGroupNameTable(
             Toml.KeyValue kv, Toml.Table inline, String newGroupId, String newArtifactId, @Nullable String newVersion) {
-        inline = TomlTableValue.withString(inline, "group", newGroupId);
-        inline = TomlTableValue.withString(inline, "name", newArtifactId);
+        if (TomlTableValue.getString(inline, "group") != null) {
+            inline = (Toml.Table) new ChangeValue("group", quotedValue(inline, "group", newGroupId))
+                    .getVisitor()
+                    .visitNonNull(inline, new InMemoryExecutionContext());
+        }
+        if (TomlTableValue.getString(inline, "name") != null) {
+            inline = (Toml.Table) new ChangeValue("name", quotedValue(inline, "name", newArtifactId))
+                    .getVisitor()
+                    .visitNonNull(inline, new InMemoryExecutionContext());
+        }
         return updateTableVersion(kv, inline, newVersion);
     }
 
@@ -184,7 +191,25 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
         if (TomlTableValue.find(inline, "version.ref") != null) {
             return kv.withValue(inline);
         }
-        return kv.withValue(TomlTableValue.withStringOrAdd(inline, "version", newVersion));
+        if (TomlTableValue.find(inline, "version") == null) {
+            inline = TomlTableValue.withStringOrAdd(inline, "version", newVersion);
+        } else if (TomlTableValue.getString(inline, "version") != null) {
+            inline = (Toml.Table) new ChangeValue("version", quotedValue(inline, "version", newVersion))
+                    .getVisitor()
+                    .visitNonNull(inline, new InMemoryExecutionContext());
+        }
+        return kv.withValue(inline);
+    }
+
+    private static String keyName(Toml.KeyValue keyValue) {
+        return ((Toml.Identifier) keyValue.getKey()).getName();
+    }
+
+    private static String quotedValue(Toml.Table table, String key, String value) {
+        Toml.KeyValue keyValue = TomlTableValue.find(table, key);
+        return keyValue != null && keyValue.getValue() instanceof Toml.Literal ?
+                TomlTableValue.quoted((Toml.Literal) keyValue.getValue(), value) :
+                "\"" + value + "\"";
     }
 
     private boolean isUnchanged(

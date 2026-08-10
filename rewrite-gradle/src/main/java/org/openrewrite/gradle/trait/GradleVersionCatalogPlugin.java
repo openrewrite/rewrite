@@ -18,8 +18,10 @@ package org.openrewrite.gradle.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.toml.ChangeValue;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
 import org.openrewrite.toml.tree.Toml;
@@ -51,9 +53,10 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
         Toml.KeyValue keyValue = getTree();
         if (keyValue.getValue() instanceof Toml.Literal) {
             Toml.Literal literal = (Toml.Literal) keyValue.getValue();
-            Toml.KeyValue updated = keyValue.withValue(literal
-                    .withSource(TomlTableValue.quoted(literal, pluginId + ":" + newVersion))
-                    .withValue(pluginId + ":" + newVersion));
+            Toml.KeyValue updated = (Toml.KeyValue) new ChangeValue(keyName(keyValue),
+                    TomlTableValue.quoted(literal, pluginId + ":" + newVersion))
+                    .getVisitor()
+                    .visitNonNull(keyValue, new InMemoryExecutionContext());
             return new GradleVersionCatalogPlugin(new Cursor(cursor.getParent(), updated),
                     pluginId, newVersion, null);
         }
@@ -61,12 +64,29 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
             return this;
         }
         Toml.Table inline = (Toml.Table) keyValue.getValue();
-        if (TomlTableValue.find(inline, "version") == null) {
+        Toml.KeyValue versionKey = TomlTableValue.find(inline, "version");
+        if (versionKey == null) {
             return this;
         }
-        Toml.KeyValue updated = keyValue.withValue(TomlTableValue.withString(inline, "version", newVersion));
+        String currentVersion = TomlTableValue.getString(inline, "version");
+        if (currentVersion == null) {
+            return this;
+        }
+        if (!(versionKey.getValue() instanceof Toml.Literal)) {
+            return this;
+        }
+        Toml.Literal versionLiteral = (Toml.Literal) versionKey.getValue();
+        Toml.Table updatedInline = (Toml.Table) new ChangeValue("version",
+                        TomlTableValue.quoted(versionLiteral, newVersion))
+                .getVisitor()
+                .visitNonNull(inline, new InMemoryExecutionContext());
+        Toml.KeyValue updated = keyValue.withValue(updatedInline);
         return new GradleVersionCatalogPlugin(new Cursor(cursor.getParent(), updated),
                 pluginId, newVersion, null);
+    }
+
+    private static String keyName(Toml.KeyValue keyValue) {
+        return ((Toml.Identifier) keyValue.getKey()).getName();
     }
 
     public static class Matcher extends SimpleTraitMatcher<GradleVersionCatalogPlugin> {
@@ -122,7 +142,7 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
                     return null;
                 }
                 String[] parts = ((String) literal.getValue()).split(":", 2);
-                if (parts.length != 2 || !matches(parts[0], pluginIdPattern)) {
+                if (parts.length != 2 || doesNotMatch(parts[0], pluginIdPattern)) {
                     return null;
                 }
                 return new GradleVersionCatalogPlugin(cursor, parts[0], parts[1], null);
@@ -132,7 +152,7 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
             }
             Toml.Table table = (Toml.Table) keyValue.getValue();
             String pluginId = TomlTableValue.getString(table, "id");
-            if (pluginId == null || !matches(pluginId, pluginIdPattern)) {
+            if (pluginId == null || doesNotMatch(pluginId, pluginIdPattern)) {
                 return null;
             }
             return new GradleVersionCatalogPlugin(cursor, pluginId,
@@ -140,8 +160,8 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
                     TomlTableValue.getString(table, "version.ref"));
         }
 
-        private static boolean matches(String pluginId, @Nullable String pattern) {
-            return pattern == null || matchesGlob(pluginId, pattern);
+        private static boolean doesNotMatch(String pluginId, @Nullable String pattern) {
+            return pattern != null && !matchesGlob(pluginId, pattern);
         }
     }
 }
