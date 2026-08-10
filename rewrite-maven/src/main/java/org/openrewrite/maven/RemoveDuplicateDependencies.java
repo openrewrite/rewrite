@@ -28,10 +28,13 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.Duration;
 import java.util.*;
+
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -58,42 +61,178 @@ public class RemoveDuplicateDependencies extends Recipe {
             private final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
             private final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
-            @SuppressWarnings("DataFlowIssue")
             @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = tag;
                 if (isDependenciesTag()) {
-                    getCursor().putMessage("dependencies", new HashMap<DependencyKey, Xml.Tag>());
+                    t = removeDuplicates(t, false);
                 } else if (isManagedDependenciesTag()) {
-                    getCursor().putMessage("managedDependencies", new HashMap<DependencyKey, Xml.Tag>());
-                } else if (isDependencyTag()) {
-                    Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("dependencies");
-                    DependencyKey dependencyKey = getDependencyKey(tag);
-                    if (dependencyKey != null) {
-                        Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
-                        if (existing != null && existing != tag) {
-                            maybeUpdateModel();
-                            return null;
-                        }
-                    }
-                } else if (isManagedDependencyTag()) {
-                    Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("managedDependencies");
-                    DependencyKey dependencyKey = getManagedDependencyKey(tag);
-                    if (dependencyKey != null) {
-                        // Additionally compare classifier and type, which are only partially compared in `findManagedDependency`
-                        String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-                        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
-                        if (Objects.equals(classifier, dependencyKey.getClassifier()) &&
-                                Objects.equals(type, dependencyKey.getType())) {
-                            Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
-                            if (existing != null && existing != tag) {
-                                maybeUpdateModel();
-                                return null;
+                    t = removeDuplicates(t, true);
+                }
+                if (t != tag) {
+                    maybeUpdateModel();
+                }
+                return super.visitTag(t, ctx);
+            }
+
+            /**
+             * Maven expects dependencies to be unique by group, artifact, type and classifier, and warns when a POM
+             * declares the same one twice ({@code 'dependencies.dependency.(groupId:artifactId:type:classifier)'
+             * must be unique}), but it still builds an effective model. This recipe only removes a duplicate when
+             * doing so leaves that model unchanged, and the two sections resolve differently:
+             * <ul>
+             *     <li>in {@code <dependencies>} the last declaration is the effective one, see the
+             *     {@code rootDependencies} map in {@link org.openrewrite.maven.tree.ResolvedPom}, so a differing
+             *     duplicate has to take the place of the earlier declaration rather than be dropped;</li>
+             *     <li>in {@code <dependencyManagement>} duplicates merge field-wise: each field comes from the
+             *     first declaration that sets it, and exclusions accumulate across all declarations
+             *     ({@code <optional>} excepted: Maven does not inject it from {@code <dependencyManagement>} at
+             *     all, so a duplicate adding only it changes nothing either way and is conservatively kept). A later
+             *     duplicate is therefore only removed when it sets no field the earlier declarations leave unset
+             *     and carries no exclusion they do not already carry; otherwise several declarations make up the
+             *     effective entry and all of them are left in place. A repeated BOM import is likewise only
+             *     removed when it resolves to the same version, because for entries both versions manage the
+             *     first import wins, pinned by {@code ResolvedPomTest#firstUniqueManagedDependencyWins}, while a
+             *     different version may manage entries the first import does not.</li>
+             * </ul>
+             * The surviving declaration keeps the position of the first one, which is the position the resolved
+             * model already gave it. Removing a duplicate therefore leaves the resolved dependencies, the
+             * effective dependency management entries and their order exactly as they were.
+             */
+            private Xml.Tag removeDuplicates(Xml.Tag dependencies, boolean managed) {
+                List<? extends Content> content = dependencies.getContent();
+                if (content == null) {
+                    return dependencies;
+                }
+
+                List<Content> deduplicated = new ArrayList<>(content.size());
+                Map<DependencyKey, Integer> firstDeclarations = new HashMap<>();
+                Map<DependencyKey, Set<String>> managedFields = new HashMap<>();
+                Map<DependencyKey, Set<String>> managedExclusions = new HashMap<>();
+                boolean removed = false;
+                for (Content child : content) {
+                    if (child instanceof Xml.Tag && "dependency".equals(((Xml.Tag) child).getName())) {
+                        Xml.Tag dependency = (Xml.Tag) child;
+                        DependencyKey dependencyKey = managed ? getManagedDependencyKey(dependency) : getDependencyKey(dependency);
+                        if (dependencyKey != null) {
+                            if (managed) {
+                                Set<String> fields = declaredManagedFields(dependency);
+                                Set<String> exclusions = declaredExclusions(dependency);
+                                Set<String> earlierFields = managedFields.get(dependencyKey);
+                                if (earlierFields == null) {
+                                    managedFields.put(dependencyKey, fields);
+                                    managedExclusions.put(dependencyKey, exclusions);
+                                } else {
+                                    Set<String> earlierExclusions = managedExclusions.get(dependencyKey);
+                                    if (earlierFields.containsAll(fields) && earlierExclusions.containsAll(exclusions)) {
+                                        removed = true;
+                                        continue;
+                                    }
+                                    // The duplicate contributes to the effective entry, so it has to stay
+                                    earlierFields.addAll(fields);
+                                    earlierExclusions.addAll(exclusions);
+                                }
+                            } else {
+                                Integer firstDeclaration = firstDeclarations.putIfAbsent(dependencyKey, deduplicated.size());
+                                if (firstDeclaration != null) {
+                                    Xml.Tag effective = (Xml.Tag) deduplicated.get(firstDeclaration);
+                                    if (!isSameDeclaration(effective, dependency)) {
+                                        deduplicated.set(firstDeclaration, dependency.withPrefix(effective.getPrefix()));
+                                    }
+                                    removed = true;
+                                    continue;
+                                }
                             }
                         }
+                    }
+                    deduplicated.add(child);
+                }
+                return removed ? dependencies.withContent(deduplicated) : dependencies;
+            }
 
+            /**
+             * The names of the fields this declaration sets, {@code exclusions} excepted, which
+             * {@link #declaredExclusions} compares by value because Maven accumulates them across duplicates
+             * instead of taking them from any one declaration. Values are not compared: whether a duplicate sets
+             * {@code <version>2</version>} or restates {@code <version>1</version>}, the effective entry takes
+             * the version of the first declaration that sets one.
+             */
+            private Set<String> declaredManagedFields(Xml.Tag dependency) {
+                Set<String> fields = new HashSet<>();
+                for (Xml.Tag field : dependency.getChildren()) {
+                    if (!"exclusions".equals(field.getName()) && !fieldValue(field).isEmpty()) {
+                        fields.add(field.getName());
                     }
                 }
-                return super.visitTag(tag, ctx);
+                return fields;
+            }
+
+            private Set<String> declaredExclusions(Xml.Tag dependency) {
+                Set<String> exclusions = new HashSet<>();
+                for (Xml.Tag field : dependency.getChildren()) {
+                    if ("exclusions".equals(field.getName())) {
+                        for (Xml.Tag exclusion : field.getChildren()) {
+                            exclusions.add(fieldValue(exclusion));
+                        }
+                    }
+                }
+                return exclusions;
+            }
+
+            /**
+             * Compares the fields the effective model of a {@code <dependencies>} entry is built from, ignoring
+             * formatting and comments and resolving property placeholders, so that a duplicate declared through a
+             * property is recognised as the same declaration. Any difference that is not known to be irrelevant
+             * counts as a difference, so that the two are only collapsed onto the earlier declaration when they
+             * resolve to the same thing.
+             */
+            private boolean isSameDeclaration(Xml.Tag dependency, Xml.Tag other) {
+                return declaredFields(dependency).equals(declaredFields(other));
+            }
+
+            private Map<String, List<String>> declaredFields(Xml.Tag dependency) {
+                Map<String, List<String>> fields = new HashMap<>();
+                for (Xml.Tag field : dependency.getChildren()) {
+                    fields.computeIfAbsent(field.getName(), name -> new ArrayList<>()).add(fieldValue(field));
+                }
+                // An omitted field is generally not the same as one restating its default, because it can also be
+                // supplied by `<dependencyManagement>`. `type` is defaulted anyway to keep collapsing a bare
+                // declaration onto one that spells out `<type>jar</type>`, as `removeDependencyWithDefaultType`
+                // expects; that stays first-declaration-wins even where the two inherit a managed `<type>`.
+                fields.putIfAbsent("type", singletonList("jar"));
+                return fields;
+            }
+
+            private String fieldValue(Xml.Tag field) {
+                List<? extends Content> content = field.getContent();
+                if (content == null) {
+                    return "";
+                }
+                StringBuilder value = new StringBuilder();
+                boolean plainText = true;
+                for (Content child : content) {
+                    if (child instanceof Xml.CharData) {
+                        // Read the text directly rather than through `Xml.Tag#getValue`, which gives up as soon as a
+                        // value is interrupted by a comment and would make two different values look identical
+                        value.append(((Xml.CharData) child).getText().trim());
+                    } else if (child instanceof Xml.Comment) {
+                        // A comment is not part of the value Maven reads
+                    } else if (child instanceof Xml.Tag) {
+                        Xml.Tag nested = (Xml.Tag) child;
+                        value.append(nested.getName()).append('=').append(fieldValue(nested)).append(';');
+                        plainText = false;
+                    } else {
+                        // Content that cannot be compared as text falls back to its identity, so that two values are
+                        // never considered equal on the strength of a part that was not actually compared
+                        value.append(child.getId());
+                        plainText = false;
+                    }
+                }
+                if (!plainText) {
+                    return value.toString();
+                }
+                String resolved = getResolutionResult().getPom().getValue(value.toString());
+                return resolved != null ? resolved : value.toString();
             }
 
             private boolean isDependenciesTag() {
@@ -123,11 +262,21 @@ public class RemoveDuplicateDependencies extends Recipe {
             }
 
             private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
+                DependencyKey dependencyKey;
                 if (tag.getChildValue("scope").filter("import"::equalsIgnoreCase).isPresent()) {
-                    return DependencyKey.from(tag);
+                    dependencyKey = DependencyKey.from(tag, tag.getChild("version").map(this::fieldValue).orElse(null));
+                } else {
+                    ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
+                    dependencyKey = resolvedDependency == null ? null : DependencyKey.from(resolvedDependency);
                 }
-                ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
-                return resolvedDependency != null ? DependencyKey.from(resolvedDependency) : null;
+                if (dependencyKey == null) {
+                    return null;
+                }
+                // Additionally compare classifier and type, which are only partially compared in `findManagedDependency`
+                String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
+                String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
+                return Objects.equals(classifier, dependencyKey.getClassifier()) &&
+                        Objects.equals(type, dependencyKey.getType()) ? dependencyKey : null;
             }
         });
     }
@@ -145,22 +294,31 @@ public class RemoveDuplicateDependencies extends Recipe {
 
         Scope scope;
 
+        /**
+         * Only set for BOM imports, where a repeated import at a different version is not a duplicate of the
+         * first import: for entries both versions manage the first import wins, but a different version may
+         * manage entries the first import does not.
+         */
+        @Nullable
+        String version;
+
         public static DependencyKey from(ResolvedDependency dependency, Scope scope) {
-            return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), scope);
+            return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), scope, null);
         }
 
         public static DependencyKey from(ResolvedManagedDependency dependency) {
-            return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), Scope.Compile);
+            return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), Scope.Compile, null);
         }
 
-        public static @Nullable DependencyKey from(Xml.Tag tag) {
+        public static @Nullable DependencyKey from(Xml.Tag tag, @Nullable String version) {
             return tag.getChildValue("artifactId").map(artifactId ->
                     new DependencyKey(
                             tag.getChildValue("groupId").orElse(null),
                             artifactId,
                             tag.getChildValue("type").orElse("jar"),
                             tag.getChildValue("classifier").orElse(null),
-                            tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile)
+                            tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile),
+                            version
                     )).orElse(null);
         }
     }
