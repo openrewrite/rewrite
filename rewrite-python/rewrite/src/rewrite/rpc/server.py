@@ -36,7 +36,7 @@ import threading
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Set
+from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
 
 try:
@@ -560,17 +560,36 @@ def handle_parse(params: dict) -> List[str]:
     return results
 
 
-# Never-source dirs (caches, venvs, VCS, dependency trees, build output); caller exclusions extend, not replace.
+# These nest anywhere in a project.
 DEFAULT_PARSE_EXCLUSIONS = [
     '__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne',
-    'node_modules', '.pytest_cache', '.mypy_cache', 'build', 'dist', 'target',
+    'node_modules', '.pytest_cache', '.mypy_cache',
 ]
+
+# Build output, which only ever sits at the project root; deeper down these are
+# ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
+ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+
+
+def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
+    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
+    import fnmatch
+
+    def excluded(name: str, patterns: List[str]) -> bool:
+        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
+
+    for root, dirs, files in os.walk(project_path):
+        at_root = root == project_path
+        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
+        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+
+        for file in files:
+            if file.endswith('.py'):
+                yield os.path.join(root, file)
 
 
 def handle_parse_project(params: dict) -> List[dict]:
     """Handle a ParseProject RPC request."""
-    import fnmatch
-
     project_path = params.get('projectPath', '.')
     exclusions = DEFAULT_PARSE_EXCLUSIONS + [
         excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
@@ -603,26 +622,21 @@ def handle_parse_project(params: dict) -> List[dict]:
         pass
 
     try:
-        for root, dirs, files in os.walk(project_path):
-            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
-
-            for file in files:
-                if file.endswith('.py'):
-                    path = os.path.join(root, file)
-                    try:
-                        oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
-                    except OSError:
-                        oversize = False  # let the normal path surface the read error
-                    if oversize:
-                        results.append(_create_quark(path, relative_to))
-                        continue
-                    try:
-                        result = parse_python_file(path, relative_to, ty_client,
-                                                   language_level=language_level,
-                                                   project_language_level=project_language_level)
-                        results.append(result)
-                    except Exception as e:
-                        logger.error(f"Error parsing {path}: {e}")
+        for path in _walk_python_files(project_path, exclusions):
+            try:
+                oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
+            except OSError:
+                oversize = False  # let the normal path surface the read error
+            if oversize:
+                results.append(_create_quark(path, relative_to))
+                continue
+            try:
+                result = parse_python_file(path, relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error parsing {path}: {e}")
     finally:
         if ty_client is not None:
             ty_client.shutdown()
