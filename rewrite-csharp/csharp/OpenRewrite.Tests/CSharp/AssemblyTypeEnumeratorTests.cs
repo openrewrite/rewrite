@@ -81,4 +81,38 @@ public class AssemblyTypeEnumeratorTests
         Assert.Equal("System.Exception", supertype.FullyQualifiedName);
         Assert.Null(supertype.Methods);
     }
+
+    /// <summary>
+    /// The dependency type table is where a referenced type's attributes have to come from: an
+    /// LST resolves a dependency type through the table, not through the parse of the file that
+    /// mentions it. Newtonsoft's <c>JsonConvert</c> carries <c>[NullableContext]</c>/<c>[Nullable]</c>
+    /// compiler attributes; <c>JsonPropertyAttribute</c> carries an <c>[AttributeUsage]</c> with
+    /// both a positional and a named argument, which exercises both argument forms.
+    /// </summary>
+    [Fact]
+    public void OwnTypeAttributesAreEnumerated()
+    {
+        var types = AssemblyTypeEnumerator.Enumerate([NewtonsoftJsonDll()], RuntimeAssemblies());
+        var byFqn = types.OfType<JavaType.Class>().ToDictionary(c => c.FullyQualifiedName, c => c);
+
+        var jsonProperty = byFqn["Newtonsoft.Json.JsonPropertyAttribute"];
+        Assert.NotNull(jsonProperty.Annotations);
+
+        var usage = Assert.Single(jsonProperty.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class
+            {
+                FullyQualifiedName: "System.AttributeUsageAttribute"
+            });
+
+        // [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
+        // The positional argument resolves to the ValidOn property it feeds; the flags combination
+        // matches no single enum member, so the underlying value is kept rather than mis-named.
+        var validOn = Assert.Single(usage.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "ValidOn" });
+        Assert.NotNull(validOn.ConstantValue);
+
+        var allowMultiple = Assert.Single(usage.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "AllowMultiple" });
+        Assert.Equal(false, allowMultiple.ConstantValue);
+    }
 }

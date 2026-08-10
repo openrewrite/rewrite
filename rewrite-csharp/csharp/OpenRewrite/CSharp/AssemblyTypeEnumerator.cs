@@ -210,9 +210,20 @@ internal sealed class AssemblyTypeMapping
             : null;
 
         cls.UnsafeSet(flags, kind, fqn, typeParameters, supertype, owningClass,
-            null, interfaces, MapMembers(symbol, cls), MapMethods(symbol, cls));
+            ListAnnotations(symbol), interfaces, MapMembers(symbol, cls), MapMethods(symbol, cls));
         return cls;
     }
+
+    /// <summary>
+    /// The attributes on a symbol. This is the only place a referenced control's
+    /// <c>[TemplatePart]</c>s can come from once the source set has been parsed: an LST resolves
+    /// dependency types through the type table this enumerator feeds, not through the per-file
+    /// parse, so an attribute mapped only by <see cref="CSharpTypeMapping"/> would not survive a
+    /// build.
+    /// </summary>
+    private IList<JavaType.FullyQualified>? ListAnnotations(ISymbol symbol) =>
+        AttributeMapping.ListAnnotations(symbol, Map, MapVariable,
+            m => Map(m.ContainingType) is JavaType.Class owner ? MapMethod(m, owner) : null);
 
     private List<JavaType.Variable>? MapMembers(INamedTypeSymbol symbol, JavaType.Class owner)
     {
@@ -247,7 +258,14 @@ internal sealed class AssemblyTypeMapping
 
     private JavaType.Method MapMethod(IMethodSymbol symbol, JavaType.Class owner)
     {
+        // Shell-cache before mapping annotations: an attribute applied to an attribute class'
+        // own constructor leads straight back here.
+        if (_cache.TryGetValue(symbol, out var cached) && cached is JavaType.Method cachedMethod)
+        {
+            return cachedMethod;
+        }
         var method = new JavaType.Method();
+        _cache[symbol] = method;
         // Constructors return void in Roslyn, but the Java model expects the declaring type.
         var returnType = symbol.MethodKind == MethodKind.Constructor
             ? owner
@@ -260,15 +278,16 @@ internal sealed class AssemblyTypeMapping
             symbol.Parameters.Length > 0 ? symbol.Parameters.Select(p => p.Name).ToList() : null,
             symbol.Parameters.Length > 0 ? symbol.Parameters.Select(p => Map(p.Type)).ToList()! : null,
             null,
-            null,
+            null, // annotations, set below once this method's shell is cached
             null,
             symbol.TypeParameters.Length > 0 ? symbol.TypeParameters.Select(tp => tp.Name).ToList() : null);
+        method.Annotations = ListAnnotations(symbol);
         return method;
     }
 
     private JavaType.Variable MapVariable(ISymbol symbol, string name, JavaType? owner, JavaType? type)
     {
-        return new JavaType.Variable(name, owner, type, null)
+        return new JavaType.Variable(name, owner, type, ListAnnotations(symbol))
         {
             FlagsBitMap = CSharpTypeMapping.MapFlags(symbol)
         };

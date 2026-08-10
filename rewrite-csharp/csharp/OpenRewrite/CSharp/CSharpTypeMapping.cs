@@ -292,6 +292,11 @@ internal class CSharpTypeMapping
     /// </summary>
     private void PopulateMembers(INamedTypeSymbol symbol, JavaType.Class cls)
     {
+        // Attributes are mapped here rather than in MapNamedType for the same reason members are:
+        // an attribute class is itself a type, so mapping one re-enters the mapper. Doing it from
+        // inside the drain loop means that re-entry only enqueues, keeping the walk iterative.
+        cls.Annotations = ListAnnotations(symbol);
+
         List<JavaType.Variable>? members = null;
         List<JavaType.Method>? methods = null;
 
@@ -399,12 +404,16 @@ internal class CSharpTypeMapping
             parameterNames,
             parameterTypes,
             null, // thrownExceptions (C# doesn't have checked exceptions)
-            null, // annotations
+            null, // annotations, set below once this method is cached
             null, // defaultValue
             symbol.TypeParameters.Length > 0
                 ? symbol.TypeParameters.Select(tp => tp.Name).ToList()
                 : null
         );
+
+        // Set after the shell is cached and populated: mapping an attribute maps its type, which
+        // can lead back here (an attribute class' own constructor, say).
+        method.Annotations = ListAnnotations(symbol);
 
         return method;
     }
@@ -419,8 +428,19 @@ internal class CSharpTypeMapping
             FlagsBitMap = MapFlags(symbol)
         };
         _typeCache[symbol] = variable;
+        // Set after caching, so that an attribute whose mapping leads back to this same symbol
+        // resolves to the shell rather than recursing.
+        variable.Annotations = ListAnnotations(symbol);
         return variable;
     }
+
+    /// <summary>
+    /// Maps the attributes applied to a symbol onto <c>Annotations</c>. The type and member
+    /// mappings passed in are this mapper's, so an attribute's type resolves to the same instance
+    /// every other reference to it does.
+    /// </summary>
+    private IList<JavaType.FullyQualified>? ListAnnotations(ISymbol symbol) =>
+        AttributeMapping.ListAnnotations(symbol, MapType, MapVariable, MapMethod);
 
     internal static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
     {

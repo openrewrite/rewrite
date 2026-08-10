@@ -558,6 +558,223 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     /// <summary>
+    /// Attributes written on a type in the analysed source are mapped onto
+    /// <see cref="JavaType.Class.Annotations"/>, with their named arguments resolved to the
+    /// attribute class' properties and their values carried as constants or type references.
+    /// </summary>
+    [Fact]
+    public void SourceClass_AnnotationsAreMapped()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+            sealed class MarkerAttribute : Attribute
+            {
+                public string? Name { get; set; }
+                public Type? Kind { get; set; }
+            }
+
+            [Marker(Name = "first", Kind = typeof(string))]
+            class Marked { }
+
+            class Test
+            {
+                void M() { Marked marked = new Marked(); }
+            }
+            """);
+
+        var marked = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "marked")!.TypeExpression?.Type);
+
+        Assert.NotNull(marked.Annotations);
+        var marker = Assert.Single(marked.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "MarkerAttribute" });
+
+        Assert.NotNull(marker.Values);
+        Assert.Equal(2, marker.Values!.Count);
+
+        var name = Assert.Single(marker.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Name" });
+        Assert.Equal("first", name.ConstantValue);
+        Assert.Null(name.ReferenceValue);
+        // The element resolves to the property on the attribute class, typed as the property is.
+        Assert.Equal("MarkerAttribute",
+            Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Variable>(name.Element).Owner)
+                .FullyQualifiedName);
+
+        var kind = Assert.Single(marker.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Kind" });
+        Assert.Null(kind.ConstantValue);
+        Assert.Equal("System.String",
+            Assert.IsType<JavaType.Class>(kind.ReferenceValue).FullyQualifiedName);
+    }
+
+    /// <summary>
+    /// A positional (constructor) attribute argument has no element name of its own. It is
+    /// resolved to the property of the attribute class that the constructor parameter feeds,
+    /// matched case-insensitively on name — the universal C# convention.
+    /// </summary>
+    [Fact]
+    public void PositionalAttributeArguments_ResolveToTheMatchingProperty()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            [Obsolete("use something else", true)]
+            class Old { }
+
+            class Test
+            {
+                void M() { Old old = new Old(); }
+            }
+            """);
+
+        var old = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "old")!.TypeExpression?.Type);
+
+        var obsolete = Assert.Single(old.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
+
+        // ObsoleteAttribute(string message, bool error). Positional arguments stay in declaration
+        // order.
+        var values = obsolete.Values!.Cast<JavaType.Annotation.SingleElementValue>().ToList();
+        Assert.Equal(2, values.Count);
+
+        // `message` names the Message property, so the value is attributed to it.
+        Assert.Equal("Message", Assert.IsType<JavaType.Variable>(values[0].Element).Name);
+        Assert.Equal("use something else", values[0].ConstantValue);
+
+        // `error` names no property — the property is called IsError — so rather than guessing a
+        // member it does not name, the value's element is the constructor that received it.
+        // Java's ElementValue.getElement() contract is non-null, so a null element would not
+        // survive the RPC round trip.
+        var ctor = Assert.IsType<JavaType.Method>(values[1].Element);
+        Assert.Equal(".ctor", ctor.Name);
+        Assert.Equal("System.ObsoleteAttribute",
+            Assert.IsAssignableFrom<JavaType.Class>(ctor.DeclaringType).FullyQualifiedName);
+        Assert.Equal(true, values[1].ConstantValue);
+    }
+
+    /// <summary>
+    /// Enum-valued arguments map to the enum member as a <see cref="JavaType.Variable"/>
+    /// reference (matching Java's <c>Attribute.Enum</c> -> <c>VarSymbol</c> mapping), and array
+    /// arguments map to an <see cref="JavaType.Annotation.ArrayElementValue"/>.
+    /// </summary>
+    [Fact]
+    public void EnumAndArrayAttributeArguments_AreMapped()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            enum Level { Low, High }
+
+            sealed class ShapeAttribute : Attribute
+            {
+                public Level Level { get; set; }
+                public string[] Names { get; set; } = [];
+            }
+
+            [Shape(Level = Level.High, Names = new[] { "a", "b" })]
+            class Shaped { }
+
+            class Test
+            {
+                void M() { Shaped shaped = new Shaped(); }
+            }
+            """);
+
+        var shaped = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "shaped")!.TypeExpression?.Type);
+        var shape = Assert.Single(shaped.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "ShapeAttribute" });
+
+        var level = Assert.Single(shape.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Level" });
+        var member = Assert.IsType<JavaType.Variable>(level.ReferenceValue);
+        Assert.Equal("High", member.Name);
+        Assert.Equal("Level", Assert.IsType<JavaType.Class>(member.Owner).FullyQualifiedName);
+
+        var names = Assert.Single(shape.Values!.OfType<JavaType.Annotation.ArrayElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Names" });
+        Assert.Equal(["a", "b"], names.ConstantValues);
+    }
+
+    /// <summary>
+    /// Attributes on methods and on fields/properties are mapped too.
+    /// </summary>
+    [Fact]
+    public void MethodAndVariableAnnotationsAreMapped()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            class Holder
+            {
+                [Obsolete] public int Field;
+                [Obsolete] public void Method() { }
+            }
+
+            class Test
+            {
+                void M() { Holder holder = new Holder(); }
+            }
+            """);
+
+        var holder = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "holder")!.TypeExpression?.Type);
+
+        var field = Assert.Single(holder.Members!, v => v.Name == "Field");
+        Assert.Contains(field.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
+
+        var method = Assert.Single(holder.Methods!, m => m.Name == "Method");
+        Assert.Contains(method.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
+    }
+
+    /// <summary>
+    /// The motivating case: <c>ComboBox</c> comes from a reference assembly and declares two
+    /// <c>[TemplatePart]</c> attributes. Both must survive, distinguished by their values — a
+    /// WPF recipe that only sees one of them silently loses <c>PART_Popup</c>.
+    /// </summary>
+    [Fact]
+    public void MetadataClass_RepeatedAnnotationsAreMappedWithTheirValues()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System.Windows.Controls;
+            class Test
+            {
+                void M() { ComboBox box = new ComboBox(); }
+            }
+            """, Assemblies.Net90.AddPackage("Microsoft.WindowsDesktop.App.Ref", "9.0.16"));
+
+        var comboBox = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "box")!.TypeExpression?.Type);
+        Assert.Equal("System.Windows.Controls.ComboBox", comboBox.FullyQualifiedName);
+
+        Assert.NotNull(comboBox.Annotations);
+        var templateParts = comboBox.Annotations!.OfType<JavaType.Annotation>()
+            .Where(a => a.AnnotationType is JavaType.Class
+            {
+                FullyQualifiedName: "System.Windows.TemplatePartAttribute"
+            })
+            .ToList();
+        Assert.Equal(2, templateParts.Count);
+
+        var byName = templateParts.ToDictionary(
+            a => (string)a.Values!.OfType<JavaType.Annotation.SingleElementValue>()
+                .Single(v => v.Element is JavaType.Variable { Name: "Name" }).ConstantValue!,
+            a => Assert.IsType<JavaType.Class>(
+                a.Values!.OfType<JavaType.Annotation.SingleElementValue>()
+                    .Single(v => v.Element is JavaType.Variable { Name: "Type" }).ReferenceValue)
+                .FullyQualifiedName);
+
+        Assert.Equal("System.Windows.Controls.TextBox", byName["PART_EditableTextBox"]);
+        Assert.Equal("System.Windows.Controls.Primitives.Popup", byName["PART_Popup"]);
+    }
+
+    /// <summary>
     /// An event reference carries <see cref="JavaType.Variable"/> attribution naming the type that
     /// declares it, exactly as a field or property reference does. Without it a recipe renaming an
     /// event has nothing to key an unqualified reference on — the enclosing type is the wrong
