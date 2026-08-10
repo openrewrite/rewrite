@@ -529,8 +529,19 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline
 	sw = &c
-	// selector - Java sends ControlParentheses, extract inner Expression for Tag
-	if cpResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
+	// Java ships the selector as a ControlParentheses; reconstruct its baseline from the
+	// existing Tag so a changed selector's unchanged children keep their values,
+	// mirroring receiveBlockBody.
+	var selectorBaseline any
+	if sw.Tag != nil {
+		selectorBaseline = &java.ControlParentheses{
+			Tree: java.RightPadded[java.Expression]{
+				Element: sw.Tag.Element,
+				After:   sw.Tag.After,
+			},
+		}
+	}
+	if cpResult := q.Receive(selectorBaseline, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
 		if cp, ok := cpResult.(*java.ControlParentheses); ok {
 			if _, isEmpty := cp.Tree.Element.(*java.Empty); !isEmpty {
 				sw.Tag = &java.RightPadded[java.Expression]{

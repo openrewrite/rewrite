@@ -395,22 +395,30 @@ func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J 
 	return fc
 }
 
+// Derives a stable UUID for a synthetic switch-selector node from the owning
+// switch's ID so repeated sends stay byte-identical. The salt keeps the wrapper,
+// its markers, and the tagless Empty distinct.
+func switchSelectorID(switchID uuid.UUID, salt string) uuid.UUID {
+	return uuid.NewSHA1(uuid.Nil, append([]byte(salt), switchID[:]...))
+}
+
 func (s *JavaSender) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*SendQueue)
-	// selector - wrap tag in ControlParentheses for Java's J.Switch model
+	// Java models the selector as a ControlParentheses, so synthesize one with IDs
+	// derived from the switch and carry the tag's trailing space (before `{`).
 	q.GetAndSend(sw, func(v any) any {
-		tag := v.(*java.Switch).Tag
-		var inner java.Expression
+		swNode := v.(*java.Switch)
+		tag := swNode.Tag
+		inner := java.Expression(&java.Empty{ID: switchSelectorID(swNode.ID, "empty")})
+		after := java.EmptySpace
 		if tag != nil {
 			inner = tag.Element
-		} else {
-			// Tagless switch: use Empty as the expression
-			inner = &java.Empty{ID: uuid.New()}
+			after = tag.After
 		}
 		return &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: inner, After: java.EmptySpace},
+			ID:      switchSelectorID(swNode.ID, "cp"),
+			Markers: java.Markers{ID: switchSelectorID(swNode.ID, "markers")},
+			Tree:    java.RightPadded[java.Expression]{Element: inner, After: after},
 		}
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	// cases (Block)
