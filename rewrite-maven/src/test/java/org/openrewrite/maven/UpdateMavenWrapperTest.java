@@ -898,45 +898,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
     }
 
     @Test
-    void updateWrapperWhenOnlyPropertiesFileCarriesMavenBuildToolMarker() {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
-            .afterRecipe(run -> {
-                var mvnw = result(run, PlainText.class, "mvnw");
-                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
-
-                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
-                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
-
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
-            }),
-          properties(
-            withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
-              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
-              """),
-            withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
-              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
-              """),
-            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
-              .markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0"))
-              .afterRecipe(mavenWrapperProperties ->
-                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool ->
-                  assertThat(buildTool.getVersion()).isEqualTo("3.8.9")))
-          ),
-          text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)
-            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
-          text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)
-            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
-          other("", spec -> spec.path(WRAPPER_JAR_LOCATION).after(notEmpty)
-            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0")))
-        );
-    }
-
-    @Test
     void updateWrapperInSubDirectoryWithoutBuildToolMarker() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))

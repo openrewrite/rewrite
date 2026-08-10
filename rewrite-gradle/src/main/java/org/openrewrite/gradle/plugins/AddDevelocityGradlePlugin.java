@@ -23,9 +23,9 @@ import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.gradle.internal.GradleWrapperProperties;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -180,7 +180,7 @@ public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradl
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                 for (Properties.Entry entry : FindProperties.find(file, "distributionUrl", false)) {
-                    String version = GradleWrapperProperties.versionFromDistributionUrl(entry.getValue().getText());
+                    String version = GradleWrapper.versionFromDistributionUrl(entry.getValue().getText());
                     if (version != null) {
                         acc.put(file.getSourcePath(), version);
                         break;
@@ -200,11 +200,10 @@ public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradl
              * the version the nearest wrapper declares, so the recipe works on LSTs produced by any other parser.
              */
             private @Nullable String gradleVersion(JavaSourceFile cu) {
-                Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
-                if (maybeBuildTool.isPresent() && maybeBuildTool.get().getType() == BuildTool.Type.Gradle) {
-                    return maybeBuildTool.get().getVersion();
-                }
-                return acc.nearest(cu.getSourcePath());
+                return cu.getMarkers().findFirst(BuildTool.class)
+                        .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
+                        .map(BuildTool::getVersion)
+                        .orElseGet(() -> acc.nearest(cu.getSourcePath()));
             }
 
             @Override

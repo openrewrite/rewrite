@@ -23,7 +23,6 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.GradleWrapperProperties;
 import org.openrewrite.gradle.internal.GradleWrapperScriptLoader;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
@@ -268,13 +267,27 @@ public class GradleWrapper {
 
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
     private static final Pattern MAVEN_VERSION_FOLDER_PATTERN = Pattern.compile("\\d+\\.\\d+(?:\\.\\d+)?(?:-[\\w.-]+)?");
+    private static final Pattern DISTRIBUTION_URL_VERSION_PATTERN = Pattern.compile("gradle-(\\d+(?:\\.\\d+)*(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?)-(?:bin|all)\\.zip");
+
+    /**
+     * The Gradle version a wrapper declares, read from the {@code distributionUrl} it points at. Used when no
+     * {@link org.openrewrite.marker.BuildTool} marker is available, which is the case for any parser that isn't the
+     * OpenRewrite Gradle plugin. Tolerates custom and mirrored distribution hosts.
+     *
+     * @param distributionUrl the {@code distributionUrl} value, which may still carry the properties-file escaping of {@code :}
+     * @return the version, or {@code null} when the URL contains no recognizable Gradle version
+     */
+    public static @Nullable String versionFromDistributionUrl(String distributionUrl) {
+        Matcher matcher = DISTRIBUTION_URL_VERSION_PATTERN.matcher(distributionUrl.replace("\\", ""));
+        return matcher.find() ? matcher.group(1) : null;
+    }
 
     /**
      * Construct a Gradle wrapper from a URI.
      * Can be used in contexts where downloads.gradle.org, normally used for version lookups, is unavailable.
      */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
-        String version = GradleWrapperProperties.versionFromDistributionUrl(fullDistributionUri.toString());
+        String version = versionFromDistributionUrl(fullDistributionUri.toString());
         if (version == null) {
             version = "";
             Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());

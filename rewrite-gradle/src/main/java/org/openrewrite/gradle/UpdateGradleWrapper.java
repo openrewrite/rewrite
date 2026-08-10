@@ -21,7 +21,6 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.GradleWrapperProperties;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
@@ -44,7 +43,6 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
-import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -205,7 +203,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         acc.currentDistributionUrl = currentDistributionUrl;
 
                         String currentVersion = acc.currentMarker == null ?
-                                GradleWrapperProperties.versionFromDistributionUrl(currentDistributionUrl) :
+                                GradleWrapper.versionFromDistributionUrl(currentDistributionUrl) :
                                 acc.currentMarker.getVersion();
                         if (currentVersion == null) {
                             return entry;
@@ -358,17 +356,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
                         if (currentMarker.getType() != BuildTool.Type.Gradle) {
-                            if (!isWrapperPath(sourceFile.getSourcePath())) {
-                                return sourceFile;
-                            }
+                            return sourceFile;
+                        }
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
+                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                        if (compare < 0) {
+                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
                         } else {
-                            VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
-                            int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
-                            if (compare < 0) {
-                                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
-                            } else {
-                                return sourceFile;
-                            }
+                            return sourceFile;
                         }
                     }
                 }
@@ -405,13 +400,6 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return sourceFile;
             }
         };
-    }
-
-    private static boolean isWrapperPath(Path sourcePath) {
-        return PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH);
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {

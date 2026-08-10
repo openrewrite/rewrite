@@ -1706,41 +1706,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    void updateWrapperWhenOnlyPropertiesFileCarriesGradleBuildToolMarker() {
-        rewriteRun(
-          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).hasSize(4)),
-          properties(
-            """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-bin.zip
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-              """,
-            """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
-              """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-              .markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))
-              .afterRecipe(gradleWrapperProperties ->
-                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool ->
-                  assertThat(buildTool.getVersion()).isEqualTo("7.4.2")))
-          ),
-          text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)
-            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
-          text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)
-            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
-          other("", spec -> spec.path(WRAPPER_JAR_LOCATION)
-            .markers(new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "3.44.0")))
-        );
-    }
-
-    @Test
     void updateWrapperInSubDirectoryWithoutBuildToolMarker() {
         rewriteRun(
           spec -> spec.afterRecipe(run -> {

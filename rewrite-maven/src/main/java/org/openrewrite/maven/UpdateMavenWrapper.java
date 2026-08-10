@@ -38,7 +38,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
-import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -385,17 +384,14 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
                         if (currentMarker.getType() != BuildTool.Type.Maven) {
-                            if (!isWrapperPath(sourceFile.getSourcePath())) {
-                                return sourceFile;
-                            }
+                            return sourceFile;
+                        }
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
+                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                        if (compare < 0) {
+                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
                         } else {
-                            VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
-                            int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
-                            if (compare < 0) {
-                                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
-                            } else {
-                                return sourceFile;
-                            }
+                            return sourceFile;
                         }
                     }
                 }
@@ -466,14 +462,6 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
             }
         }
         return null;
-    }
-
-    private static boolean isWrapperPath(Path sourcePath) {
-        return PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) ||
-               PathUtils.matchesGlob(sourcePath, "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH);
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {
