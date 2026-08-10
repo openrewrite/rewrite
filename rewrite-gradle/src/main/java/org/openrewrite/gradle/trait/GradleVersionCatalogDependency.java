@@ -268,7 +268,6 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             }
             Toml.KeyValue kv = cursor.getValue();
 
-            // Must be a direct child of the [libraries] table.
             Cursor parent = cursor.getParent();
             if (parent == null || !(parent.getValue() instanceof Toml.Table)) {
                 return null;
@@ -281,47 +280,70 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             DependencyMatcher dependencyMatcher = new DependencyMatcher(groupPattern, artifactPattern, null);
 
             if (kv.getValue() instanceof Toml.Literal) {
-                Toml.Literal literal = (Toml.Literal) kv.getValue();
-                if (!(literal.getValue() instanceof String)) {
-                    return null;
-                }
-                Dependency dep = DependencyNotation.parse((String) literal.getValue());
-                if (dep == null || !dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
-                    return null;
-                }
-                return new GradleVersionCatalogDependency(cursor, dep.getGroupId(), dep.getArtifactId(), null,
-                        dep.getVersion(), null);
+                return testLiteral(cursor, kv, dependencyMatcher);
             }
             if (kv.getValue() instanceof Toml.Table) {
-                Toml.Table inline = (Toml.Table) kv.getValue();
-                String groupId = TomlTableValue.getString(inline, "group");
-                String artifactId = TomlTableValue.getString(inline, "name");
-                String module = TomlTableValue.getString(inline, "module");
-                if (module != null && (groupId != null || artifactId != null)) {
-                    return null;
-                }
-                if (groupId != null && artifactId != null) {
-                    if (!dependencyMatcher.matches(groupId, artifactId)) {
-                        return null;
-                    }
-                    return new GradleVersionCatalogDependency(cursor, groupId, artifactId, null,
-                            TomlTableValue.getString(inline, "version"),
-                            TomlTableValue.getString(inline, "version.ref"));
-                }
-                if (module == null || module.indexOf(':') < 0 || module.indexOf(':') != module.lastIndexOf(':')) {
-                    return null;
-                }
-                Dependency dep = DependencyNotation.parse(module);
-                String depGroupId = dep == null ? null : dep.getGroupId();
-                String depArtifactId = dep == null ? null : dep.getArtifactId();
-                if (depGroupId == null || depGroupId.isEmpty() || depArtifactId.isEmpty() || !dependencyMatcher.matches(depGroupId, depArtifactId)) {
-                    return null;
-                }
-                return new GradleVersionCatalogDependency(cursor, depGroupId, depArtifactId, module,
-                        TomlTableValue.getString(inline, "version"),
-                        TomlTableValue.getString(inline, "version.ref"));
+                return testInlineTable(cursor, kv, dependencyMatcher);
             }
             return null;
+        }
+
+        private static @Nullable GradleVersionCatalogDependency testLiteral(
+                Cursor cursor, Toml.KeyValue kv, DependencyMatcher dependencyMatcher) {
+            Toml.Literal literal = (Toml.Literal) kv.getValue();
+            if (!(literal.getValue() instanceof String)) {
+                return null;
+            }
+            Dependency dep = DependencyNotation.parse((String) literal.getValue());
+            if (dep == null) {
+                return null;
+            }
+            String groupId = dep.getGroupId();
+            String artifactId = dep.getArtifactId();
+            if (groupId == null || !dependencyMatcher.matches(groupId, artifactId)) {
+                return null;
+            }
+            return new GradleVersionCatalogDependency(cursor, groupId, artifactId, null,
+                    dep.getVersion(), null);
+        }
+
+        private static @Nullable GradleVersionCatalogDependency testInlineTable(
+                Cursor cursor, Toml.KeyValue kv, DependencyMatcher dependencyMatcher) {
+            Toml.Table inline = (Toml.Table) kv.getValue();
+            String groupId = TomlTableValue.getString(inline, "group");
+            String artifactId = TomlTableValue.getString(inline, "name");
+            String module = TomlTableValue.getString(inline, "module");
+            if (module != null && (groupId != null || artifactId != null)) {
+                return null;
+            }
+            if (groupId != null && artifactId != null) {
+                return dependencyMatcher.matches(groupId, artifactId) ?
+                        new GradleVersionCatalogDependency(cursor, groupId, artifactId, null,
+                                TomlTableValue.getString(inline, "version"),
+                                TomlTableValue.getString(inline, "version.ref")) :
+                        null;
+            }
+            return testModule(cursor, inline, module, dependencyMatcher);
+        }
+
+        private static @Nullable GradleVersionCatalogDependency testModule(
+                Cursor cursor, Toml.Table inline, @Nullable String module, DependencyMatcher dependencyMatcher) {
+            if (module == null || module.indexOf(':') < 0 || module.indexOf(':') != module.lastIndexOf(':')) {
+                return null;
+            }
+            Dependency dep = DependencyNotation.parse(module);
+            if (dep == null) {
+                return null;
+            }
+            String groupId = dep.getGroupId();
+            String artifactId = dep.getArtifactId();
+            if (groupId == null || groupId.isEmpty() || artifactId.isEmpty() ||
+                    !dependencyMatcher.matches(groupId, artifactId)) {
+                return null;
+            }
+            return new GradleVersionCatalogDependency(cursor, groupId, artifactId, module,
+                    TomlTableValue.getString(inline, "version"),
+                    TomlTableValue.getString(inline, "version.ref"));
         }
     }
 }
