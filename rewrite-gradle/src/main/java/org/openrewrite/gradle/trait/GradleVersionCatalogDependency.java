@@ -23,14 +23,13 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
-
-import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
  * Represents a library entry in a Gradle version catalog TOML file ({@code [libraries]} table).
@@ -56,15 +55,6 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
      * Present for entries that carry a {@code version.ref} key.
      */
     @Nullable String versionRef;
-
-    public boolean hasUnsupportedVersionDeclaration() {
-        if (!(getTree().getValue() instanceof Toml.Table)) {
-            return false;
-        }
-        Toml.Table table = (Toml.Table) getTree().getValue();
-        return TomlTableValue.find(table, "version") != null && version == null ||
-                TomlTableValue.find(table, "version.ref") != null && versionRef == null;
-    }
 
     /**
      * Returns a new {@link Toml.KeyValue} with the version updated to {@code newVersion}.
@@ -109,7 +99,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
     }
 
     public GradleVersionCatalogDependency withVersion(String newVersion) {
-        if (newVersion.equals(version) || versionRef != null || hasUnsupportedVersionDeclaration()) {
+        if (newVersion.equals(version) || versionRef != null) {
             return this;
         }
         return withUpdatedValue(updateValue(groupId, artifactId, newVersion, module),
@@ -125,9 +115,6 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
 
     private Toml.KeyValue updateValue(
             String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String coordinateModule) {
-        if (newVersion != null && hasUnsupportedVersionDeclaration()) {
-            return getTree();
-        }
         if (isUnchanged(newGroupId, newArtifactId, newVersion, coordinateModule)) {
             return getTree();
         }
@@ -193,9 +180,6 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
     private Toml.KeyValue updateTableVersion(Toml.KeyValue kv, Toml.Table inline, @Nullable String newVersion) {
         if (newVersion == null) {
             return kv.withValue(inline);
-        }
-        if (TomlTableValue.find(inline, "version") != null) {
-            return kv.withValue(TomlTableValue.withString(inline, "version", newVersion));
         }
         if (TomlTableValue.find(inline, "version.ref") != null) {
             return kv.withValue(inline);
@@ -294,39 +278,15 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
             if (tableName == null || !"libraries".equals(tableName.getName())) {
                 return null;
             }
+            DependencyMatcher dependencyMatcher = new DependencyMatcher(groupPattern, artifactPattern, null);
 
-            return extractWithCursor(cursor, kv, groupPattern, artifactPattern);
-        }
-
-        /**
-         * Extracts a {@link GradleVersionCatalogDependency} from a {@link Toml.KeyValue} that is already
-         * known to reside inside the {@code [libraries]} table, without requiring a full cursor chain.
-         * Useful when iterating table values directly (e.g. inside a {@code visitDocument} pre-scan).
-         * The returned trait can be used for coordinate/version access and for mutation via its
-         * {@code with*} methods; the updated {@link Toml.KeyValue} should be used as the replacement
-         * value in the enclosing map operation.
-         */
-        public static @Nullable GradleVersionCatalogDependency extract(
-                Toml.KeyValue kv,
-                @Nullable String groupPattern,
-                @Nullable String artifactPattern) {
-            // Build a minimal synthetic cursor so that getTree() / mutation methods work correctly.
-            Cursor syntheticCursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), kv);
-            return extractWithCursor(syntheticCursor, kv, groupPattern, artifactPattern);
-        }
-
-        private static @Nullable GradleVersionCatalogDependency extractWithCursor(
-                Cursor cursor,
-                Toml.KeyValue kv,
-                @Nullable String groupPattern,
-                @Nullable String artifactPattern) {
             if (kv.getValue() instanceof Toml.Literal) {
                 Toml.Literal literal = (Toml.Literal) kv.getValue();
                 if (!(literal.getValue() instanceof String)) {
                     return null;
                 }
                 Dependency dep = DependencyNotation.parse((String) literal.getValue());
-                if (dep == null || !matchesPatterns(dep.getGroupId(), dep.getArtifactId(), groupPattern, artifactPattern)) {
+                if (dep == null || !dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
                     return null;
                 }
                 return new GradleVersionCatalogDependency(cursor, dep.getGroupId(), dep.getArtifactId(), null,
@@ -341,7 +301,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                     return null;
                 }
                 if (groupId != null && artifactId != null) {
-                    if (!matchesPatterns(groupId, artifactId, groupPattern, artifactPattern)) {
+                    if (!dependencyMatcher.matches(groupId, artifactId)) {
                         return null;
                     }
                     return new GradleVersionCatalogDependency(cursor, groupId, artifactId, null,
@@ -354,8 +314,7 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                 Dependency dep = DependencyNotation.parse(module);
                 String depGroupId = dep == null ? null : dep.getGroupId();
                 String depArtifactId = dep == null ? null : dep.getArtifactId();
-                if (depGroupId == null || depGroupId.isEmpty() || depArtifactId == null || depArtifactId.isEmpty() ||
-                        !matchesPatterns(depGroupId, depArtifactId, groupPattern, artifactPattern)) {
+                if (depGroupId == null || depGroupId.isEmpty() || depArtifactId.isEmpty() || !dependencyMatcher.matches(depGroupId, depArtifactId)) {
                     return null;
                 }
                 return new GradleVersionCatalogDependency(cursor, depGroupId, depArtifactId, module,
@@ -363,15 +322,6 @@ public class GradleVersionCatalogDependency implements Trait<Toml.KeyValue> {
                         TomlTableValue.getString(inline, "version.ref"));
             }
             return null;
-        }
-
-        private static boolean matchesPatterns(
-                @Nullable String groupId, @Nullable String artifactId,
-                @Nullable String groupPattern, @Nullable String artifactPattern) {
-            if (groupPattern != null && !matchesGlob(groupId, groupPattern)) {
-                return false;
-            }
-            return artifactPattern == null || matchesGlob(artifactId, artifactPattern);
         }
     }
 }

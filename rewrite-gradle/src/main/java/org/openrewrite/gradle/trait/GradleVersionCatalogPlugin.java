@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.TomlTableValue;
 import org.openrewrite.toml.tree.Toml;
@@ -45,25 +44,29 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
      * Entries using {@code version.ref} are intentionally unchanged; their shared version
      * entry is updated by the recipe after selecting a version.
      */
-    public Toml.KeyValue withVersion(String newVersion) {
+    public GradleVersionCatalogPlugin withVersion(String newVersion) {
         if (newVersion.equals(version) || versionRef != null) {
-            return getTree();
+            return this;
         }
         Toml.KeyValue keyValue = getTree();
         if (keyValue.getValue() instanceof Toml.Literal) {
             Toml.Literal literal = (Toml.Literal) keyValue.getValue();
-            return keyValue.withValue(literal
+            Toml.KeyValue updated = keyValue.withValue(literal
                     .withSource(TomlTableValue.quoted(literal, pluginId + ":" + newVersion))
                     .withValue(pluginId + ":" + newVersion));
+            return new GradleVersionCatalogPlugin(new Cursor(cursor.getParent(), updated),
+                    pluginId, newVersion, null);
         }
         if (!(keyValue.getValue() instanceof Toml.Table)) {
-            return keyValue;
+            return this;
         }
         Toml.Table inline = (Toml.Table) keyValue.getValue();
         if (TomlTableValue.find(inline, "version") == null) {
-            return keyValue;
+            return this;
         }
-        return keyValue.withValue(TomlTableValue.withString(inline, "version", newVersion));
+        Toml.KeyValue updated = keyValue.withValue(TomlTableValue.withString(inline, "version", newVersion));
+        return new GradleVersionCatalogPlugin(new Cursor(cursor.getParent(), updated),
+                pluginId, newVersion, null);
     }
 
     public static class Matcher extends SimpleTraitMatcher<GradleVersionCatalogPlugin> {
@@ -138,7 +141,7 @@ public class GradleVersionCatalogPlugin implements Trait<Toml.KeyValue> {
         }
 
         private static boolean matches(String pluginId, @Nullable String pattern) {
-            return StringUtils.isBlank(pattern) || matchesGlob(pluginId, pattern);
+            return pattern == null || matchesGlob(pluginId, pattern);
         }
     }
 }

@@ -102,7 +102,7 @@ class GradleVersionCatalogPluginTest implements RewriteTest {
                 spec -> spec.recipe(RewriteTest.toRecipe(() ->
                         new GradleVersionCatalogPlugin.Matcher()
                                 .pluginIdPattern("org.jetbrains.kotlin.jvm")
-                                .asVisitor(plugin -> plugin.withVersion("2.1.0")))),
+                                .asVisitor(plugin -> plugin.withVersion("2.1.0").getTree()))),
                 toml(
                         """
                           [plugins]
@@ -123,7 +123,7 @@ class GradleVersionCatalogPluginTest implements RewriteTest {
                 spec -> spec.recipe(RewriteTest.toRecipe(() ->
                         new GradleVersionCatalogPlugin.Matcher()
                                 .pluginIdPattern("org.jetbrains.kotlin.jvm")
-                                .asVisitor(plugin -> plugin.withVersion("2.1.0")))),
+                                .asVisitor(plugin -> plugin.withVersion("2.1.0").getTree()))),
                 toml(
                         """
                           [plugins]
@@ -144,7 +144,7 @@ class GradleVersionCatalogPluginTest implements RewriteTest {
                 spec -> spec.recipe(RewriteTest.toRecipe(() ->
                         new GradleVersionCatalogPlugin.Matcher()
                                 .pluginIdPattern("org.jetbrains.kotlin.jvm")
-                                .asVisitor(plugin -> plugin.withVersion("2.1.0")))),
+                                .asVisitor(plugin -> plugin.withVersion("2.1.0").getTree()))),
                 toml(
                         """
                           [plugins]
