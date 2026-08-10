@@ -19,11 +19,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -35,28 +38,42 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
         if (asBinary.getOperator() == J.Binary.Type.And) {
             if (isLiteralFalse(asBinary.getLeft())) {
-                j = asBinary.getLeft();
+                // The right side is short-circuited, so it is never evaluated, but it may still
+                // declare a pattern variable that the surrounding code reads.
+                if (!declaresPatternVariable(asBinary.getRight())) {
+                    j = asBinary.getLeft();
+                }
             } else if (isLiteralFalse(asBinary.getRight())) {
-                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                if (isEvaluationFreeOfObservableEffects(asBinary.getLeft())) {
+                    j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                }
             } else if (isLiteralTrue(asBinary.getLeft())) {
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight()) &&
+                       isEvaluationFreeOfObservableEffects(asBinary.getLeft())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
             if (isLiteralTrue(asBinary.getLeft())) {
-                j = asBinary.getLeft();
+                // The right side is short-circuited, so it is never evaluated, but it may still
+                // declare a pattern variable that the surrounding code reads.
+                if (!declaresPatternVariable(asBinary.getRight())) {
+                    j = asBinary.getLeft();
+                }
             } else if (isLiteralTrue(asBinary.getRight())) {
-                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                if (isEvaluationFreeOfObservableEffects(asBinary.getLeft())) {
+                    j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                }
             } else if (isLiteralFalse(asBinary.getLeft())) {
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight()) &&
+                       isEvaluationFreeOfObservableEffects(asBinary.getLeft())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -284,7 +301,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             Expression arg = asMethod.getArguments().get(0);
             if (arg instanceof J.Literal && select instanceof J.Literal) {
                 return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));
-            } else if (SemanticallyEqual.areEqual(select, arg)) {
+            } else if (isEvaluationFreeOfObservableEffects(select) &&
+                       isEvaluationFreeOfObservableEffects(arg) &&
+                       SemanticallyEqual.areEqual(select, arg)) {
                 return booleanLiteral(method, true);
             }
         }
@@ -431,6 +450,150 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     /**
+     * A single, deliberately conservative purity and repeatability predicate, used everywhere this
+     * visitor would otherwise delete an evaluation ({@code effect() && false}, {@code effect() || true})
+     * or fold two evaluations into one ({@code x && x}, {@code x.equals(x)}).
+     * <p>
+     * Boolean identities preserve the resulting value, not the evaluation that produced it, so they are
+     * only sound when re-ordering, dropping or de-duplicating that evaluation cannot be observed. Only an
+     * allow list of node kinds is accepted; anything else, in particular an arbitrary method invocation,
+     * constructor call, assignment or increment anywhere in the subtree, is assumed to mutate state, throw,
+     * block, synchronize, perform I/O or return a changing value. Array access and casts are rejected
+     * outright, which also covers method calls nested inside them, and reads of {@code volatile} variables
+     * are rejected because they are synchronization actions whose repetition is observable.
+     * <p>
+     * The only invocations on the allow list are {@code String#isEmpty()} and {@code String#equals(Object)},
+     * the two calls this visitor already constant folds. Both are declared on the {@code final} class
+     * {@code String}, so neither can be overridden, and both only read {@code String} state, so the sole
+     * effect they can have is a {@link NullPointerException} on a {@code null} receiver.
+     * <p>
+     * These elisions are accepted deliberately, because rejecting them would stop this visitor from
+     * cleaning up the literal-heavy conditions that Refaster templates and constant folding produce, and
+     * none of them was preserved before this predicate existed either:
+     * <ul>
+     *     <li>a {@link NullPointerException} from a {@code null} receiver, both for the two allowed
+     *     {@code String} calls and for a field read such as {@code a.b};</li>
+     *     <li>a {@link NullPointerException} from unboxing, as in {@code Boolean b; b && false};</li>
+     *     <li>the static initializer that reading a non-constant static field of another class runs;</li>
+     *     <li>a {@code volatile} read whose variable carries no type attribution, which the languages
+     *     that do not attribute variables rely on.</li>
+     * </ul>
+     * The allow list describes Java semantics. Groovy, Kotlin and the other languages that inherit this
+     * visitor resolve more of it to user code: {@code a.b} is a property read that runs a getter, and
+     * {@code ==}, {@code <}, {@code !}, {@code &&} and {@code ?:} dispatch to a user-definable
+     * {@code equals}, {@code compareTo}, {@code not} or {@code asBoolean}. Only the qualified read is
+     * guarded here, because it is the one case that can be rejected without also rejecting every
+     * unattributed identifier and operator, which would leave those languages unable to simplify
+     * anything but literals. So {@code a.b && false} keeps its operand outside Java, while a bare
+     * {@code flag && false} or an operator such as {@code (a == b) && false} still drops it, exactly as
+     * both did before this predicate existed. Closing that remainder needs a language-aware operator
+     * model rather than a wider allow list.
+     *
+     * @param tree the subtree that a simplification would drop or evaluate fewer times
+     * @return true only when that is unobservable, modulo the elisions listed above
+     */
+    protected boolean isEvaluationFreeOfObservableEffects(@Nullable J tree) {
+        if (tree instanceof J.Literal || tree instanceof J.Empty) {
+            return true;
+        }
+        if (tree instanceof J.Identifier) {
+            return isStableRead(((J.Identifier) tree).getFieldType());
+        }
+        if (tree instanceof J.FieldAccess) {
+            J.FieldAccess fieldAccess = (J.FieldAccess) tree;
+            return isJava() &&
+                   isStableRead(fieldAccess.getName().getFieldType()) &&
+                   isEvaluationFreeOfObservableEffects(fieldAccess.getTarget());
+        }
+        if (tree instanceof J.Parentheses) {
+            return isEvaluationFreeOfObservableEffects(((J.Parentheses<?>) tree).getTree());
+        }
+        if (tree instanceof J.ControlParentheses) {
+            return isEvaluationFreeOfObservableEffects(((J.ControlParentheses<?>) tree).getTree());
+        }
+        if (tree instanceof J.Unary) {
+            J.Unary unary = (J.Unary) tree;
+            return !unary.getOperator().isModifying() && isEvaluationFreeOfObservableEffects(unary.getExpression());
+        }
+        if (tree instanceof J.InstanceOf) {
+            J.InstanceOf instanceOf = (J.InstanceOf) tree;
+            return instanceOf.getPattern() == null && isEvaluationFreeOfObservableEffects(instanceOf.getExpression());
+        }
+        if (tree instanceof J.Ternary) {
+            J.Ternary ternary = (J.Ternary) tree;
+            return isEvaluationFreeOfObservableEffects(ternary.getCondition()) &&
+                   isEvaluationFreeOfObservableEffects(ternary.getTruePart()) &&
+                   isEvaluationFreeOfObservableEffects(ternary.getFalsePart());
+        }
+        if (tree instanceof J.Binary) {
+            J.Binary binary = (J.Binary) tree;
+            J.Binary.Type operator = binary.getOperator();
+            if (operator == J.Binary.Type.Addition || // String concatenation can call a user defined `toString()`
+                operator == J.Binary.Type.Division || operator == J.Binary.Type.Modulo) { // Can throw `ArithmeticException`
+                return false;
+            }
+            return isEvaluationFreeOfObservableEffects(binary.getLeft()) &&
+                   isEvaluationFreeOfObservableEffects(binary.getRight());
+        }
+        if (tree instanceof J.MethodInvocation) {
+            J.MethodInvocation method = (J.MethodInvocation) tree;
+            if (!isEmpty.matches(method) && !equals.matches(method)) {
+                return false;
+            }
+            if (!isEvaluationFreeOfObservableEffects(method.getSelect())) {
+                return false;
+            }
+            for (Expression argument : method.getArguments()) {
+                if (!isEvaluationFreeOfObservableEffects(argument)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isStableRead(JavaType.@Nullable Variable variable) {
+        return variable == null || !variable.hasFlags(Flag.Volatile);
+    }
+
+    private boolean isJava() {
+        return getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit;
+    }
+
+    /**
+     * A short-circuited operand is never evaluated, but it can still declare a pattern variable that the
+     * surrounding code reads: {@code if (false && o instanceof String s) { s.length(); }} compiles, because
+     * {@code s} is definitely matched wherever the condition is true. Dropping that operand deletes the
+     * declaration and produces source that no longer compiles.
+     * <p>
+     * This over-approximates: a pattern variable only escapes the operand through {@code &&}, {@code ||},
+     * {@code !} and parentheses, so some of the operands this rejects could in fact be dropped. The one
+     * exception made is a lambda body, whose pattern variables are scoped to the lambda and can never be
+     * read by the surrounding code.
+     *
+     * @param expression the short-circuited operand a simplification would drop
+     * @return true if dropping it would delete a pattern variable declaration
+     */
+    private static boolean declaresPatternVariable(Expression expression) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, AtomicBoolean found) {
+                if (instanceOf.getPattern() != null) {
+                    found.set(true);
+                    return instanceOf;
+                }
+                return super.visitInstanceOf(instanceOf, found);
+            }
+
+            @Override
+            public J.Lambda visitLambda(J.Lambda lambda, AtomicBoolean found) {
+                return lambda;
+            }
+        }.reduce(expression, new AtomicBoolean()).get();
+    }
+
+    /**
      * In Java, {@code !} only applies to boolean expressions, so {@code !!x} is always
      * equivalent to {@code x}. In other languages like JavaScript/TypeScript and Groovy,
      * {@code !!x} is an idiomatic boolean coercion that converts any truthy/falsy value
@@ -438,7 +601,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
      * semantics when {@code x} is not boolean-typed.
      */
     private boolean canSimplifyDoubleNegation(Expression innerExpression) {
-        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+        if (isJava()) {
             return true;
         }
         return innerExpression.getType() == JavaType.Primitive.Boolean;
@@ -460,7 +623,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
      * @return true if the equals comparison can be safely simplified
      */
     protected boolean shouldSimplifyEqualsOn(J j) {
-        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+        if (isJava()) {
             return true;
         }
         return j instanceof Expression && ((Expression) j).getType() == JavaType.Primitive.Boolean;

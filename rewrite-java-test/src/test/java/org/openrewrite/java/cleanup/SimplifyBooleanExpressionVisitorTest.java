@@ -663,6 +663,292 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void retainEvaluationDroppedByBooleanIdentities() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class State {
+                      boolean value;
+                  }
+
+                  boolean effect() {
+                      return true;
+                  }
+
+                  State next() {
+                      return new State();
+                  }
+
+                  String nextString() {
+                      return "";
+                  }
+
+                  boolean andFalse() {
+                      return effect() && false;
+                  }
+
+                  boolean orTrue() {
+                      return effect() || true;
+                  }
+
+                  boolean repeatedField() {
+                      return next().value && next().value;
+                  }
+
+                  boolean repeatedEquals() {
+                      return nextString().equals(nextString());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainEvaluationNestedInsideDroppedOperand() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class State {
+                      boolean value;
+                  }
+
+                  boolean[] flags = new boolean[1];
+
+                  State next() {
+                      return new State();
+                  }
+
+                  Boolean boxed() {
+                      return Boolean.TRUE;
+                  }
+
+                  int denominator() {
+                      return 0;
+                  }
+
+                  int index() {
+                      return 0;
+                  }
+
+                  boolean nestedInFieldAccess() {
+                      return next().value && false;
+                  }
+
+                  boolean nestedInArrayAccess() {
+                      return flags[index()] || true;
+                  }
+
+                  boolean nestedInCast() {
+                      return (boolean) boxed() && false;
+                  }
+
+                  boolean nestedInParentheses() {
+                      return /*keep*/(next().value) || true;
+                  }
+
+                  boolean nestedInDivision() {
+                      return 1 / denominator() > 0 && false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainEvaluationRejectedWithoutAnyMethodCall() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean[] flags = new boolean[1];
+                  Boolean boxed = Boolean.TRUE;
+                  int zero = 0;
+                  int counter;
+
+                  boolean arrayAccess() {
+                      return flags[0] && false;
+                  }
+
+                  boolean cast() {
+                      return (boolean) boxed || true;
+                  }
+
+                  boolean division() {
+                      return 1 / zero > 0 && false;
+                  }
+
+                  boolean modulo() {
+                      return 1 % zero > 0 || true;
+                  }
+
+                  boolean increment() {
+                      return counter++ > 0 && false;
+                  }
+
+                  boolean concatenation() {
+                      return ("a" + boxed).isEmpty() && false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainVolatileReads() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  volatile boolean flag;
+
+                  boolean andFalse() {
+                      return flag && false;
+                  }
+
+                  boolean orTrue() {
+                      return flag || true;
+                  }
+
+                  boolean repeated() {
+                      return flag && flag;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeShortCircuitedRightOperand() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean effect() {
+                      return true;
+                  }
+
+                  boolean andFalse() {
+                      return false && effect();
+                  }
+
+                  boolean orTrue() {
+                      return true || effect();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean effect() {
+                      return true;
+                  }
+
+                  boolean andFalse() {
+                      return false;
+                  }
+
+                  boolean orTrue() {
+                      return true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainPatternVariableDeclaredByShortCircuitedOperand() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int andFalse(Object o) {
+                      if (false && o instanceof String s) {
+                          return s.length();
+                      }
+                      return 0;
+                  }
+
+                  int orTrue(Object o) {
+                      if (true || !(o instanceof String s)) {
+                          return 0;
+                      }
+                      return s.length();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dropShortCircuitedOperandWhosePatternVariableCannotEscape() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  boolean orTrue(List<Object> l) {
+                      return true || l.stream().anyMatch(o -> o instanceof String s && !s.isEmpty());
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  boolean orTrue(List<Object> l) {
+                      return true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stillSimplifyEvaluationFreeIdentities() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean field;
+
+                  void m(boolean a, String s) {
+                      boolean b = a && false;
+                      boolean c = a || true;
+                      boolean d = a && a;
+                      boolean e = a || a;
+                      boolean f = this.field && false;
+                      boolean g = s.equals(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean field;
+
+                  void m(boolean a, String s) {
+                      boolean b = false;
+                      boolean c = true;
+                      boolean d = a;
+                      boolean e = a;
+                      boolean f = false;
+                      boolean g = true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @CsvSource(delimiterString = "//", textBlock = """
       a == null || a.isEmpty()                                 // a == null || a.isEmpty()
       a == null || !a.isEmpty()                                // a == null || !a.isEmpty()
