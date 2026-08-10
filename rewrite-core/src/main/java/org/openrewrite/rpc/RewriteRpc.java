@@ -41,9 +41,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -63,6 +65,8 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  */
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
+    private static final ThreadLocal<@Nullable RewriteRpc> CURRENT = new ThreadLocal<>();
+
     private final JsonRpc jsonRpc;
     private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
@@ -167,9 +171,9 @@ public class RewriteRpc {
             }
             return o;
         };
-        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
+        jsonRpc.rpc("Visit", new Visit.Handler(this, localObjects, preparedRecipes,
                 getRecipeObject, this::getCursor));
-        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(localObjects, preparedRecipes,
+        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(this, localObjects, preparedRecipes,
                 getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 getRecipeObject));
@@ -262,6 +266,33 @@ public class RewriteRpc {
         });
 
         jsonRpc.bind();
+    }
+
+    /**
+     * The instance the request currently being handled on this thread arrived on, or
+     * {@code null} outside request handling. Lets a visitor dispatch follow-up visits back
+     * to the requesting peer when this process is the spawned server and has no other
+     * handle to it.
+     */
+    public static @Nullable RewriteRpc current() {
+        return CURRENT.get();
+    }
+
+    /**
+     * Runs {@code work} with this instance discoverable via {@link #current()}.
+     */
+    public <T> T withCurrent(Callable<T> work) throws Exception {
+        RewriteRpc previous = CURRENT.get();
+        CURRENT.set(this);
+        try {
+            return work.call();
+        } finally {
+            if (previous == null) {
+                CURRENT.remove();
+            } else {
+                CURRENT.set(previous);
+            }
+        }
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
@@ -738,13 +769,12 @@ public class RewriteRpc {
 
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
             // which spawns helper threads that can leak per-thread RewriteRpc state.
-            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate.
-            long totalTimeoutMs = timeout.toMillis();
             long pollIntervalMs = 1;
-            long livenessIntervalMs = 500;
-            long elapsedMs = 0;
-            long lastLivenessMs = 0;
-            while (elapsedMs < totalTimeoutMs) {
+            long livenessIntervalNanos = TimeUnit.MILLISECONDS.toNanos(500);
+            long startNanos = System.nanoTime();
+            long deadlineNanos = startNanos + TimeUnit.MILLISECONDS.toNanos(timeout.toMillis());
+            long lastLivenessNanos = startNanos;
+            while (System.nanoTime() < deadlineNanos) {
                 JsonRpcSuccess result = future.getNow(null);
                 if (result != null) {
                     return result.getResult(responseType);
@@ -753,10 +783,10 @@ public class RewriteRpc {
                     return future.get().getResult(responseType);
                 }
                 Thread.sleep(pollIntervalMs);
-                elapsedMs += pollIntervalMs;
-                if (elapsedMs - lastLivenessMs >= livenessIntervalMs) {
+                long nowNanos = System.nanoTime();
+                if (nowNanos - lastLivenessNanos >= livenessIntervalNanos) {
                     checkLiveness();
-                    lastLivenessMs = elapsedMs;
+                    lastLivenessNanos = nowNanos;
                 }
             }
 

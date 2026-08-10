@@ -149,6 +149,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+
+        @Nullable
         BuildTool currentMarker;
 
         @Nullable
@@ -184,16 +186,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
-                        Optional<BuildTool> maybeBuildTool = sourceFile.getMarkers().findFirst(BuildTool.class);
-                        if (!maybeBuildTool.isPresent()) {
-                            return false;
-                        }
-                        BuildTool buildTool = maybeBuildTool.get();
-                        if (buildTool.getType() != BuildTool.Type.Gradle) {
-                            return false;
-                        }
-
-                        acc.currentMarker = buildTool;
+                        acc.currentMarker = sourceFile.getMarkers().findFirst(BuildTool.class)
+                                .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
+                                .orElse(null);
                         return true;
                     }
 
@@ -207,20 +202,29 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
 
+                        String currentVersion = acc.currentMarker == null ?
+                                GradleWrapper.versionFromDistributionUrl(currentDistributionUrl) :
+                                acc.currentMarker.getVersion();
+                        if (currentVersion == null) {
+                            return entry;
+                        }
+
                         String newVersion = isBlank(version) ? "latest.release" : version;
                         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, null).getValue());
-                        if (versionComparator.compare(null, acc.currentMarker.getVersion(), newVersion) > 0) {
+                        if (versionComparator.compare(null, currentVersion, newVersion) > 0) {
                             return entry;
                         }
 
                         GradleWrapper gradleWrapper = getGradleWrapper(currentDistributionUrl, ctx);
                         String gradleWrapperVersion = gradleWrapper.getVersion();
 
-                        int compare = versionComparator.compare(null, acc.currentMarker.getVersion(), gradleWrapperVersion);
+                        int compare = versionComparator.compare(null, currentVersion, gradleWrapperVersion);
                         // maybe we want to update the distribution type or url
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
-                            acc.updatedMarker = acc.currentMarker.withVersion(gradleWrapperVersion);
+                            if (acc.currentMarker != null) {
+                                acc.updatedMarker = acc.currentMarker.withVersion(gradleWrapperVersion);
+                            }
                             return entry;
                         } else if (compare == 0 && !gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
                             acc.needsWrapperUpdate = true;

@@ -232,6 +232,144 @@ class TestMaybeRemoveImport:
             )
         )
 
+    def test_keep_aliased_from_import_when_alias_used(self):
+        """Keep 'from typing import List as L' while L is used."""
+        class RemoveListVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='typing',
+                    name='List',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveListVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List as L
+                x = L
+                """,
+            )
+        )
+
+    def test_remove_aliased_from_import_when_alias_unused(self):
+        """Remove 'from typing import List as L' when L is not used."""
+        class RemoveListVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='typing',
+                    name='List',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveListVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List as L
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_remove_aliased_from_import_even_when_imported_name_used(self):
+        """A use of the bare imported name is some other binding and must not
+        keep the aliased import alive."""
+        class RemoveListVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='typing',
+                    name='List',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveListVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List as L
+                List = [1]
+                """,
+                """
+                List = [1]
+                """,
+            )
+        )
+
+    def test_mixed_multi_import_removes_only_unreferenced_bindings(self):
+        """Only the entry whose bound name is unreferenced is removed."""
+        class RemoveListVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='typing',
+                    name='List',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveListVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List, List as L
+                x = L
+                """,
+                """
+                from typing import List as L
+                x = L
+                """,
+            )
+        )
+
+    def test_keep_aliased_direct_import_when_alias_used(self):
+        """Keep 'import numpy as np' while np is used."""
+        class RemoveNumpyVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='numpy',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveNumpyVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                import numpy as np
+                x = np
+                """,
+            )
+        )
+
+    def test_remove_aliased_direct_import_when_alias_unused(self):
+        """Remove 'import numpy as np' when np is not used."""
+        class RemoveNumpyVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='numpy',
+                    only_if_unused=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveNumpyVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                import numpy as np
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
     def test_partial_from_import_removal_keeps_ids_accessible(self):
         """Removing one name from a from-import rebuilds the MultiImport from the
         public `.id` property; the rebuilt node's id must remain accessible
@@ -284,5 +422,99 @@ class TestMaybeRemoveImport:
                 x = 1
                 """,
                 after_recipe=_assert_ids_accessible,
+            )
+        )
+
+
+class TestCanonicalRemoveImport:
+    """A requested (module, name) also matches an import by its canonical FQN
+    (``os.path.join`` is canonically ``posixpath.join``), not just by its
+    written path."""
+
+    @staticmethod
+    def _remover(module, name=None):
+        class RemoveVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module=module, name=name, only_if_unused=False))
+                return super().visit_compilation_unit(cu, p)
+
+        return RecipeSpec(recipe=from_visitor(RemoveVisitor()))
+
+    def test_remove_reexported_function_by_canonical_fqn(self):
+        self._remover('posixpath', 'join').rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_remove_reexported_class_by_canonical_fqn(self):
+        self._remover('typing', 'Iterable').rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_canonical_removal_keeps_other_names(self):
+        self._remover('posixpath', 'join').rewrite_run(
+            python(
+                """
+                from os.path import exists, join
+                x = 1
+                """,
+                """
+                from os.path import exists
+                x = 1
+                """,
+            )
+        )
+
+    def test_remove_module_binding_by_canonical_fqn(self):
+        """`from os import path` binds the module canonically named os.path."""
+        self._remover('os.path').rewrite_run(
+            python(
+                """
+                from os import path
+                x = 1
+                """,
+                """
+                x = 1
+                """,
+            )
+        )
+
+    def test_canonical_mismatch_is_not_removed(self):
+        """os.path.exists is canonically genericpath.exists, not posixpath.exists."""
+        self._remover('posixpath', 'exists').rewrite_run(
+            python(
+                """
+                from os.path import exists
+                x = 1
+                """,
+            )
+        )
+
+    def test_whole_module_removal_spares_canonically_related_members(self):
+        """`typing` is the canonical home of many re-exports, so a whole-module
+        request must match only bindings of the module itself — not every member
+        that happens to be declared there."""
+        self._remover('typing').rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                x = 1
+                """,
             )
         )

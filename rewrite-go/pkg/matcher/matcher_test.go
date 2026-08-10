@@ -92,6 +92,85 @@ func TestIsString(t *testing.T) {
 	}
 }
 
+func TestIsInt(t *testing.T) {
+	// Signed widths map to primitive keywords; unsigned widths to named types.
+	intLike := []java.JavaType{
+		&java.JavaTypePrimitive{Keyword: "int"},   // int, int32
+		&java.JavaTypePrimitive{Keyword: "long"},  // int64
+		&java.JavaTypePrimitive{Keyword: "short"}, // int16
+		&java.JavaTypePrimitive{Keyword: "byte"},  // int8, byte
+		&java.JavaTypeClass{FullyQualifiedName: "uint"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint8"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint16"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint32"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint64"},
+		&java.JavaTypeClass{FullyQualifiedName: "uintptr"},
+	}
+	for _, typ := range intLike {
+		if !IsInt(typ) {
+			t.Errorf("IsInt(%q) = false, want true", GetFullyQualifiedName(typ))
+		}
+	}
+	notInt := []java.JavaType{
+		&java.JavaTypePrimitive{Keyword: "double"},
+		&java.JavaTypePrimitive{Keyword: "String"},
+		&java.JavaTypePrimitive{Keyword: "boolean"},
+		nil,
+	}
+	for _, typ := range notInt {
+		if IsInt(typ) {
+			t.Errorf("IsInt(%q) = true, want false", GetFullyQualifiedName(typ))
+		}
+	}
+}
+
+func TestIsNumeric(t *testing.T) {
+	numeric := []java.JavaType{
+		// Signed widths, floats, and rune map to primitive keywords.
+		&java.JavaTypePrimitive{Keyword: "int"},    // int, int32
+		&java.JavaTypePrimitive{Keyword: "long"},   // int64
+		&java.JavaTypePrimitive{Keyword: "short"},  // int16
+		&java.JavaTypePrimitive{Keyword: "byte"},   // int8, byte
+		&java.JavaTypePrimitive{Keyword: "float"},  // float32
+		&java.JavaTypePrimitive{Keyword: "double"}, // float64
+		&java.JavaTypePrimitive{Keyword: "char"},   // rune
+		// Unsigned widths have no Java primitive, so they are named types.
+		&java.JavaTypeClass{FullyQualifiedName: "uint"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint8"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint16"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint32"},
+		&java.JavaTypeClass{FullyQualifiedName: "uint64"},
+		&java.JavaTypeClass{FullyQualifiedName: "uintptr"},
+	}
+	for _, typ := range numeric {
+		if !IsNumeric(typ) {
+			t.Errorf("IsNumeric(%q) = false, want true", GetFullyQualifiedName(typ))
+		}
+	}
+	if IsNumeric(&java.JavaTypePrimitive{Keyword: "String"}) {
+		t.Error("IsNumeric(String) = true, want false")
+	}
+	if IsNumeric(nil) {
+		t.Error("IsNumeric(nil) = true, want false")
+	}
+}
+
+// Pattern type names must resolve to the same signature the type mapper
+// produces, so int64 patterns match "long" and uint stays "uint".
+func TestResolveGoType(t *testing.T) {
+	tests := map[string]string{
+		"int": "int", "int32": "int", "int16": "short", "int8": "byte", "int64": "long",
+		"uint": "uint", "uint64": "uint64", "uintptr": "uintptr",
+		"float32": "float", "float64": "double",
+		"string": "String", "bool": "boolean", "byte": "byte", "rune": "char", "error": "error",
+	}
+	for in, want := range tests {
+		if got := resolveGoType(in); got != want {
+			t.Errorf("resolveGoType(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestAsClass(t *testing.T) {
 	cls := &java.JavaTypeClass{FullyQualifiedName: "foo.Bar"}
 	if AsClass(cls) != cls {

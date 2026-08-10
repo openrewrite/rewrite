@@ -16,7 +16,7 @@
 
 from typing import Optional
 
-from rewrite.java.support_types import JRightPadded, Space
+from rewrite.java.support_types import JavaType, JRightPadded, Space
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import
 from rewrite.markers import Markers
 
@@ -55,6 +55,28 @@ def get_alias_name(imp: Import) -> Optional[str]:
     alias = imp.alias
     if isinstance(alias, Identifier):
         return alias.simple_name
+    return None
+
+
+def get_canonical_fqn(imp: Import) -> Optional[str]:
+    """The canonical fully qualified name of the symbol ``imp`` binds, read off
+    the type attributed to its qualid (see
+    ``PythonTypeMapping.import_alias_type``), or None when unattributed. Differs
+    from the written path for re-exports: ``from os.path import join`` yields
+    ``posixpath.join``."""
+    t = getattr(imp.qualid, 'type', None)
+    if isinstance(t, JavaType.Method):
+        declaring = t.declaring_type
+        if isinstance(declaring, JavaType.FullyQualified) and \
+                not isinstance(declaring, JavaType.Unknown) and t.name:
+            declaring_fqn = getattr(declaring, 'fully_qualified_name', None)
+            if declaring_fqn:
+                return f"{declaring_fqn}.{t.name}"
+        return None
+    if isinstance(t, JavaType.Parameterized):
+        t = t.type
+    if isinstance(t, JavaType.FullyQualified) and not isinstance(t, JavaType.Unknown):
+        return getattr(t, 'fully_qualified_name', None) or None
     return None
 
 

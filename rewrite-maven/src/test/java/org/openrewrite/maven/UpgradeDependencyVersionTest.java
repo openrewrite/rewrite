@@ -16,10 +16,13 @@
 package org.openrewrite.maven;
 
 import com.google.common.collect.Lists;
+import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,14 +30,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.net.InetAddress;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -3048,7 +3055,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void bomUpgradeSkipsSnapshotVersions() throws Exception {
+        // Serve over TLS: MavenPomDownloader#normalizeRepository probes https first and only falls back to
+        // http once that fails, so a plaintext mock costs two doomed handshakes per repository before anything
+        // resolves.
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
         try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
@@ -3168,7 +3189,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         <mirror>
                             <mirrorOf>*</mirrorOf>
                             <name>mock</name>
-                            <url>http://%s:%d</url>
+                            <url>https://%s:%d</url>
                             <id>mock</id>
                         </mirror>
                     </mirrors>
@@ -3176,10 +3197,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 """.formatted(mockRepo.getHostName(), mockRepo.getPort())
             ), new InMemoryExecutionContext());
 
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
             rewriteRun(
               spec -> spec
                 .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "2.x", null, true, null))
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
                   .setMavenSettings(settings, "mock")),
               pomXml(
                 """

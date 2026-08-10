@@ -14,6 +14,7 @@
 
 """AddImport visitor for Python import handling."""
 
+import builtins
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -23,7 +24,7 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, pad_right
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn, pad_right
 from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -90,10 +91,6 @@ def maybe_add_import(visitor: PythonVisitor, options: AddImportOptions) -> None:
         # Add: from typing import *
         maybe_add_import(visitor, AddImportOptions(module='typing', name='*'))
     """
-    # builtins are always available; only import them under an explicit alias
-    if options.module == 'builtins' and options.alias is None:
-        return
-
     # Check for duplicate registrations
     if visitor._after_visit is None:
         visitor._after_visit = []
@@ -126,6 +123,15 @@ class AddImport(PythonVisitor):
         self.only_if_referenced = options.only_if_referenced
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
+        # builtins are always available; only import them under an explicit alias
+        if self.module == 'builtins' and self.alias is None:
+            return cu
+
+        # A bare builtin name (e.g. `list` when ChangeType retargets a type to a builtin) is
+        # not a module, so there is no import that could bind it.
+        if self.name is None and '.' not in self.module and hasattr(builtins, self.module):
+            return cu
+
         # Check if import already exists
         if self._import_exists(cu):
             return cu
@@ -168,10 +174,14 @@ class AddImport(PythonVisitor):
             if multi.from_ is None:
                 return False  # This is not a "from" import
             from_name = get_name_string(multi.from_)
-            if from_name != self.module:
-                return False
             for imp in multi.names:
-                if self._import_name_matches(imp, self.name, self.alias):
+                if from_name == self.module and self._import_name_matches(imp, self.name, self.alias):
+                    return True
+                # A member canonically matching the requested module.name
+                # satisfies the request too — provided it binds the same name,
+                # so references to the requested name resolve through it.
+                if get_canonical_fqn(imp) == f"{self.module}.{self.name}" and \
+                        (get_alias_name(imp) or get_qualid_name(imp.qualid)) == (self.alias or self.name):
                     return True
         return False
 
@@ -196,9 +206,25 @@ class AddImport(PythonVisitor):
             def __init__(self):
                 super().__init__()
                 self.found = False
+                self.in_import = False
+
+            def visit_import(self, import_: Import, p) -> J:
+                # Identifiers in import statements are bindings, not references.
+                self.in_import = True
+                try:
+                    return super().visit_import(import_, p)
+                finally:
+                    self.in_import = False
+
+            def visit_multi_import(self, multi: MultiImport, p) -> J:
+                self.in_import = True
+                try:
+                    return super().visit_multi_import(multi, p)
+                finally:
+                    self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if ident.simple_name == target_name:
+                if not self.in_import and ident.simple_name == target_name:
                     self.found = True
                 return ident
 

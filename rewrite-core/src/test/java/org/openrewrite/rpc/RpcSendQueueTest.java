@@ -15,16 +15,21 @@
  */
 package org.openrewrite.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Marker;
 
 import java.nio.file.AccessMode;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.rpc.RpcObjectData.State.ADD;
 
 class RpcSendQueueTest {
 
@@ -72,6 +77,125 @@ class RpcSendQueueTest {
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void changedListElementWithoutCodecIsInlined() throws Exception {
+        BuildTool before = new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.0");
+        BuildTool after = before.withVersion("8.0");
+
+        CountDownLatch latch = new CountDownLatch(1);
+        RpcSendQueue q = new RpcSendQueue(10, t -> {
+            assertThat(t).containsExactly(
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, false),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0), null, false),
+              // codec-less elements carry their value inline on CHANGE
+              new RpcObjectData(RpcObjectData.State.CHANGE, BuildTool.class.getName(), after, null, false)
+            );
+            latch.countDown();
+        }, new IdentityHashMap<>(), null, false);
+
+        q.sendList(List.of(after), List.of(before), Marker::getId, null, false);
+        q.flush();
+
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void changedRefSlotIsReAddedInsteadOfChanged() {
+        List<RpcObjectData> sent = new ArrayList<>();
+        RpcSendQueue q = new RpcSendQueue(100, sent::addAll, new IdentityHashMap<>(), null, false);
+
+        String t1 = "T1";
+        String t2 = "T2";
+
+        q.send(Reference.asRef(t1), null, null);
+        q.send(Reference.asRef(t2), Reference.asRef(t1), null);
+        // A repeat of the same transition dedups against the ref registered by the re-add
+        q.send(Reference.asRef(t2), Reference.asRef(t1), null);
+        q.flush();
+
+        assertThat(sent).containsExactly(
+          new RpcObjectData(ADD, null, "T1", 1, false),
+          new RpcObjectData(ADD, null, "T2", 2, false),
+          new RpcObjectData(ADD, null, null, 2, false)
+        );
+    }
+
+    @Test
+    void deletedRefSlotIsSent() {
+        RefSlotDiff diff = diffRefSlot("java.util.List", null);
+        assertThat(diff.data())
+          .extracting(RpcObjectData::getState)
+          .containsExactly(RpcObjectData.State.CHANGE, RpcObjectData.State.DELETE);
+        assertThat(diff.consumed()).isNull();
+    }
+
+    @Test
+    void identicalRefSlotIsNoChange() {
+        Object type = new Object();
+        RefSlotDiff diff = diffRefSlot(type, type);
+        assertThat(diff.data())
+          .extracting(RpcObjectData::getState)
+          .containsExactly(RpcObjectData.State.CHANGE, RpcObjectData.State.NO_CHANGE);
+        assertThat(diff.consumed()).isNull();
+    }
+
+    @Test
+    void changedRefSlotOfDifferentClassIsAdded() {
+        RefSlotDiff diff = diffRefSlot(1, "java.util.ArrayList");
+        assertThat(diff.data())
+          .extracting(RpcObjectData::getState)
+          .containsExactly(RpcObjectData.State.CHANGE, RpcObjectData.State.ADD);
+        assertThat(diff.consumed()).isEqualTo("java.util.ArrayList");
+    }
+
+    /**
+     * Diffs one ref-wrapped slot between a before and an after holder. The slot is emitted
+     * from within the holders' own diff (send &rarr; onChange &rarr; getAndSend), which is what
+     * seeds the queue's before context; a bare getAndSend would diff against null and always ADD.
+     */
+    private RefSlotDiff diffRefSlot(@Nullable Object beforeValue, @Nullable Object afterValue) {
+        List<RpcObjectData> data = new ArrayList<>();
+        RpcSendQueue q = new RpcSendQueue(100, data::addAll, new IdentityHashMap<>(), null, false);
+        Holder after = new Holder(afterValue);
+        AtomicReference<Object> consumed = new AtomicReference<>();
+        q.send(after, new Holder(beforeValue), () ->
+          q.getAndSend(after, h -> Reference.asRef(h.value), v -> consumed.set(Reference.getValue(v))));
+        q.flush();
+        return new RefSlotDiff(data, consumed.get());
+    }
+
+    private record RefSlotDiff(List<RpcObjectData> data, @Nullable Object consumed) {
+    }
+
+    private record Holder(@Nullable Object value) {
+    }
+
+    @Test
+    void listImplementationClassMayDiffer() {
+        List<String> before = new ArrayList<>(List.of("A", "B"));
+        List<String> after = List.of("A");
+
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    @Test
+    void listImplementationClassMayDifferReverse() {
+        List<String> before = List.of("A");
+        List<String> after = new ArrayList<>(List.of("A", "B"));
+
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    private List<String> roundTripList(List<String> after, List<String> before) {
+        Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
+        RpcSendQueue sq = new RpcSendQueue(1, batches::addLast, new IdentityHashMap<>(), null, false);
+        RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
+
+        sq.sendList(after, before, Function.identity(), null, false);
+        sq.flush();
+        return rq.receiveList(before, null);
     }
 
     @Test

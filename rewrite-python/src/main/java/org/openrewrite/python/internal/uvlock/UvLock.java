@@ -33,7 +33,7 @@ public class UvLock {
 
     /**
      * Lockfile revision: absent for uv &lt; 0.6 locks, 2 for ~0.7, 3 for current uv.
-     * Drives whether artifacts carry {@code upload-time}; surgical edits must match it.
+     * Drives whether artifacts carry {@code upload-time}; in-place edits must match it.
      */
     @Nullable
     Integer revision;

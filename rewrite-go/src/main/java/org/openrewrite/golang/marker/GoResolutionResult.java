@@ -70,7 +70,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
     @Nullable String toolchain;
 
     /**
-     * Absolute or repo-relative path to the go.mod file.
+     * Project-root-relative path to the go.mod file, matching the {@code GoMod}'s own source path.
      */
     @ToString.Include
     String path;

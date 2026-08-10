@@ -41,7 +41,7 @@ import org.openrewrite.toml.tree.Toml;
 import java.util.*;
 
 /**
- * Regenerates poetry.lock natively from an edited pyproject.toml. Scope (v1): a surgical version
+ * Regenerates poetry.lock natively from an edited pyproject.toml. Scope (v1): an in-place version
  * change of one or more direct dependencies that resolve to a leaf package (no dependency edges and
  * no extras), where the closure is provably unchanged. Everything else — adding or removing a
  * dependency, changing a dependency with its own edges/extras, non-registry sources, or a Python

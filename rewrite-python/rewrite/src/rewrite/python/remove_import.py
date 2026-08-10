@@ -20,7 +20,7 @@ from typing import Optional, Set
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded
 from rewrite.java.tree import Identifier, Import, MethodDeclaration, Space
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -89,44 +89,46 @@ class RemoveImport(PythonVisitor):
         self.module = options.module
         self.name = options.name
         self.only_if_unused = options.only_if_unused
+        self._used: Optional[Set[str]] = None
+        self._cu: Optional[CompilationUnit] = None
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
-        # If only_if_unused is True, check if the identifier is used
-        if self.only_if_unused:
-            if self._is_referenced(cu):
-                return cu
-
-        # Remove the import
+        self._used = self._collect_used_identifiers(cu) if self.only_if_unused else None
+        self._cu = cu
         return self._remove_import(cu)
 
-    def _is_referenced(self, cu: CompilationUnit) -> bool:
-        """Check if the identifier we're removing is still used elsewhere."""
-        target_name = self.name or self.module.split('.')[-1]
-
-        # Collect all used identifiers (excluding import statements)
-        used = self._collect_used_identifiers(cu)
-        if target_name not in used:
-            return False
-
+    def _is_removable(self, imp: Import, fallback_bound: str) -> bool:
+        """True when ``only_if_unused`` permits removing ``imp``, judged by the
+        name the import binds: ``from typing import List as L`` binds ``L``,
+        not ``List``."""
+        if self._used is None:
+            return True
+        bound = get_alias_name(imp) or fallback_bound
+        if bound not in self._used:
+            return True
         # Removable anyway if another import already binds the name (what ChangeType leaves behind),
         # since that binding shadows this one and the references keep resolving through it.
-        return not self._bound_by_another_import(cu, target_name)
+        return self._bound_by_another_import(self._cu, bound, imp)
 
-    def _bound_by_another_import(self, cu: CompilationUnit, target_name: str) -> bool:
-        """True when some import other than the one being removed binds ``target_name``."""
+    def _bound_by_another_import(self, cu: CompilationUnit, target_name: str,
+                                 removing: Import) -> bool:
+        """True when some import other than ``removing`` binds ``target_name``."""
         for stmt in cu.statements:
             if isinstance(stmt, MultiImport):
                 from_name = get_name_string(stmt.from_) if stmt.from_ is not None else None
                 for imp in stmt.names:
-                    if self._binds_other(imp, from_name, target_name):
+                    if self._binds_other(imp, from_name, target_name, removing):
                         return True
             elif isinstance(stmt, Import):
-                if self._binds_other(stmt, None, target_name):
+                if self._binds_other(stmt, None, target_name, removing):
                     return True
         return False
 
-    def _binds_other(self, imp: Import, from_name: Optional[str], target_name: str) -> bool:
+    def _binds_other(self, imp: Import, from_name: Optional[str], target_name: str,
+                     removing: Import) -> bool:
         """True when ``imp`` binds ``target_name`` and is not the import being removed."""
+        if imp is removing:
+            return False
         alias = get_alias_name(imp)
         qualid = get_qualid_name(imp.qualid)
         bound = alias or (qualid if from_name is not None else qualid.split('.')[0])
@@ -237,7 +239,7 @@ class RemoveImport(PythonVisitor):
         if self.name is not None:
             return imp
         name = get_qualid_name(imp.qualid)
-        if name == self.module:
+        if name == self.module and self._is_removable(imp, self.module.split('.')[-1]):
             return None
         return imp
 
@@ -251,88 +253,84 @@ class RemoveImport(PythonVisitor):
             return self._remove_name_from_import(multi)
 
     def _remove_module_import(self, multi: MultiImport) -> Optional[MultiImport]:
-        """Remove an entire module import (import X or from X import *)."""
+        """Remove an entire module import (import X or from X import ...)."""
         if multi.from_ is not None:
             # This is a "from X import Y" statement
-            from_name = get_name_string(multi.from_)
-            if from_name == self.module:
-                # Check if removing all names or just star import
-                if len(multi.names) == 1:
-                    name = get_qualid_name(multi.names[0].qualid)
-                    if name == '*':
-                        return None  # Remove "from X import *"
-                # For "from X import a, b, c", only remove if we want to remove all
-                return None
+            syntactic = get_name_string(multi.from_) == self.module
+            new_padded = [
+                padded_imp for padded_imp in multi.padding.names.padding.elements
+                if not (syntactic or self._canonical_module_matches(padded_imp.element))
+                or not self._is_removable(padded_imp.element,
+                                          get_qualid_name(padded_imp.element.qualid))
+            ]
         else:
             # This is a "import X" statement
-            existing_padded = multi.padding.names.padding.elements
             new_padded = []
-            for padded_imp in existing_padded:
+            for padded_imp in multi.padding.names.padding.elements:
                 name = get_qualid_name(padded_imp.element.qualid)
-                if name != self.module:
+                if name != self.module or not self._is_removable(
+                        padded_imp.element, name.split('.')[-1]):
                     new_padded.append(padded_imp)
 
-            if len(new_padded) == 0:
-                return None  # Remove entire statement
-            if len(new_padded) < len(existing_padded):
-                # Fix up first element prefix
-                first = new_padded[0]
-                if first.element.prefix != Space.EMPTY:
-                    new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+        return self._prune_names(multi, new_padded)
 
-                return MultiImport(
-                    multi.id,
-                    multi.prefix,
-                    multi.markers,
-                    multi.padding.from_,
-                    multi.parenthesized,
-                    JContainer(
-                        multi.padding.names.before,
-                        new_padded,
-                        multi.padding.names.markers
-                    )
-                )
-
-        return multi
+    def _canonical_module_matches(self, imp: Import) -> bool:
+        """True when ``imp`` binds the requested module itself (``from os import
+        path`` for ``os.path``). Membership is deliberately not enough: a module
+        is the canonical home of every symbol re-exported through it, so
+        matching members would sweep up imports written against other modules.
+        """
+        return get_canonical_fqn(imp) == self.module
 
     def _remove_name_from_import(self, multi: MultiImport) -> Optional[MultiImport]:
-        """Remove a specific name from a 'from X import a, b, c' statement."""
+        """Remove a specific name from a 'from X import a, b, c' statement.
+
+        A member matches when written module and name match, or when its
+        canonical FQN equals the requested ``module.name``.
+        """
         if multi.from_ is None:
             return multi  # Not a "from" import
 
-        from_name = get_name_string(multi.from_)
-        if from_name != self.module:
-            return multi  # Different module
+        syntactic = get_name_string(multi.from_) == self.module
+        target_fqn = f"{self.module}.{self.name}"
 
-        # Filter padded elements, preserving their padding
-        existing_padded = multi.padding.names.padding.elements
         new_padded = []
-        for padded_imp in existing_padded:
+        for padded_imp in multi.padding.names.padding.elements:
             name = get_qualid_name(padded_imp.element.qualid)
-            if name != self.name:
+            matches = (syntactic and name == self.name) or \
+                get_canonical_fqn(padded_imp.element) == target_fqn
+            if not matches or not self._is_removable(padded_imp.element, name):
                 new_padded.append(padded_imp)
 
+        return self._prune_names(multi, new_padded)
+
+    def _prune_names(self, multi: MultiImport, new_padded: list) -> Optional[MultiImport]:
+        """Rebuild ``multi`` with only ``new_padded`` names, preserving padding.
+
+        Returns None when nothing is left, or the original when nothing was removed.
+        """
+        existing_padded = multi.padding.names.padding.elements
         if len(new_padded) == 0:
             return None  # Remove entire statement
-        if len(new_padded) < len(existing_padded):
-            # Fix up the first element's prefix to not have a leading space
-            # (only relevant if the removed element was the first one)
-            first = new_padded[0]
-            if first.element.prefix != Space.EMPTY:
-                new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+        if len(new_padded) == len(existing_padded):
+            return multi
 
-            return MultiImport(
-                multi.id,
-                multi.prefix,
-                multi.markers,
-                multi.padding.from_,
-                multi.parenthesized,
-                JContainer(
-                    multi.padding.names.before,
-                    new_padded,
-                    multi.padding.names.markers
-                )
+        # Fix up the first element's prefix to not have a leading space
+        # (only relevant if the removed element was the first one)
+        first = new_padded[0]
+        if first.element.prefix != Space.EMPTY:
+            new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+
+        return MultiImport(
+            multi.id,
+            multi.prefix,
+            multi.markers,
+            multi.padding.from_,
+            multi.parenthesized,
+            JContainer(
+                multi.padding.names.before,
+                new_padded,
+                multi.padding.names.markers
             )
-
-        return multi
+        )
 

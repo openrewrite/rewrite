@@ -20,8 +20,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.internal.PyProjectHelper;
-import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -29,10 +29,6 @@ import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -50,8 +46,6 @@ public class RequirementsTxtParser implements Parser {
     private static final Pattern FILENAME_PATTERN = Pattern.compile(
             "requirements(-[\\w-]+)?\\.(txt|in)"
     );
-
-    private static final Pattern EXTRA_MARKER_PATTERN = Pattern.compile("\\bextra\\s*==");
 
     private final PlainTextParser plainTextParser = new PlainTextParser();
     private final Map<String, String> subprocessEnvironment;
@@ -190,138 +184,18 @@ public class RequirementsTxtParser implements Parser {
     }
 
     /**
-     * Link transitive dependencies by reading installed package METADATA files from site-packages.
-     * Uses a two-pass approach: first builds a name→entry map, then reads each package's
-     * {@code Requires-Dist} entries to link the graph.
+     * Link transitive dependencies from the workspace's {@code .venv} site-packages.
      *
      * @param resolved  flat list of resolved dependencies from freeze output
      * @param workspace workspace directory containing {@code .venv/}
      * @return new list with dependencies linked (or original list if site-packages not found)
      */
     static List<ResolvedDependency> linkDependenciesFromMetadata(List<ResolvedDependency> resolved, Path workspace) {
-        Path sitePackages = findSitePackages(workspace);
+        Path sitePackages = InstalledEnvParser.findSitePackages(workspace.resolve(".venv"));
         if (sitePackages == null) {
             return resolved;
         }
-
-        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(resolved.size());
-        for (ResolvedDependency r : resolved) {
-            packages.add(new PythonResolutionLinker.UnlinkedPackage(
-                    r.getName(), r.getVersion(), r.getSource(),
-                    readRequiresDist(sitePackages, r.getName(), r.getVersion())));
-        }
-        return PythonResolutionLinker.buildGraph(packages);
-    }
-
-    private static @Nullable Path findSitePackages(Path workspace) {
-        // Windows: .venv/Lib/site-packages (no python* subdirectory)
-        Path windowsSitePackages = workspace.resolve(".venv/Lib/site-packages");
-        if (Files.isDirectory(windowsSitePackages)) {
-            return windowsSitePackages;
-        }
-        // Unix: .venv/lib/python*/site-packages
-        Path lib = workspace.resolve(".venv/lib");
-        if (!Files.isDirectory(lib)) {
-            return null;
-        }
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(lib, "python*")) {
-            for (Path pythonDir : stream) {
-                Path sp = pythonDir.resolve("site-packages");
-                if (Files.isDirectory(sp)) {
-                    return sp;
-                }
-            }
-        } catch (IOException e) {
-            // fall through
-        }
-        return null;
-    }
-
-    private static List<String> readRequiresDist(Path sitePackages, String packageName, String version) {
-        Path metadataFile = findMetadataFile(sitePackages, packageName, version);
-        if (metadataFile == null) {
-            return Collections.emptyList();
-        }
-        try {
-            String content = new String(Files.readAllBytes(metadataFile), StandardCharsets.UTF_8);
-            return parseRequiresDist(content);
-        } catch (IOException e) {
-            return Collections.emptyList();
-        }
-    }
-
-    private static @Nullable Path findMetadataFile(Path sitePackages, String packageName, String version) {
-        // Try common naming conventions: package_name-version.dist-info
-        // The directory name uses the package's canonical form which may differ from freeze output
-        String normalized = packageName.replace('-', '_');
-        Path direct = sitePackages.resolve(normalized + "-" + version + ".dist-info/METADATA");
-        if (Files.exists(direct)) {
-            return direct;
-        }
-        // Try with original name (dashes preserved)
-        direct = sitePackages.resolve(packageName + "-" + version + ".dist-info/METADATA");
-        if (Files.exists(direct)) {
-            return direct;
-        }
-        // Fallback: glob for matching dist-info directory (must also match version)
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(sitePackages, "*.dist-info")) {
-            String normalizedLower = PythonResolutionResult.normalizeName(packageName);
-            String expectedSuffix = "-" + version + ".dist-info";
-            for (Path distInfo : stream) {
-                String dirName = distInfo.getFileName().toString();
-                if (!dirName.endsWith(expectedSuffix)) {
-                    continue;
-                }
-                String dirPkgName = dirName.substring(0, dirName.length() - expectedSuffix.length());
-                if (PythonResolutionResult.normalizeName(dirPkgName).equals(normalizedLower)) {
-                    Path metadata = distInfo.resolve("METADATA");
-                    if (Files.exists(metadata)) {
-                        return metadata;
-                    }
-                }
-            }
-        } catch (IOException e) {
-            // fall through
-        }
-        return null;
-    }
-
-    /**
-     * Parse {@code Requires-Dist} entries from package METADATA content.
-     * Filters out entries gated by {@code extra ==} markers (optional extras).
-     *
-     * @return list of required package names (not normalized)
-     */
-    static List<String> parseRequiresDist(String metadataContent) {
-        List<String> names = new ArrayList<>();
-        for (String line : metadataContent.split("\n")) {
-            String trimmed = line.trim();
-            if (!trimmed.startsWith("Requires-Dist:")) {
-                continue;
-            }
-            String value = trimmed.substring("Requires-Dist:".length()).trim();
-
-            // Skip entries with "extra ==" markers (optional extras, not always installed)
-            if (EXTRA_MARKER_PATTERN.matcher(value).find()) {
-                continue;
-            }
-
-            // Extract package name: everything before the first version specifier or marker
-            // PEP 508: name followed by optional extras [..], version specs, or ; markers
-            int end = value.length();
-            for (int i = 0; i < value.length(); i++) {
-                char c = value.charAt(i);
-                if (c == '<' || c == '>' || c == '=' || c == '!' || c == ';' || c == '[' || c == ' ') {
-                    end = i;
-                    break;
-                }
-            }
-            String name = value.substring(0, end).trim();
-            if (!name.isEmpty()) {
-                names.add(name);
-            }
-        }
-        return names;
+        return InstalledEnvParser.linkDependenciesFromMetadata(resolved, sitePackages);
     }
 
     @Override

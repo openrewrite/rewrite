@@ -26,7 +26,7 @@ import java.util.Map;
  * 4-space multiline arrays with trailing commas, single-element {@code requires-dist}
  * arrays inline, one blank line between blocks, LF endings and a single trailing newline.
  * Whether artifacts carry {@code upload-time} is data carried by the model (set on read),
- * so a surgical edit re-emits in the source file's own revision style.
+ * so an edit re-emits in the source file's own revision style.
  */
 public final class UvLockWriter {
 

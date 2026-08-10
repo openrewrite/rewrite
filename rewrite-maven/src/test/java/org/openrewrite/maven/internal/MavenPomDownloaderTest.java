@@ -42,6 +42,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -1471,6 +1472,38 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void normalizesRepositoryThatDropsAnonymousRequests() {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            // Close without a status line, as an authenticating gateway may do, so the probe
+                            // sees a connection failure rather than a 401 it could recognize as "server exists"
+                            return new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mockRepo.start();
+                MavenRepository repository = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build();
+
+                MavenRepository normalized = new MavenPomDownloader(emptyMap(), ctx)
+                  .normalizeRepository(repository, MavenExecutionContextView.view(ctx), null);
+
+                assertThat(normalized).isNotNull();
+                assertThat(MavenExecutionContextView.view(ctx).getUnreachableEndpoints()).isEmpty();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void authenticatesPreemptivelyAfterCredentialsRequired() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try (MockWebServer mockRepo = getMockServer()) {
@@ -1551,6 +1584,70 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void usesHttpHeaderAuthenticationWhenServerHasNoUsernameOrPassword() {
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+              //language=xml
+              """
+                <settings>
+                    <servers>
+                        <server>
+                            <id>id</id>
+                            <configuration>
+                                <httpHeaders>
+                                    <property>
+                                        <name>X-Auth-Token</name>
+                                        <value>token</value>
+                                    </property>
+                                </httpHeaders>
+                            </configuration>
+                        </server>
+                    </servers>
+                </settings>
+                """.getBytes())), ctx);
+            MavenExecutionContextView.view(ctx).setMavenSettings(settings);
+
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestTokens = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestTokens.add(recordedRequest.getHeaders().get("X-Auth-Token"));
+                        }
+                        if (recordedRequest.getHeaders().get("X-Auth-Token") == null) {
+                            return new MockResponse().setResponseCode(401).setBody("");
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                // No <username>/<password>: the token header is the only credential this server has.
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Anonymous first, then a retry carrying the header — as with username/password credentials.
+                assertThat(getRequestTokens).containsExactly(null, "token");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

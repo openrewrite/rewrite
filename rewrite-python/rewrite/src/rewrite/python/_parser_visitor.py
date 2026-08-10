@@ -832,14 +832,15 @@ class ParserVisitor(ast.NodeVisitor):
         return multi_import
 
     def visit_alias(self, node):
+        alias_type = self._type_mapping.import_alias_type(node)
         return j.Import(
             random_id(),
             self.__whitespace(),
             Markers.EMPTY,
             self.__pad_left(Space.EMPTY, False),
-            self.__convert_qualified_name(node.name),
+            self.__convert_qualified_name(node.name, alias_type),
             None if not node.asname else
-            self.__pad_left(self.__source_before('as'), self.__convert_name(node.asname))
+            self.__pad_left(self.__source_before('as'), self.__convert_name(node.asname, alias_type))
         )
 
     def visit_keyword(self, node):
@@ -863,7 +864,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self._type_mapping.type(node.value),
             )
 
-    def __convert_qualified_name(self, name: str) -> j.FieldAccess:
+    def __convert_qualified_name(self, name: str, name_type: Optional[JavaType] = None) -> j.FieldAccess:
         if '.' not in name:
             return j.FieldAccess(
                 random_id(),
@@ -872,11 +873,14 @@ class ParserVisitor(ast.NodeVisitor):
                 j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 self.__pad_left(
                     Space.EMPTY,
-                    self.__convert_name(name)
+                    self.__convert_name(name, name_type)
                 ),
-                None
+                name_type
             )
-        return cast(j.FieldAccess, self.__convert_name(name))
+        # For dotted names only the outermost FieldAccess names the full path,
+        # so only it carries the type.
+        qualid = cast(j.FieldAccess, self.__convert_name(name))
+        return qualid.replace(type=name_type) if name_type is not None else qualid
 
     def visit_Global(self, node):
         return self.__visit_variable_scope(node, 'global', py.VariableScope.Kind.GLOBAL)

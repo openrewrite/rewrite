@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
+import org.openrewrite.rpc.RewriteRpc;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -102,7 +103,12 @@ public class PythonImportService extends ImportService {
             if (!(tree instanceof SourceFile)) {
                 return (J) tree;
             }
-            PythonRewriteRpc rpc = PythonRewriteRpc.get();
+            RewriteRpc rpc = PythonRewriteRpc.get();
+            if (rpc == null) {
+                // Without a process-manager handle, the peer whose request is being handled is
+                // the one that implements the import visitors; see RewriteRpc.current().
+                rpc = RewriteRpc.current();
+            }
             if (rpc == null) {
                 return (J) tree;
             }

@@ -27,6 +27,12 @@ if TYPE_CHECKING:
 class PythonRpcSender:
     """Sender that mirrors Java's PythonSender for RPC serialization."""
 
+    def __init__(self):
+        # Type-variable names currently being rendered by _type_signature; a
+        # re-entrant occurrence prints just the name, so signatures of recursive
+        # bounds (e.g. T extends Comparable<T>) stay finite.
+        self._type_var_name_stack: set = set()
+
     def send(self, after: Any, before: Any, q: 'RpcSendQueue') -> None:
         """Entry point for sending an object."""
         from rewrite.rpc.send_queue import RpcObjectState
@@ -995,8 +1001,16 @@ class PythonRpcSender:
             elem_sig = self._type_signature(java_type._elem_type) if java_type._elem_type else ''
             return f"{elem_sig}[]"
         if isinstance(java_type, JT.GenericTypeVariable):
-            bounds_sig = ' & '.join(self._type_signature(b) for b in java_type.bounds) if java_type.bounds else ''
-            return f"Generic{{{java_type._name}{' extends ' + bounds_sig if bounds_sig else ''}}}"
+            name = java_type._name
+            if name != '?' and name in self._type_var_name_stack:
+                return f"Generic{{{name}}}"
+            if name != '?':
+                self._type_var_name_stack.add(name)
+            try:
+                bounds_sig = ' & '.join(self._type_signature(b) for b in java_type.bounds) if java_type.bounds else ''
+            finally:
+                self._type_var_name_stack.discard(name)
+            return f"Generic{{{name}{' extends ' + bounds_sig if bounds_sig else ''}}}"
         if isinstance(java_type, JT.Union):
             return '|'.join(self._type_signature(b) for b in java_type.bounds)
         if isinstance(java_type, JT.Intersection):

@@ -18,11 +18,14 @@ package org.openrewrite.java.internal.rpc;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -77,6 +80,83 @@ class JavaReceiverTest {
         assertThat(received.getName().getType())
                 .as("Name identifier type must survive the sender/receiver round trip")
                 .isNotNull();
+    }
+
+    @Test
+    void changingOneSlotOfSharedTypeLeavesOtherSlotsUntouched() {
+        // given: two arguments whose type attribution is one and the same JavaType instance
+        JavaType.ShallowClass sharedType = JavaType.ShallowClass.build("java.util.List");
+        J.Identifier a = new J.Identifier(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                Collections.emptyList(), "a", sharedType, null
+        );
+        J.Identifier b = new J.Identifier(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                Collections.emptyList(), "b", sharedType, null
+        );
+        J.MethodInvocation original = new J.MethodInvocation(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                null, null,
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        Collections.emptyList(), "foo", null, null),
+                JContainer.build(Space.EMPTY,
+                        new ArrayList<>(List.of(JRightPadded.build((Expression) a), JRightPadded.build((Expression) b))),
+                        Markers.EMPTY),
+                null
+        );
+        sq.send(original, null, null);
+        sq.flush();
+        J.MethodInvocation receivedBefore = rq.receive(null);
+
+        // when: a recipe changes only argument `a`'s type to a different instance of the same class
+        J.MethodInvocation after = original.withArguments(List.of(
+                a.withType(JavaType.ShallowClass.build("java.util.ArrayList")), b));
+        sq.send(after, original, null);
+        sq.flush();
+        J.MethodInvocation received = rq.receive(receivedBefore);
+
+        // then
+        assertThat(((JavaType.FullyQualified) received.getArguments().get(0).getType()).getFullyQualifiedName())
+                .isEqualTo("java.util.ArrayList");
+        assertThat(((JavaType.FullyQualified) received.getArguments().get(1).getType()).getFullyQualifiedName())
+                .as("The unchanged slot aliases the receiver's cached instance, which must not be mutated")
+                .isEqualTo("java.util.List");
+    }
+
+    @Test
+    void diffOfDistinctCyclicTypeGraphsRoundTripsWithCycleIntact() {
+        // given: two isomorphic but distinct instances of a cyclic type graph
+        // (node -> interfaces -> parameterized -> typeParameters -> node), as arise when
+        // the same type is materialized twice with different reference identity
+        JavaType.Class node1 = cyclicNode();
+        JavaType.Class node2 = cyclicNode();
+        sq.send(Reference.asRef(node1), null, () -> new JavaTypeSender().visit(node1, sq));
+        sq.flush();
+        JavaType.Class received1 = rq.receive(null, t -> (JavaType.Class) new JavaTypeReceiver().visit(t, rq));
+
+        // when: the slot's value changes to the other instance; the send must terminate
+        // (a delta walk without cycle handling would recurse forever) and the receiver
+        // must close the cycle by identity through its ref table
+        sq.send(Reference.asRef(node2), Reference.asRef(node1), () -> new JavaTypeSender().visit(node2, sq));
+        sq.flush();
+        JavaType.Class received2 = rq.receive(received1, t -> (JavaType.Class) new JavaTypeReceiver().visit(t, rq));
+
+        // then
+        assertThat(received2).isNotSameAs(received1);
+        JavaType.Parameterized iface = (JavaType.Parameterized) received2.getInterfaces().get(0);
+        assertThat(iface.getTypeParameters().get(0))
+                .as("The received graph's back edge must resolve to the enclosing node itself")
+                .isSameAs(received2);
+    }
+
+    private JavaType.Class cyclicNode() {
+        JavaType.ShallowClass iface = JavaType.ShallowClass.build("com.example.ISelf");
+        JavaType.Parameterized param = new JavaType.Parameterized(null, iface, null);
+        JavaType.Class node = new JavaType.Class(null, 1, "com.example.Node", JavaType.FullyQualified.Kind.Class,
+                null, null, null, null, null, null, null);
+        node.unsafeSet(null, null, null, null, List.of(param), null, null);
+        param.unsafeSet(iface, List.of(node));
+        return node;
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {

@@ -680,7 +680,9 @@ public interface JavaType {
                 prev = c;
             }
 
-            if (lastDelimiter > firstClassNameIndex) {
+            // The first uppercase-led segment marks where the class-name chain starts; a
+            // name without one (e.g. Python's `builtins.list`) is package-qualified, not nested.
+            if (firstClassNameIndex > 0 && lastDelimiter > firstClassNameIndex) {
                 owningClass = build(fullyQualifiedName.substring(0, lastDelimiter));
             }
 

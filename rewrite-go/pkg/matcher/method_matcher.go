@@ -266,23 +266,31 @@ func isRegexpMeta(ch byte) bool {
 	return strings.ContainsRune(`\.+?{}[]()^$|`, rune(ch))
 }
 
-// resolveGoType maps common Go type names to their FQN equivalents
-// used by the type mapper. This allows patterns like "string" to match
-// both the primitive keyword and the FQN.
+// Maps a Go type name from a matcher pattern to the type signature the type
+// mapper produces, so patterns like "int64" match the mapped primitive keyword
+// ("long") and "uint" matches the synthetic FQN.
 func resolveGoType(name string) string {
-	// The type mapper maps Go primitives to JavaTypePrimitive keywords.
-	// Most Go types are already their own FQN.
+	// The type mapper maps Go integer widths that Java can express to their
+	// primitive keyword and unsigned widths to a synthetic class FQN.
 	switch name {
 	case "string":
 		return "String" // JavaTypePrimitive keyword for Go strings
 	case "bool":
 		return "boolean"
-	case "int", "int8", "int16", "int32", "int64":
-		return name
+	case "int", "int32":
+		return "int"
+	case "int16":
+		return "short"
+	case "int8":
+		return "byte"
+	case "int64":
+		return "long"
 	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
-		return name
-	case "float32", "float64":
-		return name
+		return name // unsigned widths have no Java primitive; keep the Go FQN
+	case "float32":
+		return "float"
+	case "float64":
+		return "double"
 	case "byte":
 		return "byte"
 	case "rune":

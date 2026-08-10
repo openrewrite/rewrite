@@ -17,11 +17,14 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -468,6 +471,57 @@ class FindTypesTest implements RewriteTest {
                       </bean>
                   </property>
                 </bean>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedType(String type) {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes(type, false)),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              import a.b.Outer;
+              class Test {
+                  /*~~>*/Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedTypeInSpringXml(String type) {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes(type, false)),
+          xml(
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="testBean" class="a.b.Outer$Inner"/>
+              </beans>
+              """,
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="testBean" <!--~~>-->class="a.b.Outer$Inner"/>
               </beans>
               """
           )

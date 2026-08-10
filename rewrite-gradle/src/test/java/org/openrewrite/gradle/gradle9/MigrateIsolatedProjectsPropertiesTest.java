@@ -39,11 +39,13 @@ class MigrateIsolatedProjectsPropertiesTest implements RewriteTest {
               org.gradle.caching=true
               org.gradle.unsafe.isolated-projects=true
               org.gradle.unsafe.isolated-projects.diagnostics=true
+              org.gradle.unsafe.isolated-projects.dangerously-ignore-problems=true
               """,
             """
               org.gradle.caching=true
               org.gradle.isolated-projects=true
               org.gradle.isolated-projects.diagnostics=true
+              org.gradle.isolated-projects.dangerously-ignore-problems=true
               """,
             spec -> spec.path("gradle.properties")
           )

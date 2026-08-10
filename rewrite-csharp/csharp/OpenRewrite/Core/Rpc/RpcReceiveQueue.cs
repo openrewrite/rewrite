@@ -147,8 +147,10 @@ public class RpcReceiveQueue
                 }
                 else if (message.Value != null)
                 {
-                    // Simple value types (enums, primitives) sent with both valueType and value
-                    after = ExtractValue<T>(message.Value);
+                    // Inline value: typed payloads (markers, enums) carry a valueType; primitives don't
+                    after = message.ValueType != null
+                        ? DeserializeInline<T>(message.ValueType, message.Value)
+                        : ExtractValue<T>(message.Value);
                 }
                 else if (message.State == ADD && message.ValueType != null)
                 {

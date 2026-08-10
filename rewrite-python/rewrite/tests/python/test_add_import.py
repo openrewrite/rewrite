@@ -16,7 +16,7 @@
 
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
-from rewrite.python.add_import import AddImportOptions, maybe_add_import
+from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
@@ -117,6 +117,18 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_builtin_name_is_not_imported(self):
+        """A bare builtin name (e.g. from ChangeType retargeting to `list`) is not a module;
+        adding an import for it is a no-op."""
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('list')))
+        spec.rewrite_run(
+            python(
+                """
+                x: list[int] = []
+                """,
+            )
+        )
+
     def test_only_if_referenced(self):
         """Don't add import when the name is not referenced and only_if_referenced=True."""
         class AddJoinVisitor(PythonVisitor[ExecutionContext]):
@@ -133,6 +145,27 @@ class TestMaybeAddImport:
             python(
                 """
                 x = 1
+                """,
+            )
+        )
+
+    def test_only_if_referenced_ignores_identifiers_in_imports(self):
+        """``pathlib`` occurs only as the module of the existing aliased import."""
+        class AddPathlibVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_add_import(self, AddImportOptions(
+                    module='pathlib',
+                    only_if_referenced=True
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(AddPathlibVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                import pathlib as o
+
+                x = o.sep
                 """,
             )
         )
@@ -326,6 +359,83 @@ class TestMaybeAddImport:
                 """,
                 """
                 from builtins import list as _list
+                x = 1
+                """,
+            )
+        )
+
+
+class TestAddImportVisitor:
+    """Tests for AddImport constructed directly (bypassing maybe_add_import),
+    as the RPC server does for Java-initiated ``maybeAddImport`` calls."""
+
+    def test_skips_builtins_import(self):
+        """e.g. Java's ChangeType retargeting a type to ``builtins.list`` must
+        not add ``from builtins import list``."""
+        spec = RecipeSpec(recipe=from_visitor(AddImport(AddImportOptions(
+            module='builtins', name='list', only_if_referenced=False))))
+        spec.rewrite_run(
+            python(
+                """
+                x: list = []
+                """,
+            )
+        )
+
+
+class TestCanonicalAddImportDedup:
+    """An existing import already satisfies a requested (module, name) when
+    its canonical FQN matches (``os.path.join`` is canonically
+    ``posixpath.join``), not just when its written path does."""
+
+    def test_canonical_request_matches_written_from_import(self):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'join'))).rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = join('a', 'b')
+                """,
+            )
+        )
+
+    def test_canonical_request_matches_written_class_import(self):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'Iterable'))).rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                def f(x: Iterable): ...
+                """,
+            )
+        )
+
+    def test_canonical_match_requires_same_bound_name(self):
+        """An aliased binding does not satisfy a request for the plain name."""
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'join'))).rewrite_run(
+            python(
+                """
+                from os.path import join as j
+                x = 1
+                """,
+                """
+                from os.path import join as j
+                from posixpath import join
+                x = 1
+                """,
+            )
+        )
+
+    def test_canonical_mismatch_still_adds(self):
+        """os.path.exists is canonically genericpath.exists, so a posixpath
+        request is a different symbol and gets its own import."""
+        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'exists'))).rewrite_run(
+            python(
+                """
+                from os.path import exists
+                x = 1
+                """,
+                """
+                from os.path import exists
+                from posixpath import exists
                 x = 1
                 """,
             )

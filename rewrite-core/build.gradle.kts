@@ -37,7 +37,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("org.yaml:snakeyaml:latest.release")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")

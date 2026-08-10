@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
@@ -340,6 +341,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
           java(
             """
               package org.openrewrite.internal;
@@ -571,6 +573,126 @@ class ChangePackageTest implements RewriteTest {
             })
           )
         );
+    }
+
+    /**
+     * A null {@code recursive} means non-recursive, and it means that for every source kind and
+     * regardless of what else the source happens to reference. Before this was pinned down, a null
+     * {@code recursive} was read as non-recursive by the precondition but as recursive by the
+     * visitor, so a subpackage type was renamed only when the same file also referenced a type
+     * sitting directly in {@code oldPackageName}.
+     */
+    @Nested
+    class NullRecursiveDefaultsToNonRecursive {
+
+        private static final JavaParser.Builder<?, ?> cucumber = JavaParser.fromJavaVersion().dependsOn(
+          """
+            package cucumber.api.java;
+            public @interface Before {}
+            """,
+          """
+            package cucumber.api.java.en;
+            public @interface Given {}
+            """
+        );
+
+        @Test
+        void nullRecursiveIsNonRecursiveForEverySourceKind() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", null))
+                .parser(cucumber),
+              // Only a subpackage type: untouched.
+              java(
+                """
+                  import cucumber.api.java.en.Given;
+
+                  class A {
+                      @Given
+                      void given() {}
+                  }
+                  """
+              ),
+              // Both: the type directly in the old package moves, the subpackage one stays put.
+              java(
+                """
+                  import cucumber.api.java.Before;
+                  import cucumber.api.java.en.Given;
+
+                  class B {
+                      @Before
+                      void before() {}
+
+                      @Given
+                      void given() {}
+                  }
+                  """,
+                """
+                  import io.cucumber.java.Before;
+                  import cucumber.api.java.en.Given;
+
+                  class B {
+                      @Before
+                      void before() {}
+
+                      @Given
+                      void given() {}
+                  }
+                  """
+              ),
+              properties(
+                """
+                  given=cucumber.api.java.en.Given
+                  """,
+                spec -> spec.path("application.properties")
+              ),
+              properties(
+                """
+                  before=cucumber.api.java.Before
+                  given=cucumber.api.java.en.Given
+                  """,
+                """
+                  before=io.cucumber.java.Before
+                  given=cucumber.api.java.en.Given
+                  """,
+                spec -> spec.path("application-extra.properties")
+              )
+            );
+        }
+
+        @Test
+        void recursiveOptsIntoSubpackagesForEverySourceKind() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", true))
+                .parser(cucumber),
+              java(
+                """
+                  import cucumber.api.java.en.Given;
+
+                  class A {
+                      @Given
+                      void given() {}
+                  }
+                  """,
+                """
+                  import io.cucumber.java.en.Given;
+
+                  class A {
+                      @Given
+                      void given() {}
+                  }
+                  """
+              ),
+              properties(
+                """
+                  given=cucumber.api.java.en.Given
+                  """,
+                """
+                  given=io.cucumber.java.en.Given
+                  """,
+                spec -> spec.path("application.properties")
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
@@ -2182,8 +2304,17 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", false)),
           text(
-            "org.foo.MyImpl\n",
+            """
+              org.foo.MyImplA
+              org.foo.sub.MyImplB
+              """,
+            """
+              org.bar.MyImplA
+              org.foo.sub.MyImplB
+              """,
             spec -> spec.path("META-INF/services/org.foo.MyInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.MyInterface"))
           )
         );
     }

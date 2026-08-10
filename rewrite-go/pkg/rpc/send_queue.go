@@ -114,15 +114,38 @@ func (q *SendQueue) Send(after, before any, onChange func(any)) {
 		q.add(after, onChange)
 	} else if isNilValue(afterVal) {
 		q.Put(RpcObjectData{State: Delete})
+	} else if IsRef(after) {
+		// A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+		// instance may be aliased by any number of other slots and source files. A CHANGE would
+		// be applied to that shared instance in place, corrupting every alias, so the new value
+		// is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+		q.add(after, onChange)
 	} else {
 		vt := getValueType(afterVal)
-		var val any
-		if onChange == nil && vt == nil {
-			val = afterVal
-		}
+		val, skipDoChange := inlineValue(afterVal, onChange, vt)
 		q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
-		q.doChange(afterVal, beforeVal, onChange)
+		if !skipDoChange {
+			q.doChange(afterVal, beforeVal, onChange)
+		}
 	}
+}
+
+// inlineValue computes the Value payload for an ADD/CHANGE message and whether
+// sub-field dispatch must be skipped. A codec-less GenericMarker ships its data
+// map inline — sub-field dispatch would emit nothing for it (sendMarkerCodecFields
+// default case). Other values travel inline when neither an onChange callback nor
+// a value type supplies sub-field messages to reconstruct them from.
+func inlineValue(afterVal any, onChange func(any), vt *string) (val any, skipDoChange bool) {
+	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+		if gm.Data == nil {
+			return map[string]any{}, true
+		}
+		return gm.Data, true
+	}
+	if onChange == nil && vt == nil {
+		return afterVal, false
+	}
+	return nil, false
 }
 
 func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange func(any), asRef bool) {
@@ -173,7 +196,9 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 				}
 				if sameIdentity(aBefore, a) {
 					q.Put(RpcObjectData{State: NoChange})
-				} else if isNilValue(aBefore) || !sameType(a, aBefore) {
+				} else if asRef || isNilValue(aBefore) || !sameType(a, aBefore) {
+					// Type changed, or a ref-deduplicated item, which is always re-added
+					// rather than CHANGEd (see Send)
 					if asRef {
 						q.add(AsRef(a), onChangeRun)
 					} else {
@@ -181,8 +206,11 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 					}
 				} else {
 					vt := getValueType(a)
-					q.Put(RpcObjectData{State: Change, ValueType: vt})
-					q.doChange(a, aBefore, onChangeRun)
+					val, skipDoChange := inlineValue(a, onChangeRun, vt)
+					q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
+					if !skipDoChange {
+						q.doChange(a, aBefore, onChangeRun)
+					}
 				}
 			}
 		}
@@ -208,23 +236,7 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 	}
 
 	vt := getValueType(afterVal)
-	var val any
-	skipDoChange := false
-	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
-		// No RpcCodec on either side for this marker — inline the marker's
-		// data as the ADD message's Value so the receiver can reconstruct
-		// the typed instance. Skip sub-field dispatch, which would otherwise
-		// emit nothing (sendMarkerCodecFields default case) and leave the
-		// receiver waiting for fields that never arrive.
-		if gm.Data == nil {
-			val = map[string]any{}
-		} else {
-			val = gm.Data
-		}
-		skipDoChange = true
-	} else if onChange == nil && vt == nil {
-		val = afterVal
-	}
+	val, skipDoChange := inlineValue(afterVal, onChange, vt)
 	q.Put(RpcObjectData{State: Add, ValueType: vt, Value: val, Ref: ref})
 	if !skipDoChange {
 		q.doChange(afterVal, nil, onChange)

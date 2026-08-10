@@ -191,7 +191,7 @@ future uv backend.
                                  ▼
                  ┌───────────────────────────────────────────┐
                  │ 7. PipenvLockEngine                       │  orchestration:
-                 │    surgical patch │ delta resolve         │  Phase A / Phase B
+                 │    in-place patch │ delta resolve         │  Phase A / Phase B
                  └──┬──────────┬──────────┬─────────────┬────┘
                     ▼          ▼          ▼             ▼
               ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌─────────┐
@@ -405,7 +405,7 @@ mechanism. On any failure the old lock is left untouched.
 
 | Phase | Scope | Acceptance criteria |
 |---|---|---|
-| **A** | Format layer, config/credentials, index client, metadata ladder, PEP 440/508, surgical patch | Round-trip byte-identity on a corpus of real pipenv-written locks; hash corpus matches recorded pipenv/plette outputs (both variants); all five dependency recipes + `requires` bumps regenerate locks for closure-unchanged edits with `pipenv verify`-green results; structured failures for the rest |
+| **A** | Format layer, config/credentials, index client, metadata ladder, PEP 440/508, in-place patch | Round-trip byte-identity on a corpus of real pipenv-written locks; hash corpus matches recorded pipenv/plette outputs (both variants); all five dependency recipes + `requires` bumps regenerate locks for closure-unchanged edits with `pipenv verify`-green results; structured failures for the rest |
 | **B** | resolvelib-core port, pip-ordered provider, lock-seeded preferences | Additions and closure-changing upgrades resolve; resolver conformance against recorded pip resolutions on fixture indexes; deterministic output for fixed index state |
 | **C** | uv backend on the same layers: revision-aware byte-exact `uv.lock` reader/writer, uv index discovery (`[[tool.uv.index]]`/`uv.toml`/`UV_*` env, flat and repo-relative indexes), graph-aware `UvLockEngine` (exact offline removals via the recorded dependency graph; requires-python upward bumps as pure wheel-list filters; conservative fork gate), replacing the `uv lock` shell-out | Engine output byte-identical to real `uv lock` for pin-bump, removal, and requires-python-bump goldens; `uv lock --check` passes on engine output and a real `uv lock` over it is a byte-identical no-op; repo-relative `[[tool.uv.index]]` sources resolve against the project directory |
 

@@ -560,12 +560,21 @@ def handle_parse(params: dict) -> List[str]:
     return results
 
 
+# Never-source dirs (caches, venvs, VCS, dependency trees, build output); caller exclusions extend, not replace.
+DEFAULT_PARSE_EXCLUSIONS = [
+    '__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne',
+    'node_modules', '.pytest_cache', '.mypy_cache', 'build', 'dist', 'target',
+]
+
+
 def handle_parse_project(params: dict) -> List[dict]:
     """Handle a ParseProject RPC request."""
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
+    exclusions = DEFAULT_PARSE_EXCLUSIONS + [
+        excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
+    ]
     relative_to = params.get('relativeTo') or project_path
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
@@ -1060,6 +1069,7 @@ def handle_reset(params: dict) -> bool:
     _prepared_editor_overrides.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
+    _local_object_ids.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
     _ref_checkpoints.clear()
@@ -1565,6 +1575,32 @@ _prepared_editor_overrides: Dict[str, Any] = {}
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
 # Execution contexts storage - maps context IDs to ExecutionContext instances
 _execution_contexts: Dict[str, Any] = {}
+# Identity-keyed registry backing local_object(). Holds a strong reference to
+# each registered object so its id() — and therefore its minted RPC id — can
+# never be reused for a different object while a peer still diffs against it.
+_local_object_ids: Dict[int, Any] = {}
+
+
+def local_object(obj: Any) -> str:
+    """The stable id under which a peer can fetch ``obj`` via GetObject,
+    minted on first use — the counterpart of ``RewriteRpc.localObject`` in the
+    Java and JavaScript runtimes.
+
+    An ExecutionContext is also entered into ``_execution_contexts`` so that
+    an inbound Visit carrying the id resolves to this very context (see
+    ``_context_for``) instead of fabricating a fresh one.
+    """
+    from rewrite.execution import ExecutionContext
+
+    entry = _local_object_ids.get(id(obj))
+    if entry is not None and entry[0] is obj:
+        return entry[1]
+    obj_id = str(uuid4())
+    _local_object_ids[id(obj)] = (obj, obj_id)
+    local_objects[obj_id] = obj
+    if isinstance(obj, ExecutionContext):
+        _execution_contexts[obj_id] = obj
+    return obj_id
 # Accumulator storage for ScanningRecipes - maps recipe IDs to accumulators
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'

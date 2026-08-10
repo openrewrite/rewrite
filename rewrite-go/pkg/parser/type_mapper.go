@@ -62,6 +62,9 @@ func (m *typeMapper) doMapType(t types.Type) java.JavaType {
 	switch v := t.(type) {
 	case *types.Basic:
 		return m.mapBasic(v)
+	case *types.Alias:
+		// Go 1.22+ materializes transparent aliases (including the predeclared `any`); map the target.
+		return m.mapType(types.Unalias(v))
 	case *types.Named:
 		if m.ownPkg != nil {
 			if pkg := v.Obj().Pkg(); pkg != nil && !m.ownPkg(pkg.Path()) {
@@ -119,11 +122,21 @@ func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
 	switch b.Kind() {
 	case types.Bool, types.UntypedBool:
 		return &java.JavaTypePrimitive{Keyword: "boolean"}
-	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
-		types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64,
-		types.Uintptr, types.UntypedInt:
+	case types.Int8:
+		return &java.JavaTypePrimitive{Keyword: "byte"}
+	case types.Int16:
+		return &java.JavaTypePrimitive{Keyword: "short"}
+	case types.Int64:
+		return &java.JavaTypePrimitive{Keyword: "long"}
+	case types.Int, types.Int32, types.UntypedInt:
 		return &java.JavaTypePrimitive{Keyword: "int"}
-	case types.Float32, types.Float64, types.UntypedFloat:
+	case types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64, types.Uintptr:
+		// Go's unsigned integer widths have no Java primitive equivalent, so they map to
+		// synthetic named types keyed by their Go type name (as with map/chan).
+		return &java.JavaTypeClass{FullyQualifiedName: b.Name(), Kind: "Class"}
+	case types.Float32:
+		return &java.JavaTypePrimitive{Keyword: "float"}
+	case types.Float64, types.UntypedFloat:
 		return &java.JavaTypePrimitive{Keyword: "double"}
 	case types.Complex64, types.Complex128, types.UntypedComplex:
 		return &java.JavaTypePrimitive{Keyword: "double"}
@@ -133,6 +146,9 @@ func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
 		return &java.JavaTypePrimitive{Keyword: "char"}
 	case types.UntypedNil:
 		return &java.JavaTypePrimitive{Keyword: "void"}
+	case types.UnsafePointer:
+		// No Java primitive exists for it, so map it to a synthetic named type.
+		return &java.JavaTypeClass{FullyQualifiedName: "unsafe.Pointer", Kind: "Class"}
 	default:
 		return java.UnknownType
 	}
