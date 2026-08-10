@@ -621,27 +621,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     public void visitSpace(Space space, RpcSendQueue q) {
-        q.getAndSendList(space, Space::getComments,
-                c -> {
-                    if (c instanceof TextComment) {
-                        return ((TextComment) c).getText() + c.getSuffix();
-                    } else if (c instanceof Javadoc.DocComment) {
-                        return ((Javadoc.DocComment) c).getId();
-                    }
-                    throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
-                },
-                c -> {
-                    if (c instanceof TextComment) {
-                        TextComment tc = (TextComment) c;
-                        q.getAndSend(tc, TextComment::isMultiline);
-                        q.getAndSend(tc, TextComment::getText);
-                    } else {
-                        throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
-                    }
-                    q.getAndSend(c, Comment::getSuffix);
-                    q.getAndSend(c, Comment::getMarkers);
-                });
-        q.getAndSend(space, Space::getWhitespace);
+        JavaSpaceRpcCodec.sendSpace(space, q);
     }
 
     private final JavaTypeSender javaTypeSender = new JavaTypeSender();

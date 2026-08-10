@@ -610,17 +610,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public Space visitSpace(Space space, RpcReceiveQueue q) {
-        return space
-                .withComments(q.receiveList(space.getComments(), c -> {
-                    if (c instanceof TextComment) {
-                        return ((TextComment) c).withMultiline(q.receive(c.isMultiline()))
-                                .withText(q.receive(((TextComment) c).getText()))
-                                .withSuffix(q.receive(c.getSuffix()))
-                                .withMarkers(q.receive(c.getMarkers()));
-                    }
-                    return c;
-                }))
-                .withWhitespace(q.receive(space.getWhitespace()));
+        return JavaSpaceRpcCodec.receiveSpace(space, q);
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, RpcReceiveQueue q) {

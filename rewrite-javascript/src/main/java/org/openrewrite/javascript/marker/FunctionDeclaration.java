@@ -17,8 +17,7 @@ package org.openrewrite.javascript.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.internal.rpc.JavaSpaceRpcCodec;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -36,13 +35,13 @@ public class FunctionDeclaration implements Marker, RpcCodec<FunctionDeclaration
     @Override
     public void rpcSend(FunctionDeclaration after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, FunctionDeclaration::getPrefix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, FunctionDeclaration::getPrefix, space -> JavaSpaceRpcCodec.sendSpace(space, q));
     }
 
     @Override
     public FunctionDeclaration rpcReceive(FunctionDeclaration before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withPrefix(q.receive(before.getPrefix(), space -> new JavaReceiver().visitSpace(space, q)));
+                .withPrefix(q.receive(before.getPrefix(), space -> JavaSpaceRpcCodec.receiveSpace(space, q)));
     }
 }

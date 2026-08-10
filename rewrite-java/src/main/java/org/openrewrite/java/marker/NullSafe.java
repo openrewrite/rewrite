@@ -18,8 +18,7 @@ package org.openrewrite.java.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.With;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.internal.rpc.JavaSpaceRpcCodec;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -58,13 +57,13 @@ public class NullSafe implements Marker, RpcCodec<NullSafe> {
     @Override
     public void rpcSend(NullSafe after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, NullSafe::getDotPrefix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, NullSafe::getDotPrefix, space -> JavaSpaceRpcCodec.sendSpace(space, q));
     }
 
     @Override
     public NullSafe rpcReceive(NullSafe before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withDotPrefix(q.receive(before.getDotPrefix(), space -> new JavaReceiver().visitSpace(space, q)));
+                .withDotPrefix(q.receive(before.getDotPrefix(), space -> JavaSpaceRpcCodec.receiveSpace(space, q)));
     }
 }

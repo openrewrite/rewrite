@@ -17,8 +17,7 @@ package org.openrewrite.golang.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.internal.rpc.JavaSpaceRpcCodec;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -37,15 +36,15 @@ public class TrailingComma implements Marker, RpcCodec<TrailingComma> {
     @Override
     public void rpcSend(TrailingComma after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, TrailingComma::getBefore, space -> new JavaSender().visitSpace(space, q));
-        q.getAndSend(after, TrailingComma::getAfter, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, TrailingComma::getBefore, space -> JavaSpaceRpcCodec.sendSpace(space, q));
+        q.getAndSend(after, TrailingComma::getAfter, space -> JavaSpaceRpcCodec.sendSpace(space, q));
     }
 
     @Override
     public TrailingComma rpcReceive(TrailingComma before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withBefore(q.receive(before.getBefore(), space -> new JavaReceiver().visitSpace(space, q)))
-                .withAfter(q.receive(before.getAfter(), space -> new JavaReceiver().visitSpace(space, q)));
+                .withBefore(q.receive(before.getBefore(), space -> JavaSpaceRpcCodec.receiveSpace(space, q)))
+                .withAfter(q.receive(before.getAfter(), space -> JavaSpaceRpcCodec.receiveSpace(space, q)));
     }
 }
