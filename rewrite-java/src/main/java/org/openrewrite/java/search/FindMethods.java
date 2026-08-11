@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.table.SearchResultRows;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -87,6 +88,15 @@ public class FindMethods extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+            final SearchResultRows<MethodCalls.Row> rows = new SearchResultRows<>(methodCalls);
+
+            @Override
+            public @Nullable J postVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    rows.insertRows(tree, ctx);
+                }
+                return super.postVisit(tree, ctx);
+            }
 
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
@@ -96,19 +106,16 @@ public class FindMethods extends Recipe {
                     !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
                     JavaType.Method m = (JavaType.Method) i.getType();
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                m.getName(),
-                                m.getDeclaringType().getFullyQualifiedName(),
-                                m.getName(),
-                                m.getParameterTypes().stream()
-                                        .map(String::valueOf)
-                                        .collect(joining(", "))
-
-                        ));
+                    if (javaSourceFile == null) {
+                        return SearchResult.found(i);
                     }
-                    i = SearchResult.found(i);
+                    String sourceFile = javaSourceFile.getSourcePath().toString();
+                    String declaringType = m.getDeclaringType().getFullyQualifiedName();
+                    String parameterTypes = m.getParameterTypes().stream()
+                            .map(String::valueOf)
+                            .collect(joining(", "));
+                    i = rows.found(i, line -> new MethodCalls.Row(sourceFile, m.getName(), declaringType,
+                            m.getName(), parameterTypes, line));
                 }
                 return i;
             }
@@ -118,19 +125,18 @@ public class FindMethods extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                method.printTrimmed(getCursor().getParentTreeCursor()),
-                                method.getMethodType().getDeclaringType().getFullyQualifiedName(),
-                                method.getSimpleName(),
-                                method.getArguments().stream()
-                                        .map(Expression::getType)
-                                        .map(String::valueOf)
-                                        .collect(joining(", "))
-                        ));
+                    if (javaSourceFile == null) {
+                        return SearchResult.found(m);
                     }
-                    m = SearchResult.found(m);
+                    String sourceFile = javaSourceFile.getSourcePath().toString();
+                    String code = method.printTrimmed(getCursor().getParentTreeCursor());
+                    String declaringType = method.getMethodType().getDeclaringType().getFullyQualifiedName();
+                    String argumentTypes = method.getArguments().stream()
+                            .map(Expression::getType)
+                            .map(String::valueOf)
+                            .collect(joining(", "));
+                    m = rows.found(m, line -> new MethodCalls.Row(sourceFile, code, declaringType,
+                            method.getSimpleName(), argumentTypes, line));
                 }
                 return m;
             }
@@ -140,19 +146,19 @@ public class FindMethods extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                memberRef.printTrimmed(getCursor().getParentTreeCursor()),
-                                memberRef.getMethodType().getDeclaringType().getFullyQualifiedName(),
-                                memberRef.getMethodType().getName(),
-                                memberRef.getArguments().stream()
-                                        .map(Expression::getType)
-                                        .map(String::valueOf)
-                                        .collect(joining(", "))
-                        ));
+                    if (javaSourceFile == null) {
+                        return m.withReference(SearchResult.found(m.getReference()));
                     }
-                    m = m.withReference(SearchResult.found(m.getReference()));
+                    String sourceFile = javaSourceFile.getSourcePath().toString();
+                    String code = memberRef.printTrimmed(getCursor().getParentTreeCursor());
+                    String declaringType = memberRef.getMethodType().getDeclaringType().getFullyQualifiedName();
+                    String methodName = memberRef.getMethodType().getName();
+                    String argumentTypes = memberRef.getArguments().stream()
+                            .map(Expression::getType)
+                            .map(String::valueOf)
+                            .collect(joining(", "));
+                    m = m.withReference(rows.found(m.getReference(), line -> new MethodCalls.Row(sourceFile, code,
+                            declaringType, methodName, argumentTypes, line)));
                 }
                 return m;
             }
@@ -162,19 +168,18 @@ public class FindMethods extends Recipe {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                newClass.printTrimmed(getCursor().getParentTreeCursor()),
-                                newClass.getType().toString(),
-                                "<constructor>",
-                                newClass.getArguments().stream()
-                                        .map(Expression::getType)
-                                        .map(String::valueOf)
-                                        .collect(joining(", "))
-                        ));
+                    if (javaSourceFile == null) {
+                        return SearchResult.found(n);
                     }
-                    n = SearchResult.found(n);
+                    String sourceFile = javaSourceFile.getSourcePath().toString();
+                    String code = newClass.printTrimmed(getCursor().getParentTreeCursor());
+                    String declaringType = newClass.getType().toString();
+                    String argumentTypes = newClass.getArguments().stream()
+                            .map(Expression::getType)
+                            .map(String::valueOf)
+                            .collect(joining(", "));
+                    n = rows.found(n, line -> new MethodCalls.Row(sourceFile, code, declaringType,
+                            "<constructor>", argumentTypes, line));
                 }
                 return n;
             }

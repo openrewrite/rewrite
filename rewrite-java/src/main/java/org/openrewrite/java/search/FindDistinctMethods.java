@@ -25,7 +25,7 @@ import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.MethodCall;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.table.SearchResultRows;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -99,6 +99,15 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, UUID> acc) {
         return Preconditions.check(new UsesMethod<>(getMethodPattern(), matchOverrides), new JavaVisitor<ExecutionContext>() {
             final MethodMatcher methodMatcher = new MethodMatcher(getMethodPattern(), matchOverrides);
+            final SearchResultRows<MethodCalls.Row> rows = new SearchResultRows<>(methodCalls);
+
+            @Override
+            public @Nullable J postVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    rows.insertRows(tree, ctx);
+                }
+                return super.postVisit(tree, ctx);
+            }
 
             @Override
             public J visitExpression(Expression expression, ExecutionContext ctx) {
@@ -109,16 +118,16 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
                         String key = methodCall.getMethodType().toString();
                         if (methodCall.getId().equals(acc.get(key))) {
                             Cursor methodCursor = getCursor();
-                            methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                    methodCursor.firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                                    methodCall.printTrimmed(methodCursor),
-                                    requireNonNull(methodCall.getMethodType()).getDeclaringType().getFullyQualifiedName(),
-                                    methodCall.getMethodType().getName(),
-                                    methodCall.getMethodType().getParameterTypes().stream().map(Object::toString)
-                                            .collect(joining(","))
-                            ));
+                            String sourceFile = methodCursor.firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString();
+                            String code = methodCall.printTrimmed(methodCursor);
+                            String declaringType = requireNonNull(methodCall.getMethodType()).getDeclaringType().getFullyQualifiedName();
+                            String methodName = methodCall.getMethodType().getName();
+                            String parameterTypes = methodCall.getMethodType().getParameterTypes().stream()
+                                    .map(Object::toString)
+                                    .collect(joining(","));
                             acc.remove(key);
-                            e = SearchResult.found(e);
+                            e = rows.found(e, line -> new MethodCalls.Row(sourceFile, code, declaringType,
+                                    methodName, parameterTypes, line));
                         }
                     }
                 }

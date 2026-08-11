@@ -18,6 +18,7 @@ package org.openrewrite.java.table;
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Setter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.ExecutionContext;
@@ -53,6 +54,12 @@ public class MethodCalls extends DataTable<MethodCalls.Row> {
         @Column(displayName = "Argument types",
                 description = "The argument types of the method call.")
         String argumentTypes;
+
+        @Column(displayName = "Line number",
+                description = "The 1-based line that the method call starts on, in the source as printed when the " +
+                        "search ran. Empty when no position could be established for it.")
+        @Nullable
+        Integer line;
     }
 
     @Override

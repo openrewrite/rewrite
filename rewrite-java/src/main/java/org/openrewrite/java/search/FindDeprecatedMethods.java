@@ -27,6 +27,7 @@ import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.table.SearchResultRows;
 
 import java.util.Iterator;
 
@@ -108,6 +109,16 @@ public class FindDeprecatedMethods extends Recipe {
         }
 
         return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
+            final SearchResultRows<MethodCalls.Row> rows = new SearchResultRows<>(deprecatedMethodCalls);
+
+            @Override
+            public @Nullable J postVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    rows.insertRows(tree, ctx);
+                }
+                return super.postVisit(tree, ctx);
+            }
+
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -128,19 +139,19 @@ public class FindDeprecatedMethods extends Recipe {
                             }
 
                             JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                            if (javaSourceFile != null) {
-                                deprecatedMethodCalls.insertRow(ctx, new MethodCalls.Row(
-                                        javaSourceFile.getSourcePath().toString(),
-                                        method.printTrimmed(getCursor().getParentTreeCursor()),
-                                        method.getMethodType().getDeclaringType().getFullyQualifiedName(),
-                                        method.getSimpleName(),
-                                        method.getArguments().stream()
-                                                .map(Expression::getType)
-                                                .map(String::valueOf)
-                                                .collect(joining(", "))
-                                ));
+                            if (javaSourceFile == null) {
+                                m = SearchResult.found(m);
+                            } else {
+                                String sourceFile = javaSourceFile.getSourcePath().toString();
+                                String code = method.printTrimmed(getCursor().getParentTreeCursor());
+                                String declaringType = method.getMethodType().getDeclaringType().getFullyQualifiedName();
+                                String argumentTypes = method.getArguments().stream()
+                                        .map(Expression::getType)
+                                        .map(String::valueOf)
+                                        .collect(joining(", "));
+                                m = rows.found(m, line -> new MethodCalls.Row(sourceFile, code, declaringType,
+                                        method.getSimpleName(), argumentTypes, line));
                             }
-                            m = SearchResult.found(m);
                         }
                     }
                 }

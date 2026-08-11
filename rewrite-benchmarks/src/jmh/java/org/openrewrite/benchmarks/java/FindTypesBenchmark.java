@@ -22,6 +22,7 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.java.search.FindTypes;
 
 import java.util.concurrent.TimeUnit;
@@ -46,5 +47,20 @@ public class FindTypesBenchmark {
     public void findTypes(JavaCompilationUnitState state) {
         new FindTypes("java.util.List", false)
                 .run(state.getSourceSet(), new InMemoryExecutionContext());
+    }
+
+    @Benchmark
+    public void findTypesInDenseFile(DenseJavaFileState state) {
+        new FindTypes("java.util.List", false)
+                .run(state.getSourceSet(), new InMemoryExecutionContext());
+    }
+
+    /**
+     * One whole-file print, for scale against {@link #findTypesInDenseFile}.
+     */
+    @Benchmark
+    public String printDenseFile(DenseJavaFileState state) {
+        return state.getDenseFile().printAll(
+                new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.FENCED));
     }
 }

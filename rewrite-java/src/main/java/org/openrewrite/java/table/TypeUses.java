@@ -17,6 +17,7 @@ package org.openrewrite.java.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
@@ -42,5 +43,11 @@ public class TypeUses extends DataTable<TypeUses.Row> {
         @Column(displayName = "Concrete type",
                 description = "The concrete type in use, which may be a subtype of a searched type.")
         String concreteType;
+
+        @Column(displayName = "Line number",
+                description = "The 1-based line that the type use starts on, in the source as printed when the " +
+                        "search ran. Empty when no position could be established for it.")
+        @Nullable
+        Integer line;
     }
 }

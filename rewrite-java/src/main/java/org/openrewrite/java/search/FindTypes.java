@@ -26,6 +26,7 @@ import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.table.SearchResultRows;
 import org.openrewrite.trait.Trait;
 
 import java.util.HashSet;
@@ -165,9 +166,18 @@ public class FindTypes extends Recipe {
 
     private class JavaSourceFileVisitor extends JavaVisitor<ExecutionContext> {
         private final TypeNameMatcher fullyQualifiedType;
+        private final SearchResultRows<TypeUses.Row> rows = new SearchResultRows<>(typeUses);
 
         public JavaSourceFileVisitor(TypeNameMatcher fullyQualifiedType) {
             this.fullyQualifiedType = fullyQualifiedType;
+        }
+
+        @Override
+        public @Nullable J postVisit(J tree, ExecutionContext ctx) {
+            if (tree instanceof SourceFile) {
+                rows.insertRows(tree, ctx);
+            }
+            return super.postVisit(tree, ctx);
         }
 
         @Override
@@ -185,7 +195,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
-                    return found(ident, ctx);
+                    return found(ident);
                 }
             }
             return super.visitIdentifier(ident, ctx);
@@ -197,7 +207,7 @@ public class FindTypes extends Recipe {
             // in Java trees this is idempotent with the parent's `visitTypeName` call
             J.ParameterizedType pt = (J.ParameterizedType) super.visitParameterizedType(type, ctx);
             if (parameterizedTypeMatches(pt) && getCursor().firstEnclosing(J.Import.class) == null) {
-                return found(pt, ctx);
+                return found(pt);
             }
             return pt;
         }
@@ -213,7 +223,7 @@ public class FindTypes extends Recipe {
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
             if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                     getCursor().firstEnclosing(J.Import.class) == null) {
-                return found(n, ctx);
+                return found(n);
             }
             return n;
         }
@@ -224,22 +234,21 @@ public class FindTypes extends Recipe {
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
             if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                     "class".equals(fa.getName().getSimpleName())) {
-                return found(fa, ctx);
+                return found(fa);
             }
             return fa;
         }
 
-        private <J2 extends TypedTree> J2 found(J2 j, ExecutionContext ctx) {
-            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
-            if (!j.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                // Avoid double-counting results in the data table
-                typeUses.insertRow(ctx, new TypeUses.Row(
-                        getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                        j.printTrimmed(getCursor().getParentTreeCursor()),
-                        fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
-                ));
+        private <J2 extends TypedTree> J2 found(J2 j) {
+            if (j.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                // Already matched by another visit method
+                return j;
             }
-            return SearchResult.found(j);
+            JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
+            String sourceFile = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString();
+            String code = j.printTrimmed(getCursor().getParentTreeCursor());
+            String concreteType = fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName();
+            return rows.found(j, line -> new TypeUses.Row(sourceFile, code, concreteType, line));
         }
     }
 }

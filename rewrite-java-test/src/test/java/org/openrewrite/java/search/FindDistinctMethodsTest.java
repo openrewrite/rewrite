@@ -29,8 +29,8 @@ class FindDistinctMethodsTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(MethodCalls.class.getName(),
             //language=csv
             """
-              sourceFile,method,className,methodName,argumentTypes
-              Test.java,"System.out.print(""hello"")",java.io.PrintStream,print,java.lang.String
+              sourceFile,method,className,methodName,argumentTypes,line
+              Test.java,"System.out.print(""hello"")",java.io.PrintStream,print,java.lang.String,3
               """
           ).recipe(new FindDistinctMethods("java.io.PrintStream print(..)", false)),
           java(

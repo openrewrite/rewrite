@@ -27,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.xml.Assertions.xml;
 
@@ -52,7 +53,7 @@ class FindTypesTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
             .containsExactly(
-              new TypeUses.Row("B.java", "A1", "a.A1")
+              new TypeUses.Row("B.java", "A1", "a.A1", 2)
             )),
           java(
             """
@@ -163,6 +164,7 @@ class FindTypesTest implements RewriteTest {
                 assertThat(rows).hasSize(1);
                 assertThat(rows.getFirst().getConcreteType()).isEqualTo("java.util.List");
                 assertThat(rows.getFirst().getCode()).isEqualTo("List<String>");
+                assertThat(rows.getFirst().getLine()).isEqualTo(3);
             }),
           java(
             """
@@ -178,6 +180,41 @@ class FindTypesTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void lineNumberOfEachMatch() {
+        rewriteRun(
+          spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
+            .extracting(TypeUses.Row::getCode, TypeUses.Row::getLine)
+            .containsExactly(
+              tuple("A1", 6),
+              tuple("A1", 7)
+            )),
+          java(
+            """
+              import a.A1;
+
+              /**
+               * Prose mentioning A1 on a line that holds no reference to it.
+               */
+              public class B extends A1 {
+                  A1 field;
+              }
+              """,
+            """
+              import a.A1;
+
+              /**
+               * Prose mentioning A1 on a line that holds no reference to it.
+               */
+              public class B extends /*~~>*/A1 {
+                  /*~~>*/A1 field;
+              }
+              """
+          ),
+          java(a1)
         );
     }
 

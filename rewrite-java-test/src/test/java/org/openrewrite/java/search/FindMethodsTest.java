@@ -266,12 +266,84 @@ class FindMethodsTest implements RewriteTest {
     }
 
     @Test
+    void lineNumberOfEachMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("java.util.List add(..)", false))
+            .dataTable(MethodCalls.Row.class, rows -> assertThat(rows)
+              .extracting(MethodCalls.Row::getLine)
+              .containsExactly(4, 8, 10)),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  void test(List<String> l) {
+                      l.add("a");
+                      /*
+                       * A comment spanning lines, mentioning add.
+                       */
+                      l.add(
+                              "b");
+                      Runnable r = () -> l.add("c");
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  void test(List<String> l) {
+                      /*~~>*/l.add("a");
+                      /*
+                       * A comment spanning lines, mentioning add.
+                       */
+                      /*~~>*/l.add(
+                              "b");
+                      Runnable r = () -> /*~~>*/l.add("c");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @Test
+    void reportsAMatchAlreadyMarkedByAnotherSearch() {
+        rewriteRun(
+          spec -> spec.recipes(
+              new FindMethods("java.util.Collection isEmpty()", true),
+              new FindMethods("java.util.List isEmpty()", false))
+            // One marker covers both searches, and each still reports its call at the right line
+            .dataTable(MethodCalls.Row.class, rows -> assertThat(rows)
+              .extracting(MethodCalls.Row::getLine)
+              .containsExactly(4, 4)),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  void test(List<String> l) {
+                      l.isEmpty();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  void test(List<String> l) {
+                      /*~~>*/l.isEmpty();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void datatableFormat() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(MethodCalls.class.getName(),
             """
-              sourceFile,method,className,methodName,argumentTypes
-              A.java,"new B.C().foo(bar, 123)","B$C",foo,"java.lang.String, int"
+              sourceFile,method,className,methodName,argumentTypes,line
+              A.java,"new B.C().foo(bar, 123)","B$C",foo,"java.lang.String, int",3
               """
           ).recipe(new FindMethods("B.C foo(..)", false)),
           java(
