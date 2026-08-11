@@ -2443,6 +2443,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void retainVersionWithoutArtifactIdFailsValidation() {
+            assertThat(new UpgradeDependencyVersion("*", "jackson*", "latest.patch", null, null,
+              singletonList("com.jcraft")).validate().isValid()).isFalse();
+        }
+
+        @Test
+        void blankRetainVersionIsIgnored() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("*", "spring-cloud-config*", "3.1.4", null, true, singletonList(""))),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.2</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.4</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
