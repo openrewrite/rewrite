@@ -602,6 +602,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append("=");
             }
             if (omitBodyBraces && body.getStatements().size() == 1) {
+                visitSpace(body.getPrefix(), Space.Location.BLOCK_PREFIX, p);
                 visit(body.getStatements().get(0), p);
             } else {
                 visit(body, p);
