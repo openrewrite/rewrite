@@ -34,8 +34,9 @@ class ParseProject implements RpcRequest {
     Path projectPath;
 
     /**
-     * Optional glob patterns to exclude from parsing.
-     * If not provided, default exclusions (__pycache__, .venv, etc.) will be used.
+     * Optional glob patterns matched against directory names, not paths.
+     * These extend the parser's built-in exclusions (__pycache__, .venv, etc.)
+     * rather than replacing them.
      */
     @Nullable
     List<String> exclusions;
