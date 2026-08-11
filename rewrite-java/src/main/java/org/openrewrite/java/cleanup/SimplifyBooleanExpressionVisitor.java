@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.ParenthesizeVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -146,11 +147,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
             if (asUnary.getOperator() == J.Unary.Type.Not) {
                 j = unpackExpression(asUnary.getExpression(), asUnary);
-                if (j instanceof J.Ternary && parentBindsTighterThanTernary(unary)) {
-                    j = new J.Parentheses<>(Tree.randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            JRightPadded.build(((Expression) j).withPrefix(Space.EMPTY)));
+                if (j instanceof J.Ternary) {
+                    j = ParenthesizeVisitor.maybeParenthesize((Expression) j, getCursor());
                 }
             }
             if (asUnary != j) {
@@ -158,20 +156,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         }
         return j;
-    }
-
-    /**
-     * A ternary binds looser than every operator it can be an operand of, so replacing a negation
-     * with a ternary in such a position needs parentheses to preserve the original grouping,
-     * e.g. {@code !(a ? b : c) && d} must not become {@code a ? !b : !c && d}.
-     */
-    private boolean parentBindsTighterThanTernary(J.Unary unary) {
-        Object parent = getCursor().getParentTreeCursor().getValue();
-        if (parent instanceof J.Binary || parent instanceof J.Unary ||
-            parent instanceof J.InstanceOf || parent instanceof J.TypeCast) {
-            return true;
-        }
-        return parent instanceof J.Ternary && ((J.Ternary) parent).getCondition() == unary;
     }
 
     @Override
