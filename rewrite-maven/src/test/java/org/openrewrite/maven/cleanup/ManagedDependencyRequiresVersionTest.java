@@ -18,17 +18,23 @@ package org.openrewrite.maven.cleanup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ManagedDependencyRequiresVersionTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new DependencyManagementDependencyRequiresVersion());
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1084")
     @Test
     void dependencyManagementDependencyRequiresVersion() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -59,7 +65,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void managedScopeAndExclusionsFromParentManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("parent",
             pomXml(
               """
@@ -126,7 +131,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryHidesParentManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("parent",
             pomXml(
               """
@@ -179,7 +183,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryWhenTheParentManagesNothingForIt() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("parent",
             pomXml(
               """
@@ -242,7 +245,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryMayHideAnImportedBom() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("bom",
             pomXml(
               """
@@ -294,9 +296,47 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     }
 
     @Test
+    void coordinatesOnlyEntryMayHideABomImportedInAProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <profiles>
+                  <profile>
+                    <id>pinned</id>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.example</groupId>
+                          <artifactId>bom</artifactId>
+                          <version>1</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void coordinatesOnlyEntryWhenTheParentManagesInAnInactiveProfile() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("parent",
             pomXml(
               """
@@ -354,7 +394,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryInAPomAnotherModuleDeclaresAsItsParent() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("parent",
             pomXml(
               """
@@ -396,7 +435,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryInAPomWithACyclicAncestry() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           mavenProject("a",
             pomXml(
               """
@@ -453,7 +491,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryBesideASiblingWithAnUnresolvableProperty() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -482,7 +519,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryInAPomThatOthersInheritFromOrImport() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -507,7 +543,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryWithAnUnresolvableProperty() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -531,7 +566,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryWithAResolvableProperty() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -568,7 +602,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void coordinatesOnlyEntryBesideADuplicateInTheSamePom() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -597,7 +630,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void managedScope() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -629,7 +661,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void managedExclusions() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -666,7 +697,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void managedOptional() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -698,7 +728,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void declaresMoreThanCoordinates() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -724,7 +753,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void incompleteCoordinates() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -747,7 +775,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void removesOnlyTheEntryThatManagesNothing() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
@@ -806,7 +833,6 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void propertyVersion() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
               <project>
