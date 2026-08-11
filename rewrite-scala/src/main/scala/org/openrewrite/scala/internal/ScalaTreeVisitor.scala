@@ -276,6 +276,11 @@ class ScalaTreeVisitor(
   }
   
   private def visitLiteral(lit: Trees.Literal[?]): J.Literal = {
+    // An `()` the author wrote parses as an empty `Tuple`, so a unit literal is always the
+    // compiler's: no source text to print, and a `BoxedUnit` value no LST consumer accepts.
+    if (lit.const.tag == UnitTag) {
+      throw unmappedException(lit)
+    }
     val prefix = extractPrefix(lit.span)
     val value = lit.const.value
     val valueSource = extractSource(lit.span)
@@ -4750,9 +4755,16 @@ class ScalaTreeVisitor(
       }
     }
     
+    // Dotty closes an auxiliary constructor's body with a unit literal that spans no source,
+    // so dropping it leaves the cursor where the last statement ended.
+    val isSyntheticUnit = block.expr match {
+      case lit: Trees.Literal[?] => lit.const.tag == UnitTag
+      case _ => false
+    }
+
     // Handle the expression part of the block (if any)
     // Skip synthetic ??? added by compiler for procedure syntax
-    val isSyntheticExpr = if (!block.expr.isEmpty) {
+    val isSyntheticExpr = if (!block.expr.isEmpty && !isSyntheticUnit) {
       def hasTripleQ(t: Trees.Tree[?]): Boolean = t match {
         case sel: Trees.Select[?] => sel.name.toString == "???" || sel.name.toString == "$qmark$qmark$qmark" || hasTripleQ(sel.qualifier)
         case id: Trees.Ident[?] => id.name.toString == "???" || id.name.toString == "$qmark$qmark$qmark"
@@ -4776,7 +4788,7 @@ class ScalaTreeVisitor(
         else cursor = blockEnd2
       }
     }
-    if (!block.expr.isEmpty && !isSyntheticExpr) {
+    if (!block.expr.isEmpty && !isSyntheticExpr && !isSyntheticUnit) {
       // Visit the expression and check if it's a synthetic ??? that slipped through.
       // Detect structurally (a `Predef.???`-style field access), never by string-matching
       // the printed output — user code such as the string literal `"???"` is not synthetic.
@@ -6590,13 +6602,15 @@ class ScalaTreeVisitor(
               }
               val statements = new util.ArrayList[JRightPadded[Statement]]()
               statements.add(JRightPadded.build(stmtExpr))
-              new J.Block(Tree.randomId(), beforeEquals,
+              // A braceless body's block covers only what follows `=`, so the space after the
+              // `=` belongs to its statement.
+              new J.Block(Tree.randomId(), Space.EMPTY,
                 Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))),
                 JRightPadded.build(false), statements, Space.EMPTY)
             case stmt: Statement =>
               val statements = new util.ArrayList[JRightPadded[Statement]]()
               statements.add(JRightPadded.build(stmt))
-              new J.Block(Tree.randomId(), beforeEquals,
+              new J.Block(Tree.randomId(), Space.EMPTY,
                 Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))),
                 JRightPadded.build(false), statements, Space.EMPTY)
             case _ => null
