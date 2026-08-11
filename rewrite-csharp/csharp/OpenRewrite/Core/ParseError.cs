@@ -44,6 +44,9 @@ public sealed class ParseError(
     public Tree WithId(Guid id) =>
         id == Id ? this : new ParseError(id, Markers, SourcePath, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Text);
 
+    public ParseError WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new ParseError(Id, markers, SourcePath, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Text);
+
     public SourceFile WithSourcePath(string sourcePath) =>
         sourcePath == SourcePath ? this : new ParseError(Id, Markers, sourcePath, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Text);
 

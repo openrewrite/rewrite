@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp;
@@ -421,7 +422,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitLiteral(Literal literal, RpcReceiveQueue q)
     {
-        var value = q.Receive(literal.Value);
+        var value = MaterializeScalar(q.Receive(literal.Value));
         var valueSource = q.Receive(literal.ValueSource);
         var unicodeEscapes = q.ReceiveList(literal.UnicodeEscapes, ue => new Literal.UnicodeEscape(
             q.Receive(ue?.ValueSourceIndex ?? 0),
@@ -831,17 +832,39 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             {
                 var constantValues = q.ReceiveList(array.ConstantValues, x => x);
                 var refValues = q.ReceiveList(array.ReferenceValues, t => VisitType(t, q)!);
-                return new JavaType.Annotation.ArrayElementValue(element, constantValues, refValues);
+                return new JavaType.Annotation.ArrayElementValue(element,
+                    constantValues?.Select(MaterializeScalar).ToList(), refValues);
             }
             default:
             {
                 var single = v as JavaType.Annotation.SingleElementValue;
                 var constantValue = q.Receive(single?.ConstantValue);
                 var refValue = q.Receive(single?.ReferenceValue, t => VisitType(t, q)!);
-                return new JavaType.Annotation.SingleElementValue(element, constantValue, refValue);
+                return new JavaType.Annotation.SingleElementValue(element,
+                    MaterializeScalar(constantValue), refValue);
             }
         }
     }
+
+    /// <summary>
+    /// A value declared as <c>object</c> (an annotation element's constant, a literal's value)
+    /// gives the receive queue no target type to convert to, so it hands back the raw
+    /// <see cref="JsonElement"/> the formatter produced. Recipes read these values — a
+    /// <c>[TemplatePart(Name = "...")]</c> part name, a <c>Literal</c>'s string — and match them
+    /// against CLR types, so the scalar has to be materialised here. The wire does not carry the
+    /// numeric subtype (see JavaSender), so integers arrive as <c>long</c> and reals as
+    /// <c>double</c>.
+    /// </summary>
+    internal static object? MaterializeScalar(object? value) => value switch
+    {
+        JsonElement { ValueKind: JsonValueKind.String } e => e.GetString(),
+        JsonElement { ValueKind: JsonValueKind.True } => true,
+        JsonElement { ValueKind: JsonValueKind.False } => false,
+        JsonElement { ValueKind: JsonValueKind.Null } => null,
+        JsonElement { ValueKind: JsonValueKind.Number } e =>
+            e.TryGetInt64(out var l) ? l : e.GetDouble(),
+        _ => value
+    };
 
     // Utility methods
 
