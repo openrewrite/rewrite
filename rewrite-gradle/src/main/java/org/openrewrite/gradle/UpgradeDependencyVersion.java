@@ -23,9 +23,11 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.internal.AddDependencyVisitor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
+import org.openrewrite.gradle.trait.GradleVersionCatalog;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -544,6 +546,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         GradleProject gradleProject;
 
         @Nullable
+        GradleSettings gradleSettings;
+
+        @Nullable
         List<GroupArtifact> newlyManaged;
 
         @Nullable
@@ -564,6 +569,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 noLongerManaged = null;
                 newlyManaged = null;
                 gradleProject = original.getMarkers().findFirst(GradleProject.class)
+                        .orElse(null);
+                gradleSettings = original.getMarkers().findFirst(GradleSettings.class)
                         .orElse(null);
                 JavaSourceFile sourceFile = applyPluginProvidedDependencies(original, ctx);
                 JavaSourceFile result = (JavaSourceFile) super.visit(sourceFile, ctx);
@@ -747,6 +754,30 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (bomEntry.getVersionVariable() == null) {
                     m = updateBomEntry(bomEntry, ctx);
                 }
+            }
+
+            GradleVersionCatalog catalog = new GradleVersionCatalog.Matcher()
+                    .get(getCursor())
+                    .orElse(null);
+            if (catalog != null) {
+                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings);
+                for (GroupArtifact ga : catalog.getLibraries().keySet()) {
+                    if (dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                        String currentVersion = catalog.getVersion(ga);
+                        if (currentVersion != null) {
+                            try {
+                                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion);
+                                String selectedVersion = versionSelector.select(gav, null, newVersion, versionPattern, ctx);
+                                if (selectedVersion != null && !selectedVersion.equals(currentVersion)) {
+                                    catalog = catalog.withVersion(ga, selectedVersion);
+                                }
+                            } catch (MavenDownloadingException ignored) {
+                                // leave this library's version unchanged
+                            }
+                        }
+                    }
+                }
+                m = catalog.getTree();
             }
 
             if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {

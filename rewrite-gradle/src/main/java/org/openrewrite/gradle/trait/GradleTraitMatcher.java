@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
@@ -49,5 +50,41 @@ public abstract class GradleTraitMatcher<U extends Trait<?>> extends SimpleTrait
         }
 
         return false;
+    }
+
+    /**
+     * @return {@code true} if the cursor's tree is itself a statement in an enclosing block,
+     * rather than a nested expression (e.g. the receiver of a chained method call).
+     */
+    protected boolean isTopLevelStatement(Cursor cursor) {
+        Cursor parent = cursor.getParentTreeCursor();
+        if (parent.getValue() instanceof J.Return) {
+            // Groovy closures implicitly return their last expression -- the parser wraps it in
+            // a synthetic Return node, so unwrap that before checking for the enclosing block.
+            parent = parent.getParentTreeCursor();
+        }
+        return !parent.isRoot() && parent.getValue() instanceof J.Block;
+    }
+
+    /**
+     * @return the method invocation that {@code m} is chained onto (i.e. {@code m.getSelect()}),
+     * or {@code null} if {@code m} isn't chained onto another method call.
+     */
+    protected static J.@Nullable MethodInvocation asChainedInvocation(J.MethodInvocation m) {
+        return m.getSelect() instanceof J.MethodInvocation ? (J.MethodInvocation) m.getSelect() : null;
+    }
+
+    /**
+     * @return the string value of {@code m}'s argument at {@code index}, or {@code null} if
+     * there's no such argument or it isn't a string literal.
+     */
+    protected static @Nullable String literalArgument(J.MethodInvocation m, int index) {
+        if (index < m.getArguments().size()) {
+            Expression argument = m.getArguments().get(index);
+            if (argument instanceof J.Literal && ((J.Literal) argument).getValue() instanceof String) {
+                return (String) ((J.Literal) argument).getValue();
+            }
+        }
+        return null;
     }
 }
