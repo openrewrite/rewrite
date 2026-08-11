@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -156,18 +157,30 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        if (newVersion == null) {
-            return TreeVisitor.noop();
-        }
-        final VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-        if (versionComparator == null) {
-            return TreeVisitor.noop();
-        }
+        final VersionComparator versionComparator = newVersion == null ? null : Semver.validate(newVersion, versionPattern).getValue();
         return new MavenIsoVisitor<ExecutionContext>() {
             final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;
 
             @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                ResolvedPom resolvedPom = getResolutionResult().getPom();
+                Pom requestedPom = resolvedPom.getRequested();
+                for (ManagedDependency managedDependency : requestedPom.getDependencyManagement()) {
+                    if (managedDependency instanceof ManagedDependency.Defined &&
+                            matchesGlob(resolvedPom.getValue(managedDependency.getGroupId()), oldGroupId) &&
+                            matchesGlob(resolvedPom.getValue(managedDependency.getArtifactId()), oldArtifactId)) {
+                        acc.getPomsManagingOldCoordinates().add(new GroupArtifact(requestedPom.getGroupId(), requestedPom.getArtifactId()));
+                        break;
+                    }
+                }
+                return super.visitDocument(document, ctx);
+            }
+
+            @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (versionComparator == null) {
+                    return super.visitTag(tag, ctx);
+                }
                 if (!isDependencyTag(oldGroupId, oldArtifactId) &&
                         !isPluginDependencyTag(oldGroupId, oldArtifactId) &&
                         !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
@@ -355,6 +368,25 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         if (isImplicitlyDefinedVersionProperty(currentVersionValue)) {
                             return t;
                         }
+                    } else if (isOldDependencyTag && !t.getChild("version").isPresent()) {
+                        String currentGroupId = t.getChildValue("groupId").orElse(oldGroupId);
+                        String currentArtifactId = t.getChildValue("artifactId").orElse(oldArtifactId);
+                        String type = t.getChildValue("type").orElse(null);
+                        String classifier = t.getChildValue("classifier").orElse(null);
+                        Scope scope = Scope.fromName(t.getChildValue("scope").orElse("compile"));
+                        ResolvedPom pom = getResolutionResult().getPom();
+                        if (pom.getManagedVersion(currentGroupId, currentArtifactId, type, classifier) != null &&
+                                !isDependencyManaged(scope, renamedGroupId(currentGroupId), renamedArtifactId(currentArtifactId))) {
+                            // This dependency has no version of its own, and the new coordinates have no managed version
+                            if (!managedVersionFollowsRename(scope, pom.getManagedDependency(currentGroupId, currentArtifactId, type, classifier))) {
+                                return Markup.warn(tag, new IllegalStateException(String.format(
+                                        "%s:%s is not changed to %s:%s, because the new coordinates have no managed version and no `newVersion` was provided, which would leave the dependency without a version.",
+                                        currentGroupId, currentArtifactId, renamedGroupId(currentGroupId), renamedArtifactId(currentArtifactId))));
+                            }
+                            // The dependency management that provides the version is renamed as well, possibly in
+                            // another POM; leave the model update to that POM to avoid an interim resolution failure
+                            deferUpdate = true;
+                        }
                     }
 
                     String groupId = newGroupId;
@@ -474,6 +506,24 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 return isBlank(value) ? null : value;
             }
 
+            /**
+             * Whether the dependency management that gives this dependency its version is renamed along with the
+             * dependency, so that the new coordinates end up managed once every POM in this repository is visited.
+             */
+            private boolean managedVersionFollowsRename(Scope scope, @Nullable ResolvedManagedDependency managedDependency) {
+                return configuredToChangeManagedDependency &&
+                        (canAffectManagedDependency(getResolutionResult(), scope, oldGroupId, oldArtifactId) ||
+                                isManagedByPomInThisRepository(managedDependency));
+            }
+
+            private boolean isManagedByPomInThisRepository(@Nullable ResolvedManagedDependency managedDependency) {
+                if (managedDependency == null || managedDependency.getBomGav() == null) {
+                    return false;
+                }
+                ResolvedGroupArtifactVersion bomGav = managedDependency.getBomGav();
+                return acc.getPomsManagingOldCoordinates().contains(new GroupArtifact(bomGav.getGroupId(), bomGav.getArtifactId()));
+            }
+
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
                 MavenResolutionResult result = getResolutionResult();
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
@@ -554,6 +604,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Value
     public static class Accumulator {
         Set<PomProperty> pomProperties = new HashSet<>();
+
+        /**
+         * The coordinates of the POMs in this repository that declare dependency management matching the old
+         * coordinates, and whose dependency management this recipe will therefore rename as well.
+         */
+        Set<GroupArtifact> pomsManagingOldCoordinates = new HashSet<>();
     }
 
     @Value
