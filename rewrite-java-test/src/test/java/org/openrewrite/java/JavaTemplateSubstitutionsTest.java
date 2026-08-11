@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -330,6 +331,68 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             """
               public class Test {
                   String literal = Some.method();
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("JavaTemplate has no escape for a literal #{ in template source")
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/pull/976")
+    @Test
+    void hashBraceInStringLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  if ("placeholder".equals(literal.getValue())) {
+                      return JavaTemplate.builder("\"#{foo}\"")
+                        .build()
+                        .apply(getCursor(), literal.getCoordinates().replace());
+                  }
+                  return super.visitLiteral(literal, ctx);
+              }
+          })),
+          java(
+            """
+              public class Test {
+                  String s = "placeholder";
+              }
+              """,
+            """
+              public class Test {
+                  String s = "#{foo}";
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Substitutions loops replacePlaceholders to a fixed point, so the #{ unescaped in pass 1 is re-parsed as a placeholder in pass 2")
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/pull/976")
+    @Test
+    void escapedHashBraceInStringLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  if ("placeholder".equals(literal.getValue())) {
+                      return JavaTemplate.builder("\"\\#{foo}\"")
+                        .build()
+                        .apply(getCursor(), literal.getCoordinates().replace());
+                  }
+                  return super.visitLiteral(literal, ctx);
+              }
+          })),
+          java(
+            """
+              public class Test {
+                  String s = "placeholder";
+              }
+              """,
+            """
+              public class Test {
+                  String s = "#{foo}";
               }
               """
           )
