@@ -3051,15 +3051,8 @@ class ScalaTreeVisitor(
       return visitLambdaParameter(vd)
     }
     
-    // Special handling for variables with annotations
     val hasAnnotations = vd.mods != null && vd.mods.annotations.nonEmpty
-    val prefix = if (hasAnnotations) {
-      // Don't extract prefix yet - annotations will consume their own prefix
-      Space.EMPTY
-    } else {
-      extractPrefix(vd.span)
-    }
-    
+
     // Handle annotations first
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
     if (hasAnnotations) {
@@ -3070,7 +3063,9 @@ class ScalaTreeVisitor(
         }
       }
     }
-    
+
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(vd.span)
+
     // Extract modifiers and keywords from source
     // When we have annotations, cursor is positioned after them
     val adjustedStart = if (hasAnnotations) cursor else Math.max(0, vd.span.start - offsetAdjustment)
@@ -3584,9 +3579,6 @@ class ScalaTreeVisitor(
 
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
     val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
-    // When annotations are present they own the leading whitespace; otherwise
-    // the prefix lives on the ModuleDef itself.
-    val prefix = if (hasAnnotations) Space.EMPTY else extractPrefix(md.span)
 
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
     if (hasAnnotations) {
@@ -3597,6 +3589,8 @@ class ScalaTreeVisitor(
         }
       }
     }
+
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(md.span)
 
     // Extract the source text to find modifiers
     val adjustedStart = Math.max(0, md.span.start - offsetAdjustment)
@@ -4856,15 +4850,8 @@ class ScalaTreeVisitor(
   }
   
   private def visitClassDef(td: Trees.TypeDef[?]): J.ClassDeclaration = {
-    // Special handling for classes with annotations
     val hasAnnotations = td.mods.annotations.nonEmpty
-    val prefix = if (hasAnnotations) {
-      // Don't extract prefix yet - annotations will consume their own prefix
-      Space.EMPTY
-    } else {
-      extractPrefix(td.span)
-    }
-    
+
     // Handle annotations first
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
     for (annot <- td.mods.annotations) {
@@ -4873,7 +4860,9 @@ class ScalaTreeVisitor(
         case _ => // Skip if not mapped to annotation
       }
     }
-    
+
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(td.span)
+
     // After processing annotations, we need to find where modifiers/class keyword start
     // The cursor should now be positioned after the last annotation
     
@@ -8751,6 +8740,21 @@ class ScalaTreeVisitor(
     )
   }
   
+  /**
+   * Takes the whitespace and comments preceding the first annotation as the declaration's
+   * own prefix, leaving that annotation's prefix empty: as in the Java LST, a declaration
+   * owns the space ahead of it even when an annotation comes first in source.
+   */
+  private def hoistAnnotationPrefix(annotations: util.List[J.Annotation]): Space = {
+    if (annotations.isEmpty) {
+      Space.EMPTY
+    } else {
+      val first = annotations.get(0)
+      annotations.set(0, first.withPrefix(Space.EMPTY))
+      first.getPrefix
+    }
+  }
+
   def extractPrefix(span: Spans.Span): Space = {
     if (!span.exists) {
       return Space.EMPTY
