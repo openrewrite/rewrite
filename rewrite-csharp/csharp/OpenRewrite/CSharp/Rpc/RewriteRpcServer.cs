@@ -1006,7 +1006,7 @@ public class RewriteRpcServer
     {
         var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
-        if (requestedVersion != null)
+        if (!string.IsNullOrWhiteSpace(requestedVersion))
             addArgs += $" --version {requestedVersion}";
         RunDotnet(addArgs);
 
