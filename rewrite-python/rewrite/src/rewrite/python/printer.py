@@ -1849,6 +1849,8 @@ class PythonJavaPrinter:
 
         if unary.operator == Unary.Type.Not:
             p.append("not")
+            if not unary.expression.prefix.whitespace:
+                p.append(" ")
         elif unary.operator == Unary.Type.Positive:
             p.append("+")
         elif unary.operator == Unary.Type.Negative:

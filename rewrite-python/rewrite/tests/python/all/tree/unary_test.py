@@ -1,13 +1,27 @@
-from rewrite.java.support_types import JavaType
+from rewrite.java.support_types import JavaType, Space
 from rewrite.java.tree import Unary
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
-from rewrite.test import RecipeSpec, python
+from rewrite.test import RecipeSpec, from_visitor, python
 
 
 def test_bool_ops():
     # language=python
     RecipeSpec().rewrite_run(python("assert not True"))
+
+
+def test_not_keeps_separator_when_operand_prefix_collapses():
+    class RemoveWhitespace(PythonVisitor):
+        def visit_unary(self, unary, p):
+            u = super().visit_unary(unary, p)
+            if isinstance(u, Unary) and u.operator == Unary.Type.Not:
+                return u.replace(_expression=u.expression.replace(_prefix=Space.EMPTY))
+            return u
+
+    RecipeSpec(recipe=from_visitor(RemoveWhitespace())).rewrite_run(
+        # language=python
+        python("assert not  x", "assert not x")
+    )
 
 
 def test_arithmetic_ops():
