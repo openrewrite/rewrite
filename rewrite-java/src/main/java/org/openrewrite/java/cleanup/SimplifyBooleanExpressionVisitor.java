@@ -146,12 +146,32 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
             if (asUnary.getOperator() == J.Unary.Type.Not) {
                 j = unpackExpression(asUnary.getExpression(), asUnary);
+                if (j instanceof J.Ternary && parentBindsTighterThanTernary(unary)) {
+                    j = new J.Parentheses<>(Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            JRightPadded.build(((Expression) j).withPrefix(Space.EMPTY)));
+                }
             }
             if (asUnary != j) {
                 j = j.withPrefix(asUnary.getPrefix());
             }
         }
         return j;
+    }
+
+    /**
+     * A ternary binds looser than every operator it can be an operand of, so replacing a negation
+     * with a ternary in such a position needs parentheses to preserve the original grouping,
+     * e.g. {@code !(a ? b : c) && d} must not become {@code a ? !b : !c && d}.
+     */
+    private boolean parentBindsTighterThanTernary(J.Unary unary) {
+        Object parent = getCursor().getParentTreeCursor().getValue();
+        if (parent instanceof J.Binary || parent instanceof J.Unary ||
+            parent instanceof J.InstanceOf || parent instanceof J.TypeCast) {
+            return true;
+        }
+        return parent instanceof J.Ternary && ((J.Ternary) parent).getCondition() == unary;
     }
 
     @Override
@@ -414,9 +434,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             !(sideRetained instanceof J.Parentheses) &&
             !(sideRetained instanceof J.Unary)) {
             sideRetained = new J.Parentheses<>(Tree.randomId(),
-                    Space.EMPTY,
+                    sideRetained.getPrefix(),
                     Markers.EMPTY,
-                    JRightPadded.build(sideRetained));
+                    JRightPadded.build(sideRetained.withPrefix(Space.EMPTY)));
         }
         return new J.Unary(Tree.randomId(),
                 sideRetained.getPrefix(),

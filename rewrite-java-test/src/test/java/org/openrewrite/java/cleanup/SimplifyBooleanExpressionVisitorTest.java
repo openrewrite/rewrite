@@ -633,6 +633,68 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void negatedTernaryBranchWrappedInParentheses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, Object o, boolean c) {
+                      return !(a ? o instanceof String : c);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, Object o, boolean c) {
+                      return a ? !(o instanceof String) : !c;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void negatedTernaryAsOperandKeepsParentheses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean c, boolean d) {
+                      return !(a ? b : c) && d;
+                  }
+                  boolean m2(boolean a, boolean b, boolean c, boolean d) {
+                      return !(a ? b : c) ? c : d;
+                  }
+                  boolean m3(boolean a, boolean b, boolean c, boolean d) {
+                      return d ? !(a ? b : c) : d;
+                  }
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return !!(a ? b : c);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean c, boolean d) {
+                      return (a ? !b : !c) && d;
+                  }
+                  boolean m2(boolean a, boolean b, boolean c, boolean d) {
+                      return (a ? !b : !c) ? c : d;
+                  }
+                  boolean m3(boolean a, boolean b, boolean c, boolean d) {
+                      return d ? a ? !b : !c : d;
+                  }
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void differentFieldAccesses() {
         rewriteRun(
           java(
