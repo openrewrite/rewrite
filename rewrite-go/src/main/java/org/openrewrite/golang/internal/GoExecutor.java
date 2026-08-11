@@ -112,12 +112,8 @@ public final class GoExecutor {
     }
 
     /**
-     * {@code PATH} is searched ahead of the well-known install directories because callers hand the
-     * resolved binary's {@code GOROOT} to child processes that go on to invoke a bare {@code go} of
-     * their own. Preferring a fixed location such as {@code /usr/bin/go} pairs that child's {@code go}
-     * with a {@code GOROOT} from whichever release happens to sit there, and the toolchain rejects the
-     * mismatch with {@code compile: version "goX" does not match go tool version "goY"}. An explicit
-     * {@code GOROOT} still wins, since child processes inherit it.
+     * {@code PATH} is searched ahead of the well-known install directories so the resolved binary matches the
+     * bare {@code go} that child processes invoke; otherwise the toolchain rejects the {@code GOROOT} mismatch.
      */
     @Nullable String find(@Nullable String goRoot, @Nullable String pathEnv, Predicate<Path> isExecutable) {
         String exe = IS_WINDOWS ? name + ".exe" : name;
