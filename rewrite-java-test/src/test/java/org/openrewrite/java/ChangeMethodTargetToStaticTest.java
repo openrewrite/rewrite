@@ -418,6 +418,116 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedFieldReceiversAreDropped() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public void nonStatic() {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static void nonStatic() {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+
+              class C {
+                 static A shared = new A();
+                 A field = new A();
+
+                 class Inner {
+                     public void test() {
+                         C.shared.nonStatic();
+                         C.this.field.nonStatic();
+                     }
+                 }
+
+                 public void test() {
+                     this.field.nonStatic();
+                 }
+              }
+              """,
+            """
+              import a.A;
+              import b.B;
+
+              class C {
+                 static A shared = new A();
+                 A field = new A();
+
+                 class Inner {
+                     public void test() {
+                         B.nonStatic();
+                         B.nonStatic();
+                     }
+                 }
+
+                 public void test() {
+                     B.nonStatic();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedMatchesInArgumentsAreRewritten() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A value(..)", "b.B", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public String value() { return "a"; }
+                 public String value(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static String value() { return "b"; }
+                 public static String value(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+
+              class C {
+                 public void test(A x, A y) {
+                     x.value(y.value());
+                 }
+              }
+              """,
+            """
+              import a.A;
+              import b.B;
+
+              class C {
+                 public void test(A x, A y) {
+                     B.value(B.value());
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void chainedSelfCallsCollapseOntoTargetType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A value()", "b.B", null, null, false)),
@@ -503,6 +613,51 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               class C {
                  public void test() {
                      B.reverse();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainedCallOnCollapsingReceiverWithSideEffectingArgumentsIsNotChanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A *(..)", "b.B", "java.util.List", null, false)),
+          java(
+            """
+              package a;
+              import java.util.List;
+              public class A {
+                 public static A of(String s) { return new A(); }
+                 public List<String> reverse() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              import java.util.List;
+              public class B {
+                 public static List<String> of(String s) { return null; }
+                 public static List<String> reverse() { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+
+              class C {
+                 int calls;
+
+                 String argument() {
+                     calls++;
+                     return "x";
+                 }
+
+                 public void test() {
+                     A.of(argument()).reverse();
                  }
               }
               """

@@ -119,14 +119,10 @@ public class ChangeMethodTargetToStatic extends Recipe {
         }
 
         /**
-         * Java evaluates the expression qualifying a static method invocation and then discards its value,
-         * without a null check. This only drops an expression whose evaluation cannot be observed: a type name,
-         * {@code this} (possibly qualified), or a simple non-volatile variable read (class initialization
-         * aside). As a deliberate exception that preserves the {@code new A().staticMethod()} shape this recipe
-         * exists to rewrite, an instantiation whose arguments are themselves discardable is also dropped, even
-         * though a constructor can run arbitrary code and throw. A method invocation, a dereference, an array
-         * access, a cast or any other expression may mutate state or throw, so the invocation is left alone
-         * instead.
+         * Whether the receiver can be replaced by the target type name without the running program noticing:
+         * a type name, {@code this}, a literal, or a non-volatile field read qualified by neither. An
+         * invocation, a dereference, an array access or a cast may mutate state or throw, so those leave the
+         * call alone instead.
          */
         private boolean isSafeToDiscard(@Nullable Expression expression) {
             Expression expr = Expression.unwrap(expression);
@@ -138,12 +134,17 @@ public class ChangeMethodTargetToStatic extends Recipe {
                 return fieldType == null || !fieldType.hasFlags(Flag.Volatile);
             }
             if (expr instanceof J.FieldAccess) {
-                return isTypeReference(expr);
+                J.FieldAccess fieldAccess = (J.FieldAccess) expr;
+                if (isTypeReference(fieldAccess)) {
+                    return true;
+                }
+                JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
+                return isTypeReference(fieldAccess.getTarget()) &&
+                       (fieldType == null || !fieldType.hasFlags(Flag.Volatile));
             }
             if (expr instanceof J.NewClass) {
-                // Instantiating a type only to call a static method on it is the case this recipe was written
-                // for, so the instantiation itself is still discarded even though a constructor can throw.
-                // Its arguments are not covered by that, so they have to be discardable in their own right.
+                // `new A().staticMethod()` is the shape this recipe exists to rewrite, so the instantiation is
+                // dropped even though a constructor can throw. Its arguments still have to stand on their own.
                 J.NewClass newClass = (J.NewClass) expr;
                 if (newClass.getBody() != null || newClass.getEnclosing() != null) {
                     return false;
@@ -159,13 +160,10 @@ public class ChangeMethodTargetToStatic extends Recipe {
         }
 
         /**
-         * A qualifier that is itself an invocation this recipe rewrites needs no preservation: the recipe's
-         * long-standing treatment of such chains is to collapse them, so that with a fluent
-         * {@code a.Legacy value()} pattern {@code legacy.value().value()} becomes {@code Modern.value()}.
-         * Blocking that collapse would leave the rewritten qualifier behind as the receiver of the outer
-         * call, producing {@code Modern.value().value()}, which no longer resolves once the migrated method
-         * is static on the target type. The qualifier's own receiver is checked recursively, so a chain
-         * rooted in an expression that cannot be discarded is left entirely unchanged instead.
+         * A qualifier that is itself an invocation this recipe rewrites needs no preservation, so that
+         * {@code legacy.value().value()} collapses to {@code Modern.value()} rather than to the
+         * {@code Modern.value().value()} that no longer resolves. Its own receiver and arguments are checked
+         * recursively, leaving a chain rooted in something undiscardable entirely unchanged.
          */
         private boolean collapsesOntoTargetType(@Nullable Expression expression) {
             Expression expr = Expression.unwrap(expression);
@@ -173,16 +171,49 @@ public class ChangeMethodTargetToStatic extends Recipe {
                 return false;
             }
             J.MethodInvocation qualifier = (J.MethodInvocation) expr;
-            return !isAlreadyStaticCallOnTargetType(qualifier.getSelect(), qualifier) &&
-                   methodMatcher.matches(qualifier, matchUnknownTypes) &&
-                   (isSafeToDiscard(qualifier.getSelect()) || collapsesOntoTargetType(qualifier.getSelect()));
+            if (isAlreadyStaticCallOnTargetType(qualifier.getSelect(), qualifier) ||
+                !methodMatcher.matches(qualifier, matchUnknownTypes) ||
+                !(isSafeToDiscard(qualifier.getSelect()) || collapsesOntoTargetType(qualifier.getSelect()))) {
+                return false;
+            }
+            for (Expression argument : qualifier.getArguments()) {
+                if (!isSafeToDiscard(argument)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /**
-         * Check if the expression only names a type or is {@code this} (possibly qualified, as in
-         * {@code Outer.this}), so that evaluating it always succeeds without any observable effect. Unlike an
-         * invocation, a member reference evaluates and null checks its qualifier when the reference is created,
-         * so it only replaces a qualifier of that shape with the target type.
+         * An invocation qualifying another matched invocation defers to that outer one, which either collapses
+         * it away or is itself left alone. Rewriting it here instead would strand a call to the migrated
+         * static method on a receiver that no longer declares it.
+         */
+        private boolean isQualifierOfMatchedCall(Expression expression) {
+            Cursor parent = getCursor().getParentTreeCursor();
+            while (parent.getValue() instanceof J.Parentheses) {
+                parent = parent.getParentTreeCursor();
+            }
+            Object value = parent.getValue();
+            if (value instanceof J.MethodInvocation) {
+                J.MethodInvocation outer = (J.MethodInvocation) value;
+                return Expression.unwrap(outer.getSelect()) == expression &&
+                       !isAlreadyStaticCallOnTargetType(outer.getSelect(), outer) &&
+                       methodMatcher.matches(outer, matchUnknownTypes);
+            }
+            if (value instanceof J.MemberReference) {
+                J.MemberReference outer = (J.MemberReference) value;
+                return Expression.unwrap(outer.getContaining()) == expression &&
+                       !isAlreadyStaticCallOnTargetType(outer.getContaining(), outer) &&
+                       methodMatcher.matches(outer);
+            }
+            return false;
+        }
+
+        /**
+         * Whether the expression only names a type or is {@code this}, possibly qualified as {@code Outer.this}.
+         * A member reference evaluates and null checks its qualifier when the reference is created, so unlike an
+         * invocation it accepts only a qualifier of that shape.
          */
         private boolean isTypeReference(@Nullable Expression expression) {
             if (expression instanceof J.Identifier) {
@@ -220,6 +251,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
             Expression select = method.getSelect();
             if (!isAlreadyStaticCallOnTargetType(select, method) &&
                 methodMatcher.matches(method, matchUnknownTypes) &&
+                !isQualifierOfMatchedCall(method) &&
                 (isSafeToDiscard(select) || collapsesOntoTargetType(select))) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
@@ -230,7 +262,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName(), !matchUnknownTypes);
                 } else {
                     maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
-                    m = method.withSelect(
+                    m = m.withSelect(
                             new J.Identifier(randomId(),
                                     select == null ?
                                             Space.EMPTY :
@@ -262,7 +294,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     transformedType = transformMethodType(memberRef.getMethodType());
                 }
                 maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
-                m = memberRef.withContaining(
+                m = m.withContaining(
                         new J.Identifier(randomId(),
                                 containing.getPrefix(),
                                 Markers.EMPTY,
