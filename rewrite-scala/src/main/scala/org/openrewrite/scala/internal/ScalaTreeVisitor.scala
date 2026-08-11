@@ -276,6 +276,11 @@ class ScalaTreeVisitor(
   }
   
   private def visitLiteral(lit: Trees.Literal[?]): J.Literal = {
+    // An `()` the author wrote parses as an empty `Tuple`, so a unit literal is always the
+    // compiler's: no source text to print, and a `BoxedUnit` value no LST consumer accepts.
+    if (lit.const.tag == UnitTag) {
+      throw unmappedException(lit)
+    }
     val prefix = extractPrefix(lit.span)
     val value = lit.const.value
     val valueSource = extractSource(lit.span)
@@ -3051,15 +3056,8 @@ class ScalaTreeVisitor(
       return visitLambdaParameter(vd)
     }
     
-    // Special handling for variables with annotations
     val hasAnnotations = vd.mods != null && vd.mods.annotations.nonEmpty
-    val prefix = if (hasAnnotations) {
-      // Don't extract prefix yet - annotations will consume their own prefix
-      Space.EMPTY
-    } else {
-      extractPrefix(vd.span)
-    }
-    
+
     // Handle annotations first
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
     if (hasAnnotations) {
@@ -3070,7 +3068,9 @@ class ScalaTreeVisitor(
         }
       }
     }
-    
+
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(vd.span)
+
     // Extract modifiers and keywords from source
     // When we have annotations, cursor is positioned after them
     val adjustedStart = if (hasAnnotations) cursor else Math.max(0, vd.span.start - offsetAdjustment)
@@ -3584,9 +3584,6 @@ class ScalaTreeVisitor(
 
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
     val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
-    // When annotations are present they own the leading whitespace; otherwise
-    // the prefix lives on the ModuleDef itself.
-    val prefix = if (hasAnnotations) Space.EMPTY else extractPrefix(md.span)
 
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
     if (hasAnnotations) {
@@ -3597,6 +3594,8 @@ class ScalaTreeVisitor(
         }
       }
     }
+
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(md.span)
 
     // Extract the source text to find modifiers
     val adjustedStart = Math.max(0, md.span.start - offsetAdjustment)
@@ -4756,9 +4755,16 @@ class ScalaTreeVisitor(
       }
     }
     
+    // Dotty closes an auxiliary constructor's body with a unit literal that spans no source,
+    // so dropping it leaves the cursor where the last statement ended.
+    val isSyntheticUnit = block.expr match {
+      case lit: Trees.Literal[?] => lit.const.tag == UnitTag
+      case _ => false
+    }
+
     // Handle the expression part of the block (if any)
     // Skip synthetic ??? added by compiler for procedure syntax
-    val isSyntheticExpr = if (!block.expr.isEmpty) {
+    val isSyntheticExpr = if (!block.expr.isEmpty && !isSyntheticUnit) {
       def hasTripleQ(t: Trees.Tree[?]): Boolean = t match {
         case sel: Trees.Select[?] => sel.name.toString == "???" || sel.name.toString == "$qmark$qmark$qmark" || hasTripleQ(sel.qualifier)
         case id: Trees.Ident[?] => id.name.toString == "???" || id.name.toString == "$qmark$qmark$qmark"
@@ -4782,7 +4788,7 @@ class ScalaTreeVisitor(
         else cursor = blockEnd2
       }
     }
-    if (!block.expr.isEmpty && !isSyntheticExpr) {
+    if (!block.expr.isEmpty && !isSyntheticExpr && !isSyntheticUnit) {
       // Visit the expression and check if it's a synthetic ??? that slipped through.
       // Detect structurally (a `Predef.???`-style field access), never by string-matching
       // the printed output — user code such as the string literal `"???"` is not synthetic.
@@ -4856,15 +4862,8 @@ class ScalaTreeVisitor(
   }
   
   private def visitClassDef(td: Trees.TypeDef[?]): J.ClassDeclaration = {
-    // Special handling for classes with annotations
     val hasAnnotations = td.mods.annotations.nonEmpty
-    val prefix = if (hasAnnotations) {
-      // Don't extract prefix yet - annotations will consume their own prefix
-      Space.EMPTY
-    } else {
-      extractPrefix(td.span)
-    }
-    
+
     // Handle annotations first
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
     for (annot <- td.mods.annotations) {
@@ -4873,7 +4872,9 @@ class ScalaTreeVisitor(
         case _ => // Skip if not mapped to annotation
       }
     }
-    
+
+    val prefix = if (hasAnnotations) hoistAnnotationPrefix(leadingAnnotations) else extractPrefix(td.span)
+
     // After processing annotations, we need to find where modifiers/class keyword start
     // The cursor should now be positioned after the last annotation
     
@@ -6601,13 +6602,15 @@ class ScalaTreeVisitor(
               }
               val statements = new util.ArrayList[JRightPadded[Statement]]()
               statements.add(JRightPadded.build(stmtExpr))
-              new J.Block(Tree.randomId(), beforeEquals,
+              // A braceless body's block covers only what follows `=`, so the space after the
+              // `=` belongs to its statement.
+              new J.Block(Tree.randomId(), Space.EMPTY,
                 Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))),
                 JRightPadded.build(false), statements, Space.EMPTY)
             case stmt: Statement =>
               val statements = new util.ArrayList[JRightPadded[Statement]]()
               statements.add(JRightPadded.build(stmt))
-              new J.Block(Tree.randomId(), beforeEquals,
+              new J.Block(Tree.randomId(), Space.EMPTY,
                 Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))),
                 JRightPadded.build(false), statements, Space.EMPTY)
             case _ => null
@@ -8751,6 +8754,21 @@ class ScalaTreeVisitor(
     )
   }
   
+  /**
+   * Takes the whitespace and comments preceding the first annotation as the declaration's
+   * own prefix, leaving that annotation's prefix empty: as in the Java LST, a declaration
+   * owns the space ahead of it even when an annotation comes first in source.
+   */
+  private def hoistAnnotationPrefix(annotations: util.List[J.Annotation]): Space = {
+    if (annotations.isEmpty) {
+      Space.EMPTY
+    } else {
+      val first = annotations.get(0)
+      annotations.set(0, first.withPrefix(Space.EMPTY))
+      first.getPrefix
+    }
+  }
+
   def extractPrefix(span: Spans.Span): Space = {
     if (!span.exists) {
       return Space.EMPTY

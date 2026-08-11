@@ -2155,6 +2155,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
+
         // Parse modifiers
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
@@ -2225,9 +2231,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.SemicolonToken.Span.End;
         }
 
-        return new PropertyDeclaration(
+        var propertyDecl = new PropertyDeclaration(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -2238,6 +2244,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             expressionBody,
             initializer
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                propertyDecl
+            );
+        }
+
+        return propertyDecl;
     }
 
     private new Block VisitAccessorList(AccessorListSyntax node)
@@ -8531,6 +8550,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 );
             }
 
+            if (result is ArrayType outermost)
+            {
+                result = outermost.WithType(_typeMapping?.Type(arrayType));
+            }
+
             return result;
         }
         else if (type is TupleTypeSyntax tupleType)
@@ -8746,7 +8770,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             rightText,
-            null,
+            _typeMapping?.Type(qualified.Right),
             null
         );
 
@@ -8756,7 +8780,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             left,
             new JLeftPadded<Identifier>(dotSpace, right),
-            null
+            _typeMapping?.Type(qualified)
         );
     }
 

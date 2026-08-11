@@ -22,6 +22,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.ParenthesizeVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -163,6 +164,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
             if (asUnary.getOperator() == J.Unary.Type.Not) {
                 j = unpackExpression(asUnary.getExpression(), asUnary);
+                if (j instanceof J.Ternary) {
+                    j = ParenthesizeVisitor.maybeParenthesize((Expression) j, getCursor());
+                }
             }
             if (asUnary != j) {
                 j = j.withPrefix(asUnary.getPrefix());
@@ -249,15 +253,13 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
             return ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
         } else if (expr instanceof J.Ternary) {
+            // The negation of `c ? t : f` is `c ? !t : !f`. Flipping the condition and swapping the
+            // branches instead would preserve the ternary's value rather than negate it.
             J.Ternary ternary = (J.Ternary) expr;
-            Expression negatedCondition = maybeNegate(ternary.getCondition());
-            if (negatedCondition != ternary.getCondition()) {
-                return ternary
-                        .withCondition(negatedCondition)
-                        .withTruePart(ternary.getFalsePart())
-                        .withFalsePart(ternary.getTruePart())
-                        .withPrefix(expr.getPrefix());
-            }
+            return ternary
+                    .withTruePart(maybeNegate(ternary.getTruePart()))
+                    .withFalsePart(maybeNegate(ternary.getFalsePart()))
+                    .withPrefix(expr.getPrefix());
         } else if (isLiteralTrue(expr)) {
             return ((J.Literal) expr).withValue(false).withValueSource("false");
         } else if (isLiteralFalse(expr)) {
@@ -435,9 +437,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             !(sideRetained instanceof J.Parentheses) &&
             !(sideRetained instanceof J.Unary)) {
             sideRetained = new J.Parentheses<>(Tree.randomId(),
-                    Space.EMPTY,
+                    sideRetained.getPrefix(),
                     Markers.EMPTY,
-                    JRightPadded.build(sideRetained));
+                    JRightPadded.build(sideRetained.withPrefix(Space.EMPTY)));
         }
         return new J.Unary(Tree.randomId(),
                 sideRetained.getPrefix(),

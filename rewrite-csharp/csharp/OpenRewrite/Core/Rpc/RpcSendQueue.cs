@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using Rewrite.Core.Rpc;
 using static OpenRewrite.Core.Rpc.RpcObjectData;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
@@ -24,8 +25,14 @@ public class RpcSendQueue
     /// <summary>
     /// Overrides for C# types whose Java names don't follow the convention.
     /// Key: C# type, Value: Java fully-qualified class name.
+    /// <para>
+    /// Concurrent because process-wide: registration happens on whichever thread first loads a
+    /// recipe bundle, while <see cref="ToJavaTypeName"/> reads it from every send queue in
+    /// parallel. A plain <c>Dictionary</c> here corrupts its internal buckets under a concurrent
+    /// write, which surfaces as spurious <c>IndexOutOfRangeException</c>s on unrelated reads.
+    /// </para>
     /// </summary>
-    private static readonly Dictionary<Type, string> JavaTypeNameOverrides = new();
+    private static readonly ConcurrentDictionary<Type, string> JavaTypeNameOverrides = new();
 
     public static void RegisterJavaTypeName(Type csharpType, string javaTypeName)
     {
