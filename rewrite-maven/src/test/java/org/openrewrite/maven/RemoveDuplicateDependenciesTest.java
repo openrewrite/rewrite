@@ -754,9 +754,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * `<dependencyManagement>` resolves differently from `<dependencies>`: duplicates merge field-wise, with each
-     * field taken from the first declaration that sets it. Both duplicates here set the same fields, so the later
-     * declaration contributes nothing to the effective entry and can be removed, whatever its values.
+     * Managed duplicates merge field-wise from the first declaration that sets each field, so a later duplicate
+     * setting only the same fields contributes nothing, whatever its values.
      */
     @Test
     void retainFirstManagedDependencyDeclaration() {
@@ -830,9 +829,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * The field-wise merge means the effective managed entry can be made up of several declarations: here Maven
-     * takes the version from the second declaration because the first does not set one. Removing the second
-     * declaration would leave the dependency with no managed version at all.
+     * The effective managed entry can be made up of several declarations: Maven takes the version from the
+     * second because the first sets none, so removing it would leave no managed version at all.
      */
     @Test
     void retainManagedDuplicateSettingAFieldTheFirstLeavesUnset() {
@@ -866,11 +864,9 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * Scope comes from the first declaration that sets it and exclusions accumulate across all duplicates, so
-     * those later declarations contribute to the effective entry and have to stay. Maven 3.9 does not inject
-     * {@code <optional>} from {@code <dependencyManagement>} at all, so a duplicate that only adds it changes
-     * nothing either way; the recipe keeps it rather than reasoning about a field the resolved model does not
-     * carry.
+     * Scope comes from the first declaration that sets it and exclusions accumulate, so those duplicates stay.
+     * Maven 3.9 never injects {@code <optional>} from {@code <dependencyManagement>}, so a duplicate adding only
+     * it changes nothing either way and is kept rather than reasoned about.
      */
     @Test
     void retainManagedDuplicateContributingScopeOptionalOrExclusions() {
@@ -935,8 +931,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * A later duplicate that sets no field the earlier declarations leave unset and carries no exclusion they do
-     * not already carry contributes nothing to the effective entry, so it can still be removed.
+     * A later duplicate adding neither an unset field nor a new exclusion contributes nothing, so it still goes.
      */
     @Test
     void removeRedundantManagedDependencyDuplicates() {
@@ -1027,10 +1022,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * A repeated BOM import at a different version is not redundant: for entries both versions manage the first
-     * import wins (see `ResolvedPomTest#firstUniqueManagedDependencyWins`), but the second version may manage
-     * entries the first does not, and those still take effect. Only an import of the same version again changes
-     * nothing, see `removeDuplicatedDependencyWithImportScope`.
+     * The first import wins for the entries both versions manage, but the second may manage entries the first
+     * does not. Only a repeat of the same version changes nothing, see `removeDuplicatedDependencyWithImportScope`.
      */
     @Test
     void retainRepeatedBomImportWithDifferentVersion() {
@@ -1134,9 +1127,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * The resolved model orders duplicated dependencies by their first declaration, so the surviving declaration
-     * has to stay in that position rather than move to where it was written. Comments keep the position they were
-     * written in, exactly as they do when a duplicate is removed outright, see `preservesComments`.
+     * The resolved model orders duplicates by their first declaration, so the survivor stays in that position
+     * rather than moving to where it was written. Comments keep their own, as in `preservesComments`.
      */
     @Test
     void retainLaterDeclarationInTheFirstPosition() {
@@ -1245,9 +1237,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     /**
-     * The surviving declaration is taken over whole, so it brings its own indentation with it and only the
-     * indentation of the `<dependency>` tag itself is taken from the declaration it replaces. Duplicates that were
-     * written at different indentation levels therefore need a formatting recipe afterwards.
+     * The survivor is taken over whole, so only the `<dependency>` tag's own indentation comes from the
+     * declaration it replaces. Duplicates written at different levels need a formatting recipe afterwards.
      */
     @Test
     void retainLaterDeclarationIndentedDifferently() {
