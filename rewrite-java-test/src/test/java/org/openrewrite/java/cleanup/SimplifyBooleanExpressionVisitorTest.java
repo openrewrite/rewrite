@@ -593,6 +593,46 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void nestedTernaryNegation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return !(a ? b ? x : y : z);
+                  }
+                  boolean m2(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return !(a ? x : b ? y : z);
+                  }
+                  boolean m3(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return !(a ? !b ? x : y : z);
+                  }
+                  boolean m4(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? x : y : z;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? !x : !y : !z;
+                  }
+                  boolean m2(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? !x : b ? !y : !z;
+                  }
+                  boolean m3(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? !y : !x : !z;
+                  }
+                  boolean m4(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? x : y : z;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void differentFieldAccesses() {
         rewriteRun(
           java(

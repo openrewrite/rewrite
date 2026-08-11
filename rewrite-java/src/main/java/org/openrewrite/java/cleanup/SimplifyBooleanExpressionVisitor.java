@@ -232,15 +232,13 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
             return ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
         } else if (expr instanceof J.Ternary) {
+            // The negation of `c ? t : f` is `c ? !t : !f`. Flipping the condition and swapping the
+            // branches instead would preserve the ternary's value rather than negate it.
             J.Ternary ternary = (J.Ternary) expr;
-            Expression negatedCondition = maybeNegate(ternary.getCondition());
-            if (negatedCondition != ternary.getCondition()) {
-                return ternary
-                        .withCondition(negatedCondition)
-                        .withTruePart(ternary.getFalsePart())
-                        .withFalsePart(ternary.getTruePart())
-                        .withPrefix(expr.getPrefix());
-            }
+            return ternary
+                    .withTruePart(maybeNegate(ternary.getTruePart()))
+                    .withFalsePart(maybeNegate(ternary.getFalsePart()))
+                    .withPrefix(expr.getPrefix());
         } else if (isLiteralTrue(expr)) {
             return ((J.Literal) expr).withValue(false).withValueSource("false");
         } else if (isLiteralFalse(expr)) {
