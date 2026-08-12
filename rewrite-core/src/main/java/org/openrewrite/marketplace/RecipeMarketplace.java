@@ -121,9 +121,16 @@ public class RecipeMarketplace {
         }
     }
 
-    public void uninstall(String packageEcosystem, String packageName) {
-        root.uninstall(packageEcosystem, packageName);
+    /**
+     * @return The listings removed, keyed by recipe name as {@link #merge} keys what it added.
+     * Not recoverable by diffing {@link #getAllRecipes()}: that projection is keyed by name, so a
+     * removal another bundle's same-named listing was shadowing leaves its size unchanged.
+     */
+    public Set<RecipeListing> uninstall(String packageEcosystem, String packageName) {
+        Set<RecipeListing> removed = new LinkedHashSet<>();
+        root.uninstall(packageEcosystem, packageName, removed);
         bundles.remove(new BundleKey(packageEcosystem, packageName));
+        return removed;
     }
 
     @Getter
@@ -191,11 +198,17 @@ public class RecipeMarketplace {
             }
         }
 
-        private void uninstall(String packageEcosystem, String packageName) {
-            recipes.removeIf(r -> Objects.equals(r.getBundle().getPackageName(), packageName) &&
-                                  Objects.equals(r.getBundle().getPackageEcosystem(), packageEcosystem));
+        private void uninstall(String packageEcosystem, String packageName, Set<RecipeListing> removed) {
+            recipes.removeIf(r -> {
+                if (Objects.equals(r.getBundle().getPackageName(), packageName) &&
+                    Objects.equals(r.getBundle().getPackageEcosystem(), packageEcosystem)) {
+                    removed.add(r);
+                    return true;
+                }
+                return false;
+            });
             for (Category category : categories) {
-                category.uninstall(packageEcosystem, packageName);
+                category.uninstall(packageEcosystem, packageName, removed);
             }
         }
 

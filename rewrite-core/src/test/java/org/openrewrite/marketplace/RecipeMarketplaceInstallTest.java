@@ -121,6 +121,23 @@ class RecipeMarketplaceInstallTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    void uninstallReportsWhatItRemovedEvenWhenAnotherBundleSharesTheName() {
+        RecipeBundle a = new RecipeBundle("maven", "org.example:a", "LATEST", "1.0.0", null);
+        RecipeBundle b = new RecipeBundle("maven", "org.example:b", "LATEST", "1.0.0", null);
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        marketplace.install(singleRecipeReader(a, "com.foo.Bar"));
+        marketplace.install(singleRecipeReader(b, "com.foo.Bar"));
+
+        Set<RecipeListing> removed = marketplace.uninstall("maven", "org.example:a");
+
+        assertThat(marketplace.getAllRecipes())
+                .as("b's listing merely stops being shadowed, so a diff of this cannot see the removal")
+                .hasSize(1);
+        assertThat(removed).extracting(RecipeListing::getName).containsExactly("com.foo.Bar");
+        assertThat(marketplace.bundleFor("maven", "org.example:a")).isNull();
+    }
+
     private static List<RecipeListing> allListings(RecipeMarketplace.Category category) {
         List<RecipeListing> out = new java.util.ArrayList<>(category.getRecipes());
         for (RecipeMarketplace.Category child : category.getCategories()) {
