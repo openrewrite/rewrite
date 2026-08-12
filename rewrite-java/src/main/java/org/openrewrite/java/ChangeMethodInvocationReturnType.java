@@ -67,6 +67,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
         String returnTypeExpression = newReturnType.replace('$', '.');
+        String returnTypeSignature = binaryName(newReturnType);
         return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean methodUpdated;
@@ -75,8 +76,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 JavaType.Method type = m.getMethodType();
-                if (methodMatcher.matches(method) && type != null && !returnTypeExpression.equals(type.getReturnType().toString())) {
-                    type = type.withReturnType(JavaType.buildType(returnTypeExpression));
+                if (methodMatcher.matches(method) && type != null && !returnTypeSignature.equals(type.getReturnType().toString())) {
+                    type = type.withReturnType(JavaType.buildType(returnTypeSignature));
                     m = m.withMethodType(type);
                     if (m.getName().getType() != null) {
                         m = m.withName(m.getName().withType(type));
@@ -175,12 +176,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     }
 
     /**
-     * A fully qualified name alone cannot say where the package ends and the type nesting begins, so `$` is honored as
-     * an explicit nesting separator, and for the dotted portion the outermost type is taken to be the first segment
-     * that starts with an uppercase letter and is followed only by segments that do too. When no segment qualifies the
-     * last segment is the type, matching the convention that packages are lowercase.
-     *
-     * @return the package name, possibly empty, followed by the simple name of each type from outermost to innermost.
+     * @return the package name, possibly empty, followed by each type simple name from outermost to innermost.
      */
     private static List<String> splitPackageAndTypeNames(String fqn) {
         int dollar = fqn.indexOf('$');
@@ -219,6 +215,19 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             }
         }
         return names;
+    }
+
+    private static String binaryName(String type) {
+        int lt = type.indexOf('<');
+        List<String> names = splitPackageAndTypeNames(lt == -1 ? type : type.substring(0, lt));
+        StringBuilder binaryName = new StringBuilder(names.get(0));
+        for (int i = 1; i < names.size(); i++) {
+            if (binaryName.length() > 0) {
+                binaryName.append(i == 1 ? '.' : '$');
+            }
+            binaryName.append(names.get(i));
+        }
+        return lt == -1 ? binaryName.toString() : binaryName.append(type.substring(lt)).toString();
     }
 
     private static void appendStubClass(StringBuilder stub, String name, StubClass stubClass, boolean topLevel) {

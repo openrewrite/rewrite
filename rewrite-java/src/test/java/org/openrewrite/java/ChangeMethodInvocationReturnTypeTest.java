@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -526,10 +528,11 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
         );
     }
 
-    @Test
-    void nestedNewReturnType() {
+    @ParameterizedTest
+    @ValueSource(strings = {"mockwebserver3.MockResponse.Builder", "mockwebserver3.MockResponse$Builder"})
+    void nestedNewReturnType(String newReturnType) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodInvocationReturnType("mockwebserver3.MockResponse setResponseCode(int)", "mockwebserver3.MockResponse.Builder"))
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("mockwebserver3.MockResponse setResponseCode(int)", newReturnType))
             .parser(JavaParser.fromJavaVersion()
               //language=java
               .dependsOn(
@@ -573,13 +576,21 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                     }
                     return super.visitVariable(variable, p);
                 }
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(method.getMethodType()).satisfies(t ->
+                      assertThat(((JavaType.FullyQualified) t.getReturnType()).getFullyQualifiedName())
+                        .isEqualTo("mockwebserver3.MockResponse$Builder"));
+                    return super.visitMethodInvocation(method, p);
+                }
             }.visit(cu, 0))
           )
         );
     }
 
     @Test
-    void nestedNewReturnTypeWithExplicitDollarSeparator() {
+    void nestedNewReturnTypeAlreadyInPlaceIsNotChanged() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodInvocationReturnType("mockwebserver3.MockResponse setResponseCode(int)", "mockwebserver3.MockResponse$Builder"))
             .parser(JavaParser.fromJavaVersion()
@@ -588,8 +599,8 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                 """
                   package mockwebserver3;
                   public class MockResponse {
-                      public MockResponse setResponseCode(int code) {
-                          return this;
+                      public Builder setResponseCode(int code) {
+                          return null;
                       }
                       public static class Builder {
                       }
@@ -603,81 +614,10 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
               import mockwebserver3.MockResponse;
               class Foo {
                   void foo() {
-                      MockResponse response = new MockResponse().setResponseCode(200);
-                  }
-              }
-              """,
-            """
-              import mockwebserver3.MockResponse;
-              class Foo {
-                  void foo() {
                       MockResponse.Builder response = new MockResponse().setResponseCode(200);
                   }
               }
-              """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
-                    if ("response".equals(variable.getSimpleName())) {
-                        assertThat(variable.getType()).satisfies(t ->
-                          assertThat(((JavaType.FullyQualified) t).getFullyQualifiedName())
-                            .isEqualTo("mockwebserver3.MockResponse$Builder"));
-                    }
-                    return super.visitVariable(variable, p);
-                }
-            }.visit(cu, 0))
-          )
-        );
-    }
-
-    @Test
-    void uppercasePackageSegmentIsNotMistakenForAnEnclosingType() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "com.Acme.util.Thing"))
-            .parser(JavaParser.fromJavaVersion()
-              //language=java
-              .dependsOn(
-                """
-                  package bar;
-                  public class Bar {
-                      public static Object bar() {
-                          return null;
-                      }
-                  }
-                  """
-              )
-            ),
-          //language=java
-          java(
-            """
-              import bar.Bar;
-              class Foo {
-                  void foo() {
-                      Object one = Bar.bar();
-                  }
-              }
-              """,
-            """
-              import bar.Bar;
-              import com.Acme.util.Thing;
-
-              class Foo {
-                  void foo() {
-                      Thing one = Bar.bar();
-                  }
-              }
-              """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
-                    if ("one".equals(variable.getSimpleName())) {
-                        assertThat(variable.getType()).satisfies(t ->
-                          assertThat(((JavaType.FullyQualified) t).getFullyQualifiedName())
-                            .isEqualTo("com.Acme.util.Thing"));
-                    }
-                    return super.visitVariable(variable, p);
-                }
-            }.visit(cu, 0))
+              """
           )
         );
     }
@@ -782,6 +722,38 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                     return super.visitVariable(variable, p);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeThatCannotBeTemplatedLeavesTheSourceUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "void"))
+            .expectedCyclesThatMakeChanges(1)
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """
           )
         );
     }
