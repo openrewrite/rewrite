@@ -1416,8 +1416,15 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		}
 		exprs = java.Container[java.Expression]{Elements: elements}
 	} else {
-		// default:
+		// default: mirror the shape every other parser produces — a single
+		// J.Identifier named "default" as the sole case label, so a visitor
+		// indexing J.Case.getCaseLabels().get(0) stays safe.
 		ctx.skip(len("default"))
+		exprs = java.Container[java.Expression]{
+			Elements: []java.RightPadded[java.Expression]{
+				{Element: &java.Identifier{ID: uuid.New(), Name: "default"}},
+			},
+		}
 	}
 
 	// Skip the colon
@@ -1428,13 +1435,8 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		ctx.skip(1) // ":"
 	}
 
-	// For case: last expression's After gets the space before colon
-	// For default: exprs.Before gets the space before colon
-	if len(exprs.Elements) > 0 {
-		exprs.Elements[len(exprs.Elements)-1].After = colonPrefix
-	} else {
-		exprs.Before = colonPrefix
-	}
+	// The last label's After gets the space before the colon.
+	exprs.Elements[len(exprs.Elements)-1].After = colonPrefix
 
 	// Body statements
 	var body []java.RightPadded[java.Statement]

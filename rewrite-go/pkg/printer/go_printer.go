@@ -590,10 +590,27 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	return sw
 }
 
+// isDefaultCase reports whether a J.Case is Go's `default:` clause, modeled as a
+// single J.Identifier label named "default" (matching every other parser). Since
+// `default` is a reserved keyword, no real case expression can be that identifier.
+func isDefaultCase(c *java.Case) bool {
+	if len(c.Expressions.Elements) != 1 {
+		return false
+	}
+	id, ok := c.Expressions.Elements[0].Element.(*java.Identifier)
+	return ok && id.Name == "default"
+}
+
 func (p *GoPrinter) VisitCase(c *java.Case, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
-	if len(c.Expressions.Elements) > 0 {
+	if isDefaultCase(c) {
+		// `default:` — a single J.Identifier named "default" (mirroring Java);
+		// print the label itself, with no `case` keyword.
+		rp := c.Expressions.Elements[0]
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+	} else if len(c.Expressions.Elements) > 0 {
 		out.Append("case")
 		for i, rp := range c.Expressions.Elements {
 			p.Visit(rp.Element, out)
@@ -604,9 +621,6 @@ func (p *GoPrinter) VisitCase(c *java.Case, param any) java.J {
 				p.visitSpace(rp.After, out)
 			}
 		}
-	} else {
-		out.Append("default")
-		p.visitSpace(c.Expressions.Before, out)
 	}
 	out.Append(":")
 	for _, rp := range c.Body {
