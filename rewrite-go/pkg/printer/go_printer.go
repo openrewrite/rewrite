@@ -641,7 +641,16 @@ func (p *GoPrinter) VisitForLoop(forLoop *java.ForLoop, param any) java.J {
 func (p *GoPrinter) VisitForControl(control *java.ForControl, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Init != nil {
+	if java.FindMarker[golang.ImplicitForClauses](control.Markers) != nil {
+		// Go's condition-only `for cond {}` or infinite `for {}`. Init and
+		// update hold synthetic J.Empty placeholders (kept only so the Java
+		// J.ForLoop.Control list contract holds); print just the condition,
+		// with no `;` separators.
+		if control.Condition != nil {
+			p.Visit(control.Condition.Element, out)
+			p.visitSpace(control.Condition.After, out)
+		}
+	} else if control.Init != nil {
 		// 3-clause form: init; cond; update
 		p.Visit(control.Init.Element, out)
 		p.visitSpace(control.Init.After, out)
