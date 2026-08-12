@@ -14,63 +14,119 @@
  * limitations under the License.
  */
 
-package visitor
+package visitor_test
 
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
+func cursorDepth(c *visitor.Cursor) int {
+	d := 0
+	for p := c.Parent(); p != nil; p = p.Parent() {
+		d++
+	}
+	return d
+}
+
+type innermostBlockFinder struct {
+	visitor.GoVisitor
+	depth  int
+	found  bool
+	result bool
+}
+
+func (v *innermostBlockFinder) VisitBlock(block *java.Block, p any) java.J {
+	if d := cursorDepth(v.Cursor()); !v.found || d > v.depth {
+		v.depth = d
+		v.result = visitor.IsFunctionBodyBlock(v.Cursor())
+		v.found = true
+	}
+	return v.GoVisitor.VisitBlock(block, p)
+}
+
+type firstIfFinder struct {
+	visitor.GoVisitor
+	found  bool
+	result bool
+}
+
+func (v *firstIfFinder) VisitIf(ifStmt *java.If, p any) java.J {
+	if !v.found {
+		v.found = true
+		v.result = visitor.IsInitWrappedIf(v.Cursor())
+	}
+	return v.GoVisitor.VisitIf(ifStmt, p)
+}
+
 func TestIsFunctionBodyBlock(t *testing.T) {
-	block := &java.Block{}
 	tests := []struct {
-		name   string
-		parent java.Tree
-		want   bool
+		name string
+		src  string
+		want bool
 	}{
-		{"java method declaration parent", &java.MethodDeclaration{}, true},
-		{"golang method declaration parent", &golang.MethodDeclaration{}, true},
-		{"nested block parent", &java.Block{}, false},
-		{"no parent", nil, false},
+		{
+			name: "method body is a function body block",
+			src:  "package main\n\ntype T int\n\nfunc (r T) m() {\n}\n",
+			want: true,
+		},
+		{
+			name: "if body is not a function body block",
+			src:  "package main\n\nfunc f(b bool) {\n\tif b {\n\t}\n}\n",
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var c *Cursor
-			if tt.parent == nil {
-				c = NewCursor(nil, block)
-			} else {
-				c = NewCursor(NewCursor(nil, tt.parent), block)
+			cu, err := parser.NewGoParser().Parse("fb.go", tt.src)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
 			}
-			if got := IsFunctionBodyBlock(c); got != tt.want {
-				t.Errorf("IsFunctionBodyBlock() = %v, want %v", got, tt.want)
+			v := visitor.Init(&innermostBlockFinder{})
+			v.Visit(cu, nil)
+			if !v.found {
+				t.Fatal("no block visited")
+			}
+			if v.result != tt.want {
+				t.Errorf("IsFunctionBodyBlock = %v, want %v", v.result, tt.want)
 			}
 		})
 	}
 }
 
 func TestIsInitWrappedIf(t *testing.T) {
-	ifStmt := &java.If{}
 	tests := []struct {
-		name   string
-		parent java.Tree
-		want   bool
+		name string
+		src  string
+		want bool
 	}{
-		{"statement with init parent", &golang.StatementWithInit{}, true},
-		{"plain block parent", &java.Block{}, false},
-		{"no parent", nil, false},
+		{
+			name: "if with init clause is init-wrapped",
+			src:  "package main\n\nfunc f() {\n\tif x := 1; x > 0 {\n\t}\n}\n",
+			want: true,
+		},
+		{
+			name: "plain if is not init-wrapped",
+			src:  "package main\n\nfunc f(b bool) {\n\tif b {\n\t}\n}\n",
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var c *Cursor
-			if tt.parent == nil {
-				c = NewCursor(nil, ifStmt)
-			} else {
-				c = NewCursor(NewCursor(nil, tt.parent), ifStmt)
+			cu, err := parser.NewGoParser().Parse("iw.go", tt.src)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
 			}
-			if got := IsInitWrappedIf(c); got != tt.want {
-				t.Errorf("IsInitWrappedIf() = %v, want %v", got, tt.want)
+			v := visitor.Init(&firstIfFinder{})
+			v.Visit(cu, nil)
+			if !v.found {
+				t.Fatal("no if visited")
+			}
+			if v.result != tt.want {
+				t.Errorf("IsInitWrappedIf = %v, want %v", v.result, tt.want)
 			}
 		})
 	}

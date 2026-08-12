@@ -28,11 +28,8 @@ func IsFunctionBodyBlock(c *Cursor) bool {
 	if parent == nil {
 		return false
 	}
-	switch parent.Value().(type) {
-	case *java.MethodDeclaration, *golang.MethodDeclaration:
-		return true
-	}
-	return false
+	_, ok := parent.Value().(*java.MethodDeclaration)
+	return ok
 }
 
 // Reports whether the If at the cursor is the inner statement of a
