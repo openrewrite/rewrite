@@ -32,8 +32,8 @@ public class AddProjectBuildOutputTimestamp extends Recipe {
 
     @Option(displayName = "Timestamp",
             description = "ISO 8601 timestamp, integer seconds since the epoch, or property reference such as " +
-                          "`${git.commit.author.time}`. Defaults to `1980-01-01T00:00:00Z`, the earliest value " +
-                          "the ZIP format can represent.",
+                          "`${git.commit.author.time}`. Defaults to `1980-01-01T00:00:02Z`, the earliest value " +
+                          "accepted by Maven's ZIP-producing toolchain.",
             example = "2024-01-01T00:00:00Z",
             required = false)
     @Nullable
@@ -56,7 +56,7 @@ public class AddProjectBuildOutputTimestamp extends Recipe {
     public List<Recipe> getRecipeList() {
         return singletonList(new AddProperty(
                 "project.build.outputTimestamp",
-                timestamp == null ? "1980-01-01T00:00:00Z" : timestamp,
+                timestamp == null ? "1980-01-01T00:00:02Z" : timestamp,
                 true,
                 false));
     }
