@@ -21,11 +21,13 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.json.tree.Comment;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -71,10 +73,6 @@ public class DeleteKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         boolean deleteEmpty = Boolean.TRUE.equals(deleteEmptyParents);
         return new JsonIsoVisitor<ExecutionContext>() {
-            /**
-             * Identifiers of the containers this visitor emptied, so that containers which were already
-             * empty in the source are not deleted.
-             */
             private final Set<UUID> emptied = new HashSet<>();
 
             @Override
@@ -101,13 +99,12 @@ public class DeleteKey extends Recipe {
                     o = o.withMembers(ListUtils.mapFirst(o.getMembers(), e -> e.withPrefix(copyFirstPrefix.get())));
                 }
 
-                // the whitespace preceding the closing brace is the trailing space of the last member
                 if (!o.getMembers().isEmpty() && copyLastAfter.get() != null) {
                     o = o.getPadding().withMembers(ListUtils.mapLast(o.getPadding().getMembers(),
-                            m -> m.withAfter(copyLastAfter.get())));
+                            m -> m.withAfter(concat(m.getAfter(), copyLastAfter.get()))));
                 }
 
-                if (deleteEmpty && o.getMembers().isEmpty() && !obj.getMembers().isEmpty()) {
+                if (deleteEmpty && holdsNothing(o.getMembers()) && !holdsNothing(obj.getMembers())) {
                     emptied.add(o.getId());
                 }
 
@@ -142,13 +139,12 @@ public class DeleteKey extends Recipe {
                     a = a.withValues(ListUtils.mapFirst(a.getValues(), v -> v.withPrefix(copyFirstPrefix.get())));
                 }
 
-                // the whitespace preceding the closing bracket is the trailing space of the last value
                 if (!a.getValues().isEmpty() && copyLastAfter.get() != null) {
                     a = a.getPadding().withValues(ListUtils.mapLast(a.getPadding().getValues(),
-                            v -> v.withAfter(copyLastAfter.get())));
+                            v -> v.withAfter(concat(v.getAfter(), copyLastAfter.get()))));
                 }
 
-                if (a.getValues().isEmpty() && !array.getValues().isEmpty()) {
+                if (holdsNothing(a.getValues()) && !holdsNothing(array.getValues())) {
                     emptied.add(a.getId());
                 }
 
@@ -163,5 +159,25 @@ public class DeleteKey extends Recipe {
                 return (value instanceof Json.JsonObject || value instanceof Json.Array) && emptied.contains(value.getId());
             }
         };
+    }
+
+    private static boolean holdsNothing(List<? extends Json> elements) {
+        for (Json element : elements) {
+            if (!(element instanceof Json.Empty)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Space concat(Space existing, Space trailing) {
+        if (existing.getComments().isEmpty()) {
+            return trailing;
+        }
+        List<Comment> comments = new ArrayList<>(existing.getComments());
+        int last = comments.size() - 1;
+        comments.set(last, comments.get(last).withSuffix(trailing.getWhitespace()));
+        comments.addAll(trailing.getComments());
+        return existing.withComments(comments);
     }
 }

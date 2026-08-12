@@ -287,6 +287,28 @@ class DeleteKeyTest implements RewriteTest {
     }
 
     @Test
+    void keepArraysThatWereAlreadyEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.engines.node", true)),
+          json(
+                """
+              {
+                "keywords": [],
+                "engines": {
+                  "node": ">=20"
+                }
+              }
+              """,
+            """
+              {
+                "keywords": []
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepEmptiedRootObject() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.node", true)),
@@ -441,6 +463,102 @@ class DeleteKeyTest implements RewriteTest {
             """
               {
                 "keep": "keep-value"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteLastKey() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.engines.npm", null)),
+          json(
+                """
+              {
+                "engines": {
+                  "node": ">=20",
+                  "npm": ">=10"
+                }
+              }
+              """,
+            """
+              {
+                "engines": {
+                  "node": ">=20"
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainCommentOnKeyThatBecomesLast() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.npm", null)),
+          json(
+                """
+              {
+                "node": ">=20" /* the runtime */,
+                "npm": ">=10"
+              }
+              """,
+            """
+              {
+                "node": ">=20" /* the runtime */
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainCommentOnArrayElementThatBecomesLast() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.subjects[*].kind", true)),
+          json(
+                """
+              {
+                "subjects": [
+                  {
+                    "name": "monitoring-tools"
+                  } /* the only one left */,
+                  {
+                    "kind": "ServiceAccount"
+                  }
+                ]
+              }
+              """,
+            """
+              {
+                "subjects": [
+                  {
+                    "name": "monitoring-tools"
+                  } /* the only one left */
+                ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEmptyParentWithTrailingComma() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.engines.node", true)),
+          json(
+                """
+              {
+                "name": "my-package",
+                "engines": {
+                  "node": ">=20",
+                }
+              }
+              """,
+            """
+              {
+                "name": "my-package"
               }
               """
           )
