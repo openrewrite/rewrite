@@ -2374,9 +2374,13 @@ public class GroovyParserVisitor {
             return labels.get(0).withStatement(condenseLabels(labels.subList(1, labels.size()), s));
         }
 
-        private Statement visitLoopBody(org.codehaus.groovy.ast.stmt.Statement loopBlock) {
-            if (!(loopBlock instanceof EmptyStatement)) {
-                return doVisit(loopBlock);
+        /**
+         * Visits the body of a loop or {@code if}, mapping a body that is just {@code ;} to a {@link J.Empty} rather
+         * than the {@code null} that visiting an {@link EmptyStatement} would otherwise produce.
+         */
+        private Statement visitBody(org.codehaus.groovy.ast.stmt.Statement body) {
+            if (!(body instanceof EmptyStatement)) {
+                return doVisit(body);
             }
             Space prefix = whitespace();
             Markers markers = Markers.EMPTY;
@@ -2410,7 +2414,7 @@ public class GroovyParserVisitor {
                     return new J.ForLoop(randomId(), prefix, Markers.EMPTY,
                             new J.ForLoop.Control(randomId(), controlFmt,
                                     Markers.EMPTY, init, condition, update),
-                            JRightPadded.build(visitLoopBody(forLoop.getLoopBlock())));
+                            JRightPadded.build(visitBody(forLoop.getLoopBlock())));
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
@@ -2440,7 +2444,7 @@ public class GroovyParserVisitor {
 
                     return new J.ForEachLoop(randomId(), prefix, forEachMarkers,
                             new J.ForEachLoop.Control(randomId(), controlFmt, Markers.EMPTY, variable, iterable),
-                            JRightPadded.build(visitLoopBody(forLoop.getLoopBlock())));
+                            JRightPadded.build(visitBody(forLoop.getLoopBlock())));
                 }
             }));
         }
@@ -2450,7 +2454,7 @@ public class GroovyParserVisitor {
             Space fmt = sourceBefore("if");
             J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) doVisit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
-            JRightPadded<Statement> then = maybeSemicolon(doVisit(ifElse.getIfBlock()));
+            JRightPadded<Statement> then = maybeSemicolon(visitBody(ifElse.getIfBlock()));
             J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
                     new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
                             maybeSemicolon(doVisit(ifElse.getElseBlock())));
@@ -3387,7 +3391,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitDoWhileLoop(DoWhileStatement loop) {
             Space fmt = sourceBefore("do");
-            Statement body = visitLoopBody(loop.getLoopBlock());
+            Statement body = visitBody(loop.getLoopBlock());
             Space beforeWhile = sourceBefore("while");
             J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
@@ -3404,7 +3408,7 @@ public class GroovyParserVisitor {
                     new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                             JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
                                     .withAfter(sourceBefore(")"))),
-                    JRightPadded.build(visitLoopBody(loop.getLoopBlock()))
+                    JRightPadded.build(visitBody(loop.getLoopBlock()))
             ));
         }
 

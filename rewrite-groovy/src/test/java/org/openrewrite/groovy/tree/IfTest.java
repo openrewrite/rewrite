@@ -16,8 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyIfStatementWithIdenticalBranches", "GroovyConstantIfStatement", "GrUnnecessarySemicolon", "GroovyUnusedIncOrDec", "GroovyEmptyStatementBody"})
@@ -62,6 +65,35 @@ class IfTest implements RewriteTest {
               if (n == 0) n++;
               else if (n == 1) n++;
               else n++;
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyBody() {
+        rewriteRun(
+          groovy(
+            """
+              if (true);
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.If visitIf(J.If iff, Object o) {
+                    assertThat(iff.getThenPart()).isInstanceOf(J.Empty.class);
+                    return super.visitIf(iff, o);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyWithElse() {
+        rewriteRun(
+          groovy(
+            """
+              if (true); else println 'a'
               """
           )
         );
