@@ -104,12 +104,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 if (!stubs.isEmpty()) {
                     templateBuilder.javaParser(JavaParser.fromJavaVersion().dependsOn(stubs.toArray(new String[0])));
                 }
-                J.VariableDeclarations resolved;
-                try {
-                    resolved = templateBuilder.build().apply(updateCursor(mv), mv.getCoordinates().replace());
-                } catch (Exception e) {
-                    return mv;
-                }
+                J.VariableDeclarations resolved = templateBuilder.build()
+                        .apply(updateCursor(mv), mv.getCoordinates().replace());
                 TypeTree newTypeExpression = resolved.getTypeExpression();
                 if (newTypeExpression == null || newTypeExpression.getType() instanceof JavaType.Unknown) {
                     return mv;
