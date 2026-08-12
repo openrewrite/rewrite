@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class RemovePluginGoalTest implements RewriteTest {
@@ -316,6 +317,77 @@ class RemovePluginGoalTest implements RewriteTest {
                           </goals>
                         </execution>
                       </executions>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeWhenExecutionHasEmptyGoalsElement() {
+        rewriteRun(
+          spec -> spec.recipe(new RemovePluginGoal("org.apache.maven.plugins", "maven-surefire-plugin", "verify")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-surefire-plugin</artifactId>
+                      <executions>
+                        <execution>
+                          <id>default</id>
+                          <phase>test</phase>
+                          <goals></goals>
+                          <configuration>
+                            <skipTests>true</skipTests>
+                          </configuration>
+                        </execution>
+                      </executions>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotTouchPluginShapedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new RemovePluginGoal("org.apache.maven.plugins", "maven-surefire-plugin", "verify")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.other</groupId>
+                      <artifactId>wrapper-plugin</artifactId>
+                      <configuration>
+                        <plugins>
+                          <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <goals>
+                              <goal>verify</goal>
+                            </goals>
+                          </plugin>
+                        </plugins>
+                      </configuration>
                     </plugin>
                   </plugins>
                 </build>
@@ -1119,6 +1191,126 @@ class RemovePluginGoalTest implements RewriteTest {
                 </build>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void multiModuleRemovesFromParentAndChild() {
+        rewriteRun(
+          spec -> spec.recipe(new RemovePluginGoal("org.apache.maven.plugins", "maven-surefire-plugin", "verify")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                          <execution>
+                            <id>default</id>
+                            <goals>
+                              <goal>verify</goal>
+                              <goal>test</goal>
+                            </goals>
+                          </execution>
+                        </executions>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                          <execution>
+                            <id>default</id>
+                            <goals>
+                              <goal>test</goal>
+                            </goals>
+                          </execution>
+                        </executions>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <build>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                          <execution>
+                            <id>child-verify</id>
+                            <goals>
+                              <goal>verify</goal>
+                            </goals>
+                          </execution>
+                        </executions>
+                      </plugin>
+                    </plugins>
+                  </build>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <build>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                      </plugin>
+                    </plugins>
+                  </build>
+                </project>
+                """
+            )
           )
         );
     }

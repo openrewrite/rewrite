@@ -17,24 +17,20 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.function.Predicate;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
+import static org.openrewrite.xml.MapTagChildrenVisitor.mapTagChildren;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemovePluginGoal extends Recipe {
-    private static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
 
     @Option(displayName = "Plugin group ID",
             description = "Group ID of the plugin from which the goal will be removed. Supports glob. " +
@@ -49,7 +45,7 @@ public class RemovePluginGoal extends Recipe {
     String pluginArtifactId;
 
     @Option(displayName = "Goal",
-            description = "The goal to remove. Goal names are case-sensitive. Supports glob.",
+            description = "The goal to remove. Matching is case-insensitive and supports glob.",
             example = "compile")
     String goal;
 
@@ -60,130 +56,67 @@ public class RemovePluginGoal extends Recipe {
         return String.format("`%s` from `%s:%s`", goal, pluginGroupId, pluginArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a goal from a Maven plugin wherever it is declared: directly under a `<plugin>`, " +
-                "inside `<executions>`, and within `<build>`, `<pluginManagement>`, or `<profiles>`. " +
-                "If removing the goal leaves an `<execution>` with no remaining goals, the execution is removed. " +
-                "If all executions are removed, the `<executions>` element is also removed.";
-    }
+    String description = "Removes a goal from a Maven plugin wherever it is declared: directly under a `<plugin>`, " +
+            "inside `<executions>`, and within `<build>`, `<pluginManagement>`, or `<profiles>`. " +
+            "If removing the goal leaves an `<execution>` with no remaining goals, the execution is removed. " +
+            "If all executions are removed, the `<executions>` element is also removed.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveGoalVisitor();
-    }
-
-    private class RemoveGoalVisitor extends MavenIsoVisitor<ExecutionContext> {
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag plugin = super.visitTag(tag, ctx);
-            if (!PLUGIN_MATCHER.matches(getCursor())) {
-                return plugin;
-            }
-            if (!pluginMatches(plugin)) {
-                return plugin;
-            }
-            plugin = removeDirectGoals(plugin);
-            plugin = removeExecutionGoals(plugin);
-
-            return plugin;
-        }
-
-        private Xml.Tag removeDirectGoals(Xml.Tag plugin) {
-            Xml.Tag goals = plugin.getChild("goals").orElse(null);
-            if (goals == null) {
-                return plugin;
-            }
-            plugin = filterMatchingGoals(plugin, goals);
-
-            return removeChildIfEmpty(plugin, "goals");
-        }
-
-        private Xml.Tag removeExecutionGoals(Xml.Tag plugin) {
-            Xml.Tag executions = plugin.getChild("executions").orElse(null);
-            if (executions == null) {
-                return plugin;
-            }
-            for (Xml.Tag execution : executions.getChildren("execution")) {
-                plugin = removeGoalFromExecution(plugin, execution);
-            }
-
-            return removeExecutionsIfEmpty(plugin);
-        }
-
-        private Xml.Tag removeGoalFromExecution(Xml.Tag plugin, Xml.Tag executionIdentity) {
-            Xml.Tag execution = findCurrentExecution(plugin, executionIdentity).orElse(null);
-            if (execution == null) {
-                return plugin;
-            }
-            Xml.Tag goals = execution.getChild("goals").orElse(null);
-            if (goals == null) {
-                return plugin;
-            }
-            plugin = filterMatchingGoals(plugin, goals);
-
-            return removeExecutionIfGoalsEmpty(plugin, executionIdentity);
-        }
-
-        private Xml.Tag filterMatchingGoals(Xml.Tag plugin, Xml.Tag goals) {
-            Predicate<Xml.Tag> isNotMatchingGoal = goalTag ->
-                    !goalTag.getValue().map(v -> matchesGlob(v, goal)).orElse(false);
-
-            return filterTagChildren(plugin, goals, isNotMatchingGoal);
-        }
-
-        private Xml.Tag removeExecutionIfGoalsEmpty(Xml.Tag plugin, Xml.Tag executionIdentity) {
-            Xml.Tag execution = findCurrentExecution(plugin, executionIdentity).orElse(null);
-            if (execution == null) {
-                return plugin;
-            }
-            if (isGoalsEmpty(execution)) {
-                Xml.Tag executions = plugin.getChild("executions").orElse(null);
-                if (executions != null) {
-                    Predicate<Xml.Tag> isNotThisExecution = e -> !e.isScope(executionIdentity);
-                    plugin = filterTagChildren(plugin, executions, isNotThisExecution);
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag plugin = super.visitTag(tag, ctx);
+                if (!isPluginTag(pluginGroupId, pluginArtifactId) || isWithinConfiguration()) {
+                    return plugin;
                 }
+                Xml.Tag updated = mapTagChildren(plugin, child -> {
+                    if ("goals".equals(child.getName())) {
+                        return filterGoals(child);
+                    }
+                    if ("executions".equals(child.getName())) {
+                        return filterExecutions(child);
+                    }
+                    return child;
+                });
+                if (updated != plugin) {
+                    maybeUpdateModel();
+                }
+                return updated;
             }
 
-            return plugin;
-        }
-
-        private Xml.Tag removeExecutionsIfEmpty(Xml.Tag plugin) {
-            return removeChildIfEmpty(plugin, "executions");
-        }
-
-        private Xml.Tag removeChildIfEmpty(Xml.Tag plugin, String childName) {
-            Xml.Tag child = plugin.getChild(childName).orElse(null);
-            if (child != null && child.getChildren().isEmpty()) {
-                Predicate<Xml.Tag> isNotChild = c -> !childName.equals(c.getName());
-                plugin = filterTagChildren(plugin, plugin, isNotChild);
+            private boolean isWithinConfiguration() {
+                return getCursor().getPathAsStream(v -> v instanceof Xml.Tag && "configuration".equals(((Xml.Tag) v).getName()))
+                        .findAny()
+                        .isPresent();
             }
 
-            return plugin;
-        }
+            private Xml.@Nullable Tag filterGoals(Xml.Tag goals) {
+                Xml.Tag filtered = filterTagChildren(goals, goalTag ->
+                        !goalTag.getValue().map(v -> matchesGlob(v, goal)).orElse(false));
+                // Only cascade the cleanup of a now-empty element when a goal was actually removed
+                return filtered != goals && filtered.getChildren().isEmpty() ? null : filtered;
+            }
 
-        private boolean isGoalsEmpty(Xml.Tag execution) {
-            Optional<Xml.Tag> goals = execution.getChild("goals");
-
-            return goals.map(g -> g.getChildren().isEmpty()).orElse(false);
-        }
-
-        private Optional<Xml.Tag> findCurrentExecution(Xml.Tag plugin, Xml.Tag executionIdentity) {
-            Optional<Xml.Tag> executions = plugin.getChild("executions");
-
-            return executions.flatMap(e -> e.getChildren("execution").stream()
-                    .filter(ex -> ex.isScope(executionIdentity))
-                    .findFirst());
-        }
-
-        private boolean pluginMatches(Xml.Tag plugin) {
-            String groupId = plugin.getChildValue("groupId").orElse("org.apache.maven.plugins");
-            boolean groupIdMatches = matchesGlob(groupId, pluginGroupId);
-            boolean artifactIdMatches = plugin.getChildValue("artifactId")
-                    .map(v -> matchesGlob(v, pluginArtifactId))
-                    .orElse(false);
-
-            return groupIdMatches && artifactIdMatches;
-        }
+            private Xml.@Nullable Tag filterExecutions(Xml.Tag executions) {
+                Xml.Tag mapped = mapTagChildren(executions, execution -> {
+                    Xml.Tag goals = "execution".equals(execution.getName()) ?
+                            execution.getChild("goals").orElse(null) : null;
+                    if (goals == null) {
+                        return execution;
+                    }
+                    Xml.Tag filtered = filterGoals(goals);
+                    if (filtered == null) {
+                        // the execution's last goal was removed, so the execution goes with it
+                        return null;
+                    }
+                    if (filtered == goals) {
+                        return execution;
+                    }
+                    return mapTagChildren(execution, child -> child == goals ? filtered : child);
+                });
+                return mapped != executions && mapped.getChildren().isEmpty() ? null : mapped;
+            }
+        };
     }
 }
