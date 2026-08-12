@@ -171,11 +171,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             /**
-             * Record which dependency coordinates take their version from which property, so that the edit
+             * Record which coordinates take their version from which property, so that the edit
              * phase can tell whether a property is shared by several artifacts.
              */
             private void recordVersionPropertyConsumer(Xml.Tag tag) {
-                if (!"dependency".equals(tag.getName())) {
+                if (!"dependency".equals(tag.getName()) && !isAnnotationProcessorPathTag("*", "*")) {
                     return;
                 }
                 String version = tag.getChildValue("version").orElse(null);
@@ -183,12 +183,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (propertyName == null) {
                     return;
                 }
-                ResolvedPom pom = getResolutionResult().getPom();
+                MavenResolutionResult mrr = getResolutionResult();
+                ResolvedPom pom = mrr.getPom();
                 String group = pom.getValue(tag.getChildValue("groupId").orElse(null));
                 String artifact = pom.getValue(tag.getChildValue("artifactId").orElse(null));
                 if (group != null && artifact != null) {
                     accumulator.propertyConsumers
-                            .computeIfAbsent(propertyName, key -> new HashSet<>())
+                            .computeIfAbsent(propertyKey(mrr, propertyName), key -> new HashSet<>())
                             .add(new GroupArtifact(group, artifact));
                 }
             }
@@ -381,13 +382,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (isExternalDependency(accumulator, d)) {
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
-                        Xml.Tag versionTag = t.getChild("version").orElse(null);
-                        if (versionTag != null) {
-                            if (mustDecoupleFromProperty(versionTag.getValue().orElse(null), newerVersion, ctx)) {
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag, newerVersion).visitNonNull(t, ctx);
-                            } else {
-                                t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
-                            }
+                        if (t.getChild("version").isPresent()) {
+                            t = changeVersionTagValue(t, newerVersion, ctx);
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
 
@@ -420,6 +416,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return t;
             }
 
+            /**
+             * The single seam through which every {@code <version>} of an existing tag is written, so that a
+             * version held in a property is only ever raised through that property when it is safe to do so.
+             */
+            private Xml.Tag changeVersionTagValue(Xml.Tag t, String newerVersion, ExecutionContext ctx) {
+                Xml.Tag versionTag = t.getChild("version").orElse(null);
+                if (versionTag != null && mustDecoupleFromProperty(versionTag.getValue().orElse(null), newerVersion, ctx)) {
+                    return (Xml.Tag) new ChangeTagValueVisitor<>(versionTag, newerVersion).visitNonNull(t, ctx);
+                }
+                return changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+            }
+
             private Xml.Tag addVersionTag(Xml.Tag t, String version) {
                 Xml.Tag versionTag = Xml.Tag.build("<version>" + version + "</version>");
                 //noinspection ConstantConditions
@@ -441,7 +449,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             private boolean canUpdateProperty(String propertyName, String newerVersion, ExecutionContext ctx) {
-                Set<GroupArtifact> consumers = accumulator.propertyConsumers.get(propertyName);
+                Set<GroupArtifact> consumers = accumulator.propertyConsumers.get(propertyKey(getResolutionResult(), propertyName));
                 if (consumers == null) {
                     return true;
                 }
@@ -453,11 +461,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return true;
             }
 
+            /**
+             * Answered once per coordinate, as the POMs that reach the same property each see different
+             * repositories, and would otherwise be able to reach opposite conclusions.
+             */
             private boolean versionExists(GroupArtifact ga, String version, ExecutionContext ctx) {
+                return accumulator.versionExistence.computeIfAbsent(
+                        new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version),
+                        gav -> downloadableVersion(ga, version, ctx));
+            }
+
+            private boolean downloadableVersion(GroupArtifact ga, String version, ExecutionContext ctx) {
                 MavenPomDownloader downloader = newPomDownloader(ctx);
                 List<MavenRepository> repositories = getResolutionResult().getPom().getRepositories();
                 try {
-                    MavenMetadata metadata = metadataFailures.insertRows(ctx, () -> downloader.downloadMetadata(ga, null, repositories));
+                    MavenMetadata metadata = downloader.downloadMetadata(ga, null, repositories);
                     if (metadata.getVersioning().getVersions().contains(version)) {
                         return true;
                     }
@@ -511,7 +529,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (groupId != null && artifactId != null && version != null) {
                     String newerVersion = findNewerVersion(groupId, artifactId, resolveVersion(version), ctx);
                     if (newerVersion != null) {
-                        t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+                        t = changeVersionTagValue(t, newerVersion, ctx);
                     }
                 }
                 return t;
@@ -677,15 +695,39 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return null;
     }
 
+    /**
+     * Identify a property by the POM that declares it as well as by its name, as modules that are unrelated to one
+     * another can each declare a property of the same name for altogether different artifacts.
+     */
+    private static PropertyKey propertyKey(@Nullable MavenResolutionResult mrr, String propertyName) {
+        while (mrr != null) {
+            Pom requested = mrr.getPom().getRequested();
+            if (requested.getProperties().containsKey(propertyName)) {
+                return new PropertyKey(requested.getSourcePath(), propertyName);
+            }
+            mrr = mrr.getParent();
+        }
+        return new PropertyKey(null, propertyName);
+    }
+
     @Value
     public static class Accumulator {
         Set<GroupArtifact> projectArtifacts = new HashSet<>();
         Set<PomProperty> pomProperties = new HashSet<>();
 
         /**
-         * Property name to the dependencies whose version resolves through it, across all POMs in the project.
+         * Property to the dependencies whose version resolves through it, across all POMs in the project.
          */
-        Map<String, Set<GroupArtifact>> propertyConsumers = new HashMap<>();
+        Map<PropertyKey, Set<GroupArtifact>> propertyConsumers = new HashMap<>();
+
+        Map<GroupArtifactVersion, Boolean> versionExistence = new HashMap<>();
+    }
+
+    @Value
+    static class PropertyKey {
+        @Nullable
+        Path declaringPomFilePath;
+        String propertyName;
     }
 
     @Value
