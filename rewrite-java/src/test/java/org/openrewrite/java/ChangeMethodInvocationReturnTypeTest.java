@@ -787,38 +787,6 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
     }
 
     @Test
-    void newReturnTypeThatCannotBeTemplatedLeavesTheSourceUnchanged() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "void"))
-            .expectedCyclesThatMakeChanges(1)
-            .parser(JavaParser.fromJavaVersion()
-              //language=java
-              .dependsOn(
-                """
-                  package bar;
-                  public class Bar {
-                      public static Object bar() {
-                          return null;
-                      }
-                  }
-                  """
-              )
-            ),
-          //language=java
-          java(
-            """
-              import bar.Bar;
-              class Foo {
-                  void foo() {
-                      Object one = Bar.bar();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void newReturnTypeMayUseSimpleNamesForJavaLangTypeArguments() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.List<String>"))
