@@ -333,6 +333,28 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    void tabsDeeperThanBlockDepth() {
+        var cus = jp().parse(
+          """
+            public class Test {
+            \tpublic int method(boolean b) {
+            \t\tif (b)
+            \t\t\t    return 1;
+            \t\treturn 0;
+            \t}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize4() {
         var cus = jp().parse(
           """
