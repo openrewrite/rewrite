@@ -2397,7 +2397,7 @@ public class GroovyParserVisitor {
                     return new J.ForLoop(randomId(), prefix, Markers.EMPTY,
                             new J.ForLoop.Control(randomId(), controlFmt,
                                     Markers.EMPTY, init, condition, update),
-                            JRightPadded.build(doVisit(forLoop.getLoopBlock())));
+                            JRightPadded.build(visitLoopBody(forLoop.getLoopBlock())));
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
@@ -2427,7 +2427,7 @@ public class GroovyParserVisitor {
 
                     return new J.ForEachLoop(randomId(), prefix, forEachMarkers,
                             new J.ForEachLoop.Control(randomId(), controlFmt, Markers.EMPTY, variable, iterable),
-                            JRightPadded.build(doVisit(forLoop.getLoopBlock())));
+                            JRightPadded.build(visitLoopBody(forLoop.getLoopBlock())));
                 }
             }));
         }
@@ -3374,7 +3374,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitDoWhileLoop(DoWhileStatement loop) {
             Space fmt = sourceBefore("do");
-            Statement body = doVisit(loop.getLoopBlock());
+            Statement body = visitLoopBody(loop.getLoopBlock());
             Space beforeWhile = sourceBefore("while");
             J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
@@ -3391,8 +3391,27 @@ public class GroovyParserVisitor {
                     new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                             JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
                                     .withAfter(sourceBefore(")"))),
-                    JRightPadded.build(doVisit(loop.getLoopBlock()))
+                    JRightPadded.build(visitLoopBody(loop.getLoopBlock()))
             ));
+        }
+
+        /**
+         * An {@link EmptyStatement} loop body, as in {@code for (...);}, contributes nothing to the queue. The
+         * terminating {@code ;} is carried on the {@link J.Empty} as a marker, since the Groovy printer emits
+         * statement terminators only where the source has one.
+         */
+        private Statement visitLoopBody(org.codehaus.groovy.ast.stmt.Statement loopBlock) {
+            Statement body = doVisit(loopBlock);
+            if (body != null) {
+                return body;
+            }
+            Space prefix = whitespace();
+            Markers markers = Markers.EMPTY;
+            if (cursor < source.length() && source.charAt(cursor) == ';') {
+                skip(";");
+                markers = markers.add(new Semicolon(randomId()));
+            }
+            return new J.Empty(randomId(), prefix, markers);
         }
 
         private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends ASTNode> nodes,
