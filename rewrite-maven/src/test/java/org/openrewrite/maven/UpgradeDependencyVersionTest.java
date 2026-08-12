@@ -1157,6 +1157,81 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void doNotUpgradeSharedPluginDependencyPropertyWhenNewVersionMissingForOtherConsumer() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <jackson.version>2.10.5</jackson.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                          <version>${jackson.version}</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>5.4.1</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>com.fasterxml.jackson.core</groupId>
+                                      <artifactId>jackson-annotations</artifactId>
+                                      <version>${jackson.version}</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <jackson.version>2.10.5</jackson.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                          <version>${jackson.version}</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>5.4.1</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>com.fasterxml.jackson.core</groupId>
+                                      <artifactId>jackson-annotations</artifactId>
+                                      <version>2.21</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotUpgradeSharedManagedPropertyWhenNewVersionMissingForOtherConsumer() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null, null, null)),
@@ -1313,6 +1388,72 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </project>
                   """
               )
+            )
+          )
+        );
+    }
+
+    @Test
+    void upgradeSharedPropertyNameDeclaredSeparatelyPerModule() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null, true, null)),
+          mavenProject("module-a",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>module-a</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <jackson.version>2.10.5</jackson.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-annotations</artifactId>
+                            <version>${jackson.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>module-a</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <jackson.version>2.21</jackson.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-annotations</artifactId>
+                            <version>${jackson.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("module-b",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>module-b</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <jackson.version>2.10.5</jackson.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>${jackson.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
             )
           )
         );
