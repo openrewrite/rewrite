@@ -16,8 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon", "GroovyUnnecessaryContinue"})
@@ -129,6 +132,48 @@ class ForLoopTest implements RewriteTest {
           groovy(
             """
               for(;;) test()
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyBody() {
+        rewriteRun(
+          groovy(
+            """
+              int port = 0
+              Random rand = new Random()
+              for (; port < 1024; port = rand.nextInt(65536));
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ForLoop visitForLoop(J.ForLoop forLoop, Object o) {
+                    assertThat(forLoop.getBody()).isInstanceOf(J.Empty.class);
+                    return super.visitForLoop(forLoop, o);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyWithSpaceBeforeSemicolon() {
+        rewriteRun(
+          groovy(
+            """
+              for (int i = 0; i < 10; i++)  ;
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachWithEmptyBody() {
+        rewriteRun(
+          groovy(
+            """
+              for (def i : [1, 2, 3]);
               """
           )
         );

@@ -44,4 +44,28 @@ class WhileLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyBody() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              while (i++ < 10);
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileWithEmptyBody() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              do; while (i++ < 10)
+              """
+          )
+        );
+    }
 }
