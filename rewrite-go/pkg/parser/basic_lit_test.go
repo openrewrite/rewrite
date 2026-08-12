@@ -17,9 +17,12 @@
 package parser_test
 
 import (
+	"strconv"
 	"testing"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // litRHS parses src and returns the J.Literal on the RHS of the first `:=`.
