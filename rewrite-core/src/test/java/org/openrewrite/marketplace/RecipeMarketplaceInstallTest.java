@@ -121,6 +121,24 @@ class RecipeMarketplaceInstallTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    void uninstallReportsWhatItRemovedEvenWhenAnotherBundleSharesTheName() {
+        RecipeBundle a = new RecipeBundle("maven", "org.example:a", "LATEST", "1.0.0", null);
+        RecipeBundle b = new RecipeBundle("maven", "org.example:b", "LATEST", "1.0.0", null);
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        marketplace.install(singleRecipeReader(a, "com.foo.Bar"));
+        marketplace.install(singleRecipeReader(b, "com.foo.Bar"));
+
+        // getAllRecipes() is keyed by recipe name, so its size does not move here -- b's listing
+        // simply stops being shadowed. Anything diffing that projection concludes nothing went.
+        int before = marketplace.getAllRecipes().size();
+        Set<RecipeListing> removed = marketplace.uninstall("maven", "org.example:a");
+
+        assertThat(marketplace.getAllRecipes()).hasSize(before);
+        assertThat(removed).extracting(RecipeListing::getName).containsExactly("com.foo.Bar");
+        assertThat(marketplace.bundleFor("maven", "org.example:a")).isNull();
+    }
+
     private static List<RecipeListing> allListings(RecipeMarketplace.Category category) {
         List<RecipeListing> out = new java.util.ArrayList<>(category.getRecipes());
         for (RecipeMarketplace.Category child : category.getCategories()) {
