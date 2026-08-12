@@ -122,10 +122,9 @@ public class RecipeMarketplace {
     }
 
     /**
-     * @return The listings actually removed, so callers report what went rather than diffing
-     * {@link #getAllRecipes()} across the call. That projection is keyed by recipe name, so a
-     * removal is invisible to a diff whenever another bundle declares the same name. Keyed by
-     * recipe name in the same way {@link #merge} reports what it added.
+     * @return The listings removed, keyed by recipe name as {@link #merge} keys what it added.
+     * Not recoverable by diffing {@link #getAllRecipes()}: that projection is keyed by name, so a
+     * removal another bundle's same-named listing was shadowing leaves its size unchanged.
      */
     public Set<RecipeListing> uninstall(String packageEcosystem, String packageName) {
         Set<RecipeListing> removed = new LinkedHashSet<>();

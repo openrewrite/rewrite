@@ -129,12 +129,11 @@ class RecipeMarketplaceInstallTest {
         marketplace.install(singleRecipeReader(a, "com.foo.Bar"));
         marketplace.install(singleRecipeReader(b, "com.foo.Bar"));
 
-        // getAllRecipes() is keyed by recipe name, so its size does not move here -- b's listing
-        // simply stops being shadowed. Anything diffing that projection concludes nothing went.
-        int before = marketplace.getAllRecipes().size();
         Set<RecipeListing> removed = marketplace.uninstall("maven", "org.example:a");
 
-        assertThat(marketplace.getAllRecipes()).hasSize(before);
+        assertThat(marketplace.getAllRecipes())
+                .as("b's listing merely stops being shadowed, so a diff of this cannot see the removal")
+                .hasSize(1);
         assertThat(removed).extracting(RecipeListing::getName).containsExactly("com.foo.Bar");
         assertThat(marketplace.bundleFor("maven", "org.example:a")).isNull();
     }
