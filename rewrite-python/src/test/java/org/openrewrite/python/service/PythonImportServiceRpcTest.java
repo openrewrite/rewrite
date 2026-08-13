@@ -28,8 +28,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.tree.Py;
@@ -38,10 +36,8 @@ import org.openrewrite.rpc.RewriteRpc;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.nio.file.Paths;
 import java.util.HashMap;
 
-import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -76,8 +72,9 @@ class PythonImportServiceRpcTest {
 
     @Test
     void dispatchesImportEditBackToRequestingPeer() {
-        Py.CompilationUnit cu = new Py.CompilationUnit(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-          Paths.get("test.py"), null, null, false, null, emptyList(), emptyList(), Space.EMPTY);
+        // The predicate only dispatches when an import could actually satisfy the request, so the
+        // tree needs one for the RemovesTypingList visitor to have anything to remove.
+        Py.CompilationUnit cu = PythonImports.cu(PythonImports.fromImport("typing", PythonImports.member("List")));
 
         // The maybeRemoveImport queued on the server dispatches org.openrewrite.python.RemoveImport
         // back to the host, where the test stand-in receives it.
