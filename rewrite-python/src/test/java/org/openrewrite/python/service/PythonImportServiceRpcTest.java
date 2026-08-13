@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.service;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.file.Paths;
+import java.util.HashMap;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,5 +95,36 @@ class PythonImportServiceRpcTest {
             maybeRemoveImport("typing.List");
             return tree;
         }
+    }
+
+    @Test
+    void addVisitorIsConstructibleFromAnOptionsMap() {
+        var mapper = JsonMapper.builder().addModule(new ParameterNamesModule()).build();
+        var options = new HashMap<String, Object>();
+        options.put("module", "typing");
+        options.put("name", "List");
+        options.put("alias", null);
+        options.put("onlyIfReferenced", true);
+
+        PythonAddImportVisitor<?> visitor = mapper.convertValue(options, PythonAddImportVisitor.class);
+
+        assertThat(visitor.getModule()).isEqualTo("typing");
+        assertThat(visitor.getName()).isEqualTo("List");
+        assertThat(visitor.getAlias()).isNull();
+        assertThat(visitor.isOnlyIfReferenced()).isTrue();
+    }
+
+    @Test
+    void removeVisitorIsConstructibleFromAnOptionsMap() {
+        var mapper = JsonMapper.builder().addModule(new ParameterNamesModule()).build();
+        var options = new HashMap<String, Object>();
+        options.put("module", "typing");
+        options.put("name", "List");
+        options.put("onlyIfUnused", false);
+
+        PythonRemoveImportVisitor<?> visitor = mapper.convertValue(options, PythonRemoveImportVisitor.class);
+
+        assertThat(visitor.getModule()).isEqualTo("typing");
+        assertThat(visitor.isOnlyIfUnused()).isFalse();
     }
 }
