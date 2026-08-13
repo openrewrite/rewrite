@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.python.internal.PythonImportNames.aliasName;
 import static org.openrewrite.python.internal.PythonImportNames.canonicalFqn;
 import static org.openrewrite.python.internal.PythonImportNames.nameString;
@@ -44,7 +43,7 @@ import static org.openrewrite.python.internal.PythonImportNames.nameString;
 @Getter
 public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
 
-    private final @Nullable String module;
+    private final String module;
     private final @Nullable String name;
     private final @Nullable String alias;
     private final boolean onlyIfReferenced;
@@ -72,7 +71,7 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
         }
         // A bare builtin name (e.g. `list` when ChangeType retargets a type to a builtin) is not a
         // module, so there is no import that could bind it.
-        if (name == null && module != null && module.indexOf('.') == -1 && PythonBuiltins.contains(module)) {
+        if (name == null && module.indexOf('.') == -1 && PythonBuiltins.contains(module)) {
             return false;
         }
         if (importExists(cu)) {
@@ -136,7 +135,7 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
 
     private boolean isReferenced(Py.CompilationUnit cu) {
         String target = alias != null ? alias :
-                name != null ? name : requireNonNull(module).substring(module.lastIndexOf('.') + 1);
+                name != null ? name : module.substring(module.lastIndexOf('.') + 1);
         AtomicBoolean found = new AtomicBoolean();
         new PythonVisitor<AtomicBoolean>() {
             // Identifiers inside an import are bindings rather than uses, so neither kind of

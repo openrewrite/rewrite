@@ -87,6 +87,11 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
      * out risks a dispatch that changes nothing rather than a skip that loses a change.
      */
     private boolean hasCandidate(Py.MultiImport multi) {
+        // A statement with no names left is deleted by the Python side whatever the request, so it
+        // is never something this predicate may rule out.
+        if (multi.getNames().isEmpty()) {
+            return true;
+        }
         NameTree from = multi.getFrom();
         if (name == null) {
             if (from == null) {
@@ -98,7 +103,7 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
                 return false;
             }
             if (module.equals(nameString(from))) {
-                return !multi.getNames().isEmpty();
+                return true;
             }
             for (J.Import member : multi.getNames()) {
                 if (module.equals(canonicalFqn(member))) {

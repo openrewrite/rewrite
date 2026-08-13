@@ -333,12 +333,9 @@ class TestCanonicalRemoveImport:
     (``os.path.join`` is canonically ``posixpath.join``), not just by its
     written path."""
 
-    @staticmethod
-    def _remover(arm, module, name=None):
-        return _remove_import_visitor(arm, module, name, only_if_unused=False)
-
     def test_remove_reexported_function_by_canonical_fqn(self, arm):
-        RecipeSpec(recipe=from_visitor(self._remover(arm, 'posixpath', 'join'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
                 from os.path import join
@@ -351,7 +348,8 @@ class TestCanonicalRemoveImport:
         )
 
     def test_remove_reexported_class_by_canonical_fqn(self, arm):
-        RecipeSpec(recipe=from_visitor(self._remover(arm, 'typing', 'Iterable'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'Iterable', only_if_unused=False))).rewrite_run(
             python(
                 """
                 from collections.abc import Iterable
@@ -364,7 +362,8 @@ class TestCanonicalRemoveImport:
         )
 
     def test_canonical_removal_keeps_other_names(self, arm):
-        RecipeSpec(recipe=from_visitor(self._remover(arm, 'posixpath', 'join'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
                 from os.path import exists, join
@@ -379,7 +378,8 @@ class TestCanonicalRemoveImport:
 
     def test_remove_module_binding_by_canonical_fqn(self, arm):
         """`from os import path` binds the module canonically named os.path."""
-        RecipeSpec(recipe=from_visitor(self._remover(arm, 'os.path'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'os.path', only_if_unused=False))).rewrite_run(
             python(
                 """
                 from os import path
@@ -393,7 +393,8 @@ class TestCanonicalRemoveImport:
 
     def test_canonical_mismatch_is_not_removed(self, arm):
         """os.path.exists is canonically genericpath.exists, not posixpath.exists."""
-        RecipeSpec(recipe=from_visitor(self._remover(arm, 'posixpath', 'exists'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'posixpath', 'exists', only_if_unused=False))).rewrite_run(
             python(
                 """
                 from os.path import exists
@@ -406,7 +407,8 @@ class TestCanonicalRemoveImport:
         """`typing` is the canonical home of many re-exports, so a whole-module
         request must match only bindings of the module itself — not every member
         that happens to be declared there."""
-        RecipeSpec(recipe=from_visitor(self._remover(arm, 'typing'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', only_if_unused=False))).rewrite_run(
             python(
                 """
                 from collections.abc import Iterable

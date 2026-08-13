@@ -51,19 +51,19 @@ class PythonRemoveImportVisitorTest {
     @Test
     void dispatchesForAMatchingMemberAmongOthers() {
         assertThat(mightChange("typing", "List",
-          cu(fromImport("typing", member("Iterable"), member("List"))))).isTrue();
+                cu(fromImport("typing", member("Iterable"), member("List"))))).isTrue();
     }
 
     @Test
     void dispatchesForACanonicalMatch() {
         assertThat(mightChange("posixpath", "join",
-          cu(fromImport("os.path", member("join", null, methodType("posixpath", "join")))))).isTrue();
+                cu(fromImport("os.path", member("join", null, methodType("posixpath", "join")))))).isTrue();
     }
 
     @Test
     void skipsWhenTheCanonicalNameDiffers() {
         assertThat(mightChange("posixpath", "exists",
-          cu(fromImport("os.path", member("exists", null, methodType("genericpath", "exists")))))).isFalse();
+                cu(fromImport("os.path", member("exists", null, methodType("genericpath", "exists")))))).isFalse();
     }
 
     @Test

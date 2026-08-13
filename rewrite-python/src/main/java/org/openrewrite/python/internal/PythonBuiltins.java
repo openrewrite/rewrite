@@ -23,6 +23,8 @@ import java.util.Set;
  * The names Python's {@code builtins} module binds. A bare builtin name is not a module, so no
  * import can bind it. Generated from {@code dir(builtins)} on CPython 3.12.5; a name added in a
  * later release is not an importable module either, so the set does not need to track the runtime.
+ * The package supports Python 3.10+; {@code BaseExceptionGroup} and {@code ExceptionGroup} (3.11+)
+ * are kept in the set regardless, since a dotless module named exactly one of them is not realistic.
  */
 public final class PythonBuiltins {
 

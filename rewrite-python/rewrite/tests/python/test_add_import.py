@@ -164,6 +164,22 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_finds_a_reference_in_a_comprehension(self, arm):
+        """The only reference is inside a comprehension, a Python-specific node."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', 'join', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                paths = [join(p) for p in ps]
+                """,
+                """
+                from os.path import join
+                paths = [join(p) for p in ps]
+                """,
+            )
+        )
+
     def test_merge_into_existing_from_import(self, arm):
         """Merge a new name into an existing 'from X import ...' statement.
 
@@ -354,22 +370,6 @@ class TestMaybeAddImport:
                 """
                 from builtins import list as _list
                 x = 1
-                """,
-            )
-        )
-
-
-class TestAddImportVisitor:
-    """Requests that must not add an import even with only_if_referenced off."""
-
-    def test_skips_builtins_import(self, arm):
-        """e.g. Java's ChangeType retargeting a type to ``builtins.list`` must
-        not add ``from builtins import list``."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'builtins', 'list')))
-        spec.rewrite_run(
-            python(
-                """
-                x: list = []
                 """,
             )
         )

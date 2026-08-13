@@ -20,8 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.UUID;
-
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
@@ -89,8 +87,8 @@ class PythonImportNamesTest {
 
     @Test
     void canonicalFqnOfClassType() {
-        assertThat(PythonImportNames.canonicalFqn(imp("Iterable", null, JavaType.ShallowClass.build("typing.Iterable"))))
-                .isEqualTo("typing.Iterable");
+        assertThat(PythonImportNames.canonicalFqn(
+                imp("Iterable", null, JavaType.ShallowClass.build("typing.Iterable")))).isEqualTo("typing.Iterable");
     }
 
     @Test

@@ -34,19 +34,22 @@ public class PythonImportService extends ImportService {
                                                boolean onlyIfReferenced) {
         // A `member` is Java's static import, whose Python equivalent imports the member from
         // the type's own module: `from <package>.<type> import <member>`.
-        String[] moduleAndName = member == null ?
-                moduleAndName(packageName, typeName) :
-                moduleAndName(packageName == null ? typeName : packageName + "." + typeName, member);
-        return new PythonAddImportVisitor<>(moduleAndName[0], moduleAndName[1], alias, onlyIfReferenced);
+        String fqType = member == null ? packageName : packageName == null ? typeName : packageName + "." + typeName;
+        String boundName = member == null ? typeName : member;
+        // A name with no dot becomes a plain `import <name>` with a null name.
+        String module = fqType == null || fqType.isEmpty() ? boundName : fqType;
+        String name = fqType == null || fqType.isEmpty() ? null : boundName;
+        return new PythonAddImportVisitor<>(module, name, alias, onlyIfReferenced);
     }
 
     @Override
     public <P> JavaVisitor<P> removeImportVisitor(String fullyQualifiedName) {
         int lastDot = fullyQualifiedName.lastIndexOf('.');
-        String[] moduleAndName = lastDot == -1 ?
-                moduleAndName(null, fullyQualifiedName) :
-                moduleAndName(fullyQualifiedName.substring(0, lastDot), fullyQualifiedName.substring(lastDot + 1));
-        return new PythonRemoveImportVisitor<>(moduleAndName[0], moduleAndName[1]);
+        String packageName = lastDot == -1 ? null : fullyQualifiedName.substring(0, lastDot);
+        String typeName = lastDot == -1 ? fullyQualifiedName : fullyQualifiedName.substring(lastDot + 1);
+        String module = packageName == null || packageName.isEmpty() ? typeName : packageName;
+        String name = packageName == null || packageName.isEmpty() ? null : typeName;
+        return new PythonRemoveImportVisitor<>(module, name);
     }
 
     /**
@@ -55,15 +58,5 @@ public class PythonImportService extends ImportService {
     @Override
     public boolean usesStatementBasedImports() {
         return true;
-    }
-
-    /**
-     * Splits a fully-qualified name into Python's (module, name) pair, e.g. {@code collections.abc}
-     * + {@code Iterable}; a name with no dot becomes a plain {@code import <name>} with a null name.
-     */
-    private static String[] moduleAndName(@Nullable String packageName, String typeName) {
-        return packageName == null || packageName.isEmpty() ?
-                new String[]{typeName, null} :
-                new String[]{packageName, typeName};
     }
 }
