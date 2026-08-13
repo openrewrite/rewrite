@@ -20,10 +20,16 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.python.tree.Py;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.openrewrite.python.internal.PythonImportNames.canonicalFqn;
+import static org.openrewrite.python.internal.PythonImportNames.nameString;
 
 /**
  * Dispatches to {@code rewrite.python.remove_import.RemoveImport}.
@@ -63,6 +69,55 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
 
     @Override
     boolean mightChange(Py.CompilationUnit cu) {
-        return true;
+        for (Statement statement : cu.getStatements()) {
+            if (statement instanceof J.Import) {
+                if (name == null && module.equals(nameString(((J.Import) statement).getQualid()))) {
+                    return true;
+                }
+            } else if (statement instanceof Py.MultiImport && hasCandidate((Py.MultiImport) statement)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether any member of the statement is one the Python implementation would consider removing.
+     * {@code only_if_unused} is not evaluated here: it can only retain a candidate, so leaving it
+     * out risks a dispatch that changes nothing rather than a skip that loses a change.
+     */
+    private boolean hasCandidate(Py.MultiImport multi) {
+        NameTree from = multi.getFrom();
+        if (name == null) {
+            if (from == null) {
+                for (J.Import member : multi.getNames()) {
+                    if (module.equals(nameString(member.getQualid()))) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            if (module.equals(nameString(from))) {
+                return !multi.getNames().isEmpty();
+            }
+            for (J.Import member : multi.getNames()) {
+                if (module.equals(canonicalFqn(member))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (from == null) {
+            return false;
+        }
+        boolean syntactic = module.equals(nameString(from));
+        String targetFqn = module + "." + name;
+        for (J.Import member : multi.getNames()) {
+            if (syntactic && name.equals(nameString(member.getQualid())) ||
+                    targetFqn.equals(canonicalFqn(member))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
