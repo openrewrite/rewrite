@@ -671,7 +671,9 @@ class AutodetectTest implements RewriteTest {
 
             public class Outer {
                 public enum Measure {
-                    One, Two, Three, Four, Five, Six
+                    One, Two, Three, Four, Five, Six;
+
+                    public int label;
                 }
             }
             """,
@@ -687,7 +689,8 @@ class AutodetectTest implements RewriteTest {
                     return List.of(One, Two, Three, Four, Five);
                 }
 
-                void parameterized(Outer.Measure measure) {
+                int parameterized(Outer.Measure measure) {
+                    return measure.label;
                 }
             }
             """
