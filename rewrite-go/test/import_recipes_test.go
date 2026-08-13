@@ -19,11 +19,95 @@ package test
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 func strPtr(s string) *string { return &s }
+
+// stripQualifierAttribution rewrites `y.Hello()` into an equivalent call
+// whose qualifier identifier and method type carry no attribution,
+// mimicking a hand-built cross-package call node.
+type stripQualifierAttribution struct {
+	recipe.Base
+}
+
+func (r *stripQualifierAttribution) Name() string {
+	return "org.openrewrite.golang.test.StripQualifierAttribution"
+}
+func (r *stripQualifierAttribution) DisplayName() string { return "Strip qualifier attribution" }
+func (r *stripQualifierAttribution) Description() string {
+	return "Replaces the qualifier of `y.Hello()` with an un-attributed identifier."
+}
+
+func (r *stripQualifierAttribution) Editor() recipe.TreeVisitor {
+	return visitor.Init(&stripQualifierVisitor{})
+}
+
+type stripQualifierVisitor struct {
+	visitor.GoVisitor
+}
+
+func (v *stripQualifierVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	if mi.Name == nil || mi.Name.Name != "Hello" || mi.Select == nil {
+		return v.GoVisitor.VisitMethodInvocation(mi, p)
+	}
+	qualifier, ok := mi.Select.Element.(*java.Identifier)
+	if !ok {
+		return v.GoVisitor.VisitMethodInvocation(mi, p)
+	}
+	c := *mi
+	sel := *mi.Select
+	sel.Element = &java.Identifier{ID: uuid.New(), Prefix: qualifier.Prefix, Name: qualifier.Name}
+	c.Select = &sel
+	c.MethodType = nil
+	return v.GoVisitor.VisitMethodInvocation(&c, p)
+}
+
+type handBuiltCallThenRemoveUnused struct {
+	recipe.Base
+}
+
+func (r *handBuiltCallThenRemoveUnused) Name() string {
+	return "org.openrewrite.golang.test.HandBuiltCallThenRemoveUnused"
+}
+func (r *handBuiltCallThenRemoveUnused) DisplayName() string {
+	return "Hand-built call then remove unused"
+}
+func (r *handBuiltCallThenRemoveUnused) Description() string {
+	return "Strips qualifier attribution, then removes unused imports."
+}
+func (r *handBuiltCallThenRemoveUnused) RecipeList() []recipe.Recipe {
+	return []recipe.Recipe{&stripQualifierAttribution{}, &recipes.RemoveUnusedImports{}}
+}
+
+func TestRemoveUnusedImports_KeepsImportReferencedByUnattributedQualifier(t *testing.T) {
+	// given a file whose only use of `github.com/x/y` is a call whose
+	// qualifier is stripped of attribution (as a hand-built node would be)
+	// when RemoveUnusedImports runs after
+	// then the import survives on the lexical qualifier match alone
+	spec := NewRecipeSpec().WithRecipe(&handBuiltCallThenRemoveUnused{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				"github.com/x/y"
+			)
+
+			func main() {
+				fmt.Println("hi")
+				_ = y.Hello()
+			}
+		`),
+	)
+}
 
 func TestAddImport_NoOpWhenAlreadyImported(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
