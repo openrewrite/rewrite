@@ -19,6 +19,8 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -29,9 +31,7 @@ import (
 func firstStatementInBody(t *testing.T, src string) java.Statement {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("body.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	if len(cu.Statements) == 0 {
 		t.Fatalf("no top-level statements parsed")
 	}
@@ -39,9 +39,7 @@ func firstStatementInBody(t *testing.T, src string) java.Statement {
 	if !ok {
 		t.Fatalf("expected first statement to be *java.MethodDeclaration, got %T", cu.Statements[0].Element)
 	}
-	if fn.Body == nil || len(fn.Body.Statements) == 0 {
-		t.Fatalf("function body is empty")
-	}
+	require.False(t, fn.Body == nil || len(fn.Body.Statements) == 0)
 	return fn.Body.Statements[0].Element
 }
 
@@ -71,14 +69,10 @@ func TestIfConditionIsControlParentheses(t *testing.T) {
 
 	// when
 	ifStmt, ok := firstStatementInBody(t, src).(*java.If)
-	if !ok {
-		t.Fatalf("expected *java.If")
-	}
+	require.True(t, ok)
 
 	// then
-	if ifStmt.Condition == nil {
-		t.Fatalf("condition must be a *java.ControlParentheses, got nil")
-	}
+	require.NotNil(t, ifStmt.Condition)
 	if _, ok := ifStmt.Condition.Tree.Element.(*java.Identifier); !ok {
 		t.Fatalf("expected the condition to wrap the bare *java.Identifier, got %T", ifStmt.Condition.Tree.Element)
 	}
@@ -98,16 +92,12 @@ func TestIfWithInitIsWrapped(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *golang.StatementWithInit, got %T", stmt)
 	}
-	if wrapper.Init.Element == nil {
-		t.Fatalf("wrapper must carry the init statement")
-	}
+	require.NotNil(t, wrapper.Init.Element)
 	if _, ok := wrapper.Statement.(*java.If); !ok {
 		t.Fatalf("wrapper must hold the inner *java.If, got %T", wrapper.Statement)
 	}
 	// The prefix (whitespace before `if`) belongs on the outermost node.
-	if wrapper.Prefix.Whitespace != "\n\t" {
-		t.Fatalf("expected wrapper to carry the prefix %q, got %q", "\n\t", wrapper.Prefix.Whitespace)
-	}
+	require.Equal(t, "\n\t", wrapper.Prefix.Whitespace)
 	if inner := wrapper.Statement.(*java.If); inner.Prefix.Whitespace != "" || len(inner.Prefix.Comments) != 0 {
 		t.Fatalf("inner if must be prefix-less, got %+v", inner.Prefix)
 	}

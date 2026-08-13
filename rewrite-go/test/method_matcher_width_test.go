@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -41,9 +43,7 @@ func main() {
 	_ = strconv.Itoa(i)
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	calls := map[string]*java.MethodInvocation{}
 	visitor.Walk(cu, func(n java.Tree) bool {

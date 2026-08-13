@@ -18,6 +18,8 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -41,9 +43,7 @@ func TestGoModRPCRoundTrip(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// given: a parsed GoMod LST
 			before, err := parser.ParseGoModFile("go.mod", content)
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// when: round-tripped through the RPC sender/receiver
 			seed := &golang.GoMod{Ident: before.Ident}
@@ -66,13 +66,9 @@ func TestGoModRPCRoundTrip(t *testing.T) {
 func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
 	content := "module example.com/foo\n\ngo 1.21\n\nrequire github.com/x/y v1.2.3\n"
 	before, err := parser.ParseGoModFile("go.mod", content)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	mrr, err := parser.ParseGoMod("go.mod", content)
-	if err != nil {
-		t.Fatalf("marker parse error: %v", err)
-	}
+	require.NoError(t, err)
 	before.Markers.Entries = append(before.Markers.Entries, *mrr)
 
 	seed := &golang.GoMod{Ident: before.Ident}
@@ -87,7 +83,5 @@ func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
 	if found == nil {
 		t.Fatalf("GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries)
 	}
-	if found.ModulePath != "example.com/foo" || len(found.Requires) != 1 {
-		t.Fatalf("marker fields not preserved: %#v", found)
-	}
+	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1)
 }

@@ -21,6 +21,10 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 )
 
@@ -31,9 +35,7 @@ func parsedNames(t *testing.T, buildCtx build.Context, files []parser.FileInput)
 	t.Helper()
 	p := parser.NewGoParserWithBuildContext(buildCtx)
 	cus, err := p.ParsePackage(files)
-	if err != nil {
-		t.Fatalf("ParsePackage: %v", err)
-	}
+	require.NoError(t, err)
 	out := make([]string, 0, len(cus))
 	for _, cu := range cus {
 		out = append(out, cu.SourcePath)
@@ -74,15 +76,11 @@ func TestBuildTags_FilenameSuffix(t *testing.T) {
 	}
 	got := parsedNames(t, ctx("linux", "amd64"), files)
 	want := []string{"extra_amd64.go", "extra_linux.go", "extra_linux_amd64.go", "main.go"}
-	if !equal(got, want) {
-		t.Errorf("on linux/amd64: got %v, want %v", got, want)
-	}
+	assert.True(t, equal(got, want))
 
 	got = parsedNames(t, ctx("darwin", "arm64"), files)
 	want = []string{"main.go"}
-	if !equal(got, want) {
-		t.Errorf("on darwin/arm64: got %v, want %v", got, want)
-	}
+	assert.True(t, equal(got, want))
 }
 
 // Case 3: combined constraints — `//go:build linux && amd64`.

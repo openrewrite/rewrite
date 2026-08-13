@@ -22,6 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -604,9 +608,7 @@ func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedBy
 		// parse this file in isolation so two bare specs sharing a
 		// default Path don't clobber each other.
 		parsed, err := p.Parse(src.Path, src.Before)
-		if err != nil {
-			t.Fatalf("parse error: %v", err)
-		}
+		require.NoError(t, err)
 		cu = parsed
 	}
 
@@ -649,9 +651,7 @@ func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	t.Helper()
 
 	gm, err := parser.ParseGoModFile(src.Path, src.Before)
-	if err != nil {
-		t.Fatalf("go.mod parse error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Attach any markers contributed by GoProject(...) wrappers (e.g. the
 	// GoResolutionResult / GoProject markers) so recipes can read them.
@@ -673,9 +673,7 @@ func (spec *RecipeSpec) parseGoSum(t *testing.T, src SourceSpec) *golang.GoSum {
 	t.Helper()
 
 	gs, err := parser.ParseGoSumFile(src.Path, src.Before)
-	if err != nil {
-		t.Fatalf("go.sum parse error: %v", err)
-	}
+	require.NoError(t, err)
 
 	for _, m := range src.Markers {
 		gs = gs.WithMarkers(java.AddMarker(gs.Markers, m))
@@ -696,23 +694,17 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	src := ps.spec
 
 	if ps.tree == nil {
-		if src.After != nil && *src.After != src.Before {
-			t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
-		}
+		assert.False(t, src.After != nil && *src.After != src.Before)
 		return
 	}
 
 	if spec.Recipe == nil {
-		if src.After != nil {
-			t.Error("after state specified but no recipe configured")
-		}
+		assert.Nil(t, src.After)
 		return
 	}
 
 	if ps.result == nil {
-		if src.After != nil {
-			t.Error("recipe returned nil (deleted source file) but expected an after state")
-		}
+		assert.Nil(t, src.After)
 		return
 	}
 
@@ -725,9 +717,7 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 		return
 	}
 	// No after state: expect no changes.
-	if actual != src.Before {
-		t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
-	}
+	assert.Equal(t, src.Before, actual)
 }
 
 func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, generated []java.Tree) {

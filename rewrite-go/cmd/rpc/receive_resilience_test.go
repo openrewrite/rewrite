@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"github.com/stretchr/testify/require"
 )
 
 // frameReverseGetObjectReply renders one Content-Length framed JSON-RPC
@@ -35,9 +36,7 @@ func frameReverseGetObjectReply(t *testing.T, result any) []byte {
 		"id":      "go-GetObject",
 		"result":  result,
 	})
-	if err != nil {
-		t.Fatalf("marshal reply: %v", err)
-	}
+	require.NoError(t, err)
 	return append([]byte(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))), body...)
 }
 
@@ -88,9 +87,7 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 		s.getObjectFromJava(id, "")
 		return false
 	}()
-	if !panicked {
-		t.Fatal("transfer 1: expected a panic mid-receive, got none")
-	}
+	require.True(t, panicked)
 
 	// Containment: the diverged per-id baseline is dropped.
 	if v, ok := s.reverseRemoteObjects[id]; ok {

@@ -19,6 +19,8 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -50,7 +52,5 @@ func TestReceiveValue_DeleteReturnsNil(t *testing.T) {
 	before := makeIdent("x")
 	got := receiveValue(queueOf(RpcObjectData{State: Delete}), java.Expression(before),
 		func(e java.Expression) any { return e })
-	if got != nil {
-		t.Errorf("DELETE: want nil, got %v", got)
-	}
+	assert.Nil(t, got)
 }

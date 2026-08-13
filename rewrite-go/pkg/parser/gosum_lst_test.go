@@ -18,19 +18,17 @@ package parser
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 )
 
 func roundTripSum(t *testing.T, content string) {
 	t.Helper()
 	gs, err := ParseGoSumFile("go.sum", content)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	got := printer.PrintGoSum(gs)
-	if got != content {
-		t.Fatalf("not lossless\n--- want ---\n%q\n--- got ---\n%q", content, got)
-	}
+	require.Equal(t, content, got)
 }
 
 func TestGoSumLossless(t *testing.T) {
@@ -81,22 +79,14 @@ func TestGoSumFields(t *testing.T) {
 
 	// when
 	gs, err := ParseGoSumFile("go.sum", content)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// then
-	if len(gs.Lines) != 2 {
-		t.Fatalf("expected 2 lines, got %d", len(gs.Lines))
-	}
+	require.Len(t, gs.Lines, 2)
 	zip := gs.Lines[0].Element
-	if zip.ModulePath != "github.com/a/b" || zip.Version != "v1.0.0" || zip.GoMod || zip.Hash != "h1:zip=" {
-		t.Fatalf("zip line fields wrong: %#v", zip)
-	}
+	require.False(t, zip.ModulePath != "github.com/a/b" || zip.Version != "v1.0.0" || zip.GoMod || zip.Hash != "h1:zip=")
 	mod := gs.Lines[1].Element
-	if !mod.GoMod || mod.Hash != "h1:mod=" {
-		t.Fatalf("go.mod line fields wrong: %#v", mod)
-	}
+	require.False(t, !mod.GoMod || mod.Hash != "h1:mod=")
 }
 
 func TestGoSumMalformedLineErrors(t *testing.T) {

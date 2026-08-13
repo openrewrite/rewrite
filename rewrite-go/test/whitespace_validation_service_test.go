@@ -20,6 +20,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
@@ -31,9 +35,7 @@ import (
 // importing pkg/recipe/golang registers the service.
 func TestWhitespaceValidationService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.WhitespaceValidationService](nil)
-	if svc == nil {
-		t.Fatal("recipe.Service returned nil for *golang.WhitespaceValidationService")
-	}
+	require.NotNil(t, svc)
 }
 
 // TestWhitespaceValidationService_CleanTree confirms a freshly parsed
@@ -42,16 +44,12 @@ func TestWhitespaceValidationService_CleanTree(t *testing.T) {
 	src := "package main\n\nfunc main() {\n\tprintln(\"hi\")\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	svc := &recipes.WhitespaceValidationService{}
 	if errs := svc.Validate(cu); len(errs) != 0 {
 		t.Fatalf("expected clean tree to validate, got %d errs:\n%s", len(errs), strings.Join(errs, "\n"))
 	}
-	if !svc.IsValid(cu) {
-		t.Error("IsValid disagrees with Validate on a clean tree")
-	}
+	assert.True(t, svc.IsValid(cu))
 }
 
 // TestWhitespaceValidationService_DetectsCorruption hand-crafts a tree
@@ -69,9 +67,7 @@ func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 	if !strings.Contains(errs[0], "non-whitespace") {
 		t.Errorf("error should mention non-whitespace, got: %s", errs[0])
 	}
-	if svc.IsValid(cu) {
-		t.Error("IsValid should be false when Validate returned errors")
-	}
+	assert.False(t, svc.IsValid(cu))
 }
 
 // TestWhitespaceValidationService_DetectsBadComment crafts a Comment

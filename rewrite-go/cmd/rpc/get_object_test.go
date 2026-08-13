@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
@@ -29,18 +31,14 @@ import (
 func getObjectParams(t *testing.T, id string) json.RawMessage {
 	t.Helper()
 	params, err := json.Marshal(getObjectRequest{ID: id})
-	if err != nil {
-		t.Fatalf("marshal GetObject params: %v", err)
-	}
+	require.NoError(t, err)
 	return params
 }
 
 func getObjectBatchForTest(t *testing.T, s *server, params json.RawMessage) []rpc.RpcObjectData {
 	t.Helper()
 	result, rpcErr := s.handleGetObject(params)
-	if rpcErr != nil {
-		t.Fatalf("GetObject failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	return result.([]rpc.RpcObjectData)
 }
 
@@ -60,9 +58,7 @@ func getCompleteObjectForTest(t *testing.T, s *server, id string) []rpc.RpcObjec
 func getObjectTreeForTest(t *testing.T) java.Tree {
 	t.Helper()
 	cu, err := goparser.NewGoParser().Parse("main.go", "package main\n")
-	if err != nil {
-		t.Fatalf("parse test source: %v", err)
-	}
+	require.NoError(t, err)
 	return cu
 }
 
@@ -76,9 +72,7 @@ func TestHandleGetObjectReturnsOneBatchPerRequest(t *testing.T) {
 	params := getObjectParams(t, id)
 
 	first := getObjectBatchForTest(t, s, params)
-	if len(first) != s.batchSize || first[0].State != rpc.Add {
-		t.Fatalf("first batch = %+v, want a full batch beginning with ADD", first)
-	}
+	require.False(t, len(first) != s.batchSize || first[0].State != rpc.Add)
 	if _, complete := s.remoteObjects[id]; complete {
 		t.Fatal("remote baseline was updated before END_OF_OBJECT was delivered")
 	}
@@ -153,9 +147,7 @@ func TestHandleGetObjectReusesReferencesAcrossTransfers(t *testing.T) {
 
 	getCompleteObjectForTest(t, s, "first")
 	refsAfterFirst := s.localRefs.Len()
-	if refsAfterFirst == 0 {
-		t.Fatal("first transfer did not retain any references")
-	}
+	require.NotEqual(t, 0, refsAfterFirst)
 
 	second := getCompleteObjectForTest(t, s, "second")
 	if got := s.localRefs.Len(); got != refsAfterFirst {
@@ -196,9 +188,7 @@ func TestHandleGetObjectRejectsInterleavedTransfers(t *testing.T) {
 			break
 		}
 	}
-	if len(s.inProgressGetObjects) != 0 {
-		t.Fatalf("in-progress GetObjects after completion = %d, want 0", len(s.inProgressGetObjects))
-	}
+	require.Len(t, s.inProgressGetObjects, 0)
 	getCompleteObjectForTest(t, s, "second")
 }
 
@@ -212,10 +202,6 @@ func TestResetCancelsInProgressGetObject(t *testing.T) {
 	_ = getObjectBatchForTest(t, s, params)
 
 	s.handleReset()
-	if len(s.inProgressGetObjects) != 0 {
-		t.Fatalf("in-progress transfers after Reset = %d, want 0", len(s.inProgressGetObjects))
-	}
-	if len(s.localObjects) != 0 || len(s.remoteObjects) != 0 {
-		t.Fatal("Reset did not clear object state")
-	}
+	require.Len(t, s.inProgressGetObjects, 0)
+	require.False(t, len(s.localObjects) != 0 || len(s.remoteObjects) != 0)
 }

@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -33,17 +37,11 @@ func TestParsePackageResolvesCrossFileSymbols(t *testing.T) {
 		{Path: "main.go", Content: "package main\n\nfunc main() { helper() }\n"},
 		{Path: "helper.go", Content: "package main\n\nfunc helper() {}\n"},
 	})
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if len(cus) != 2 {
-		t.Fatalf("expected 2 CUs, got %d", len(cus))
-	}
+	require.NoError(t, err)
+	require.Len(t, cus, 2)
 
 	mainTypes := collectIdentTypes(cus[0])
-	if mainTypes["helper"] == nil {
-		t.Errorf("expected `helper` reference in main.go to have a non-nil Type after multi-file parse; got nil (cross-file resolution still broken)")
-	}
+	assert.NotNil(t,mainTypes["helper"])
 }
 
 // TestGoProjectMultiFilePackageResolves is the harness-level integration:
@@ -58,9 +56,7 @@ func TestGoProjectMultiFilePackageResolves(t *testing.T) {
 	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		ids := collectIdentTypes(cu)
-		if ids["helper"] == nil {
-			t.Errorf("`helper` reference should have a resolved Type when parsed alongside helper.go; got nil")
-		}
+		assert.NotNil(t,ids["helper"])
 	}
 
 	helperSrc := test.Golang(`

@@ -16,7 +16,10 @@
 
 package template
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/assert"
+)
 
 func TestToPlaceholder(t *testing.T) {
 	if got := ToPlaceholder("expr"); got != "__plh_expr__" {
@@ -26,9 +29,7 @@ func TestToPlaceholder(t *testing.T) {
 
 func TestFromPlaceholder(t *testing.T) {
 	name, ok := FromPlaceholder("__plh_expr__")
-	if !ok || name != "expr" {
-		t.Errorf("FromPlaceholder(\"__plh_expr__\") = (%q, %v), want (\"expr\", true)", name, ok)
-	}
+	assert.False(t, !ok || name != "expr")
 }
 
 func TestFromPlaceholderNotPlaceholder(t *testing.T) {

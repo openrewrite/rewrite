@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsProxyFetchError(t *testing.T) {
@@ -55,18 +57,14 @@ func TestIsProxyFetchError(t *testing.T) {
 		got := isProxyFetchError(tc.err)
 
 		// then
-		if got != tc.want {
-			t.Errorf("isProxyFetchError(%q) = %v, want %v", tc.err, got, tc.want)
-		}
+		assert.Equal(t, tc.want, got)
 	}
 }
 
 func writeGoMod(t *testing.T, contents string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(contents), 0o644); err != nil {
-		t.Fatalf("write go.mod: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(contents), 0o644))
 	return dir
 }
 
@@ -98,9 +96,7 @@ require (
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3, got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got)
 }
 
 func TestReadResolvedVersion_IndirectRequireInBlock(t *testing.T) {
@@ -119,9 +115,7 @@ require (
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3, got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got)
 }
 
 func TestReadResolvedVersion_SingleLineRequire(t *testing.T) {
@@ -138,9 +132,7 @@ require github.com/foo/bar v1.2.3
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3, got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got)
 }
 
 func TestReadResolvedVersion_PrefixCollision(t *testing.T) {
@@ -160,7 +152,5 @@ require (
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	if got != "v1.2.3" {
-		t.Errorf("expected v1.2.3 (the exact match, not the prefix-collision sibling), got %q", got)
-	}
+	assert.Equal(t, "v1.2.3", got)
 }

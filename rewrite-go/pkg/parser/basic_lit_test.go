@@ -20,6 +20,10 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -69,9 +73,7 @@ func TestBasicLitDecodedValue(t *testing.T) {
 			if lit.Value != tc.wantValue {
 				t.Errorf("Value = %#v (%T), want %#v (%T)", lit.Value, lit.Value, tc.wantValue, tc.wantValue)
 			}
-			if lit.Source != tc.wantSource {
-				t.Errorf("Source = %q, want %q", lit.Source, tc.wantSource)
-			}
+			assert.Equal(t, lit.Source, tc.wantSource)
 		})
 	}
 }
@@ -81,9 +83,7 @@ func TestBasicLitDecodedValue(t *testing.T) {
 func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("g.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	var found *java.Literal
 	visitor.Walk(cu, func(n java.Tree) bool {
 		if lit, ok := n.(*java.Literal); ok {

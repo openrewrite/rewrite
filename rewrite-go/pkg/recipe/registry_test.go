@@ -16,7 +16,10 @@
 
 package recipe
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/assert"
+)
 
 // leafRecipe is a minimal standalone recipe used as a composite child.
 type leafRecipe struct {
@@ -71,9 +74,7 @@ func TestRegisterResolvesCompositeChildren(t *testing.T) {
 		if inst == nil {
 			t.Fatalf("expected child recipe %q constructor to return an instance", child)
 		}
-		if inst.Name() != child {
-			t.Errorf("child %q resolved to instance with name %q", child, inst.Name())
-		}
+		assert.Equal(t, inst.Name(), child)
 	}
 }
 

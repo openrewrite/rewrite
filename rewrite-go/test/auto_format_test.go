@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/format"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
@@ -34,13 +38,9 @@ func applyVisitor(t *testing.T, src string, v recipe.TreeVisitor) string {
 	t.Helper()
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	result := v.Visit(cu, nil)
-	if result == nil {
-		t.Fatal("visit returned nil")
-	}
+	require.NotNil(t, result)
 
 	final := visitor.DrainAfterVisits(v, result.(java.Tree), nil)
 	return printer.Print(final)
@@ -48,18 +48,14 @@ func applyVisitor(t *testing.T, src string, v recipe.TreeVisitor) string {
 
 func TestAutoFormatService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.AutoFormatService](nil)
-	if svc == nil {
-		t.Fatal("expected AutoFormatService to be registered, got nil")
-	}
+	require.NotNil(t, svc)
 }
 
 func TestRemoveTrailingWhitespace_StripsTrailingTabsFromLines(t *testing.T) {
 	src := "package main   \n\nfunc main() {}\n"
 	out := applyVisitor(t, src, format.NewRemoveTrailingWhitespaceVisitor(nil))
 	want := "package main\n\nfunc main() {}\n"
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 // Regression: the leading blank line above the first statement of a
@@ -83,9 +79,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewBlankLinesVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 // Regression: the trailing blank line above the closing brace lives on
@@ -107,9 +101,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewBlankLinesVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestBlankLines_CapsRunOfBlankLinesInBlock(t *testing.T) {
@@ -134,18 +126,14 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewBlankLinesVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestTabsAndIndents_ReindentsFunctionBody(t *testing.T) {
 	src := "package main\n\nfunc main() {\n\t\t   a := 1\n\t_ = a\n}\n"
 	want := "package main\n\nfunc main() {\n\ta := 1\n\t_ = a\n}\n"
 	out := applyVisitor(t, src, format.NewTabsAndIndentsVisitor(nil))
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestTabsAndIndents_NestedBlockGetsTwoTabs(t *testing.T) {
@@ -168,9 +156,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewTabsAndIndentsVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestSpaces_NormalizesBinaryOperatorSpacing(t *testing.T) {
@@ -189,9 +175,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewSpacesVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 // Regression: when the right operand of `:=` is itself a Binary, the
@@ -214,9 +198,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewSpacesVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 // Regression: same delegation rule when the assigned expression is a
@@ -239,9 +221,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewSpacesVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 // Regression: TabsAndIndentsVisitor places `case` clauses at the
@@ -271,9 +251,7 @@ func main() {
 }
 `
 	out := applyVisitor(t, src, format.NewTabsAndIndentsVisitor(nil))
-	if out != want {
-		t.Errorf("got:\n%s\nwant:\n%s", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestAutoFormat_FullPipelineEndToEnd(t *testing.T) {
@@ -283,7 +261,5 @@ func TestAutoFormat_FullPipelineEndToEnd(t *testing.T) {
 	src := "package main\n\nfunc main() {   \n\n\n\tif true {\n\ta := 1+2\n\t_ = a\n\t}\n}\n"
 	want := "package main\n\nfunc main() {\n\tif true {\n\t\ta := 1 + 2\n\t\t_ = a\n\t}\n}\n"
 	out := applyVisitor(t, src, format.NewAutoFormatVisitor(nil))
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
-	}
+	assert.Equal(t, want, out)
 }

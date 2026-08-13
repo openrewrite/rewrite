@@ -22,6 +22,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
@@ -43,9 +47,7 @@ func TestParseProjectResolvesModuleGraph(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -64,9 +66,7 @@ func TestParseProjectResolvesModuleGraph(t *testing.T) {
 	if main == nil {
 		t.Fatalf("main module missing from resolved build list: %+v", mrr.ResolvedDependencies)
 	}
-	if !main.Main {
-		t.Errorf("main module should have Main=true: %+v", main)
-	}
+	assert.True(t, main.Main)
 
 	var sawStdlib, sawMainPkg bool
 	for _, p := range mrr.PackageModules {
@@ -105,9 +105,7 @@ func TestParseProjectResolvesTestOnlyDependency(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {

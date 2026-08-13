@@ -19,6 +19,7 @@ package rpc
 import (
 	"testing"
 	"unsafe"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDecodeBatch_DecodesTypedFields(t *testing.T) {
@@ -33,12 +34,8 @@ func TestDecodeBatch_DecodesTypedFields(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(batch) != 3 {
-		t.Fatalf("expected 3 messages, got %d", len(batch))
-	}
+	require.NoError(t, err)
+	require.Len(t, batch, 3)
 	if batch[0].State != Add || batch[0].ValueType == nil || *batch[0].ValueType != "org.openrewrite.marker.SearchResult" || batch[0].Ref == nil || *batch[0].Ref != 7 {
 		t.Fatalf("message 0 decoded wrong: %+v", batch[0])
 	}
@@ -66,17 +63,13 @@ func TestDecodeBatch_InternsDuplicateStrings(t *testing.T) {
 	batch, err := DecodeBatch(data, intern)
 
 	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	s0 := batch[0].Value.(string)
 	s1 := batch[1].Value.(string)
 	nested := batch[2].Value.(map[string]any)
 	sa := nested["a"].(string)
 	sb := nested["b"].(string)
-	if s0 != "\n\t" || s1 != "\n\t" || sa != "\n\t" || sb != "\n\t" {
-		t.Fatalf("interning corrupted values: %q %q %q %q", s0, s1, sa, sb)
-	}
+	require.False(t, s0 != "\n\t" || s1 != "\n\t" || sa != "\n\t" || sb != "\n\t")
 	for _, s := range []string{s1, sa, sb} {
 		if strData(s0) != strData(s) {
 			t.Fatalf("duplicate string not interned to shared backing")
@@ -92,12 +85,8 @@ func TestDecodeBatch_NilInternKeepsDistinctBacking(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if batch[0].Value.(string) != "dup" || batch[1].Value.(string) != "dup" {
-		t.Fatalf("values decoded wrong without interning")
-	}
+	require.NoError(t, err)
+	require.False(t, batch[0].Value.(string) != "dup" || batch[1].Value.(string) != "dup")
 }
 
 func strData(s string) unsafe.Pointer {

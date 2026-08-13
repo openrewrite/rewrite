@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
@@ -56,9 +60,7 @@ func TestGenericFuncTypeParametersSurviveRpc(t *testing.T) {
 	} {
 		// given
 		cu, err := parser.NewGoParser().Parse("x.go", src)
-		if err != nil {
-			t.Fatalf("parse error: %v", err)
-		}
+		require.NoError(t, err)
 
 		// when
 		got := rpcRoundTrip(t, cu)
@@ -86,9 +88,7 @@ func TestGenericCallTypeArgumentsSurviveRpc(t *testing.T) {
 	} {
 		// given
 		cu, err := parser.NewGoParser().Parse("x.go", tc.src)
-		if err != nil {
-			t.Fatalf("parse error: %v", err)
-		}
+		require.NoError(t, err)
 
 		// when
 		got := rpcRoundTrip(t, cu)
@@ -98,9 +98,7 @@ func TestGenericCallTypeArgumentsSurviveRpc(t *testing.T) {
 		if mi.TypeParameters == nil {
 			t.Fatalf("call-site type arguments lost over RPC for %q", tc.src)
 		}
-		if len(mi.TypeParameters.Elements) != tc.count {
-			t.Errorf("expected %d type arguments, got %d for %q", tc.count, len(mi.TypeParameters.Elements), tc.src)
-		}
+		assert.Len(t, mi.TypeParameters.Elements, tc.count)
 		if printed := printer.Print(got); printed != tc.src {
 			t.Errorf("RPC round-trip mismatch\nexpected:\n%s\nactual:\n%s", tc.src, printed)
 		}
@@ -139,9 +137,7 @@ func TestGenericTypeDeclTypeParametersSurviveRpc(t *testing.T) {
 	} {
 		// given
 		cu, err := parser.NewGoParser().Parse("x.go", src)
-		if err != nil {
-			t.Fatalf("parse error: %v", err)
-		}
+		require.NoError(t, err)
 
 		// when
 		got := rpcRoundTrip(t, cu)

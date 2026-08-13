@@ -26,6 +26,10 @@ import (
 
 	"golang.org/x/mod/module"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -61,17 +65,11 @@ func TestHandleExportedTypes(t *testing.T) {
 
 	s, _ := newTestServer(t)
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/foo", Version: "v1.0.0"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("ExportedTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	data := result.([]rpc.RpcObjectData)
-	if len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject {
-		t.Fatalf("expected a batch ending in END_OF_OBJECT, got %d items", len(data))
-	}
+	require.False(t, len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject)
 
 	// The own-FQN list is sent first and must name every enumerated type, so the
 	// caller can tell defined types from references before the first type arrives.
@@ -128,10 +126,7 @@ func TestHandleExportedTypes(t *testing.T) {
 	if !ok {
 		t.Fatalf("io.Writer reference is %T, want *java.JavaTypeShallowClass", out)
 	}
-	if sc.FullyQualifiedName != "io.Writer" || len(sc.Members) != 0 || len(sc.Methods) != 0 {
-		t.Errorf("shallow ref = %s (members=%d methods=%d); want io.Writer with an empty body",
-			sc.FullyQualifiedName, len(sc.Members), len(sc.Methods))
-	}
+	assert.False(t, sc.FullyQualifiedName != "io.Writer" || len(sc.Members) != 0 || len(sc.Methods) != 0)
 	sawShallowTag := false
 	for _, d := range data {
 		if d.ValueType != nil && *d.ValueType == java.JavaTypeShallowClassKind {
@@ -139,9 +134,7 @@ func TestHandleExportedTypes(t *testing.T) {
 			break
 		}
 	}
-	if !sawShallowTag {
-		t.Error("no JavaType$ShallowClass valueType tag on the wire")
-	}
+	assert.True(t, sawShallowTag)
 }
 
 // Covers the enumerator's correctness fixes: an alias to an external type is not
@@ -177,12 +170,8 @@ func (g *Greeter) Greet() string { return g.Name }
 	if greeter == nil {
 		t.Fatalf("Greeter not enumerated; got %v", keys(byFqn))
 	}
-	if !hasMethod(greeter, "Greet") {
-		t.Errorf("Greeter missing Greet method")
-	}
-	if !hasMember(greeter, "Name") {
-		t.Errorf("Greeter missing Name field")
-	}
+	assert.True(t, hasMethod(greeter, "Greet"))
+	assert.True(t, hasMember(greeter, "Name"))
 	if _, ok := byFqn["io.Reader"]; ok {
 		t.Errorf("external alias target io.Reader was collected as an owned type")
 	}
@@ -199,12 +188,8 @@ func (g *Greeter) Greet() string { return g.Name }
 	if config == nil {
 		t.Fatalf("Config not enumerated; got %v", keys(byFqn))
 	}
-	if !hasMember(config, "Linux") {
-		t.Errorf("Config missing Linux field (fixed linux/amd64 context)")
-	}
-	if hasMember(config, "Windows") {
-		t.Errorf("Config has Windows field; _windows.go should be filtered out")
-	}
+	assert.True(t, hasMember(config, "Linux"))
+	assert.False(t, hasMember(config, "Windows"))
 }
 
 // A subdirectory with its own go.mod is a separate module; its files must not be
@@ -246,16 +231,12 @@ func TestExportedTypes_StdlibPackage(t *testing.T) {
 	if stringer == nil {
 		t.Fatalf("fmt.Stringer not enumerated; got %v", keys(byFqn))
 	}
-	if !hasMethod(stringer, "String") {
-		t.Errorf("fmt.Stringer missing String method")
-	}
+	assert.True(t, hasMethod(stringer, "String"))
 	pkg := byFqn["fmt"]
 	if pkg == nil {
 		t.Fatalf("synthetic fmt package class not enumerated; got %v", keys(byFqn))
 	}
-	if !hasMethod(pkg, "Sprintf") {
-		t.Errorf("fmt package class missing Sprintf; got %v", pkg.Methods)
-	}
+	assert.True(t, hasMethod(pkg, "Sprintf"))
 	// A stdlib package's cross-package references are shallow too.
 	for _, m := range pkg.Methods {
 		if m.Name != "Fprintf" {
@@ -282,17 +263,11 @@ func TestHandleDependencyTypes_StdlibCoordinate(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.batchSize = 1 << 20
 	params, err := json.Marshal(dependencyRequest{ModulePath: "fmt"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("stdlib DependencyTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	data := result.([]rpc.RpcObjectData)
-	if len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject {
-		t.Fatalf("expected a batch ending in END_OF_OBJECT, got %d items", len(data))
-	}
+	require.False(t, len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject)
 	fqns := map[string]bool{}
 	for _, f := range receiveFqnList(t, data) {
 		fqns[f] = true
@@ -313,21 +288,15 @@ func TestHandleDependencyTypes_VendorTree(t *testing.T) {
 
 	s, _ := newTestServer(t)
 	pp, err := json.Marshal(parseProjectRequest{ProjectPath: proj})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 	if _, rpcErr := s.handleParseProject(pp); rpcErr != nil {
 		t.Fatalf("ParseProject failed: %+v", rpcErr)
 	}
 
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/foo", Version: "v1.0.0"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("vendored DependencyTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	byFqn := map[string]*java.JavaTypeClass{}
 	for _, ty := range receiveTypeList(t, result.([]rpc.RpcObjectData)) {
 		if cls, ok := ty.(*java.JavaTypeClass); ok {
@@ -345,9 +314,7 @@ func TestHandleDependencyTypes_UnresolvableCoordinate(t *testing.T) {
 	t.Setenv("GOMODCACHE", t.TempDir())
 	s, _ := newTestServer(t)
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/missing", Version: "v9.9.9"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 	if _, rpcErr := s.handleDependencyTypes(params); rpcErr == nil {
 		t.Fatal("expected an error for an unresolvable coordinate")
 	}
@@ -363,21 +330,15 @@ func TestExportedTypes_Paginates(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "greeter.go"), greeterModule)
 
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/foo", Version: "v1.0.0"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Single-shot reference run with a batch large enough to hold the whole table.
 	single, _ := newTestServer(t)
 	single.batchSize = 1 << 20
 	oneShot, rpcErr := single.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("single-shot ExportedTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	want := oneShot.([]rpc.RpcObjectData)
-	if len(want) == 0 || want[len(want)-1].State != rpc.EndOfObject {
-		t.Fatalf("single-shot must end in END_OF_OBJECT; got %d items", len(want))
-	}
+	require.False(t, len(want) == 0 || want[len(want)-1].State != rpc.EndOfObject)
 
 	// Paginated run: same params, tiny batch, drained across repeated calls.
 	s, _ := newTestServer(t)
@@ -388,9 +349,7 @@ func TestExportedTypes_Paginates(t *testing.T) {
 			t.Fatalf("pagination did not terminate after %d calls", calls)
 		}
 		result, rpcErr := s.handleDependencyTypes(params)
-		if rpcErr != nil {
-			t.Fatalf("paginated ExportedTypes failed: %+v", rpcErr)
-		}
+		require.Nil(t, rpcErr)
 		batch := result.([]rpc.RpcObjectData)
 		if len(batch) > s.batchSize {
 			t.Fatalf("batch of %d exceeds batchSize %d", len(batch), s.batchSize)
@@ -401,9 +360,7 @@ func TestExportedTypes_Paginates(t *testing.T) {
 		}
 	}
 
-	if len(s.pendingDependencyTypes) != 0 {
-		t.Errorf("cache not freed after drain: %d entries remain", len(s.pendingDependencyTypes))
-	}
+	assert.Len(t, s.pendingDependencyTypes, 0)
 	if len(got) != len(want) {
 		t.Fatalf("paginated total %d != single-shot %d", len(got), len(want))
 	}
@@ -437,13 +394,9 @@ func exportedTypesByFqn(t *testing.T, modulePath, version string) map[string]*ja
 	t.Helper()
 	s, _ := newTestServer(t)
 	params, err := json.Marshal(dependencyRequest{ModulePath: modulePath, Version: version})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("ExportedTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	byFqn := map[string]*java.JavaTypeClass{}
 	for _, ty := range receiveTypeList(t, result.([]rpc.RpcObjectData)) {
 		if cls, ok := ty.(*java.JavaTypeClass); ok {

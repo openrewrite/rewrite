@@ -20,6 +20,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -142,9 +146,7 @@ func TestSearchRecipeWithMarkerPrinting(t *testing.T) {
 	src := "package main\n\nfunc foo() {\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ctx := recipe.NewExecutionContext()
 	result := editor.Visit(cu, ctx)
@@ -152,33 +154,23 @@ func TestSearchRecipeWithMarkerPrinting(t *testing.T) {
 	// Print with default marker printer — should show search result comment
 	output := printer.PrintWithMarkers(result, printer.DefaultMarkerPrinter)
 	expected := "package main\n\nfunc /*~~(found foo)~~>*/foo() {\n}\n"
-	if output != expected {
-		t.Errorf("marker output mismatch\nexpected: %q\nactual:   %q", expected, output)
-	}
+	assert.Equal(t, expected, output)
 
 	// Print without markers — should be original source
 	plain := printer.Print(result)
-	if plain != src {
-		t.Errorf("plain print should match original source\nexpected: %q\nactual:   %q", src, plain)
-	}
+	assert.Equal(t, plain, src)
 
 	// Print with sanitized printer — should strip markers
 	sanitized := printer.PrintWithMarkers(result, printer.SanitizedMarkerPrinter)
-	if sanitized != src {
-		t.Errorf("sanitized print should match original source\nexpected: %q\nactual:   %q", src, sanitized)
-	}
+	assert.Equal(t, sanitized, src)
 }
 
 func TestRecipeDescriptor(t *testing.T) {
 	r := &findFoo{}
 	desc := recipe.Describe(r)
 
-	if desc.Name != "org.openrewrite.golang.test.FindFoo" {
-		t.Errorf("expected name %q, got %q", "org.openrewrite.golang.test.FindFoo", desc.Name)
-	}
-	if desc.DisplayName != "Find foo identifiers" {
-		t.Errorf("expected displayName %q, got %q", "Find foo identifiers", desc.DisplayName)
-	}
+	assert.Equal(t, "org.openrewrite.golang.test.FindFoo", desc.Name)
+	assert.Equal(t, "Find foo identifiers", desc.DisplayName)
 	if desc.EstimatedEffortPerOccurrence != 5*time.Minute {
 		t.Errorf("expected 5 minute default effort, got %v", desc.EstimatedEffortPerOccurrence)
 	}
@@ -201,24 +193,16 @@ func TestRegistryActivate(t *testing.T) {
 	reg.Activate(activateSearch, activateRefactoring)
 
 	found, ok := reg.FindRecipe("org.openrewrite.golang.test.FindFoo")
-	if !ok {
-		t.Fatal("expected to find FindFoo recipe")
-	}
-	if found.Descriptor.DisplayName != "Find foo identifiers" {
-		t.Errorf("expected displayName %q, got %q", "Find foo identifiers", found.Descriptor.DisplayName)
-	}
+	require.True(t, ok)
+	assert.Equal(t, "Find foo identifiers", found.Descriptor.DisplayName)
 
 	// All recipes
 	all := reg.AllRecipes()
-	if len(all) != 2 {
-		t.Errorf("expected 2 recipes, got %d", len(all))
-	}
+	assert.Len(t, all, 2)
 
 	// Categories
 	cats := reg.Categories()
-	if len(cats) != 1 {
-		t.Fatalf("expected 1 top-level category, got %d", len(cats))
-	}
+	require.Len(t, cats, 1)
 	if cats[0].DisplayName != "Go" {
 		t.Errorf("expected top-level category 'Go', got %q", cats[0].DisplayName)
 	}
@@ -241,15 +225,11 @@ func TestRegistryReflectConstructor(t *testing.T) {
 	})
 
 	found, ok := reg.FindRecipe("org.openrewrite.golang.test.RenameFooToBar")
-	if !ok {
-		t.Fatal("expected to find recipe")
-	}
+	require.True(t, ok)
 
 	// Constructor auto-derived from prototype via reflection
 	instance := found.Constructor(nil)
-	if instance.Name() != "org.openrewrite.golang.test.RenameFooToBar" {
-		t.Errorf("unexpected name: %s", instance.Name())
-	}
+	assert.Equal(t, "org.openrewrite.golang.test.RenameFooToBar", instance.Name())
 }
 
 func TestFencedMarkerPrinting(t *testing.T) {
@@ -259,18 +239,14 @@ func TestFencedMarkerPrinting(t *testing.T) {
 	src := "package main\n\nfunc foo() {\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ctx := recipe.NewExecutionContext()
 	result := editor.Visit(cu, ctx)
 
 	// Print with fenced printer — should show {{uuid}} delimiters
 	output := printer.PrintWithMarkers(result, printer.FencedMarkerPrinter)
-	if output == src {
-		t.Error("expected fenced markers in output, but output is unchanged")
-	}
+	assert.NotEqual(t, output, src)
 	// Fenced output should contain UUID-style markers
 	if len(output) <= len(src) {
 		t.Error("fenced output should be longer than original source")

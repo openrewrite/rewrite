@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -34,9 +38,7 @@ import (
 func parseAndFindMethod(t *testing.T, src, name string) *java.MethodDeclaration {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	for _, rp := range cu.Statements {
 		if md, ok := rp.Element.(*java.MethodDeclaration); ok && md.Name != nil && md.Name.Name == name {
 			return md
@@ -49,9 +51,7 @@ func parseAndFindMethod(t *testing.T, src, name string) *java.MethodDeclaration 
 func parseAndFindType(t *testing.T, src, name string) *golang.TypeDecl {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	for _, rp := range cu.Statements {
 		if td, ok := rp.Element.(*golang.TypeDecl); ok && td.Name != nil && td.Name.Name == name {
 			return td
@@ -64,9 +64,7 @@ func parseAndFindType(t *testing.T, src, name string) *golang.TypeDecl {
 func parseAndFindVar(t *testing.T, src string) *java.VariableDeclarations {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	for _, rp := range cu.Statements {
 		if vd, ok := rp.Element.(*java.VariableDeclarations); ok {
 			return vd
@@ -86,9 +84,7 @@ func TestDirective_BareGoNoinline(t *testing.T) {
 	if id, _ := ann.AnnotationType.(*java.Identifier); id == nil || id.Name != "go:noinline" {
 		t.Errorf("AnnotationType: got %+v, want Identifier{Name:\"go:noinline\"}", ann.AnnotationType)
 	}
-	if ann.Arguments != nil {
-		t.Errorf("Arguments: got %+v, want nil for bare directive", ann.Arguments)
-	}
+	assert.Nil(t, ann.Arguments)
 }
 
 func TestDirective_GoLinknameWithArgs(t *testing.T) {
@@ -101,13 +97,9 @@ func TestDirective_GoLinknameWithArgs(t *testing.T) {
 	if id, _ := ann.AnnotationType.(*java.Identifier); id == nil || id.Name != "go:linkname" {
 		t.Errorf("AnnotationType: got %+v, want Identifier{Name:\"go:linkname\"}", ann.AnnotationType)
 	}
-	if ann.Arguments == nil || len(ann.Arguments.Elements) != 1 {
-		t.Fatalf("Arguments: got %+v, want one Literal", ann.Arguments)
-	}
+	require.False(t, ann.Arguments == nil || len(ann.Arguments.Elements) != 1)
 	lit, _ := ann.Arguments.Elements[0].Element.(*java.Literal)
-	if lit == nil || lit.Source != "x runtime.x" {
-		t.Errorf("Args: got %+v, want \"x runtime.x\"", lit)
-	}
+	assert.False(t, lit == nil || lit.Source != "x runtime.x")
 }
 
 func TestDirective_MultipleDirectivesOnFunc(t *testing.T) {
@@ -134,9 +126,7 @@ func TestDirective_LintIgnoreOnType(t *testing.T) {
 	if ann.AnnotationType.(*java.Identifier).Name != "lint:ignore" {
 		t.Errorf("AnnotationType: got %+v", ann.AnnotationType)
 	}
-	if ann.Arguments == nil {
-		t.Fatal("Arguments: got nil")
-	}
+	require.NotNil(t, ann.Arguments)
 	if got := ann.Arguments.Elements[0].Element.(*java.Literal).Source; got != "U1000 unused but kept" {
 		t.Errorf("Args: got %q, want %q", got, "U1000 unused but kept")
 	}
@@ -176,9 +166,7 @@ func TestDirective_RegularCommentBeforeDirectiveStops(t *testing.T) {
 func TestDirective_RoundtripFunc(t *testing.T) {
 	src := "package main\n\n//go:noinline\n//go:nosplit\nfunc slow() {}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	if got := printer.Print(cu); got != src {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
@@ -187,9 +175,7 @@ func TestDirective_RoundtripFunc(t *testing.T) {
 func TestDirective_RoundtripType(t *testing.T) {
 	src := "package main\n\n//go:generate go run gen.go\ntype Foo struct{}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	if got := printer.Print(cu); got != src {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
@@ -198,9 +184,7 @@ func TestDirective_RoundtripType(t *testing.T) {
 func TestDirective_RoundtripVar(t *testing.T) {
 	src := "package main\n\n//go:linkname x runtime.x\nvar x int = 1\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	if got := printer.Print(cu); got != src {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
@@ -209,9 +193,7 @@ func TestDirective_RoundtripVar(t *testing.T) {
 func TestDirective_RoundtripMixed(t *testing.T) {
 	src := "package main\n\n//go:noinline\n//go:nosplit\nfunc slow() { _ = 1 }\n\n//go:generate go run gen.go\ntype Foo struct{}\n\n//go:linkname x runtime.x\nvar x int = 1\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	if got := printer.Print(cu); got != src {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}

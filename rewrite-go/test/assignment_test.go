@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -155,7 +157,5 @@ func TestMultiAssignmentVisitsRHSMethodInvocation(t *testing.T) {
 	v.Visit(ma, nil)
 
 	// then
-	if len(rec.visited) != 1 || rec.visited[0] != "ReadAll" {
-		t.Errorf("expected RHS method invocation %q to be visited, got %v", "ReadAll", rec.visited)
-	}
+	assert.False(t, len(rec.visited) != 1 || rec.visited[0] != "ReadAll")
 }

@@ -22,14 +22,14 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
 func TestSelfParseGoParser(t *testing.T) {
 	data, err := os.ReadFile("../pkg/parser/go_parser.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err)
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -37,9 +37,7 @@ func TestSelfParseGoParser(t *testing.T) {
 
 func TestSelfParseGoPrinter(t *testing.T) {
 	data, err := os.ReadFile("../pkg/printer/go_printer.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err)
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -47,9 +45,7 @@ func TestSelfParseGoPrinter(t *testing.T) {
 
 func TestSelfParseGoVisitor(t *testing.T) {
 	data, err := os.ReadFile("../pkg/visitor/go_visitor.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err)
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -57,9 +53,7 @@ func TestSelfParseGoVisitor(t *testing.T) {
 
 func TestSelfParseJTree(t *testing.T) {
 	data, err := os.ReadFile("../pkg/tree/java/j.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err)
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -67,9 +61,7 @@ func TestSelfParseJTree(t *testing.T) {
 
 func TestSelfParseGoTree(t *testing.T) {
 	data, err := os.ReadFile("../pkg/tree/golang/go.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err)
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -77,9 +69,7 @@ func TestSelfParseGoTree(t *testing.T) {
 
 func TestSelfParseSpec(t *testing.T) {
 	data, err := os.ReadFile("../pkg/test/spec.go")
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
+	require.NoError(t, err)
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)

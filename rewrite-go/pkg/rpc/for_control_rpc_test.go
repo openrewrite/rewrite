@@ -19,6 +19,10 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -41,9 +45,7 @@ func TestImplicitForClausesSurvivesRpcRoundTrip(t *testing.T) {
 		t.Run(src, func(t *testing.T) {
 			// given: a parsed for-loop that already prints back to its source
 			cu, err := parser.NewGoParser().Parse("f.go", src)
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
+			require.NoError(t, err)
 			if got := printer.Print(cu); got != src {
 				t.Fatalf("parse-print idempotence failed:\n got=%q\nwant=%q", got, src)
 			}
@@ -59,15 +61,9 @@ func TestImplicitForClausesSurvivesRpcRoundTrip(t *testing.T) {
 			}
 			// ...and the control still carries the placeholders and the marker
 			control := firstForControl(t, rt)
-			if control.Init == nil {
-				t.Errorf("Init placeholder lost on round-trip")
-			}
-			if control.Update == nil {
-				t.Errorf("Update placeholder lost on round-trip")
-			}
-			if java.FindMarker[golang.ImplicitForClauses](control.Markers) == nil {
-				t.Errorf("ImplicitForClauses marker lost on round-trip")
-			}
+			assert.NotNil(t, control.Init)
+			assert.NotNil(t, control.Update)
+			assert.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers))
 		})
 	}
 }

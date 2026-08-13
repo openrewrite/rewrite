@@ -16,7 +16,10 @@
 
 package rpc
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/require"
+)
 
 func TestDecodeBatch_EmptyArray(t *testing.T) {
 	// given
@@ -26,12 +29,8 @@ func TestDecodeBatch_EmptyArray(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(batch) != 0 {
-		t.Fatalf("expected empty batch, got %d", len(batch))
-	}
+	require.NoError(t, err)
+	require.Len(t, batch, 0)
 }
 
 func TestDecodeBatch_NullPayload(t *testing.T) {
@@ -42,12 +41,8 @@ func TestDecodeBatch_NullPayload(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(batch) != 0 {
-		t.Fatalf("expected empty batch for null, got %d", len(batch))
-	}
+	require.NoError(t, err)
+	require.Len(t, batch, 0)
 }
 
 func TestDecodeBatch_NonArrayIsError(t *testing.T) {
@@ -58,9 +53,7 @@ func TestDecodeBatch_NonArrayIsError(t *testing.T) {
 	_, err := DecodeBatch(data, nil)
 
 	// then
-	if err == nil {
-		t.Fatalf("expected error for non-array payload")
-	}
+	require.Error(t, err)
 }
 
 func TestDecodeBatch_StreamsManyMessages(t *testing.T) {
@@ -71,12 +64,8 @@ func TestDecodeBatch_StreamsManyMessages(t *testing.T) {
 	batch, err := DecodeBatch(data, make(map[string]string))
 
 	// then
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(batch) != 500 {
-		t.Fatalf("expected 500 messages, got %d", len(batch))
-	}
+	require.NoError(t, err)
+	require.Len(t, batch, 500)
 	if positions, ok := batch[2].Value.([]any); !ok || len(positions) != 5 {
 		t.Fatalf("message 2 positions not decoded as a list: %#v", batch[2].Value)
 	}

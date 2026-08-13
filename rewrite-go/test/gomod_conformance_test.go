@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
@@ -135,9 +137,7 @@ func nilIfEmpty(s string) *string {
 func TestGoModConformanceCorpus(t *testing.T) {
 	corpusDir := filepath.Join("..", "src", "test", "resources", "gomod-conformance")
 	entries, err := os.ReadDir(corpusDir)
-	if err != nil {
-		t.Fatalf("read corpus dir: %v", err)
-	}
+	require.NoError(t, err)
 	cases := 0
 	for _, ent := range entries {
 		if ent.IsDir() || !strings.HasSuffix(ent.Name(), ".gomod") {
@@ -148,9 +148,7 @@ func TestGoModConformanceCorpus(t *testing.T) {
 		t.Run(caseName, func(t *testing.T) {
 			modContent := mustRead(t, filepath.Join(corpusDir, ent.Name()))
 			mrr, err := parser.ParseGoMod("go.mod", modContent)
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
+			require.NoError(t, err)
 			if sumPath := filepath.Join(corpusDir, caseName+".gosum"); fileExists(sumPath) {
 				mrr.ResolvedDependencies = parser.ParseGoSum(mustRead(t, sumPath))
 			}
@@ -158,9 +156,7 @@ func TestGoModConformanceCorpus(t *testing.T) {
 
 			goldenContent := mustRead(t, filepath.Join(corpusDir, caseName+".gomod.json"))
 			var expected conformanceShape
-			if err := json.Unmarshal([]byte(goldenContent), &expected); err != nil {
-				t.Fatalf("unmarshal golden: %v", err)
-			}
+			require.NoError(t, json.Unmarshal([]byte(goldenContent), &expected))
 			normalize(&expected)
 
 			if !reflect.DeepEqual(actual, expected) {
@@ -171,9 +167,7 @@ func TestGoModConformanceCorpus(t *testing.T) {
 			}
 		})
 	}
-	if cases == 0 {
-		t.Fatal("no .gomod cases found in corpus")
-	}
+	require.NotEqual(t, 0, cases)
 }
 
 // normalize replaces nil slices with empty slices so reflect.DeepEqual

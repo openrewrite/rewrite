@@ -19,6 +19,10 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -28,9 +32,7 @@ import (
 func firstAssignRHS(t *testing.T, src string) java.Expression {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("g.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	for _, rp := range cu.Statements {
 		md, ok := rp.Element.(*java.MethodDeclaration)
 		if !ok || md.Body == nil {
@@ -63,27 +65,15 @@ func TestGenericFuncCallSingleTypeArg(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected RHS to be *java.MethodInvocation, got %T", rhs)
 	}
-	if mi.Select != nil {
-		t.Errorf("expected Select to be nil for a free generic function call, got %T", mi.Select.Element)
-	}
-	if mi.Name == nil || mi.Name.Name != "Map" {
-		t.Errorf("expected Name == %q, got %q", "Map", nameOrEmpty(mi.Name))
-	}
-	if mi.TypeParameters == nil {
-		t.Fatalf("expected TypeParameters to be non-nil")
-	}
-	if len(mi.TypeParameters.Elements) != 1 {
-		t.Fatalf("expected 1 type argument, got %d", len(mi.TypeParameters.Elements))
-	}
+	assert.Nil(t, mi.Select)
+	assert.False(t, mi.Name == nil || mi.Name.Name != "Map")
+	require.NotNil(t, mi.TypeParameters)
+	require.Len(t, mi.TypeParameters.Elements, 1)
 	if id, ok := mi.TypeParameters.Elements[0].Element.(*java.Identifier); !ok || id.Name != "int" {
 		t.Errorf("expected type argument Identifier(int), got %T", mi.TypeParameters.Elements[0].Element)
 	}
-	if len(mi.Arguments.Elements) != 1 {
-		t.Errorf("expected 1 call argument, got %d", len(mi.Arguments.Elements))
-	}
-	if mi.MethodType == nil {
-		t.Errorf("expected MethodType to be attributed")
-	}
+	assert.Len(t, mi.Arguments.Elements, 1)
+	assert.NotNil(t, mi.MethodType)
 
 	assertRoundTrip(t, src)
 }
@@ -96,9 +86,7 @@ func TestGenericFuncCallMultipleTypeArgs(t *testing.T) {
 
 	// when
 	ccu, err := parser.NewGoParser().Parse("g.go", callSrc)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 
 	// then
 	var mi *java.MethodInvocation
@@ -113,15 +101,9 @@ func TestGenericFuncCallMultipleTypeArgs(t *testing.T) {
 			}
 		}
 	}
-	if mi == nil {
-		t.Fatalf("no MethodInvocation found")
-	}
-	if mi.Name == nil || mi.Name.Name != "Pair" {
-		t.Errorf("expected Name == %q, got %q", "Pair", nameOrEmpty(mi.Name))
-	}
-	if mi.TypeParameters == nil || len(mi.TypeParameters.Elements) != 2 {
-		t.Fatalf("expected 2 type arguments, got %v", mi.TypeParameters)
-	}
+	require.NotNil(t, mi)
+	assert.False(t, mi.Name == nil || mi.Name.Name != "Pair")
+	require.False(t, mi.TypeParameters == nil || len(mi.TypeParameters.Elements) != 2)
 	assertRoundTrip(t, callSrc)
 }
 
@@ -134,9 +116,7 @@ func TestFuncValueIndexCallIsNotGeneric(t *testing.T) {
 
 	// when
 	cu, err := parser.NewGoParser().Parse("g.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 
 	// then
 	var mi *java.MethodInvocation
@@ -151,15 +131,9 @@ func TestFuncValueIndexCallIsNotGeneric(t *testing.T) {
 			}
 		}
 	}
-	if mi == nil {
-		t.Fatalf("no MethodInvocation found")
-	}
-	if mi.TypeParameters != nil {
-		t.Errorf("expected TypeParameters to be nil for func-value index call")
-	}
-	if mi.Select == nil {
-		t.Fatalf("expected Select to be present")
-	}
+	require.NotNil(t, mi)
+	assert.Nil(t, mi.TypeParameters)
+	require.NotNil(t, mi.Select)
 	if _, ok := mi.Select.Element.(*java.ArrayAccess); !ok {
 		t.Errorf("expected Select to be *java.ArrayAccess, got %T", mi.Select.Element)
 	}

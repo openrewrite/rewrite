@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 )
 
@@ -66,9 +68,7 @@ func TestProjectImporter_DirectImportCycle(t *testing.T) {
 	pi.AddSource("b/b.go", "package b\n\nimport \"example.com/foo/a\"\n\nfunc B() string { return a.A() }\n")
 
 	pkg := importWithTimeout(t, pi, "example.com/foo/a")
-	if pkg.Path() != "example.com/foo/a" {
-		t.Errorf("expected package path %q, got %q", "example.com/foo/a", pkg.Path())
-	}
+	assert.Equal(t, "example.com/foo/a", pkg.Path())
 }
 
 // A longer cycle (a -> b -> c -> a) exercises the same guard across more than
@@ -81,7 +81,5 @@ func TestProjectImporter_TransitiveImportCycle(t *testing.T) {
 	pi.AddSource("c/c.go", "package c\n\nimport \"example.com/foo/a\"\n\nfunc C() string { return a.A() }\n")
 
 	pkg := importWithTimeout(t, pi, "example.com/foo/a")
-	if pkg.Path() != "example.com/foo/a" {
-		t.Errorf("expected package path %q, got %q", "example.com/foo/a", pkg.Path())
-	}
+	assert.Equal(t, "example.com/foo/a", pkg.Path())
 }

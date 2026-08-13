@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -28,18 +30,12 @@ import (
 
 func TestCursorBuildChain(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	chain := visitor.BuildChain([]java.Tree{cu})
-	if chain == nil || chain.Value() != cu || chain.Parent() != nil {
-		t.Fatalf("expected single-element chain rooted at cu; got parent=%v value=%v", chain.Parent(), chain.Value())
-	}
+	require.False(t, chain == nil || chain.Value() != cu || chain.Parent() != nil)
 
 	chain2 := visitor.BuildChain(nil)
-	if chain2 != nil {
-		t.Fatalf("expected nil chain for empty input, got %v", chain2)
-	}
+	require.Nil(t, chain2)
 }
 
 // TestVisitorCursorState confirms that GoVisitor exposes its cursor as
@@ -48,9 +44,7 @@ func TestCursorBuildChain(t *testing.T) {
 // it from inside any Visit* override.
 func TestVisitorCursorState(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\nfunc f(){}\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	v := &cursorObservingVisitor{}
 	visitor.Init(v)
@@ -62,12 +56,8 @@ func TestVisitorCursorState(t *testing.T) {
 	}
 
 	v.Visit(cu, recipe.NewExecutionContext())
-	if !v.observedCU {
-		t.Fatal("VisitCompilationUnit was never invoked")
-	}
-	if v.cuCursor == nil || v.cuCursor.Value() != cu {
-		t.Fatalf("expected v.Cursor().Value() == cu inside VisitCompilationUnit; got %v", v.cuCursor)
-	}
+	require.True(t, v.observedCU)
+	require.False(t, v.cuCursor == nil || v.cuCursor.Value() != cu)
 }
 
 type cursorObservingVisitor struct {

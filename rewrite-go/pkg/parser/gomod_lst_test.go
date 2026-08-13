@@ -18,6 +18,8 @@ package parser
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 )
 
@@ -26,13 +28,9 @@ import (
 func roundTrip(t *testing.T, content string) {
 	t.Helper()
 	gm, err := ParseGoModFile("go.mod", content)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 	got := printer.PrintGoMod(gm)
-	if got != content {
-		t.Fatalf("not lossless\n--- want ---\n%q\n--- got ---\n%q", content, got)
-	}
+	require.Equal(t, content, got)
 }
 
 func TestGoModLossless(t *testing.T) {

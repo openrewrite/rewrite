@@ -21,28 +21,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
 func prepareRecipe(t *testing.T, s *server, id string) string {
 	t.Helper()
 	params, err := json.Marshal(prepareRecipeRequest{ID: id})
-	if err != nil {
-		t.Fatalf("marshal prepare request: %v", err)
-	}
+	require.NoError(t, err)
 	resp, rpcErr := s.handlePrepareRecipe(params)
-	if rpcErr != nil {
-		t.Fatalf("handlePrepareRecipe returned error: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr)
 	return resp.(prepareRecipeResponse).ID
 }
 
 func visit(t *testing.T, s *server, visitor string) (any, *rpcError) {
 	t.Helper()
 	params, err := json.Marshal(visitRequest{Visitor: visitor, TreeID: "tree-1", SourceFileType: "Go"})
-	if err != nil {
-		t.Fatalf("marshal visit request: %v", err)
-	}
+	require.NoError(t, err)
 	return s.handleVisit(params)
 }
 

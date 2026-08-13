@@ -19,6 +19,8 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -29,9 +31,7 @@ import (
 func firstDeclaration(t *testing.T, src string) java.Statement {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("decl.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	if len(cu.Statements) == 0 {
 		t.Fatalf("no top-level statements parsed")
 	}
@@ -71,19 +71,11 @@ func TestMethodWithReceiverIsWrapped(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *golang.MethodDeclaration, got %T", decl)
 	}
-	if wrapper.Declaration == nil {
-		t.Fatalf("wrapper must carry the inner *java.MethodDeclaration")
-	}
-	if len(wrapper.Receiver.Elements) != 1 {
-		t.Fatalf("expected a single receiver element, got %d", len(wrapper.Receiver.Elements))
-	}
+	require.NotNil(t, wrapper.Declaration)
+	require.Len(t, wrapper.Receiver.Elements, 1)
 	// The prefix (the blank line before `func`) belongs on the outermost node.
-	if wrapper.Prefix.Whitespace != "\n\n" {
-		t.Fatalf("expected wrapper to carry the prefix %q, got %q", "\n\n", wrapper.Prefix.Whitespace)
-	}
-	if wrapper.Declaration.Prefix.Whitespace != "" || len(wrapper.Declaration.Prefix.Comments) != 0 {
-		t.Fatalf("inner declaration must be prefix-less, got %+v", wrapper.Declaration.Prefix)
-	}
+	require.Equal(t, "\n\n", wrapper.Prefix.Whitespace)
+	require.False(t, wrapper.Declaration.Prefix.Whitespace != "" || len(wrapper.Declaration.Prefix.Comments) != 0)
 }
 
 // With the prefix on the wrapper but `//go:` directives still on the inner

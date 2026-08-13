@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -59,9 +61,7 @@ func parseInProject(t *testing.T, root string, modulePath string, requires []str
 	p := parser.NewGoParser()
 	p.Importer = pi
 	cu, err := p.Parse(sourcePath, src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	return cu
 }
 

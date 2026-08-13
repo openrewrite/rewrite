@@ -16,7 +16,10 @@
 
 package rpc
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/require"
+)
 
 // A changed ref-deduplicated slot is re-added under a fresh ref, never CHANGEd
 // (see Send for why).
@@ -33,9 +36,7 @@ func TestChangedRefSlotIsReAddedInsteadOfChanged(t *testing.T) {
 	// A repeat of the same transition dedups against the ref registered by the re-add
 	q.Send(AsRef(t2), AsRef(t1), nil)
 
-	if len(q.batch) != 3 {
-		t.Fatalf("batch length = %d, want 3", len(q.batch))
-	}
+	require.Len(t, q.batch, 3)
 	for i, d := range q.batch {
 		if d.State != Add {
 			t.Fatalf("batch[%d].State = %v, want Add", i, d.State)

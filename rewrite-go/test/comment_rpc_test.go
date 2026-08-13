@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
 )
@@ -26,9 +28,7 @@ import (
 func TestCommentSendsTextCommentValueType(t *testing.T) {
 	// given
 	cu, err := parser.NewGoParser().Parse("test.go", "package main\n\n// hello\nfunc hello() {\n}\n")
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// when
 	var messages []rpc.RpcObjectData
@@ -54,7 +54,5 @@ func TestCommentSendsTextCommentValueType(t *testing.T) {
 			foundTextComment = true
 		}
 	}
-	if !foundTextComment {
-		t.Fatal("expected at least one RPC message with valueType org.openrewrite.java.tree.TextComment")
-	}
+	require.True(t, foundTextComment)
 }

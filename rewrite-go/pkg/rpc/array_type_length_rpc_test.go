@@ -19,6 +19,8 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -32,9 +34,7 @@ func TestArrayTypeLengthSurvivesPrintRoundTrip(t *testing.T) {
 	// given: a Go file using a fixed-size array type `[5]int`
 	src := "package main\n\nfunc process(data [5]int) {\n}\n"
 	cu, err := parser.NewGoParser().Parse("a.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err)
 	if got := printer.Print(cu); got != src {
 		t.Fatalf("parse-print idempotence failed:\n got=%q\nwant=%q", got, src)
 	}

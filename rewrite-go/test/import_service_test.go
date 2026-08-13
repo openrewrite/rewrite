@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
@@ -31,9 +33,7 @@ import (
 // pkg/recipe/golang triggers registration of *golang.ImportService.
 func TestImportService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.ImportService](nil)
-	if svc == nil {
-		t.Fatal("recipe.Service returned nil for *golang.ImportService")
-	}
+	require.NotNil(t, svc)
 }
 
 // addStringsImportRecipe is a recipe that uses ImportService via

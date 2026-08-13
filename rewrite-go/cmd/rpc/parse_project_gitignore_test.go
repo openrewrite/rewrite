@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
@@ -48,9 +50,7 @@ func TestParseProjectExcludesGitIgnored(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err)
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
