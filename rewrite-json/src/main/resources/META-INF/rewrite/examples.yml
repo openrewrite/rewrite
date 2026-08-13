@@ -112,7 +112,6 @@ examples:
 - description: '`DeleteKeyTest#deleteNestedKey`'
   parameters:
   - $.metadata.name
-  - 'null'
   sources:
   - before: |
       {
