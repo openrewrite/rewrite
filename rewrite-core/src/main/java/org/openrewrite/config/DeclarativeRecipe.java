@@ -130,10 +130,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     result.add(subRecipe);
                 } else {
                     initValidation = initValidation.and(
-                            invalid(name + ".recipeList" +
-                                    "[" + i + "] (in " + source + ")",
+                            invalid(name + ".recipeList[" + i + "] (in " + source + ")",
                                     recipeFqn,
-                                    "recipe '" + recipeFqn + "' does not exist.",
+                                    "refers to a recipe that doesn't exist.",
                                     null));
                 }
             } else {
