@@ -25,14 +25,6 @@ jobs:
       java_version: |
         25
         21
-      # Mirror the sidecar packages `publish` just built into the Code Genome Project package
-      # repositories, alongside npmjs, PyPI and nuget.org. Name and version are read from the
-      # tarball / wheel / .nupkg themselves, so no version handoff is involved. Each of these is
-      # produced by a packaging task `publish` depends on unconditionally, so the mirror keeps
-      # working if any of the three public registry pushes is retired.
-      cgp_npm_artifacts: rewrite-javascript/build/distributions/openrewrite-rewrite-*.tgz
-      cgp_pypi_artifacts: rewrite-python/rewrite/dist/*
-      cgp_nuget_artifacts: rewrite-csharp/csharp/dist/*.nupkg
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
@@ -44,7 +36,10 @@ jobs:
       OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
+      # Maven dual-publish (Gradle's s3:// transport) and npm/PyPI/NuGet publishing respectively:
+      # two separate mechanisms, either of which can be switched off on its own.
       cgp_aws_access_key_id: ${{ secrets.CGP_AWS_ACCESS_KEY_ID }}
       cgp_aws_secret_access_key: ${{ secrets.CGP_AWS_SECRET_ACCESS_KEY }}
+      cgp_publish_token: ${{ secrets.CGP_PUBLISH_TOKEN }}
       cgp_artifacts_maven_username: ${{ secrets.CGP_ARTIFACTS_MAVEN_USERNAME }}
       cgp_artifacts_maven_token: ${{ secrets.CGP_ARTIFACTS_MAVEN_TOKEN }}

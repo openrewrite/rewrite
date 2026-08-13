@@ -388,16 +388,79 @@ val pythonPublish by tasks.registering(Exec::class) {
     }
 }
 
-// The distributable is built whenever we publish, regardless of where it is going: the Code
-// Genome Project mirror uploads dist/ and must not depend on the PyPI push existing.
+// Null when the property is absent OR blank, for the same reason pypiToken() is.
+fun cgpPublishToken(): String? =
+    project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
+
+// Task to publish to the Code Genome Project
+val pythonPublishCgp by tasks.registering {
+    group = "python"
+    description = "Publish Python package to the Code Genome Project"
+
+    dependsOn(pythonBuild)
+
+    doLast {
+        val token = cgpPublishToken()
+            ?: throw GradleException("cgpPublishToken property is required for Code Genome Project publishing")
+        // A named repository rather than --repository-url, which twine resolves *instead of* the
+        // config file (utils._config_from_repository_url) and so would force the token onto argv.
+        val pypirc = temporaryDir.resolve("pypirc")
+        pypirc.writeText("""
+            [distutils]
+            index-servers = codegenome
+
+            [codegenome]
+            repository = https://artifacts.codegenomeproject.org/pypi/
+            username = __token__
+            password = $token
+        """.trimIndent())
+
+        // One twine per file, because twine abandons the run on the first failure and a file that
+        // is already published must not stop the others. --skip-existing is not available: twine 7
+        // refuses it for any non-PyPI repository before making a request (see
+        // Settings.verify_feature_capability), so the 409 a re-run of this build earns is tolerated
+        // here instead.
+        val alreadyPublished = Regex("""HTTPError: 409\b""")
+        val dists = pythonDir.resolve("dist").listFiles()?.filter { it.isFile }?.sorted().orEmpty()
+        if (dists.isEmpty()) {
+            throw GradleException("No distributions to publish in ${pythonDir.resolve("dist")}")
+        }
+        for (dist in dists) {
+            val builder = ProcessBuilder(
+                pythonExe.absolutePath, "-m", "twine", "upload",
+                "--config-file", pypirc.absolutePath,
+                "--repository", "codegenome",
+                dist.absolutePath
+            ).directory(pythonDir).redirectErrorStream(true)
+            builder.environment()["COLUMNS"] = "200"   // twine word-wraps its errors to this width
+            val process = builder.start()
+            val output = process.inputStream.bufferedReader().readText()
+            val exit = process.waitFor()
+            logger.lifecycle(output)
+            if (exit != 0 && !alreadyPublished.containsMatchIn(output)) {
+                throw GradleException("Publishing ${dist.name} to the Code Genome Project failed (exit $exit)")
+            }
+        }
+        logger.lifecycle("Published ${dists.size} distribution(s) to the Code Genome Project (version: $pythonVersion)")
+    }
+}
+
+// The distributable is built whenever we publish, regardless of where it is going.
 tasks.named("publish") {
     dependsOn(pythonBuild)
 }
 
-// Only the push is gated on the credential, so retiring PyPI is deleting this block and the secret.
+// Only the pushes are gated, each on its own credential, so retiring a destination is deleting one
+// block and one secret.
 if (pypiToken() != null) {
     tasks.named("publish") {
         dependsOn(pythonPublish)
+    }
+}
+
+if (cgpPublishToken() != null) {
+    tasks.named("publish") {
+        dependsOn(pythonPublishCgp)
     }
 }
 

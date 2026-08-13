@@ -1,11 +1,10 @@
 ---
 name: npm-publish
 
-# npmjs, and nothing else. The Code Genome Project npm mirror used to run from here (it was the
-# only place the dist-tag was known); it now runs from `ci`/`publish` off the tarball `publish`
-# builds, symmetrically with the PyPI and NuGet mirrors. So this workflow exists solely because
-# npm's OIDC Trusted Publishing binds a package to a single workflow filename, and it can be
-# deleted wholesale — file and secret — when npmjs publishing is retired.
+# npmjs, and nothing else — the Code Genome Project npm publish is the `npmPublishCgp` task that
+# `ci`/`publish` already runs. This workflow exists solely because npm's OIDC Trusted Publishing
+# binds a package to a single workflow filename, and it can be deleted wholesale when npmjs
+# publishing is retired.
 #
 # Publishes after `ci` succeeds for any non-PR event on main (push, manual
 # dispatch, or the daily schedule), or `publish` succeeds for a version tag.

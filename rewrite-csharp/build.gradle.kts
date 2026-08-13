@@ -373,6 +373,54 @@ val csharpPublish by tasks.registering(Exec::class) {
     }
 }
 
+// Null when the property is absent OR blank, for the same reason nugetApiKey() is.
+fun cgpPublishToken(): String? =
+    project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
+
+// Task to publish NuGet packages to the Code Genome Project
+val csharpPublishCgp by tasks.registering(Exec::class) {
+    group = "csharp"
+    description = "Publish C# NuGet packages to the Code Genome Project"
+
+    dependsOn(csharpPack)
+
+    workingDir = csharpDir
+
+    doFirst {
+        val token = cgpPublishToken()
+            ?: throw GradleException("cgpPublishToken property is required for Code Genome Project publishing")
+        // `dotnet nuget push` resolves the PackagePublish resource from the service index first,
+        // over the SOURCE's stored credentials — --api-key rides on the push alone — and that index
+        // is 401-on-anonymous. Hence a throwaway config naming a source that carries credentials.
+        val config = temporaryDir.resolve("NuGet.config")
+        config.writeText("""
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="codegenome" value="https://artifacts.codegenomeproject.org/nuget/v3/index.json" />
+              </packageSources>
+              <packageSourceCredentials>
+                <codegenome>
+                  <add key="Username" value="cgp" />
+                  <add key="ClearTextPassword" value="$token" />
+                </codegenome>
+              </packageSourceCredentials>
+            </configuration>
+        """.trimIndent())
+        commandLine(
+            findDotnet(), "nuget", "push",
+            "dist/*.nupkg",
+            "--source", "codegenome",
+            "--configfile", config.absolutePath,
+            "--api-key", token,
+            // Keys off the 409 the repository answers on a version it already holds.
+            "--skip-duplicate"
+        )
+        logger.lifecycle("Publishing C# NuGet packages to the Code Genome Project (version: $nugetVersion)")
+    }
+}
+
 // Task to publish the C# SDK library to a local NuGet feed for cross-repo development.
 // Usage: ./gradlew :rewrite-csharp:csharpPublishLocal
 val csharpPublishLocal by tasks.registering {
@@ -476,16 +524,22 @@ tasks.named("publishToMavenLocal") {
     dependsOn(csharpPublishLocal)
 }
 
-// The .nupkg files are packed whenever we publish, regardless of where they are going: the Code
-// Genome Project mirror uploads dist/ and must not depend on the nuget.org push existing.
+// The .nupkg files are packed whenever we publish, regardless of where they are going.
 tasks.named("publish") {
     dependsOn(csharpPack)
 }
 
-// Only the push is gated on the credential, so retiring nuget.org is deleting this block.
+// Only the pushes are gated, each on its own credential, so retiring a destination is deleting one
+// block and one secret.
 if (nugetApiKey() != null) {
     tasks.named("publish") {
         dependsOn(csharpPublish)
+    }
+}
+
+if (cgpPublishToken() != null) {
+    tasks.named("publish") {
+        dependsOn(csharpPublishCgp)
     }
 }
 

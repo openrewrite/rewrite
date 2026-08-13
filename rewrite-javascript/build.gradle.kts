@@ -245,9 +245,8 @@ testing {
     }
 }
 
-// The tarball is built whenever we publish, regardless of where it is going: the Code Genome
-// Project mirror uploads it and must not depend on the npmjs push, which is not a Gradle task at
-// all (see npm-publish.yml) and so has no credential gate to pair this with.
+// The tarball is built whenever we publish, regardless of where it is going: the npmjs push is not
+// a Gradle task at all (see npm-publish.yml) and so has no credential gate to pair this with.
 tasks.named("publish") {
     dependsOn(npmPack)
 }
@@ -297,6 +296,57 @@ val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVers
 
 tasks.named("publish") {
     finalizedBy(recordPublishedSnapshotVersion)
+}
+
+// Null when the property is absent OR blank: the release workflow sets
+// ORG_GRADLE_PROJECT_cgpPublishToken unconditionally, so a deleted secret still defines it as "".
+fun cgpPublishToken(): String? =
+    project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
+
+val npmPublishCgp by tasks.registering {
+    group = "javascript"
+    description = "Publish the npm tarball to the Code Genome Project"
+
+    dependsOn(npmPack)
+
+    doLast {
+        val token = cgpPublishToken()
+            ?: throw GradleException("cgpPublishToken property is required for Code Genome Project publishing")
+        // The auth key is the registry URL with the scheme stripped, trailing slash included. If
+        // the two ever disagree npm quietly sends no credential and the publish 401s.
+        val npmrc = temporaryDir.resolve("npmrc")
+        npmrc.writeText("//artifacts.codegenomeproject.org/npm/:_authToken=$token\n")
+
+        val tarball = npmPack.get().archiveFile.get().asFile
+        // SemVer: a prerelease version goes to `next`, so neither a snapshot nor an -rc. can claim
+        // `latest`. Read off the tarball's own version, which is the one being published.
+        val version = npmPack.get().archiveVersion.get()
+        val distTag = if (version.substringBefore('+').contains('-')) "next" else "latest"
+
+        val builder = ProcessBuilder(
+            if (System.getProperty("os.name").lowercase().contains("windows")) "npm.cmd" else "npm",
+            "publish", tarball.absolutePath,
+            "--registry=https://artifacts.codegenomeproject.org/npm/",
+            "--tag", distTag
+        ).directory(projectDir).redirectErrorStream(true)
+        builder.environment()["npm_config_userconfig"] = npmrc.absolutePath
+        val process = builder.start()
+        val output = process.inputStream.bufferedReader().readText()
+        val exit = process.waitFor()
+        logger.lifecycle(output)
+        // npm has no --skip-duplicate, and a re-run of the same commit resolves to the same version,
+        // so the 409 the repository answers on a version it already holds is tolerated here.
+        if (exit != 0 && !output.contains("E409")) {
+            throw GradleException("Publishing ${tarball.name} to the Code Genome Project failed (exit $exit)")
+        }
+        logger.lifecycle("Published ${tarball.name} to the Code Genome Project (dist-tag: $distTag)")
+    }
+}
+
+if (cgpPublishToken() != null) {
+    tasks.named("publish") {
+        dependsOn(npmPublishCgp)
+    }
 }
 
 // ============================================

@@ -18,13 +18,6 @@ jobs:
       java_version: |
         25
         21
-      # As in ci.yml — the same artifacts, on the release path. An `-rc.` tag needs no special
-      # casing here: the action reads the version out of the artifact and tags a prerelease
-      # `kind=snapshot` so the bucket's 180-day lifecycle rule can reclaim it. (npm's dist-tag
-      # does turn on it, and publish-gradle.yml derives that from the tag.)
-      cgp_npm_artifacts: rewrite-javascript/build/distributions/openrewrite-rewrite-*.tgz
-      cgp_pypi_artifacts: rewrite-python/rewrite/dist/*
-      cgp_nuget_artifacts: rewrite-csharp/csharp/dist/*.nupkg
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
@@ -37,5 +30,8 @@ jobs:
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
       cgp_artifacts_maven_username: ${{ secrets.CGP_ARTIFACTS_MAVEN_USERNAME }}
       cgp_artifacts_maven_token: ${{ secrets.CGP_ARTIFACTS_MAVEN_TOKEN }}
+      # Maven dual-publish (Gradle's s3:// transport) and npm/PyPI/NuGet publishing respectively:
+      # two separate mechanisms, either of which can be switched off on its own.
       cgp_aws_access_key_id: ${{ secrets.CGP_AWS_ACCESS_KEY_ID }}
       cgp_aws_secret_access_key: ${{ secrets.CGP_AWS_SECRET_ACCESS_KEY }}
+      cgp_publish_token: ${{ secrets.CGP_PUBLISH_TOKEN }}
