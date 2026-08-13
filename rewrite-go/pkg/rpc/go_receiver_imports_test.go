@@ -85,7 +85,7 @@ func TestCoerceRightPaddedTyped_NonMatchingElementFallsBack(t *testing.T) {
 	var wire any = java.RightPadded[java.Expression]{Element: makeIdent("x"), After: java.EmptySpace, Markers: java.Markers{}}
 
 	got := coerceRightPaddedTyped[*java.Import](wire)
-	assert.Nil(t, got.Element)
+	assert.Nil(t, got.Element, "want nil Element on fallback")
 }
 
 func TestRawCastPanics_ContainerImportFromExpression(t *testing.T) {
@@ -113,8 +113,8 @@ func TestCompilationUnitRoundTrip_EmptyImports(t *testing.T) {
 	got := roundTripNode(t, before, seed).(*golang.CompilationUnit)
 
 	// then: Imports stays a *Container[*Import].
-	require.NotNil(t, got.Imports)
-	assert.Len(t, got.Imports.Elements, 0)
+	require.NotNil(t, got.Imports, "Imports: got nil, want empty *Container[*Import]")
+	assert.Len(t, got.Imports.Elements, 0, "Imports.Elements")
 }
 
 func TestCompilationUnitRoundTrip_WithImports(t *testing.T) {
@@ -136,10 +136,10 @@ func TestCompilationUnitRoundTrip_WithImports(t *testing.T) {
 	got := roundTripNode(t, before, seed).(*golang.CompilationUnit)
 
 	// then: both imports survive, typed as *Import.
-	require.NotNil(t, got.Imports)
-	require.Len(t, got.Imports.Elements, 2)
+	require.NotNil(t, got.Imports, "Imports: got nil, want non-nil")
+	require.Len(t, got.Imports.Elements, 2, "Imports.Elements")
 	gotImp0 := got.Imports.Elements[0].Element
-	require.NotNil(t, gotImp0)
+	require.NotNil(t, gotImp0, "Imports[0]: got nil *Import")
 	if lit, ok := gotImp0.Qualid.(*java.Literal); !ok || lit.Value != "fmt" {
 		t.Errorf("Imports[0].Qualid: got %+v, want literal \"fmt\"", gotImp0.Qualid)
 	}
@@ -152,5 +152,5 @@ func TestCompilationUnitRoundTrip_NilImports(t *testing.T) {
 	seed := &golang.CompilationUnit{ID: cuID}
 
 	got := roundTripNode(t, before, seed).(*golang.CompilationUnit)
-	assert.Nil(t, got.Imports)
+	assert.Nilf(t, got.Imports, "Imports: got %+v, want nil", got.Imports)
 }

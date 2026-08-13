@@ -35,7 +35,7 @@ func parsedNames(t *testing.T, buildCtx build.Context, files []parser.FileInput)
 	t.Helper()
 	p := parser.NewGoParserWithBuildContext(buildCtx)
 	cus, err := p.ParsePackage(files)
-	require.NoError(t, err)
+	require.NoError(t, err, "ParsePackage")
 	out := make([]string, 0, len(cus))
 	for _, cu := range cus {
 		out = append(out, cu.SourcePath)
@@ -76,11 +76,11 @@ func TestBuildTags_FilenameSuffix(t *testing.T) {
 	}
 	got := parsedNames(t, ctx("linux", "amd64"), files)
 	want := []string{"extra_amd64.go", "extra_linux.go", "extra_linux_amd64.go", "main.go"}
-	assert.True(t, equal(got, want))
+	assert.True(t, equal(got, want), "on linux/amd")
 
 	got = parsedNames(t, ctx("darwin", "arm64"), files)
 	want = []string{"main.go"}
-	assert.True(t, equal(got, want))
+	assert.True(t, equal(got, want), "on darwin/arm")
 }
 
 // Case 3: combined constraints — `//go:build linux && amd64`.

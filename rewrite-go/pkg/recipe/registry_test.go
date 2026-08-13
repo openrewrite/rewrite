@@ -18,6 +18,7 @@ package recipe
 
 import (
 	"testing"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,14 +68,10 @@ func TestRegisterResolvesCompositeChildren(t *testing.T) {
 	// Children with '$' in their names resolve and round-trip correctly.
 	for _, child := range []string{"com.example.Composite$Keep", "com.example.Composite$Negate"} {
 		reg, ok := r.FindRecipe(child)
-		if !ok {
-			t.Fatalf("expected child recipe %q to resolve via FindRecipe", child)
-		}
+		require.Truef(t, ok, "expected child recipe %q to resolve via FindRecipe", child)
 		inst := reg.Constructor(nil)
-		if inst == nil {
-			t.Fatalf("expected child recipe %q constructor to return an instance", child)
-		}
-		assert.Equal(t, inst.Name(), child)
+		require.NotNilf(t, inst, "expected child recipe %q constructor to return an instance", child)
+		assert.Equalf(t, inst.Name(), child, "child %q resolved to instance with name", child)
 	}
 }
 
@@ -91,23 +88,17 @@ func TestCompositeChildrenNotInMarketplace(t *testing.T) {
 	}
 
 	for _, reg := range r.AllRegistrations() {
-		if childNames[reg.Descriptor.Name] {
-			t.Errorf("child recipe %q must not appear in AllRegistrations (marketplace)", reg.Descriptor.Name)
-		}
+		assert.Falsef(t, childNames[reg.Descriptor.Name], "child recipe %q must not appear in AllRegistrations (marketplace)", reg.Descriptor.Name)
 	}
 	for _, desc := range r.AllRecipes() {
-		if childNames[desc.Name] {
-			t.Errorf("child recipe %q must not appear in AllRecipes", desc.Name)
-		}
+		assert.Falsef(t, childNames[desc.Name], "child recipe %q must not appear in AllRecipes", desc.Name)
 	}
 
 	// And not in the category tree.
 	var walk func(c *Category)
 	walk = func(c *Category) {
 		for _, reg := range c.Recipes {
-			if childNames[reg.Descriptor.Name] {
-				t.Errorf("child recipe %q must not appear in the category tree", reg.Descriptor.Name)
-			}
+			assert.Falsef(t, childNames[reg.Descriptor.Name], "child recipe %q must not appear in the category tree", reg.Descriptor.Name)
 		}
 		for _, sub := range c.Subcategories {
 			walk(sub)

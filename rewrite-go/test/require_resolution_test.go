@@ -33,10 +33,10 @@ func TestProjectImporterStubsRequiredModule(t *testing.T) {
 	pi.AddRequire("github.com/x/y")
 
 	pkg, err := pi.Import("github.com/x/y")
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-	assert.Equal(t, "github.com/x/y", pkg.Path())
-	assert.Equal(t, "y", pkg.Name())
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "expected stub package, got nil")
+	assert.Equalf(t, "github.com/x/y", pkg.Path(), "Path: want %q", "github.com/x/y")
+	assert.Equalf(t, "y", pkg.Name(), "Name: want %q", "y")
 }
 
 func TestProjectImporterStubMatchesSubPath(t *testing.T) {
@@ -46,9 +46,9 @@ func TestProjectImporterStubMatchesSubPath(t *testing.T) {
 	// `import "github.com/x/y/sub"` should also stub-resolve, because the
 	// require covers the whole module subtree.
 	pkg, err := pi.Import("github.com/x/y/sub")
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-	assert.Equal(t, "sub", pkg.Name())
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "expected stub package for sub-path, got nil")
+	assert.Equalf(t, "sub", pkg.Name(), "Name: want %q", "sub")
 }
 
 func TestProjectImporterUnknownPathFallsThroughToError(t *testing.T) {
@@ -76,7 +76,7 @@ func TestGoProjectThirdPartyImportResolves(t *testing.T) {
 		// identifier should now have a non-nil Type. Without require-driven
 		// stubbing this would be nil.
 		ids := collectIdentTypes(cu)
-		assert.NotNil(t,ids["y"])
+		assert.NotNil(t,ids["y"], "expected `y` import identifier to have a non-nil Type via the require stub; got nil")
 	}
 
 	spec := test.NewRecipeSpec()

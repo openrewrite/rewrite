@@ -66,7 +66,7 @@ func (*goCompositeInvalidChild) RecipeList() []recipe.Recipe {
 func prepareErr(t *testing.T, s *server, id string) *rpcError {
 	t.Helper()
 	params, err := json.Marshal(prepareRecipeRequest{ID: id})
-	require.NoError(t, err)
+	require.NoError(t, err, "marshal prepare request")
 	_, rpcErr := s.handlePrepareRecipe(params)
 	return rpcErr
 }
@@ -77,8 +77,8 @@ func TestPrepareRecipeRejectsMissingRequiredOption(t *testing.T) {
 
 	rpcErr := prepareErr(t, s, "org.openrewrite.go.test.RequiresOpt")
 
-	require.NotNil(t, rpcErr)
-	assert.False(t, !strings.Contains(rpcErr.Message, "Missing required option") || !strings.Contains(rpcErr.Message, "text"))
+	require.NotNil(t, rpcErr, "expected a missing-required-option error, got success")
+	assert.Falsef(t, !strings.Contains(rpcErr.Message, "Missing required option") || !strings.Contains(rpcErr.Message, "text"), "error %q does not report the missing `text` option", rpcErr.Message)
 }
 
 // Validation recurses through the whole prepared tree (like the C#, JS, and Python servers).
@@ -88,8 +88,8 @@ func TestPrepareRecipeValidatesChildRequiredOptions(t *testing.T) {
 
 	rpcErr := prepareErr(t, s, "org.openrewrite.go.test.CompositeInvalid")
 
-	require.NotNil(t, rpcErr)
-	assert.False(t, !strings.Contains(rpcErr.Message, "Missing required option") || !strings.Contains(rpcErr.Message, "text"))
+	require.NotNil(t, rpcErr, "expected a missing-required-option error for the child, got success")
+	assert.Falsef(t, !strings.Contains(rpcErr.Message, "Missing required option") || !strings.Contains(rpcErr.Message, "text"), "error %q does not report the child's missing `text` option", rpcErr.Message)
 }
 
 func TestPrepareRecipeReturnsWholeChildTree(t *testing.T) {
@@ -97,12 +97,12 @@ func TestPrepareRecipeReturnsWholeChildTree(t *testing.T) {
 	s.registry.Register(&goCompositeRecipe{})
 
 	params, err := json.Marshal(prepareRecipeRequest{ID: "org.openrewrite.go.test.Composite"})
-	require.NoError(t, err)
+	require.NoError(t, err, "marshal prepare request")
 	resp, rpcErr := s.handlePrepareRecipe(params)
-	require.Nil(t, rpcErr)
+	require.Nil(t, rpcErr, "handlePrepareRecipe error")
 
 	pr := resp.(prepareRecipeResponse)
-	require.Len(t, pr.RecipeList, 1)
+	require.Len(t, pr.RecipeList, 1, "expected 1 prepared child")
 	if got := pr.RecipeList[0].Descriptor.Name; got != "org.openrewrite.go.test.Leaf" {
 		t.Errorf("expected child Leaf, got %q", got)
 	}
@@ -143,12 +143,12 @@ func TestPrepareRecipeSameTypeChildrenPreserveDistinctOptions(t *testing.T) {
 	s.registry.Register(&goCompositeSameType{})
 
 	params, err := json.Marshal(prepareRecipeRequest{ID: "org.openrewrite.go.test.CompositeSameType"})
-	require.NoError(t, err)
+	require.NoError(t, err, "marshal prepare request")
 	resp, rpcErr := s.handlePrepareRecipe(params)
-	require.Nil(t, rpcErr)
+	require.Nil(t, rpcErr, "handlePrepareRecipe error")
 
 	pr := resp.(prepareRecipeResponse)
-	require.Len(t, pr.RecipeList, 3)
+	require.Len(t, pr.RecipeList, 3, "expected 3 prepared children")
 
 	ids := map[string]bool{}
 	var texts []any
@@ -165,8 +165,8 @@ func TestPrepareRecipeSameTypeChildrenPreserveDistinctOptions(t *testing.T) {
 	}
 
 	// Each child is prepared as its own instance (distinct id)...
-	assert.Len(t, ids, 3)
+	assert.Len(t, ids, 3, "expected 3 distinct child ids")
 	// ...retaining its own distinct option value, in the order the composite declared them.
 	want := []any{"a", "b", "c"}
-	assert.True(t, reflect.DeepEqual(texts, want))
+	assert.True(t, reflect.DeepEqual(texts, want), "expected child option values")
 }

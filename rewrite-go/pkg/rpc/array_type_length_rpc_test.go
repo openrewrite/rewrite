@@ -34,7 +34,7 @@ func TestArrayTypeLengthSurvivesPrintRoundTrip(t *testing.T) {
 	// given: a Go file using a fixed-size array type `[5]int`
 	src := "package main\n\nfunc process(data [5]int) {\n}\n"
 	cu, err := parser.NewGoParser().Parse("a.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse")
 	if got := printer.Print(cu); got != src {
 		t.Fatalf("parse-print idempotence failed:\n got=%q\nwant=%q", got, src)
 	}

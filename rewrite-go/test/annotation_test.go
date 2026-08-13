@@ -90,7 +90,7 @@ func TestAnnotation_VisitorRoundtripIdentity(t *testing.T) {
 
 	v := visitor.Init(&visitor.GoVisitor{})
 	out := v.Visit(ann, nil)
-	require.NotNil(t, out)
+	require.NotNil(t, out, "visitor returned nil")
 	got := printer.Print(out.(java.Tree))
 	want := ` json:"user_id"`
 	assert.Equal(t, want, got)

@@ -86,12 +86,12 @@ func StartJavaRpcClient(t *testing.T, recipes []RecipeEntry) *JavaRpcClient {
 	)
 
 	stdin, err := cmd.StdinPipe()
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get stdin pipe")
 	stdout, err := cmd.StdoutPipe()
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get stdout pipe")
 	cmd.Stderr = os.Stderr
 
-	require.NoError(t, cmd.Start())
+	require.NoError(t, cmd.Start(), "failed to start Java RPC server")
 
 	client := &JavaRpcClient{
 		process: cmd,
@@ -278,7 +278,7 @@ func writeMarketplaceCSV(t *testing.T, recipes []RecipeEntry) string {
 	t.Helper()
 
 	tmpFile, err := os.CreateTemp("", "marketplace-*.csv")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create marketplace CSV")
 	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
 
 	w := csv.NewWriter(tmpFile)

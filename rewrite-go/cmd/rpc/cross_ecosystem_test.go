@@ -58,9 +58,9 @@ func (*goCompositeWithJavaChild) RecipeList() []recipe.Recipe {
 func prepareOK(t *testing.T, s *server, id string) prepareRecipeResponse {
 	t.Helper()
 	params, err := json.Marshal(prepareRecipeRequest{ID: id})
-	require.NoError(t, err)
+	require.NoError(t, err, "marshal prepare request")
 	resp, rpcErr := s.handlePrepareRecipe(params)
-	require.Nil(t, rpcErr)
+	require.Nil(t, rpcErr, "handlePrepareRecipe error")
 	return resp.(prepareRecipeResponse)
 }
 
@@ -72,7 +72,7 @@ func TestPrepareRecipeRootDelegatesToJavaRecipe(t *testing.T) {
 
 	pr := prepareOK(t, s, "org.openrewrite.go.test.Delegating")
 
-	require.NotNil(t, pr.DelegatesTo)
+	require.NotNil(t, pr.DelegatesTo, "expected delegatesTo to be set, got nil")
 	if got := pr.DelegatesTo.RecipeName; got != "org.openrewrite.java.ChangeType" {
 		t.Errorf("delegatesTo.recipeName = %q, want org.openrewrite.java.ChangeType", got)
 	}
@@ -80,8 +80,8 @@ func TestPrepareRecipeRootDelegatesToJavaRecipe(t *testing.T) {
 		"oldFullyQualifiedTypeName": "a.A",
 		"newFullyQualifiedTypeName": "b.B",
 	}
-	assert.True(t, reflect.DeepEqual(pr.DelegatesTo.Options, want))
-	assert.Len(t, pr.RecipeList, 0)
+	assert.True(t, reflect.DeepEqual(pr.DelegatesTo.Options, want), "delegatesTo.options")
+	assert.Lenf(t, pr.RecipeList, 0, "a delegating recipe carries no child tree, got %d children", len(pr.RecipeList))
 }
 
 // A composite's child that delegates to a Java recipe is emitted inside the prepared recipeList as
@@ -94,10 +94,10 @@ func TestPrepareRecipeCompositeChildDelegatesToJavaRecipe(t *testing.T) {
 
 	pr := prepareOK(t, s, "org.openrewrite.go.test.CompositeWithJavaChild")
 
-	assert.Nil(t, pr.DelegatesTo)
-	require.Len(t, pr.RecipeList, 1)
+	assert.Nil(t, pr.DelegatesTo, "the composite itself should not delegate")
+	require.Len(t, pr.RecipeList, 1, "expected 1 prepared child")
 	child := pr.RecipeList[0]
-	require.NotNil(t, child.DelegatesTo)
+	require.NotNil(t, child.DelegatesTo, "expected the child to carry delegatesTo, got nil")
 	if got := child.DelegatesTo.RecipeName; got != "org.openrewrite.java.ChangeType" {
 		t.Errorf("child delegatesTo.recipeName = %q, want org.openrewrite.java.ChangeType", got)
 	}

@@ -132,10 +132,8 @@ func main() {
 	v.Visit(cu, nil)
 
 	typ, ok := v.identTypes["a"]
-	require.True(t, ok)
+	require.True(t, ok, "no type attribution for a")
 	cls, ok := typ.(*java.JavaTypeClass)
-	if !ok {
-		t.Fatalf("any: type is %T, want *JavaTypeClass (empty interface)", typ)
-	}
-	assert.Equal(t, "Interface", cls.Kind)
+	require.Truef(t, ok, "any: type is %T, want *JavaTypeClass (empty interface)", typ)
+	assert.Equalf(t, "Interface", cls.Kind, "any: Kind = %q, want %q", cls.Kind, "Interface")
 }

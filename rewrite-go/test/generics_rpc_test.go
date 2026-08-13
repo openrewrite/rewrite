@@ -60,16 +60,14 @@ func TestGenericFuncTypeParametersSurviveRpc(t *testing.T) {
 	} {
 		// given
 		cu, err := parser.NewGoParser().Parse("x.go", src)
-		require.NoError(t, err)
+		require.NoError(t, err, "parse error")
 
 		// when
 		got := rpcRoundTrip(t, cu)
 
 		// then
 		md := got.Statements[0].Element.(*java.MethodDeclaration)
-		if md.TypeParameters == nil {
-			t.Fatalf("type parameters lost over RPC for %q", src)
-		}
+		require.NotNilf(t, md.TypeParameters, "type parameters lost over RPC for %q", src)
 		if printed := printer.Print(got); printed != src {
 			t.Errorf("RPC round-trip mismatch\nexpected:\n%s\nactual:\n%s", src, printed)
 		}
@@ -88,17 +86,15 @@ func TestGenericCallTypeArgumentsSurviveRpc(t *testing.T) {
 	} {
 		// given
 		cu, err := parser.NewGoParser().Parse("x.go", tc.src)
-		require.NoError(t, err)
+		require.NoError(t, err, "parse error")
 
 		// when
 		got := rpcRoundTrip(t, cu)
 
 		// then
 		mi := findFirstCallInMain(t, got)
-		if mi.TypeParameters == nil {
-			t.Fatalf("call-site type arguments lost over RPC for %q", tc.src)
-		}
-		assert.Len(t, mi.TypeParameters.Elements, tc.count)
+		require.NotNilf(t, mi.TypeParameters, "call-site type arguments lost over RPC for %q", tc.src)
+		assert.Lenf(t, mi.TypeParameters.Elements, tc.count, "expected %d type arguments, got %d for", tc.count, len(mi.TypeParameters.Elements))
 		if printed := printer.Print(got); printed != tc.src {
 			t.Errorf("RPC round-trip mismatch\nexpected:\n%s\nactual:\n%s", tc.src, printed)
 		}
@@ -137,16 +133,14 @@ func TestGenericTypeDeclTypeParametersSurviveRpc(t *testing.T) {
 	} {
 		// given
 		cu, err := parser.NewGoParser().Parse("x.go", src)
-		require.NoError(t, err)
+		require.NoError(t, err, "parse error")
 
 		// when
 		got := rpcRoundTrip(t, cu)
 
 		// then
 		td := got.Statements[0].Element.(*golang.TypeDecl)
-		if td.TypeParameters == nil {
-			t.Fatalf("type parameters lost over RPC for %q", src)
-		}
+		require.NotNilf(t, td.TypeParameters, "type parameters lost over RPC for %q", src)
 		if printed := printer.Print(got); printed != src {
 			t.Errorf("RPC round-trip mismatch\nexpected:\n%s\nactual:\n%s", src, printed)
 		}

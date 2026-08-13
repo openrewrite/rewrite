@@ -44,15 +44,13 @@ func TestMergeResolvedDependencies(t *testing.T) {
 	merged := MergeResolvedDependencies(fromSum, fromList)
 
 	// then: the build-list node is authoritative and inherits the go.sum hashes
-	require.Len(t, merged, 2)
+	require.Len(t, merged, 2, "want 2 entries (1 build-list + 1 stale sum")
 	got := merged[0]
-	require.False(t, got.ModulePath != "github.com/a/b" || got.Version != "v1.0.0")
-	assert.False(t, !got.Indirect || got.ModuleGoVersion != "1.20" || len(got.Deps) != 1)
-	assert.False(t, got.ModuleHash != "h1:mod=" || got.GoModHash != "h1:gomod=")
+	require.False(t, got.ModulePath != "github.com/a/b" || got.Version != "v1.0.0", "first entry should be the selected build-list node")
+	assert.False(t, !got.Indirect || got.ModuleGoVersion != "1.20" || len(got.Deps) != 1, "build-list metadata not preserved")
+	assert.False(t, got.ModuleHash != "h1:mod=" || got.GoModHash != "h1:gomod=", "go.sum hashes not inherited onto build-list node")
 	// and: the superseded go.sum row is preserved
-	if merged[1].Version != "v0.9.0" || merged[1].ModuleHash != "h1:stale=" {
-		t.Errorf("stale go.sum row should be preserved, got %+v", merged[1])
-	}
+	assert.Falsef(t, merged[1].Version != "v0.9.0" || merged[1].ModuleHash != "h1:stale=", "stale go.sum row should be preserved, got %+v", merged[1])
 }
 
 func TestMergeResolvedDependenciesEmpty(t *testing.T) {
@@ -61,7 +59,7 @@ func TestMergeResolvedDependenciesEmpty(t *testing.T) {
 
 	// then
 	merged := MergeResolvedDependencies(fromSum, nil)
-	require.False(t, len(merged) != 1 || merged[0].ModuleHash != "h1:x=")
+	require.False(t, len(merged) != 1 || merged[0].ModuleHash != "h1:x=", "go.sum-only merge should pass through")
 	if got := MergeResolvedDependencies(nil, nil); len(got) != 0 {
 		t.Errorf("empty inputs should yield empty, got %+v", got)
 	}
@@ -82,12 +80,8 @@ func TestAttachEdges(t *testing.T) {
 	attachEdges(mods, edges)
 
 	// then
-	if len(mods[0].Deps) != 1 || mods[0].Deps[0].ModulePath != "github.com/a/b" {
-		t.Fatalf("edge not attached to source node: %+v", mods[0].Deps)
-	}
-	if len(mods[1].Deps) != 0 {
-		t.Errorf("node with no outgoing edges should have no Deps: %+v", mods[1].Deps)
-	}
+	require.Falsef(t, len(mods[0].Deps) != 1 || mods[0].Deps[0].ModulePath != "github.com/a/b", "edge not attached to source node: %+v", mods[0].Deps)
+	assert.Lenf(t, mods[1].Deps, 0, "node with no outgoing edges should have no Deps: %+v", mods[1].Deps)
 }
 
 func TestSplitModuleVersion(t *testing.T) {
@@ -113,7 +107,7 @@ func TestResolveModuleGraphStdlibOnly(t *testing.T) {
 
 	// when
 	mods, pkgs, err := ResolveModuleGraph(dir)
-	require.NoError(t, err)
+	require.NoError(t, err, "resolve failed")
 
 	// then: the build list contains the main module
 	var main *golang.GoResolvedDependency
@@ -122,10 +116,8 @@ func TestResolveModuleGraphStdlibOnly(t *testing.T) {
 			main = &mods[i]
 		}
 	}
-	if main == nil {
-		t.Fatalf("main module missing from build list: %+v", mods)
-	}
-	assert.True(t, main.Main)
+	require.NotNilf(t, main, "main module missing from build list: %+v", mods)
+	assert.True(t, main.Main, "main module should have Main=true")
 
 	// and: the package map classifies stdlib and the main package
 	var sawStdlib, sawMain bool
@@ -137,17 +129,11 @@ func TestResolveModuleGraphStdlibOnly(t *testing.T) {
 			sawMain = true
 		}
 	}
-	if !sawStdlib {
-		t.Errorf("expected stdlib package fmt with Standard=true in %+v", pkgs)
-	}
-	if !sawMain {
-		t.Errorf("expected the main package mapped to its module in %+v", pkgs)
-	}
+	assert.Truef(t, sawStdlib, "expected stdlib package fmt with Standard=true in %+v", pkgs)
+	assert.Truef(t, sawMain, "expected the main package mapped to its module in %+v", pkgs)
 }
 
 func writeFile(t *testing.T, dir, name, content string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-		t.Fatalf("write %s: %v", name, err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644), "write")
 }

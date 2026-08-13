@@ -34,12 +34,8 @@ func vendorScaffold(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for rel, content := range files {
 		full := filepath.Join(root, rel)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", full, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", full, err)
-		}
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755), "mkdir")
+		require.NoError(t, os.WriteFile(full, []byte(content), 0o644), "write")
 	}
 }
 
@@ -61,7 +57,7 @@ func parseInProject(t *testing.T, root string, modulePath string, requires []str
 	p := parser.NewGoParser()
 	p.Importer = pi
 	cu, err := p.Parse(sourcePath, src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse")
 	return cu
 }
 

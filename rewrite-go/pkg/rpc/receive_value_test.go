@@ -52,5 +52,5 @@ func TestReceiveValue_DeleteReturnsNil(t *testing.T) {
 	before := makeIdent("x")
 	got := receiveValue(queueOf(RpcObjectData{State: Delete}), java.Expression(before),
 		func(e java.Expression) any { return e })
-	assert.Nil(t, got)
+	assert.Nil(t, got, "DELETE: want nil")
 }

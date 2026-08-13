@@ -54,8 +54,8 @@ func TestJavaReceiverVisitIfUsesExistingElsePartAsReceiveBaseline(t *testing.T) 
 
 	got := NewGoReceiver().VisitIf(before, q).(*java.If)
 
-	require.NotNil(t, got.ElsePart)
-	require.True(t, reflect.DeepEqual(got.ElsePart.Prefix, beforeElsePadding))
+	require.NotNil(t, got.ElsePart, "ElsePart: got nil, want non-nil")
+	require.True(t, reflect.DeepEqual(got.ElsePart.Prefix, beforeElsePadding), "ElsePart.Prefix")
 	if got.ElsePart.Body.Element != beforeElseBody {
 		t.Fatalf("ElsePart.Body.Element: got %p, want existing body %p", got.ElsePart.Body.Element, beforeElseBody)
 	}

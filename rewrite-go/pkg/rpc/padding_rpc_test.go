@@ -76,7 +76,7 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	got := coerceToStatementRP(wire)
 
 	// then: the element survives, now typed as Statement
-	require.NotNil(t, got.Element)
+	require.NotNil(t, got.Element, "Element nil after coerce")
 	if got.Element.(*java.MethodInvocation) != mi {
 		t.Errorf("Element identity lost: want %p, got %p", mi, got.Element)
 	}

@@ -39,8 +39,8 @@ func TestGoProjectTagsGoSiblingsButNotMod(t *testing.T) {
 	goSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		project, ok := findGoProject(cu.Markers)
-		require.True(t, ok)
-		require.Equal(t, "foo", project.ProjectName)
+		require.True(t, ok, "expected GoProject marker on .go file but none was attached")
+		require.Equalf(t, "foo", project.ProjectName, "expected GoProject name=%q", "foo")
 	}
 
 	spec := test.NewRecipeSpec()

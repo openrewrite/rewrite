@@ -57,14 +57,14 @@ func TestIsProxyFetchError(t *testing.T) {
 		got := isProxyFetchError(tc.err)
 
 		// then
-		assert.Equal(t, tc.want, got)
+		assert.Equal(t, tc.want, got, "isProxyFetchError")
 	}
 }
 
 func writeGoMod(t *testing.T, contents string) string {
 	t.Helper()
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(contents), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(contents), 0o644), "write go.mod")
 	return dir
 }
 
@@ -96,7 +96,7 @@ require (
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	assert.Equal(t, "v1.2.3", got)
+	assert.Equal(t, "v1.2.3", got, "expected v")
 }
 
 func TestReadResolvedVersion_IndirectRequireInBlock(t *testing.T) {
@@ -115,7 +115,7 @@ require (
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	assert.Equal(t, "v1.2.3", got)
+	assert.Equal(t, "v1.2.3", got, "expected v")
 }
 
 func TestReadResolvedVersion_SingleLineRequire(t *testing.T) {
@@ -132,7 +132,7 @@ require github.com/foo/bar v1.2.3
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	assert.Equal(t, "v1.2.3", got)
+	assert.Equal(t, "v1.2.3", got, "expected v")
 }
 
 func TestReadResolvedVersion_PrefixCollision(t *testing.T) {
@@ -152,5 +152,5 @@ require (
 	got := inst.readResolvedVersion("github.com/foo/bar")
 
 	// then
-	assert.Equal(t, "v1.2.3", got)
+	assert.Equal(t, "v1.2.3", got, "expected v1.2.3 (the exact match, not the prefix-collision sibling")
 }

@@ -28,9 +28,9 @@ import (
 func roundTrip(t *testing.T, content string) {
 	t.Helper()
 	gm, err := ParseGoModFile("go.mod", content)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 	got := printer.PrintGoMod(gm)
-	require.Equal(t, content, got)
+	require.Equal(t, content, got, "not lossless")
 }
 
 func TestGoModLossless(t *testing.T) {

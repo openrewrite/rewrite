@@ -29,7 +29,7 @@ import (
 
 func TestNamingService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.NamingService](nil)
-	require.NotNil(t, svc)
+	require.NotNil(t, svc, "recipe.Service returned nil for *golang.NamingService")
 }
 
 func TestNamingService_ToPascalCase(t *testing.T) {
@@ -109,9 +109,9 @@ func TestNamingService_IsValidIdentifier(t *testing.T) {
 func TestNamingService_IsPredeclared(t *testing.T) {
 	svc := &recipes.NamingService{}
 	for _, name := range []string{"int", "string", "true", "false", "nil", "iota", "len", "make", "new", "any", "comparable", "min", "max", "clear", "error"} {
-		assert.True(t, svc.IsPredeclared(name))
+		assert.Truef(t, svc.IsPredeclared(name), "IsPredeclared(%q) = false, want true", name)
 	}
 	for _, name := range []string{"Foo", "foo", "MyType", "Println", "func", "if"} {
-		assert.False(t, svc.IsPredeclared(name))
+		assert.Falsef(t, svc.IsPredeclared(name), "IsPredeclared(%q) = true, want false", name)
 	}
 }

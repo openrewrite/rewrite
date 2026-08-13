@@ -38,9 +38,9 @@ func applyVisitor(t *testing.T, src string, v recipe.TreeVisitor) string {
 	t.Helper()
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 	result := v.Visit(cu, nil)
-	require.NotNil(t, result)
+	require.NotNil(t, result, "visit returned nil")
 
 	final := visitor.DrainAfterVisits(v, result.(java.Tree), nil)
 	return printer.Print(final)
@@ -48,7 +48,7 @@ func applyVisitor(t *testing.T, src string, v recipe.TreeVisitor) string {
 
 func TestAutoFormatService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.AutoFormatService](nil)
-	require.NotNil(t, svc)
+	require.NotNil(t, svc, "expected AutoFormatService to be registered, got nil")
 }
 
 func TestRemoveTrailingWhitespace_StripsTrailingTabsFromLines(t *testing.T) {

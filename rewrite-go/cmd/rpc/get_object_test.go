@@ -31,14 +31,14 @@ import (
 func getObjectParams(t *testing.T, id string) json.RawMessage {
 	t.Helper()
 	params, err := json.Marshal(getObjectRequest{ID: id})
-	require.NoError(t, err)
+	require.NoError(t, err, "marshal GetObject params")
 	return params
 }
 
 func getObjectBatchForTest(t *testing.T, s *server, params json.RawMessage) []rpc.RpcObjectData {
 	t.Helper()
 	result, rpcErr := s.handleGetObject(params)
-	require.Nil(t, rpcErr)
+	require.Nil(t, rpcErr, "GetObject failed")
 	return result.([]rpc.RpcObjectData)
 }
 
@@ -58,7 +58,7 @@ func getCompleteObjectForTest(t *testing.T, s *server, id string) []rpc.RpcObjec
 func getObjectTreeForTest(t *testing.T) java.Tree {
 	t.Helper()
 	cu, err := goparser.NewGoParser().Parse("main.go", "package main\n")
-	require.NoError(t, err)
+	require.NoError(t, err, "parse test source")
 	return cu
 }
 
@@ -72,7 +72,7 @@ func TestHandleGetObjectReturnsOneBatchPerRequest(t *testing.T) {
 	params := getObjectParams(t, id)
 
 	first := getObjectBatchForTest(t, s, params)
-	require.False(t, len(first) != s.batchSize || first[0].State != rpc.Add)
+	require.Falsef(t, len(first) != s.batchSize || first[0].State != rpc.Add, "first batch = %+v, want a full batch beginning with ADD", first)
 	if _, complete := s.remoteObjects[id]; complete {
 		t.Fatal("remote baseline was updated before END_OF_OBJECT was delivered")
 	}
@@ -122,9 +122,7 @@ func TestHandleGetObjectBatchesAreConsumedByReceiveQueue(t *testing.T) {
 		return v
 	})
 	gotTree, ok := got.(java.Tree)
-	if !ok {
-		t.Fatalf("received object = %T, want java.Tree", got)
-	}
+	require.Truef(t, ok, "received object = %T, want java.Tree", got)
 	if printed := printer.Print(gotTree); printed != want {
 		t.Fatalf("received source = %q, want %q", printed, want)
 	}
@@ -147,7 +145,7 @@ func TestHandleGetObjectReusesReferencesAcrossTransfers(t *testing.T) {
 
 	getCompleteObjectForTest(t, s, "first")
 	refsAfterFirst := s.localRefs.Len()
-	require.NotEqual(t, 0, refsAfterFirst)
+	require.NotEqual(t, 0, refsAfterFirst, "first transfer did not retain any references")
 
 	second := getCompleteObjectForTest(t, s, "second")
 	if got := s.localRefs.Len(); got != refsAfterFirst {
@@ -188,7 +186,7 @@ func TestHandleGetObjectRejectsInterleavedTransfers(t *testing.T) {
 			break
 		}
 	}
-	require.Len(t, s.inProgressGetObjects, 0)
+	require.Len(t, s.inProgressGetObjects, 0, "in-progress GetObjects after completion")
 	getCompleteObjectForTest(t, s, "second")
 }
 
@@ -202,6 +200,6 @@ func TestResetCancelsInProgressGetObject(t *testing.T) {
 	_ = getObjectBatchForTest(t, s, params)
 
 	s.handleReset()
-	require.Len(t, s.inProgressGetObjects, 0)
-	require.False(t, len(s.localObjects) != 0 || len(s.remoteObjects) != 0)
+	require.Len(t, s.inProgressGetObjects, 0, "in-progress transfers after Reset")
+	require.False(t, len(s.localObjects) != 0 || len(s.remoteObjects) != 0, "Reset did not clear object state")
 }

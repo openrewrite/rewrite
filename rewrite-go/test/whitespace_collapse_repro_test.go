@@ -60,7 +60,7 @@ func locateIfThenBlock(t *testing.T, root java.Tree) *java.Block {
 	t.Helper()
 	loc := visitor.Init(&ifThenBlockLocator{})
 	loc.Visit(root, nil)
-	require.NotNil(t, loc.block)
+	require.NotNil(t, loc.block, "could not locate the if-then block in the parsed tree")
 	return loc.block
 }
 
@@ -71,7 +71,7 @@ func TestNoOpVisitPreservesUntouchedBlockIdentity(t *testing.T) {
 	// given
 	p := parser.NewGoParser()
 	cu, err := p.Parse("bind.go", collapseReproSrc)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 	before := locateIfThenBlock(t, cu)
 
 	// when

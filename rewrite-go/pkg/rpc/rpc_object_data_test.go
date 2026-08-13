@@ -34,20 +34,14 @@ func TestDecodeBatch_DecodesTypedFields(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	require.NoError(t, err)
-	require.Len(t, batch, 3)
-	if batch[0].State != Add || batch[0].ValueType == nil || *batch[0].ValueType != "org.openrewrite.marker.SearchResult" || batch[0].Ref == nil || *batch[0].Ref != 7 {
-		t.Fatalf("message 0 decoded wrong: %+v", batch[0])
-	}
+	require.NoError(t, err, "unexpected error")
+	require.Len(t, batch, 3, "expected 3 messages")
+	require.Falsef(t, batch[0].State != Add || batch[0].ValueType == nil || *batch[0].ValueType != "org.openrewrite.marker.SearchResult" || batch[0].Ref == nil || *batch[0].Ref != 7, "message 0 decoded wrong: %+v", batch[0])
 	if m, ok := batch[0].Value.(map[string]any); !ok || m["id"] != "x" {
 		t.Fatalf("message 0 value not a decoded map: %#v", batch[0].Value)
 	}
-	if batch[1].State != NoChange || batch[1].Value != nil {
-		t.Fatalf("message 1 decoded wrong: %+v", batch[1])
-	}
-	if batch[2].State != Change || batch[2].Value != " " {
-		t.Fatalf("message 2 decoded wrong: %+v", batch[2])
-	}
+	require.Falsef(t, batch[1].State != NoChange || batch[1].Value != nil, "message 1 decoded wrong: %+v", batch[1])
+	require.Falsef(t, batch[2].State != Change || batch[2].Value != " ", "message 2 decoded wrong: %+v", batch[2])
 }
 
 func TestDecodeBatch_InternsDuplicateStrings(t *testing.T) {
@@ -63,13 +57,13 @@ func TestDecodeBatch_InternsDuplicateStrings(t *testing.T) {
 	batch, err := DecodeBatch(data, intern)
 
 	// then
-	require.NoError(t, err)
+	require.NoError(t, err, "unexpected error")
 	s0 := batch[0].Value.(string)
 	s1 := batch[1].Value.(string)
 	nested := batch[2].Value.(map[string]any)
 	sa := nested["a"].(string)
 	sb := nested["b"].(string)
-	require.False(t, s0 != "\n\t" || s1 != "\n\t" || sa != "\n\t" || sb != "\n\t")
+	require.False(t, s0 != "\n\t" || s1 != "\n\t" || sa != "\n\t" || sb != "\n\t", "interning corrupted values")
 	for _, s := range []string{s1, sa, sb} {
 		if strData(s0) != strData(s) {
 			t.Fatalf("duplicate string not interned to shared backing")
@@ -85,8 +79,8 @@ func TestDecodeBatch_NilInternKeepsDistinctBacking(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	require.NoError(t, err)
-	require.False(t, batch[0].Value.(string) != "dup" || batch[1].Value.(string) != "dup")
+	require.NoError(t, err, "unexpected error")
+	require.False(t, batch[0].Value.(string) != "dup" || batch[1].Value.(string) != "dup", "values decoded wrong without interning")
 }
 
 func strData(s string) unsafe.Pointer {

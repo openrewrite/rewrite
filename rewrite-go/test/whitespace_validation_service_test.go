@@ -35,7 +35,7 @@ import (
 // importing pkg/recipe/golang registers the service.
 func TestWhitespaceValidationService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.WhitespaceValidationService](nil)
-	require.NotNil(t, svc)
+	require.NotNil(t, svc, "recipe.Service returned nil for *golang.WhitespaceValidationService")
 }
 
 // TestWhitespaceValidationService_CleanTree confirms a freshly parsed
@@ -44,12 +44,12 @@ func TestWhitespaceValidationService_CleanTree(t *testing.T) {
 	src := "package main\n\nfunc main() {\n\tprintln(\"hi\")\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse")
 	svc := &recipes.WhitespaceValidationService{}
 	if errs := svc.Validate(cu); len(errs) != 0 {
 		t.Fatalf("expected clean tree to validate, got %d errs:\n%s", len(errs), strings.Join(errs, "\n"))
 	}
-	assert.True(t, svc.IsValid(cu))
+	assert.True(t, svc.IsValid(cu), "IsValid disagrees with Validate on a clean tree")
 }
 
 // TestWhitespaceValidationService_DetectsCorruption hand-crafts a tree
@@ -64,10 +64,8 @@ func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 	if len(errs) == 0 {
 		t.Fatal("expected validator to flag non-whitespace in Space.Whitespace")
 	}
-	if !strings.Contains(errs[0], "non-whitespace") {
-		t.Errorf("error should mention non-whitespace, got: %s", errs[0])
-	}
-	assert.False(t, svc.IsValid(cu))
+	assert.Truef(t, strings.Contains(errs[0], "non-whitespace"), "error should mention non-whitespace, got: %s", errs[0])
+	assert.False(t, svc.IsValid(cu), "IsValid should be false when Validate returned errors")
 }
 
 // TestWhitespaceValidationService_DetectsBadComment crafts a Comment

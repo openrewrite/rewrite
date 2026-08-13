@@ -40,12 +40,12 @@ func TestVisitorReturningNilDoesNotPanic(t *testing.T) {
 	src := "package main\n\nfunc foo() int {\n\treturn 1\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 
 	v := visitor.Init(&deletingVisitor{})
 	// This should not panic even though VisitReturn returns nil.
 	result := v.Visit(cu, nil)
-	require.NotNil(t, result)
+	require.NotNil(t, result, "visitor returned nil for compilation unit")
 }
 
 type importCountingVisitor struct {
@@ -62,11 +62,11 @@ func TestVisitorVisitsImports(t *testing.T) {
 	src := "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 
 	v := visitor.Init(&importCountingVisitor{})
 	v.Visit(cu, nil)
-	assert.Equal(t, 2, v.count)
+	assert.Equal(t, 2, v.count, "expected 2 imports visited")
 }
 
 type identCountingVisitor struct {
@@ -85,7 +85,7 @@ func TestVisitorVisitsPackageDecl(t *testing.T) {
 	src := "package pkg\n\nfunc foo() {\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 
 	v := visitor.Init(&identCountingVisitor{})
 	v.Visit(cu, nil)
@@ -97,7 +97,5 @@ func TestVisitorVisitsPackageDecl(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Errorf("visitor did not visit package decl identifier 'pkg'; visited: %v", v.names)
-	}
+	assert.Truef(t, found, "visitor did not visit package decl identifier 'pkg'; visited: %v", v.names)
 }

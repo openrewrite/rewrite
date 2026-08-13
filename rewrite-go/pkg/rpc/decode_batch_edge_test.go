@@ -29,8 +29,8 @@ func TestDecodeBatch_EmptyArray(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	require.NoError(t, err)
-	require.Len(t, batch, 0)
+	require.NoError(t, err, "unexpected error")
+	require.Len(t, batch, 0, "expected empty batch")
 }
 
 func TestDecodeBatch_NullPayload(t *testing.T) {
@@ -41,8 +41,8 @@ func TestDecodeBatch_NullPayload(t *testing.T) {
 	batch, err := DecodeBatch(data, nil)
 
 	// then
-	require.NoError(t, err)
-	require.Len(t, batch, 0)
+	require.NoError(t, err, "unexpected error")
+	require.Len(t, batch, 0, "expected empty batch for null")
 }
 
 func TestDecodeBatch_NonArrayIsError(t *testing.T) {
@@ -53,7 +53,7 @@ func TestDecodeBatch_NonArrayIsError(t *testing.T) {
 	_, err := DecodeBatch(data, nil)
 
 	// then
-	require.Error(t, err)
+	require.Error(t, err, "expected error for non-array payload")
 }
 
 func TestDecodeBatch_StreamsManyMessages(t *testing.T) {
@@ -64,8 +64,8 @@ func TestDecodeBatch_StreamsManyMessages(t *testing.T) {
 	batch, err := DecodeBatch(data, make(map[string]string))
 
 	// then
-	require.NoError(t, err)
-	require.Len(t, batch, 500)
+	require.NoError(t, err, "unexpected error")
+	require.Len(t, batch, 500, "expected 500 messages")
 	if positions, ok := batch[2].Value.([]any); !ok || len(positions) != 5 {
 		t.Fatalf("message 2 positions not decoded as a list: %#v", batch[2].Value)
 	}

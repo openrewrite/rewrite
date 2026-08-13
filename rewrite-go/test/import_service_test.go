@@ -33,7 +33,7 @@ import (
 // pkg/recipe/golang triggers registration of *golang.ImportService.
 func TestImportService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.ImportService](nil)
-	require.NotNil(t, svc)
+	require.NotNil(t, svc, "recipe.Service returned nil for *golang.ImportService")
 }
 
 // addStringsImportRecipe is a recipe that uses ImportService via

@@ -154,23 +154,23 @@ func TestSearchRecipeWithMarkerPrinting(t *testing.T) {
 	// Print with default marker printer — should show search result comment
 	output := printer.PrintWithMarkers(result, printer.DefaultMarkerPrinter)
 	expected := "package main\n\nfunc /*~~(found foo)~~>*/foo() {\n}\n"
-	assert.Equal(t, expected, output)
+	assert.Equal(t, expected, output, "marker output mismatch")
 
 	// Print without markers — should be original source
 	plain := printer.Print(result)
-	assert.Equal(t, plain, src)
+	assert.Equal(t, plain, src, "plain print should match original source")
 
 	// Print with sanitized printer — should strip markers
 	sanitized := printer.PrintWithMarkers(result, printer.SanitizedMarkerPrinter)
-	assert.Equal(t, sanitized, src)
+	assert.Equal(t, sanitized, src, "sanitized print should match original source")
 }
 
 func TestRecipeDescriptor(t *testing.T) {
 	r := &findFoo{}
 	desc := recipe.Describe(r)
 
-	assert.Equal(t, "org.openrewrite.golang.test.FindFoo", desc.Name)
-	assert.Equal(t, "Find foo identifiers", desc.DisplayName)
+	assert.Equalf(t, "org.openrewrite.golang.test.FindFoo", desc.Name, "expected name %q", "org.openrewrite.golang.test.FindFoo")
+	assert.Equalf(t, "Find foo identifiers", desc.DisplayName, "expected displayName %q", "Find foo identifiers")
 	if desc.EstimatedEffortPerOccurrence != 5*time.Minute {
 		t.Errorf("expected 5 minute default effort, got %v", desc.EstimatedEffortPerOccurrence)
 	}
@@ -193,28 +193,20 @@ func TestRegistryActivate(t *testing.T) {
 	reg.Activate(activateSearch, activateRefactoring)
 
 	found, ok := reg.FindRecipe("org.openrewrite.golang.test.FindFoo")
-	require.True(t, ok)
-	assert.Equal(t, "Find foo identifiers", found.Descriptor.DisplayName)
+	require.True(t, ok, "expected to find FindFoo recipe")
+	assert.Equalf(t, "Find foo identifiers", found.Descriptor.DisplayName, "expected displayName %q", "Find foo identifiers")
 
 	// All recipes
 	all := reg.AllRecipes()
-	assert.Len(t, all, 2)
+	assert.Len(t, all, 2, "expected 2 recipes")
 
 	// Categories
 	cats := reg.Categories()
-	require.Len(t, cats, 1)
-	if cats[0].DisplayName != "Go" {
-		t.Errorf("expected top-level category 'Go', got %q", cats[0].DisplayName)
-	}
-	if len(cats[0].Recipes) != 1 {
-		t.Errorf("expected 1 recipe directly in Go category, got %d", len(cats[0].Recipes))
-	}
-	if len(cats[0].Subcategories) != 1 {
-		t.Fatalf("expected 1 subcategory in Go, got %d", len(cats[0].Subcategories))
-	}
-	if cats[0].Subcategories[0].DisplayName != "Search" {
-		t.Errorf("expected subcategory 'Search', got %q", cats[0].Subcategories[0].DisplayName)
-	}
+	require.Len(t, cats, 1, "expected 1 top-level category")
+	assert.Equalf(t, "Go", cats[0].DisplayName, "expected top-level category 'Go', got %q", cats[0].DisplayName)
+	assert.Lenf(t, cats[0].Recipes, 1, "expected 1 recipe directly in Go category, got %d", len(cats[0].Recipes))
+	require.Lenf(t, cats[0].Subcategories, 1, "expected 1 subcategory in Go, got %d", len(cats[0].Subcategories))
+	assert.Equalf(t, "Search", cats[0].Subcategories[0].DisplayName, "expected subcategory 'Search', got %q", cats[0].Subcategories[0].DisplayName)
 }
 
 func TestRegistryReflectConstructor(t *testing.T) {
@@ -225,11 +217,11 @@ func TestRegistryReflectConstructor(t *testing.T) {
 	})
 
 	found, ok := reg.FindRecipe("org.openrewrite.golang.test.RenameFooToBar")
-	require.True(t, ok)
+	require.True(t, ok, "expected to find recipe")
 
 	// Constructor auto-derived from prototype via reflection
 	instance := found.Constructor(nil)
-	assert.Equal(t, "org.openrewrite.golang.test.RenameFooToBar", instance.Name())
+	assert.Equal(t, "org.openrewrite.golang.test.RenameFooToBar", instance.Name(), "unexpected name")
 }
 
 func TestFencedMarkerPrinting(t *testing.T) {
@@ -246,7 +238,7 @@ func TestFencedMarkerPrinting(t *testing.T) {
 
 	// Print with fenced printer — should show {{uuid}} delimiters
 	output := printer.PrintWithMarkers(result, printer.FencedMarkerPrinter)
-	assert.NotEqual(t, output, src)
+	assert.NotEqual(t, output, src, "expected fenced markers in output, but output is unchanged")
 	// Fenced output should contain UUID-style markers
 	if len(output) <= len(src) {
 		t.Error("fenced output should be longer than original source")

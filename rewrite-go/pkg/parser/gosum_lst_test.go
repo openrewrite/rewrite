@@ -26,9 +26,9 @@ import (
 func roundTripSum(t *testing.T, content string) {
 	t.Helper()
 	gs, err := ParseGoSumFile("go.sum", content)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 	got := printer.PrintGoSum(gs)
-	require.Equal(t, content, got)
+	require.Equal(t, content, got, "not lossless")
 }
 
 func TestGoSumLossless(t *testing.T) {
@@ -79,14 +79,14 @@ func TestGoSumFields(t *testing.T) {
 
 	// when
 	gs, err := ParseGoSumFile("go.sum", content)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 
 	// then
-	require.Len(t, gs.Lines, 2)
+	require.Len(t, gs.Lines, 2, "expected 2 lines")
 	zip := gs.Lines[0].Element
-	require.False(t, zip.ModulePath != "github.com/a/b" || zip.Version != "v1.0.0" || zip.GoMod || zip.Hash != "h1:zip=")
+	require.False(t, zip.ModulePath != "github.com/a/b" || zip.Version != "v1.0.0" || zip.GoMod || zip.Hash != "h1:zip=", "zip line fields wrong")
 	mod := gs.Lines[1].Element
-	require.False(t, !mod.GoMod || mod.Hash != "h1:mod=")
+	require.False(t, !mod.GoMod || mod.Hash != "h1:mod=", "go.mod line fields wrong")
 }
 
 func TestGoSumMalformedLineErrors(t *testing.T) {

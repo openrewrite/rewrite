@@ -93,17 +93,13 @@ func TestAnnotationRpcRoundTrip_BasicTag(t *testing.T) {
 		t.Errorf("ID: got %s, want %s", got.ID, annID)
 	}
 	gotType, ok := got.AnnotationType.(*java.Identifier)
-	if !ok {
-		t.Fatalf("AnnotationType: got %T, want *Identifier", got.AnnotationType)
-	}
-	assert.Equal(t, "json", gotType.Name)
-	require.NotNil(t, got.Arguments)
-	require.Len(t, got.Arguments.Elements, 1)
+	require.Truef(t, ok, "AnnotationType: got %T, want *Identifier", got.AnnotationType)
+	assert.Equalf(t, "json", gotType.Name, "AnnotationType.Name: got %q, want %q", gotType.Name, "json")
+	require.NotNil(t, got.Arguments, "Arguments: got nil, want non-nil")
+	require.Len(t, got.Arguments.Elements, 1, "Arguments.Elements")
 	gotLit, ok := got.Arguments.Elements[0].Element.(*java.Literal)
-	if !ok {
-		t.Fatalf("Arguments[0]: got %T, want *Literal", got.Arguments.Elements[0].Element)
-	}
-	assert.Equal(t, `"name"`, gotLit.Source)
+	require.Truef(t, ok, "Arguments[0]: got %T, want *Literal", got.Arguments.Elements[0].Element)
+	assert.Equalf(t, `"name"`, gotLit.Source, "Arguments[0].Source: got %q, want %q", gotLit.Source, `"name"`)
 	if v, _ := gotLit.Value.(string); v != "name" {
 		t.Errorf("Arguments[0].Value: got %v, want %q", gotLit.Value, "name")
 	}
@@ -123,10 +119,8 @@ func TestAnnotationRpcRoundTrip_NoArguments(t *testing.T) {
 	seed := &java.Annotation{ID: annID}
 	got := roundTripNode(t, before, seed).(*java.Annotation)
 
-	assert.Nil(t, got.Arguments)
-	if !reflect.DeepEqual(got.AnnotationType.(*java.Identifier).Name, "go:noinline") {
-		t.Errorf("AnnotationType.Name: got %q, want %q", got.AnnotationType.(*java.Identifier).Name, "go:noinline")
-	}
+	assert.Nilf(t, got.Arguments, "Arguments: got %+v, want nil", got.Arguments)
+	assert.Truef(t, reflect.DeepEqual(got.AnnotationType.(*java.Identifier).Name, "go:noinline"), "AnnotationType.Name: got %q, want %q", got.AnnotationType.(*java.Identifier).Name, "go:noinline")
 }
 
 func TestAnnotationRpcRoundTrip_PrefixPreserved(t *testing.T) {
@@ -151,5 +145,5 @@ func TestAnnotationRpcRoundTrip_PrefixPreserved(t *testing.T) {
 	seed := &java.Annotation{ID: annID}
 	got := roundTripNode(t, before, seed).(*java.Annotation)
 
-	assert.Equal(t, " ", got.Prefix.Whitespace)
+	assert.Equalf(t, " ", got.Prefix.Whitespace, "Prefix.Whitespace: got %q, want %q", got.Prefix.Whitespace, " ")
 }

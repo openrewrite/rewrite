@@ -31,7 +31,7 @@ import (
 func firstDeclaration(t *testing.T, src string) java.Statement {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("decl.go", src)
-	require.NoError(t, err)
+	require.NoError(t, err, "parse")
 	if len(cu.Statements) == 0 {
 		t.Fatalf("no top-level statements parsed")
 	}
@@ -68,14 +68,12 @@ func TestMethodWithReceiverIsWrapped(t *testing.T) {
 
 	// then
 	wrapper, ok := decl.(*golang.MethodDeclaration)
-	if !ok {
-		t.Fatalf("expected *golang.MethodDeclaration, got %T", decl)
-	}
-	require.NotNil(t, wrapper.Declaration)
-	require.Len(t, wrapper.Receiver.Elements, 1)
+	require.Truef(t, ok, "expected *golang.MethodDeclaration, got %T", decl)
+	require.NotNil(t, wrapper.Declaration, "wrapper must carry the inner *java.MethodDeclaration")
+	require.Len(t, wrapper.Receiver.Elements, 1, "expected a single receiver element")
 	// The prefix (the blank line before `func`) belongs on the outermost node.
-	require.Equal(t, "\n\n", wrapper.Prefix.Whitespace)
-	require.False(t, wrapper.Declaration.Prefix.Whitespace != "" || len(wrapper.Declaration.Prefix.Comments) != 0)
+	require.Equalf(t, "\n\n", wrapper.Prefix.Whitespace, "expected wrapper to carry the prefix %q", "\n\n")
+	require.False(t, wrapper.Declaration.Prefix.Whitespace != "" || len(wrapper.Declaration.Prefix.Comments) != 0, "inner declaration must be prefix-less")
 }
 
 // With the prefix on the wrapper but `//go:` directives still on the inner

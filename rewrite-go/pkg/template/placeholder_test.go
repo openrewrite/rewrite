@@ -29,14 +29,12 @@ func TestToPlaceholder(t *testing.T) {
 
 func TestFromPlaceholder(t *testing.T) {
 	name, ok := FromPlaceholder("__plh_expr__")
-	assert.False(t, !ok || name != "expr")
+	assert.Falsef(t, !ok || name != "expr", "FromPlaceholder(\"__plh_expr__\") = (%q, %v), want (\"expr\", true)", name, ok)
 }
 
 func TestFromPlaceholderNotPlaceholder(t *testing.T) {
 	name, ok := FromPlaceholder("notPlaceholder")
-	if ok {
-		t.Errorf("FromPlaceholder(\"notPlaceholder\") = (%q, %v), want (\"\", false)", name, ok)
-	}
+	assert.Falsef(t, ok, "FromPlaceholder(\"notPlaceholder\") = (%q, %v), want (\"\", false)", name, ok)
 }
 
 func TestIsPlaceholder(t *testing.T) {

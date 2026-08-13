@@ -29,7 +29,7 @@ import (
 
 func TestSelfParseGoParser(t *testing.T) {
 	data, err := os.ReadFile("../pkg/parser/go_parser.go")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -37,7 +37,7 @@ func TestSelfParseGoParser(t *testing.T) {
 
 func TestSelfParseGoPrinter(t *testing.T) {
 	data, err := os.ReadFile("../pkg/printer/go_printer.go")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -45,7 +45,7 @@ func TestSelfParseGoPrinter(t *testing.T) {
 
 func TestSelfParseGoVisitor(t *testing.T) {
 	data, err := os.ReadFile("../pkg/visitor/go_visitor.go")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -53,7 +53,7 @@ func TestSelfParseGoVisitor(t *testing.T) {
 
 func TestSelfParseJTree(t *testing.T) {
 	data, err := os.ReadFile("../pkg/tree/java/j.go")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -61,7 +61,7 @@ func TestSelfParseJTree(t *testing.T) {
 
 func TestSelfParseGoTree(t *testing.T) {
 	data, err := os.ReadFile("../pkg/tree/golang/go.go")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)
@@ -69,7 +69,7 @@ func TestSelfParseGoTree(t *testing.T) {
 
 func TestSelfParseSpec(t *testing.T) {
 	data, err := os.ReadFile("../pkg/test/spec.go")
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to read file")
 	NewRecipeSpec().RewriteRun(t,
 		GolangRaw(string(data)),
 	)

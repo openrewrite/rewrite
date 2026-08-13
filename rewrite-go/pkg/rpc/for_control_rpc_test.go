@@ -45,7 +45,7 @@ func TestImplicitForClausesSurvivesRpcRoundTrip(t *testing.T) {
 		t.Run(src, func(t *testing.T) {
 			// given: a parsed for-loop that already prints back to its source
 			cu, err := parser.NewGoParser().Parse("f.go", src)
-			require.NoError(t, err)
+			require.NoError(t, err, "parse")
 			if got := printer.Print(cu); got != src {
 				t.Fatalf("parse-print idempotence failed:\n got=%q\nwant=%q", got, src)
 			}
@@ -61,9 +61,9 @@ func TestImplicitForClausesSurvivesRpcRoundTrip(t *testing.T) {
 			}
 			// ...and the control still carries the placeholders and the marker
 			control := firstForControl(t, rt)
-			assert.NotNil(t, control.Init)
-			assert.NotNil(t, control.Update)
-			assert.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers))
+			assert.NotNil(t, control.Init, "Init placeholder lost on round-trip")
+			assert.NotNil(t, control.Update, "Update placeholder lost on round-trip")
+			assert.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers), "ImplicitForClauses marker lost on round-trip")
 		})
 	}
 }
@@ -72,9 +72,7 @@ func TestImplicitForClausesSurvivesRpcRoundTrip(t *testing.T) {
 func firstForControl(t *testing.T, tree java.Tree) *java.ForControl {
 	t.Helper()
 	cu, ok := tree.(*golang.CompilationUnit)
-	if !ok {
-		t.Fatalf("expected *golang.CompilationUnit, got %T", tree)
-	}
+	require.Truef(t, ok, "expected *golang.CompilationUnit, got %T", tree)
 	for _, st := range cu.Statements {
 		fn, ok := st.Element.(*java.MethodDeclaration)
 		if !ok || fn.Body == nil {

@@ -88,8 +88,8 @@ func TestCursorComputeMessageIfAbsent(t *testing.T) {
 		calls++
 		return "second"
 	})
-	require.False(t, v1 != "computed" || v2 != "computed")
-	require.Equal(t, 1, calls)
+	require.Falsef(t, v1 != "computed" || v2 != "computed", "expected stable computed value, got v1=%v v", v1)
+	require.Equal(t, 1, calls, "expected supplier to fire once, fired")
 }
 
 func TestCursorPutMessageOnFirstEnclosing(t *testing.T) {

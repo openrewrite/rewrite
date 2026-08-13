@@ -157,5 +157,5 @@ func TestMultiAssignmentVisitsRHSMethodInvocation(t *testing.T) {
 	v.Visit(ma, nil)
 
 	// then
-	assert.False(t, len(rec.visited) != 1 || rec.visited[0] != "ReadAll")
+	assert.Falsef(t, len(rec.visited) != 1 || rec.visited[0] != "ReadAll", "expected RHS method invocation %q to be visited", "ReadAll")
 }

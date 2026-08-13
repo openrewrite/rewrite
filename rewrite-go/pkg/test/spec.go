@@ -277,9 +277,7 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 			continue
 		}
 		cus, err := p.ParsePackage(files)
-		if err != nil {
-			t.Fatalf("parse error in package %s: %v", dir, err)
-		}
+		require.NoErrorf(t, err, "parse error in package %s", dir)
 		for i, cu := range cus {
 			out[included[i].idx] = cu
 		}
@@ -608,7 +606,7 @@ func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedBy
 		// parse this file in isolation so two bare specs sharing a
 		// default Path don't clobber each other.
 		parsed, err := p.Parse(src.Path, src.Before)
-		require.NoError(t, err)
+		require.NoError(t, err, "parse error")
 		cu = parsed
 	}
 
@@ -651,7 +649,7 @@ func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	t.Helper()
 
 	gm, err := parser.ParseGoModFile(src.Path, src.Before)
-	require.NoError(t, err)
+	require.NoError(t, err, "go.mod parse error")
 
 	// Attach any markers contributed by GoProject(...) wrappers (e.g. the
 	// GoResolutionResult / GoProject markers) so recipes can read them.
@@ -673,7 +671,7 @@ func (spec *RecipeSpec) parseGoSum(t *testing.T, src SourceSpec) *golang.GoSum {
 	t.Helper()
 
 	gs, err := parser.ParseGoSumFile(src.Path, src.Before)
-	require.NoError(t, err)
+	require.NoError(t, err, "go.sum parse error")
 
 	for _, m := range src.Markers {
 		gs = gs.WithMarkers(java.AddMarker(gs.Markers, m))
@@ -694,17 +692,17 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	src := ps.spec
 
 	if ps.tree == nil {
-		assert.False(t, src.After != nil && *src.After != src.Before)
+		assert.Falsef(t, src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 		return
 	}
 
 	if spec.Recipe == nil {
-		assert.Nil(t, src.After)
+		assert.Nil(t, src.After, "after state specified but no recipe configured")
 		return
 	}
 
 	if ps.result == nil {
-		assert.Nil(t, src.After)
+		assert.Nil(t, src.After, "recipe returned nil (deleted source file) but expected an after state")
 		return
 	}
 
@@ -717,7 +715,7 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 		return
 	}
 	// No after state: expect no changes.
-	assert.Equal(t, src.Before, actual)
+	assert.Equal(t, src.Before, actual, "recipe made unexpected changes\n\nexpected (no change")
 }
 
 func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, generated []java.Tree) {
@@ -742,14 +740,10 @@ func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, gener
 			}
 			break
 		}
-		if !found {
-			t.Errorf("expected recipe to generate file %q, but it was not generated", gs.Path)
-		}
+		assert.Truef(t, found, "expected recipe to generate file %q, but it was not generated", gs.Path)
 	}
 	for j, gt := range generated {
-		if !matched[j] && gt != nil {
-			t.Errorf("recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", generatedSourcePath(gt))
-		}
+		assert.Falsef(t, !matched[j] && gt != nil, "recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", generatedSourcePath(gt))
 	}
 }
 

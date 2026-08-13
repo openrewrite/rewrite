@@ -52,9 +52,9 @@ func TestProjectImporterResolvesIntraProjectImport(t *testing.T) {
 	pi.AddSource("sub/sub.go", "package sub\n\nfunc Hello() string { return \"hi\" }\n")
 
 	pkg, err := pi.Import("example.com/foo/sub")
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-	assert.Equal(t, "sub", pkg.Name())
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "Import returned nil package")
+	assert.Equalf(t, "sub", pkg.Name(), "package name: want %q", "sub")
 	if hello := pkg.Scope().Lookup("Hello"); hello == nil {
 		t.Fatal("expected sub.Hello to be defined in the resolved package")
 	}
@@ -66,8 +66,8 @@ func TestProjectImporterResolvesIntraProjectImport(t *testing.T) {
 func TestProjectImporterFallsBackToStdlib(t *testing.T) {
 	pi := parser.NewProjectImporter("example.com/foo", nil)
 	pkg, err := pi.Import("fmt")
-	require.NoError(t, err)
-	require.False(t, pkg == nil || pkg.Name() != "fmt")
+	require.NoError(t, err, "stdlib fallback failed")
+	require.False(t, pkg == nil || pkg.Name() != "fmt", "expected pkg=fmt")
 }
 
 // TestGoProjectWiresImporterIntoHarness is the integration assertion: a
@@ -88,8 +88,8 @@ func TestGoProjectWiresImporterIntoHarness(t *testing.T) {
 		// these would all be nil because importer.Default() doesn't know
 		// about example.com/foo/sub.
 		identTypes := collectIdentTypes(cu)
-		assert.NotNil(t,identTypes["sub"])
-		assert.NotNil(t,identTypes["Hello"])
+		assert.NotNil(t,identTypes["sub"], "expected `sub` identifier in main.go to have a resolved Type, got nil")
+		assert.NotNil(t,identTypes["Hello"], "expected `Hello` identifier in main.go to have a resolved Type, got nil")
 	}
 
 	spec := test.NewRecipeSpec()

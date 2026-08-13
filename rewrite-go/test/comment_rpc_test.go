@@ -28,7 +28,7 @@ import (
 func TestCommentSendsTextCommentValueType(t *testing.T) {
 	// given
 	cu, err := parser.NewGoParser().Parse("test.go", "package main\n\n// hello\nfunc hello() {\n}\n")
-	require.NoError(t, err)
+	require.NoError(t, err, "parse error")
 
 	// when
 	var messages []rpc.RpcObjectData
@@ -54,5 +54,5 @@ func TestCommentSendsTextCommentValueType(t *testing.T) {
 			foundTextComment = true
 		}
 	}
-	require.True(t, foundTextComment)
+	require.True(t, foundTextComment, "expected at least one RPC message with valueType org.openrewrite.java.tree.TextComment")
 }

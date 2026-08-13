@@ -35,47 +35,39 @@ import (
 
 func TestScaffoldExpression(t *testing.T) {
 	source, _ := buildScaffold("1 + 2", nil, nil, ScaffoldExpression)
-	require.NotEqual(t, "", source)
+	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
-	if err != nil {
-		t.Fatalf("scaffold should parse: %v\nsource:\n%s", err, source)
-	}
+	require.NoErrorf(t, err, "scaffold should parse: %v\nsource:\n%s", err, source)
 }
 
 func TestScaffoldStatement(t *testing.T) {
 	source, _ := buildScaffold("x = 1", nil, nil, ScaffoldStatement)
-	require.NotEqual(t, "", source)
+	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
-	if err != nil {
-		t.Fatalf("scaffold should parse: %v\nsource:\n%s", err, source)
-	}
+	require.NoErrorf(t, err, "scaffold should parse: %v\nsource:\n%s", err, source)
 }
 
 func TestScaffoldWithCaptures(t *testing.T) {
 	caps := captureMap([]*Capture{Expr("x")})
 	source, count := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, ScaffoldExpression)
-	assert.Equal(t, 1, count)
+	assert.Equal(t, 1, count, "expected preamble count")
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
-	if err != nil {
-		t.Fatalf("scaffold with captures should parse: %v\nsource:\n%s", err, source)
-	}
+	require.NoErrorf(t, err, "scaffold with captures should parse: %v\nsource:\n%s", err, source)
 }
 
 func TestParseScaffoldExpression(t *testing.T) {
 	node, err := parseScaffold("1 + 2", nil, nil, ScaffoldExpression)
-	require.NoError(t, err)
-	require.NotNil(t, node)
+	require.NoError(t, err, "parseScaffold error")
+	require.NotNil(t, node, "expected non-nil node")
 	bin, ok := node.(*java.Binary)
-	if !ok {
-		t.Fatalf("expected *java.Binary, got %T", node)
-	}
-	require.False(t, bin.Left == nil || bin.Right == nil)
+	require.Truef(t, ok, "expected *java.Binary, got %T", node)
+	require.False(t, bin.Left == nil || bin.Right == nil, "binary should have left and right")
 }
 
 func TestPatternMatchIdentifier(t *testing.T) {
@@ -89,10 +81,10 @@ func TestPatternMatchIdentifier(t *testing.T) {
 	v := visitor.Init(&identFinder{target: "x", found: &found})
 	v.Visit(cu, nil)
 
-	require.NotNil(t, found)
+	require.NotNil(t, found, "could not find identifier 'x' in parsed tree")
 
 	result := pat.Match(found, nil)
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "pattern should match identifier 'x'")
 }
 
 func TestPatternNoMatch(t *testing.T) {
@@ -106,10 +98,10 @@ func TestPatternNoMatch(t *testing.T) {
 	v := visitor.Init(&identFinder{target: "y", found: &found})
 	v.Visit(cu, nil)
 
-	require.NotNil(t, found)
+	require.NotNil(t, found, "could not find identifier 'y'")
 
 	result := pat.Match(found, nil)
-	assert.Nil(t, result)
+	assert.Nil(t, result, "pattern 'x' should not match identifier 'y'")
 }
 
 func TestPatternMatchWithCapture(t *testing.T) {
@@ -126,18 +118,16 @@ func TestPatternMatchWithCapture(t *testing.T) {
 	v := visitor.Init(&binaryFinder{found: &found})
 	v.Visit(cu, nil)
 
-	require.NotNil(t, found)
+	require.NotNil(t, found, "could not find binary expression")
 
 	result := pat.Match(found, nil)
-	require.NotNil(t, result)
+	require.NotNil(t, result, "pattern should match binary expression")
 
 	captured := result.Get("expr")
-	require.NotNil(t, captured)
+	require.NotNil(t, captured, "expected capture 'expr' to be bound")
 	lit, ok := captured.(*java.Literal)
-	if !ok {
-		t.Fatalf("expected captured value to be *java.Literal, got %T", captured)
-	}
-	assert.Equal(t, "1", lit.Source)
+	require.Truef(t, ok, "expected captured value to be *java.Literal, got %T", captured)
+	assert.Equal(t, "1", lit.Source, "expected captured literal source")
 }
 
 func TestRewriteVisitor(t *testing.T) {
@@ -233,11 +223,11 @@ func TestRewritePreservesFormatting(t *testing.T) {
 
 	ctx := recipe.NewExecutionContext()
 	result := rewriter.Visit(cu, ctx)
-	require.NotNil(t, result)
+	require.NotNil(t, result, "expected non-nil result")
 
 	actual := printer.Print(result)
 	expected := "package main\n\nvar a = y\n"
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, actual, "formatting not preserved")
 }
 
 func TestPatternMatchGoUnary(t *testing.T) {
@@ -249,7 +239,7 @@ func TestPatternMatchGoUnary(t *testing.T) {
 	var found java.J
 	v := visitor.Init(&goUnaryFinder{found: &found})
 	v.Visit(cu, nil)
-	require.NotNil(t, found)
+	require.NotNil(t, found, "could not find golang.Unary '&b' in parsed tree")
 
 	// when matching a pattern that captures the operand of `&<expr>`
 	expr := Expr("expr")
@@ -259,13 +249,11 @@ func TestPatternMatchGoUnary(t *testing.T) {
 
 	// then the pattern matches (regression: golang.Unary had no comparator case)
 	result := pat.Match(found, nil)
-	require.NotNil(t, result)
+	require.NotNil(t, result, "pattern '&<expr>' should match golang.Unary '&b'")
 	captured := result.Get("expr")
-	require.NotNil(t, captured)
+	require.NotNil(t, captured, "expected capture 'expr' to be bound")
 	ident, ok := captured.(*java.Identifier)
-	if !ok || ident.Name != "b" {
-		t.Fatalf("expected captured identifier 'b', got %T %v", captured, captured)
-	}
+	require.Falsef(t, !ok || ident.Name != "b", "expected captured identifier 'b', got %T %v", captured, captured)
 }
 
 type rewriteRecipeWithVisitor struct {

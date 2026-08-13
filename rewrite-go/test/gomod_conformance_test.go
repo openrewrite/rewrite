@@ -137,7 +137,7 @@ func nilIfEmpty(s string) *string {
 func TestGoModConformanceCorpus(t *testing.T) {
 	corpusDir := filepath.Join("..", "src", "test", "resources", "gomod-conformance")
 	entries, err := os.ReadDir(corpusDir)
-	require.NoError(t, err)
+	require.NoError(t, err, "read corpus dir")
 	cases := 0
 	for _, ent := range entries {
 		if ent.IsDir() || !strings.HasSuffix(ent.Name(), ".gomod") {
@@ -148,7 +148,7 @@ func TestGoModConformanceCorpus(t *testing.T) {
 		t.Run(caseName, func(t *testing.T) {
 			modContent := mustRead(t, filepath.Join(corpusDir, ent.Name()))
 			mrr, err := parser.ParseGoMod("go.mod", modContent)
-			require.NoError(t, err)
+			require.NoError(t, err, "parse")
 			if sumPath := filepath.Join(corpusDir, caseName+".gosum"); fileExists(sumPath) {
 				mrr.ResolvedDependencies = parser.ParseGoSum(mustRead(t, sumPath))
 			}
@@ -156,7 +156,7 @@ func TestGoModConformanceCorpus(t *testing.T) {
 
 			goldenContent := mustRead(t, filepath.Join(corpusDir, caseName+".gomod.json"))
 			var expected conformanceShape
-			require.NoError(t, json.Unmarshal([]byte(goldenContent), &expected))
+			require.NoError(t, json.Unmarshal([]byte(goldenContent), &expected), "unmarshal golden")
 			normalize(&expected)
 
 			if !reflect.DeepEqual(actual, expected) {
@@ -167,7 +167,7 @@ func TestGoModConformanceCorpus(t *testing.T) {
 			}
 		})
 	}
-	require.NotEqual(t, 0, cases)
+	require.NotEqual(t, 0, cases, "no .gomod cases found in corpus")
 }
 
 // normalize replaces nil slices with empty slices so reflect.DeepEqual
@@ -193,9 +193,7 @@ func normalize(c *conformanceShape) {
 func mustRead(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
+	require.NoErrorf(t, err, "read %s", path)
 	return string(b)
 }
 

@@ -74,7 +74,7 @@ func main() {
 	// "x" should be an int type
 	if xType, ok := v.identTypes["x"]; ok {
 		if prim, ok := xType.(*java.JavaTypePrimitive); ok {
-			assert.Equal(t, "int", prim.Keyword)
+			assert.Equal(t, "int", prim.Keyword, "expected x to be int")
 		} else {
 			t.Errorf("expected x to be primitive, got %T", xType)
 		}
@@ -85,7 +85,7 @@ func main() {
 	// "y" should be a string type (mapped as Primitive "String")
 	if yType, ok := v.identTypes["y"]; ok {
 		if prim, ok := yType.(*java.JavaTypePrimitive); ok {
-			assert.Equal(t, "String", prim.Keyword)
+			assert.Equal(t, "String", prim.Keyword, "expected y to be String")
 		} else {
 			t.Errorf("expected y to be primitive, got %T", yType)
 		}
@@ -108,11 +108,11 @@ func add(a int, b int) int {
 	v.Visit(cu, nil)
 
 	addType, ok := v.methodTypes["add"]
-	require.True(t, ok)
-	assert.Equal(t, "add", addType.Name)
-	assert.Len(t, addType.ParameterTypes, 2)
+	require.True(t, ok, "no method type for add()")
+	assert.Equal(t, "add", addType.Name, "expected method name 'add")
+	assert.Len(t, addType.ParameterTypes, 2, "expected 2 parameters")
 	if ret, ok := addType.ReturnType.(*java.JavaTypePrimitive); ok {
-		assert.Equal(t, "int", ret.Keyword)
+		assert.Equal(t, "int", ret.Keyword, "expected return type int")
 	} else {
 		t.Errorf("expected primitive return type, got %T", addType.ReturnType)
 	}
@@ -135,22 +135,18 @@ func divmod(a int, b int) (int, int) {
 
 	// then
 	mt, ok := v.methodTypes["divmod"]
-	require.True(t, ok)
+	require.True(t, ok, "no method type for divmod()")
 	param, ok := mt.ReturnType.(*java.JavaTypeParameterized)
-	if !ok {
-		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
-	}
-	assert.False(t, param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple")
-	require.Len(t, param.TypeParameters, 2)
+	require.Truef(t, ok, "expected parameterized return type, got %T", mt.ReturnType)
+	assert.False(t, param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple", "expected tuple FQN 'go.tuple")
+	require.Len(t, param.TypeParameters, 2, "expected 2 tuple type parameters")
 	for i, tp := range param.TypeParameters {
 		prim, ok := tp.(*java.JavaTypePrimitive)
 		if !ok {
 			t.Errorf("tuple element %d: expected primitive, got %T", i, tp)
 			continue
 		}
-		if prim.Keyword != "int" {
-			t.Errorf("tuple element %d: expected int, got %s", i, prim.Keyword)
-		}
+		assert.Equalf(t, "int", prim.Keyword, "tuple element %d: expected int", i)
 	}
 }
 
@@ -171,13 +167,11 @@ func split() (string, int, bool) {
 
 	// then
 	mt, ok := v.methodTypes["split"]
-	require.True(t, ok)
+	require.True(t, ok, "no method type for split()")
 	param, ok := mt.ReturnType.(*java.JavaTypeParameterized)
-	if !ok {
-		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
-	}
-	assert.False(t, param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple")
-	require.Len(t, param.TypeParameters, 3)
+	require.Truef(t, ok, "expected parameterized return type, got %T", mt.ReturnType)
+	assert.False(t, param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple", "expected tuple FQN 'go.tuple")
+	require.Len(t, param.TypeParameters, 3, "expected 3 tuple type parameters")
 	expectedKeywords := []string{"String", "int", "boolean"}
 	for i, want := range expectedKeywords {
 		prim, ok := param.TypeParameters[i].(*java.JavaTypePrimitive)
@@ -185,9 +179,7 @@ func split() (string, int, bool) {
 			t.Errorf("tuple element %d: expected primitive, got %T", i, param.TypeParameters[i])
 			continue
 		}
-		if prim.Keyword != want {
-			t.Errorf("tuple element %d: expected %s, got %s", i, want, prim.Keyword)
-		}
+		assert.Equalf(t, want, prim.Keyword, "tuple element %d", i)
 	}
 }
 
@@ -237,5 +229,5 @@ func main() {
 `)
 	// Parser should still succeed
 	require.NoError(t, err)
-	require.NotNil(t, cu)
+	require.NotNil(t, cu, "expected non-nil compilation unit")
 }

@@ -58,8 +58,8 @@ func TestCheckRunsEditorWhenConditionMarks(t *testing.T) {
 	wrapped := Check(cond, editor)
 	wrapped.Visit(newSourceFile(), nil)
 
-	assert.Equal(t, 1, cond.calls)
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, cond.calls, "condition calls")
+	assert.Equal(t, 1, editor.calls, "editor calls")
 }
 
 func TestCheckSkipsEditorWhenConditionReturnsIdentity(t *testing.T) {
@@ -69,8 +69,8 @@ func TestCheckSkipsEditorWhenConditionReturnsIdentity(t *testing.T) {
 	wrapped := Check(cond, editor)
 	wrapped.Visit(newSourceFile(), nil)
 
-	assert.Equal(t, 1, cond.calls)
-	assert.Equal(t, 0, editor.calls)
+	assert.Equal(t, 1, cond.calls, "condition calls")
+	assert.Equalf(t, 0, editor.calls, "editor calls = %d, want 0 (gate did not match)", editor.calls)
 }
 
 func TestOrShortCircuitsOnFirstMatch(t *testing.T) {
@@ -80,9 +80,9 @@ func TestOrShortCircuitsOnFirstMatch(t *testing.T) {
 
 	Check(Or(matching, nonMatching), editor).Visit(newSourceFile(), nil)
 
-	assert.Equal(t, 1, matching.calls)
-	assert.Equal(t, 0, nonMatching.calls)
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, matching.calls, "matching calls")
+	assert.Equalf(t, 0, nonMatching.calls, "nonMatching calls = %d, want 0 (Or should short-circuit)", nonMatching.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls")
 }
 
 func TestOrSkipsEditorWhenNoOperandMatches(t *testing.T) {
@@ -92,8 +92,8 @@ func TestOrSkipsEditorWhenNoOperandMatches(t *testing.T) {
 
 	Check(Or(a, b), editor).Visit(newSourceFile(), nil)
 
-	assert.False(t, a.calls != 1 || b.calls != 1)
-	assert.Equal(t, 0, editor.calls)
+	assert.False(t, a.calls != 1 || b.calls != 1, "operand calls")
+	assert.Equal(t, 0, editor.calls, "editor calls")
 }
 
 func TestAndRunsEditorOnlyWhenAllMatch(t *testing.T) {
@@ -101,21 +101,21 @@ func TestAndRunsEditorOnlyWhenAllMatch(t *testing.T) {
 	b := &markingVisitor{}
 	editor := &recordingVisitor{}
 	Check(And(a, b), editor).Visit(newSourceFile(), nil)
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls (all match")
 
 	editor2 := &recordingVisitor{}
 	Check(And(a, &recordingVisitor{}), editor2).Visit(newSourceFile(), nil)
-	assert.Equal(t, 0, editor2.calls)
+	assert.Equal(t, 0, editor2.calls, "editor2 calls (one non-matching")
 }
 
 func TestNotInvertsMatch(t *testing.T) {
 	editor1 := &recordingVisitor{}
 	Check(Not(&markingVisitor{}), editor1).Visit(newSourceFile(), nil)
-	assert.Equal(t, 0, editor1.calls)
+	assert.Equal(t, 0, editor1.calls, "not(matching): editor calls")
 
 	editor2 := &recordingVisitor{}
 	Check(Not(&recordingVisitor{}), editor2).Visit(newSourceFile(), nil)
-	assert.Equal(t, 1, editor2.calls)
+	assert.Equal(t, 1, editor2.calls, "not(non-matching): editor calls")
 }
 
 func TestBareRecipeRefShortCircuitsToMatch(t *testing.T) {
@@ -128,7 +128,7 @@ func TestBareRecipeRefShortCircuitsToMatch(t *testing.T) {
 		Options:    map[string]any{"methodPattern": "*..* nope(..)"},
 	}
 	Check(bare, editor).Visit(newSourceFile(), nil)
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls (bare RecipeRef")
 }
 
 func TestRecipeRefWithLocalVisitorEvaluatesForReal(t *testing.T) {
@@ -138,16 +138,16 @@ func TestRecipeRefWithLocalVisitorEvaluatesForReal(t *testing.T) {
 	// fails and the editor is skipped.
 	editor := &recordingVisitor{}
 	Check(UsesMethod("*..* tostring(..)"), editor).Visit(newSourceFile(), nil)
-	assert.Equal(t, 0, editor.calls)
+	assert.Equal(t, 0, editor.calls, "editor calls (RecipeRef with LocalVisitor")
 }
 
 func TestHelpersPopulateLocalVisitor(t *testing.T) {
 	// Spot-check that helpers bundle a TreeVisitor for offline eval.
-	assert.NotNil(t, HasSourcePath("**/*.go").LocalVisitor)
-	assert.NotNil(t, UsesMethod("*..* a(..)").LocalVisitor)
-	assert.NotNil(t, UsesType("foo.Bar").LocalVisitor)
-	assert.NotNil(t, FindMethods("*..* a(..)").LocalVisitor)
-	assert.NotNil(t, FindTypes("foo.Bar").LocalVisitor)
+	assert.NotNil(t, HasSourcePath("**/*.go").LocalVisitor, "HasSourcePath did not populate LocalVisitor")
+	assert.NotNil(t, UsesMethod("*..* a(..)").LocalVisitor, "UsesMethod did not populate LocalVisitor")
+	assert.NotNil(t, UsesType("foo.Bar").LocalVisitor, "UsesType did not populate LocalVisitor")
+	assert.NotNil(t, FindMethods("*..* a(..)").LocalVisitor, "FindMethods did not populate LocalVisitor")
+	assert.NotNil(t, FindTypes("foo.Bar").LocalVisitor, "FindTypes did not populate LocalVisitor")
 }
 
 func TestHasSourcePathMatchesCompilationUnit(t *testing.T) {
@@ -159,12 +159,12 @@ func TestHasSourcePathMatchesCompilationUnit(t *testing.T) {
 	Check(HasSourcePath("**/*.go"), editor).Visit(cu, nil)
 
 	// then the editor runs
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls (matching path")
 
 	// and when the glob does not match
 	editor2 := &recordingVisitor{}
 	Check(HasSourcePath("**/*.java"), editor2).Visit(cu, nil)
-	assert.Equal(t, 0, editor2.calls)
+	assert.Equal(t, 0, editor2.calls, "editor calls (non-matching path")
 }
 
 func TestHasSourcePathMatchesGoMod(t *testing.T) {
@@ -176,13 +176,13 @@ func TestHasSourcePathMatchesGoMod(t *testing.T) {
 	Check(HasSourcePath("**/go.mod"), editor).Visit(mod, nil)
 
 	// then the editor runs even though GoMod is not a java.SourceFile
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls (go.mod")
 
 	// and a non-matching glob must actually filter the GoMod out, rather
 	// than the gate being bypassed because GoMod is not a java.SourceFile.
 	editor2 := &recordingVisitor{}
 	Check(HasSourcePath("**/*.go"), editor2).Visit(mod, nil)
-	assert.Equal(t, 0, editor2.calls)
+	assert.Equal(t, 0, editor2.calls, "editor calls (go.mod, non-matching")
 }
 
 func TestUsesMethodMatchesInvocationInTree(t *testing.T) {
@@ -200,12 +200,12 @@ func TestUsesMethodMatchesInvocationInTree(t *testing.T) {
 	Check(UsesMethod("fmt Println(..)"), editor).Visit(cu, nil)
 
 	// then the editor runs
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls (matching method")
 
 	// and a non-matching pattern skips the editor
 	editor2 := &recordingVisitor{}
 	Check(UsesMethod("fmt Printf(..)"), editor2).Visit(cu, nil)
-	assert.Equal(t, 0, editor2.calls)
+	assert.Equal(t, 0, editor2.calls, "editor calls (non-matching method")
 }
 
 func TestUsesTypeMatchesAttributionInTree(t *testing.T) {
@@ -224,12 +224,12 @@ func TestUsesTypeMatchesAttributionInTree(t *testing.T) {
 	Check(UsesType("tarfile"), editor).Visit(cu, nil)
 
 	// then the editor runs
-	assert.Equal(t, 1, editor.calls)
+	assert.Equal(t, 1, editor.calls, "editor calls (matching type")
 
 	// and an unrelated type skips the editor
 	editor2 := &recordingVisitor{}
 	Check(UsesType("zipfile"), editor2).Visit(cu, nil)
-	assert.Equal(t, 0, editor2.calls)
+	assert.Equal(t, 0, editor2.calls, "editor calls (non-matching type")
 }
 
 func TestOrRequiresAtLeastTwoOperands(t *testing.T) {

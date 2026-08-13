@@ -27,7 +27,7 @@ func TestReferenceMapReusesStrongIdentity(t *testing.T) {
 	refs := NewReferenceMap()
 
 	firstID, existed := refs.GetOrCreate(shared)
-	require.False(t, existed || firstID != 1)
+	require.Falsef(t, existed || firstID != 1, "first allocation = (%d, %v), want (1, false)", firstID, existed)
 	if got := refs.Len(); got != 1 {
 		t.Fatalf("reference count = %d, want 1", got)
 	}

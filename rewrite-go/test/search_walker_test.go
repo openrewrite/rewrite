@@ -59,7 +59,7 @@ func TestCollectSearchResultIDsAfterMark(t *testing.T) {
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
 	ids := visitor.CollectSearchResultIDs(result)
-	require.Len(t, ids, 1)
+	require.Len(t, ids, 1, "expected exactly one search result id")
 	if ids[0] != mark.Ident {
 		t.Fatalf("collected id %v does not match marker id %v", ids[0], mark.Ident)
 	}
@@ -86,9 +86,7 @@ func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
 	ids := visitor.CollectSearchResultIDs(gm)
 
 	// then
-	if len(ids) != 1 || ids[0] != mark.Ident {
-		t.Fatalf("expected [%v], got %v", mark.Ident, ids)
-	}
+	require.Falsef(t, len(ids) != 1 || ids[0] != mark.Ident, "expected [%v", mark.Ident)
 }
 
 // rewriteMarkerVisitor swaps the ID of every SearchResult it encounters via
@@ -121,9 +119,7 @@ func TestVisitMarkerRewritesInPlace(t *testing.T) {
 
 	// then
 	ids := visitor.CollectSearchResultIDs(rewritten)
-	if len(ids) != 1 || ids[0] != newID {
-		t.Fatalf("expected VisitMarker to rewrite the id to %v, got %v", newID, ids)
-	}
+	require.Falsef(t, len(ids) != 1 || ids[0] != newID, "expected VisitMarker to rewrite the id to %v", newID)
 }
 
 func TestCollectSearchResultIDsDedupes(t *testing.T) {
@@ -137,5 +133,5 @@ func TestCollectSearchResultIDsDedupes(t *testing.T) {
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
 	ids := visitor.CollectSearchResultIDs(result)
-	require.Len(t, ids, 1)
+	require.Len(t, ids, 1, "expected dedup to produce 1 id")
 }

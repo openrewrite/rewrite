@@ -62,16 +62,14 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{gp}}
 
 	after := roundTripMarkers(t, before)
-	require.Len(t, after.Entries, 1)
+	require.Len(t, after.Entries, 1, "entries")
 	got, ok := after.Entries[0].(golang.GoProject)
-	if !ok {
-		t.Fatalf("entry is %T, want golang.GoProject", after.Entries[0])
-	}
+	require.Truef(t, ok, "entry is %T, want golang.GoProject", after.Entries[0])
 	if got.Ident != id {
 		t.Errorf("Ident: want %s, got %s", id, got.Ident)
 	}
-	assert.Equal(t, "example/foo", got.ProjectName)
-	assert.Equal(t, "example.com/foo", got.ModulePath)
+	assert.Equalf(t, "example/foo", got.ProjectName, "ProjectName: want %q", "example/foo")
+	assert.Equalf(t, "example.com/foo", got.ModulePath, "ModulePath: want %q", "example.com/foo")
 }
 
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
@@ -120,12 +118,10 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
 	after := roundTripMarkers(t, before)
-	require.Len(t, after.Entries, 1)
+	require.Len(t, after.Entries, 1, "entries")
 	got, ok := after.Entries[0].(golang.GoResolutionResult)
-	if !ok {
-		t.Fatalf("entry is %T, want golang.GoResolutionResult", after.Entries[0])
-	}
-	assert.True(t, reflect.DeepEqual(mrr, got))
+	require.Truef(t, ok, "entry is %T, want golang.GoResolutionResult", after.Entries[0])
+	assert.Truef(t, reflect.DeepEqual(mrr, got), "round-trip mismatch\nbefore: %+v\nafter", mrr)
 }
 
 func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
@@ -146,7 +142,7 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 
 	after := roundTripMarkers(t, before)
 	got := after.Entries[0].(golang.GoResolutionResult)
-	assert.Equal(t, "example.com/empty", got.ModulePath)
+	assert.Equalf(t, "example.com/empty", got.ModulePath, "ModulePath: want %q", "example.com/empty")
 }
 
 // diffRoundTripMarkers serializes `after` as a delta against `before` and
@@ -187,11 +183,9 @@ func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
 	after := java.Markers{ID: markersID, Entries: []java.Marker{mk("8.0")}}
 
 	got := diffRoundTripMarkers(t, before, after)
-	require.Len(t, got.Entries, 1)
+	require.Len(t, got.Entries, 1, "entries")
 	gm, ok := got.Entries[0].(java.GenericMarker)
-	if !ok {
-		t.Fatalf("entry is %T, want java.GenericMarker", got.Entries[0])
-	}
+	require.Truef(t, ok, "entry is %T, want java.GenericMarker", got.Entries[0])
 	if gm.Data["version"] != "8.0" {
 		t.Errorf("version: want %q, got %v", "8.0", gm.Data["version"])
 	}

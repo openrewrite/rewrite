@@ -265,10 +265,10 @@ func TestNewRecipeMetadata(t *testing.T) {
 		WithAfter(`y`),
 	)
 
-	assert.Equal(t, "org.openrewrite.golang.MyRecipe", r.Name())
-	assert.Equal(t, "My Recipe", r.DisplayName())
-	assert.Equal(t, "Does something useful.", r.Description())
-	assert.False(t, len(r.Tags()) != 2 || r.Tags()[0] != "cleanup")
+	assert.Equal(t, "org.openrewrite.golang.MyRecipe", r.Name(), "Name")
+	assert.Equal(t, "My Recipe", r.DisplayName(), "DisplayName")
+	assert.Equal(t, "Does something useful.", r.Description(), "Description")
+	assert.False(t, len(r.Tags()) != 2 || r.Tags()[0] != "cleanup", "Tags")
 }
 
 type myRecipe struct {

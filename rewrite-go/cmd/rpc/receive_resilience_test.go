@@ -36,7 +36,7 @@ func frameReverseGetObjectReply(t *testing.T, result any) []byte {
 		"id":      "go-GetObject",
 		"result":  result,
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "marshal reply")
 	return append([]byte(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))), body...)
 }
 
@@ -87,7 +87,7 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 		s.getObjectFromJava(id, "")
 		return false
 	}()
-	require.True(t, panicked)
+	require.True(t, panicked, "transfer 1: expected a panic mid-receive, got none")
 
 	// Containment: the diverged per-id baseline is dropped.
 	if v, ok := s.reverseRemoteObjects[id]; ok {

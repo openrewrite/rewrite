@@ -30,9 +30,7 @@ import (
 func forControl(t *testing.T, src string) *java.ForControl {
 	t.Helper()
 	loop, ok := firstStatementInBody(t, src).(*java.ForLoop)
-	if !ok {
-		t.Fatalf("expected first statement to be *java.ForLoop, got %T", firstStatementInBody(t, src))
-	}
+	require.Truef(t, ok, "expected first statement to be *java.ForLoop, got %T", firstStatementInBody(t, src))
 	return &loop.Control
 }
 
@@ -47,16 +45,16 @@ func TestConditionOnlyForHasEmptyInitAndUpdate(t *testing.T) {
 	control := forControl(t, src)
 
 	// then
-	require.NotNil(t, control.Init)
+	require.NotNil(t, control.Init, "Init must not be nil for a condition-only for")
 	if _, ok := control.Init.Element.(*java.Empty); !ok {
 		t.Fatalf("Init element must be *java.Empty, got %T", control.Init.Element)
 	}
-	require.NotNil(t, control.Update)
+	require.NotNil(t, control.Update, "Update must not be nil for a condition-only for")
 	if _, ok := control.Update.Element.(*java.Empty); !ok {
 		t.Fatalf("Update element must be *java.Empty, got %T", control.Update.Element)
 	}
-	require.NotNil(t, control.Condition)
-	require.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers))
+	require.NotNil(t, control.Condition, "Condition must be the real condition, got nil")
+	require.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers), "expected golang.ImplicitForClauses marker on the control")
 }
 
 // An infinite `for {}` has no condition, but its init/update placeholders must
@@ -69,13 +67,13 @@ func TestInfiniteForHasEmptyInitAndUpdate(t *testing.T) {
 	control := forControl(t, src)
 
 	// then
-	require.NotNil(t, control.Init)
+	require.NotNil(t, control.Init, "Init must not be nil for an infinite for")
 	if _, ok := control.Init.Element.(*java.Empty); !ok {
 		t.Fatalf("Init element must be *java.Empty, got %T", control.Init.Element)
 	}
-	require.NotNil(t, control.Update)
-	require.Nil(t, control.Condition)
-	require.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers))
+	require.NotNil(t, control.Update, "Update must not be nil for an infinite for")
+	require.Nil(t, control.Condition, "infinite for must have no condition")
+	require.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers), "expected golang.ImplicitForClauses marker on the control")
 }
 
 // A genuine 3-clause for keeps its real init and is NOT marked implicit; an
@@ -89,12 +87,12 @@ func TestThreeClauseForIsNotMarkedImplicit(t *testing.T) {
 	control := forControl(t, src)
 
 	// then
-	require.Nil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers))
-	require.NotNil(t, control.Init)
+	require.Nil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers), "a 3-clause for must not carry the ImplicitForClauses marker")
+	require.NotNil(t, control.Init, "Init must not be nil")
 	if _, ok := control.Init.Element.(*java.Empty); ok {
 		t.Fatalf("Init element must be the real init statement, not J.Empty")
 	}
-	require.NotNil(t, control.Update)
+	require.NotNil(t, control.Update, "Update must not be nil for a 3-clause for without an update clause")
 	if _, ok := control.Update.Element.(*java.Empty); !ok {
 		t.Fatalf("omitted update must be a *java.Empty placeholder, got %T", control.Update.Element)
 	}

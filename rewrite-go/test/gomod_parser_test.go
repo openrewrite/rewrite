@@ -46,26 +46,18 @@ exclude github.com/bad v0.0.1
 retract v0.0.5 // accidentally deleted main.go
 retract [v1.0.0, v1.0.5]
 `)
-	require.NoError(t, err)
-	assert.Equal(t, "example.com/foo", mrr.ModulePath)
-	assert.Equal(t, "1.22", mrr.GoVersion)
-	assert.Equal(t, "go1.22.3", mrr.Toolchain)
-	require.Len(t, mrr.Requires, 2)
-	if mrr.Requires[0].ModulePath != "github.com/x/y" || mrr.Requires[0].Version != "v1.2.3" || mrr.Requires[0].Indirect {
-		t.Errorf("Requires[0]: %+v", mrr.Requires[0])
-	}
-	if mrr.Requires[1].ModulePath != "github.com/z/w" || !mrr.Requires[1].Indirect {
-		t.Errorf("Requires[1]: %+v", mrr.Requires[1])
-	}
-	assert.False(t, len(mrr.Replaces) != 1 || mrr.Replaces[0].OldPath != "github.com/x/y" || mrr.Replaces[0].NewVersion != "v1.2.4")
-	assert.False(t, len(mrr.Excludes) != 1 || mrr.Excludes[0].ModulePath != "github.com/bad")
-	require.Len(t, mrr.Retracts, 2)
-	if mrr.Retracts[0].VersionRange != "v0.0.5" || mrr.Retracts[0].Rationale == "" {
-		t.Errorf("Retracts[0]: %+v", mrr.Retracts[0])
-	}
-	if mrr.Retracts[1].VersionRange != "[v1.0.0, v1.0.5]" {
-		t.Errorf("Retracts[1] range: %+v", mrr.Retracts[1])
-	}
+	require.NoError(t, err, "parse failed")
+	assert.Equalf(t, "example.com/foo", mrr.ModulePath, "ModulePath: want %q", "example.com/foo")
+	assert.Equalf(t, "1.22", mrr.GoVersion, "GoVersion: want %q", "1.22")
+	assert.Equalf(t, "go1.22.3", mrr.Toolchain, "Toolchain: want %q", "go1.22.3")
+	require.Len(t, mrr.Requires, 2, "Requires len")
+	assert.Falsef(t, mrr.Requires[0].ModulePath != "github.com/x/y" || mrr.Requires[0].Version != "v1.2.3" || mrr.Requires[0].Indirect, "Requires[0]: %+v", mrr.Requires[0])
+	assert.Falsef(t, mrr.Requires[1].ModulePath != "github.com/z/w" || !mrr.Requires[1].Indirect, "Requires[1]: %+v", mrr.Requires[1])
+	assert.False(t, len(mrr.Replaces) != 1 || mrr.Replaces[0].OldPath != "github.com/x/y" || mrr.Replaces[0].NewVersion != "v1.2.4", "Replaces")
+	assert.False(t, len(mrr.Excludes) != 1 || mrr.Excludes[0].ModulePath != "github.com/bad", "Excludes")
+	require.Len(t, mrr.Retracts, 2, "Retracts len")
+	assert.Falsef(t, mrr.Retracts[0].VersionRange != "v0.0.5" || mrr.Retracts[0].Rationale == "", "Retracts[0]: %+v", mrr.Retracts[0])
+	assert.Equalf(t, "[v1.0.0, v1.0.5]", mrr.Retracts[1].VersionRange, "Retracts[1] range: %+v", mrr.Retracts[1])
 }
 
 func TestGoModSourceSpecCarriesParsedMarker(t *testing.T) {
@@ -77,8 +69,8 @@ func TestGoModSourceSpecCarriesParsedMarker(t *testing.T) {
 		require github.com/x/y v1.2.3
 	`)
 	mrr := test.FindGoResolutionResult(spec)
-	require.NotNil(t, mrr)
-	assert.Equal(t, "example.com/foo", mrr.ModulePath)
+	require.NotNil(t, mrr, "expected GoResolutionResult marker on the GoMod SourceSpec")
+	assert.Equalf(t, "example.com/foo", mrr.ModulePath, "ModulePath: want %q", "example.com/foo")
 	if r := mrr.FindRequire("github.com/x/y"); r == nil || r.Version != "v1.2.3" {
 		t.Errorf("FindRequire: %+v", r)
 	}
@@ -97,11 +89,11 @@ github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+
 golang.org/x/mod v0.35.0 h1:Ww1D637e6Pg+Zb2KrWfHQUnH2dQRLBQyAtpr/haaJeM=
 golang.org/x/mod v0.35.0/go.mod h1:+GwiRhIInF8wPm+4AoT6L0FA1QWAad3OMdTRx4tFYlU=
 `)
-	require.Len(t, resolved, 2)
+	require.Len(t, resolved, 2, "ParseGoSum: want 2 entries")
 	uuid := resolved[0]
-	assert.False(t, uuid.ModulePath != "github.com/google/uuid" || uuid.Version != "v1.6.0")
-	assert.Equal(t, "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=", uuid.ModuleHash)
-	assert.Equal(t, "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=", uuid.GoModHash)
+	assert.False(t, uuid.ModulePath != "github.com/google/uuid" || uuid.Version != "v1.6.0", "entry[0]: want github.com/google/uuid@v")
+	assert.Equal(t, "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=", uuid.ModuleHash, "entry[0].ModuleHash")
+	assert.Equal(t, "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=", uuid.GoModHash, "entry[0].GoModHash")
 	if mod := resolved[1]; mod.ModulePath != "golang.org/x/mod" || mod.Version != "v0.35.0" {
 		t.Errorf("entry[1]: want golang.org/x/mod@v0.35.0, got %+v", mod)
 	}
@@ -114,13 +106,9 @@ func TestParseGoSumOnlyGoModHashRecorded(t *testing.T) {
 	// build graph knows about.
 	resolved := parser.ParseGoSum(`example.com/indirect v1.0.0/go.mod h1:abc123=
 `)
-	require.Len(t, resolved, 1)
-	if resolved[0].ModuleHash != "" {
-		t.Errorf("ModuleHash: want empty, got %q", resolved[0].ModuleHash)
-	}
-	if resolved[0].GoModHash != "h1:abc123=" {
-		t.Errorf("GoModHash: %q", resolved[0].GoModHash)
-	}
+	require.Len(t, resolved, 1, "want 1 entry")
+	assert.Equalf(t, "", resolved[0].ModuleHash, "ModuleHash: want empty, got %q", resolved[0].ModuleHash)
+	assert.Equalf(t, "h1:abc123=", resolved[0].GoModHash, "GoModHash: %q", resolved[0].GoModHash)
 }
 
 func TestParseGoSumMalformedLineSkipped(t *testing.T) {
@@ -130,10 +118,8 @@ func TestParseGoSumMalformedLineSkipped(t *testing.T) {
 this is not a valid go.sum line
 github.com/c/d v2.0.0 h1:hashC=
 `)
-	require.Len(t, resolved, 2)
-	if resolved[0].ModulePath != "github.com/a/b" || resolved[1].ModulePath != "github.com/c/d" {
-		t.Errorf("unexpected modules: %+v", resolved)
-	}
+	require.Len(t, resolved, 2, "want 2 entries (malformed skipped")
+	assert.Falsef(t, resolved[0].ModulePath != "github.com/a/b" || resolved[1].ModulePath != "github.com/c/d", "unexpected modules: %+v", resolved)
 }
 
 func TestParseGoSumEmptyInput(t *testing.T) {
@@ -141,8 +127,8 @@ func TestParseGoSumEmptyInput(t *testing.T) {
 	// directly to GoResolutionResult.ResolvedDependencies, and a nil slice
 	// would be serialized as a null list and break the LST write.
 	got := parser.ParseGoSum("")
-	assert.NotNil(t, got)
-	assert.Len(t, got, 0)
+	assert.NotNil(t, got, "want non-nil empty slice for empty input, got nil")
+	assert.Len(t, got, 0, "want empty slice for empty input")
 }
 
 func TestGoProjectMergesGoSumIntoGoModMarker(t *testing.T) {
@@ -169,13 +155,13 @@ func TestGoProjectMergesGoSumIntoGoModMarker(t *testing.T) {
 			modSpec = &expanded[i]
 		}
 	}
-	require.NotNil(t, modSpec)
+	require.NotNil(t, modSpec, "no go.mod spec in expanded project")
 	mrr := test.FindGoResolutionResult(*modSpec)
-	require.NotNil(t, mrr)
-	require.Len(t, mrr.ResolvedDependencies, 1)
+	require.NotNil(t, mrr, "no GoResolutionResult marker on go.mod")
+	require.Len(t, mrr.ResolvedDependencies, 1, "want 1 resolved dep")
 	rd := mrr.ResolvedDependencies[0]
-	assert.False(t, rd.ModulePath != "github.com/google/uuid" || rd.Version != "v1.6.0")
-	assert.False(t, rd.ModuleHash == "" || rd.GoModHash == "")
+	assert.False(t, rd.ModulePath != "github.com/google/uuid" || rd.Version != "v1.6.0", "unexpected resolved dep")
+	assert.False(t, rd.ModuleHash == "" || rd.GoModHash == "", "expected both ModuleHash and GoModHash populated")
 }
 
 // TestParseGoModDirectiveListsNeverNil guards the root cause of the Moderne CLI
@@ -185,12 +171,12 @@ func TestGoProjectMergesGoSumIntoGoModMarker(t *testing.T) {
 // reflective binary LST serializer then NPEs calling items.size() on it.
 func TestParseGoModDirectiveListsNeverNil(t *testing.T) {
 	mrr, err := parser.ParseGoMod("go.mod", "module example.com/foo\n\ngo 1.22\n")
-	require.NoError(t, err)
-	assert.NotNil(t, mrr.Requires)
-	assert.NotNil(t, mrr.Replaces)
-	assert.NotNil(t, mrr.Excludes)
-	assert.NotNil(t, mrr.Retracts)
-	assert.NotNil(t, mrr.ResolvedDependencies)
+	require.NoError(t, err, "parse failed")
+	assert.NotNil(t, mrr.Requires, "Requires is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.Replaces, "Replaces is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.Excludes, "Excludes is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.Retracts, "Retracts is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.ResolvedDependencies, "ResolvedDependencies is nil; want non-nil empty slice")
 }
 
 // TestParseGoModRequireButNoReplace covers the gin/cobra/zap failure shape: a
@@ -198,10 +184,10 @@ func TestParseGoModDirectiveListsNeverNil(t *testing.T) {
 // must still be non-nil empty slices.
 func TestParseGoModRequireButNoReplace(t *testing.T) {
 	mrr, err := parser.ParseGoMod("go.mod", "module example.com/foo\n\ngo 1.22\n\nrequire github.com/x/y v1.2.3\n")
-	require.NoError(t, err)
-	require.Len(t, mrr.Requires, 1)
-	assert.NotNil(t, mrr.Replaces)
-	assert.NotNil(t, mrr.Excludes)
-	assert.NotNil(t, mrr.Retracts)
-	assert.NotNil(t, mrr.ResolvedDependencies)
+	require.NoError(t, err, "parse failed")
+	require.Len(t, mrr.Requires, 1, "Requires len")
+	assert.NotNil(t, mrr.Replaces, "Replaces is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.Excludes, "Excludes is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.Retracts, "Retracts is nil; want non-nil empty slice")
+	assert.NotNil(t, mrr.ResolvedDependencies, "ResolvedDependencies is nil; want non-nil empty slice")
 }

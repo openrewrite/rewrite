@@ -49,12 +49,8 @@ func TestParseOrderedColumnsPreservesOrder(t *testing.T) {
 func TestParseOrderedColumnsEmptyAndNull(t *testing.T) {
 	for _, raw := range []json.RawMessage{nil, json.RawMessage("null"), json.RawMessage("{}")} {
 		cols, err := parseOrderedColumns(raw)
-		if err != nil {
-			t.Fatalf("unexpected error for %q: %v", string(raw), err)
-		}
-		if len(cols) != 0 {
-			t.Errorf("expected no columns for %q, got %+v", string(raw), cols)
-		}
+		require.NoErrorf(t, err, "unexpected error for %q", string(raw))
+		assert.Lenf(t, cols, 0, "expected no columns for %q", string(raw))
 	}
 }
 
@@ -90,10 +86,8 @@ func TestParseSetDataTableStoreSelectsVariantByKind(t *testing.T) {
 		`{"kind":"CSV","outputDir":"/tmp/dt","prefixColumns":{"repositoryOrigin":"acme"}}`))
 	require.NoError(t, err)
 	c, ok := csv.(*csvDataTableStore)
-	if !ok {
-		t.Fatalf("CSV: expected *csvDataTableStore, got %T", csv)
-	}
-	assert.Equal(t, "/tmp/dt", c.OutputDir)
+	require.Truef(t, ok, "CSV: expected *csvDataTableStore, got %T", csv)
+	assert.Equalf(t, "/tmp/dt", c.OutputDir, "OutputDir = %q, want /tmp/dt", c.OutputDir)
 
 	noop, err := parseSetDataTableStore(json.RawMessage(`{"kind":"NOOP"}`))
 	require.NoError(t, err)
@@ -108,7 +102,7 @@ func TestHandleSetDataTableStoreInstallsConfiguredStore(t *testing.T) {
 
 	params, _ := json.Marshal(map[string]string{"kind": "CSV", "outputDir": dir})
 	result, rpcErr := s.handleSetDataTableStore(params)
-	require.Nil(t, rpcErr)
+	require.Nil(t, rpcErr, "unexpected rpc error")
 	if result != true {
 		t.Errorf("expected result true, got %v", result)
 	}
@@ -119,7 +113,7 @@ func TestHandleSetDataTableStoreInstallsConfiguredStore(t *testing.T) {
 	ctx := recipe.NewExecutionContext()
 	s.installDataTableStore(ctx)
 	installed, ok := ctx.GetMessage(recipe.DataTableStoreKey)
-	require.True(t, ok)
+	require.True(t, ok, "expected a store installed on the ctx")
 	if installed != s.configuredDataTableStore {
 		t.Errorf("installed store %p != configured store %p", installed, s.configuredDataTableStore)
 	}

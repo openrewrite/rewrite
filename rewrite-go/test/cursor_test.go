@@ -32,10 +32,10 @@ func TestCursorBuildChain(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n")
 	require.NoError(t, err)
 	chain := visitor.BuildChain([]java.Tree{cu})
-	require.False(t, chain == nil || chain.Value() != cu || chain.Parent() != nil)
+	require.Falsef(t, chain == nil || chain.Value() != cu || chain.Parent() != nil, "expected single-element chain rooted at cu; got parent=%v value", chain.Parent())
 
 	chain2 := visitor.BuildChain(nil)
-	require.Nil(t, chain2)
+	require.Nil(t, chain2, "expected nil chain for empty input")
 }
 
 // TestVisitorCursorState confirms that GoVisitor exposes its cursor as
@@ -56,8 +56,8 @@ func TestVisitorCursorState(t *testing.T) {
 	}
 
 	v.Visit(cu, recipe.NewExecutionContext())
-	require.True(t, v.observedCU)
-	require.False(t, v.cuCursor == nil || v.cuCursor.Value() != cu)
+	require.True(t, v.observedCU, "VisitCompilationUnit was never invoked")
+	require.False(t, v.cuCursor == nil || v.cuCursor.Value() != cu, "expected v.Cursor().Value() == cu inside VisitCompilationUnit")
 }
 
 type cursorObservingVisitor struct {
