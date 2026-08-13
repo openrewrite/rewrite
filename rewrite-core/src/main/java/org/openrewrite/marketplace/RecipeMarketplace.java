@@ -16,7 +16,6 @@
 package org.openrewrite.marketplace;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
@@ -134,16 +133,31 @@ public class RecipeMarketplace {
     }
 
     @Getter
-    @RequiredArgsConstructor
     public class Category {
         @NlsRewrite.DisplayName
         private final String displayName;
 
         @NlsRewrite.DisplayName
-        private final String description;
+        private String description;
 
         private final List<Category> categories = new ArrayList<>();
         private final List<RecipeListing> recipes = new ArrayList<>();
+
+        public Category(@NlsRewrite.DisplayName String displayName, @NlsRewrite.DisplayName String description) {
+            this.displayName = displayName;
+            this.description = description;
+        }
+
+        /**
+         * Categories are keyed by display name, so the first artifact to install one owns the
+         * node and later descriptors for the same name are discarded. When the winner carried no
+         * description, adopt the first one offered rather than leaving the category undescribed.
+         */
+        private void describeIfBlank(@Nullable String candidate) {
+            if (StringUtils.isBlank(description) && !StringUtils.isBlank(candidate)) {
+                description = candidate;
+            }
+        }
 
         /**
          * A view, not a copy. Structural change goes through {@link #install} and
@@ -187,6 +201,7 @@ public class RecipeMarketplace {
                     }
                 }
                 if (existingSubCategory != null) {
+                    existingSubCategory.describeIfBlank(subCategory.description);
                     existingSubCategory.merge(subCategory, alreadyInstalled, added);
                 } else {
                     Category copy = new Category(subCategory.displayName, subCategory.description);
@@ -268,6 +283,7 @@ public class RecipeMarketplace {
         private Category findOrCreateCategory(CategoryDescriptor categoryDescriptor) {
             for (Category category : categories) {
                 if (category.getDisplayName().equalsIgnoreCase(categoryDescriptor.getDisplayName())) {
+                    category.describeIfBlank(categoryDescriptor.getDescription());
                     return category;
                 }
             }

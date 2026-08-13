@@ -15,6 +15,7 @@
  */
 package org.openrewrite.marketplace;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.CategoryDescriptor;
@@ -220,5 +221,72 @@ class RecipeMarketplaceInstallTest {
                 .isNotNull()
                 .extracting(l -> l.getBundle().getPackageName())
                 .isEqualTo("org.example:b");
+    }
+
+    private static CategoryDescriptor category(String name, String description) {
+        return new CategoryDescriptor(name, "", description, emptySet(), false, 0, false);
+    }
+
+    private static RecipeListing listing(String name) {
+        return new RecipeListing(null, name, name, name + ".", null, emptyList(), emptyList(), 1,
+                new RecipeBundle("maven", "org.example:a", "1.0.0", "1.0.0", null));
+    }
+
+    private static RecipeMarketplace.@Nullable Category child(RecipeMarketplace marketplace, String displayName) {
+        for (RecipeMarketplace.Category c : marketplace.getRoot().getCategories()) {
+            if (c.getDisplayName().equals(displayName)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    @Test
+    void anUndescribedCategoryDoesNotShadowADescriptionOfferedLater() {
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+
+        // Two artifacts name the same category. The first says nothing about it; without this
+        // the second one's description is discarded and the category renders bare forever.
+        marketplace.install(listing("com.foo.Bar"), List.of(category("Spring Boot 2.x", "")));
+        marketplace.install(listing("com.foo.Baz"), List.of(category("Spring Boot 2.x", "Recipes for Spring Boot 2.")));
+
+        assertThat(marketplace.getRoot().getCategories()).hasSize(1);
+        assertThat(child(marketplace, "Spring Boot 2.x"))
+                .isNotNull()
+                .extracting(RecipeMarketplace.Category::getDescription)
+                .isEqualTo("Recipes for Spring Boot 2.");
+    }
+
+    @Test
+    void aDescribedCategoryIsNotOverwrittenByALaterOne() {
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+
+        marketplace.install(listing("com.foo.Bar"), List.of(category("Spring Boot 2.x", "The first description.")));
+        marketplace.install(listing("com.foo.Baz"), List.of(category("Spring Boot 2.x", "A competing description.")));
+
+        assertThat(child(marketplace, "Spring Boot 2.x"))
+                .isNotNull()
+                .extracting(RecipeMarketplace.Category::getDescription)
+                .as("first-wins still applies once a category actually says something")
+                .isEqualTo("The first description.");
+    }
+
+    @Test
+    void mergeFillsInADescriptionTheExistingCategoryLacks() {
+        // Regenerating a marketplace CSV merges into what is already on disk. A category read
+        // back from a CSV written before its descriptor existed has no description, and would
+        // otherwise keep suppressing the one the freshly scanned marketplace supplies.
+        RecipeMarketplace onDisk = new RecipeMarketplace();
+        onDisk.install(listing("com.foo.Bar"), List.of(category("Gradle", "")));
+
+        RecipeMarketplace scanned = new RecipeMarketplace();
+        scanned.install(listing("com.foo.Baz"), List.of(category("Gradle", "Recipes to transform Gradle builds.")));
+
+        onDisk.merge(scanned);
+
+        assertThat(child(onDisk, "Gradle"))
+                .isNotNull()
+                .extracting(RecipeMarketplace.Category::getDescription)
+                .isEqualTo("Recipes to transform Gradle builds.");
     }
 }
