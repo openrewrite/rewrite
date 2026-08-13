@@ -518,3 +518,158 @@ class TestCanonicalRemoveImport:
                 """,
             )
         )
+
+
+class TestRemoveImportUsageScoping:
+    """``only_if_unused`` counts every reference the enclosing scopes do not
+    rebind, including references that appear only in annotations."""
+
+    @staticmethod
+    def _remove(module, name):
+        class RemoveVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module=module, name=name, only_if_unused=True))
+                return super().visit_compilation_unit(cu, p)
+
+        return from_visitor(RemoveVisitor())
+
+    def test_keep_import_referenced_in_function_annotations(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove('typing', 'Deque'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+
+                    def f(q: Deque[int]) -> Deque[int]:
+                        local: Deque[int] = q
+                        return local
+                    """,
+                )
+            )
+
+    def test_keep_import_referenced_in_function_body(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove('os.path', 'join'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from os.path import join
+
+
+                    def f():
+                        return join("a", "b")
+                    """,
+                )
+            )
+
+    def test_keep_import_referenced_outside_the_shadowing_function(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove('os.path', 'join'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from os.path import join
+
+
+                    def shadows():
+                        join = "not a function"
+                        return join
+
+
+                    def uses():
+                        return join("a", "b")
+                    """,
+                )
+            )
+
+    def test_remove_import_shadowed_in_every_function(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove('os.path', 'join'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from os.path import join
+
+
+                    def f():
+                        join = "not a function"
+                        return join
+                    """,
+                    """\
+                    def f():
+                        join = "not a function"
+                        return join
+                    """,
+                )
+            )
+
+
+class TestRemoveImportScopeRules:
+    """Usage counting follows Python's scoping, so a reference the interpreter
+    resolves to the import keeps that import alive."""
+
+    @staticmethod
+    def _keeps(source):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=TestRemoveImportUsageScoping._remove('time', 'clock'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(python(source))
+
+    def test_class_attribute_does_not_hide_method_usage(self):
+        self._keeps(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = 1
+
+                def m(self):
+                    return clock()
+            """
+        )
+
+    def test_attribute_assignment_does_not_hide_usage(self):
+        self._keeps(
+            """\
+            from time import clock
+
+
+            class C:
+                def m(self):
+                    self.clock = 1
+                    return clock()
+            """
+        )
+
+    def test_decorator_usage_counts(self):
+        self._keeps(
+            """\
+            from time import clock
+
+
+            @clock
+            def f():
+                clock = 1
+                return clock
+            """
+        )
+
+    def test_parameter_default_usage_counts(self):
+        self._keeps(
+            """\
+            from time import clock
+
+
+            def f(x=clock):
+                clock = 1
+                return clock, x
+            """
+        )

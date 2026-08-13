@@ -288,7 +288,8 @@ public class Autodetect extends NamedStyles {
 
     private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
         Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
-                .filter(entry -> entry.getKey().indentDepth != 0)
+                // A prefix with more tabs than its block depth has a negative delta, from which no tab size can be inferred
+                .filter(entry -> entry.getKey().indentDepth > 0)
                 .flatMap(entry -> entry.getValue().entrySet().stream()
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),

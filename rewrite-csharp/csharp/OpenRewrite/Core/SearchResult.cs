@@ -27,14 +27,25 @@ public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCod
     public string? Description { get; } = description;
 
     /// <summary>
-    /// Adds a SearchResult marker to the given tree node.
-    /// Uses reflection to call WithMarkers on the concrete type.
+    /// Adds a SearchResult marker to the given tree node, resolving <c>WithMarkers(Markers)</c> on the
+    /// concrete type. Throws when the node exposes none: a search recipe's whole output is the marker
+    /// it attaches, so quietly returning the node unchanged reports "no findings" for code that does
+    /// have them — a failure mode with no symptom at all. Every concrete <c>Tree</c> type in this
+    /// assembly exposes the wither (enforced by <c>JWitherContractTests</c>), so this cannot fire for
+    /// in-tree nodes.
     /// </summary>
     public static T Found<T>(T tree, string? description = null) where T : Tree
     {
         var newMarkers = tree.Markers.Add(new SearchResult(Guid.NewGuid(), description));
+        if (tree is J j)
+            return (T)J.SetMarkers(j, newMarkers);
+
         var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
-        return withMarkers != null ? (T)withMarkers.Invoke(tree, [newMarkers])! : tree;
+        if (withMarkers == null)
+            throw new InvalidOperationException(
+                $"{tree.GetType().FullName} does not expose WithMarkers(Markers), so markers cannot be attached to it.");
+
+        return (T)withMarkers.Invoke(tree, [newMarkers])!;
     }
 
     public void RpcSend(SearchResult after, RpcSendQueue q)

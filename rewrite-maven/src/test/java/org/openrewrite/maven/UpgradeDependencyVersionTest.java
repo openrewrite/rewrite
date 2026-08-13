@@ -1278,6 +1278,60 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradesExistingParentOverridePropertyInSamePom() {
+        // Child pom redeclares a parent-managed version property below the managed value.
+        // overrideManagedVersion=true should bump that local property rather than leaving it orphaned
+        // (or adding a redundant explicit <version> that RemoveRedundantDependencyVersions would strip).
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <flyway.version>10.10.0</flyway.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <flyway.version>10.15.0</flyway.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4193")
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
@@ -2384,6 +2438,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         <version>1.1.1</version>
                       </dependency>
                     </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void retainVersionWithoutArtifactIdFailsValidation() {
+            assertThat(new UpgradeDependencyVersion("*", "jackson*", "latest.patch", null, null,
+              singletonList("com.jcraft")).validate().isValid()).isFalse();
+        }
+
+        @Test
+        void blankRetainVersionIsIgnored() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("*", "spring-cloud-config*", "3.1.4", null, true, singletonList(""))),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.2</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.4</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
                   </project>
                   """
               )
