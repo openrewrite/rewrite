@@ -1001,13 +1001,20 @@ public class Autodetect extends NamedStyles {
 
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
-                        int count = 0;
+                        Set<String> staticMembers = new HashSet<>();
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                            if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
-                                count++;
+                            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(variable.getOwner());
+                            if (owner != null && anImport.getTypeName().equals(owner.getFullyQualifiedName())) {
+                                staticMembers.add(variable.getName());
                             }
                         }
+                        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+                            if (method.hasFlags(Flag.Static) &&
+                                anImport.getTypeName().equals(method.getDeclaringType().getFullyQualifiedName())) {
+                                staticMembers.add(method.getName());
+                            }
+                        }
+                        int count = staticMembers.size();
 
                         importLayoutStatistics.minimumFoldedStaticImports = Math.min(
                                 importLayoutStatistics.minimumFoldedStaticImports,

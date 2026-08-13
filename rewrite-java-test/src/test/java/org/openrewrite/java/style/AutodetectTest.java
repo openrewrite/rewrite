@@ -664,6 +664,43 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
+        var cus = jp().parse(
+          """
+            package org.openrewrite.test;
+
+            public class Outer {
+                public enum Measure {
+                    One, Two, Three, Four, Five, Six
+                }
+            }
+            """,
+          """
+            package org.openrewrite.test;
+
+            import java.util.List;
+
+            import static org.openrewrite.test.Outer.Measure.*;
+
+            class OuterTest {
+                List<Object> used() {
+                    return List.of(One, Two, Three, Four, Five);
+                }
+
+                void parameterized(Outer.Measure measure) {
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+
+        assertThat(importLayout.getNameCountToUseStarImport()).isEqualTo(5);
+    }
+
+    @Test
     void detectMethodArgs() {
         var cus = jp().parse(
           """
