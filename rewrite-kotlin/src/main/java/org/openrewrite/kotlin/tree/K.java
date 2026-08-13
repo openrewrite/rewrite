@@ -1093,6 +1093,11 @@ public interface K extends J {
         @Nullable
         @With
         @Getter
+        ContextParameters contextParameters;
+
+        @Nullable
+        @With
+        @Getter
         JRightPadded<NameTree> receiver;
 
         @Nullable
@@ -1210,7 +1215,7 @@ public interface K extends J {
 
             public FunctionType withParameters(@Nullable JContainer<TypeTree> parameters) {
                 return t.parameters == parameters ? t :
-                        new FunctionType(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.receiver, parameters, t.arrow, t.returnType);
+                        new FunctionType(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.contextParameters, t.receiver, parameters, t.arrow, t.returnType);
             }
         }
     }
@@ -1305,7 +1310,12 @@ public interface K extends J {
 
         Markers markers;
         J.MethodDeclaration methodDeclaration;
+
+        @Nullable
         TypeConstraints typeConstraints;
+
+        @Nullable
+        ContextParameters contextParameters;
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
@@ -1456,6 +1466,15 @@ public interface K extends J {
         @Nullable
         JRightPadded<Expression> receiver;
 
+        /**
+         * The explicit backing field of a property, as in `val n: List<Int> field = mutableListOf()`,
+         * or {@code null} when the property has none. Its single named variable is always called `field`.
+         */
+        J.@Nullable VariableDeclarations backingField;
+
+        @Nullable
+        ContextParameters contextParameters;
+
         public J.VariableDeclarations getVariableDeclarations() {
             return paddedVariableDeclarations.getElement();
         }
@@ -1506,7 +1525,7 @@ public interface K extends J {
 
             public Property withVariableDeclarations(JRightPadded<J.VariableDeclarations> variableDeclarations) {
                 return t.paddedVariableDeclarations == variableDeclarations ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
-                        variableDeclarations, t.typeConstraints, t.accessors, t.receiver);
+                        variableDeclarations, t.typeConstraints, t.accessors, t.receiver, t.backingField, t.contextParameters);
             }
 
             public @Nullable JContainer<TypeParameter> getTypeParameters() {
@@ -1515,7 +1534,7 @@ public interface K extends J {
 
             public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters,
-                        t.paddedVariableDeclarations, t.typeConstraints, t.accessors, t.receiver);
+                        t.paddedVariableDeclarations, t.typeConstraints, t.accessors, t.receiver, t.backingField, t.contextParameters);
             }
 
             public @Nullable JRightPadded<Expression> getReceiver() {
@@ -1524,7 +1543,7 @@ public interface K extends J {
 
             public @Nullable Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
                 return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
-                        t.paddedVariableDeclarations, t.typeConstraints, t.accessors, receiver);
+                        t.paddedVariableDeclarations, t.typeConstraints, t.accessors, receiver, t.backingField, t.contextParameters);
             }
         }
     }
@@ -2208,6 +2227,43 @@ public interface K extends J {
         }
     }
 
+    /**
+     * A Kotlin 2.2 context parameter list, as in `context(c: Ctx)` on a declaration or `context(Ctx) () -> Unit`
+     * on a function type. Entries are named parameters on declarations and bare types on function types.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @Data
+    @With
+    final class ContextParameters implements K {
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        /**
+         * The space before the `context` keyword.
+         */
+        Space prefix;
+
+        Markers markers;
+
+        /**
+         * The parameters, whose container `before` is the space between `context` and `(`.
+         */
+        JContainer<Statement> parameters;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitContextParameters(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+    }
+
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2239,6 +2295,22 @@ public interface K extends J {
 
         public WhenBranch withExpressions(List<Expression> expressions) {
             return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
+        }
+
+        /**
+         * The `if <expression>` guard of a `when` branch, as in `is String if flag -> ...`, or {@code null}
+         * when the branch is unguarded. The element's prefix is the space after `if`, and its `after` is the
+         * space before `->`; when there is no guard that space is the last condition's `after` instead.
+         */
+        @Nullable
+        JRightPadded<Expression> guard;
+
+        public @Nullable Expression getGuard() {
+            return guard == null ? null : guard.getElement();
+        }
+
+        public WhenBranch withGuard(@Nullable Expression guard) {
+            return getPadding().withGuard(JRightPadded.withElement(this.guard, guard));
         }
 
         JRightPadded<J> body;
@@ -2291,7 +2363,7 @@ public interface K extends J {
             }
 
             public WhenBranch withBody(JRightPadded<J> body) {
-                return t.body == body ? t : new WhenBranch(t.id, t.prefix, t.markers, t.expressions, body);
+                return t.body == body ? t : new WhenBranch(t.id, t.prefix, t.markers, t.expressions, t.guard, body);
             }
 
             public JContainer<Expression> getExpressions() {
@@ -2299,7 +2371,15 @@ public interface K extends J {
             }
 
             public WhenBranch withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new WhenBranch(t.id, t.prefix, t.markers, expressions, t.body);
+                return t.expressions == expressions ? t : new WhenBranch(t.id, t.prefix, t.markers, expressions, t.guard, t.body);
+            }
+
+            public @Nullable JRightPadded<Expression> getGuard() {
+                return t.guard;
+            }
+
+            public WhenBranch withGuard(@Nullable JRightPadded<Expression> guard) {
+                return t.guard == guard ? t : new WhenBranch(t.id, t.prefix, t.markers, t.expressions, guard, t.body);
             }
         }
     }
