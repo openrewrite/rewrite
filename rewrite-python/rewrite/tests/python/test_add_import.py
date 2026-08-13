@@ -148,6 +148,22 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_adds_when_referenced(self, arm):
+        """The name is used, so the import is added."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', 'join', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                x = join('a', 'b')
+                """,
+                """
+                from os.path import join
+                x = join('a', 'b')
+                """,
+            )
+        )
+
     def test_merge_into_existing_from_import(self, arm):
         """Merge a new name into an existing 'from X import ...' statement.
 

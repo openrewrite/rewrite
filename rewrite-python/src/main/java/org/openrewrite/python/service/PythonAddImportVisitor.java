@@ -140,7 +140,7 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
         AtomicBoolean found = new AtomicBoolean();
         new PythonVisitor<AtomicBoolean>() {
             // Identifiers inside an import are bindings rather than uses, so neither kind of
-            // import statement is descended into.
+            // import statement is descended into (#8409).
             @Override
             public J visitImport(J.Import imp, AtomicBoolean found) {
                 return imp;
