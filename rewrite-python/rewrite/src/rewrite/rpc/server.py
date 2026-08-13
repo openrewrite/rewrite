@@ -80,9 +80,10 @@ _metrics_lock = threading.Lock()
 _request_id_counter = 0
 _request_id_lock = threading.Lock()
 
-# Pending requests waiting for responses
-_pending_requests: Dict[int, Any] = {}
-_pending_lock = threading.Lock()
+# Ids of the calls currently on the stack, and responses that arrived for one of them
+# while another was waiting; anything no listed call claims is dropped rather than kept.
+_awaiting_ids: Set[Any] = set()
+_pending_responses: Dict[Any, dict] = {}
 
 # Flag for trace mode
 _trace_rpc = False
@@ -144,21 +145,44 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     # Send the request to Java via stdout
     write_message(request)
 
-    # Read the response from Java with timeout
-    response = read_message_with_timeout(timeout_seconds)
+    _awaiting_ids.add(request_id)
+    try:
+        while True:
+            response = _pending_responses.pop(request_id, None)
+            if response is None:
+                try:
+                    response = read_message_with_timeout(timeout_seconds)
+                except TimeoutError as e:
+                    raise RuntimeError(f"No response received for {method} request ({e})")
+                if response is None:
+                    raise RuntimeError(f"Host closed the stream while awaiting a response to {method}")
 
-    if response is None:
-        raise RuntimeError(f"No response received for {method} request (timeout after {timeout_seconds}s)")
+            # Java can call us while we are calling Java; serve it and keep waiting, as
+            # the JS peer's connection does for a request arriving mid-call.
+            if response.get('method') is not None:
+                _serve(response)
+                continue
 
-    if _trace_rpc:
-        logger.debug(f"Received response from Java: {json.dumps(response)}")
+            response_id = response.get('id')
+            if response_id != request_id:
+                if response_id in _awaiting_ids:
+                    _pending_responses[response_id] = response
+                else:
+                    logger.warning(f"Discarding response for request {response_id}; "
+                                   f"no call is awaiting it")
+                continue
 
-    # Check for errors
-    if 'error' in response:
-        error = response['error']
-        raise RuntimeError(f"RPC error from Java: {error.get('message', 'Unknown error')}")
+            if _trace_rpc:
+                logger.debug(f"Received response from Java: {json.dumps(response)}")
 
-    return response.get('result')
+            if 'error' in response:
+                error = response['error']
+                raise RuntimeError(f"RPC error from Java: {error.get('message', 'Unknown error')}")
+
+            return response.get('result')
+    finally:
+        _awaiting_ids.discard(request_id)
+        _pending_responses.pop(request_id, None)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -2544,6 +2568,10 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+class _ProtocolError(Exception):
+    """The stream can no longer be framed, so no later message can be trusted."""
+
+
 class _StdinBuffer:
     """Buffered reader for raw stdin file descriptor.
 
@@ -2556,6 +2584,7 @@ class _StdinBuffer:
     def __init__(self):
         self._fd: Optional[int] = None
         self._buf = bytearray()
+        self.at_eof = False
 
     def _get_fd(self) -> int:
         fd = self._fd
@@ -2621,6 +2650,7 @@ class _StdinBuffer:
         else:
             chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
         if not chunk:
+            self.at_eof = True
             return False
         self._buf += chunk
         return True
@@ -2629,75 +2659,70 @@ class _StdinBuffer:
 _stdin_buffer = _StdinBuffer()
 
 
-def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
-    """Read a JSON-RPC message from stdin with timeout.
+def _read_body(header_line: bytes) -> Optional[dict]:
+    """Read the remainder of a message whose header line has been consumed.
 
-    Args:
-        timeout_seconds: Maximum time to wait for complete message
+    No deadline applies past the header. A message the reader walks away from
+    half-read leaves its body to be parsed as the next message's header, which
+    desynchronizes every read that follows.
 
     Returns:
-        Parsed JSON message, or None on timeout/error
+        Parsed JSON message
+
+    Raises:
+        _ProtocolError: If the frame cannot be parsed or ends early
     """
-    deadline = time.time() + timeout_seconds
+    header_str = header_line.decode('utf-8', 'replace').strip()
+    if not header_str.startswith('Content-Length:'):
+        raise _ProtocolError(f"invalid header: {header_str}")
 
     try:
-        # Read Content-Length header
-        header_line = _stdin_buffer.read_line(deadline)
-        if not header_line:
-            logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
-            return None
-
-        header_str = header_line.decode('utf-8').strip()
-        if not header_str.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_str}")
-            return None
-
         content_length = int(header_str.split(':')[1].strip())
+    except ValueError:
+        raise _ProtocolError(f"invalid content length: {header_str}")
 
-        # Read empty line (separator)
-        separator = _stdin_buffer.read_line(deadline)
-        if separator is None:
-            logger.warning(f"Timeout waiting for header separator")
-            return None
+    # The separator line. A stream ending mid-frame has truncated a message rather
+    # than closed between two, so it is a fault and not the host hanging up.
+    if _stdin_buffer.read_line() is None:
+        raise _ProtocolError("stream ended before the message body")
 
-        # Read content
-        content_bytes = _stdin_buffer.read_bytes(content_length, deadline)
-        if content_bytes is None:
-            logger.warning(f"Timeout waiting for message content")
-            return None
+    content_bytes = _stdin_buffer.read_bytes(content_length)
+    if content_bytes is None:
+        raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
+    try:
         return json.loads(content_bytes.decode('utf-8'))
-    except Exception as e:
-        logger.error(f"Error reading message with timeout: {e}")
-        return None
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise _ProtocolError(f"invalid message body: {e}")
+
+
+def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
+    """Read a JSON-RPC message from stdin, bounding the wait for it to *start*.
+
+    Args:
+        timeout_seconds: Maximum time to wait for a message to begin arriving
+
+    Returns:
+        Parsed JSON message, or None if the host closed the stream
+
+    Raises:
+        TimeoutError: If no message begins arriving within the deadline
+        _ProtocolError: If the frame cannot be parsed or ends early
+    """
+    header_line = _stdin_buffer.read_line(time.time() + timeout_seconds)
+    if header_line is None:
+        if _stdin_buffer.at_eof:
+            return None
+        raise TimeoutError(f"no RPC message arrived within {timeout_seconds}s")
+    return _read_body(header_line)
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
-    try:
-        # Read Content-Length header
-        header_line = _stdin_buffer.read_line()
-        if not header_line:
-            return None
-
-        header_str = header_line.decode('utf-8').strip()
-        if not header_str.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_str}")
-            return None
-
-        content_length = int(header_str.split(':')[1].strip())
-
-        # Read empty line (separator)
-        _stdin_buffer.read_line()
-
-        # Read content
-        content_bytes = _stdin_buffer.read_bytes(content_length)
-        if not content_bytes:
-            return None
-        return json.loads(content_bytes.decode('utf-8'))
-    except Exception as e:
-        logger.error(f"Error reading message: {e}")
+    """Read a JSON-RPC message from stdin (blocking, no timeout). None on EOF."""
+    header_line = _stdin_buffer.read_line()
+    if not header_line:
         return None
+    return _read_body(header_line)
 
 
 def write_message(response: dict):
@@ -2710,6 +2735,72 @@ def write_message(response: dict):
     content_bytes = json.dumps(response).encode('utf-8')
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
     os.write(sys.stdout.fileno(), header + content_bytes)
+
+
+def _error_response(request_id: Any, e: Exception) -> dict:
+    """Must be called while handling ``e``, so the traceback reaches the host."""
+    return {
+        'jsonrpc': '2.0',
+        'id': request_id,
+        'error': {
+            'code': -32603,
+            'message': str(e),
+            'data': traceback.format_exc()
+        }
+    }
+
+
+def _write_response(response: dict) -> None:
+    """Send a response, substituting an error when the result cannot be encoded.
+
+    Encoding sits outside the guard around the handler, and a value JSON cannot
+    represent is that one request's failure rather than the server's.
+    """
+    try:
+        if _trace_rpc:
+            logger.debug(f"Sending: {json.dumps(response)}")
+        write_message(response)
+    except (TypeError, ValueError) as e:
+        request_id = response.get('id')
+        logger.exception(f"Error encoding response for request {request_id}: {e}")
+        write_message(_error_response(request_id, e))
+
+
+def _serve(message: dict) -> None:
+    """Handle one inbound request and reply to it."""
+    request_id = message.get('id')
+    method = message.get('method')
+    params = message.get('params', {})
+
+    if method is None:
+        logger.error("Missing 'method' in request")
+        return
+
+    if _trace_rpc:
+        logger.debug(f"Received: {json.dumps(message)}")
+
+    metric_start = time.monotonic()
+    metric_error = ''
+    try:
+        response = {
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'result': handle_request(method, params)
+        }
+    except _ProtocolError:
+        # A nested call can raise this. Answering it as a request-level error would
+        # leave main() reading on, so let it through and end the process.
+        raise
+    except Exception as e:
+        logger.exception(f"Error handling request: {e}")
+        metric_error = str(e)
+        response = _error_response(request_id, e)
+    _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
+
+    # Notifications (no id, e.g. Evict) get no reply — a null-id response would
+    # fail every in-flight request on the Java reader.
+    if request_id is not None:
+        _write_response(response)
 
 
 def _init_pyroscope() -> None:
@@ -2806,6 +2897,11 @@ def _close_metrics() -> None:
         _metrics_file = _metrics_writer = None
 
 
+# Exit status for a fault, distinguishing it from the 0 of a host-closed stream.
+# Matches the JS server's `process.on('uncaughtException') -> process.exit(8)`.
+FATAL_EXIT_CODE = 8
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -2850,64 +2946,27 @@ def main():
 
     logger.info("Python RPC server starting...")
 
-    while True:
-        try:
+    exit_code = 0
+    try:
+        while True:
             message = read_message()
             if message is None:
                 break
-
-            if args.trace_rpc_messages:
-                logger.debug(f"Received: {json.dumps(message)}")
-
-            request_id = message.get('id')
-            method = message.get('method')
-            params = message.get('params', {})
-
-            if method is None:
-                logger.error("Missing 'method' in request")
-                continue
-
-            metric_start = time.monotonic()
-            metric_error = ''
-            try:
-                result = handle_request(method, params)
-                response = {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'result': result
-                }
-            except Exception as e:
-                logger.exception(f"Error handling request: {e}")
-                # Include full stack trace in error response for debugging
-                tb_str = traceback.format_exc()
-                metric_error = str(e)
-                response = {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'error': {
-                        'code': -32603,
-                        'message': str(e),
-                        'data': tb_str
-                    }
-                }
-            _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
-
-            if args.trace_rpc_messages:
-                logger.debug(f"Sending: {json.dumps(response)}")
-
-            # Notifications (no id, e.g. Evict) get no reply — a null-id response would
-            # fail every in-flight request on the Java reader.
-            if request_id is not None:
-                write_message(response)
-
-        except Exception as e:
-            logger.exception(f"Fatal error: {e}")
-            break
+            _serve(message)
+    except _ProtocolError as e:
+        logger.error(f"Protocol error, cannot continue: {e}")
+        exit_code = FATAL_EXIT_CODE
+    except Exception as e:
+        logger.exception(f"Fatal error: {e}")
+        exit_code = FATAL_EXIT_CODE
 
     # No ty-types cleanup needed here — clients are scoped per parse batch
 
     _close_metrics()
     logger.info("Python RPC server shutting down...")
+
+    if exit_code:
+        sys.exit(exit_code)
 
 
 if __name__ == '__main__':
