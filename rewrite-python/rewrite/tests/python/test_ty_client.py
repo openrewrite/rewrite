@@ -145,6 +145,16 @@ def test_process_death_marks_the_client_unavailable(client, caplog):
     assert "ty-types panicked" in caplog.text
 
 
+def test_initialize_revives_a_client_whose_process_died(client):
+    assert client.initialize("/some/project")
+    assert client.get_types("/some/project/die.py", timeout=10) is None
+    assert not client.is_available
+
+    assert client.initialize("/some/project")
+    assert client.is_available
+    assert client.get_types("/some/project/app.py", timeout=10) is not None
+
+
 def test_initialize_revives_a_killed_client(wedged_client):
     assert wedged_client.initialize("/some/project")
     for i in range(TyTypesClient._MAX_CONSECUTIVE_TIMEOUTS):

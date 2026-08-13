@@ -29,13 +29,16 @@ import os
 import queue
 import subprocess
 import sys
-import tempfile
 import threading
 import time
+from collections import deque
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Deque, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Enough to carry a panic message and its backtrace into the exit warning.
+_STDERR_TAIL_LINES = 50
 
 
 class TyTypesClient:
@@ -72,7 +75,6 @@ class TyTypesClient:
         self._initialized = False
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
-        self._stderr_path: Optional[Path] = None
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
         #
@@ -110,33 +112,31 @@ class TyTypesClient:
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
 
-        # ty writes to stderr only as it dies, so the diagnostics are worth
-        # keeping; a file, unlike a pipe, never blocks the writer.
-        stderr_fd, stderr_path = tempfile.mkstemp(prefix='ty-types-', suffix='.log')
-        self._stderr_path = Path(stderr_path)
         try:
             self._process = subprocess.Popen(
                 [str(binary), '--serve'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=stderr_fd,
+                stderr=subprocess.PIPE,
                 env=self._subprocess_env(virtual_env=self._virtual_env),
             )
         except FileNotFoundError:
             self._process = None
-            self._discard_stderr()
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
-        finally:
-            os.close(stderr_fd)
 
-        # An undrained stdout deadlocks ty once its buffer fills, and a pipe
-        # read cannot be bounded on Windows.
+        # Draining both pipes keeps ty from deadlocking on a full buffer; threads
+        # because a pipe read cannot be bounded on Windows.
         self._responses: queue.Queue = queue.Queue()
         self._consecutive_timeouts = 0
+        self._stderr_lines: Deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
         threading.Thread(target=self._drain_stdout, args=(self._process,),
                          name="ty-types-stdout", daemon=True).start()
+        self._stderr_thread = threading.Thread(
+            target=self._drain_stderr, args=(self._process, self._stderr_lines),
+            name="ty-types-stderr", daemon=True)
+        self._stderr_thread.start()
 
     def _drain_stdout(self, process: subprocess.Popen) -> None:
         """Read response lines into the queue until EOF; EOF enqueues None."""
@@ -158,21 +158,15 @@ class TyTypesClient:
             else:
                 logger.warning("ty-types emitted a non-object JSON line on stdout")
 
-    def _discard_stderr(self) -> None:
-        path, self._stderr_path = self._stderr_path, None
-        if path is not None:
-            try:
-                path.unlink()
-            except OSError:
-                pass
-
-    def _stderr_tail(self, limit: int = 2000) -> str:
-        if self._stderr_path is None:
-            return ""
-        try:
-            return self._stderr_path.read_text('utf-8', errors='replace')[-limit:].strip()
-        except OSError:
-            return ""
+    @staticmethod
+    def _drain_stderr(process: subprocess.Popen, lines: Deque[str]) -> None:
+        """Buffer stderr for ``_note_exit``; ty writes there only as it dies."""
+        stderr = process.stderr
+        while True:
+            line = stderr.readline()
+            if not line:
+                return
+            lines.append(line.decode('utf-8', 'replace').rstrip())
 
     def _note_exit(self, process: subprocess.Popen) -> None:
         """Record that ty exited, surfacing its stderr when the exit was abnormal."""
@@ -182,7 +176,10 @@ class TyTypesClient:
         except subprocess.TimeoutExpired:
             return
         if returncode:
-            logger.warning("ty-types exited with code %s: %s", returncode, self._stderr_tail())
+            # ty is gone, so stderr is at EOF and the reader only needs to finish.
+            self._stderr_thread.join(timeout=1)
+            logger.warning("ty-types exited with code %s: %s",
+                           returncode, "\n".join(self._stderr_lines))
 
     @staticmethod
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
@@ -298,7 +295,7 @@ class TyTypesClient:
                 return None
 
             if response is None:
-                # EOF sentinel: ty closed stdout, so the session is over.
+                # EOF sentinel: ty closed stdout.
                 process = self._process
                 if process is not None:
                     self._note_exit(process)
@@ -323,7 +320,9 @@ class TyTypesClient:
 
         if self._initialized:
             self.shutdown()
-        if self._process is None:
+        # Only ``_kill`` and ``shutdown`` detach ``_process``; one that exited on
+        # its own is still attached, so its liveness has to be polled for.
+        if self._process is None or self._process.poll() is not None:
             self.session_types.clear()
             self._start_process()
 
@@ -387,7 +386,6 @@ class TyTypesClient:
             self._process = None
             self._initialized = False
             self._project_root = None
-            self._discard_stderr()
 
     def _kill(self) -> None:
         """Forcibly terminate an unresponsive ty-types process."""
@@ -395,7 +393,6 @@ class TyTypesClient:
         self._process = None
         self._initialized = False
         self._project_root = None
-        self._discard_stderr()
         if process is not None:
             try:
                 process.kill()
