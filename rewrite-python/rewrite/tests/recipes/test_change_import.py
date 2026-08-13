@@ -628,3 +628,364 @@ class TestChangeImportLeavesUnrelatedImports:
                 """,
             )
         )
+
+
+class TestChangeImportFunctionScopedReferences:
+    """References inside a function body are renamed unless the enclosing scope
+    binds the name itself."""
+
+    def test_rename_annotation_references_in_function(self):
+        """Annotations are references to the imported name, not bindings of it,
+        so they are renamed along with the import."""
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='typing',
+                old_name='Deque',
+                new_module='collections',
+                new_name='deque',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+
+                    def f(q: Deque[int]) -> Deque[int]:
+                        local: Deque[int] = q
+                        return local
+                    """,
+                    """\
+                    from collections import deque
+
+
+                    def f(q: deque[int]) -> deque[int]:
+                        local: deque[int] = q
+                        return local
+                    """,
+                )
+            )
+
+    def test_rename_plain_references_in_function(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from time import clock
+
+
+                    def f():
+                        return clock()
+                    """,
+                    """\
+                    from time import perf_counter
+
+
+                    def f():
+                        return perf_counter()
+                    """,
+                )
+            )
+
+    def test_no_rename_of_names_bound_in_the_same_function(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from time import clock
+
+
+                    def assigned():
+                        clock = 1
+                        return clock
+
+
+                    def parameter(clock):
+                        return clock
+
+
+                    def loop_target():
+                        for clock in range(3):
+                            print(clock)
+
+
+                    def as_clause():
+                        with open("f") as clock:
+                            return clock
+
+
+                    def nested_def():
+                        def clock():
+                            pass
+                        return clock
+
+
+                    def uses_import():
+                        return clock()
+                    """,
+                    """\
+                    from time import perf_counter
+
+
+                    def assigned():
+                        clock = 1
+                        return clock
+
+
+                    def parameter(clock):
+                        return clock
+
+
+                    def loop_target():
+                        for clock in range(3):
+                            print(clock)
+
+
+                    def as_clause():
+                        with open("f") as clock:
+                            return clock
+
+
+                    def nested_def():
+                        def clock():
+                            pass
+                        return clock
+
+
+                    def uses_import():
+                        return perf_counter()
+                    """,
+                )
+            )
+
+    def test_nested_function_shadowing_does_not_leak_outward(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from time import clock
+
+
+                    def outer():
+                        def inner():
+                            clock = 1
+                            return clock
+                        return clock() + inner()
+                    """,
+                    """\
+                    from time import perf_counter
+
+
+                    def outer():
+                        def inner():
+                            clock = 1
+                            return clock
+                        return perf_counter() + inner()
+                    """,
+                )
+            )
+
+
+class TestChangeImportPythonScopeRules:
+    """Renaming follows Python's own scoping: a name is a local only where the
+    interpreter would resolve it to one."""
+
+    @staticmethod
+    def _run(before, after=None):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(python(before, after) if after else python(before))
+
+    def test_class_attribute_does_not_shadow_inside_methods(self):
+        """A class body is not part of the scope chain of its methods."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = 1
+
+                def m(self):
+                    return clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = 1
+
+                def m(self):
+                    return perf_counter()
+            """,
+        )
+
+    def test_class_attribute_shadows_within_the_class_body(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = 1
+                alias = clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = 1
+                alias = clock
+            """,
+        )
+
+    def test_attribute_and_subscript_targets_do_not_bind(self):
+        """``self.clock = 1`` and ``d[clock] = 1`` assign through an object."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                def m(self, d):
+                    self.clock = 1
+                    d[clock] = 2
+                    return clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                def m(self, d):
+                    self.clock = 1
+                    d[perf_counter] = 2
+                    return perf_counter()
+            """,
+        )
+
+    def test_tuple_unpacking_binds(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(pair):
+                clock, other = pair
+                return clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(pair):
+                clock, other = pair
+                return clock
+            """,
+        )
+
+    def test_function_local_import_shadows(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f():
+                from mymod import clock
+                return clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f():
+                from mymod import clock
+                return clock()
+            """,
+        )
+
+    def test_decorator_resolves_in_the_enclosing_scope(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            @clock
+            def f():
+                clock = 1
+                return clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            @perf_counter
+            def f():
+                clock = 1
+                return clock
+            """,
+        )
+
+    def test_parameter_default_resolves_in_the_enclosing_scope(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(x=clock):
+                clock = 1
+                return clock, x
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(x=perf_counter):
+                clock = 1
+                return clock, x
+            """,
+        )
+
+    def test_global_declaration_is_not_a_local_binding(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f():
+                global clock
+                clock = 1
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f():
+                global perf_counter
+                perf_counter = 1
+            """,
+        )

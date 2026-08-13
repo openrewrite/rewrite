@@ -24,8 +24,9 @@ from rewrite.marketplace import Python
 from rewrite.recipe import option
 from rewrite.java import J
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import FieldAccess, Identifier, Import, MethodDeclaration, MethodInvocation
+from rewrite.java.tree import FieldAccess, Identifier, Import, MethodInvocation
 from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
+from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
@@ -142,6 +143,7 @@ class ChangeImport(Recipe):
             module_alias: Optional[str] = None
             rewrote_qualified_refs: bool = False
             new_module_type: Optional[JavaType.Class] = None
+            local_bindings: LocalBindings  # a fresh instance per compilation unit
 
             def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
                 self.has_old_import = False
@@ -150,6 +152,7 @@ class ChangeImport(Recipe):
                 self.module_alias = None
                 self.rewrote_qualified_refs = False
                 self.new_module_type = None
+                self.local_bindings = LocalBindings()
 
                 # Single pass: detect old imports and direct module imports
                 for stmt in cu.statements:
@@ -259,14 +262,13 @@ class ChangeImport(Recipe):
                 # Skip identifiers inside import statements
                 if self.cursor.first_enclosing(Import):
                     return ident
-                # Skip local variables that shadow the imported name.
-                # Only check field_type inside function scopes — at module level,
-                # bare references to the imported name always need renaming.
-                # When ty is unavailable, field_type is None for all identifiers
-                # and shadowed locals may be incorrectly renamed.
-                if self.cursor.first_enclosing(MethodDeclaration) is not None:
-                    if ident.field_type is not None:
-                        return ident
+                # An attribute name resolves against its target object;
+                # visit_field_access handles the qualified references.
+                parent = self.cursor.parent_tree_cursor().value
+                if isinstance(parent, FieldAccess) and parent.name.id == ident.id:
+                    return ident
+                if self.local_bindings.is_bound(self.cursor, old_ref_name):
+                    return ident
                 return ident.replace(_simple_name=new_ref_name)
 
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:
