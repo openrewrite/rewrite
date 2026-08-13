@@ -131,6 +131,27 @@ examples:
     language: json
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.json.RemoveEmptyKeys
+examples:
+- description: '`RemoveEmptyKeysTest#removeEmptyObject`'
+  parameters:
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      {
+        "name": "my-package",
+        "engines": {},
+        "version": "1.0.0"
+      }
+    after: |
+      {
+        "name": "my-package",
+        "version": "1.0.0"
+      }
+    language: json
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.json.format.AutoFormat
 examples:
 - description: '`AutoFormatTest#simple`'
