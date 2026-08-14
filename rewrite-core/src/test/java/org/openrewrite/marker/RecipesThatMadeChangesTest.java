@@ -16,26 +16,33 @@
 package org.openrewrite.marker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.moderne.jsonrpc.JsonRpcRequest;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import org.junit.jupiter.api.Test;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.FindAndReplace;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.tuple;
 
 class RecipesThatMadeChangesTest {
@@ -56,10 +63,10 @@ class RecipesThatMadeChangesTest {
     }
 
     @Test
-    void runStateDoesNotReachThePayload() {
-        RecipesThatMadeChanges marker = RecipesThatMadeChanges.create(List.of(new RecipeHoldingRunState()));
-
-        assertThatNoException().isThrownBy(() -> mapper.writeValueAsString(send(marker)));
+    void payloadIsBoundedByStackDepthNotRunState() {
+        // Same two frames both times; only what the scanning recipe accumulated behind the
+        // precondition visitor's cursor differs, and that is not part of a recipe's identity.
+        assertThat(wireSize(accumulating(10))).isEqualTo(wireSize(accumulating(10_000)));
     }
 
     @Test
@@ -155,12 +162,39 @@ class RecipesThatMadeChangesTest {
           .doesNotContainNull();
     }
 
-    /** Stands in for an {@link org.openrewrite.rpc.RpcRecipe}, which holds live run state. */
-    @Getter
-    static class RecipeHoldingRunState extends Recipe {
-        String displayName = "Recipe holding run state";
-        String description = "Reaches live run state that no JSON mapper can serialize.";
-        Object runState = new Object();
+    /**
+     * A stack shaped like the one that provoked this change: an {@link RpcRecipe} whose precondition
+     * visitor holds a cursor whose messages reach a scanning recipe's accumulator.
+     */
+    private static RecipesThatMadeChanges accumulating(int entries) {
+        TreeVisitor<?, ExecutionContext> precondition = new TreeVisitor<Tree, ExecutionContext>() {
+        };
+        Map<String, String> accumulator = new LinkedHashMap<>();
+        for (int i = 0; i < entries; i++) {
+            accumulator.put("pyproject-" + i + ".toml", "requires-python = \">=3.13\"");
+        }
+        Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cursor.putMessage("org.openrewrite.recipe.acc.816496f7", accumulator);
+        precondition.setCursor(cursor);
+
+        RecipeDescriptor descriptor = new RecipeDescriptor("com.example.Remote", "Remote", "Remote", "",
+          emptySet(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
+          emptyList(), URI.create("test:rpc"));
+        return RecipesThatMadeChanges.create(List.of(new ChangeText("hello"),
+          new RpcRecipe(null, "remote-id", descriptor, "EditVisitor", precondition, "ScanVisitor",
+            null, List.of())));
+    }
+
+    /** Serialized through the formatter {@code GetObject} responses actually use. */
+    private static int wireSize(RecipesThatMadeChanges marker) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            new JsonMessageFormatter(new SimpleModule())
+              .serialize(JsonRpcRequest.newRequest("GetObject", send(marker)), out);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return out.size();
     }
 
     private static List<RpcObjectData> send(RecipesThatMadeChanges marker) {
