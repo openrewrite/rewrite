@@ -2728,7 +2728,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitModuleNode(Nodes.ModuleNode node) {
         Space prefix = prefix(node);
         skip("module");
-        return new Rb.Module(randomId(), prefix, Markers.EMPTY, identifier(node.constant_path),
+        return new Rb.Module(randomId(), prefix, Markers.EMPTY, convertExpression(node.constant_path),
                 keywordBlock(node.body, "end"));
     }
 

@@ -351,7 +351,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             m = (Rb.Module) temp;
         }
-        m = m.withName((J.Identifier) visit(m.getName(), p));
+        m = m.withName(visitAndCast(m.getName(), p));
         m = m.withBlock((J.Block) visit(m.getBlock(), p));
         return m;
     }

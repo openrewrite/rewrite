@@ -16,8 +16,10 @@
 package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 public class ClassDeclarationTest implements RewriteTest {
@@ -180,6 +182,42 @@ public class ClassDeclarationTest implements RewriteTest {
                   end
                             
                   ORIGIN = Point.new(0,0)
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * `J.ClassDeclaration.name` is a single identifier, so a compact name is held whole rather than
+     * split the way {@link Rb.Module} splits it. What matters either way is that no segment is lost:
+     * dropping the namespace is what breaks reconstructing a Rails route from a controller.
+     */
+    @Test
+    void compactName() {
+        rewriteRun(
+          ruby(
+            """
+              class Api::V1::PhotosController < ApplicationController
+                def index
+                end
+              end
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration clazz = (J.ClassDeclaration) cu.getStatements().get(0);
+                assertThat(clazz.getName().getSimpleName()).isEqualTo("Api::V1::PhotosController");
+                assertThat(clazz.getExtends()).isNotNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void topLevelName() {
+        rewriteRun(
+          ruby(
+            """
+              class ::TopLevel
               end
               """
           )

@@ -1385,7 +1385,14 @@ public interface Rb extends J {
 
         Space prefix;
         Markers markers;
-        Identifier name;
+
+        /**
+         * A {@link J.Identifier} for a plain name and a {@link J.MemberReference} for a compact one
+         * (`module Api::V1`), the same shape `::` takes in expression position. Widened from an
+         * identifier for the same reason {@link J.Package} holds an expression.
+         */
+        Expression name;
+
         J.Block block;
 
         @Override
