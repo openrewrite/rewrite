@@ -50,11 +50,10 @@ case the source is read at a node offset rather than guessed:
   whole construct, so only a node starting at the cursor has a `begin` of its own.
 
 Ruby syntax the visitor has not been taught reaches `defaultVisit`, which throws with
-the Prism node name. Known gaps: pattern captures (`=> name`), alternation and pins,
-numbered block parameters (`_1`), `it`, `undef`, and compact class names
-(`class Foo::Bar`).
+the Prism node name. There are no known gaps: every file that is Ruby in the redmine and
+dependabot-core corpora parses. `README.md` has the full inventory of what maps where.
 
-`RubyCorpusTest` measures where those gaps bite. It is skipped unless
+`RubyCorpusTest` measures where a new gap would bite. It is skipped unless
 `-Druby.corpus.dir=<dir>` is set, and prints a parse rate plus a histogram of failure
 causes; alongside its report it writes `<report>.failures` (one `cause<TAB>path` line
 per file) and `<report>.messages` (the full message per file), since the histogram
@@ -81,6 +80,34 @@ which is the same shape as the top-level target list of `Rb.MultipleAssignment`.
 loops instead spread their targets across the names of one `J.VariableDeclarations`,
 which is what `J.ForEachLoop.Control` can hold.
 
+**A pattern is an expression, and its decorations are types rather than markers.**
+`in Integer => n` is `Rb.PatternBinding` (not `Rb.RightwardAssignment`, which spells the
+same token with the operands the other way round), `in a | b` is
+`Rb.Binary.Type.PatternOr` (not `J.Binary.Type.Or`, which prints `||`), `in ^x` is
+`Rb.Unary.Type.Pin` — whose parenthesized form `^(n + 2)` keeps a `J.Parentheses` operand,
+since Prism models no node for those parentheses. A guard is `Rb.PatternGuard` standing in
+the `J.Case` expression container, because `J.Case` has no guard slot; it carries the
+existing `Unless` marker for `in [x] unless c`. `Rb.Unary.getType()` is
+operator-dependent: `defined?` is always boolean, a pin is whatever it pins.
+
+**An implicit block parameter writes nothing, so it holds nothing.** A block or lambda
+using `_1`/`_2` or `it` gets a Prism parameters node spanning the whole block; `Rb.Block`
+keeps `parameters == null` for those and the body refers to the names as ordinary
+`J.Identifier`s. `writesParameters` is the guard, and both `visitBlockNode` and
+`visitLambdaNode` need it. RSpec's `it "..." do ... end` is unaffected: it is a
+`J.MethodInvocation` named `it`, not an identifier.
+
+**`&nil` and `**nil` are the ordinary `&`/`**` shapes over a `nil` identifier**
+(`Rb.BlockArgument` and `Rb.Splat`) rather than an identifier holding the whole token.
+Prism gives each one node with no child, so the `nil` is read back off the source.
+
+**A compact declaration name keeps every segment.** `Rb.Module.name` is an `Expression`, so
+`module Api::V1` is the same `J.MemberReference` that `::` produces in expression position
+and `module ::TopLevel` is one with an empty left operand. `J.ClassDeclaration.name` is a
+`J.Identifier` upstream and cannot hold that, so `class Api::V1::Photos` keeps the whole
+dotted name in one identifier — losing segments is the thing to avoid, and the asymmetry is
+the price of not forking `J.ClassDeclaration`.
+
 **Both printers restore the other's cursor.** `RubyPrinter` and its inner
 `RubyJavaPrinter` hand each other the cursor to print a subtree; whoever hands it over
 puts its own back afterwards. Without that the outer printer is left inside the subtree
@@ -88,7 +115,8 @@ it just delegated, and anything that reads its ancestors (`visitCase` choosing b
 `when`, `in` and `=>`, `visitVariable` looking for a keyword argument) reads the wrong
 ones.
 
-See `doc/adr/0012-ruby-parsing-via-jruby.md`.
+See `README.md` for the type and marker inventory, and
+`doc/adr/0012-ruby-parsing-via-jruby.md` for the parser front-end decision.
 
 ## J.Unknown is forbidden
 

@@ -85,3 +85,25 @@ Ruby 3.x syntax the visitor has not been taught still reaches `defaultVisit` and
 two corpora: redmine 998/1129 files (88%), dependabot-core 1855/2017 (92%). The largest remaining gaps
 are endless method definitions (`def x = expr`), `;` as a statement separator, `RescueModifierNode`
 and `MultiTargetNode`.
+
+## Status: Stage C landed
+
+The syntax gaps are closed. Pattern matching gained bindings (`in Integer => n`, `Rb.PatternBinding`),
+alternations (`Rb.Binary.Type.PatternOr`), pins (`Rb.Unary.Type.Pin`, whose operand type is now
+operator-dependent) and guards (`Rb.PatternGuard`, reusing the `Unless` marker). Blocks gained the
+implicit parameters `_1`/`_2` and `it`, which write no parameter list and appear in the body as
+ordinary identifiers, and the refusals `&nil`/`**nil`. `undef` became `Rb.Undef`, alongside `Rb.Alias`
+and sharing its name mapping. The `# shareable_constant_value:` wrapper unwraps to the assignment it
+wraps. `Rb.Module.name` widened from an identifier to an expression so that `module Api::V1` keeps
+both segments; `J.ClassDeclaration.name` is an identifier upstream, so a compact class name is held
+whole instead.
+
+Measured over the same two corpora, every file that is Ruby now parses: redmine 1128/1129 and
+dependabot-core 2016/2017. The two failures are not Ruby — an ERB template named `.rb`
+(`lib/generators/redmine_plugin_model/templates/migration.rb`) and a fixture that is deliberately
+invalid (`bundler/spec/fixtures/projects/bundler2/invalid_ruby/Gemfile`).
+
+`rewrite-kotlin` now generates a `RubyScope` for the recipe DSL, so recipes can be written as
+`ruby { visitX { ... } }`. It reaches rewrite-ruby through a `compileOnly` dependency that asks for
+the Java 21 variant, since rewrite-kotlin itself targets Java 8 and rewrite-ruby publishes no Java 8
+variant.

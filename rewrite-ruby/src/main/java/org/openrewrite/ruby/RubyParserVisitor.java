@@ -3073,7 +3073,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     /**
-     * `&nil` refuses a block, and is the same {@code &} + expression shape as any other block
+     * {@code &nil} refuses a block, and is the same {@code &} + expression shape as any other block
      * argument.
      */
     @Override
