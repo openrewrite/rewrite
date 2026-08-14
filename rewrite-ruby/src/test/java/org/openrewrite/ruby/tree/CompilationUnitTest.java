@@ -39,6 +39,24 @@ public class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    /**
+     * The magic comment makes Prism wrap the assignments that follow it; the tree keeps only the
+     * assignments, and the comment round-trips as a comment.
+     */
+    @Test
+    void shareableConstantValue() {
+        rewriteRun(
+          ruby(
+            """
+              # frozen_string_literal: true
+              # shareable_constant_value: literal
+              CONST = [1, 2, 3]
+              OTHER = {a: 1}
+              """
+          )
+        );
+    }
+
     @Test
     void singleBlockStatementIsAnArray() {
         rewriteRun(

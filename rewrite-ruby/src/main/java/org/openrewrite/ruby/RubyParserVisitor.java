@@ -2757,6 +2757,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 methodName(node.new_name), methodName(node.old_name));
     }
 
+    /**
+     * A `# shareable_constant_value:` magic comment makes Prism wrap each constant assignment that
+     * follows it. The comment round-trips as an ordinary comment and the wrapper spans exactly its
+     * assignment, so it contributes nothing of its own to the tree.
+     */
+    @Override
+    public J visitShareableConstantNode(Nodes.ShareableConstantNode node) {
+        return convert(node.write);
+    }
+
     @Override
     public J visitUndefNode(Nodes.UndefNode node) {
         Space prefix = prefix(node);
