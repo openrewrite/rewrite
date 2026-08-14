@@ -700,6 +700,12 @@ public interface Rb extends J {
             ImplicitStringConcatenation,
             Match,
             NotMatch,
+
+            /**
+             * The {@code |} between alternative patterns, which is not {@link J.Binary.Type#Or}
+             * ({@code ||}).
+             */
+            PatternOr,
             RangeExclusive,
             RangeInclusive,
             Within,
@@ -1684,6 +1690,190 @@ public interface Rb extends J {
         }
     }
 
+    /**
+     * A pattern that binds whatever it matched to a name, as in {@code in Integer => n}. Not a
+     * {@link RightwardAssignment}: that spells the same token with the operands mirrored, matching a
+     * value on the left against a pattern on the right.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class PatternBinding implements Rb, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Expression pattern;
+
+        JLeftPadded<J.Identifier> name;
+
+        public J.Identifier getName() {
+            return name.getElement();
+        }
+
+        public PatternBinding withName(J.Identifier name) {
+            return getPadding().withName(this.name.withElement(name));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return pattern.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withPattern(pattern.withType(type));
+        }
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            return v.visitPatternBinding(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PatternBinding t;
+
+            public JLeftPadded<J.Identifier> getName() {
+                return t.name;
+            }
+
+            public PatternBinding withName(JLeftPadded<J.Identifier> name) {
+                return t.name == name ? t : new PatternBinding(t.id, t.prefix, t.markers, t.pattern, name);
+            }
+        }
+    }
+
+    /**
+     * An {@code in} pattern narrowed by a modifier condition, as in {@code in [x, y] if x > y}.
+     * Carries the {@link org.openrewrite.ruby.marker.Unless} marker when written with {@code unless}.
+     * {@link J.Case} has no guard slot, so this stands in the case's expression container.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class PatternGuard implements Rb, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Expression pattern;
+
+        JLeftPadded<Expression> condition;
+
+        public Expression getCondition() {
+            return condition.getElement();
+        }
+
+        public PatternGuard withCondition(Expression condition) {
+            return getPadding().withCondition(this.condition.withElement(condition));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return pattern.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withPattern(pattern.withType(type));
+        }
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            return v.visitPatternGuard(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PatternGuard t;
+
+            public JLeftPadded<Expression> getCondition() {
+                return t.condition;
+            }
+
+            public PatternGuard withCondition(JLeftPadded<Expression> condition) {
+                return t.condition == condition ? t : new PatternGuard(t.id, t.prefix, t.markers, t.pattern, condition);
+            }
+        }
+    }
+
     @Value
     @With
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2316,17 +2506,26 @@ public interface Rb extends J {
 
         public enum Type {
             Defined,
+
+            /**
+             * The pattern-matching pin {@code ^}, which matches against the operand's value rather
+             * than binding it.
+             */
+            Pin,
         }
 
+        /**
+         * {@code defined?} is always a boolean; a pin evaluates to whatever it pins.
+         */
         @Override
-        public JavaType getType() {
-            return JavaType.Primitive.Boolean;
+        public @Nullable JavaType getType() {
+            return operator == Type.Defined ? JavaType.Primitive.Boolean : expression.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Rb.Unary withType(@Nullable JavaType ignored) {
-            return this;
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return operator == Type.Defined ? (T) this : (T) withExpression(expression.withType(type));
         }
     }
 

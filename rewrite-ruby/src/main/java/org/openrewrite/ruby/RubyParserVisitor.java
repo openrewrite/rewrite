@@ -2802,18 +2802,19 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                               boolean pattern) {
         Space prefix = prefix(node);
         skip(pattern ? "in" : "when");
-        JContainer<J> caseLabels = caseLabels(labels);
+        JContainer<J> caseLabels = caseLabels(labels, pattern);
         Markers markers = pattern ? Markers.EMPTY.add(new PatternCase(randomId())) : Markers.EMPTY;
         JContainer<Statement> body = JContainer.build(whitespace(), statements(statements), Markers.EMPTY);
         return new J.Case(randomId(), prefix, markers, J.Case.Type.Statement, null, null, caseLabels,
                 null, body, null);
     }
 
-    private JContainer<J> caseLabels(Nodes.Node[] labels) {
+    private JContainer<J> caseLabels(Nodes.Node[] labels, boolean pattern) {
         Space before = whitespace();
         List<JRightPadded<J>> mapped = new ArrayList<>(labels.length);
         for (int i = 0; i < labels.length; i++) {
-            mapped.add(padRight(convert(labels[i]), i == labels.length - 1 ? EMPTY : sourceBefore(",")));
+            J label = pattern ? patternLabel(labels[i]) : convert(labels[i]);
+            mapped.add(padRight(label, i == labels.length - 1 ? EMPTY : sourceBefore(",")));
         }
         JContainer<J> container = JContainer.build(before, mapped, Markers.EMPTY);
         return peekWhitespace(container, (c, beforeBody) -> {
@@ -2851,6 +2852,71 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Markers markers = patternCase ? Markers.EMPTY.add(new PatternCase(randomId())) : Markers.EMPTY;
         return new J.Case(randomId(), prefix, markers, J.Case.Type.Statement, null, null, labels, null,
                 JContainer.empty(), null);
+    }
+
+    /**
+     * A guard (`in [x, y] if x > y`) reuses Prism's `if`/`unless` modifier node, with the pattern
+     * standing where the modified statement normally would.
+     */
+    private J patternLabel(Nodes.Node label) {
+        if (label instanceof Nodes.IfNode) {
+            Nodes.IfNode iff = (Nodes.IfNode) label;
+            return patternGuard(iff, iff.statements, iff.predicate, "if", Markers.EMPTY);
+        } else if (label instanceof Nodes.UnlessNode) {
+            Nodes.UnlessNode unless = (Nodes.UnlessNode) label;
+            return patternGuard(unless, unless.statements, unless.predicate, "unless",
+                    Markers.EMPTY.add(new Unless(randomId())));
+        }
+        return convert(label);
+    }
+
+    private J patternGuard(Nodes.Node node, Nodes.@Nullable StatementsNode pattern, Nodes.Node predicate,
+                           String keyword, Markers markers) {
+        Space prefix = prefix(node);
+        Expression patternExpr = convertExpression(pattern == null || pattern.body.length == 0 ?
+                null : pattern.body[0]);
+        return new Rb.PatternGuard(randomId(), prefix, markers, patternExpr,
+                padLeft(sourceBefore(keyword), convertExpression(predicate)));
+    }
+
+    @Override
+    public J visitCapturePatternNode(Nodes.CapturePatternNode node) {
+        Space prefix = prefix(node);
+        Expression pattern = convertExpression(node.value);
+        return new Rb.PatternBinding(randomId(), prefix, Markers.EMPTY, pattern,
+                padLeft(sourceBefore("=>"), identifier(node.target)));
+    }
+
+    @Override
+    public J visitAlternationPatternNode(Nodes.AlternationPatternNode node) {
+        Space prefix = prefix(node);
+        Expression left = convertExpression(node.left);
+        return new Rb.Binary(randomId(), prefix, Markers.EMPTY, left,
+                padLeft(sourceBefore("|"), Rb.Binary.Type.PatternOr), convertExpression(node.right),
+                null);
+    }
+
+    @Override
+    public J visitPinnedVariableNode(Nodes.PinnedVariableNode node) {
+        Space prefix = prefix(node);
+        skip("^");
+        return new Rb.Unary(randomId(), prefix, Markers.EMPTY, Rb.Unary.Type.Pin,
+                convertExpression(node.variable));
+    }
+
+    /**
+     * The parentheses a pinned expression requires have no node of their own, so they are read back
+     * off the source between the `^` and the expression's start.
+     */
+    @Override
+    public J visitPinnedExpressionNode(Nodes.PinnedExpressionNode node) {
+        Space prefix = prefix(node);
+        skip("^");
+        Space beforeParentheses = whitespace();
+        skip("(");
+        J.Parentheses<Expression> parenthesized = new J.Parentheses<>(randomId(), beforeParentheses,
+                Markers.EMPTY, padRight(convertExpression(node.expression), sourceBefore(")")));
+        return new Rb.Unary(randomId(), prefix, Markers.EMPTY, Rb.Unary.Type.Pin, parenthesized);
     }
 
     @Override

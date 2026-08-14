@@ -424,6 +424,38 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return o;
     }
 
+    public J visitPatternBinding(Rb.PatternBinding patternBinding, P p) {
+        Rb.PatternBinding b = patternBinding;
+        b = b.withPrefix(visitSpace(b.getPrefix(), RubySpace.Location.PATTERN_BINDING_PREFIX, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof Rb.PatternBinding)) {
+            return temp;
+        } else {
+            b = (Rb.PatternBinding) temp;
+        }
+        b = b.withPattern(visitAndCast(b.getPattern(), p));
+        b = b.getPadding().withName(visitLeftPadded(b.getPadding().getName(),
+                JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return b;
+    }
+
+    public J visitPatternGuard(Rb.PatternGuard patternGuard, P p) {
+        Rb.PatternGuard g = patternGuard;
+        g = g.withPrefix(visitSpace(g.getPrefix(), RubySpace.Location.PATTERN_GUARD_PREFIX, p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(g, p);
+        if (!(temp instanceof Rb.PatternGuard)) {
+            return temp;
+        } else {
+            g = (Rb.PatternGuard) temp;
+        }
+        g = g.withPattern(visitAndCast(g.getPattern(), p));
+        g = g.getPadding().withCondition(visitLeftPadded(g.getPadding().getCondition(),
+                JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return g;
+    }
+
     public J visitRedo(Rb.Redo redo, P p) {
         Rb.Redo r = redo;
         r = r.withPrefix(visitSpace(r.getPrefix(), RubySpace.Location.REDO_PREFIX, p));

@@ -173,6 +173,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             case NotMatch:
                 keyword = "!~";
                 break;
+            case PatternOr:
+                keyword = "|";
+                break;
             case Within:
                 keyword = "===";
                 break;
@@ -438,6 +441,26 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitPatternBinding(Rb.PatternBinding patternBinding, PrintOutputCapture<P> p) {
+        beforeSyntax(patternBinding, RubySpace.Location.PATTERN_BINDING_PREFIX, p);
+        visit(patternBinding.getPattern(), p);
+        visitLeftPadded("=>", patternBinding.getPadding().getName(),
+                RubyLeftPadded.Location.PATTERN_BINDING_NAME, p);
+        afterSyntax(patternBinding, p);
+        return patternBinding;
+    }
+
+    @Override
+    public J visitPatternGuard(Rb.PatternGuard patternGuard, PrintOutputCapture<P> p) {
+        beforeSyntax(patternGuard, RubySpace.Location.PATTERN_GUARD_PREFIX, p);
+        visit(patternGuard.getPattern(), p);
+        visitLeftPadded(patternGuard.getMarkers().findFirst(Unless.class).isPresent() ? "unless" : "if",
+                patternGuard.getPadding().getCondition(), RubyLeftPadded.Location.PATTERN_GUARD_CONDITION, p);
+        afterSyntax(patternGuard, p);
+        return patternGuard;
+    }
+
+    @Override
     public J visitRedo(Rb.Redo redo, PrintOutputCapture<P> p) {
         beforeSyntax(redo, RubySpace.Location.REDO_PREFIX, p);
         p.append("redo");
@@ -575,7 +598,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitUnary(Rb.Unary unary, PrintOutputCapture<P> p) {
         beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
-        p.append("defined?");
+        p.append(unary.getOperator() == Rb.Unary.Type.Pin ? "^" : "defined?");
         visit(unary.getExpression(), p);
         afterSyntax(unary, p);
         return unary;

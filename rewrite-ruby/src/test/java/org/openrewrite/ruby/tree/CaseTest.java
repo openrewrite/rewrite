@@ -69,4 +69,38 @@ public class CaseTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void casePatternMatchingOverMultipleLines() {
+        rewriteRun(
+          ruby(
+            """
+              expected = 42
+              case config
+              in {db: {host: String => host}} if host.start_with?("prod")
+                connect(host)
+              in :draft | :pending
+                wait
+              in ^expected
+                exact
+              else
+                raise ArgumentError
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void caseWithSemicolonAfterPattern() {
+        rewriteRun(
+          ruby(
+            """
+              case value
+              in Integer => n; n
+              end
+              """
+          )
+        );
+    }
 }

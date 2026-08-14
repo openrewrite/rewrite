@@ -208,6 +208,169 @@ public class PatternMatchingTest implements RewriteTest {
     }
 
     @Test
+    void namedHashRest() {
+        rewriteRun(
+          ruby(
+            """
+              case params
+                in {id: Integer, **rest} then update(id, rest)
+                in {id: Integer, **nil} then "id only"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void binding() {
+        rewriteRun(
+          ruby(
+            """
+              case value
+                in Integer => n then n
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedBindings() {
+        rewriteRun(
+          ruby(
+            """
+              case config
+                in {db: {host: String => host, port: Integer => port}} then connect(host, port)
+                in [Integer => first, *rest] then first
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void bindingOfWholeHash() {
+        rewriteRun(
+          ruby(
+            """
+              case params
+                in {id: Integer, **rest} => whole then whole
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void alternation() {
+        rewriteRun(
+          ruby(
+            """
+              case status
+                in :draft | :pending | :review then "in progress"
+                in Integer | Float then "numeric"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void alternationInsideArrayPattern() {
+        rewriteRun(
+          ruby(
+            """
+              case pair
+                in [Integer | Float, String] then "matched"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void pinnedLocalVariable() {
+        rewriteRun(
+          ruby(
+            """
+              expected = 42
+              case value
+                in ^expected then "exact"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void pinnedVariables() {
+        rewriteRun(
+          ruby(
+            """
+              case pair
+                in [_, ^@limit] then "at limit"
+                in [_, ^@@limit] then "at class limit"
+                in [_, ^$limit] then "at global limit"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void pinnedExpression() {
+        rewriteRun(
+          ruby(
+            """
+              case pair
+                in [n, ^( n + 2 )] then "twin primes"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void guard() {
+        rewriteRun(
+          ruby(
+            """
+              case point
+                in [x, y] if x > y then "below diagonal"
+                in [x] unless x.zero? then "off axis"
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void guardOverAlternationAndBinding() {
+        rewriteRun(
+          ruby(
+            """
+              case value
+                in Integer | Float => n if n.positive?
+                  n
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void onelineWithoutBrackets() {
+        rewriteRun(
+          ruby(
+            """
+              [0, 1] => _, x
+              {y: 2} => y:
+              """
+          )
+        );
+    }
+
+    @Test
     void structArrayMatching() {
         rewriteRun(
           ruby(
