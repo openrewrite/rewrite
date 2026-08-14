@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.CommentService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
@@ -28,6 +29,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
 import org.openrewrite.ruby.internal.RubyPrinter;
+import org.openrewrite.ruby.service.RubyCommentService;
 import org.openrewrite.ruby.service.RubyWhitespaceValidationService;
 
 import java.beans.Transient;
@@ -177,6 +179,10 @@ public interface Rb extends J {
             try {
                 if (WhitespaceValidationService.class.getName().equals(serviceName)) {
                     return (T) service.getClassLoader().loadClass(RubyWhitespaceValidationService.class.getName())
+                            .getConstructor().newInstance();
+                } else if (CommentService.class.getName().equals(serviceName)) {
+                    // the Java implementation reads only J TextComments and prints `//` delimiters
+                    return (T) service.getClassLoader().loadClass(RubyCommentService.class.getName())
                             .getConstructor().newInstance();
                 }
             } catch (Exception e) {
@@ -870,7 +876,7 @@ public interface Rb extends J {
             return withMethod(method.getElement().withType(type));
         }
 
-        public JavaType.@Nullable Method getMethodTye() {
+        public JavaType.@Nullable Method getMethodType() {
             return method.getElement().getMethodType();
         }
 

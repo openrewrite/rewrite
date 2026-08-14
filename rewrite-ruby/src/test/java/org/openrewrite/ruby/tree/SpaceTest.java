@@ -16,7 +16,14 @@
 package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.RubyParser;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ruby.Assertions.ruby;
@@ -117,5 +124,38 @@ public class SpaceTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * {@code withText(getText())} is the only read-modify-write a recipe has, so it has to be
+     * lossless — including for a block comment, whose delimiters sit on lines of their own.
+     */
+    @Test
+    void rewritingCommentText() {
+        String source = "=begin rdoc\ndocs\n=end\nputs 1\n";
+        assertThat(rewriteComments(source, UnaryOperator.identity())).isEqualTo(source);
+        assertThat(rewriteComments(source, text -> text.replace("docs", "notes")))
+                .isEqualTo("=begin rdoc\nnotes\n=end\nputs 1\n");
+    }
+
+    @Test
+    void rewritingLineCommentText() {
+        String source = "# docs\nputs 1\n";
+        assertThat(rewriteComments(source, UnaryOperator.identity())).isEqualTo(source);
+        assertThat(rewriteComments(source, text -> text.replace("docs", "notes")))
+                .isEqualTo("# notes\nputs 1\n");
+    }
+
+    private static String rewriteComments(String source, UnaryOperator<String> rewrite) {
+        SourceFile cu = (SourceFile) RubyParser.builder().build().parse(source)
+                .findFirst().orElseThrow();
+        return ((SourceFile) new RubyIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                return space.withComments(ListUtils.map(space.getComments(), c ->
+                        c instanceof RubyTextComment ?
+                                ((RubyTextComment) c).withText(rewrite.apply(((RubyTextComment) c).getText())) : c));
+            }
+        }.visitNonNull(cu, 0)).printAll();
     }
 }

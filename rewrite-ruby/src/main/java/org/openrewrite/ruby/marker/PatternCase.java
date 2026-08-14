@@ -23,12 +23,26 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 /**
- * In Ruby, "in" conditions in case statements are mutually exclusive
- * "when" conditions. This marker is used to indicate that a
- * {@link J.Switch.Case} node is a case-in statement.
+ * A {@link J.Case} that destructures a pattern rather than comparing with {@code ===}, which is
+ * what {@code when} does. The operator says how it is spelled; a case with no {@code PatternCase}
+ * is a {@code when}.
  */
 @Value
 @With
 public class PatternCase implements Marker {
     UUID id;
+
+    Operator operator;
+
+    public enum Operator {
+        /**
+         * {@code in [x, y]}, both as a {@code case} clause and as a standalone boolean check.
+         */
+        In,
+
+        /**
+         * {@code config => {db:}}, the rightward assignment that spells the same match inline.
+         */
+        Rightward
+    }
 }

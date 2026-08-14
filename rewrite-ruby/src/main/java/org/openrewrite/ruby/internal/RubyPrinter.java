@@ -546,18 +546,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 visit(types, p);
             }
 
-            if (!param.getVariables().isEmpty()) {
-                List<J.VariableDeclarations.NamedVariable> variables = param.getVariables();
-                for (int i = 0; i < variables.size(); i++) {
-                    if (i > 1) {
-                        throw new IllegalArgumentException("Expected at most one variable name in rescue");
-                    }
-                    J.VariableDeclarations.NamedVariable exceptionName = variables.get(i);
-                    visitSpace(exceptionName.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
-                    visitMarkers(exceptionName.getMarkers(), p);
-                    p.append("=>");
-                    visit(exceptionName.getName(), p);
-                }
+            List<J.VariableDeclarations.NamedVariable> variables = param.getVariables();
+            if (variables.size() > 1) {
+                throw new IllegalArgumentException("Expected at most one variable name in rescue");
+            }
+            for (J.VariableDeclarations.NamedVariable exceptionName : variables) {
+                visitSpace(exceptionName.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
+                visitMarkers(exceptionName.getMarkers(), p);
+                p.append("=>");
+                visit(exceptionName.getName(), p);
             }
 
             visit(aCatch.getBody(), p);
@@ -1031,14 +1028,12 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             if (aCase.getCaseLabels().isEmpty()) {
                 p.append("else");
             } else {
-                Object parent = getCursor().getParentTreeCursor().getValue();
-                if (parent instanceof Rb.RightwardAssignment) {
-                    p.append("=>");
-                } else if (aCase.getMarkers().findFirst(PatternCase.class).isPresent() ||
-                           parent instanceof Rb.BooleanCheck) {
-                    p.append("in");
-                } else {
+                // the keyword is a property of the case, not of whatever parent it currently sits in
+                Optional<PatternCase> patternCase = aCase.getMarkers().findFirst(PatternCase.class);
+                if (!patternCase.isPresent()) {
                     p.append("when");
+                } else {
+                    p.append(patternCase.get().getOperator() == PatternCase.Operator.Rightward ? "=>" : "in");
                 }
                 visitContainer("", aCase.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL,
                         ",", "", p);
@@ -1138,10 +1133,13 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             String keyword = iff.getMarkers().findFirst(Unless.class).isPresent() ? "unless" : "if";
             Optional<IfModifier> ifModifier = iff.getMarkers().findFirst(IfModifier.class);
             if (ifModifier.isPresent()) {
+                if (iff.getElsePart() != null) {
+                    throw new UnsupportedOperationException("A modifier `if` cannot have an else part; " +
+                                                            "remove the IfModifier marker to print the expanded form.");
+                }
                 visitStatement(iff.getPadding().getThenPart(), JRightPadded.Location.IF_THEN, p);
                 p.append(keyword);
                 visit(iff.getIfCondition(), p);
-                return iff;
             } else {
                 p.append(keyword);
                 visit(iff.getIfCondition(), p);
@@ -1227,10 +1225,11 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         /**
          * A `do ... end` or <code>{ ... }</code> block rides in the argument container but prints
          * after the closing parenthesis, so it is taken back out before the arguments are printed.
+         * A recipe that appends an argument leaves it in the middle, hence the whole-list scan.
          */
         private JContainer<Expression> withoutBlock(JContainer<Expression> args,
                                                     AtomicReference<Rb.Block> blockArg) {
-            return JContainer.withElements(args, ListUtils.mapLast(args.getElements(), arg -> {
+            return JContainer.withElements(args, ListUtils.map(args.getElements(), arg -> {
                 if (arg instanceof Rb.Block) {
                     blockArg.set((Rb.Block) arg);
                     return null;

@@ -2885,7 +2885,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         skip(pattern ? "in" : "when");
         JContainer<J> caseLabels = caseLabels(labels, pattern);
-        Markers markers = pattern ? Markers.EMPTY.add(new PatternCase(randomId())) : Markers.EMPTY;
+        Markers markers = pattern ?
+                Markers.EMPTY.add(new PatternCase(randomId(), PatternCase.Operator.In)) : Markers.EMPTY;
         JContainer<Statement> body = JContainer.build(whitespace(), statements(statements), Markers.EMPTY);
         return new J.Case(randomId(), prefix, markers, J.Case.Type.Statement, null, null, caseLabels,
                 null, body, null);
@@ -2915,7 +2916,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         Expression left = convertExpression(node.value);
         return new Rb.BooleanCheck(randomId(), prefix, Markers.EMPTY, left,
-                inlinePattern(node.pattern, "in", true), null);
+                inlinePattern(node.pattern, "in", PatternCase.Operator.In), null);
     }
 
     @Override
@@ -2923,17 +2924,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         Expression left = convertExpression(node.value);
         return new Rb.RightwardAssignment(randomId(), prefix, Markers.EMPTY, left,
-                inlinePattern(node.pattern, "=>", false), null);
+                inlinePattern(node.pattern, "=>", PatternCase.Operator.Rightward), null);
     }
 
-    private J.Case inlinePattern(Nodes.Node pattern, String keyword, boolean patternCase) {
+    private J.Case inlinePattern(Nodes.Node pattern, String keyword, PatternCase.Operator operator) {
         Space prefix = whitespace();
         skip(keyword);
         JContainer<J> labels = JContainer.build(whitespace(),
                 singletonList(padRight(convert(pattern), EMPTY)), Markers.EMPTY);
-        Markers markers = patternCase ? Markers.EMPTY.add(new PatternCase(randomId())) : Markers.EMPTY;
-        return new J.Case(randomId(), prefix, markers, J.Case.Type.Statement, null, null, labels, null,
-                JContainer.empty(), null);
+        return new J.Case(randomId(), prefix, Markers.EMPTY.add(new PatternCase(randomId(), operator)),
+                J.Case.Type.Statement, null, null, labels, null, JContainer.empty(), null);
     }
 
     /**

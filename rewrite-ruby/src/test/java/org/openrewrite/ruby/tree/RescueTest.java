@@ -16,8 +16,14 @@
 package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.RubyParser;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 public class RescueTest implements RewriteTest {
@@ -340,5 +346,31 @@ public class RescueTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Ruby binds at most one name per rescue clause, so a tree carrying two has to fail before
+     * anything is printed rather than emit a second `=>` clause.
+     */
+    @Test
+    void atMostOneVariableName() {
+        Rb.CompilationUnit twoNames = (Rb.CompilationUnit) new RubyIsoVisitor<Integer>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                if (multiVariable.getVariables().size() != 1) {
+                    return multiVariable;
+                }
+                J.VariableDeclarations.NamedVariable second = multiVariable.getVariables().get(0);
+                second = second.withId(Tree.randomId()).withName(second.getName().withSimpleName("e2"));
+                return multiVariable.withVariables(ListUtils.concat(multiVariable.getVariables(), second));
+            }
+        }.visitNonNull(RubyParser.builder().build()
+                .parse("begin\n  x\nrescue Foo => e\n  y\nend\n")
+                .findFirst().orElseThrow(), 0);
+
+        assertThatThrownBy(twoNames::printAll)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at most one variable name in rescue");
     }
 }

@@ -25,27 +25,19 @@ import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
 
+/**
+ * A Ruby comment. {@link #getText()} is everything the delimiters enclose — the text after the
+ * {@code #} for a line comment, and everything between {@code =begin} and {@code =end}, newlines
+ * included, for a block one — so that {@code withText(getText())} is lossless.
+ */
 @Value
 public class RubyTextComment implements Comment {
 
     @With
     boolean multiline;
 
+    @With
     String text;
-
-    public String getText() {
-        return text
-                .replaceAll("^\\r?\\n", "")
-                .replaceAll("\\r?\\n$", "");
-    }
-
-    public RubyTextComment withText(String text) {
-        if (!text.equals(this.text)) {
-            // TODO add newlines if necessary to text
-            return new RubyTextComment(multiline, text, suffix, markers);
-        }
-        return this;
-    }
 
     String suffix;
 

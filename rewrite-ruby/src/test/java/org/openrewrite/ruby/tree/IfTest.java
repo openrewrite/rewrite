@@ -16,8 +16,17 @@
 package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.ruby.RubyParser;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 public class IfTest implements RewriteTest {
@@ -261,5 +270,29 @@ public class IfTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Ruby has no `x if c else y`, so a recipe that adds an else has to drop the modifier marker
+     * as well; the printer must not quietly discard the else part instead.
+     */
+    @Test
+    void modifierIfCannotHoldAnElsePart() {
+        Rb.CompilationUnit cu = parse("raise err if bad\n");
+        J.If iff = (J.If) cu.getStatements().get(0);
+        Statement elseBody = parse("puts 1\n").getStatements().get(0);
+        Rb.CompilationUnit withElse = cu.withStatements(singletonList(iff.withElsePart(
+                new J.If.Else(Tree.randomId(), Space.format("\n"), Markers.EMPTY,
+                        JRightPadded.build(elseBody)))));
+
+        assertThatThrownBy(withElse::printAll)
+                .rootCause()
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("modifier `if` cannot have an else part");
+    }
+
+    private static Rb.CompilationUnit parse(String source) {
+        return (Rb.CompilationUnit) RubyParser.builder().build().parse(source)
+                .findFirst().orElseThrow();
     }
 }

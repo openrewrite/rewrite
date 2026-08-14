@@ -18,9 +18,19 @@ package org.openrewrite.ruby.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.ruby.RubyIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.ruby.Assertions.ruby;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 public class MethodInvocationTest implements RewriteTest {
 
@@ -221,6 +231,36 @@ public class MethodInvocationTest implements RewriteTest {
           ruby(
             """
               value = details.[]('version')
+              """
+          )
+        );
+    }
+
+    /**
+     * A block rides in the argument container, so appending an argument — which is what a recipe
+     * does — leaves it in the middle of the list and it still has to print after the parentheses.
+     */
+    @Test
+    void appendingAnArgumentToACallWithABlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RubyIsoVisitor<ExecutionContext>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (!"foo".equals(m.getSimpleName()) || m.getArguments().size() != 2) {
+                      return m;
+                  }
+                  Expression two = new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                          2, "2", null, JavaType.Primitive.Int);
+                  return m.withArguments(ListUtils.concat(m.getArguments(), two));
+              }
+          })),
+          ruby(
+            """
+              foo(1) { |x| x }
+              """,
+            """
+              foo(1, 2) { |x| x }
               """
           )
         );

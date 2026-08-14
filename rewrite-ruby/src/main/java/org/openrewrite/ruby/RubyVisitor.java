@@ -146,6 +146,12 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         Rb.PreExecution b = begin;
         b = b.withPrefix(visitSpace(b.getPrefix(), RubySpace.Location.PRE_EXECUTION_PREFIX, p));
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(b, p);
+        if (!(temp instanceof Rb.PreExecution)) {
+            return temp;
+        } else {
+            b = (Rb.PreExecution) temp;
+        }
         b = b.withBlock((J.Block) visit(b.getBlock(), p));
         return b;
     }
@@ -279,6 +285,12 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
     public J visitComplexStringValue(Rb.ComplexString.Value value, P p) {
         Rb.ComplexString.Value v = value;
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(v, p);
+        if (!(temp instanceof Rb.ComplexString.Value)) {
+            return temp;
+        } else {
+            v = (Rb.ComplexString.Value) temp;
+        }
         v = v.withTree(visit(v.getTree(), p));
         v = v.withAfter(visitSpace(v.getAfter(), RubySpace.Location.COMPLEX_STRING_VALUE_SUFFIX, p));
         return v;
@@ -288,6 +300,12 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         Rb.PostExecution e = end;
         e = e.withPrefix(visitSpace(e.getPrefix(), RubySpace.Location.POST_EXECUTION_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(e, p);
+        if (!(temp instanceof Rb.PostExecution)) {
+            return temp;
+        } else {
+            e = (Rb.PostExecution) temp;
+        }
         e = e.withBlock((J.Block) visit(e.getBlock(), p));
         return e;
     }
@@ -296,6 +314,12 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         Rb.ExpressionTypeTree s = expressionTypeTree;
         s = s.withPrefix(visitSpace(s.getPrefix(), RubySpace.Location.EXPRESSION_TYPE_TREE_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof Rb.ExpressionTypeTree)) {
+            return temp;
+        } else {
+            s = (Rb.ExpressionTypeTree) temp;
+        }
         s = s.withReference(visit(s.getReference(), p));
         return s;
     }
@@ -412,7 +436,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             n = (Rb.NumericDomain) temp;
         }
-        n = n.withValue((Expression) visitNonNull(n.getValue(), p));
+        n = n.getPadding().withValue(visitRightPadded(n.getPadding().getValue(),
+                JRightPadded.Location.LANGUAGE_EXTENSION, p));
         n = n.withType(visitType(n.getType(), p));
         return n;
     }
@@ -579,7 +604,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             s = (Rb.SubArrayIndex) temp;
         }
         s = s.withStartIndex((Expression) visitNonNull(s.getStartIndex(), p));
-        s = s.withLength((Expression) visitNonNull(s.getLength(), p));
+        s = s.getPadding().withLength(visitLeftPadded(s.getPadding().getLength(),
+                JLeftPadded.Location.LANGUAGE_EXTENSION, p));
         return s;
     }
 

@@ -16,8 +16,20 @@
 package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.RubyParser;
+import org.openrewrite.ruby.marker.PatternCase;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 /**
@@ -398,5 +410,37 @@ public class PatternMatchingTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Which keyword a case is spelled with is a property of the case, so moving one to another
+     * parent must not turn a pattern match into a `when` (a `===` comparison).
+     */
+    @Test
+    void theKeywordTravelsWithTheCase() {
+        Rb.CompilationUnit cu = (Rb.CompilationUnit) RubyParser.builder().build()
+                .parse("config => {db:}\n").findFirst().orElseThrow();
+        J.Case pattern = new RubyIsoVisitor<AtomicReference<J.Case>>() {
+            @Override
+            public J.Case visitCase(J.Case aCase, AtomicReference<J.Case> found) {
+                found.set(aCase);
+                return aCase;
+            }
+        }.reduce(cu, new AtomicReference<>()).get();
+
+        assertThat(pattern.getMarkers().findFirst(PatternCase.class))
+                .get()
+                .extracting(PatternCase::getOperator)
+                .isEqualTo(PatternCase.Operator.Rightward);
+
+        J.Switch moved = new J.Switch(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                new J.ControlParentheses<>(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                        JRightPadded.build(new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                                emptyList(), "config", null, null))),
+                new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                        singletonList(JRightPadded.build((Statement) pattern)), Space.format("\n")));
+        assertThat(moved.printTrimmed(new Cursor(null, cu)))
+                .contains("=>")
+                .doesNotContain("when");
     }
 }
