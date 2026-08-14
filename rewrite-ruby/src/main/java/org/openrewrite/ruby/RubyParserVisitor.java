@@ -1275,7 +1275,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Expression target = convertExpression(receiver);
         Space beforeDot = whitespace();
         skip(safeNavigation ? "&." : ".");
-        J.FieldAccess field = new J.FieldAccess(randomId(), EMPTY, Markers.EMPTY,
+        J.FieldAccess field = new J.FieldAccess(randomId(), EMPTY,
+                safeNavigation ? Markers.EMPTY.add(new SafeNavigation(randomId())) : Markers.EMPTY,
                 target, padLeft(beforeDot, identifier(name)), null);
         return operatorAssignment(prefix, field, operator, value);
     }
@@ -2536,10 +2537,22 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return method;
     }
 
+    /**
+     * A method evaluates to its last statement. Trailing `;` separators leave {@link J.Empty}
+     * statements behind that one (`def x; a;; end`), so the value is the last one that is not empty.
+     */
     private List<JRightPadded<Statement>> implicitReturn(List<JRightPadded<Statement>> statements) {
-        return ListUtils.mapLast(statements, statement -> {
+        int last = statements.size() - 1;
+        while (last >= 0 && statements.get(last).getElement() instanceof J.Empty) {
+            last--;
+        }
+        if (last < 0) {
+            return statements;
+        }
+        int value = last;
+        return ListUtils.map(statements, (i, statement) -> {
             J element = statement.getElement();
-            if (element instanceof J.Return || element instanceof J.Empty || !(element instanceof Expression)) {
+            if (i != value || element instanceof J.Return || !(element instanceof Expression)) {
                 return statement;
             }
             return statement.withElement(new J.Return(randomId(), element.getPrefix(),

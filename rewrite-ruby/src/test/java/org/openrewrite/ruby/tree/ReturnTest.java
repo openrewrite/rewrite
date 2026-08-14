@@ -17,6 +17,7 @@ package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.ruby.RubyIsoVisitor;
 import org.openrewrite.test.RewriteTest;
@@ -76,6 +77,41 @@ public class ReturnTest implements RewriteTest {
                   return Math.hypot(y,x), Math.atan2(y,x)
               end
               """
+          )
+        );
+    }
+
+    /**
+     * A trailing `;` leaves an empty statement behind the value, which is a separator and not what
+     * the method returns.
+     */
+    @Test
+    void implicitReturnSkipsTrailingSeparators() {
+        rewriteRun(
+          ruby(
+            """
+              def x; a;; end
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicInteger counter = new AtomicInteger();
+                new RubyIsoVisitor<AtomicInteger>() {
+                    @Override
+                    public J.Return visitReturn(J.Return aReturn, AtomicInteger p) {
+                        if (aReturn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+                            Expression value = aReturn.getExpression();
+                            if (value instanceof Rb.ExpressionStatement) {
+                                value = ((Rb.ExpressionStatement) value).getExpression();
+                            }
+                            assertThat(value).isInstanceOf(J.Identifier.class);
+                            assertThat(((J.Identifier) value).getSimpleName()).isEqualTo("a");
+                            counter.incrementAndGet();
+                        }
+                        return aReturn;
+                    }
+                }.visit(cu, counter);
+
+                assertThat(counter.get()).isEqualTo(1);
+            })
           )
         );
     }

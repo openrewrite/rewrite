@@ -18,8 +18,14 @@ package org.openrewrite.ruby.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.marker.SafeNavigation;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 public class AssignmentTest implements RewriteTest {
@@ -235,6 +241,37 @@ public class AssignmentTest implements RewriteTest {
             """
               a, (b, (c, d)) = [1, [2, [3, 4]]]
               """
+          )
+        );
+    }
+
+    /**
+     * The attribute write and the operator writes reach different visitors, and each has to keep the
+     * `&`.
+     */
+    @Test
+    void safeNavigation() {
+        rewriteRun(
+          ruby(
+            """
+              user&.profile = profile
+              config&.timeout ||= 30
+              config&.retries &&= 3
+              config&.count += 1
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicInteger counter = new AtomicInteger();
+                new RubyIsoVisitor<AtomicInteger>() {
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicInteger p) {
+                        fieldAccess.getMarkers().findFirst(SafeNavigation.class)
+                          .ifPresent(s -> counter.incrementAndGet());
+                        return super.visitFieldAccess(fieldAccess, p);
+                    }
+                }.visit(cu, counter);
+
+                assertThat(counter.get()).isEqualTo(4);
+            })
           )
         );
     }
