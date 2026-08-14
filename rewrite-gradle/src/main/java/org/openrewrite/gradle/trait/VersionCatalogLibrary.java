@@ -36,9 +36,6 @@ import static org.openrewrite.gradle.trait.GradleTraitMatcher.literalArgument;
  * terminated by {@code .version(...)}, {@code .versionRef(...)}, or {@code .withoutVersion()},
  * or the single coordinate-string {@code library(alias, "group:artifact:version")} form (which
  * is always terminal -- Gradle's API returns {@code void} for it, so it can't be chained).
- * <p>
- * Minimal for now: only exposes what {@link GradleVersionCatalog}'s marker-building needs.
- * Accessors are computed from the underlying AST on every call rather than cached at match time.
  */
 @Value
 public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
@@ -64,8 +61,8 @@ public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return the alias of the shared {@code version(...)} declaration this library resolves
-     * its version through, or {@code null} if it's declared inline or not at all.
+     * @return the alias of the shared {@code version(...)} declaration this library resolves its
+     * version through, or {@code null} if it's declared inline or not at all.
      */
     public @Nullable String getVersionRefAlias() {
         J.MethodInvocation outer = getTree();
@@ -74,10 +71,9 @@ public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return the inline version literal, whether from a chained {@code .version(...)} call or
-     * embedded in a single coordinate-string {@code library(alias, "group:artifact:version")}
-     * declaration, or {@code null} if this library's version is declared via
-     * {@code versionRef(...)} or not at all.
+     * @return the inline version literal, whether chained as {@code .version(...)} or embedded in
+     * a single coordinate string, or {@code null} if the version comes via
+     * {@code versionRef(...)} or isn't declared at all.
      */
     public @Nullable String getInlineVersion() {
         J.MethodInvocation outer = getTree();
@@ -93,10 +89,8 @@ public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return a copy of this library with its inline version literal rewritten to
-     * {@code newVersion}, covering the chained {@code .version(...)} form and the embedded
-     * coordinate-string form. Returns this library unchanged if it has no inline version to
-     * rewrite (i.e. its version comes via {@code versionRef(...)}, or it has none at all).
+     * @return a copy with its inline version literal rewritten to {@code newVersion}, or this
+     * library unchanged if it has no inline version to rewrite.
      */
     public VersionCatalogLibrary withVersion(String newVersion) {
         J.MethodInvocation outer = getTree();
@@ -127,9 +121,9 @@ public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return a copy of this library with its chained {@code .versionRef(...)} call replaced by
-     * {@code .version(newVersion)}, detaching it from whatever shared reference it pointed to.
-     * Returns this library unchanged if it isn't currently on a {@code versionRef(...)} chain.
+     * @return a copy with its chained {@code .versionRef(...)} call replaced by
+     * {@code .version(newVersion)}, or this library unchanged if it isn't on a
+     * {@code versionRef(...)} chain.
      */
     public VersionCatalogLibrary detachToVersion(String newVersion) {
         J.MethodInvocation outer = getTree();
@@ -140,11 +134,9 @@ public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return a copy of this library with its chained {@code .version(...)} call replaced by
-     * {@code .versionRef(alias)}, re-attaching it to a shared reference. Returns this library
-     * unchanged if it isn't currently on a chained inline {@code .version(...)} call (e.g. its
-     * version is embedded in a single coordinate-string {@code library(...)} declaration, which
-     * has no chained call to rewrite).
+     * @return a copy with its chained {@code .version(...)} call replaced by
+     * {@code .versionRef(alias)}, or this library unchanged if it has no chained
+     * {@code .version(...)} call to rewrite.
      */
     public VersionCatalogLibrary reattachToVersionRef(String alias) {
         J.MethodInvocation outer = getTree();
@@ -167,11 +159,6 @@ public class VersionCatalogLibrary implements Trait<J.MethodInvocation> {
         return new VersionCatalogLibrary(new Cursor(cursor.getParent(), newOuter));
     }
 
-    /**
-     * @return the inner {@code library(...)} call, unwinding the
-     * {@code .version(...)}/{@code .versionRef(...)}/{@code .withoutVersion()} call chained onto
-     * it, if any.
-     */
     private J.MethodInvocation libraryCall() {
         J.MethodInvocation outer = getTree();
         J.MethodInvocation chained = asChainedInvocation(outer);

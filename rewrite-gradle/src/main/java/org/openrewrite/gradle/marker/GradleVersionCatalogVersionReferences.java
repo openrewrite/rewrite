@@ -30,14 +30,10 @@ import java.util.stream.Collectors;
 /**
  * A snapshot of which libraries declared in a
  * {@code org.openrewrite.gradle.trait.GradleVersionCatalog} originally shared each
- * {@code versionRef(...)} declaration, taken before any recipe mutates the catalog. Several
- * libraries commonly share a single version reference (e.g. a dozen {@code spring-boot-starter-*}
- * artifacts all pointing at one {@code springBoot} version) -- keyed by the reference's own alias
- * since that's the only direction this is ever looked up: "which libraries originally shared
- * this ref?", never "which ref did this library originally use?".
+ * {@code versionRef(...)} declaration, taken before any recipe mutates the catalog.
  * <p>
- * Attached to the version catalog's own root AST node, so downstream recipes can consult it to
- * tell whether two separately-requested version bumps actually target the same underlying
+ * Attached to the version catalog's own root AST node, so downstream recipes can tell whether
+ * two separately-requested version bumps actually target the same underlying
  * {@code version(...)} declaration.
  */
 @Value
@@ -46,11 +42,8 @@ public class GradleVersionCatalogVersionReferences implements Marker {
     UUID id;
 
     /**
-     * Keyed by a shared {@code version(...)} declaration's own alias -- there's no group:artifact
-     * for a version declaration itself to key by instead. Only references actually shared by at
-     * least one library are present here -- libraries with an inline version, an embedded
-     * single-string coordinate version, or no version at all don't resolve through any reference,
-     * so they're never recorded.
+     * Keyed by a shared {@code version(...)} declaration's own alias. Only references actually
+     * resolved through by at least one library are recorded.
      */
     Map<String, SharedReference> sharedReferencesByAlias;
 
@@ -68,10 +61,8 @@ public class GradleVersionCatalogVersionReferences implements Marker {
     }
 
     /**
-     * The version value a shared reference held at the time the snapshot was taken, together
-     * with the group:artifact of every library that originally resolved its version through it.
-     * Keyed by group:artifact rather than the library's own alias, since that's what
-     * {@code UpgradeDependencyVersion} actually targets -- a library's alias is irrelevant to it.
+     * The version value a shared reference held when the snapshot was taken, together with the
+     * group:artifact of every library that originally resolved its version through it.
      */
     @Value
     public static class SharedReference {

@@ -47,12 +47,6 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
  * type-attributed method signatures, since Gradle's Groovy/Kotlin DSL closures for
  * user-defined catalogs are not reliably type-attributed to
  * {@code org.gradle.api.initialization.dsl.VersionCatalogBuilder} during parsing.
- * <p>
- * Not a Lombok {@code @Value}: {@link #getLibraries()} and the (package-private)
- * {@code getVersionDeclarations()} are both derived from the same single AST walk, memoized
- * lazily on first access to either -- see {@link #collectLibrariesAndVersions()}. Equality and
- * {@code toString} are still based solely on {@code cursor}/{@code catalogName}, the same as a
- * {@code @Value} class would produce; the cache fields are purely an implementation detail.
  */
 @EqualsAndHashCode(of = {"cursor", "catalogName"})
 @ToString(of = {"cursor", "catalogName"})
@@ -71,32 +65,20 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return every {@code library(...)} declaration in this catalog with a resolvable
-     * group:artifact, keyed by it, in declaration order. {@code UpgradeDependencyVersion} only
-     * ever targets a library by its group:artifact, never its alias, so that's the natural key --
-     * a library whose group:artifact can't be resolved (malformed coordinates) is never included,
-     * same as it was always skipped by callers before. If more than one library declares the same
-     * group:artifact under different aliases, the first one encountered wins, matching the
-     * find-the-first-match behavior every lookup here had before this was a map.
+     * @return every {@code library(...)} declaration with a resolvable group:artifact, keyed by
+     * it, in declaration order. Where two aliases declare the same group:artifact, the first one
+     * encountered wins.
      */
     public Map<GroupArtifact, VersionCatalogLibrary> getLibraries() {
         collectLibrariesAndVersions();
         return cachedLibrariesByGroupArtifact;
     }
 
-    /**
-     * @return every {@code version(alias, value)} declaration in this catalog, keyed by alias.
-     */
     private Map<String, String> getVersionDeclarations() {
         collectLibrariesAndVersions();
         return cachedVersionValuesByAlias;
     }
 
-    /**
-     * Populates {@link #cachedLibrariesByGroupArtifact} and {@link #cachedVersionValuesByAlias}
-     * together, in a single AST walk, the first time either is needed -- a no-op on every
-     * subsequent call.
-     */
     private void collectLibrariesAndVersions() {
         if (cachedLibrariesByGroupArtifact == null) {
             Map<GroupArtifact, VersionCatalogLibrary> librariesByGroupArtifact = new LinkedHashMap<>();
@@ -124,19 +106,13 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Captures a snapshot of which libraries currently declared in this catalog share each
-     * {@code versionRef(...)} declaration -- keyed by the reference's own alias, valued by its
-     * current version value and the group:artifact of every library currently resolving through
-     * it -- and attaches it to this catalog's root AST node as a
-     * {@link GradleVersionCatalogVersionReferences} marker. Downstream recipes can consult this
-     * marker to tell whether two separately-requested version bumps actually target the same
-     * underlying {@code version(...)} declaration.
+     * Snapshots which libraries share each {@code versionRef(...)} declaration onto this
+     * catalog's root AST node as a {@link GradleVersionCatalogVersionReferences} marker.
      */
     GradleVersionCatalog withOriginalVersionReferencesMarker() {
         if (getTree().getMarkers().findFirst(GradleVersionCatalogVersionReferences.class).isPresent()) {
-            // Already memorized the original sharing structure on an earlier call -- never recompute
-            // it, or a later call would only see the post-detachment structure and lose the "these
-            // used to share a ref" fact the detach/re-attach algorithm depends on.
+            // Never recompute: a later call would only see the post-detachment structure, losing
+            // the "these used to share a ref" fact the detach/re-attach algorithm depends on.
             return this;
         }
         Map<String, String> versionValuesByAlias = getVersionDeclarations();
@@ -165,12 +141,8 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Resolves the current version of the library matching {@code ga} in this catalog, following
-     * {@code versionRef(...)} indirection to the referenced {@code version(...)} declaration when
-     * necessary.
-     *
-     * @return the resolved version, or {@code null} if no library in this catalog matches
-     * {@code ga}, or it has no version at all (declared via {@code withoutVersion()}).
+     * @return the version of the library matching {@code ga}, following {@code versionRef(...)}
+     * indirection, or {@code null} if there is no such library or it has no resolvable version.
      */
     public @Nullable String getVersion(GroupArtifact ga) {
         VersionCatalogLibrary library = getLibraries().get(ga);
@@ -188,17 +160,13 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Rewrites the version of the library matching {@code ga} in this catalog to
-     * {@code newVersion}. Re-locates the library by {@code ga} against this catalog's own current
-     * tree on every call, so it's safe to call repeatedly, threading the returned
-     * {@code GradleVersionCatalog} from one call to the next.
+     * Rewrites the version of the library matching {@code ga} to {@code newVersion}. An inline
+     * version has its literal rewritten directly; a {@code versionRef(...)} is tentatively
+     * detached to an inline literal, then checked for convergence with the rest of its original
+     * sharing group -- see {@link #reconciledAfterDetaching(String)}.
      * <p>
-     * If the library's version is inline, its literal is rewritten directly. If it comes via
-     * {@code versionRef(...)}, the library is tentatively detached to its own inline literal and
-     * the whole original sharing group (per the {@link GradleVersionCatalogVersionReferences}
-     * marker) is checked for convergence -- see {@link #reconciledAfterDetaching(String)}.
-     * No-op if no library in this catalog matches {@code ga}, or it's already at
-     * {@code newVersion}.
+     * The library is re-located by {@code ga} against the current tree on every call, so calls
+     * can be chained by threading the returned catalog from one to the next.
      */
     public GradleVersionCatalog withVersion(GroupArtifact ga, String newVersion) {
         VersionCatalogLibrary library = getLibraries().get(ga);
@@ -254,15 +222,10 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * After a library has just been tentatively detached from {@code refAlias}, checks every
-     * library that *originally* shared that reference (per the
-     * {@link GradleVersionCatalogVersionReferences} marker) against its current, live resolved
-     * version. If they all now agree on the same value, the whole group collapses back onto a
-     * shared reference: {@code refAlias}'s {@code version(...)} declaration is set to that common
-     * value, and every group member (including the one just detached) is re-attached via
-     * {@code versionRef(refAlias)}. Otherwise, this catalog is returned unchanged -- the tentative
-     * detach stands, and {@code refAlias} plus any group members still pointing at it are left
-     * alone.
+     * Collapses a sharing group back onto {@code refAlias} when every library that originally
+     * shared it (per the {@link GradleVersionCatalogVersionReferences} marker) has since
+     * converged on one version. Otherwise the tentative detach stands, leaving {@code refAlias}
+     * and any members still pointing at it alone.
      */
     private GradleVersionCatalog reconciledAfterDetaching(String refAlias) {
         GradleVersionCatalogVersionReferences marker = getTree().getMarkers()

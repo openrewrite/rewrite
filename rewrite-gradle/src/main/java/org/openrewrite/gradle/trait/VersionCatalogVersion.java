@@ -45,10 +45,6 @@ public class VersionCatalogVersion implements Trait<J.MethodInvocation> {
         return literalArgument(getTree(), 1);
     }
 
-    /**
-     * @return a copy of this version declaration with its value literal rewritten to
-     * {@code newVersion}.
-     */
     public VersionCatalogVersion withVersion(String newVersion) {
         J.MethodInvocation outer = getTree();
         Expression argument = outer.getArguments().get(1);

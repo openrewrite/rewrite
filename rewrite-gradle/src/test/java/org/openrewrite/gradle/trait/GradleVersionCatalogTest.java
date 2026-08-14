@@ -27,13 +27,7 @@ class GradleVersionCatalogTest implements RewriteTest {
 
     @Test
     void capturesOriginalVersionReferencesOnCatalogRoot() {
-        // The version-reference-mapping snapshot is what lets a later recipe recognize that
-        // two independently-requested version bumps (springBootStarterWeb, springBootStarterWebflux)
-        // actually resolve through the same underlying version('springBootVersion', ...) declaration.
-        // GradleVersionCatalogVersionReferences.print() renders its own toString(), but only under
-        // verbose printing -- it's an internal implementation detail that must stay invisible in
-        // normal (non-verbose) recipe test output, so this test opts into VERBOSE explicitly to
-        // visualize it.
+        // The marker only prints under verbose printing, as it must stay invisible in normal recipe output
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
                     new GradleVersionCatalog.Matcher().asVisitor(catalog -> catalog.withOriginalVersionReferencesMarker().getTree())))
@@ -99,9 +93,7 @@ class GradleVersionCatalogTest implements RewriteTest {
 
     @Test
     void matchesWhenSplitIntoASeparateGradleFile() {
-        // Mirrors the `apply from: './gradle/versions.gradle'` pattern: the catalog block lives in a
-        // plain build-script-style file, not literally named settings.gradle. Matching is purely
-        // name-based (not type-attribution-based), so this works the same as the inline case.
+        // Mirrors the `apply from: './gradle/versions.gradle'` pattern
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),

@@ -24,17 +24,8 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-/**
- * Test cases for {@link UpgradeDependencyVersion} against Gradle version catalogs
- * ({@code dependencyResolutionManagement { versionCatalogs { ... } } }).
- */
 class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
 
-    /**
-     * Two libraries share a single version reference. Targeting each one in turn, via two
-     * separate UDV recipe runs, should still only ever touch the shared version(...) declaration
-     * -- neither library's own declaration should be rewritten or detached to a literal.
-     */
     @Test
     void sequentialRecipesTargetingBothSharersOnlyUpdateTheSharedVersionReference() {
         rewriteRun(
@@ -103,12 +94,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * Same starting catalog as above, but only the recipe targeting widget-a runs. Since
-     * widget-b still shares the version reference and isn't targeted by this run, widget-a gets
-     * detached to its own inline literal instead of bumping the shared version(...) declaration
-     * -- which is left unchanged, along with widget-b's untouched versionRef(...) declaration.
-     */
     @Test
     void singleRecipeTargetingOneSharerDetachesInsteadOfUpdatingTheSharedReference() {
         rewriteRun(
@@ -171,10 +156,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A library with an inline `.version(...)` isn't shared with anything -- its literal is
-     * simply upgraded in place.
-     */
     @Test
     void inlineVersionLibraryIsUpgradedDirectly() {
         rewriteRun(
@@ -229,10 +210,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A library declared with the single coordinate-string form has its version embedded in the
-     * same literal as the group and artifact -- upgrading it rewrites the whole string.
-     */
     @Test
     void singleStringCoordinateLibraryIsUpgradedDirectly() {
         rewriteRun(
@@ -287,12 +264,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A library declared `.withoutVersion()` has no version of its own -- its version comes from
-     * a BOM/platform or transitive resolution elsewhere. That's an explicit declaration of intent
-     * to leave it unmanaged here, so UDV leaves it alone even though `newVersion` is specified --
-     * it does not assume `.withoutVersion()` into an inline version.
-     */
     @Test
     void libraryWithoutVersionIsLeftUnmanaged() {
         rewriteRun(
@@ -329,11 +300,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A library declared via `versionRef(...)` that no other library shares can have its shared
-     * version(...) declaration bumped directly -- there's no untargeted sharer to protect, so no
-     * detach is needed.
-     */
     @Test
     void nonSharedVersionRefIsUpgradedDirectly() {
         rewriteRun(
@@ -392,13 +358,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * `groupId`/`artifactId` can be glob expressions (per UDV's own javadoc) -- a single recipe
-     * run can match every current sharer of a ref at once. That's the same end state as running
-     * two exact-GA recipes in sequence (see the pair of tests above), but reached in one pass:
-     * the scanner must discover every matching library by testing the glob against each one, not
-     * by looking up one known GA.
-     */
     @Test
     void wildcardGroupAndArtifactUpgradesAllMatchingSharersInOnePass() {
         rewriteRun(
@@ -461,12 +420,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A glob can also match multiple libraries that don't share anything with each other -- each
-     * has its own non-shared {@code versionRef}. There's no sharing to reconcile here, so this is
-     * just the non-shared case (see {@link #nonSharedVersionRefIsUpgradedDirectly()}) applied once
-     * per matched library in a single pass.
-     */
     @Test
     void wildcardGroupAndArtifactUpgradesMultipleNonSharedLibrariesInOnePass() {
         rewriteRun(
@@ -533,12 +486,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A glob can also match only *some* of a ref's sharers in one pass -- `gadget-c` shares
-     * `widgetVersion` too, but "widget-*" doesn't match it. The matched libraries still detach
-     * to their own literal, exactly as if each had been targeted by a separate exact-GA run; the
-     * unmatched sharer and the shared declaration are untouched.
-     */
     @Test
     void wildcardGroupAndArtifactDetachesWhenAnUnmatchedSharerRemains() {
         rewriteRun(
@@ -605,16 +552,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A library's version can't be resolved to a literal at all -- a rich
-     * {@code .version { strictly(...) } }} constraint, whose argument is a closure rather than a
-     * string literal, authored directly in the catalog from the start. Targeting it directly is a
-     * safe no-op rather than a crash: it matches neither the inline-version nor the versionRef
-     * shape, so {@code withVersion} has nothing to rewrite. And since it never used
-     * {@code versionRef(...)} to begin with, it was never a member of widget-a/widget-b's
-     * sharing group in the first place, so it doesn't interfere with -- or get swept into -- their
-     * own reconciliation, which proceeds and collapses normally once they agree.
-     */
     @Test
     void libraryWithUnresolvableVersionConstraintIsLeftUnchanged() {
         rewriteRun(
@@ -687,12 +624,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * A library's version is a GString rather than a plain string literal --
-     * {@code .version("${widgetDVersion}")} -- so it can't be resolved to a literal either, the
-     * same as a rich {@code .version { strictly(...) } }} constraint. Left unchanged rather than
-     * crashing.
-     */
     @Test
     void libraryWithInterpolatedVersionIsLeftUnchanged() {
         rewriteRun(

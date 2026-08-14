@@ -54,22 +54,17 @@ public abstract class GradleTraitMatcher<U extends Trait<?>> extends SimpleTrait
 
     /**
      * @return {@code true} if the cursor's tree is itself a statement in an enclosing block,
-     * rather than a nested expression (e.g. the receiver of a chained method call).
+     * rather than a nested expression such as the receiver of a chained method call.
      */
     protected boolean isTopLevelStatement(Cursor cursor) {
         Cursor parent = cursor.getParentTreeCursor();
         if (parent.getValue() instanceof J.Return) {
-            // Groovy closures implicitly return their last expression -- the parser wraps it in
-            // a synthetic Return node, so unwrap that before checking for the enclosing block.
+            // Groovy closures implicitly return their last expression through a synthetic Return
             parent = parent.getParentTreeCursor();
         }
         return !parent.isRoot() && parent.getValue() instanceof J.Block;
     }
 
-    /**
-     * @return the method invocation that {@code m} is chained onto (i.e. {@code m.getSelect()}),
-     * or {@code null} if {@code m} isn't chained onto another method call.
-     */
     protected static J.@Nullable MethodInvocation asChainedInvocation(J.MethodInvocation m) {
         return m.getSelect() instanceof J.MethodInvocation ? (J.MethodInvocation) m.getSelect() : null;
     }
