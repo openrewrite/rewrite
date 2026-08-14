@@ -309,6 +309,15 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return after >= source.length() || !Character.isJavaIdentifierPart(source.charAt(after));
     }
 
+    /**
+     * A parameter or argument list is written on the same line as the name it follows; a `(` that
+     * starts the next line opens a new expression (`def offset` / `(page - 1) * per_page`) and must
+     * not be adopted as an empty list.
+     */
+    private boolean sameLineAs(int from) {
+        return cursor <= from || source.lastIndexOf('\n', cursor - 1) < from;
+    }
+
     private int indexOfNextNonWhitespace(int from) {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
@@ -921,11 +930,15 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return new Rb.ComplexString.Value(randomId(), Markers.EMPTY, tree, sourceBefore("}"));
     }
 
+    /**
+     * The short interpolation form, which drops the braces around a variable: `"#@name"`, `"#$1"`.
+     */
     @Override
     public J visitEmbeddedVariableNode(Nodes.EmbeddedVariableNode node) {
         prefixTo(charStart(node));
         skip("#");
-        return new Rb.ComplexString.Value(randomId(), Markers.EMPTY, convert(node.variable), EMPTY);
+        return new Rb.ComplexString.Value(randomId(), Markers.EMPTY.add(new OmitBraces(randomId())),
+                convert(node.variable), EMPTY);
     }
 
     // ------------------------------------------------------------------ symbols
@@ -1360,7 +1373,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitCallNode(Nodes.CallNode node) {
         String name = str(node.name);
 
-        if (name.equals("[]") && node.receiver != null) {
+        // `x[i]` is an index, but `x&.[](i)` is an ordinary call to the same method
+        if (name.equals("[]") && node.receiver != null && written("[", node.receiver)) {
             Space prefix = prefix(node);
             return arrayAccess(prefix, node.receiver,
                     node.arguments == null ? new Nodes.Node[0] : node.arguments.arguments);
@@ -1536,12 +1550,18 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private boolean isInfixOperator(Nodes.CallNode node, String name) {
-        if (!BINARY_OPERATORS.containsKey(name) && !RUBY_BINARY_OPERATORS.containsKey(name)) {
-            return false;
-        }
         // `a.+(b)` is a method call written with a dot, not an infix expression
-        int at = indexOfNextNonWhitespace(charEnd(node.receiver));
-        return source.startsWith(name, at);
+        return (BINARY_OPERATORS.containsKey(name) || RUBY_BINARY_OPERATORS.containsKey(name)) &&
+               written(name, node.receiver);
+    }
+
+    /**
+     * Whether {@code token} is what the source actually writes after {@code receiver}, which is how
+     * an operator or index written in call form (`a.+(b)`, `x&.[](i)`) is told from the infix and
+     * index forms that share its Prism node.
+     */
+    private boolean written(String token, Nodes.Node receiver) {
+        return source.startsWith(token, indexOfNextNonWhitespace(charEnd(receiver)));
     }
 
     private J binary(Nodes.CallNode node, String name) {
@@ -1583,6 +1603,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         RUBY_BINARY_OPERATORS.put("===", Rb.Binary.Type.Within);
         RUBY_BINARY_OPERATORS.put("<=>", Rb.Binary.Type.Comparison);
         RUBY_BINARY_OPERATORS.put("=~", Rb.Binary.Type.Match);
+        RUBY_BINARY_OPERATORS.put("!~", Rb.Binary.Type.NotMatch);
     }
 
     @Override
@@ -1688,12 +1709,14 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
         AtomicReference<Boolean> parenthesized = new AtomicReference<>(Boolean.FALSE);
+        int nameEnd = cursor;
 
         Optional<JContainer<Expression>> built = peekWhitespace(0, (n, prefix) -> {
             // A `(` that starts exactly where the arguments start belongs to the first argument
-            // (`print ("x")`), not to the call.
+            // (`print ("x")`), not to the call. With no arguments at all, only a `(` on the same
+            // line is an empty argument list; one on the next line starts its own expression.
             boolean parens = source.startsWith("(", cursor) &&
-                             (arguments == null || cursor < charStart(arguments));
+                             (arguments == null ? sameLineAs(nameEnd) : cursor < charStart(arguments));
             if (parens) {
                 skip("(");
                 parenthesized.set(Boolean.TRUE);
@@ -1792,17 +1815,26 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitLambdaNode(Nodes.LambdaNode node) {
         Space prefix = prefix(node);
         skip("->");
-        Space parametersPrefix = whitespace();
+        // with no parameters there is nothing to hold the space before the body, so the body keeps it
+        Space parametersPrefix = node.parameters == null ? EMPTY : whitespace();
         List<JRightPadded<J>> params = node.parameters == null ?
                 emptyList() : blockParameters(node.parameters).getPadding().getElements();
+
+        Space bodyPrefix = whitespace();
+        boolean braces = source.startsWith("{", cursor);
+        skip(braces ? "{" : "do");
+        J.Block body = new J.Block(randomId(), bodyPrefix,
+                braces ? Markers.EMPTY : Markers.EMPTY.add(new ExplicitDo(randomId())),
+                JRightPadded.build(false), bodyStatements(node.body),
+                sourceBefore(braces ? "}" : "end"));
+
         return new J.Lambda(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 new J.Lambda.Parameters(randomId(), parametersPrefix, Markers.EMPTY, true, params),
                 EMPTY,
-                new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, JRightPadded.build(false),
-                        bodyStatements(node.body), sourceBefore("}")),
+                body,
                 null
         );
     }
@@ -1911,7 +1943,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitSplatNode(Nodes.SplatNode node) {
         Space prefix = prefix(node);
         skip("*");
-        return new Rb.Splat(randomId(), prefix, Markers.EMPTY,
+        return new Rb.Splat(randomId(), prefix, Markers.EMPTY, Rb.Splat.Operator.Array,
                 node.expression == null ?
                         new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
                         convertExpression(node.expression));
@@ -1945,9 +1977,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitAssocSplatNode(Nodes.AssocSplatNode node) {
         Space prefix = prefix(node);
         skip("**");
-        return convertExpression(node.value)
-                .withPrefix(prefix)
-                .withMarkers(Markers.EMPTY.add(new KeywordRestArgument(randomId())));
+        return new Rb.Splat(randomId(), prefix, Markers.EMPTY, Rb.Splat.Operator.Hash,
+                convertExpression(node.value));
     }
 
     private Rb.Hash hash(Space prefix, Nodes.Node[] elements, Nodes.@Nullable Node rest) {
@@ -1971,8 +2002,10 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             Expression pair = all.get(i) instanceof Nodes.AssocNode ?
                     keyValue((Nodes.AssocNode) all.get(i)) :
                     convertExpression(all.get(i));
-            pairs.add(padRight(pair, i == all.size() - 1 ?
-                    maybeTrailingComma(markers, braces ? "}" : null) : sourceBefore(",")));
+            // a brace-less hash is the trailing keyword arguments of a call, so a `,` after its
+            // last pair separates it from what follows (`f(a, b: 1, &block)`) and is not its own
+            pairs.add(padRight(pair, i < all.size() - 1 ? sourceBefore(",") :
+                    braces ? maybeTrailingComma(markers, "}") : EMPTY));
         }
         if (pairs.isEmpty()) {
             pairs = singletonList(padRight((Expression) new J.Empty(randomId(), EMPTY, Markers.EMPTY),
@@ -2509,8 +2542,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             collectParameters(parameters, params);
         }
         AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        int nameEnd = cursor;
         Optional<JContainer<J>> built = peekWhitespace(0, (n, prefix) -> {
-            boolean parens = source.startsWith("(", cursor);
+            boolean parens = source.startsWith("(", cursor) && sameLineAs(nameEnd);
             if (parens) {
                 skip("(");
             } else {

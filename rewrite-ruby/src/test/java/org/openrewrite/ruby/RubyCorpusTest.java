@@ -59,6 +59,8 @@ public class RubyCorpusTest {
         Map<String, Integer> causes = new LinkedHashMap<>();
         Map<String, String> examples = new LinkedHashMap<>();
         Map<String, String> details = new LinkedHashMap<>();
+        List<String> failures = new ArrayList<>();
+        List<String> messages = new ArrayList<>();
 
         for (Path path : paths) {
             // swallowing errors keeps one bad file from ending the run
@@ -90,6 +92,8 @@ public class RubyCorpusTest {
             String cause = classify(message);
             causes.merge(cause, 1, Integer::sum);
             String example = root.relativize(path).toString();
+            failures.add(cause + '\t' + example);
+            messages.add("==== " + example + '\n' + message);
             examples.merge(cause, example, (a, b) -> a.split(", ").length < 3 ? a + ", " + b : a);
             int detail = Integer.getInteger("ruby.corpus.detail", 300);
             details.computeIfAbsent(cause, c ->
@@ -115,6 +119,14 @@ public class RubyCorpusTest {
             Files.createDirectories(out.getParent());
         }
         Files.write(out, report.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        // one `cause<TAB>path` line per failure, so a bucket can be worked through file by file,
+        // and the full messages next to it, since the histogram only keeps one sample per cause
+        failures.sort(Comparator.naturalOrder());
+        Files.write(Paths.get(out + ".failures"),
+                String.join("\n", failures).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Files.write(Paths.get(out + ".messages"),
+                String.join("\n", messages).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /**

@@ -699,6 +699,7 @@ public interface Rb extends J {
             FlipFlopInclusive,
             ImplicitStringConcatenation,
             Match,
+            NotMatch,
             RangeExclusive,
             RangeInclusive,
             Within,
@@ -1869,6 +1870,9 @@ public interface Rb extends J {
         }
     }
 
+    /**
+     * A splatted expression: `*args` spreads an array, `**opts` a hash.
+     */
     @Value
     @With
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1878,7 +1882,19 @@ public interface Rb extends J {
 
         Space prefix;
         Markers markers;
+
+        /**
+         * Named for what it spreads rather than {@code type}, which {@link Expression} already
+         * uses for the {@link JavaType}.
+         */
+        Operator operator;
+
         Expression value;
+
+        public enum Operator {
+            Array,
+            Hash
+        }
 
         @Override
         public <P> J acceptRuby(RubyVisitor<P> v, P p) {
@@ -1893,7 +1909,8 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) withValue(value.withType(type));
+            // the splatted expression may refuse an unchanged type, as J.MethodInvocation does
+            return type == getType() ? (T) this : (T) withValue(value.withType(type));
         }
 
         @Override

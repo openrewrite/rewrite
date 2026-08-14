@@ -164,6 +164,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             case Match:
                 keyword = "=~";
                 break;
+            case NotMatch:
+                keyword = "!~";
+                break;
             case Within:
                 keyword = "===";
                 break;
@@ -301,10 +304,14 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitComplexStringValue(Rb.ComplexString.Value value, PrintOutputCapture<P> p) {
         beforeSyntax(value, RubySpace.Location.COMPLEX_STRING_VALUE_PREFIX, p);
-        p.append("#{");
+        // the short form `#@name` / `#$1` interpolates a variable without braces
+        boolean braces = !value.getMarkers().findFirst(OmitBraces.class).isPresent();
+        p.append(braces ? "#{" : "#");
         visit(value.getTree(), p);
         visitSpace(value.getAfter(), RubySpace.Location.COMPLEX_STRING_VALUE_SUFFIX, p);
-        p.append('}');
+        if (braces) {
+            p.append('}');
+        }
         afterSyntax(value, p);
         return value;
     }
@@ -523,7 +530,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitSplat(Rb.Splat splat, PrintOutputCapture<P> p) {
         beforeSyntax(splat, RubySpace.Location.SPLAT_PREFIX, p);
-        p.append("*");
+        p.append(splat.getOperator() == Rb.Splat.Operator.Hash ? "**" : "*");
         visit(splat.getValue(), p);
         afterSyntax(splat, p);
         return splat;
@@ -775,6 +782,28 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 p.append(';');
             }
             return super.visitMarker(marker, p);
+        }
+
+        /**
+         * A trailing comma belongs after the elements, where Ruby writes it; {@link JavaPrinter}
+         * would print it from the container's markers ahead of the opening delimiter.
+         */
+        @Override
+        protected void visitContainer(String before, @Nullable JContainer<? extends J> container,
+                                      JContainer.Location location, String suffixBetween,
+                                      @Nullable String after, PrintOutputCapture<P> p) {
+            if (container == null) {
+                return;
+            }
+            visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+            p.append(before);
+            visitRightPadded(container.getPadding().getElements(), location.getElementLocation(),
+                    suffixBetween, p);
+            container.getMarkers().findFirst(TrailingComma.class).ifPresent(comma -> {
+                p.append(',');
+                visitSpace(comma.getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+            });
+            p.append(after == null ? "" : after);
         }
 
         @Override
@@ -1058,11 +1087,12 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 afterSyntax(lambda.getParameters(), p);
             }
             J.Block body = (J.Block) lambda.getBody();
+            boolean explicitDo = body.getMarkers().findFirst(ExplicitDo.class).isPresent();
             visitSpace(body.getPrefix(), Space.Location.BLOCK_PREFIX, p);
-            p.append("{");
+            p.append(explicitDo ? "do" : "{");
             visitRightPadded(body.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, "", p);
             visitSpace(body.getEnd(), Space.Location.BLOCK_END, p);
-            p.append("}");
+            p.append(explicitDo ? "end" : "}");
             afterSyntax(lambda, p);
             return lambda;
         }
@@ -1097,13 +1127,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
             JContainer<Expression> args = method.getPadding().getArguments();
             AtomicReference<Rb.Block> blockArg = new AtomicReference<>();
-            args = JContainer.withElements(args, ListUtils.mapLast(args.getElements(), arg -> {
-                if (arg instanceof Rb.Block) {
-                    blockArg.set((Rb.Block) arg);
-                    return null;
-                }
-                return arg;
-            }));
+            args = withoutBlock(args, blockArg);
             if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                 visitContainer("", args, JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", "", p);
             } else {
@@ -1115,6 +1139,21 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
             afterSyntax(method, p);
             return method;
+        }
+
+        /**
+         * A `do ... end` or <code>{ ... }</code> block rides in the argument container but prints
+         * after the closing parenthesis, so it is taken back out before the arguments are printed.
+         */
+        private JContainer<Expression> withoutBlock(JContainer<Expression> args,
+                                                    AtomicReference<Rb.Block> blockArg) {
+            return JContainer.withElements(args, ListUtils.mapLast(args.getElements(), arg -> {
+                if (arg instanceof Rb.Block) {
+                    blockArg.set((Rb.Block) arg);
+                    return null;
+                }
+                return arg;
+            }));
         }
 
         @Override
@@ -1171,13 +1210,29 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             p.append(newClass.getMarkers().findFirst(SafeNavigation.class).isPresent() ? "&." : ".");
             visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
             p.append("new");
-            if (newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
-                visitContainer("", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", "", p);
+            JContainer<Expression> args = newClass.getPadding().getArguments();
+            AtomicReference<Rb.Block> blockArg = new AtomicReference<>();
+            args = withoutBlock(args, blockArg);
+            if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                visitContainer("", args, JContainer.Location.NEW_CLASS_ARGUMENTS, ",", "", p);
             } else {
-                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+                visitContainer("(", args, JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            }
+            if (blockArg.get() != null) {
+                visit(blockArg.get(), p);
             }
             afterSyntax(newClass, p);
             return newClass;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
+            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
+            visit(fieldAccess.getTarget(), p);
+            visitLeftPadded(fieldAccess.getMarkers().findFirst(SafeNavigation.class).isPresent() ? "&." : ".",
+                    fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+            afterSyntax(fieldAccess, p);
+            return fieldAccess;
         }
 
         @Override

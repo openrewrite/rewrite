@@ -35,4 +35,40 @@ public class SplatTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doubleSplatInHashLiteral() {
+        rewriteRun(
+          ruby(
+            """
+              h = {**a, b: 1}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleSplatArgument() {
+        rewriteRun(
+          ruby(
+            """
+              f(**opts)
+              g(a, **SharedHelpers.excon_defaults(headers: headers))
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousDoubleSplatForwarding() {
+        rewriteRun(
+          ruby(
+            """
+              def fwd(name, **)
+                g(name, **)
+              end
+              """
+          )
+        );
+    }
 }

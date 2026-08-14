@@ -109,4 +109,15 @@ public class BinaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void notMatch() {
+        rewriteRun(
+          ruby(
+            """
+              recv !~ /value/
+              """
+          )
+        );
+    }
 }

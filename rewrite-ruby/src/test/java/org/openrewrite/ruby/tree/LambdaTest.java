@@ -44,4 +44,42 @@ public class LambdaTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceBeforeBody() {
+        rewriteRun(
+          ruby(
+            """
+              noop = -> { }
+              add_one = -> (x) { x + 1 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doEndBody() {
+        rewriteRun(
+          ruby(
+            """
+              find = ->(ids) do
+                ids.first
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void doEndBodyWithoutParameters() {
+        rewriteRun(
+          ruby(
+            """
+              run = -> do
+                1
+              end
+              """
+          )
+        );
+    }
 }

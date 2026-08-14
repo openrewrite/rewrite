@@ -163,6 +163,17 @@ public class AssignmentTest implements RewriteTest {
     }
 
     @Test
+    void safeNavigationAttributeAssignment() {
+        rewriteRun(
+          ruby(
+            """
+              @token_bucket&.addition = TokenBucket.new(tokens: [])
+              """
+          )
+        );
+    }
+
+    @Test
     void bracketedArraysInParallelAssignment() {
         rewriteRun(
           ruby(

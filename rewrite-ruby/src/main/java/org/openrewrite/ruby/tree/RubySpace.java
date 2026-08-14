@@ -109,16 +109,19 @@ public class RubySpace {
         List<Comment> comments = new ArrayList<>(1);
 
         boolean inSingleLineComment = false;
-        boolean inMultiLineComment = false;
+        boolean inMultiLineComment = formatting.startsWith("=begin", beginIndex) &&
+                                     (beginIndex == 0 || formatting.charAt(beginIndex - 1) == '\n');
+        int i = beginIndex + (inMultiLineComment ? "=begin".length() : 0);
 
-        for (int i = beginIndex; i < toIndex; i++) {
+        for (; i < toIndex; i++) {
             char c = formatting.charAt(i);
             char next = i + 1 < toIndex ? formatting.charAt(i + 1) : '\0';
             switch (c) {
                 case '#':
-                    if (inSingleLineComment) {
+                    if (inSingleLineComment || inMultiLineComment) {
+                        // inside a comment a `#` is just text, including within a `=begin` block
                         comment.append(c);
-                    } else if (!inMultiLineComment) {
+                    } else {
                         inSingleLineComment = true;
                         comment.setLength(0);
                     }
@@ -168,10 +171,10 @@ public class RubySpace {
         // of the last comment.
         String whitespace = prefix.toString();
         if (!comments.isEmpty()) {
-            for (int i = comments.size() - 1; i >= 0; i--) {
-                Comment c = comments.get(i);
+            for (int j = comments.size() - 1; j >= 0; j--) {
+                Comment c = comments.get(j);
                 String next = c.getSuffix();
-                comments.set(i, c.withSuffix(whitespace));
+                comments.set(j, c.withSuffix(whitespace));
                 whitespace = next;
             }
         }

@@ -186,6 +186,23 @@ public class MethodDeclarationTest implements RewriteTest {
     }
 
     /**
+     * The `(` opening the body is a grouped expression; a parameter list has to be on the same
+     * line as the method name.
+     */
+    @Test
+    void bodyStartingWithParenthesizedExpression() {
+        rewriteRun(
+          ruby(
+            """
+              def offset
+                (page - 1) * per_page
+              end
+              """
+          )
+        );
+    }
+
+    /**
      * Ruby 3.0 endless method definitions.
      */
     @Test

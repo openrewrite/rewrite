@@ -102,4 +102,127 @@ public class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keywordArgumentsBeforeBlockArgument() {
+        rewriteRun(
+          ruby(
+            """
+              tag.span(class: 'wrapper', data: {id: 1}, &block)
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockOnConstructor() {
+        rewriteRun(
+          ruby(
+            """
+              klass = Class.new(described_class) do
+                def name
+                  "anonymous"
+                end
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockOnConstructorWithoutArguments() {
+        rewriteRun(
+          ruby(
+            """
+              threads << Thread.new do
+                work
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * A `(` that opens the next line is a grouped expression, not the argument list of the call
+     * that happens to end the line before it.
+     */
+    @Test
+    void parenthesizedExpressionAfterParenthesisLessCall() {
+        rewriteRun(
+          ruby(
+            """
+              def default_value
+                if self[:default_value].present?
+                  (User.current.today + Integer(self[:default_value], 10)).to_s
+                end
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedExpressionAfterConstructor() {
+        rewriteRun(
+          ruby(
+            """
+              q = ProjectQuery.new
+
+              ((q.count / 2) + 1).times do |i|
+                p i
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void safeNavigationIndex() {
+        rewriteRun(
+          ruby(
+            """
+              source_type = new_source&.[](:type)
+              first = match&.captures&.[](1)
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInMultilineArguments() {
+        rewriteRun(
+          ruby(
+            """
+              super(
+                name: name,
+                requirement: requirement,
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaAfterPositionalArgument() {
+        rewriteRun(
+          ruby(
+            """
+              build(
+                name,
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void indexWrittenAsMethod() {
+        rewriteRun(
+          ruby(
+            """
+              value = details.[]('version')
+              """
+          )
+        );
+    }
 }

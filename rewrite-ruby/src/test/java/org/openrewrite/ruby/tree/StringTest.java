@@ -483,4 +483,49 @@ public class StringTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * Instance, class and global variables interpolate without braces.
+     */
+    @Test
+    void shortInterpolation() {
+        rewriteRun(
+          ruby(
+            """
+              puts "hello #@name"
+              puts "matched :#$1 today"
+              puts "count #@@total"
+              """
+          )
+        );
+    }
+
+    @Test
+    void hashInsideBlockComment() {
+        rewriteRun(
+          ruby(
+            """
+              =begin
+                (({ClassName#new})) accepts no arguments
+                --- Diffable#patch(diff)
+              =end
+              a = 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockCommentAtStartOfFile() {
+        rewriteRun(
+          ruby(
+            """
+              =begin
+                a leading block comment
+              =end
+              a = 1
+              """
+          )
+        );
+    }
 }
