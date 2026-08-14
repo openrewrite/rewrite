@@ -395,7 +395,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             body = value.getValue() == null ? "" : value.getValue().toString();
         }
         p.append(body);
-        if (!startsALine(body)) {
+        if (!endsWithBlankLine(body)) {
             // a recipe rewrote the body without a trailing newline; the terminator still needs one
             p.append('\n');
         }
@@ -403,7 +403,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         visitSpace(heredoc.getEnd(), Space.Location.LANGUAGE_EXTENSION, p);
     }
 
-    private static boolean startsALine(String body) {
+    private static boolean endsWithBlankLine(String body) {
         for (int i = body.length() - 1; i >= 0; i--) {
             char c = body.charAt(i);
             if (c == '\n') {

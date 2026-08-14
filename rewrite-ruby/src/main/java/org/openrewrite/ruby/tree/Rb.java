@@ -1370,7 +1370,7 @@ public interface Rb extends J {
         String delimiter;
 
         /**
-         * The body, whose {@code valueSource} is the source between the marker's line and the
+         * The body, whose {@code valueSource} is the source between the opener's line and the
          * terminator and whose value is the text the heredoc evaluates to (dedented for {@code <<~}).
          */
         J.Literal value;

@@ -34,7 +34,6 @@ import org.ruby_lang.prism.AbstractNodeVisitor;
 import org.ruby_lang.prism.Nodes;
 import org.ruby_lang.prism.ParseResult;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
