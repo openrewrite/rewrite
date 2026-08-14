@@ -22,6 +22,23 @@ import static org.openrewrite.ruby.Assertions.ruby;
 
 public class CompilationUnitTest implements RewriteTest {
 
+    /**
+     * A shebang naming a wrapper rather than ruby itself, as `Rakefile` and `bin/` scripts do.
+     */
+    @Test
+    void nonRubyShebang() {
+        rewriteRun(
+          ruby(
+            """
+              #!/usr/bin/env rake
+              # Add your own tasks in files placed in lib/tasks.
+
+              require File.expand_path('../config/application', __FILE__)
+              """
+          )
+        );
+    }
+
     @Test
     void singleBlockStatementIsAnArray() {
         rewriteRun(

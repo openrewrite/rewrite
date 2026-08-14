@@ -237,6 +237,54 @@ public class RescueTest implements RewriteTest {
         );
     }
 
+    /**
+     * The `begin` opening the body belongs to the inner rescue; the method's own rescue has no
+     * `begin` of its own even though one is the first thing in its body.
+     */
+    @Test
+    void explicitBeginFirstInMethodWithRescue() {
+        rewriteRun(
+          ruby(
+            """
+              def signature
+                begin
+                  require "gpgme"
+                rescue LoadError
+                  raise LoadError, "add gpgme"
+                end
+
+                sign
+              rescue Errno::ENOTEMPTY
+                retry
+              ensure
+                cleanup
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitBeginFirstInBlockWithRescue() {
+        rewriteRun(
+          ruby(
+            """
+              ips.each do |ip|
+                begin
+                  connect(ip)
+                rescue
+                  nil
+                end
+
+                next
+              rescue StandardError
+                retry
+              end
+              """
+          )
+        );
+    }
+
     @Test
     void modifier() {
         rewriteRun(

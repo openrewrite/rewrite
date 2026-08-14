@@ -59,7 +59,9 @@ public class RubyParser implements Parser {
                 EnumSet.noneOf(ParsingOptions.CommandLine.class),
                 ParsingOptions.SyntaxVersion.LATEST,
                 false,
-                true,
+                // Not a "main script": a shebang naming something other than ruby (`#!/usr/bin/env
+                // rake`) is then just a comment rather than a file with no Ruby in it.
+                false,
                 // OpenRewrite is routinely handed fragments rather than whole scripts, so `next`,
                 // `break` and `return` at the top level have to parse rather than error out.
                 true,

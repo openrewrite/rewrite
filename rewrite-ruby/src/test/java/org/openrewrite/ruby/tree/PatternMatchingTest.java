@@ -109,6 +109,29 @@ public class PatternMatchingTest implements RewriteTest {
     }
 
     /**
+     * The `=>` follows a subtree the Java printer prints, so it only stays an `=>` if the hand-off
+     * back and forth between the two printers leaves the cursor where it found it.
+     */
+    @Test
+    void rightwardAssignmentOfCase() {
+        rewriteRun(
+          ruby(
+            """
+              case error
+              when Dependabot::NotImplemented
+                {
+                  "error-type": "not_implemented",
+                  "error-detail": {message: error.message}
+                }
+              else
+                {"error-type": "unknown"}
+              end => details
+              """
+          )
+        );
+    }
+
+    /**
      * Only optional in case statements, not in standalone patterns
      */
     @Test

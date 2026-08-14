@@ -185,6 +185,17 @@ public class AssignmentTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedTargets() {
+        rewriteRun(
+          ruby(
+            """
+              (key, value) = line.split("=", 2)
+              """
+          )
+        );
+    }
+
+    @Test
     void nestedDestructuring() {
         rewriteRun(
           ruby(

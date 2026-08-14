@@ -1310,13 +1310,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitMultiTargetNode(Nodes.MultiTargetNode node) {
         Space prefix = prefix(node);
-        List<Nodes.Node> targets = multiTargets(node.lefts, node.rest, node.rights);
+        return targetGroup(prefix, multiTargets(node.lefts, node.rest, node.rights));
+    }
+
+    private Expression targetGroup(Space prefix, List<Nodes.Node> targets) {
+        Nodes.Node[] elements = targets.toArray(new Nodes.Node[0]);
         if (!skip("(")) {
-            return array(EMPTY, targets.toArray(new Nodes.Node[0])).withPrefix(prefix);
+            return array(EMPTY, elements).withPrefix(prefix);
         }
-        Rb.Array inner = array(EMPTY, targets.toArray(new Nodes.Node[0]));
         return new J.Parentheses<>(randomId(), prefix, Markers.EMPTY,
-                padRight((Expression) inner, sourceBefore(")")));
+                padRight((Expression) array(EMPTY, elements), sourceBefore(")")));
     }
 
     private List<Nodes.Node> multiTargets(Nodes.Node[] lefts, Nodes.@Nullable Node rest,
@@ -1337,11 +1340,19 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         List<Nodes.Node> targets = multiTargets(node.lefts, node.rest, node.rights);
 
         AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
-        List<JRightPadded<Expression>> assignments = new ArrayList<>(targets.size());
-        for (int i = 0; i < targets.size(); i++) {
-            Expression target = convertExpression(targets.get(i));
-            assignments.add(padRight(target, i == targets.size() - 1 ?
-                    maybeTrailingComma(markers, null) : sourceBefore(",")));
+        List<JRightPadded<Expression>> assignments;
+        // `(a, b) = pair` groups every target, like the nested `(b, c)` of `a, (b, c) = ...`. The
+        // gap the `(` leaves before the first target is what tells it from `(a, b), c = ...`, where
+        // the parentheses belong to that first target.
+        if (!targets.isEmpty() && charStart(node) < charStart(targets.get(0))) {
+            assignments = singletonList(padRight(targetGroup(EMPTY, targets), EMPTY));
+        } else {
+            assignments = new ArrayList<>(targets.size());
+            for (int i = 0; i < targets.size(); i++) {
+                Expression target = convertExpression(targets.get(i));
+                assignments.add(padRight(target, i == targets.size() - 1 ?
+                        maybeTrailingComma(markers, null) : sourceBefore(",")));
+            }
         }
 
         Space initializerPrefix = sourceBefore("=");
@@ -2337,7 +2348,10 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     private J rescue(Nodes.BeginNode node) {
         Space prefix = whitespace();
-        boolean explicitBegin = skip("begin");
+        // The implicit begin of a `def`, block or class body spans the whole construct, so only a
+        // node that starts right at the cursor can be a `begin` of its own — the first statement of
+        // an implicit body may itself be `begin`, which would otherwise be claimed here.
+        boolean explicitBegin = cursor == charStart(node) && skip("begin");
         Space tryPrefix = whitespace();
 
         J.Block body = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),

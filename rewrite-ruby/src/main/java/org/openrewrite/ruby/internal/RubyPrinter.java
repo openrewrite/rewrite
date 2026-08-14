@@ -54,7 +54,13 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (!(tree instanceof Rb)) {
             // re-route printing to the java printer
-            return delegate.visit(tree, p, getCursor());
+            Cursor delegateCursor = delegate.getCursor();
+            try {
+                return delegate.visit(tree, p, getCursor());
+            } finally {
+                // handing over the cursor overwrites the delegate's, which it never puts back
+                delegate.setCursor(delegateCursor);
+            }
         } else {
             return super.visit(tree, p);
         }
@@ -720,7 +726,14 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
             if (tree instanceof Rb) {
                 // re-route printing back up to ruby
-                return RubyPrinter.this.visit(tree, p, getCursor());
+                Cursor rubyCursor = RubyPrinter.this.getCursor();
+                try {
+                    return RubyPrinter.this.visit(tree, p, getCursor());
+                } finally {
+                    // without this the outer printer is left inside the subtree just printed, and
+                    // whatever it prints next reads the wrong ancestors (`visitCase`, `visitVariable`)
+                    RubyPrinter.this.setCursor(rubyCursor);
+                }
             } else {
                 return super.visit(tree, p);
             }
