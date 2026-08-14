@@ -16,8 +16,14 @@
 package org.openrewrite.ruby.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.ruby.RubyVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 /**
@@ -115,5 +121,109 @@ public class RubyBlockTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * A numbered parameter is written nowhere but the body, so the block has no parameter list and
+     * `_1` is an ordinary identifier.
+     */
+    @Test
+    void numberedParameters() {
+        rewriteRun(
+          ruby(
+            """
+              users.map { _1.name }
+              pairs.each { puts "#{_1}=#{_2}" }
+              users.select { _1.active? }.map { _1.email }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(blocksWithParameters(cu)).containsOnly(false))
+          )
+        );
+    }
+
+    @Test
+    void numberedParametersInsideMultilineBlock() {
+        rewriteRun(
+          ruby(
+            """
+              rows.each do |row|
+                row.values.map { _1.to_s }
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void itParameter() {
+        rewriteRun(
+          ruby(
+            """
+              [1, 2, 3].map { it * 2 }
+              users.select { it.active? }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(blocksWithParameters(cu)).containsOnly(false))
+          )
+        );
+    }
+
+    @Test
+    void itParameterInsideMultilineBlock() {
+        rewriteRun(
+          ruby(
+            """
+              rows.each do
+                it.values.each do
+                  puts it
+                end
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * RSpec's `it "..." do ... end` is a method call that happens to be named `it`, and must not be
+     * mistaken for the implicit block parameter.
+     */
+    @Test
+    void rspecItIsAMethodInvocation() {
+        rewriteRun(
+          ruby(
+            """
+              RSpec.describe User do
+                it "is valid" do
+                  expect(user).to be_valid
+                end
+              end
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<String> invocations = new ArrayList<>();
+                new RubyVisitor<Integer>() {
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        invocations.add(method.getSimpleName());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(invocations).contains("it");
+            })
+          )
+        );
+    }
+
+    /**
+     * @return one element per {@link Rb.Block} in the source, true when it has a parameter list.
+     */
+    private static List<Boolean> blocksWithParameters(Rb.CompilationUnit cu) {
+        List<Boolean> parameterized = new ArrayList<>();
+        new RubyVisitor<Integer>() {
+            @Override
+            public J visitBlock(Rb.Block block, Integer p) {
+                parameterized.add(block.getParameters() != null);
+                return super.visitBlock(block, p);
+            }
+        }.visit(cu, 0);
+        return parameterized;
     }
 }

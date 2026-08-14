@@ -42,6 +42,7 @@ import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.EMPTY;
 
@@ -1784,11 +1785,23 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         boolean inline = source.charAt(cursor) == '{';
         skip(inline ? "{" : "do");
 
-        JContainer<J> parameters = node.parameters == null ? null : blockParameters(node.parameters);
+        JContainer<J> parameters = writesParameters(node.parameters) ?
+                blockParameters(requireNonNull(node.parameters)) : null;
         J.Block body = new J.Block(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(false),
                 bodyStatements(node.body), sourceBefore(inline ? "}" : "end"));
 
         return new Rb.Block(randomId(), prefix, Markers.EMPTY, inline, parameters, body);
+    }
+
+    /**
+     * A block using `_1`/`_2` or `it` gets synthetic parameters that Prism spans over the whole
+     * block, because the source writes no `|...|` for them. Such a block keeps a null parameter
+     * list and its body refers to the names as ordinary identifiers.
+     */
+    private static boolean writesParameters(Nodes.@Nullable Node parameters) {
+        return parameters != null &&
+               !(parameters instanceof Nodes.NumberedParametersNode) &&
+               !(parameters instanceof Nodes.ItParametersNode);
     }
 
     private JContainer<J> blockParameters(Nodes.Node parameters) {
@@ -1826,10 +1839,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitLambdaNode(Nodes.LambdaNode node) {
         Space prefix = prefix(node);
         skip("->");
+        boolean writesParameters = writesParameters(node.parameters);
         // with no parameters there is nothing to hold the space before the body, so the body keeps it
-        Space parametersPrefix = node.parameters == null ? EMPTY : whitespace();
-        List<JRightPadded<J>> params = node.parameters == null ?
-                emptyList() : blockParameters(node.parameters).getPadding().getElements();
+        Space parametersPrefix = writesParameters ? whitespace() : EMPTY;
+        List<JRightPadded<J>> params = writesParameters ?
+                blockParameters(requireNonNull(node.parameters)).getPadding().getElements() : emptyList();
 
         Space bodyPrefix = whitespace();
         boolean braces = source.startsWith("{", cursor);
@@ -2658,7 +2672,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         if (node instanceof Nodes.BlockLocalVariableNode) {
             return identifier(node);
         }
-        if (node instanceof Nodes.ForwardingParameterNode || node instanceof Nodes.NoKeywordsParameterNode) {
+        if (node instanceof Nodes.ForwardingParameterNode) {
             return identifier(node);
         }
         return convert(node);
@@ -3003,8 +3017,25 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         );
     }
 
+    /**
+     * `**nil` refuses keyword arguments. Prism gives it one node with no child, so the `nil` is read
+     * back off the source as the identifier every other `nil` maps to.
+     */
     @Override
     public J visitNoKeywordsParameterNode(Nodes.NoKeywordsParameterNode node) {
-        return identifier(node);
+        Space prefix = prefix(node);
+        skip("**");
+        return new Rb.Splat(randomId(), prefix, Markers.EMPTY, Rb.Splat.Operator.Hash, identifier("nil"));
+    }
+
+    /**
+     * `&nil` refuses a block, and is the same {@code &} + expression shape as any other block
+     * argument.
+     */
+    @Override
+    public J visitNoBlockParameterNode(Nodes.NoBlockParameterNode node) {
+        Space prefix = prefix(node);
+        skip("&");
+        return new Rb.BlockArgument(randomId(), prefix, Markers.EMPTY, identifier("nil"));
     }
 }

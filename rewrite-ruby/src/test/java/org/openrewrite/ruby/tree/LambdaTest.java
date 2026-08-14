@@ -82,4 +82,19 @@ public class LambdaTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * A lambda literal takes `it` and `_1` too, and writes no parameter list for either.
+     */
+    @Test
+    void implicitParameters() {
+        rewriteRun(
+          ruby(
+            """
+              double = -> { it * 2 }
+              triple = -> { _1 * 3 }
+              """
+          )
+        );
+    }
 }

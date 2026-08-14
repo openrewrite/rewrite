@@ -318,4 +318,23 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * `&nil` refuses a block and `**nil` refuses keyword arguments.
+     */
+    @Test
+    void refusedParameters() {
+        rewriteRun(
+          ruby(
+            """
+              def f(&nil)
+              end
+              def g(a, **nil)
+              end
+              def h(a, ** nil, & nil)
+              end
+              """
+          )
+        );
+    }
 }
