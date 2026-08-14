@@ -22,7 +22,7 @@ import {
     MarkupError,
     MarkupInfo,
     MarkupWarn,
-    RecipeIdentity,
+    RecipeThatMadeChanges,
     RecipesThatMadeChanges,
     SearchResult
 } from "../markers";
@@ -103,9 +103,9 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     }
 });
 
-// Field order mirrors Java's RecipeIdentity codec.
-RpcCodecs.registerCodec(MarkersKind.RecipeIdentity, {
-    async rpcReceive(before: RecipeIdentity, q: RpcReceiveQueue): Promise<RecipeIdentity> {
+// Field order mirrors Java's RecipeThatMadeChanges codec.
+RpcCodecs.registerCodec(MarkersKind.RecipeThatMadeChanges, {
+    async rpcReceive(before: RecipeThatMadeChanges, q: RpcReceiveQueue): Promise<RecipeThatMadeChanges> {
         return updateIfChanged(before, {
             name: await q.receive(before.name),
             displayName: await q.receive(before.displayName),
@@ -115,7 +115,7 @@ RpcCodecs.registerCodec(MarkersKind.RecipeIdentity, {
         });
     },
 
-    async rpcSend(after: RecipeIdentity, q: RpcSendQueue): Promise<void> {
+    async rpcSend(after: RecipeThatMadeChanges, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.name);
         await q.getAndSend(after, a => a.displayName);
         await q.getAndSend(after, a => a.instanceName);

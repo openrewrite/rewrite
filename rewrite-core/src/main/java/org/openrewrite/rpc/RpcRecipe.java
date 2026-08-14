@@ -15,7 +15,6 @@
  */
 package org.openrewrite.rpc;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -36,7 +35,6 @@ import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
-    @JsonIgnore
     @Getter
     private final transient RewriteRpc rpc;
     private transient @Nullable List<Recipe> recipeList;
@@ -57,14 +55,12 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      * The non-batch path uses {@link #getVisitor()}, which already wraps with
      * {@link org.openrewrite.Preconditions#check}.
      */
-    @JsonIgnore
     @Getter
-    private final transient @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+    private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
     @Getter
     private final @Nullable String scanVisitor;
-    @JsonIgnore
     @Getter
-    private final transient @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
+    private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 
     /**
      * The prepared child recipe responses returned by the server as part of the whole-tree

@@ -19,27 +19,27 @@ namespace OpenRewrite.Core;
 
 /// <summary>
 /// One frame of a <see cref="RecipesThatMadeChanges"/> stack: how the recipe is named, how it was
-/// configured, and what it is worth. Field order mirrors Java's RecipeIdentity codec.
+/// configured, and what it is worth. Field order mirrors Java's RecipeThatMadeChanges codec.
 /// </summary>
-public sealed class RecipeIdentity(
+public sealed class RecipeThatMadeChanges(
     string name,
     string? displayName,
     string? instanceName,
     object? options,
     long? estimatedEffortPerOccurrenceMillis)
-    : IRpcCodec<RecipeIdentity>
+    : IRpcCodec<RecipeThatMadeChanges>
 {
     public string Name { get; } = name;
     public string? DisplayName { get; } = displayName;
     public string? InstanceName { get; } = instanceName;
     /// <summary>
-    /// Configured option values, carried as received. C# does not interpret them, so they stay in
-    /// whatever shape the wire delivered rather than being projected into a dictionary.
+    /// Configured option values. C# never interprets them, so they stay in whatever shape the wire
+    /// delivered rather than being projected into a dictionary.
     /// </summary>
     public object? Options { get; } = options;
     public long? EstimatedEffortPerOccurrenceMillis { get; } = estimatedEffortPerOccurrenceMillis;
 
-    public void RpcSend(RecipeIdentity after, RpcSendQueue q)
+    public void RpcSend(RecipeThatMadeChanges after, RpcSendQueue q)
     {
         q.GetAndSend(after, r => r.Name);
         q.GetAndSend(after, r => r.DisplayName);
@@ -48,13 +48,13 @@ public sealed class RecipeIdentity(
         q.GetAndSend(after, r => r.EstimatedEffortPerOccurrenceMillis);
     }
 
-    public RecipeIdentity RpcReceive(RecipeIdentity before, RpcReceiveQueue q)
+    public RecipeThatMadeChanges RpcReceive(RecipeThatMadeChanges before, RpcReceiveQueue q)
     {
         var name = q.Receive(before.Name);
         var displayName = q.Receive(before.DisplayName);
         var instanceName = q.Receive(before.InstanceName);
         var options = q.Receive(before.Options);
         var effort = q.Receive(before.EstimatedEffortPerOccurrenceMillis);
-        return new RecipeIdentity(name!, displayName, instanceName, options, effort);
+        return new RecipeThatMadeChanges(name!, displayName, instanceName, options, effort);
     }
 }

@@ -16,7 +16,7 @@
 from uuid import UUID
 
 import rewrite.rpc.python_receiver  # noqa: F401  (registers the marker codecs)
-from rewrite.markers import RecipeIdentity, RecipesThatMadeChanges
+from rewrite.markers import RecipeThatMadeChanges, RecipesThatMadeChanges
 from rewrite.rpc.receive_queue import RpcReceiveQueue
 from rewrite.rpc.send_queue import RpcSendQueue
 from rewrite.utils import random_id
@@ -42,8 +42,8 @@ def _receive(batch):
 def test_recipe_stack_round_trips_as_identity():
     marker_id = random_id()
     marker = RecipesThatMadeChanges(marker_id, [[
-        RecipeIdentity('org.openrewrite.text.ChangeText'),
-        RecipeIdentity(
+        RecipeThatMadeChanges('org.openrewrite.text.ChangeText'),
+        RecipeThatMadeChanges(
             'org.openrewrite.text.FindAndReplace',
             'Find and replace',
             'Find and replace `blacklist`',

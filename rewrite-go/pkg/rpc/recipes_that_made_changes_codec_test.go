@@ -62,7 +62,7 @@ func TestRecipesThatMadeChangesRoundTrip(t *testing.T) {
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{
 		java.RecipesThatMadeChanges{
 			Ident: markerID,
-			Recipes: [][]java.RecipeIdentity{{
+			Recipes: [][]java.RecipeThatMadeChanges{{
 				{Name: "org.openrewrite.text.ChangeText"},
 				{
 					Name:                               "org.openrewrite.text.FindAndReplace",
@@ -75,9 +75,8 @@ func TestRecipesThatMadeChangesRoundTrip(t *testing.T) {
 		},
 	}}
 
-	// Hop 1 exercises the receiver against a Java-shaped stream; hop 2 exercises this peer's
-	// own sender against what its receiver produced. Markers travel as refs, so both hops go
-	// through SendMarkersCodec rather than sending the marker directly.
+	// Markers travel as refs, so both hops go through SendMarkersCodec. Hop 1 exercises the
+	// receiver against a Java-shaped stream; hop 2 exercises this peer's own sender.
 	firstHop := sendMarkers(before)
 	got := receiveMarkers(firstHop)
 

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.marker;
 
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.AbstractRecipe;
 import org.openrewrite.Recipe;
@@ -29,16 +30,18 @@ import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 /**
  * One frame of a {@link RecipesThatMadeChanges} stack, reduced to what a consumer of the marker
  * reads: how the recipe is named, how it was configured, and what it is worth. Standing in for the
- * recipe itself keeps run state — cursors, scanning accumulators, and the source files they reach —
+ * recipe itself keeps run state (cursors, scanning accumulators, and the source files they reach)
  * off the wire. Reading anything beyond the fields below yields a {@link Recipe} default.
  */
 @AbstractRecipe
-public class RecipeIdentity extends Recipe implements RpcCodec<RecipeIdentity> {
-    private static final URI SOURCE = URI.create("recipe-identity:rpc");
+@RequiredArgsConstructor
+public class RecipeThatMadeChanges extends Recipe implements RpcCodec<RecipeThatMadeChanges> {
+    private static final URI SOURCE = URI.create("rpc:recipe-that-made-changes");
 
     private final String name;
     private final @Nullable String displayName;
@@ -46,40 +49,21 @@ public class RecipeIdentity extends Recipe implements RpcCodec<RecipeIdentity> {
     private final @Nullable Map<String, Object> options;
     private final @Nullable Duration estimatedEffortPerOccurrence;
 
-    public RecipeIdentity(String name, @Nullable String displayName, @Nullable String instanceName,
-                          @Nullable Map<String, Object> options, @Nullable Duration estimatedEffortPerOccurrence) {
-        this.name = name;
-        this.displayName = displayName;
-        this.instanceName = instanceName;
-        this.options = options;
-        this.estimatedEffortPerOccurrence = estimatedEffortPerOccurrence;
-    }
-
-    public static RecipeIdentity of(Recipe recipe) {
-        if (recipe instanceof RecipeIdentity) {
-            return (RecipeIdentity) recipe;
+    public static RecipeThatMadeChanges of(Recipe recipe) {
+        if (recipe instanceof RecipeThatMadeChanges) {
+            return (RecipeThatMadeChanges) recipe;
         }
-        RecipeDescriptor descriptor = null;
-        try {
-            descriptor = recipe.getDescriptor();
-        } catch (Exception ignored) {
-            // Descriptor introspection is best-effort; fall back to the bare name.
-        }
-        if (descriptor == null) {
-            return new RecipeIdentity(recipe.getName(), null, null, null, null);
-        }
+        RecipeDescriptor descriptor = recipe.getDescriptor();
         Map<String, Object> options = null;
-        if (descriptor.getOptions() != null) {
-            for (OptionDescriptor option : descriptor.getOptions()) {
-                if (option.getValue() != null) {
-                    if (options == null) {
-                        options = new LinkedHashMap<>();
-                    }
-                    options.put(option.getName(), option.getValue());
+        for (OptionDescriptor option : descriptor.getOptions()) {
+            if (option.getValue() != null) {
+                if (options == null) {
+                    options = new LinkedHashMap<>();
                 }
+                options.put(option.getName(), option.getValue());
             }
         }
-        return new RecipeIdentity(recipe.getName(), descriptor.getDisplayName(),
+        return new RecipeThatMadeChanges(recipe.getName(), descriptor.getDisplayName(),
                 descriptor.getInstanceName(), options, descriptor.getEstimatedEffortPerOccurrence());
     }
 
@@ -113,23 +97,19 @@ public class RecipeIdentity extends Recipe implements RpcCodec<RecipeIdentity> {
         List<OptionDescriptor> optionDescriptors = new ArrayList<>();
         if (options != null) {
             for (Map.Entry<String, Object> option : options.entrySet()) {
-                // Option types are omitted from the wire; only a received marker reads these,
-                // and it reads them for display.
+                // Option types don't travel, only their values.
                 optionDescriptors.add(new OptionDescriptor(option.getKey(), "", "", "", null, null, false, option.getValue()));
             }
         }
-        return new RecipeDescriptor(name, getDisplayName(), getInstanceName(), "", Collections.emptySet(),
+        return new RecipeDescriptor(name, getDisplayName(), getInstanceName(), "", emptySet(),
                 estimatedEffortPerOccurrence, optionDescriptors, emptyList(), emptyList(), emptyList(),
                 emptyList(), emptyList(), emptyList(), SOURCE);
     }
 
-    /**
-     * The order these fields go out in is the contract every peer codec mirrors; a peer that
-     * sends them in another order desyncs the receive queue.
-     */
+    /** Field order is the protocol; every peer codec mirrors it. */
     @Override
-    public void rpcSend(RecipeIdentity after, RpcSendQueue q) {
-        q.getAndSend(after, RecipeIdentity::getName);
+    public void rpcSend(RecipeThatMadeChanges after, RpcSendQueue q) {
+        q.getAndSend(after, RecipeThatMadeChanges::getName);
         q.getAndSend(after, r -> r.displayName);
         q.getAndSend(after, r -> r.instanceName);
         q.getAndSend(after, r -> r.options);
@@ -138,8 +118,8 @@ public class RecipeIdentity extends Recipe implements RpcCodec<RecipeIdentity> {
     }
 
     @Override
-    public RecipeIdentity rpcReceive(RecipeIdentity before, RpcReceiveQueue q) {
-        return new RecipeIdentity(
+    public RecipeThatMadeChanges rpcReceive(RecipeThatMadeChanges before, RpcReceiveQueue q) {
+        return new RecipeThatMadeChanges(
                 q.receive(before.name),
                 q.receive(before.displayName),
                 q.receive(before.instanceName),

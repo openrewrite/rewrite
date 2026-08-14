@@ -23,21 +23,21 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// Field order mirrors Java's RecipesThatMadeChanges and RecipeIdentity codecs.
+// Field order mirrors Java's RecipesThatMadeChanges and RecipeThatMadeChanges codecs.
 
 func init() {
 	RegisterValueType(reflect.TypeOf(java.RecipesThatMadeChanges{}), "org.openrewrite.marker.RecipesThatMadeChanges")
-	RegisterValueType(reflect.TypeOf(java.RecipeIdentity{}), "org.openrewrite.marker.RecipeIdentity")
+	RegisterValueType(reflect.TypeOf(java.RecipeThatMadeChanges{}), "org.openrewrite.marker.RecipeThatMadeChanges")
 	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return java.RecipesThatMadeChanges{} })
-	RegisterFactory("org.openrewrite.marker.RecipeIdentity", func() any { return java.RecipeIdentity{} })
+	RegisterFactory("org.openrewrite.marker.RecipeThatMadeChanges", func() any { return java.RecipeThatMadeChanges{} })
 }
 
 // stackKey identifies a recipe stack for the sender's own list diff. It never travels,
 // so it only has to be stable within this process.
-func stackKey(stack []java.RecipeIdentity) any {
+func stackKey(stack []java.RecipeThatMadeChanges) any {
 	names := make([]string, len(stack))
-	for i, identity := range stack {
-		names[i] = identity.Name
+	for i, recipe := range stack {
+		names[i] = recipe.Name
 	}
 	return strings.Join(names, "\x00")
 }
@@ -53,30 +53,30 @@ func sendRecipesThatMadeChanges(m java.RecipesThatMadeChanges, q *SendQueue) {
 			}
 			return out
 		},
-		func(v any) any { return stackKey(v.([]java.RecipeIdentity)) },
-		func(v any) { sendRecipeIdentityList(v.([]java.RecipeIdentity), q) })
+		func(v any) any { return stackKey(v.([]java.RecipeThatMadeChanges)) },
+		func(v any) { sendRecipeThatMadeChangesList(v.([]java.RecipeThatMadeChanges), q) })
 }
 
-func sendRecipeIdentityList(stack []java.RecipeIdentity, q *SendQueue) {
+func sendRecipeThatMadeChangesList(stack []java.RecipeThatMadeChanges, q *SendQueue) {
 	q.GetAndSendList(stack,
 		func(x any) []any {
-			identities := x.([]java.RecipeIdentity)
-			out := make([]any, len(identities))
-			for i, identity := range identities {
-				out[i] = identity
+			recipes := x.([]java.RecipeThatMadeChanges)
+			out := make([]any, len(recipes))
+			for i, recipe := range recipes {
+				out[i] = recipe
 			}
 			return out
 		},
-		func(v any) any { return v.(java.RecipeIdentity).Name },
-		func(v any) { sendRecipeIdentity(v.(java.RecipeIdentity), q) })
+		func(v any) any { return v.(java.RecipeThatMadeChanges).Name },
+		func(v any) { sendRecipeThatMadeChanges(v.(java.RecipeThatMadeChanges), q) })
 }
 
-func sendRecipeIdentity(identity java.RecipeIdentity, q *SendQueue) {
-	q.GetAndSend(identity, func(x any) any { return x.(java.RecipeIdentity).Name }, nil)
-	q.GetAndSend(identity, func(x any) any { return nilableString(x.(java.RecipeIdentity).DisplayName) }, nil)
-	q.GetAndSend(identity, func(x any) any { return nilableString(x.(java.RecipeIdentity).InstanceName) }, nil)
-	q.GetAndSend(identity, func(x any) any { return x.(java.RecipeIdentity).Options }, nil)
-	q.GetAndSend(identity, func(x any) any { return derefInt64(x.(java.RecipeIdentity).EstimatedEffortPerOccurrenceMillis) }, nil)
+func sendRecipeThatMadeChanges(recipe java.RecipeThatMadeChanges, q *SendQueue) {
+	q.GetAndSend(recipe, func(x any) any { return x.(java.RecipeThatMadeChanges).Name }, nil)
+	q.GetAndSend(recipe, func(x any) any { return nilableString(x.(java.RecipeThatMadeChanges).DisplayName) }, nil)
+	q.GetAndSend(recipe, func(x any) any { return nilableString(x.(java.RecipeThatMadeChanges).InstanceName) }, nil)
+	q.GetAndSend(recipe, func(x any) any { return x.(java.RecipeThatMadeChanges).Options }, nil)
+	q.GetAndSend(recipe, func(x any) any { return derefInt64(x.(java.RecipeThatMadeChanges).EstimatedEffortPerOccurrenceMillis) }, nil)
 }
 
 func receiveRecipesThatMadeChanges(m java.RecipesThatMadeChanges, q *ReceiveQueue) java.RecipesThatMadeChanges {
@@ -86,34 +86,34 @@ func receiveRecipesThatMadeChanges(m java.RecipesThatMadeChanges, q *ReceiveQueu
 		}
 	}
 	m.Recipes = receiveTypedList(q, m.Recipes,
-		func(v any) any { return receiveRecipeIdentityList(asStack(v), q) },
+		func(v any) any { return receiveRecipeThatMadeChangesList(asStack(v), q) },
 		asStack)
 	return m
 }
 
-func receiveRecipeIdentityList(before []java.RecipeIdentity, q *ReceiveQueue) []java.RecipeIdentity {
+func receiveRecipeThatMadeChangesList(before []java.RecipeThatMadeChanges, q *ReceiveQueue) []java.RecipeThatMadeChanges {
 	return receiveTypedList(q, before,
-		func(v any) any { return receiveRecipeIdentity(asIdentity(v), q) },
-		asIdentity)
+		func(v any) any { return receiveRecipeThatMadeChanges(asRecipe(v), q) },
+		asRecipe)
 }
 
-func asStack(v any) []java.RecipeIdentity {
-	stack, _ := v.([]java.RecipeIdentity)
+func asStack(v any) []java.RecipeThatMadeChanges {
+	stack, _ := v.([]java.RecipeThatMadeChanges)
 	return stack
 }
 
-func asIdentity(v any) java.RecipeIdentity {
-	identity, _ := v.(java.RecipeIdentity)
-	return identity
+func asRecipe(v any) java.RecipeThatMadeChanges {
+	recipe, _ := v.(java.RecipeThatMadeChanges)
+	return recipe
 }
 
-func receiveRecipeIdentity(identity java.RecipeIdentity, q *ReceiveQueue) java.RecipeIdentity {
-	identity.Name = receiveScalar[string](q, identity.Name)
-	identity.DisplayName = receiveNilableString(q, identity.DisplayName)
-	identity.InstanceName = receiveNilableString(q, identity.InstanceName)
-	identity.Options = q.Receive(identity.Options, nil)
-	identity.EstimatedEffortPerOccurrenceMillis = receiveNilableInt64(q, identity.EstimatedEffortPerOccurrenceMillis)
-	return identity
+func receiveRecipeThatMadeChanges(recipe java.RecipeThatMadeChanges, q *ReceiveQueue) java.RecipeThatMadeChanges {
+	recipe.Name = receiveScalar[string](q, recipe.Name)
+	recipe.DisplayName = receiveNilableString(q, recipe.DisplayName)
+	recipe.InstanceName = receiveNilableString(q, recipe.InstanceName)
+	recipe.Options = q.Receive(recipe.Options, nil)
+	recipe.EstimatedEffortPerOccurrenceMillis = receiveNilableInt64(q, recipe.EstimatedEffortPerOccurrenceMillis)
+	return recipe
 }
 
 func derefInt64(i *int64) any {

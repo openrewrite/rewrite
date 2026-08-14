@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using Rewrite.Core.Rpc;
-
-using System.Text.Json;
 
 namespace OpenRewrite.Tests.Rpc;
 
@@ -28,9 +27,9 @@ public class ChangedMarkerRoundTripTest
     {
         var markerId = Guid.NewGuid();
         var beforeMarker = new RecipesThatMadeChanges(markerId,
-            [[new RecipeIdentity("com.example.Before", "Before", null, null, null)]]);
+            [[new RecipeThatMadeChanges("com.example.Before", "Before", null, null, null)]]);
         var afterMarker = new RecipesThatMadeChanges(markerId,
-            [[new RecipeIdentity("com.example.After", "After", "After `x`",
+            [[new RecipeThatMadeChanges("com.example.After", "After", "After `x`",
                 new Dictionary<string, object?> { ["opt"] = "x" }, 300000)]]);
         var before = new Markers(Guid.NewGuid(), [beforeMarker]);
         var after = before.WithMarkerList([afterMarker]);
@@ -41,16 +40,16 @@ public class ChangedMarkerRoundTripTest
         sendQueue.Send(after, before, null);
         sendQueue.Flush();
 
-        // Passing through JSON is what turns the sender's live values into what the receiver
-        // actually sees; handing the messages over in memory would prove nothing.
+        // Going through JSON is what turns the sender's live values into what the receiver sees;
+        // handing the messages over in memory would prove nothing.
         var wire = JsonSerializer.Deserialize<List<RpcObjectData>>(
             JsonSerializer.Serialize(data, RpcJson.Options), RpcJson.Options)!;
 
         var receiveQueue = new RpcReceiveQueue(wire, new Dictionary<int, object>(), null);
         var received = receiveQueue.Receive(before);
 
-        // Hop 2 exercises this peer's own sender against what its receiver produced, rather than
-        // stopping at a receive. Sending against an empty before keeps it off the NO_CHANGE path.
+        // Hop 2 exercises this peer's own sender against what its receiver produced. Sending
+        // against an empty before keeps it off the NO_CHANGE path.
         var secondData = new List<RpcObjectData>();
         var secondSend = new RpcSendQueue(1024, batch => secondData.AddRange(batch),
             new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);

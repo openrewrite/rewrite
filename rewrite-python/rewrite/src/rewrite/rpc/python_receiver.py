@@ -1084,43 +1084,33 @@ def _receive_search_result(marker, q: RpcReceiveQueue):
     return SearchResult(_id=new_id, _description=description)
 
 
-def _receive_recipe_identity(identity, q: RpcReceiveQueue):
-    """Codec for receiving RecipeIdentity.
+def _receive_recipe_that_made_changes(recipe, q: RpcReceiveQueue):
+    """Codec for receiving RecipeThatMadeChanges."""
+    from rewrite.markers import RecipeThatMadeChanges
 
-    Fields are received in the order sent by Java's RecipeIdentity.rpcSend():
-    name, displayName, instanceName, options, estimatedEffortPerOccurrenceMillis
-    """
-    from rewrite.markers import RecipeIdentity
-
-    name = q.receive(identity.name if identity else None)
-    display_name = q.receive(identity.display_name if identity else None)
-    instance_name = q.receive(identity.instance_name if identity else None)
-    options = q.receive(identity.options if identity else None)
-    effort = q.receive(identity.estimated_effort_per_occurrence_millis if identity else None)
-    return RecipeIdentity(name, display_name, instance_name, options, effort)
+    # RecipeThatMadeChanges sends: name, displayName, instanceName, options, effort millis
+    name = q.receive(recipe.name if recipe else None)
+    display_name = q.receive(recipe.display_name if recipe else None)
+    instance_name = q.receive(recipe.instance_name if recipe else None)
+    options = q.receive(recipe.options if recipe else None)
+    effort = q.receive(recipe.estimated_effort_per_occurrence_millis if recipe else None)
+    return RecipeThatMadeChanges(name, display_name, instance_name, options, effort)
 
 
-def _send_recipe_identity(identity, q):
-    """Codec for sending RecipeIdentity.
-
-    Fields are sent in the order expected by Java's RecipeIdentity.rpcReceive():
-    name, displayName, instanceName, options, estimatedEffortPerOccurrenceMillis
-    """
-    q.get_and_send(identity, lambda x: x.name)
-    q.get_and_send(identity, lambda x: x.display_name)
-    q.get_and_send(identity, lambda x: x.instance_name)
-    q.get_and_send(identity, lambda x: x.options)
-    q.get_and_send(identity, lambda x: x.estimated_effort_per_occurrence_millis)
+def _send_recipe_that_made_changes(recipe, q):
+    """Codec for sending RecipeThatMadeChanges."""
+    q.get_and_send(recipe, lambda x: x.name)
+    q.get_and_send(recipe, lambda x: x.display_name)
+    q.get_and_send(recipe, lambda x: x.instance_name)
+    q.get_and_send(recipe, lambda x: x.options)
+    q.get_and_send(recipe, lambda x: x.estimated_effort_per_occurrence_millis)
 
 
 def _receive_recipes_that_made_changes(marker, q: RpcReceiveQueue):
-    """Codec for receiving RecipesThatMadeChanges.
-
-    Fields are received in the order sent by Java's RecipesThatMadeChanges.rpcSend():
-    id, recipes (a list of stacks, each a list of RecipeIdentity)
-    """
+    """Codec for receiving RecipesThatMadeChanges."""
     from rewrite.markers import RecipesThatMadeChanges
 
+    # RecipesThatMadeChanges sends: id, recipes (a list of stacks)
     before_id = id_to_str(marker._id) if marker is not None and marker._id is not None else None
     id_str = q.receive(before_id)
 
@@ -1132,17 +1122,14 @@ def _receive_recipes_that_made_changes(marker, q: RpcReceiveQueue):
 
 
 def _send_recipes_that_made_changes(marker, q):
-    """Codec for sending RecipesThatMadeChanges.
-
-    Fields are sent in the order expected by Java's RecipesThatMadeChanges.rpcReceive():
-    id, recipes. The stack key never travels; it only has to identify a stack in this process.
-    """
+    """Codec for sending RecipesThatMadeChanges."""
     q.get_and_send(marker, lambda x: id_to_str(x._id))
+    # The stack key never travels; it only has to identify a stack within this process.
     q.get_and_send_list(
         marker,
         lambda x: list(x.recipes) if x.recipes else [],
-        lambda stack: tuple(identity.name for identity in stack),
-        lambda stack: q.get_and_send_list(stack, lambda s: list(s), lambda identity: identity.name)
+        lambda stack: tuple(recipe.name for recipe in stack),
+        lambda stack: q.get_and_send_list(stack, lambda s: list(s), lambda recipe: recipe.name)
     )
 
 
@@ -1632,7 +1619,7 @@ def _register_support_type_codecs():
 
 def _register_core_marker_codecs():
     """Register codecs for core marker types."""
-    from rewrite.markers import (Markers, ParseExceptionResult, RecipeIdentity,
+    from rewrite.markers import (Markers, ParseExceptionResult, RecipeThatMadeChanges,
                                  RecipesThatMadeChanges, SearchResult)
     from rewrite.rpc.receive_queue import (
         register_codec_with_both_names,
@@ -1655,13 +1642,13 @@ def _register_core_marker_codecs():
         make_dataclass_factory(SearchResult),
         sender=_send_search_result
     )
-    # RecipeIdentity / RecipesThatMadeChanges - identity of the recipes that changed a file
+    # RecipeThatMadeChanges / RecipesThatMadeChanges - identity of the recipes that changed a file
     register_codec_with_both_names(
-        'org.openrewrite.marker.RecipeIdentity',
-        RecipeIdentity,
-        _receive_recipe_identity,
-        make_dataclass_factory(RecipeIdentity),
-        sender=_send_recipe_identity
+        'org.openrewrite.marker.RecipeThatMadeChanges',
+        RecipeThatMadeChanges,
+        _receive_recipe_that_made_changes,
+        make_dataclass_factory(RecipeThatMadeChanges),
+        sender=_send_recipe_that_made_changes
     )
     register_codec_with_both_names(
         'org.openrewrite.marker.RecipesThatMadeChanges',

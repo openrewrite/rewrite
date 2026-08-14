@@ -260,37 +260,37 @@ class MarkupDebug(Markup):
 
 
 @dataclass(frozen=True, slots=True)
-class RecipeIdentity:
+class RecipeThatMadeChanges:
     """One frame of a :class:`RecipesThatMadeChanges` stack: how the recipe is named, how it was
     configured, and what it is worth.
     """
 
-    _name: Optional[str] = None
-
-    @property
-    def name(self) -> Optional[str]:
-        return self._name
+    _name: str
 
     _display_name: Optional[str] = None
+
+    _instance_name: Optional[str] = None
+
+    # Configured option values. Python never interprets them.
+    _options: Optional[Dict[str, Any]] = None
+
+    _estimated_effort_per_occurrence_millis: Optional[int] = None
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def display_name(self) -> Optional[str]:
         return self._display_name
 
-    _instance_name: Optional[str] = None
-
     @property
     def instance_name(self) -> Optional[str]:
         return self._instance_name
 
-    #: Configured option values, carried as received. Python does not interpret them.
-    _options: Optional[Dict[str, Any]] = None
-
     @property
     def options(self) -> Optional[Dict[str, Any]]:
         return self._options
-
-    _estimated_effort_per_occurrence_millis: Optional[int] = None
 
     @property
     def estimated_effort_per_occurrence_millis(self) -> Optional[int]:
@@ -303,12 +303,12 @@ class RecipesThatMadeChanges(Marker):
     interpreting them, so a marker served to this peer returns to the host intact.
     """
 
-    _id: UUID = None  # type: ignore[assignment]
+    _id: UUID
 
-    _recipes: Optional[List[List[RecipeIdentity]]] = None
+    _recipes: Optional[List[List[RecipeThatMadeChanges]]]
 
     @property
-    def recipes(self) -> Optional[List[List[RecipeIdentity]]]:
+    def recipes(self) -> Optional[List[List[RecipeThatMadeChanges]]]:
         return self._recipes
 
 

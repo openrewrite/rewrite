@@ -33,7 +33,6 @@ import org.openrewrite.text.FindAndReplace;
 import java.time.Duration;
 import java.util.*;
 
-
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
@@ -51,20 +50,20 @@ class RecipesThatMadeChangesTest {
           .noneMatch(v -> v instanceof Recipe);
         assertThat(sent).extracting(RpcObjectData::getValueType)
           .filteredOn(Objects::nonNull)
-          .containsOnly(RecipesThatMadeChanges.class.getName(), RecipeIdentity.class.getName());
+          .containsOnly(RecipesThatMadeChanges.class.getName(), RecipeThatMadeChanges.class.getName());
         assertThat(sent).extracting(RpcObjectData::getValue)
           .contains("org.openrewrite.text.ChangeText", "Change text", "Change text to `hello`");
     }
 
     @Test
-    void recipeRunStateIsUnreachableFromThePayload() {
+    void runStateDoesNotReachThePayload() {
         RecipesThatMadeChanges marker = RecipesThatMadeChanges.create(List.of(new RecipeHoldingRunState()));
 
         assertThatNoException().isThrownBy(() -> mapper.writeValueAsString(send(marker)));
     }
 
     @Test
-    void identitySurvivesTheRoundTrip() {
+    void identitySurvivesRoundTrip() {
         Recipe received = roundTrip(RecipesThatMadeChanges.create(List.of(new ChangeText("hello"))))
           .getRecipes().iterator().next().get(0);
 
@@ -81,7 +80,7 @@ class RecipesThatMadeChangesTest {
     }
 
     @Test
-    void aConfiguredRecipeKeepsItsRenderedInstanceNameAndOptions() {
+    void configuredRecipeKeepsInstanceNameAndOptions() {
         FindAndReplace findAndReplace = new FindAndReplace("blacklist", "denylist", true, false,
           null, null, "**/*.java", null);
 
@@ -101,7 +100,7 @@ class RecipesThatMadeChangesTest {
     }
 
     @Test
-    void aMultiFrameStackKeepsItsOrder() {
+    void stackKeepsItsOrder() {
         RecipesThatMadeChanges marker = RecipesThatMadeChanges.create(
           List.of(new ChangeText("outer"), new ChangeText("inner")));
 
@@ -111,25 +110,23 @@ class RecipesThatMadeChangesTest {
     }
 
     @Test
-    void aReceivedMarkerCanBeSentOnUnchanged() {
+    void receivedMarkerCanBeForwarded() {
         RecipesThatMadeChanges received = roundTrip(
           RecipesThatMadeChanges.create(List.of(new ChangeText("hello"))));
 
-        // A host may forward a marker it received; identity must survive the second hop rather
-        // than degrading each time.
+        // Hosts forward markers they received, so identity has to survive every hop.
         assertThat(roundTrip(received).getRecipes().iterator().next().get(0).getInstanceName())
           .isEqualTo("Change text to `hello`");
     }
 
     @Test
-    void aStackAddedToAnExistingMarkerArrivesIntact() {
+    void addedStackArrivesIntact() {
         ChangeText first = new ChangeText("first");
         RecipesThatMadeChanges before = RecipesThatMadeChanges.create(List.of(first));
         RecipesThatMadeChanges after = before.withRecipes(
           List.of(List.of(first), List.of(new ChangeText("second"))));
 
-        // Stacks are keyed by recipe name, so two configurations of one recipe key alike and the
-        // frame diff, not the position, is what separates them.
+        // Both stacks key alike, so it is the frame diff rather than the key that separates them.
         RecipesThatMadeChanges received = roundTrip(after, before);
 
         assertThat(received.getRecipes())
@@ -138,22 +135,21 @@ class RecipesThatMadeChangesTest {
     }
 
     @Test
-    void anUntouchedMarkerIsNotRebuiltFromTheWire() {
+    void untouchedMarkerIsNotRebuilt() {
         RecipesThatMadeChanges marker = RecipesThatMadeChanges.create(List.of(new ChangeText("hello")));
 
-        // Peers leave this marker alone, so it diffs as NO_CHANGE even when its neighbours
-        // change and the host keeps its own live recipes rather than the identities it served.
+        // Peers leave this marker alone, so the host keeps its own live recipes rather than the
+        // identities it served, even when a neighbouring marker changed.
         assertThat(roundTripAlongsideAnAddedMarker(marker)).isSameAs(marker);
     }
 
     @Test
-    void theIdentityFrameIsNotEnumeratedAsARecipe() {
+    void notEnumeratedAsARecipe() {
         ClasspathScanningLoader loader = new ClasspathScanningLoader(
-          new Properties(), new String[]{RecipeIdentity.class.getPackageName()});
+          new Properties(), new String[]{RecipeThatMadeChanges.class.getPackageName()});
 
-        // It is a Recipe only so that a received marker satisfies getRecipes(). Enumerating it
-        // would construct one with no fields set, putting a null-named descriptor into every
-        // catalog built from this classpath.
+        // Enumerating it would construct one with no fields set, putting a null-named descriptor
+        // into every catalog built from this classpath.
         assertThat(loader.listRecipeDescriptors())
           .extracting(RecipeDescriptor::getName)
           .doesNotContainNull();
@@ -186,7 +182,7 @@ class RecipesThatMadeChangesTest {
 
     private static RecipesThatMadeChanges roundTrip(RecipesThatMadeChanges after,
                                                     @Nullable RecipesThatMadeChanges before) {
-        // Passing through JSON is what turns the sender's live instance into the maps the receiver
+        // Going through JSON is what turns the sender's live instance into the maps the receiver
         // sees; handing the messages over in memory would prove nothing.
         Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
         batches.addLast(send(after, before).stream().map(RecipesThatMadeChangesTest::reserialize).collect(toList()));

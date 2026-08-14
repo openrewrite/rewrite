@@ -18,21 +18,21 @@ using OpenRewrite.Core.Rpc;
 namespace OpenRewrite.Core;
 
 /// <summary>
-/// Records which recipe stacks changed a source file, each frame carried as identity rather than as
-/// a recipe. C# holds the stacks without interpreting them, so a marker served to this peer returns
-/// to the host intact.
+/// Records which recipe stacks changed a source file. C# holds the stacks without interpreting
+/// them, so a marker served to this peer returns to the host intact.
 /// </summary>
-public sealed class RecipesThatMadeChanges(Guid id, IList<IList<RecipeIdentity>> recipes)
+public sealed class RecipesThatMadeChanges(Guid id, IList<IList<RecipeThatMadeChanges>> recipes)
     : Marker, IRpcCodec<RecipesThatMadeChanges>, IEquatable<RecipesThatMadeChanges>
 {
     public Guid Id { get; } = id;
-    public IList<IList<RecipeIdentity>> Recipes { get; } = recipes;
+    public IList<IList<RecipeThatMadeChanges>> Recipes { get; } = recipes;
 
     public void RpcSend(RecipesThatMadeChanges after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
-        q.GetAndSendList(after, m => m.Recipes, stack => (object)stack, stack =>
-            q.GetAndSendList(stack, s => s, r => (object)r.Name, null));
+        // The stack key never travels; it only has to identify a stack within this process.
+        q.GetAndSendList(after, m => m.Recipes, stack => string.Join('\0', stack.Select(r => r.Name)),
+            stack => q.GetAndSendList(stack, s => s, r => (object)r.Name, null));
     }
 
     public RecipesThatMadeChanges RpcReceive(RecipesThatMadeChanges before, RpcReceiveQueue q)

@@ -50,13 +50,13 @@ public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeC
     public void rpcSend(RecipesThatMadeChanges after, RpcSendQueue q) {
         q.getAndSend(after, RecipesThatMadeChanges::getId);
         q.getAndSendList(after, RecipesThatMadeChanges::identities, RecipesThatMadeChanges::stackKey, stack ->
-                q.getAndSendList(stack, Function.identity(), RecipeIdentity::getName, null));
+                q.getAndSendList(stack, Function.identity(), RecipeThatMadeChanges::getName, null));
     }
 
     @Override
     public RecipesThatMadeChanges rpcReceive(RecipesThatMadeChanges before, RpcReceiveQueue q) {
         UUID receivedId = q.receiveAndGet(before.getId(), UUID::fromString);
-        List<List<RecipeIdentity>> received = requireNonNull(
+        List<List<RecipeThatMadeChanges>> received = requireNonNull(
                 q.receiveList(before.identities(), stack -> q.receiveList(stack, null)));
         return before
                 .withId(receivedId)
@@ -66,28 +66,27 @@ public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeC
     }
 
     /** Identifies a stack for the sender's own list diff; it never travels. */
-    private static String stackKey(List<RecipeIdentity> stack) {
+    private static String stackKey(List<RecipeThatMadeChanges> stack) {
         StringBuilder key = new StringBuilder();
-        for (RecipeIdentity identity : stack) {
-            key.append(identity.getName()).append('\u0000');
+        for (RecipeThatMadeChanges recipe : stack) {
+            key.append(recipe.getName()).append('\u0000');
         }
         return key.toString();
     }
 
     /**
-     * The recipe stacks as they travel: identity only. A received marker already holds
-     * {@link RecipeIdentity} frames, which pass through unchanged so that forwarding a marker on
-     * diffs against what was received rather than degrading it.
+     * The recipe stacks as they travel: identity only. Frames of a received marker pass through
+     * unchanged, so forwarding one diffs against what arrived rather than degrading it.
      */
-    private List<List<RecipeIdentity>> identities() {
+    private List<List<RecipeThatMadeChanges>> identities() {
         if (recipes == null) {
             return emptyList();
         }
-        List<List<RecipeIdentity>> identities = new ArrayList<>(recipes.size());
+        List<List<RecipeThatMadeChanges>> identities = new ArrayList<>(recipes.size());
         for (List<Recipe> stack : recipes) {
-            List<RecipeIdentity> stackIdentities = new ArrayList<>(stack.size());
+            List<RecipeThatMadeChanges> stackIdentities = new ArrayList<>(stack.size());
             for (Recipe recipe : stack) {
-                stackIdentities.add(RecipeIdentity.of(recipe));
+                stackIdentities.add(RecipeThatMadeChanges.of(recipe));
             }
             identities.add(stackIdentities);
         }

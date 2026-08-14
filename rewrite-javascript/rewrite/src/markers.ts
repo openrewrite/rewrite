@@ -29,7 +29,7 @@ export const MarkersKind = {
     MarkupDebug: "org.openrewrite.marker.Markup$Debug",
 
     RecipesThatMadeChanges: "org.openrewrite.marker.RecipesThatMadeChanges",
-    RecipeIdentity: "org.openrewrite.marker.RecipeIdentity",
+    RecipeThatMadeChanges: "org.openrewrite.marker.RecipeThatMadeChanges",
 
     /**
      * A generic marker that is sent/received as a bare map because the type hasn't been
@@ -138,13 +138,13 @@ export const emptyMarkers: Markers = asRef({
  * One frame of a {@link RecipesThatMadeChanges} stack: how the recipe is named, how it was
  * configured, and what it is worth.
  */
-export interface RecipeIdentity {
-    readonly kind: typeof MarkersKind.RecipeIdentity
+export interface RecipeThatMadeChanges {
+    readonly kind: typeof MarkersKind.RecipeThatMadeChanges
     readonly name: string
     readonly displayName?: string
     readonly instanceName?: string
     /**
-     * Configured option values, carried as received. JavaScript does not interpret them.
+     * Configured option values. JavaScript never interprets them.
      */
     readonly options?: { [name: string]: any }
     readonly estimatedEffortPerOccurrenceMillis?: number
@@ -156,7 +156,7 @@ export interface RecipeIdentity {
  */
 export interface RecipesThatMadeChanges extends Marker {
     readonly kind: typeof MarkersKind.RecipesThatMadeChanges
-    readonly recipes: RecipeIdentity[][]
+    readonly recipes: RecipeThatMadeChanges[][]
 }
 
 export interface SearchResult extends Marker {

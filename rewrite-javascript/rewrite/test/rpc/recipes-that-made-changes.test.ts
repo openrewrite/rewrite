@@ -34,9 +34,9 @@ describe("RecipesThatMadeChanges", () => {
             kind: MarkersKind.RecipesThatMadeChanges,
             id: "11111111-2222-3333-4444-555555555555",
             recipes: [[
-                {kind: MarkersKind.RecipeIdentity, name: "org.openrewrite.text.ChangeText"},
+                {kind: MarkersKind.RecipeThatMadeChanges, name: "org.openrewrite.text.ChangeText"},
                 {
-                    kind: MarkersKind.RecipeIdentity,
+                    kind: MarkersKind.RecipeThatMadeChanges,
                     name: "org.openrewrite.text.FindAndReplace",
                     displayName: "Find and replace",
                     instanceName: "Find and replace `blacklist`",
@@ -46,9 +46,8 @@ describe("RecipesThatMadeChanges", () => {
             ]]
         };
 
-        // Markers travel as refs, so both hops go through the Markers codec rather than
-        // sending the marker directly. Hop 1 exercises the receiver against a Java-shaped
-        // stream; hop 2 exercises this peer's own sender against what its receiver produced.
+        // Markers travel as refs, so both hops go through the Markers codec. Hop 1 exercises the
+        // receiver against a Java-shaped stream; hop 2 exercises this peer's own sender.
         const markers: Markers = {
             kind: MarkersKind.Markers,
             id: "99999999-8888-7777-6666-555555555555",

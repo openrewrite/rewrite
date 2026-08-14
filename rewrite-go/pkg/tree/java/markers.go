@@ -39,14 +39,14 @@ type GenericMarker struct {
 
 func (m GenericMarker) ID() uuid.UUID { return m.Ident }
 
-// RecipeIdentity is one frame of a RecipesThatMadeChanges stack: how the recipe is
+// RecipeThatMadeChanges is one frame of a RecipesThatMadeChanges stack: how the recipe is
 // named, how it was configured, and what it is worth.
-type RecipeIdentity struct {
+type RecipeThatMadeChanges struct {
 	Name         string
 	DisplayName  *string
 	InstanceName *string
-	// Options are configured option values, carried as received. Go does not interpret
-	// them, so they stay in whatever shape the wire delivered.
+	// Options are configured option values. Go never interprets them, so they stay in
+	// whatever shape the wire delivered.
 	Options                            any
 	EstimatedEffortPerOccurrenceMillis *int64
 }
@@ -55,7 +55,7 @@ type RecipeIdentity struct {
 // stacks without interpreting them, so a marker served to this peer returns to the host intact.
 type RecipesThatMadeChanges struct {
 	Ident   uuid.UUID
-	Recipes [][]RecipeIdentity
+	Recipes [][]RecipeThatMadeChanges
 }
 
 func (m RecipesThatMadeChanges) ID() uuid.UUID { return m.Ident }

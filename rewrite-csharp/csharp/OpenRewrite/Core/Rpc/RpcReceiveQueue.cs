@@ -448,7 +448,7 @@ public class RpcReceiveQueue
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
-            "org.openrewrite.marker.RecipeIdentity" => typeof(RecipeIdentity),
+            "org.openrewrite.marker.RecipeThatMadeChanges" => typeof(RecipeThatMadeChanges),
             "org.openrewrite.Checksum" => typeof(Checksum),
             "org.openrewrite.FileAttributes" => typeof(FileAttributes),
 
