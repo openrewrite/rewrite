@@ -16,9 +16,16 @@
 package org.openrewrite.ruby.migrate;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 public class CharacterLiteralToStringTest implements RewriteTest {
@@ -35,6 +42,53 @@ public class CharacterLiteralToStringTest implements RewriteTest {
             "?A",
             "'A'"
           )
+        );
+    }
+
+    /**
+     * An escape has to survive the conversion, and single quotes do not interpret escapes, so the
+     * result is double-quoted.
+     */
+    @ParameterizedTest
+    @MethodSource("escapesAndQuotes")
+    void escapesAndQuotes(String before, String after) {
+        rewriteRun(
+          ruby(before, after)
+        );
+    }
+
+    static Stream<Arguments> escapesAndQuotes() {
+        return Stream.of(
+          arguments("?\\n", "\"\\n\""),
+          arguments("?\\t", "\"\\t\""),
+          arguments("?\\r", "\"\\r\""),
+          arguments("?\\e", "\"\\e\""),
+          arguments("?\\0", "\"\\0\""),
+          arguments("?\\\\", "\"\\\\\""),
+          arguments("?'", "\"'\""),
+          arguments("?\\s", "' '"),
+          arguments("?\"", "'\"'"),
+          arguments("?#", "'#'"),
+          arguments("?é", "'é'")
+        );
+    }
+
+    /**
+     * Only a literal written in the {@code ?A} form is a character literal; a bare {@code ?} inside
+     * an interpolated string and a {@code %w} element are ordinary text that happens to start with
+     * one.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "url = \"#{path}?#{query}\"",
+      "x = %w[?a ?b]",
+      "x = %i[?a]",
+      "x = \"?\"",
+      "x = a ? b : c"
+    })
+    void notACharacterLiteral(String source) {
+        rewriteRun(
+          ruby(source)
         );
     }
 }

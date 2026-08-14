@@ -15,12 +15,13 @@
  */
 package org.openrewrite.ruby.migrate;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.marker.CharacterLiteral;
 
 public class CharacterLiteralToString extends Recipe {
 
@@ -41,13 +42,55 @@ public class CharacterLiteralToString extends Recipe {
         return new RubyIsoVisitor<ExecutionContext>() {
             @Override
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
-                if (literal.getType() == JavaType.Primitive.String && literal.getValueSource() != null &&
-                    literal.getValueSource().startsWith("?")) {
-                    return literal.withType(JavaType.Primitive.String)
-                            .withValueSource(String.format("'%s'", literal.getValueSource().substring(1)));
+                if (!literal.getMarkers().findFirst(CharacterLiteral.class).isPresent() ||
+                    !(literal.getValue() instanceof String)) {
+                    return literal;
                 }
-                return literal;
+                String value = (String) literal.getValue();
+                String quoted = quote(value);
+                return quoted == null ? literal :
+                        literal.withMarkers(literal.getMarkers().removeByType(CharacterLiteral.class))
+                                .withValueSource(quoted);
             }
         };
+    }
+
+    /**
+     * The character as a string literal that evaluates to it, or {@code null} when it cannot be
+     * written as one this way. Single quotes take a printable character as-is; everything else has
+     * to be double-quoted so that the escape means what it did after the {@code ?}.
+     */
+    private static @Nullable String quote(String value) {
+        if (value.codePointCount(0, value.length()) != 1) {
+            return null;
+        }
+        int c = value.codePointAt(0);
+        switch (c) {
+            case '\'':
+                return "\"'\"";
+            case '\\':
+                return "\"\\\\\"";
+            case '\n':
+                return "\"\\n\"";
+            case '\r':
+                return "\"\\r\"";
+            case '\t':
+                return "\"\\t\"";
+            case 0x00:
+                return "\"\\0\"";
+            case 0x07:
+                return "\"\\a\"";
+            case 0x08:
+                return "\"\\b\"";
+            case 0x0B:
+                return "\"\\v\"";
+            case 0x0C:
+                return "\"\\f\"";
+            case 0x1B:
+                return "\"\\e\"";
+            default:
+                // `?\s` is just a space, which single quotes take literally like any other printable
+                return Character.isISOControl(c) ? String.format("\"\\x%02X\"", c) : "'" + value + "'";
+        }
     }
 }

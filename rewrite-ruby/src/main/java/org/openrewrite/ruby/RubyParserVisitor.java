@@ -719,7 +719,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         String valueSource = text(node);
         cursor = charEnd(node);
-        return new J.Literal(randomId(), prefix, Markers.EMPTY, value, valueSource, null,
+        // `?A` is a one-character string whose source has no delimiters, which nothing else about
+        // the literal records
+        Markers markers = valueSource.startsWith("?") ?
+                Markers.EMPTY.add(new CharacterLiteral(randomId())) : Markers.EMPTY;
+        return new J.Literal(randomId(), prefix, markers, value, valueSource, null,
                 JavaType.Primitive.String);
     }
 
