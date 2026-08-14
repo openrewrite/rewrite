@@ -9,11 +9,18 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
 
-    // Consumed for its Prism transitive (jruby-prism -> prism-parser-api/prism-parser-wasm), which
-    // produces the AST the parser is written against; no JRuby runtime is started. Pinned rather
-    // than `latest.release` because it is what fixes the Prism version, and because the JRuby major
-    // line sets this module's Java floor, so a silent major bump would move the toolchain.
-    implementation("org.jruby:jruby-base:10.1.1.0")
+    // Prism produces the AST the parser is written against; no JRuby runtime is started, so these
+    // are taken directly rather than through jruby-base and its ~39-jar transitive tree. The
+    // versions are the ones JRuby 10.1.1.0 ships (via jruby-prism 2.0.4); bump them together with
+    // any future JRuby alignment.
+    implementation("org.ruby-lang:prism-parser-api:0.0.4")
+    implementation("org.ruby-lang:prism-parser-wasm:0.0.4")
+
+    // The WASM runtime reaches native memory through jffi, which `redline-runner-jffi` declares
+    // `provided` and so never brings along; jruby-base used to supply it by accident. Both the
+    // classes and the `native` classifier holding the stub library are needed.
+    implementation("com.github.jnr:jffi:1.4.0")
+    implementation("com.github.jnr:jffi:1.4.0:native")
 
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -31,9 +38,10 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-21"))
 }
 
-// JRuby 10 ships class file version 65 and cannot be loaded below Java 21, so this module has no
-// Java 8 consumer to protect. The toolchain is already 21 by convention; the override that matters
-// is dropping the `--release 8` that `org.openrewrite.build.java-base` puts on `compileJava`.
+// The Prism jars are themselves class file version 65 and cannot be loaded below Java 21, so this
+// module has no Java 8 consumer to protect. The toolchain is already 21 by convention; the override
+// that matters is dropping the `--release 8` that `org.openrewrite.build.java-base` puts on
+// `compileJava`.
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))

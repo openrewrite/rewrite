@@ -33,7 +33,7 @@ import static org.openrewrite.ruby.Assertions.ruby;
 public class RubyBlockTest implements RewriteTest {
 
     /**
-     * While the Ruby compiler treats multiple statements at the root note as a {@link org.jruby.ast.BlockNode},
+     * While Ruby treats multiple statements at the root as one node of their own,
      * we simply store the statements in a statement list on {@link org.openrewrite.ruby.tree.Rb.CompilationUnit}.
      * Otherwise, this just doesn't match the syntax we expect of blocks as they can occur elsewhere.
      */

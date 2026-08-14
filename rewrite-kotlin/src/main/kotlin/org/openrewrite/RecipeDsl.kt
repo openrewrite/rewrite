@@ -425,6 +425,20 @@ public abstract class LanguageHost internal constructor() {
     public fun javascript(block: org.openrewrite.dsl.scopes.JavaScriptScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
         register(org.openrewrite.dsl.scopes.JavaScriptScope().apply(block).build())
 
+    /**
+     * Unlike the other languages, `rewrite-ruby` publishes only a Java 21 variant — the Prism jars
+     * it parses with are class file version 65. A consumer whose own compilation targets an older
+     * release cannot resolve it at all (`No matching variant … needed a component compatible with
+     * Java 8`); a recipe module using `ruby { }` therefore has to target Java 21 and run on a JVM
+     * of at least that version. Depending on it from a Java 8 module needs the same per-dependency
+     * override this project uses:
+     * ```
+     * implementation("org.openrewrite:rewrite-ruby:<version>") {
+     *     attributes { attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21) }
+     * }
+     * ```
+     * which fixes resolution but not the runtime floor.
+     */
     public fun ruby(block: org.openrewrite.dsl.scopes.RubyScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
         register(org.openrewrite.dsl.scopes.RubyScope().apply(block).build())
 }

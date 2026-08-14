@@ -4,7 +4,7 @@ OpenRewrite support for Ruby source code. Parses Ruby into a Lossless Semantic T
 
 ## Parser front end
 
-The parser is [Prism](https://github.com/ruby/prism), run standalone. `RubyParser` hands the source bytes to `org.ruby_lang.prism.wasm.Prism` and loads the serialized result with `Loader`; there is no `org.jruby.Ruby` runtime. The `jruby-base` dependency is kept only because it supplies and pins the Prism artifacts (`jruby-prism` → `prism-parser-api`/`prism-parser-wasm`). Compile against `org.ruby_lang.prism.*` — the same classes appear relocated as `org.jruby.internal.prism.*` inside `jruby-complete`, which this module never depends on.
+The parser is [Prism](https://github.com/ruby/prism), run standalone. `RubyParser` hands the source bytes to `org.ruby_lang.prism.wasm.Prism` and loads the serialized result with `Loader`; there is no `org.jruby.Ruby` runtime, and the module depends on `prism-parser-api`/`prism-parser-wasm` directly, at the versions JRuby 10.1.1.0 ships. Compile against `org.ruby_lang.prism.*` — the same classes appear relocated as `org.jruby.internal.prism.*` inside `jruby-complete`, which this module never depends on.
 
 Three things shape `RubyParserVisitor`:
 

@@ -44,9 +44,10 @@ dependencies {
     compileOnly(project(":rewrite-scala"))
     compileOnly(project(":rewrite-javascript"))
     compileOnly(project(":rewrite-groovy"))
-    // rewrite-ruby targets Java 21 (JRuby 10 ships class file version 65), so it publishes no
+    // rewrite-ruby targets Java 21 (the Prism jars are class file version 65), so it publishes no
     // Java 8 variant for this Java 8 compile classpath to select. Only the generated
     // `RubyScope.kt` reads it, and kotlinc accepts newer class files than its `jvmTarget`.
+    // Consumers of `ruby { }` need the same override — see the kdoc on `LanguageHost.ruby()`.
     compileOnly(project(":rewrite-ruby")) {
         attributes {
             attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)

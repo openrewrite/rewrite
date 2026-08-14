@@ -4,9 +4,9 @@
 
 This module parses Ruby with **Prism**, run standalone: `RubyParser` hands the source
 bytes to `org.ruby_lang.prism.wasm.Prism` with explicit `ParsingOptions` and loads the
-result with `Loader`. There is no `org.jruby.Ruby` runtime. The `jruby-base` dependency
-is kept only because it supplies and pins the Prism artifacts (`jruby-prism` →
-`prism-parser-api`/`prism-parser-wasm`).
+result with `Loader`. There is no `org.jruby.Ruby` runtime, and the dependencies are
+`prism-parser-api`/`prism-parser-wasm` directly, pinned to the versions JRuby 10.1.1.0
+ships.
 
 Compile against `org.ruby_lang.prism.*`. The same classes appear relocated as
 `org.jruby.internal.prism.*` inside `jruby-complete` — never depend on that jar.
@@ -176,9 +176,15 @@ with no expected output is the assertion that proves it.
 ## Java version
 
 This module targets Java 21, unlike most of the repo (which compiles to Java 8
-bytecode). JRuby 10 ships class file version 65 and cannot load below Java 21, so
-there is no Java 8 consumer to protect. `build.gradle.kts` nulls the `--release 8`
-that `org.openrewrite.build.java-base` sets. Java 21 language features are fine here.
+bytecode). The Prism jars are themselves class file version 65 and cannot load below
+Java 21, so there is no Java 8 consumer to protect. `build.gradle.kts` nulls the
+`--release 8` that `org.openrewrite.build.java-base` sets. Java 21 language features are
+fine here.
+
+That floor reaches consumers: `rewrite-ruby` publishes only an
+`org.gradle.jvm.version=21` variant, so a recipe module that wants the Kotlin DSL's
+`ruby { }` scope has to target Java 21 as well (see the note on `LanguageHost.ruby()` in
+`rewrite-kotlin`).
 
 ## Testing
 
