@@ -63,8 +63,8 @@ names, and the `# shareable_constant_value:` wrapper.
   `prism-parser-wasm`, their Chicory/redline WASM stack and `jffi`.
 - Those jars are class file version 65, which sets the module's Java floor at 21. `build.gradle.kts`
   drops the `--release 8` the repo convention applies, and `rewrite-ruby` publishes only an
-  `org.gradle.jvm.version=21` variant — so a consumer of the Kotlin recipe DSL's `ruby { }` scope has
-  to target and run Java 21 as well.
+  `org.gradle.jvm.version=21` variant — so any module depending on it has to target and run Java 21
+  as well (or override the `TargetJvmVersion` attribute on the dependency).
 - Whitespace, comments and keywords are re-lexed from the source, anchored to node offsets. Every
   byte lands in exactly one prefix, suffix or literal value, and `prefix(node)` asserts it: a desync
   fails with file and offset context instead of corrupting everything downstream.
