@@ -11,4 +11,4 @@
 * [9. Native Python lock file regeneration](0009-native-python-lock-regeneration.md)
 * [10. Native uv.lock delta resolution: sizing and a greedy-forward approach](0010-native-uv-lock-delta-resolution.md)
 * [11. Native Node.js lock file regeneration](0011-native-node-lock-regeneration.md)
-* [12. Ruby parsing via JRuby](0012-ruby-parsing-via-jruby.md)
+* [12. Ruby parsing via Prism](0012-ruby-parsing-via-prism.md)

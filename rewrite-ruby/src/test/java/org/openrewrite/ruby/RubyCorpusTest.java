@@ -15,6 +15,7 @@
  */
 package org.openrewrite.ruby;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.openrewrite.ExecutionContext;
@@ -36,15 +37,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Parses every Ruby file under {@code -Druby.corpus.dir=...} and prints a parse rate plus a
  * histogram of failure causes. Opt-in: it is a measurement tool for prioritising parser work, not
  * an assertion about any particular corpus.
  */
-@EnabledIfSystemProperty(named = "ruby.corpus.dir", matches = ".+")
 public class RubyCorpusTest {
 
     @Test
+    @EnabledIfSystemProperty(named = "ruby.corpus.dir", matches = ".+")
     void parseCorpus() throws IOException {
         Path root = Paths.get(System.getProperty("ruby.corpus.dir"));
         RubyParser parser = RubyParser.builder().build();
@@ -131,28 +134,19 @@ public class RubyCorpusTest {
 
     /**
      * Collapses a stack trace down to the one line that says what the parser could not do, so the
-     * histogram groups by cause rather than by file.
+     * histogram groups by cause rather than by file. The whole message is searched for a specific
+     * cause first: the sanitizer's header line names the exception class, which would otherwise
+     * always win the fallback and collapse every syntax error into one bucket.
      */
-    private static String classify(String message) {
-        for (String line : message.split("\n")) {
-            if (line.contains("Prism node type")) {
-                int start = line.indexOf("Prism node type");
-                int end = line.indexOf(" is not yet implemented");
-                return "unimplemented: " + (end > start ? line.substring(start + 16, end) : line.trim());
+    static String classify(String message) {
+        String[] lines = message.split("\n");
+        for (String line : lines) {
+            String cause = specificCause(line);
+            if (cause != null) {
+                return cause;
             }
-            if (line.contains("Cursor desync")) {
-                int at = line.indexOf("(start of ");
-                return at < 0 ? "cursor desync" :
-                        "cursor desync at " + line.substring(at + 10, line.indexOf(')', at));
-            }
-            if (line.contains("is not print idempotent")) {
-                return "not print idempotent";
-            }
-            if (line.contains("[") && line.contains("/ERROR_")) {
-                int open = line.indexOf('[');
-                int slash = line.indexOf('/', open);
-                return "syntax error: " + line.substring(open + 1, slash);
-            }
+        }
+        for (String line : lines) {
             if (line.contains("Exception:") || line.contains("Error:")) {
                 String trimmed = line.trim();
                 int colon = trimmed.lastIndexOf("Exception:");
@@ -162,6 +156,53 @@ public class RubyCorpusTest {
                 return trimmed.substring(Math.max(0, trimmed.lastIndexOf('.', colon) + 1));
             }
         }
-        return message.split("\n")[0];
+        return lines[0];
+    }
+
+    /**
+     * A Prism rejection is keyed on the error type it reports, so files that are not Ruby at all
+     * separate from a real parser gap.
+     */
+    @Test
+    void classifyPrefersTheReportedCauseOverTheExceptionClass() {
+        assertThat(classify("org.openrewrite.ruby.RubyParser$RubySyntaxException: Ruby syntax error\n" +
+                            "  line 1, offset 4 [UNEXPECTED_TOKEN_IGNORE/ERROR_SYNTAX] unexpected ':', ignoring it"))
+                .isEqualTo("syntax error: UNEXPECTED_TOKEN_IGNORE");
+
+        assertThat(classify("java.lang.UnsupportedOperationException: oops\n" +
+                            "  Prism node type FooNode is not yet implemented (a.rb at offset 1)"))
+                .isEqualTo("unimplemented: FooNode");
+
+        assertThat(classify("java.lang.IllegalStateException: Cursor desync in a.rb: expected to be at " +
+                            "offset 32 (start of CallNode) but was at 19."))
+                .isEqualTo("cursor desync at CallNode");
+    }
+
+    @Test
+    void classifyFallsBackToTheExceptionClass() {
+        assertThat(classify("java.lang.IllegalStateException: something else\n\tat org.openrewrite.Foo"))
+                .isEqualTo("IllegalStateException: something else");
+    }
+
+    private static @Nullable String specificCause(String line) {
+        if (line.contains("Prism node type")) {
+            int start = line.indexOf("Prism node type");
+            int end = line.indexOf(" is not yet implemented");
+            return "unimplemented: " + (end > start ? line.substring(start + 16, end) : line.trim());
+        }
+        if (line.contains("Cursor desync")) {
+            int at = line.indexOf("(start of ");
+            return at < 0 ? "cursor desync" :
+                    "cursor desync at " + line.substring(at + 10, line.indexOf(')', at));
+        }
+        if (line.contains("is not print idempotent")) {
+            return "not print idempotent";
+        }
+        if (line.contains("[") && line.contains("/ERROR_")) {
+            int open = line.indexOf('[');
+            int slash = line.indexOf('/', open);
+            return "syntax error: " + line.substring(open + 1, slash);
+        }
+        return null;
     }
 }

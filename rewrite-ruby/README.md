@@ -143,4 +143,4 @@ Keep fixtures inline as `ruby("...")` text blocks rather than `.rb` files on dis
 
 It prints a parse rate plus a histogram of failure causes, and alongside the report writes `<report>.failures` (one `cause<TAB>path` line per file) and `<report>.messages` (the full message per file), since the histogram keeps only one sample per cause.
 
-See `CLAUDE.md` for the mapping conventions this module holds itself to, and `doc/adr/0012-ruby-parsing-via-jruby.md` for the parser front-end decision.
+See `CLAUDE.md` for the mapping conventions this module holds itself to, and `doc/adr/0012-ruby-parsing-via-prism.md` for the parser front-end decision.

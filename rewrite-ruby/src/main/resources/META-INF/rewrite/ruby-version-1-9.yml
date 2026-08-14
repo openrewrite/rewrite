@@ -17,7 +17,7 @@
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.ruby.migrate.UpgradeToRuby1_9
 displayName: Migrate to Ruby 1.9
-description: >
+description: >-
   This recipe will apply changes commonly needed when migrating to Ruby 1.9.
 recipeList:
   - org.openrewrite.ruby.migrate.CharacterLiteralToString

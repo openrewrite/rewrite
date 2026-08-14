@@ -119,7 +119,7 @@ it just delegated, and anything that reads its ancestors (`visitCase` choosing b
 ones.
 
 See `README.md` for the type and marker inventory, and
-`doc/adr/0012-ruby-parsing-via-jruby.md` for the parser front-end decision.
+`doc/adr/0012-ruby-parsing-via-prism.md` for the parser front-end decision.
 
 ## J.Unknown is forbidden
 
