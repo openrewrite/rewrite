@@ -1746,7 +1746,8 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) withPattern(pattern.withType(type));
+            // the pattern may refuse an unchanged type, as J.MethodInvocation does
+            return type == getType() ? (T) this : (T) withPattern(pattern.withType(type));
         }
 
         @Override
@@ -1838,7 +1839,8 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) withPattern(pattern.withType(type));
+            // the pattern may refuse an unchanged type, as J.MethodInvocation does
+            return type == getType() ? (T) this : (T) withPattern(pattern.withType(type));
         }
 
         @Override
@@ -2608,7 +2610,9 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return operator == Type.Defined ? (T) this : (T) withExpression(expression.withType(type));
+            // the pinned expression may refuse an unchanged type, as J.MethodInvocation does
+            return operator == Type.Defined || type == getType() ?
+                    (T) this : (T) withExpression(expression.withType(type));
         }
     }
 
