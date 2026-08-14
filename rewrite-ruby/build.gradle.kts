@@ -1,0 +1,61 @@
+plugins {
+    id("org.openrewrite.build.language-library")
+    id("org.openrewrite.build.moderne-source-available-license")
+}
+
+dependencies {
+    api(project(":rewrite-java"))
+
+    // Pinned rather than `latest.release`: this is the artifact that produces the AST the parser is
+    // written against, matching how every other AST-producing dependency here is pinned. The JRuby
+    // major line also sets this module's Java floor, so a silent major bump would move the toolchain.
+    implementation("org.jruby:jruby-base:10.1.1.0")
+
+    compileOnly(project(":rewrite-test"))
+    compileOnly("org.slf4j:slf4j-api:1.7.+")
+
+    api("org.jetbrains:annotations:latest.release")
+
+    api("com.fasterxml.jackson.core:jackson-annotations")
+
+    testImplementation(project(":rewrite-test"))
+    testImplementation(project(":rewrite-java-test"))
+    testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testImplementation("org.junit.jupiter:junit-jupiter-params")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly(project(":rewrite-java-21"))
+}
+
+// JRuby 10 ships class file version 65 and cannot be loaded below Java 21, so this module has no
+// Java 8 consumer to protect. The toolchain is already 21 by convention; the override that matters
+// is dropping the `--release 8` that `org.openrewrite.build.java-base` puts on `compileJava`.
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
+
+    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.build.java-base`
+}
+
+// `org.openrewrite.build.moderne-source-available-license` only rewrites the published POM and jar
+// manifest; the `license*` tasks still stamp the Apache header from `gradle/licenseHeader.txt`
+// unless the extension is pointed elsewhere.
+configure<nl.javadude.gradle.plugins.license.LicenseExtension> {
+    header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+
+    // The license plugin maps `.rb` to a `#` header style by default, so any Ruby fixture landing in
+    // a source set would be rewritten and break round-trip assertions.
+    excludePatterns.addAll(listOf("**/*.rb"))
+}
+
+// Lombok's `onConstructor_=@JsonCreator` on the LST model confuses the javadoc tool.
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
+    exclude("**/Rb.java")
+}
