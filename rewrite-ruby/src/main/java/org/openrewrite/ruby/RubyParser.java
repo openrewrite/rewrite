@@ -16,43 +16,85 @@
 package org.openrewrite.ruby;
 
 import org.intellij.lang.annotations.Language;
-import org.jruby.ParseResult;
-import org.jruby.ast.RootNode;
-import org.jruby.javasupport.JavaEmbedUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.ruby.internal.PrismSource;
 import org.openrewrite.ruby.tree.Rb;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.ruby_lang.prism.Loader;
+import org.ruby_lang.prism.Nodes;
+import org.ruby_lang.prism.ParseResult;
+import org.ruby_lang.prism.ParsingOptions;
+import org.ruby_lang.prism.wasm.Prism;
 
-import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
+import java.util.EnumSet;
 import java.util.stream.Stream;
 
 public class RubyParser implements Parser {
 
     /**
-     * Booting a JRuby runtime costs on the order of a second, so all parses share one. JRuby's
-     * parser is not documented as thread-safe, hence the synchronization on the parse call.
+     * Booting the Prism WASM module costs about a second, so all parses share one instance. The
+     * underlying parse is not reentrant, hence the synchronization.
      */
-    private static final class Runtime {
-        static final org.jruby.Ruby INSTANCE;
+    private static final class PrismHolder {
+        static final Prism INSTANCE = new Prism();
+    }
 
-        static {
-            // JRuby 10 still defaults to the legacy `org.jruby.ast` front end this parser is written
-            // against, but the Prism provider is already registered as a service. Pin the choice
-            // before the runtime reads the option, or a future default flip breaks parsing.
-            System.setProperty("jruby.parser.prism", "false");
-            // https://github.com/jruby/jruby/wiki/DirectJRubyEmbedding#user-content-Direct_Embedding
-            INSTANCE = JavaEmbedUtils.initialize(Collections.emptyList());
+    static ParseResult parse(Path path, PrismSource source) {
+        byte[] options = ParsingOptions.serialize(
+                path.toString().getBytes(StandardCharsets.UTF_8),
+                1,
+                source.getCharset().name().getBytes(StandardCharsets.UTF_8),
+                false,
+                EnumSet.noneOf(ParsingOptions.CommandLine.class),
+                ParsingOptions.SyntaxVersion.LATEST,
+                false,
+                true,
+                // OpenRewrite is routinely handed fragments rather than whole scripts, so `next`,
+                // `break` and `return` at the top level have to parse rather than error out.
+                true,
+                new ParsingOptions.Scope[0]);
+        byte[] serialized;
+        synchronized (PrismHolder.INSTANCE) {
+            serialized = PrismHolder.INSTANCE.parse(source.getParseBytes(), options);
+        }
+        ParseResult result = Loader.load(serialized);
+        if (result.errors.length > 0) {
+            throw new RubySyntaxException(result, source);
+        }
+        return result;
+    }
+
+    /**
+     * Carries Prism's typed, recoverable errors with 1-based line numbers so that OpenRewrite's
+     * {@link ParseError} machinery surfaces real diagnostics.
+     */
+    public static class RubySyntaxException extends RuntimeException {
+        public RubySyntaxException(ParseResult result, PrismSource source) {
+            super(describe(result, source));
+        }
+
+        private static String describe(ParseResult result, PrismSource source) {
+            StringBuilder message = new StringBuilder("Ruby syntax error");
+            for (ParseResult.Error error : result.errors) {
+                Nodes.Source prismSource = result.source;
+                message.append("\n  line ")
+                        .append(prismSource == null ? "?" : prismSource.line(error.location.startOffset))
+                        .append(", offset ").append(source.charOffset(error.location.startOffset))
+                        .append(" [").append(error.type).append('/').append(error.level).append("] ")
+                        .append(error.message);
+            }
+            return message.toString();
         }
     }
 
@@ -64,22 +106,13 @@ public class RubyParser implements Parser {
             Path path = input.getRelativePath(relativeTo);
             try {
                 EncodingDetectingInputStream is = input.getSource(ctx);
-                String source = is.readFully();
+                String text = is.readFully();
                 Charset charset = is.getCharset();
+                PrismSource source = new PrismSource(text, charset);
 
-                ParseResult parseResult;
-                synchronized (Runtime.INSTANCE) {
-                    parseResult = Runtime.INSTANCE.getParserManager().parseFile(path.toString(), 0,
-                            new ByteArrayInputStream(source.getBytes(charset)), null);
-                }
-                if (!(parseResult instanceof RootNode)) {
-                    throw new IllegalStateException("Expected JRuby's legacy parser to return an " +
-                                                    "org.jruby.ast.RootNode, but it returned a " + parseResult.getClass().getName() +
-                                                    ". Is the jruby.parser.prism system property set to true?");
-                }
-
+                ParseResult parseResult = parse(path, source);
                 Rb.CompilationUnit cu = new RubyParserVisitor(input.getPath(), input.getFileAttributes(),
-                        source, charset, is.isCharsetBomMarked()).visitRootNode((RootNode) parseResult);
+                        source, is.isCharsetBomMarked()).visitProgram(parseResult);
                 parsingListener.parsed(input, cu);
                 return requirePrintEqualsInput(cu, input, relativeTo, ctx);
             } catch (Throwable t) {

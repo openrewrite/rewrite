@@ -26,7 +26,6 @@ import static org.openrewrite.ruby.Assertions.ruby;
 
 public class StringTest implements RewriteTest {
 
-    @Disabled
     @Test
     void emoji() {
         rewriteRun(
@@ -229,7 +228,6 @@ public class StringTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multipleHeredocs() {
         rewriteRun(

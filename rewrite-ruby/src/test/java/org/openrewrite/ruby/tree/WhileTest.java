@@ -65,7 +65,6 @@ public class WhileTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void beginEndWhileModifier() {
         rewriteRun(

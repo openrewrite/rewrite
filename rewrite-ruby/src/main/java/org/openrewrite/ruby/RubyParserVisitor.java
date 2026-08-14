@@ -15,50 +15,38 @@
  */
 package org.openrewrite.ruby;
 
-import org.jruby.RubySymbol;
-import org.jruby.ast.*;
-import org.jruby.ast.types.INameNode;
-import org.jruby.ast.visitor.AbstractNodeVisitor;
-import org.jruby.ast.visitor.OperatorCallNode;
-import org.jruby.util.KeyValuePair;
-import org.jruby.util.RegexpOptions;
-import org.openrewrite.Cursor;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.ListUtils;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.FileAttributes;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.ruby.internal.OpenParenthesis;
+import org.openrewrite.ruby.internal.PrismSource;
 import org.openrewrite.ruby.internal.StringUtils;
 import org.openrewrite.ruby.marker.*;
 import org.openrewrite.ruby.tree.Rb;
-import org.openrewrite.ruby.tree.Rb.ComplexString;
 import org.openrewrite.ruby.tree.RubySpace;
+import org.ruby_lang.prism.AbstractNodeVisitor;
+import org.ruby_lang.prism.Nodes;
+import org.ruby_lang.prism.ParseResult;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
- * For detailed descriptions of what every node type is, see
- * <a href="https://www.rubydoc.info/gems/ruby-internal/Node">Ruby internals on Node</a>.
+ * Maps Prism's byte-offset AST onto the {@code Rb}/{@code J} LST. Prism gives every node an exact
+ * span but no comments and no token-level positions, so whitespace, comments and keywords are still
+ * re-lexed from the source with a linear cursor — now anchored to node offsets rather than guessed.
  */
 public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     private final Path sourcePath;
@@ -66,3204 +54,195 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Nullable
     private final FileAttributes fileAttributes;
 
+    private final PrismSource src;
     private final String source;
-    private final Charset charset;
     private final boolean charsetBomMarked;
 
     private int cursor = 0;
-    private Cursor nodes = new Cursor(null, Cursor.ROOT_VALUE);
-
-    private Queue<Rb.Heredoc> openHeredocs = new ArrayDeque<>();
-    private final Queue<OpenParenthesis> openParentheses = new ArrayDeque<>();
-    private final Map<Rb.Heredoc, String> heredocDelimiters = new HashMap<>();
 
     /**
-     * Since we're already PAST the heredoc's instantiation by the time we can fully flesh out its
-     * contents, we keep them here in a map and do a last pass in {@link #visitRootNode(RootNode)}
-     * to replace each heredoc with its finalized contents.
+     * Heredoc markers seen on the current line whose bodies have not been reached yet. The bodies
+     * live outside the parent node's span, so the linear cursor claims them the first time it
+     * crosses a newline.
      */
-    private final Map<Rb.Heredoc, Rb.Heredoc> finalizedHeredocs = new HashMap<>();
+    private Deque<PendingHeredoc> pendingHeredocs = new ArrayDeque<>();
 
-    public RubyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
-        this(sourcePath, fileAttributes, source.readFully(), source.getCharset(), source.isCharsetBomMarked());
-    }
+    /**
+     * A heredoc's body is only known once the cursor reaches it, which is after the LST node has
+     * already been placed in the tree, so completed heredocs are swapped in by a final pass.
+     */
+    private Map<Rb.Heredoc, Rb.Heredoc> finalizedHeredocs = new IdentityHashMap<>();
 
-    public RubyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, String source,
-                             Charset charset, boolean charsetBomMarked) {
+    public RubyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, PrismSource src,
+                             boolean charsetBomMarked) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
-        this.source = source;
-        this.charset = charset;
+        this.src = src;
+        this.source = src.getText();
         this.charsetBomMarked = charsetBomMarked;
     }
 
-    @Override
-    protected J defaultVisit(Node node) {
-        throw new UnsupportedOperationException(String.format("Node type %s not yet implemented",
-                node.getClass().getSimpleName()));
+    private static final class PendingHeredoc {
+        final Rb.Heredoc placeholder;
+        final String marker;
+        final String id;
+        final boolean squiggly;
+
+        PendingHeredoc(Rb.Heredoc placeholder, String marker, String id, boolean squiggly) {
+            this.placeholder = placeholder;
+            this.marker = marker;
+            this.id = id;
+            this.squiggly = squiggly;
+        }
     }
 
     @Override
-    public J visitAliasNode(AliasNode node) {
-        return new Rb.Alias(
-                randomId(),
-                sourceBefore("alias"),
-                Markers.EMPTY,
-                convertExpression(node.getNewName()),
-                convertExpression(node.getOldName())
-        );
+    protected J defaultVisit(Nodes.Node node) {
+        throw new UnsupportedOperationException(String.format(
+                "Prism node type %s is not yet implemented (%s at offset %d)",
+                node.getClass().getSimpleName(), sourcePath, charStart(node)));
     }
 
-    @Override
-    public J visitArgsCatNode(ArgsCatNode node) {
+    public Rb.CompilationUnit visitProgram(ParseResult result) {
+        Nodes.ProgramNode program = (Nodes.ProgramNode) result.value;
         Space prefix = whitespace();
-        boolean omitBrackets = !skip("[");
-        List<JRightPadded<Expression>> elements;
-        if (node.getFirstNode() instanceof ListNode) {
-            elements = convertAll(Arrays.asList(((ListNode) node.getFirstNode()).children()), n -> sourceBefore(","),
-                    n -> sourceBefore(","));
-        } else {
-            elements = singletonList(padRight(convertExpression(node.getFirstNode()), sourceBefore(",")));
-        }
-        // JRuby 10 hands back the SplatNode itself where 9.4 handed back the splatted value.
-        Expression splat = node.getSecondNode() instanceof SplatNode ?
-                convertExpression(node.getSecondNode()) :
-                new Rb.Splat(
-                        randomId(),
-                        sourceBefore("*"),
-                        Markers.EMPTY,
-                        convertExpression(node.getSecondNode())
-                );
-        elements = ListUtils.concat(elements, padRight(splat, omitBrackets ? EMPTY : sourceBefore("]")));
-
-        return new Rb.Array(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                JContainer.build(
-                        EMPTY,
-                        elements,
-                        omitBrackets ?
-                                Markers.EMPTY.add(new OmitParentheses(randomId())) :
-                                Markers.EMPTY
-                ),
-                null
-        );
-    }
-
-    @Override
-    public J visitAndNode(AndNode node) {
-        Space prefix = whitespace();
-        Expression left = convertExpression(node.getFirstNode());
-        Space opPrefix = whitespace();
-        String op = source.startsWith("&&", cursor) ? "&&" : "and";
-        skip(op);
-        return new J.Binary(
-                randomId(),
-                prefix,
-                op.equals("&&") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishOperator(randomId())),
-                left,
-                padLeft(opPrefix, J.Binary.Type.And),
-                convertExpression(node.getSecondNode()),
-                null
-        );
-    }
-
-    @Override
-    public J visitArgsNode(ArgsNode node) {
-        throw new UnsupportedOperationException("Handled by convertArgs and skipped.");
-    }
-
-    @Override
-    public Expression visitArgsPushNode(ArgsPushNode node) {
-        return convertExpression(node.getFirstNode());
-    }
-
-    @Override
-    public J visitArgumentNode(ArgumentNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitArrayNode(ArrayNode node) {
-        if (node.size() == 1 && node.get(0) instanceof ListNode) {
-            return convert(node.get(0));
-        }
-        return visitListNode(node);
-    }
-
-    @Override
-    public J visitArrayPatternNode(ArrayPatternNode node) {
-        Space prefix = whitespace();
-        if (node.getConstant() != null) {
-            Expression constant = convertExpression(node.getConstant());
-            String delimiter = source.substring(cursor, cursor + 1);
-            return new Rb.StructPattern(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    constant,
-                    delimiter,
-                    JContainer.build(
-                            sourceBefore(delimiter),
-                            singletonList(padRight(convertExpression(node.getPreArgs()), sourceBefore(StringUtils.endDelimiter(delimiter)))),
-                            Markers.EMPTY
-                    )
-            );
-        } else {
-            return convert(node.getPreArgs());
-        }
-    }
-
-    @Override
-    public J visitAttrAssignNode(AttrAssignNode node) {
-        Space prefix = whitespace();
-        String attrName = node.getName().asJavaString();
-        if (attrName.equals("[]=")) {
-            return convertArrayAssignment(node, prefix);
-        }
-        return new J.Assignment(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                new J.FieldAccess(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        convertExpression(node.getReceiverNode()),
-                        padLeft(sourceBefore("."), convertIdentifier(attrName.substring(0, attrName.indexOf('=')))),
-                        null
-                ),
-                padLeft(sourceBefore("="), convertExpression(node.getArgsNode())),
-                null
-        );
-    }
-
-    private J.Assignment convertArrayAssignment(AttrAssignNode node, Space prefix) {
-        Expression arrayAccessReceiver = convertExpression(node.getReceiverNode());
-        Space arrayDimensionPrefix = sourceBefore("[");
-        Expression index;
-        Node assignment;
-        if (node.getArgsNode() instanceof ArgsPushNode) {
-            ArgsPushNode argsPushNode = (ArgsPushNode) node.getArgsNode();
-            index = visitArgsPushNode(argsPushNode);
-            assignment = argsPushNode.getSecondNode();
-        } else {
-            ListNode args = (ListNode) node.getArgsNode();
-            if (args.size() == 2) {
-                index = convertExpression(args.get(0));
-            } else if (args.size() == 3) {
-                index = new Rb.SubArrayIndex(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        convertExpression(args.get(0)),
-                        padLeft(sourceBefore(","), convertExpression(args.get(1)))
-                );
-            } else {
-                throw new IllegalStateException("Unexpected array index with 3 nodes");
-            }
-            assignment = args.get(args.size() - 1);
-        }
-
-        return new J.Assignment(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                new J.ArrayAccess(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        arrayAccessReceiver,
-                        new J.ArrayDimension(
-                                randomId(),
-                                arrayDimensionPrefix,
-                                Markers.EMPTY,
-                                padRight(index, sourceBefore("]"))
-                        ),
-                        null
-                ),
-                padLeft(sourceBefore("="), convertExpression(assignment)),
-                null
-        );
-    }
-
-    @Override
-    public J visitBackRefNode(BackRefNode node) {
-        return convertIdentifier("$" + node.getType());
-    }
-
-    @Override
-    public J visitBeginNode(BeginNode node) {
-        // JRuby 10 wraps `begin ... rescue/ensure ... end` in a BeginNode that 9.4 did not emit.
-        // Rb.Rescue owns the begin/end keywords, so unwrap rather than nest.
-        if (node.getBodyNode() instanceof RescueNode || node.getBodyNode() instanceof EnsureNode) {
-            return convert(node.getBodyNode());
-        }
-        Space prefix = sourceBefore("begin");
-        J body = convert(node.getBodyNode());
-        if (!(body instanceof J.Block)) {
-            body = new J.Block(
-                    randomId(),
-                    body.getPrefix(),
-                    Markers.EMPTY,
-                    JRightPadded.build(false),
-                    singletonList(
-                            padRight(
-                                    body instanceof Statement ?
-                                            (Statement) body :
-                                            new Rb.ExpressionStatement(randomId(), (Expression) body),
-                                    EMPTY
-                            )
-                    ),
-                    EMPTY
-            );
-        }
-        return new Rb.Begin(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                (J.Block) body
-        );
-    }
-
-    @Override
-    public J visitBignumNode(BignumNode node) {
-        return new J.Literal(
-                randomId(),
-                sourceBefore(node.getValue().toString()),
-                Markers.EMPTY,
-                node.getValue(),
-                node.getValue().toString(),
-                null,
-                JavaType.Primitive.Long
-        );
-    }
-
-    @Override
-    public J visitBlockArgNode(BlockArgNode node) {
-        return new Rb.BlockArgument(
-                randomId(),
-                sourceBefore("&"),
-                Markers.EMPTY,
-                convertIdentifier(node.getName())
-        );
-    }
-
-    @Override
-    public J visitBlockPassNode(BlockPassNode node) {
-        return new Rb.BlockArgument(
-                randomId(),
-                sourceBefore("&"),
-                Markers.EMPTY,
-                convertExpression(node.getBodyNode())
-        );
-    }
-
-    @Override
-    public J visitBlockNode(BlockNode node) {
-        return visitBlock(node);
-    }
-
-    /**
-     * @param node A single node or a list of nodes, which in any case needs to be wrapped in a
-     *             {@link J.Block}.
-     * @return A {@link J.Block}.
-     */
-    private J.Block visitBlock(Node node) {
-        return new J.Block(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                JRightPadded.build(false),
-                convertBlockStatements(
-                        node,
-                        n -> {
-                            if (nodes.getParentOrThrow().getValue() instanceof IfNode) {
-                                return EMPTY;
-                            }
-                            Space eob = whitespace();
-                            skip("end");
-                            return eob;
-                        }
-                ),
-                EMPTY
-        );
-    }
-
-    @Override
-    public J visitBreakNode(BreakNode node) {
-        return new Rb.Break(
-                randomId(),
-                sourceBefore("break"),
-                Markers.EMPTY,
-                new J.Break(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        null
-                ),
-                convertExpression(node.getValueNode())
-        );
-    }
-
-    @Override
-    public J visitCallNode(CallNode node) {
-        if (node.getName().asJavaString().equals("[]")) {
-            return convertArrayAccess(node);
-        }
-
-        Space prefix = whitespace();
-
-        TypeTree receiver = convertTypeTree(node.getReceiverNode());
-
-        Space beforeDot = whitespace();
-        Markers markers = Markers.EMPTY;
-        if (skip("&")) {
-            markers = markers.add(new SafeNavigation(randomId()));
-        }
-        if (skip("::")) {
-            markers = markers.add(new Colon2(randomId()));
-        } else {
-            skip(".");
-        }
-
-        J.Identifier name = convertIdentifier(node.getName());
-        if (name.getSimpleName().equals("new")) {
-            return new J.NewClass(
-                    randomId(),
-                    prefix,
-                    markers,
-                    padRight(new J.Empty(randomId(), EMPTY, markers), beforeDot),
-                    name.getPrefix(),
-                    receiver,
-                    convertCallArgs(node),
-                    null,
-                    null
-            );
-        } else {
-            return new J.MethodInvocation(
-                    randomId(),
-                    prefix,
-                    markers,
-                    padRight((Expression) receiver, beforeDot),
-                    null,
-                    name,
-                    convertCallArgs(node),
-                    null
-            );
-        }
-    }
-
-    private J.ArrayAccess convertArrayAccess(CallNode callNode) {
-        return convertArrayAccess(callNode.getReceiverNode(), callNode.getArgsNode(), callNode.getIterNode());
-    }
-
-    private J.ArrayAccess convertArrayAccess(Node receiverNode, Node argsNode, @Nullable Node iterNode) {
-        Space prefix = whitespace();
-        Expression receiver = convertExpression(receiverNode);
-        JContainer<J> args = convertArgs("[", argsNode, iterNode, "]");
-        List<J> argElems = args.getElements();
-        if (argElems.size() == 2) {
-            argElems = singletonList(new Rb.SubArrayIndex(
-                    randomId(),
-                    argElems.get(0).getPrefix(),
-                    Markers.EMPTY,
-                    argElems.get(0).withPrefix(EMPTY),
-                    padLeft(args.getPadding().getElements().get(0).getAfter(), (Expression) args.getElements().get(1))
-            ));
-        }
-
-        return new J.ArrayAccess(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                receiver,
-                new J.ArrayDimension(
-                        randomId(),
-                        args.getBefore(),
-                        Markers.EMPTY,
-                        padRight((Expression) argElems.get(0), args.getLastSpace())
-                ),
-                null
-        );
-    }
-
-    private List<JRightPadded<Statement>> convertBlockStatements(@Nullable Node node, Function<Node, Space> suffix) {
-        if (node == null) {
-            return emptyList();
-        }
-        List<? extends Node> trees;
-        if (node instanceof ListNode && !(node instanceof DNode) && !(node instanceof ZArrayNode)) {
-            trees = isMultipleStatements((ListNode) node) ?
-                    Arrays.asList(((ListNode) node).children()) :
-                    singletonList(node);
-        } else {
-            trees = singletonList(node);
-        }
-
-        if (trees.isEmpty()) {
-            return emptyList();
-        }
-        List<JRightPadded<Statement>> converted = new ArrayList<>(trees.size());
-        for (int i = 0; i < trees.size(); i++) {
-            Statement stat = convertStatement(trees.get(i));
-            if (stat instanceof J.Empty) {
-                continue;
-            }
-            converted.add(padRight(stat, i == trees.size() - 1 && !(stat instanceof Rb.Rescue) ? suffix.apply(trees.get(i)) : EMPTY));
-        }
-        return converted;
-    }
-
-    /**
-     * We need a heuristic to tell whether a {@link ListNode} that is given as a block body represents
-     * a single statement (e.g. a {@link Rb.Array}) or multiple statements. All we have is an imperfect
-     * heuristic right now, and seeking a better one.
-     *
-     * @param node A {@link ListNode} that serves as a block body.
-     * @return {@code true} if the {@link ListNode} contains more than one statement.
-     */
-    private boolean isMultipleStatements(ListNode node) {
-        AtomicBoolean multiple = new AtomicBoolean(false);
-        peekWhitespace(node, (n, prefix) -> {
-            if (!source.startsWith("[", cursor)) {
-                if (node.size() <= 1) {
-                    multiple.set(true);
-                } else {
-                    int line = node.children()[0].getLine();
-                    Node[] children = node.children();
-                    for (int i = 1; i < children.length; i++) {
-                        if (children[i].getLine() != line) {
-                            multiple.set(true);
-                        }
-                    }
-                }
-            }
-            return null;
-        });
-        return multiple.get();
-    }
-
-    @Override
-    public J visitCaseNode(CaseNode node) {
-        return convertCase(node.getCaseNode(), Arrays.asList(node.getCases().children()), node.getElseNode(), false);
-    }
-
-    private J convertCase(Node caseNode, List<Node> cases, @Nullable Node elseNode,
-                          boolean patternCase) {
-        Space prefix = whitespace();
-        if (source.startsWith("case", cursor)) {
-            return convertRubyCaseStatement(caseNode, cases, elseNode, patternCase)
-                    .withPrefix(prefix);
-        } else {
-            List<Node> groupedCases = new ArrayList<>(cases.size());
-            cases.forEach(groupedCases::add);
-            Expression left = convertExpression(caseNode);
-
-            Space casePrefix = whitespace();
-
-            boolean booleanCheck = skip("in") || !skip("=>");
-            J.Case pattern = ((J.Case) convertCases(groupedCases, true).getElement())
-                    .withStatements(emptyList())
-                    .withPrefix(casePrefix);
-
-            if (booleanCheck) {
-                return new Rb.BooleanCheck(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        left,
-                        pattern,
-                        null
-                );
-            } else {
-                return new Rb.RightwardAssignment(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        left,
-                        pattern,
-                        null
-                );
-            }
-        }
-    }
-
-    private J.Switch convertRubyCaseStatement(Node caseNode, List<Node> cases, @Nullable Node elseNode,
-                                              boolean patternCase) {
-        skip("case");
-        J.ControlParentheses<Expression> selector = new J.ControlParentheses<>(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                padRight(convertExpression(caseNode), EMPTY)
-        );
-
-        Map<Integer, List<Node>> groupedWhen = new LinkedHashMap<>();
-        for (Node aCase : cases) {
-            if (aCase != null) {
-                groupedWhen.computeIfAbsent(aCase.getLine(), k -> new ArrayList<>()).add(aCase);
-            }
-        }
-
-        List<JRightPadded<Statement>> mappedCases = new ArrayList<>(groupedWhen.size());
-        for (List<Node> c : groupedWhen.values()) {
-            Space prefix = sourceBefore(patternCase ? "in" : "when");
-            JRightPadded<Statement> mapped = convertCases(c, patternCase);
-            mappedCases.add(mapped.withElement(mapped.getElement().withPrefix(prefix)));
-        }
-
-        J.Block caseBlock = new J.Block(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                JRightPadded.build(false),
-                mappedCases,
-                elseNode == null ? sourceBefore("end") : EMPTY
-        );
-
-        if (elseNode != null) {
-            Space elsePrefix = sourceBefore("else");
-            JContainer<Statement> body = JContainer.build(
-                    whitespace(),
-                    convertBlockStatements(elseNode, n -> EMPTY),
-                    Markers.EMPTY
-            );
-            caseBlock = caseBlock.getPadding().withStatements(ListUtils.concat(caseBlock.getPadding().getStatements(),
-                    padRight(new J.Case(
-                            randomId(),
-                            elsePrefix,
-                            Markers.EMPTY,
-                            J.Case.Type.Statement,
-                            null,
-                            null,
-                            JContainer.empty(),
-                            null,
-                            body,
-                            null
-                    ), EMPTY)));
-            caseBlock = caseBlock.withEnd(sourceBefore("end"));
-        }
-
-        return new J.Switch(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                selector,
-                caseBlock
-        );
-    }
-
-    private JRightPadded<Statement> convertCases(List<Node> cases, boolean patternCase) {
-        List<Node> expressionNodes = new ArrayList<>();
-        for (Node node : cases) {
-            if (patternCase) {
-                InNode in = (InNode) node;
-                if (in.getExpression() instanceof ArrayNode) {
-                    Collections.addAll(expressionNodes, ((ArrayNode) in.getExpression()).children());
-                } else {
-                    expressionNodes.add(in.getExpression());
-                }
-            } else {
-                WhenNode when = (WhenNode) node;
-                if (when.getExpressionNodes() instanceof ArrayNode) {
-                    Collections.addAll(expressionNodes, ((ArrayNode) when.getExpressionNodes()).children());
-                } else {
-                    expressionNodes.add(when.getExpressionNodes());
-                }
-            }
-        }
-
-        JContainer<J> caseLabels = JContainer.build(
-                whitespace(),
-                convertAll(expressionNodes, n -> sourceBefore(","), n -> EMPTY),
-                Markers.EMPTY
-        );
-
-        Markers markers = Markers.EMPTY;
-        if (patternCase) {
-            markers = markers.add(new PatternCase(randomId()));
-        }
-
-        Node body = cases.get(0) instanceof WhenNode ?
-                ((WhenNode) cases.get(0)).getBodyNode() :
-                ((InNode) cases.get(0)).getBody();
-
-        caseLabels = peekWhitespace(caseLabels, (exp, beforeBody) -> {
-            if (source.startsWith("then", cursor)) {
-                exp = exp.withMarkers(exp.getMarkers().add(new ExplicitThen(randomId())));
-                exp = exp.getPadding().withElements(ListUtils.mapLast(
-                        exp.getPadding().getElements(), last -> last.withAfter(beforeBody)));
-                skip("then");
-                return exp;
-            }
-            return null;
-        }).orElse(caseLabels);
-
-        return padRight(new J.Case(
-                randomId(),
-                EMPTY,
-                markers,
-                J.Case.Type.Statement,
-                null,
-                null,
-                caseLabels,
-                null,
-                JContainer.build(
-                        whitespace(),
-                        convertBlockStatements(body, n -> EMPTY),
-                        Markers.EMPTY
-                ),
-                null
-        ), EMPTY);
-    }
-
-    @Override
-    public J visitClassNode(ClassNode node) {
-        Space prefix = whitespace();
-        skip("class");
-        J.Identifier name = convertIdentifier(node.getCPath().getName());
-
-        JLeftPadded<TypeTree> extendings = null;
-        Node superNode = node.getSuperNode();
-        if (superNode != null) {
-            Space extendingsPrefix = sourceBefore("<");
-            TypeTree superClass = convertTypeTree(superNode);
-            extendings = padLeft(
-                    extendingsPrefix,
-                    superClass
-            );
-        }
-
-        return new J.ClassDeclaration(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                emptyList(),
-                emptyList(),
-                new J.ClassDeclaration.Kind(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        emptyList(),
-                        J.ClassDeclaration.Kind.Type.Class
-                ),
-                name,
-                null,
-                null,
-                extendings,
-                null,
-                null,
-                visitBlock(node.getBodyNode()),
-                null
-        );
-    }
-
-    @Override
-    public J visitClassVarAsgnNode(ClassVarAsgnNode node) {
-        return visitAsgnNode(node, node.getName());
-    }
-
-    @Override
-    public J visitClassVarNode(ClassVarNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitColon2Node(Colon2Node node) {
-        return new J.MemberReference(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                padRight(convertExpression(node.getLeftNode()), sourceBefore("::")),
-                null,
-                padLeft(EMPTY, convertIdentifier(node.getName())),
-                null,
-                null,
-                null
-        );
-    }
-
-    @Override
-    public J visitColon3Node(Colon3Node node) {
-        return new J.MemberReference(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY),
-                        source.startsWith("::", cursor) ? sourceBefore("::") : EMPTY),
-                null,
-                padLeft(EMPTY, convertIdentifier(node.getName())),
-                null,
-                null,
-                null
-        );
-    }
-
-    @Override
-    public J visitComplexNode(ComplexNode node) {
-        return new Rb.NumericDomain(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                padRight(convertExpression(node.getNumber()), sourceBefore("i")),
-                Rb.NumericDomain.Domain.Complex,
-                null
-        );
-    }
-
-    @Override
-    public J visitConstDeclNode(ConstDeclNode node) {
-        return visitAsgnNode(node, node.getName());
-    }
-
-    @Override
-    public J visitConstNode(ConstNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitDefinedNode(DefinedNode node) {
-        return new Rb.Unary(
-                randomId(),
-                sourceBefore("defined?"),
-                Markers.EMPTY,
-                Rb.Unary.Type.Defined,
-                convertExpression(node.getExpressionNode())
-        );
-    }
-
-    @Override
-    public J visitDefnNode(DefnNode node) {
-        return convertDefNode(node);
-    }
-
-    @Override
-    public J visitDefsNode(DefsNode node) {
-        return convertDefNode(node);
-    }
-
-    private Statement convertDefNode(MethodDefNode node) {
-        Space prefix = sourceBefore("def");
-
-        Expression classMethodReceiver = null;
-        Space classMethodReceiverDot = null;
-        if (node instanceof DefsNode) {
-            classMethodReceiver = convertExpression(((DefsNode) node).getReceiverNode());
-            classMethodReceiverDot = sourceBefore(".");
-        }
-
-        J.MethodDeclaration.IdentifierWithAnnotations name = new J.MethodDeclaration.IdentifierWithAnnotations(
-                convertIdentifier(node.getName()),
-                emptyList()
-        );
-
-        boolean isDelegation = false;
-        for (String variable : node.getScope().getVariables()) {
-            if (variable.equals("...")) {
-                isDelegation = true;
-                break;
-            }
-        }
-
-        JContainer<J> args = isDelegation ?
-                JContainer.build(sourceBefore("("), singletonList(padRight(convertIdentifier("..."),
-                        sourceBefore(")"))), Markers.EMPTY) :
-                convertArgs("(", node.getArgsNode(), null, ")");
-
-        args = JContainer.withElements(args, ListUtils.map(args.getElements(), arg -> {
-            if (arg instanceof J.Identifier) {
-                return new J.VariableDeclarations(
-                        randomId(),
-                        arg.getPrefix(),
-                        Markers.EMPTY,
-                        emptyList(),
-                        emptyList(),
-                        null,
-                        null,
-                        singletonList(padRight(new J.VariableDeclarations.NamedVariable(
-                                randomId(),
-                                EMPTY,
-                                Markers.EMPTY,
-                                arg.withPrefix(EMPTY),
-                                emptyList(),
-                                null,
-                                null
-                        ), EMPTY))
-                );
-            }
-            return arg;
-        }));
-
-        J body = convert(node.getBodyNode());
-        if (!(body instanceof J.Block)) {
-            Statement bodyStatement = body instanceof Statement ?
-                    (Statement) body :
-                    new Rb.ExpressionStatement(randomId(), (Expression) body);
-            body = new J.Block(randomId(), EMPTY, Markers.EMPTY,
-                    JRightPadded.build(false), singletonList(padRight(bodyStatement, EMPTY)),
-                    sourceBefore("end"));
-        }
-
-        J.Block bodyBlock = (J.Block) body;
-        bodyBlock = bodyBlock.getPadding().withStatements(ListUtils.mapLast(bodyBlock.getPadding().getStatements(), statement ->
-                statement.getElement() instanceof J.Return || !(statement.getElement() instanceof Expression) ?
-                        statement :
-                        statement.withElement(new J.Return(
-                                randomId(),
-                                statement.getElement().getPrefix(),
-                                Markers.EMPTY.add(new ImplicitReturn(randomId())),
-                                statement.getElement().withPrefix(EMPTY)
-                        ))
-        ));
-
-        //noinspection unchecked
-        J.MethodDeclaration method = new J.MethodDeclaration(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                emptyList(),
-                emptyList(),
-                null,
-                null,
-                name,
-                (JContainer<Statement>) (JContainer<?>) args,
-                emptyList(),
-                null,
-                bodyBlock,
-                null,
-                null
-        );
-
-        if (node instanceof DefsNode) {
-            return new Rb.ClassMethod(
-                    randomId(),
-                    method.getPrefix(),
-                    Markers.EMPTY,
-                    classMethodReceiver,
-                    padLeft(classMethodReceiverDot, method.withPrefix(EMPTY))
-            );
-        }
-
-        return method;
-    }
-
-    @Override
-    public J visitDotNode(DotNode node) {
-        Space prefix = whitespace();
-        Expression left = convertExpression(node.getBeginNode());
-        Space opPrefix = whitespace();
-        String op = source.substring(cursor).startsWith("...") ? "..." : "..";
-        skip(op);
-        return new Rb.Binary(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                left,
-                padLeft(opPrefix, op.equals("...") ? Rb.Binary.Type.RangeExclusive : Rb.Binary.Type.RangeInclusive),
-                convertExpression(node.getEndNode()),
-                null
-        );
-    }
-
-    @Override
-    public J visitDAsgnNode(DAsgnNode node) {
-        return visitAsgnNode(node, node.getName());
-    }
-
-    @Override
-    public J visitDRegxNode(DRegexpNode node) {
-        return convertStrings(node);
-    }
-
-    @Override
-    public J visitDStrNode(DStrNode node) {
-        // <<~ heredocs are handled here
-        return convertMaybeHeredoc(node);
-    }
-
-    private J convertMaybeHeredoc(Node node) {
-        int cursorBeforeWhitespace = cursor;
-        int nonWhitespace = indexOfNextNonWhitespace();
-        Space prefix = RubySpace.format(source.substring(cursor, nonWhitespace));
-        cursor = nonWhitespace;
-        if (source.startsWith("<<", cursor)) {
-            Rb.Heredoc heredoc = new Rb.Heredoc(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    null,
-                    null,
-                    EMPTY
-            );
-            openHeredocs.add(heredoc);
-
-            // alphabets, decimal digits, and the underscore character
-            int i;
-            for (i = cursor + 3; i < source.length(); i++) {
-                char c = source.charAt(i);
-                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
-                      (c >= 'A' && c <= 'Z') || (c == '_'))) {
-                    break;
-                }
-            }
-
-            heredocDelimiters.put(heredoc, source.substring(cursor, i));
-            cursor = i;
-            return heredoc;
-        }
-        cursor = cursorBeforeWhitespace;
-        return convertStrings(node);
-    }
-
-    @Override
-    public J visitDSymbolNode(DSymbolNode node) {
-        return convertSymbols(node);
-    }
-
-    @Override
-    public J visitDVarNode(DVarNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitDXStrNode(DXStrNode node) {
-        return convertStrings(node);
-    }
-
-    @Override
-    public J visitEncodingNode(EncodingNode node) {
-        return convertIdentifier("__ENCODING__");
-    }
-
-    @Override
-    public J visitEnsureNode(EnsureNode node) {
-        Rb.Rescue rescue = (Rb.Rescue) convert(node.getBodyNode());
-        Space prefix;
-        if (rescue.getElse() == null) {
-            List<J.Try.Catch> catches = rescue.getTry().getCatches();
-            prefix = catches.get(catches.size() - 1).getBody().getEnd();
-            rescue = rescue.withTry(rescue.getTry().withCatches(ListUtils.mapLast(catches, c ->
-                    c.withBody(c.getBody().withEnd(EMPTY)))));
-        } else {
-            prefix = rescue.getElse().getEnd();
-            rescue = rescue.withElse(rescue.getElse().withEnd(EMPTY));
-        }
-
-        skip("ensure");
-        List<JRightPadded<Statement>> ensureBody;
-        if (node.getEnsureNode() instanceof BlockNode) {
-            ensureBody = convertAll(Arrays.asList(((BlockNode) node.getEnsureNode()).children()),
-                    n -> EMPTY, n -> EMPTY);
-        } else {
-            ensureBody = singletonList(padRight(convertStatement(node.getEnsureNode()), EMPTY));
-        }
-
-        return rescue.withTry(rescue.getTry().withFinally(new J.Block(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                JRightPadded.build(false),
-                ensureBody,
-                sourceBefore("end")
-        )));
-    }
-
-    @Override
-    public J visitEvStrNode(EvStrNode node) {
-        skip("#{");
-        return new Rb.ComplexString.Value(
-                randomId(),
-                Markers.EMPTY,
-                convert(node.getBody()),
-                sourceBefore("}")
-        );
-    }
-
-    @Override
-    public J visitFalseNode(FalseNode node) {
-        return new J.Literal(randomId(), sourceBefore("false"), Markers.EMPTY, true, "false",
-                null, JavaType.Primitive.Boolean);
-    }
-
-    @Override
-    public J visitFCallNode(FCallNode node) {
-        Space prefix = whitespace();
-        J.Identifier name = convertIdentifier(node.getName());
-
-        AtomicBoolean isDelegation = new AtomicBoolean(false);
-        peekWhitespace(0, (n, ws) -> {
-            skip("(");
-            whitespace();
-            isDelegation.set(source.startsWith("...", cursor));
-            return null;
-        });
-
-        JContainer<Expression> args = isDelegation.get() ?
-                JContainer.build(sourceBefore("("), singletonList(padRight(convertIdentifier("..."),
-                        sourceBefore(")"))), Markers.EMPTY) :
-                convertCallArgs(node);
-
-        return new J.MethodInvocation(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                null,
-                null,
-                name,
-                args,
-                null
-        );
-    }
-
-    private <T extends BlockAcceptingNode & IArgumentNode> JContainer<Expression> convertCallArgs(T node) {
-        return convertArgs("(", node.getArgsNode(), node.getIterNode(), ")");
-    }
-
-    @Override
-    public J visitFindPatternNode(FindPatternNode node) {
-        Space prefix = whitespace();
-        ArrayNode allArgs = new ArrayNode(0);
-        if (node.getPreRestArg() != null) {
-            allArgs.add(node.getPreRestArg());
-        }
-        for (Node arg : node.getArgs()) {
-            allArgs.add(arg);
-        }
-        if (node.getPostRestArg() != null) {
-            allArgs.add(node.getPostRestArg());
-        }
-        JContainer<Expression> elements = convertArgs("[", allArgs, null, "]");
-        return new Rb.Array(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                elements,
-                null
-        );
-    }
-
-    @Override
-    public J visitFixnumNode(FixnumNode node) {
-        return new J.Literal(
-                randomId(),
-                sourceBefore(Long.toString(node.getValue())),
-                Markers.EMPTY,
-                node.getValue(),
-                Long.toString(node.getValue()),
-                null,
-                JavaType.Primitive.Long
-        );
-    }
-
-    @Override
-    public J visitFlipNode(FlipNode node) {
-        Space prefix = whitespace();
-        Expression left = convertExpression(node.getBeginNode());
-        Space opPrefix = sourceBefore("..");
-        Rb.Binary.Type op = Rb.Binary.Type.FlipFlopInclusive;
-        if (skip(".")) {
-            op = Rb.Binary.Type.FlipFlopExclusive;
-        }
-        return new Rb.Binary(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                left,
-                padLeft(opPrefix, op),
-                convertExpression(node.getEndNode()),
-                JavaType.Primitive.Boolean
-        );
-    }
-
-    @Override
-    public J visitFloatNode(FloatNode node) {
-        return new J.Literal(
-                randomId(),
-                sourceBefore(Double.toString(node.getValue())),
-                Markers.EMPTY,
-                node.getValue(),
-                Double.toString(node.getValue()),
-                null,
-                JavaType.Primitive.Float
-        );
-    }
-
-    @Override
-    public J visitForNode(ForNode node) {
-        Markers markers = Markers.EMPTY;
-        Space prefix = sourceBefore("for");
-
-        Expression variableIdentifier = convertExpression(node.getVarNode());
-        JRightPadded<Statement> variable = padRight(new J.VariableDeclarations(
-                randomId(),
-                variableIdentifier.getPrefix(),
-                Markers.EMPTY,
-                emptyList(),
-                emptyList(),
-                null,
-                null,
-                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        variableIdentifier.withPrefix(EMPTY),
-                        emptyList(),
-                        null,
-                        null
-                ), EMPTY))
-        ), sourceBefore("in"));
-
-        JRightPadded<Expression> iterable = padRight(convertExpression(node.getIterNode()), whitespace());
-
-        return new J.ForEachLoop(
-                randomId(),
-                prefix,
-                markers,
-                new J.ForEachLoop.Control(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        variable,
-                        iterable
-                ),
-                padRight(convertStatement(node.getBodyNode()), sourceBefore("end"))
-        );
-    }
-
-    @Override
-    public J visitGlobalAsgnNode(GlobalAsgnNode node) {
-        return visitAsgnNode(node, node.getName());
-    }
-
-    @Override
-    public J visitGlobalVarNode(GlobalVarNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitHashNode(HashNode node) {
-        if (node.hasOnlyRestKwargs()) {
-            Space prefix = sourceBefore("**");
-            return convert(node.getPairs().get(0).getValue())
-                    .withPrefix(prefix)
-                    .withMarkers(Markers.EMPTY.add(new KeywordRestArgument(randomId())));
-        }
-        return convertHash(node, null);
-    }
-
-    private Rb.Hash convertHash(HashNode node, @Nullable Node restArg) {
-        Space prefix = whitespace();
-        boolean omitBrackets = !skip("{");
-        List<JRightPadded<Expression>> pairs = new ArrayList<>(node.getPairs().size());
-        List<KeyValuePair<Node, Node>> nodePairs = node.getPairs();
-        for (int i = 0; i < nodePairs.size(); i++) {
-            KeyValuePair<Node, Node> kv = nodePairs.get(i);
-            Space kvPrefix = whitespace();
-            Expression key = convertExpression(kv.getKey());
-            Space separatorPrefix = whitespace();
-
-            Rb.Hash.KeyValue.Separator separator = skip("=>") || !skip(":") ?
-                    Rb.Hash.KeyValue.Separator.Rocket :
-                    Rb.Hash.KeyValue.Separator.Colon;
-
-            AtomicReference<Expression> value = new AtomicReference<>(null);
-            peekWhitespace(0, (n, valuePrefix) -> {
-                if (kv.getValue() instanceof LocalAsgnNode &&
-                    !source.startsWith(((LocalAsgnNode) kv.getValue()).getName().asJavaString(), cursor)) {
-                    // in hash pattern matching you can match on {sym:} with no value
-                    // to the right of the symbol. not valid in hash literals
-                    value.set(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
-                    return null;
-                } else {
-                    value.set(convert(kv.getValue()).withPrefix(valuePrefix));
-                    return 0;
-                }
-            });
-
-            pairs.add(padRight(new Rb.Hash.KeyValue(
-                    randomId(),
-                    kvPrefix,
-                    Markers.EMPTY,
-                    key,
-                    padLeft(separatorPrefix, separator),
-                    value.get(),
-                    null
-            ), i == nodePairs.size() - 1 && restArg == null ? EMPTY : sourceBefore(",")));
-        }
-        if (restArg != null) {
-            pairs.add(padRight(convertExpression(restArg), EMPTY));
-        }
-        if (nodePairs.isEmpty() && restArg == null) {
-            pairs.add(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), EMPTY));
-        }
-
-        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
-        if (!omitBrackets) {
-            pairs = ListUtils.mapLast(pairs, last -> last.withAfter(maybeTrailingComma(markers, "}")));
-        }
-
-        return new Rb.Hash(
-                randomId(),
-                prefix,
-                omitBrackets ?
-                        Markers.EMPTY.add(new OmitParentheses(randomId())) :
-                        Markers.EMPTY,
-                JContainer.build(EMPTY, pairs, markers.get()),
-                null
-        );
-    }
-
-    @Override
-    public J visitHashPatternNode(HashPatternNode node) {
-        Space prefix = whitespace();
-        if (node.getConstant() != null) {
-            Expression constant = convertExpression(node.getConstant());
-            String delimiter = source.substring(cursor, cursor + 1);
-            return new Rb.StructPattern(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    constant,
-                    delimiter,
-                    JContainer.build(
-                            sourceBefore(delimiter),
-                            singletonList(padRight(convertHash(node.getKeywordArgs(), node.getRestArg()),
-                                    sourceBefore(StringUtils.endDelimiter(delimiter)))),
-                            Markers.EMPTY
-                    )
-            );
-        } else {
-            return convertHash(node.getKeywordArgs(), node.getRestArg());
-        }
-    }
-
-    @Override
-    public J visitIfNode(IfNode node) {
-        Space prefix = whitespace();
-        if (source.startsWith("if", cursor) || source.startsWith("unless", cursor)) {
-            return ifStatement(node).withPrefix(prefix);
-        } else if (node.getThenBody() == null || node.getElseBody() == null) {
-            return ifModifier(node).withPrefix(prefix);
-        }
-        return ternary(node).withPrefix(prefix);
-    }
-
-    private J.Ternary ternary(IfNode node) {
-        return new J.Ternary(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                convertExpression(node.getCondition()),
-                padLeft(sourceBefore("?"), convertExpression(node.getThenBody())),
-                padLeft(sourceBefore(":"), convertExpression(node.getElseBody())),
-                null
-        );
-    }
-
-    private J.If ifModifier(IfNode node) {
-        J thenElem = convert(node.getThenBody() == null ? node.getElseBody() : node.getThenBody());
-        Markers markers = Markers.EMPTY.add(new IfModifier(randomId()));
-        if (node.getThenBody() == null) {
-            markers = markers.add(new Unless(randomId()));
-        }
-        if (!(thenElem instanceof Statement)) {
-            thenElem = new Rb.ExpressionStatement(randomId(), (Expression) thenElem);
-        }
-        JRightPadded<Statement> then = padRight((Statement) thenElem, whitespace());
-        skip(node.getThenBody() == null ? "unless" : "if");
-
-        Space ifConditionPrefix = whitespace();
-        Expression ifConditionExpr = convertExpression(node.getCondition());
-        J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(
-                randomId(),
-                ifConditionPrefix,
-                Markers.EMPTY,
-                padRight(ifConditionExpr, EMPTY)
-        );
-        return new J.If(
-                randomId(),
-                EMPTY,
-                markers,
-                ifCondition,
-                then,
-                null
-        );
-    }
-
-    private J.If ifStatement(IfNode node) {
-        Markers markers = Markers.EMPTY;
-        if (!skip("if")) {
-            skip("unless");
-            markers = markers.add(new Unless(randomId()));
-        }
-        Space ifConditionPrefix = whitespace();
-        Expression ifConditionExpr = convertExpression(node.getCondition());
-        boolean explicitThen = source.startsWith("then", indexOfNextNonWhitespace());
-        J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(
-                randomId(),
-                ifConditionPrefix,
-                explicitThen ?
-                        Markers.EMPTY.add(new ExplicitThen(randomId())) :
-                        Markers.EMPTY,
-                padRight(ifConditionExpr, explicitThen ? sourceBefore("then") : EMPTY)
-        );
-
-        Statement thenElem = convertStatement(node.getThenBody());
-        JRightPadded<Statement> then = node.getElseBody() == null ?
-                padRight(thenElem, sourceBefore("end")) :
-                padRight(thenElem, EMPTY);
-
-        J.If.Else anElse = null;
-        if (node.getElseBody() != null) {
-            Space elsePrefix = whitespace();
-            skip(source.startsWith("else", cursor) ? "else" : "els");
-            anElse = new J.If.Else(
-                    randomId(),
-                    elsePrefix,
-                    Markers.EMPTY,
-                    padRight(convertStatement(node.getElseBody()),
-                            node.getElseBody() instanceof IfNode ? EMPTY : sourceBefore("end"))
-            );
-        }
-
-        return new J.If(
-                randomId(),
-                EMPTY,
-                markers,
-                ifCondition,
-                then,
-                anElse
-        );
-    }
-
-    @Override
-    public J visitInNode(InNode node) {
-        return super.visitInNode(node);
-    }
-
-    @Override
-    public J visitInstAsgnNode(InstAsgnNode node) {
-        return visitAsgnNode(node, node.getName());
-    }
-
-    @Override
-    public J visitInstVarNode(InstVarNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitIterNode(IterNode node) {
-        Space prefix = whitespace();
-        J.Block body;
-        JContainer<J> parameters = null;
-        boolean inline = source.charAt(cursor) == '{';
-        if (inline) {
-            skip("{");
-            if (!node.getArgsNode().isEmpty() || node.getArgsNode().getBlock() != null) {
-                parameters = convertArgs("|", node.getArgsNode(), null, "|");
-            }
-            body = visitBlock(node.getBodyNode());
-            skip("}");
-        } else {
-            skip("do");
-            if (!node.getArgsNode().isEmpty()) {
-                parameters = convertArgs("|", node.getArgsNode(), null, "|");
-            }
-            body = visitBlock(node.getBodyNode());
-            // visitBlock handles the skip("end")
-        }
-        return new Rb.Block(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                inline,
-                parameters,
-                body
-        );
-    }
-
-    @Override
-    public J visitKeywordArgNode(KeywordArgNode node) {
-        LocalAsgnNode assignable = (LocalAsgnNode) node.getAssignable();
-        return new J.VariableDeclarations(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY.add(new KeywordArgument(randomId())),
-                emptyList(),
-                emptyList(),
-                null,
-                null,
-                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        convertIdentifier(assignable.getName()),
-                        emptyList(),
-                        padLeft(sourceBefore(":"), convertExpression(assignable.getValueNode())),
-                        null
-                ), EMPTY))
-        );
-    }
-
-    @Override
-    public J visitKeywordRestArgNode(KeywordRestArgNode node) {
-        return new J.VariableDeclarations(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY.add(new KeywordRestArgument(randomId())),
-                emptyList(),
-                emptyList(),
-                null,
-                sourceBefore("**"),
-                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        convertIdentifier(node.getName()),
-                        emptyList(),
-                        null,
-                        null
-                ), EMPTY))
-        );
-    }
-
-    @Override
-    public J visitLambdaNode(LambdaNode node) {
-        Space prefix = sourceBefore("->");
-        Space parametersPrefix = whitespace();
-        JContainer<J> args = convertArgs("(", node.getArgsNode(), null, ")");
-        return new J.Lambda(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                new J.Lambda.Parameters(
-                        randomId(),
-                        parametersPrefix,
-                        Markers.EMPTY,
-                        true,
-                        args.getPadding().getElements()
-                ),
-                EMPTY,
-                new J.Block(
-                        randomId(),
-                        sourceBefore("{"),
-                        Markers.EMPTY,
-                        JRightPadded.build(false),
-                        convertBlockStatements(node.getBodyNode(), n -> EMPTY),
-                        sourceBefore("}")
-                ),
-                null
-        );
-    }
-
-    @Override
-    public J visitListNode(ListNode node) {
-        Space prefix = whitespace();
-
-        if (!node.isEmpty() && source.startsWith("%", cursor)) {
-            Node first = node.get(0);
-            if (first instanceof SymbolNode || first instanceof DSymbolNode) {
-                // this is a symbol array literal like %i[foo bar baz]
-                return convertSymbols(node.children()).withPrefix(prefix);
-            } else if (first instanceof StrNode || first instanceof DStrNode) {
-                // this is a string array literal like %w[foo bar baz]
-                return convertStrings(node.children()).withPrefix(prefix);
-            }
-        }
-
-        JContainer<Expression> elements = convertArgs("[", node, null, "]");
-        return new Rb.Array(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                elements,
-                null
-        );
-    }
-
-    @Override
-    public J visitLiteralNode(LiteralNode node) {
-        return convertIdentifier(node.getSymbolName());
-    }
-
-    @Override
-    public J visitLocalAsgnNode(LocalAsgnNode node) {
-        Space prefix = whitespace();
-        boolean namedSingleSplat = source.startsWith("*" + node.getName().asJavaString(), cursor);
-        if (namedSingleSplat) {
-            skip("*");
-        }
-        openParensCloseLeft();
-        Expression assignment = visitAsgnNode(node, node.getName());
-        if (namedSingleSplat) {
-            J.Identifier named = (J.Identifier) assignment;
-            assignment = named.withSimpleName("*" + named.getSimpleName());
-        }
-        return assignment.withPrefix(prefix);
-    }
-
-    private Expression visitAsgnNode(AssignableNode node, RubySymbol name) {
-        if (node.getValueNode() instanceof OperatorCallNode) {
-            Space variablePrefix = whitespace();
-            J.Identifier variable = convertIdentifier(name);
-            OperatorCallNode assignOp = (OperatorCallNode) node.getValueNode();
-            Space opPrefix = whitespace();
-            if (source.charAt(cursor) == '=') {
-                skip("=");
-                return new J.Assignment(
-                        randomId(),
-                        variablePrefix,
-                        Markers.EMPTY,
-                        variable,
-                        padLeft(opPrefix, visitOperatorCallNode(assignOp)),
-                        null
-                );
-            } else {
-                Expression mapped = convertOpAsgn(
-                        () -> variable,
-                        assignOp.getName().asJavaString(), ((ListNode) assignOp.getArgsNode()).get(0)
-                ).withPrefix(variablePrefix);
-                if (mapped instanceof J.AssignmentOperation) {
-                    J.AssignmentOperation j = (J.AssignmentOperation) mapped;
-                    return j.getPadding().withOperator(j.getPadding().getOperator().withBefore(opPrefix));
-                }
-                Rb.AssignmentOperation r = (Rb.AssignmentOperation) mapped;
-                return r.getPadding().withOperator(r.getPadding().getOperator().withBefore(opPrefix));
-            }
-        } else {
-            Space prefix = whitespace();
-            J.Identifier variable = convertIdentifier(name);
-            if (node.getValueNode() instanceof NilImplicitNode) {
-                return variable.withPrefix(prefix);
-            }
-            return new J.Assignment(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    variable,
-                    padLeft(sourceBefore("="), convertExpression(node.getValueNode())),
-                    null
-            );
-        }
-    }
-
-    private Object convertAssignmentOpType(String op) {
-        switch (op) {
-            case "+":
-                return J.AssignmentOperation.Type.Addition;
-            case "-":
-                return J.AssignmentOperation.Type.Subtraction;
-            case "*":
-                return J.AssignmentOperation.Type.Multiplication;
-            case "/":
-                return J.AssignmentOperation.Type.Division;
-            case "%":
-                return J.AssignmentOperation.Type.Modulo;
-            case "**":
-                return J.AssignmentOperation.Type.Exponentiation;
-            case "&&":
-                return Rb.AssignmentOperation.Type.And;
-            case "||":
-                return Rb.AssignmentOperation.Type.Or;
-            default:
-                throw new UnsupportedOperationException("Unsupported assignment operator " + op);
-        }
-    }
-
-    @Override
-    public J visitLocalVarNode(LocalVarNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitMatchNode(MatchNode node) {
-        return convert(node.getRegexpNode());
-    }
-
-    @Override
-    public J visitMatch2Node(Match2Node node) {
-        return convert(node.getReceiverNode());
-    }
-
-    @Override
-    public J visitMatch3Node(Match3Node node) {
-        return new Rb.Binary(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                convertExpression(node.getReceiverNode()),
-                padLeft(sourceBefore("=~"), Rb.Binary.Type.Match),
-                convertExpression(node.getValueNode()),
-                null
-        );
-    }
-
-    @Override
-    public J visitModuleNode(ModuleNode node) {
-        return new Rb.Module(
-                randomId(),
-                sourceBefore("module"),
-                Markers.EMPTY,
-                convertIdentifier(node.getCPath().getName()),
-                new J.Block(
-                        randomId(),
-                        whitespace(),
-                        Markers.EMPTY,
-                        JRightPadded.build(false),
-                        convertBlockStatements(node.getBodyNode(), n -> EMPTY),
-                        sourceBefore("end")
-                )
-        );
-    }
-
-    @Override
-    public J visitMultipleAsgnNode(MultipleAsgnNode node) {
-        Space prefix = whitespace();
-        JContainer<Expression> assignments = convertArgs("(", node.getPre(), null, ")");
-        if (node.getRest() != null) {
-            Space lastComma = assignments.getMarkers().findFirst(TrailingComma.class)
-                    .map(TrailingComma::getSuffix).orElse(EMPTY);
-            assignments = assignments.withMarkers(assignments.getMarkers().removeByType(TrailingComma.class));
-            assignments = assignments.getPadding().withElements(ListUtils.concat(
-                    ListUtils.mapLast(assignments.getPadding().getElements(), assign -> assign.withAfter(lastComma)),
-                    padRight(convertExpression(node.getRest()), EMPTY)
-            ));
-        }
-        Space initializerPrefix = sourceBefore("=");
-        Space firstArgPrefix = whitespace();
-        JContainer<Expression> initializers =
-                source.startsWith("[", cursor) ?
-                        JContainer.build(initializerPrefix, singletonList(padRight(visitArrayNode(
-                                (ArrayNode) node.getValueNode()).withPrefix(firstArgPrefix), EMPTY)), Markers.EMPTY) :
-                        JContainer.build(
-                                prefix,
-                                ListUtils.mapFirst(
-                                        this.<Expression>convertArgs("[", node.getValueNode(), null, "]").getPadding().getElements(),
-                                        arg -> arg.withElement(arg.getElement().withPrefix(firstArgPrefix))
-                                ),
-                                Markers.EMPTY
-                        ).withBefore(initializerPrefix);
-        return new Rb.MultipleAssignment(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                assignments,
-                initializers,
-                null
-        );
-    }
-
-    @Override
-    public J visitNextNode(NextNode node) {
-        return new Rb.Next(
-                randomId(),
-                sourceBefore("next"),
-                Markers.EMPTY,
-                new J.Continue(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        null
-                ),
-                convertExpression(node.getValueNode())
-        );
-    }
-
-    @Override
-    public J visitNilNode(NilNode node) {
-        Space prefix = whitespace();
-        return source.startsWith("nil", cursor) ?
-                convertIdentifier("nil").withPrefix(prefix) :
-                new J.Empty(randomId(), prefix, Markers.EMPTY);
-    }
-
-    @Override
-    public J visitNilRestArgNode(NilRestArgNode node) {
-        return convertIdentifier("**nil");
-    }
-
-    @Override
-    public J visitNthRefNode(NthRefNode node) {
-        return convertIdentifier("$" + node.getMatchNumber());
-    }
-
-    @Override
-    public J visitOpAsgnNode(OpAsgnNode node) {
-        Supplier<Expression> receiver = () -> {
-            Expression r = convertExpression(node.getReceiverNode());
-            if (node.getVariableName() != null) {
-                r = new J.FieldAccess(
-                        randomId(),
-                        r.getPrefix(),
-                        Markers.EMPTY,
-                        r.withPrefix(EMPTY),
-                        padLeft(sourceBefore("."), convertIdentifier(node.getVariableName())),
-                        null
-                );
-            }
-            return r;
-        };
-        return convertOpAsgn(receiver, node.getOperatorName(), node.getValueNode());
-    }
-
-    @Override
-    public J visitOpAsgnAndNode(OpAsgnAndNode node) {
-        return convertOpAsgn(() -> convertExpression(node.getFirstNode()), "&&", node.getSecondNode());
-    }
-
-    @Override
-    public J visitOpAsgnOrNode(OpAsgnOrNode node) {
-        return convertOpAsgn(() -> convertExpression(node.getFirstNode()), "||", node.getSecondNode());
-    }
-
-    @Override
-    public J visitOpElementAsgnNode(OpElementAsgnNode node) {
-        return convertOpAsgn(
-                () -> convertArrayAccess(node.getReceiverNode(), node.getArgsNode(), null),
-                node.getOperatorName(),
-                node.getValueNode()
-        );
-    }
-
-    private Expression convertOpAsgn(Supplier<Expression> first, String op, Node second) {
-        Expression firstExpr = first.get();
-        Space prefix = firstExpr.getPrefix();
-        firstExpr = firstExpr.withPrefix(EMPTY);
-
-        Object opType = convertAssignmentOpType(op);
-
-        if (second instanceof LocalAsgnNode) {
-            second = ((LocalAsgnNode) second).getValueNode();
-        } else if (second instanceof InstAsgnNode) {
-            second = ((InstAsgnNode) second).getValueNode();
-        }
-
-        if (opType instanceof Rb.AssignmentOperation.Type) {
-            return new Rb.AssignmentOperation(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    firstExpr,
-                    padLeft(sourceBefore(op + "="), (Rb.AssignmentOperation.Type) opType),
-                    convertExpression(second),
-                    null
-            );
-        } else {
-            return new J.AssignmentOperation(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    firstExpr,
-                    padLeft(sourceBefore(op + "="), (J.AssignmentOperation.Type) opType),
-                    convertExpression(second),
-                    null
-            );
-        }
-    }
-
-    @Override
-    public Expression visitOperatorCallNode(OperatorCallNode node) {
-        String op = node.getName().asJavaString();
-        if (op.endsWith("@")) {
-            op = op.substring(0, op.length() - 1);
-        }
-        Markers markers = Markers.EMPTY;
-        J.Binary.Type type = null;
-        J.Unary.Type unaryType = null;
-        Rb.Binary.Type rubyType = null;
-        switch (op) {
-            case "+":
-                if (node.getArgsNode() == null) {
-                    unaryType = J.Unary.Type.Positive;
-                } else {
-                    type = J.Binary.Type.Addition;
-                }
-                break;
-            case "-":
-                if (node.getArgsNode() == null) {
-                    unaryType = J.Unary.Type.Negative;
-                } else {
-                    type = J.Binary.Type.Subtraction;
-                }
-                break;
-            case "*":
-                type = J.Binary.Type.Multiplication;
-                break;
-            case "/":
-                type = J.Binary.Type.Division;
-                break;
-            case "%":
-                type = J.Binary.Type.Modulo;
-                break;
-            case "**":
-                rubyType = Rb.Binary.Type.Exponentiation;
-                break;
-            case ">>":
-                type = J.Binary.Type.RightShift;
-                break;
-            case "<<":
-                type = J.Binary.Type.LeftShift;
-                break;
-            case "&":
-                type = J.Binary.Type.BitAnd;
-                break;
-            case "|":
-                type = J.Binary.Type.BitOr;
-                break;
-            case "^":
-                type = J.Binary.Type.BitXor;
-                break;
-            case "~":
-                unaryType = J.Unary.Type.Complement;
-                break;
-            case "==":
-                type = J.Binary.Type.Equal;
-                break;
-            case "===":
-                rubyType = Rb.Binary.Type.Within;
-                break;
-            case "!=":
-                type = J.Binary.Type.NotEqual;
-                break;
-            case "<=>":
-                rubyType = Rb.Binary.Type.Comparison;
-                break;
-            case "<":
-                type = J.Binary.Type.LessThan;
-                break;
-            case "<=":
-                type = J.Binary.Type.LessThanOrEqual;
-                break;
-            case ">":
-                type = J.Binary.Type.GreaterThan;
-                break;
-            case ">=":
-                type = J.Binary.Type.GreaterThanOrEqual;
-                break;
-            case "!":
-                unaryType = J.Unary.Type.Not;
-                if (source.startsWith("not", cursor)) {
-                    op = "not";
-                    markers = Markers.EMPTY.add(new EnglishOperator(randomId()));
-                }
-                break;
-            default:
-                throw new UnsupportedOperationException("Operator " + op + " not yet implemented");
-        }
-
-        if (type != null) {
-            return new J.Binary(
-                    randomId(),
-                    whitespace(),
-                    markers,
-                    convertExpression(node.getReceiverNode()),
-                    padLeft(sourceBefore(op), type),
-                    convertExpression(node.getArgsNode().childNodes().get(0)),
-                    null
-            );
-        } else if (unaryType != null) {
-            return new J.Unary(
-                    randomId(),
-                    whitespace(),
-                    markers,
-                    padLeft(sourceBefore(op), unaryType),
-                    convertExpression(node.getReceiverNode()),
-                    null
-            );
-        } else {
-            return new Rb.Binary(
-                    randomId(),
-                    whitespace(),
-                    markers,
-                    convertExpression(node.getReceiverNode()),
-                    padLeft(sourceBefore(op), rubyType),
-                    convertExpression(node.getArgsNode().childNodes().get(0)),
-                    null
-            );
-        }
-    }
-
-    @Override
-    public J visitOptArgNode(OptArgNode node) {
-        return new J.VariableDeclarations(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                emptyList(),
-                emptyList(),
-                null,
-                null,
-                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        convertIdentifier(node.getName()),
-                        emptyList(),
-                        node.getValue() == null ?
-                                null :
-                                padLeft(sourceBefore("="), convertExpression(((LocalAsgnNode) node.getValue()).getValueNode())),
-                        null
-                ), EMPTY))
-        );
-    }
-
-    @Override
-    public J visitOrNode(OrNode node) {
-        Space prefix = whitespace();
-        Expression left = convertExpression(node.getFirstNode());
-        Space opPrefix = whitespace();
-        String op = source.startsWith("||", cursor) ? "||" : "or";
-        skip(op);
-        return new J.Binary(
-                randomId(),
-                prefix,
-                op.equals("||") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishOperator(randomId())),
-                left,
-                padLeft(opPrefix, J.Binary.Type.Or),
-                convertExpression(node.getSecondNode()),
-                null
-        );
-    }
-
-    @Override
-    public J visitPatternCaseNode(PatternCaseNode node) {
-        return convertCase(node.getCaseNode(), Arrays.asList(node.getCases()), node.getElseNode(), true);
-    }
-
-    @Override
-    public J visitPostExeNode(PostExeNode node) {
-        Space prefix = sourceBefore("END");
-        return new Rb.PostExecution(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                convertBeginEndBlock(node)
-        );
-    }
-
-    @Override
-    public J visitPreExeNode(PreExeNode node) {
-        Space prefix = sourceBefore("BEGIN");
-        return new Rb.PreExecution(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                convertBeginEndBlock(node)
-        );
-    }
-
-    private J.Block convertBeginEndBlock(IterNode node) {
-        return new J.Block(
-                randomId(),
-                sourceBefore("{"),
-                Markers.EMPTY,
-                JRightPadded.build(false),
-                convertBlockStatements(node.getBodyNode(), n -> EMPTY),
-                sourceBefore("}")
-        );
-    }
-
-    @Override
-    public J visitRationalNode(RationalNode node) {
-        return new Rb.NumericDomain(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                padRight(convertExpression(node.getNumerator()), sourceBefore("r")),
-                Rb.NumericDomain.Domain.Rational,
-                null
-        );
-    }
-
-    @Override
-    public J visitRedoNode(RedoNode node) {
-        return new Rb.Redo(
-                randomId(),
-                sourceBefore("redo"),
-                Markers.EMPTY
-        );
-    }
-
-    @Override
-    public J visitRegexpNode(RegexpNode node) {
-        ComplexString j = (ComplexString) convertStrings(new StrNode(node.getLine(), node.getValue()));
-        return j.withRegexpOptions(convertRegexpOptions(node));
-    }
-
-    @Override
-    public J visitRequiredKeywordArgumentValueNode(RequiredKeywordArgumentValueNode node) {
-        return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
-    }
-
-    @Override
-    public J visitRescueBodyNode(RescueBodyNode node) {
-        throw new UnsupportedOperationException("RescueBodyNode is a recursive data structure that is " +
-                                                "handled by visitRescueNode and so should never be called.");
-    }
-
-    @Override
-    public J visitRescueNode(RescueNode node) {
-        Space prefix = whitespace();
-        skip("begin");
-        Space bodyPrefix = whitespace();
-        J.Block body = visitBlock(node.getBodyNode());
-        List<J.Try.Catch> catches = convertCatches(node.getRescueNode(), emptyList());
-
-        J.Block elseBlock = null;
-        if (node.getElseNode() != null) {
-            elseBlock = new J.Block(
-                    randomId(),
-                    sourceBefore("else"),
-                    Markers.EMPTY,
-                    JRightPadded.build(false),
-                    convertBlockStatements(node.getElseNode(), n -> EMPTY),
-                    whitespace()
-            );
-        }
-
-        if (elseBlock == null) {
-            // whitespace rather than sourceBefore("end") because an ensure may follow
-            catches = ListUtils.mapLast(catches, c -> c.withBody(c.getBody().withEnd(whitespace())));
-        }
-        skip("end");
-
-        return new Rb.Rescue(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                new J.Try(
-                        randomId(),
-                        bodyPrefix,
-                        Markers.EMPTY,
-                        JContainer.empty(),
-                        body,
-                        catches,
-                        null
-                ),
-                elseBlock
-        );
-    }
-
-    private List<J.Try.Catch> convertCatches(@Nullable RescueBodyNode rescue, List<J.Try.Catch> mappedRescues) {
-        if (rescue == null) {
-            return mappedRescues;
-        }
-        // delay allocation until at least one rescue is found
-        if (mappedRescues.isEmpty()) {
-            mappedRescues = new ArrayList<>(3);
-        }
-
-        Space prefix = sourceBefore("rescue");
-        Space exceptionVariablePrefix = whitespace();
-
-        List<JRightPadded<J>> exceptionTypes = convertAll(
-                Arrays.asList((((ArrayNode) rescue.getExceptionNodes()).children())),
-                n -> sourceBefore(","), n -> EMPTY);
-
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> names = new ArrayList<>(1);
-        List<JRightPadded<Statement>> catchBody;
-        Space beforeExceptionNamePrefix = whitespace();
-        Space bodyPrefix = beforeExceptionNamePrefix;
-        if (skip("=>")) {
-            BlockNode body = (BlockNode) rescue.getBodyNode();
-
-            // because the exceptionName is being assigned to $!
-            J.Identifier exceptionName = convertIdentifier(((INameNode) body.get(0)).getName());
-            names.add(padRight(new J.VariableDeclarations.NamedVariable(
-                    randomId(),
-                    beforeExceptionNamePrefix,
-                    Markers.EMPTY,
-                    exceptionName,
-                    emptyList(),
-                    null,
-                    null
-            ), EMPTY));
-
-            bodyPrefix = whitespace();
-            List<Node> bodyNodes = new ArrayList<>(3);
-            if (body.children()[1] instanceof BlockNode) {
-                Collections.addAll(bodyNodes, ((BlockNode) body.children()[1]).children());
-            } else {
-                bodyNodes.add(body.children()[1]);
-            }
-            catchBody = convertAll(bodyNodes, n -> EMPTY, n -> EMPTY);
-        } else if (rescue.getBodyNode() instanceof BlockNode) {
-            catchBody = convertAll(Arrays.asList(((BlockNode) rescue.getBodyNode()).children()),
-                    n -> EMPTY, n -> EMPTY);
-        } else {
-            catchBody = singletonList(padRight(convertStatement(rescue.getBodyNode()), EMPTY));
-        }
-
-        TypeTree exceptionType;
-        if (exceptionTypes.size() == 1) {
-            exceptionType = asTypeTree(exceptionTypes.get(0).getElement());
-        } else {
-            exceptionType = new J.MultiCatch(randomId(), EMPTY, Markers.EMPTY,
-                    exceptionTypes.stream()
-                            .map(t -> new JRightPadded<NameTree>(asTypeTree(t.getElement()), t.getAfter(), t.getMarkers()))
-                            .collect(toList()));
-        }
-
-        J.VariableDeclarations exceptionVariable = new J.VariableDeclarations(
-                randomId(),
-                exceptionVariablePrefix,
-                Markers.EMPTY,
-                emptyList(),
-                emptyList(),
-                exceptionType,
-                null,
-                names
-        );
-
-        mappedRescues.add(new J.Try.Catch(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                new J.ControlParentheses<>(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        padRight(exceptionVariable, EMPTY)
-                ),
-                new J.Block(
-                        randomId(),
-                        bodyPrefix,
-                        Markers.EMPTY,
-                        JRightPadded.build(false),
-                        catchBody,
-                        EMPTY
-                )
-        ));
-
-        return convertCatches(rescue.getOptRescueNode(), mappedRescues);
-    }
-
-    @Override
-    public J visitRestArgNode(RestArgNode node) {
-        return new J.VariableDeclarations(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                emptyList(),
-                emptyList(),
-                null,
-                sourceBefore("*"),
-                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        convertIdentifier(node.getName()),
-                        emptyList(),
-                        null,
-                        null
-                ), EMPTY))
-        );
-    }
-
-    @Override
-    public J visitRetryNode(RetryNode node) {
-        return new Rb.Retry(
-                randomId(),
-                sourceBefore("retry"),
-                Markers.EMPTY
-        );
-    }
-
-    @Override
-    public J visitReturnNode(ReturnNode node) {
-        Space prefix = sourceBefore("return");
-        Expression returnValue = convertExpression(node.getValueNode());
-        return new J.Return(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                returnValue
-        );
-    }
-
-    @Override
-    public Rb.CompilationUnit visitRootNode(RootNode node) {
-        Space prefix = whitespace();
-        List<JRightPadded<Statement>> statements = convertBlockStatements(node.getBodyNode(), n -> EMPTY);
+        List<JRightPadded<Statement>> statements = program == null ?
+                emptyList() : statements(program.statements);
         Rb.CompilationUnit cu = new Rb.CompilationUnit(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 sourcePath,
                 fileAttributes,
-                charset.name(),
+                src.getCharset().name(),
                 charsetBomMarked,
                 null,
                 statements,
                 whitespace()
         );
-        if (!finalizedHeredocs.isEmpty()) {
-            return (Rb.CompilationUnit) new RubyIsoVisitor<Integer>() {
-                @Override
-                public Rb.Heredoc visitHeredoc(Rb.Heredoc heredoc, Integer p) {
-                    return finalizedHeredocs.get(heredoc);
-                }
-            }.visitNonNull(cu, 0);
+        if (finalizedHeredocs.isEmpty()) {
+            return cu;
         }
-        return cu;
+        return (Rb.CompilationUnit) new RubyIsoVisitor<Integer>() {
+            @Override
+            public Rb.Heredoc visitHeredoc(Rb.Heredoc heredoc, Integer p) {
+                Rb.Heredoc finalized = finalizedHeredocs.get(heredoc);
+                return finalized == null ? heredoc : finalized;
+            }
+        }.visitNonNull(cu, 0);
     }
 
-    @Override
-    public J visitSClassNode(SClassNode node) {
-        return new Rb.OpenEigenclass(
-                randomId(),
-                sourceBefore("class"),
-                Markers.EMPTY,
-                padLeft(sourceBefore("<<"), convertExpression(node.getReceiverNode())),
-                new J.Block(
-                        randomId(),
-                        whitespace(),
-                        Markers.EMPTY,
-                        JRightPadded.build(false),
-                        convertBlockStatements(node.getBodyNode(), n -> EMPTY),
-                        sourceBefore("end")
-                )
-        );
+    // ------------------------------------------------------------------ offsets
+
+    private int charStart(Nodes.Node node) {
+        return src.charOffset(node.startOffset);
     }
 
-    @Override
-    public J visitSelfNode(SelfNode node) {
-        return convertIdentifier("self");
+    private int charEnd(Nodes.Node node) {
+        return src.charOffset(node.endOffset());
     }
 
-    @Override
-    public J visitSplatNode(SplatNode node) {
-        return new Rb.Splat(
-                randomId(),
-                sourceBefore("*"),
-                Markers.EMPTY,
-                convertExpression(node.getValue())
-        );
+    private String text(Nodes.Node node) {
+        return source.substring(charStart(node), charEnd(node));
     }
 
-    @Override
-    public J visitStarNode(StarNode node) {
-        return convertIdentifier("*");
-    }
-
-    @Override
-    public J visitStrNode(StrNode node) {
-        // <<- heredocs are handled here
-        return convertMaybeHeredoc(node);
+    private static String str(byte[] bytes) {
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     /**
-     * @param nodes An array of either {@link StrNode} or {@link DNode}.
-     * @return A {@link Rb.ComplexString}, {@link J.Literal}, or {@link Rb.DelimitedArray} node.
+     * Consumes whitespace and comments and asserts that the cursor then sits exactly on the node's
+     * start, so a desync fails here rather than corrupting everything downstream.
      */
-    public J convertStrings(Node... nodes) {
-        Object parentValue = this.nodes.getParentOrThrow().getValue();
-        boolean inDString = parentValue instanceof DStrNode || parentValue instanceof DXStrNode ||
-                            parentValue instanceof DRegexpNode;
-        Space prefix = inDString ? EMPTY : whitespace();
-        String delimiter = "";
-        if (!inDString) {
-            if (source.charAt(cursor) == '%') {
-                switch (source.charAt(cursor + 1)) {
-                    case 'q':
-                    case 'Q':
-                    case 'w':
-                    case 'W':
-                    case 'x':
-                    case 'r':
-                        delimiter = source.substring(cursor, cursor + 3);
+    private Space prefix(Nodes.Node node) {
+        Space space = whitespace();
+        int expected = charStart(node);
+        if (cursor != expected) {
+            throw new IllegalStateException(String.format(
+                    "Cursor desync in %s: expected to be at offset %d (start of %s) but was at %d. " +
+                    "Source at cursor: |%s|",
+                    sourcePath, expected, node.getClass().getSimpleName(), cursor,
+                    source.substring(Math.max(0, cursor - 20), Math.min(source.length(), cursor + 20))));
+        }
+        return space;
+    }
+
+    // ------------------------------------------------------------------ cursor
+
+    private Space whitespace() {
+        int next = indexOfNextNonWhitespace(cursor);
+        if (!pendingHeredocs.isEmpty()) {
+            int newline = source.indexOf('\n', cursor);
+            if (newline >= 0 && newline < next) {
+                Space space = RubySpace.format(source, cursor, newline + 1);
+                cursor = newline + 1;
+                for (Rb.Heredoc flushed : flushHeredocs()) {
+                    finalizedHeredocs.put(flushed, finalizedHeredocs.get(flushed).withAroundValue(space));
+                }
+                return space;
+            }
+        }
+        Space space = RubySpace.format(source, cursor, next);
+        cursor = next;
+        return space;
+    }
+
+    private List<Rb.Heredoc> flushHeredocs() {
+        List<Rb.Heredoc> flushed = new ArrayList<>(pendingHeredocs.size());
+        while (!pendingHeredocs.isEmpty()) {
+            PendingHeredoc pending = pendingHeredocs.poll();
+            int bodyStart = cursor;
+            int terminator = indexOfHeredocTerminator(bodyStart, pending.id);
+            String body = source.substring(bodyStart, terminator);
+            cursor = terminator + pending.id.length();
+
+            Rb.Heredoc heredoc = pending.placeholder.withValue(new J.Literal(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    pending.squiggly ? org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF(body) : body,
+                    pending.marker + "\n" + body + pending.id,
+                    null,
+                    JavaType.Primitive.String
+            ));
+
+            // When another heredoc body follows on the next line, this heredoc's trailing space is
+            // just the newline that closes its terminator line.
+            Space end;
+            if (pendingHeredocs.isEmpty()) {
+                end = whitespace();
+            } else {
+                int newline = source.indexOf('\n', cursor);
+                int stop = newline < 0 ? source.length() : newline + 1;
+                end = RubySpace.format(source, cursor, stop);
+                cursor = stop;
+            }
+
+            finalizedHeredocs.put(pending.placeholder, heredoc.withEnd(end));
+            flushed.add(pending.placeholder);
+        }
+        return flushed;
+    }
+
+    private int indexOfHeredocTerminator(int from, String id) {
+        for (int i = from; i < source.length(); i++) {
+            if (source.startsWith(id, i)) {
+                boolean lineStart = true;
+                for (int j = i - 1; j >= 0; j--) {
+                    char c = source.charAt(j);
+                    if (c == '\n') {
                         break;
-                    default:
-                        // the solo % case
-                        delimiter = source.substring(cursor, cursor + 2);
-                }
-            } else {
-                delimiter = source.substring(cursor, cursor + 1);
-            }
-        }
-        if (!delimiter.isEmpty()) {
-            skip(delimiter);
-            this.nodes.putMessage("delimiter", delimiter);
-        }
-
-        J stringly;
-        if (delimiter.startsWith("%w") || delimiter.startsWith("%W")) {
-            List<JRightPadded<Expression>> strings = new ArrayList<>(nodes.length);
-            for (Node node : nodes) {
-                if (node instanceof StrNode) {
-                    strings.add(padRight(convertStringLiteral((StrNode) node, delimiter, true), whitespace()));
-                } else {
-                    strings.add(padRight(convertComplexString((DNode) nodes[0], ""), whitespace()));
-                }
-            }
-            stringly = new Rb.DelimitedArray(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    delimiter,
-                    JContainer.build(EMPTY, strings, Markers.EMPTY),
-                    null
-            );
-        } else if (nodes[0] instanceof StrNode) {
-            boolean isRegex = delimiter.startsWith("%r") || delimiter.startsWith("/");
-            stringly = convertStringLiteral((StrNode) nodes[0], isRegex || inDString ? "" : delimiter, false);
-            if (isRegex) {
-                stringly = new Rb.ComplexString(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        delimiter,
-                        JContainer.build(singletonList(padRight(stringly, EMPTY))),
-                        emptyList()
-                );
-            }
-        } else if (nodes[0] instanceof DNode) {
-            stringly = convertComplexString((DNode) nodes[0], delimiter);
-        } else {
-            throw new UnsupportedOperationException("Unexpected string node type " + nodes[0].getClass().getSimpleName());
-        }
-
-        skip(StringUtils.endDelimiter(delimiter));
-
-        if (nodes[0] instanceof DRegexpNode) {
-            stringly = ((ComplexString) stringly).withRegexpOptions(convertRegexpOptions(nodes[0]));
-        }
-
-        return stringly.withPrefix(prefix);
-    }
-
-    private List<ComplexString.RegexpOptions> convertRegexpOptions(Node node) {
-        RegexpOptions options = node instanceof DRegexpNode ?
-                ((DRegexpNode) node).getOptions() :
-                ((RegexpNode) node).getOptions();
-        return regexOptionsString(options).chars().mapToObj(opt -> {
-            switch (opt) {
-                case 'x':
-                    return ComplexString.RegexpOptions.Extended;
-                case 'i':
-                    return ComplexString.RegexpOptions.IgnoreCase;
-                case 'm':
-                    return ComplexString.RegexpOptions.Multiline;
-                case 'j':
-                    return ComplexString.RegexpOptions.Java;
-                case 'o':
-                    return ComplexString.RegexpOptions.Once;
-                case 'n':
-                    return ComplexString.RegexpOptions.None;
-                case 'e':
-                    return ComplexString.RegexpOptions.EUCJPEncoding;
-                case 's':
-                    return ComplexString.RegexpOptions.SJISEncoding;
-                case 'u':
-                    return ComplexString.RegexpOptions.UTF8Encoding;
-                default:
-                    throw new UnsupportedOperationException(String.format("Unknown regexp option %s", opt));
-            }
-        }).collect(toList());
-    }
-
-    private String regexOptionsString(RegexpOptions options) {
-        int optionCount = 0;
-        if (options.isExtended()) {
-            optionCount++;
-        }
-        if (!options.isKcodeDefault()) {
-            optionCount++;
-        }
-        if (options.isIgnorecase()) {
-            optionCount++;
-        }
-        if (options.isJava()) {
-            optionCount++;
-        }
-        if (options.isLiteral()) {
-            optionCount++;
-        }
-        if (options.isMultiline()) {
-            optionCount++;
-        }
-        if (options.isOnce()) {
-            optionCount++;
-        }
-        String optionsString = source.substring(cursor, cursor + optionCount);
-        skip(optionsString);
-        return optionsString;
-    }
-
-    private Expression convertComplexString(DNode node, String delimiter) {
-        // implicitly concatenated strings
-        List<JRightPadded<J>> strings = new ArrayList<>(node.size());
-
-        // the parts of a single string (literal + evaluated portions)
-        List<JRightPadded<J>> parts = new ArrayList<>(node.size());
-
-        for (int i = 0; i < node.size(); i++) {
-            Node n = node.get(i);
-            if (!delimiter.isEmpty() && skip(StringUtils.endDelimiter(delimiter))) {
-                strings.add(padRight(new Rb.ComplexString(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        delimiter,
-                        JContainer.build(parts),
-                        emptyList()
-                ), sourceBefore(delimiter)));
-                skip(delimiter);
-                parts = new ArrayList<>(node.size());
-            }
-
-            if (!(n instanceof StrNode)) {
-                nodes = new Cursor(nodes, n);
-                parts.add(padRight(n.accept(this), EMPTY));
-                nodes = nodes.getParentOrThrow();
-            } else if (!((StrNode) n).getValue().isEmpty()) {
-                // bypassing convert(..) because the string literal may start with parentheses
-                nodes = new Cursor(nodes, n);
-                parts.add(padRight(visitStrNode((StrNode) n), EMPTY));
-                nodes = nodes.getParentOrThrow();
-            }
-        }
-
-        strings.add(padRight(new Rb.ComplexString(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                delimiter,
-                JContainer.build(parts),
-                emptyList()
-        ), EMPTY));
-
-        Expression expression = (Expression) strings.get(0).getElement();
-        for (int i = 1; i < strings.size(); i++) {
-            expression = new Rb.Binary(
-                    randomId(),
-                    expression.getPrefix(),
-                    Markers.EMPTY,
-                    expression.withPrefix(EMPTY),
-                    JLeftPadded.build(Rb.Binary.Type.ImplicitStringConcatenation)
-                            .withBefore(strings.get(i - 1).getAfter()),
-                    (Expression) strings.get(i).getElement(),
-                    null
-            );
-        }
-        return expression;
-    }
-
-    /**
-     * @param node           The string node to convert.
-     * @param delimiter      A delimiter for this string. The cursor has already advanced beyond this delimiter.
-     * @param inArrayLiteral If we are in an array literal, there may be no delimiter use.
-     * @return Either a {@link J.Literal} or a {@link Rb.Binary} with an implicit concatenation type.
-     */
-    private Expression convertStringLiteral(StrNode node, String delimiter, boolean inArrayLiteral) {
-        String value = node.getValue().toString();
-        String endDelimiter = StringUtils.endDelimiter(delimiter);
-
-        if (delimiter.equals("?")) {
-            return new J.Literal(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    value,
-                    "?" + value,
-                    null,
-                    JavaType.Primitive.String
-            );
-        } else if (inArrayLiteral) {
-            return new J.Literal(
-                    randomId(),
-                    sourceBefore(value),
-                    Markers.EMPTY,
-                    value,
-                    value,
-                    null,
-                    JavaType.Primitive.String
-            );
-        } else if (endDelimiter.isEmpty()) {
-            String escapedValue = value;
-            if (nodes.getNearestMessage("delimiter", delimiter).equals("\"")) {
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < value.toCharArray().length; i++) {
-                    sb.append(readMaybeEscaped("\""));
-                }
-                escapedValue = sb.toString();
-            }
-            skip(escapedValue);
-            return new J.Literal(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    value,
-                    escapedValue,
-                    null,
-                    JavaType.Primitive.String
-            );
-        } else if (node.getValue().isEmpty()) {
-            return new J.Literal(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    value,
-                    String.format("%s%s%s", delimiter, value, endDelimiter),
-                    null,
-                    JavaType.Primitive.String
-            );
-        }
-
-        List<String[]> strings = implicitConcatenations(delimiter, value);
-
-        // deal with the possibility of implicit concatenations
-        Expression combined = null;
-        Space beforeOperator = null;
-        int i = 0;
-        for (String[] v : strings) {
-            J.Literal literal = new J.Literal(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    v[1],
-                    String.format("%s%s%s", delimiter, v[0], endDelimiter),
-                    null,
-                    JavaType.Primitive.String
-            );
-            skip(v[0]);
-            skip(endDelimiter);
-            if (combined == null) {
-                combined = literal;
-            } else {
-                combined = new Rb.Binary(
-                        randomId(),
-                        combined.getPrefix(),
-                        Markers.EMPTY,
-                        combined.withPrefix(EMPTY),
-                        JLeftPadded.build(Rb.Binary.Type.ImplicitStringConcatenation)
-                                .withBefore(beforeOperator),
-                        literal,
-                        null
-                );
-            }
-            if (i++ < strings.size()) {
-                beforeOperator = sourceBefore(delimiter);
-            } else {
-                break;
-            }
-        }
-
-        assert combined != null : String.format("unable to create a string literal for |%s| on line %d",
-                value, node.getLine() + 1);
-        return requireNonNull(combined);
-    }
-
-    /**
-     * @param delimiter The delimiter of the string. Only double quote delimited strings are escapable.
-     * @param value     The value of the string, which will not contain escapes.
-     * @return The set of ESCAPED string values to their unescaped forms.
-     */
-    public List<String[]> implicitConcatenations(String delimiter, String value) {
-        // most of the time there is only one string
-        List<String[]> strings = new ArrayList<>(1);
-
-        int cursorBefore = cursor;
-        char endDelimiterChar = StringUtils.endDelimiter(delimiter).charAt(0);
-        StringBuilder valueSrc = new StringBuilder();
-        int start = 0;
-        for (int i = 0; i < value.length(); ) {
-            char c = source.charAt(cursor);
-            char last = source.charAt(cursor - 1);
-            char nextLast = cursor >= 2 ? source.charAt(cursor - 2) : '\0';
-            if (c == endDelimiterChar && (last != '\\' || nextLast == '\\')) {
-                strings.add(new String[] { valueSrc.toString(), value.substring(start, i) });
-                valueSrc.setLength(0);
-                cursor++;
-                sourceBefore(delimiter);
-                start = i;
-            } else {
-                valueSrc.append(readMaybeEscaped(delimiter));
-                i++;
-            }
-        }
-        cursor = cursorBefore;
-
-        strings.add(new String[] { valueSrc.toString(), value.substring(start) });
-        return strings;
-    }
-
-    private String readMaybeEscaped(String delimiter) {
-        StringBuilder sb = new StringBuilder();
-        char c = source.charAt(cursor);
-        if (delimiter.equals("\"") && c == '\\') {
-            cursor++;
-            char next = source.charAt(cursor);
-            switch (next) {
-                case '\\':
-                case 'a':
-                case 'b':
-                case 'f':
-                case 'e':
-                case 's':
-                case 'n':
-                case 'r':
-                case 't':
-                case 'v':
-                case '"':
-                    sb.append("\\");
-                    sb.append(next);
-                    break;
-                case '0':
-                case 'x':
-                    // differentiate between single, double, and triple digit octals
-                    int j;
-                    for (j = 1; j <= 2; j++) {
-                        if (!Character.isDigit(source.charAt(cursor + j))) {
-                            break;
-                        }
-                    }
-                    sb.append("\\");
-                    sb.append(source, cursor, cursor + j);
-                    cursor += j;
-                    break;
-                case 'u':
-                    sb.append("\\u");
-                    cursor++;
-                    if (source.charAt(cursor) == '{') {
-                        sb.append(source, cursor, cursor + 6);
-                    } else {
-                        sb.append(source, cursor, cursor + 4);
-                    }
-                    break;
-                case 'c':
-                    sb.append(source, cursor - 1, cursor + 2);
-                    cursor++;
-                    break;
-                case 'C':
-                case 'M':
-                    sb.append("\\");
-                    sb.append(next);
-                    cursor++;
-                    if (source.charAt(cursor) == '-') {
-                        sb.append(source, cursor, cursor + 2);
-                        cursor++;
-                    } else {
-                        sb.append(c);
-                    }
-                    break;
-                default:
-                    sb.append(next);
-            }
-        } else {
-            sb.append(c);
-        }
-        cursor++;
-        return sb.toString();
-    }
-
-    @Override
-    public J visitSuperNode(SuperNode node) {
-        return new J.MethodInvocation(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                null,
-                null,
-                convertIdentifier("super"),
-                convertCallArgs(new SuperArgsNode(node)),
-                null
-        );
-    }
-
-    /**
-     * Because {@link SuperNode} does not implement {@link IArgumentNode}.
-     */
-    private static class SuperArgsNode extends SuperNode implements IArgumentNode {
-        public SuperArgsNode(SuperNode superNode) {
-            super(superNode.getLine(), superNode.getArgsNode(), superNode.getIterNode());
-        }
-
-        @Override
-        public Node setArgsNode(Node node) {
-            throw new UnsupportedOperationException("Setter will never be called");
-        }
-    }
-
-    @Override
-    public J visitSValueNode(SValueNode node) {
-        // https://www.rubydoc.info/gems/ruby-internal/Node/SVALUE
-        throw new UnsupportedOperationException("Does not appear to be called even for SVALUEs as described " +
-                                                "in the Ruby documentation.");
-    }
-
-    @Override
-    public J visitSymbolNode(SymbolNode node) {
-        return convertSymbols(node);
-    }
-
-    /**
-     * @param nodes An array of either {@link SymbolNode} or {@link DSymbolNode}.
-     * @return A {@link Rb.Symbol} or a {@link Rb.DelimitedArray} node.
-     */
-    public Expression convertSymbols(Node... nodes) {
-        Space prefix = whitespace();
-
-        String delimiter;
-        boolean explicitColon = false;
-        if (source.startsWith("%", cursor)) { // %s or %i
-            delimiter = source.substring(cursor, cursor + 3);
-        } else {
-            if (source.startsWith(":", cursor)) {
-                explicitColon = true;
-                skip(":");
-            }
-            if (nodes[0] instanceof SymbolNode) {
-                RubySymbol firstName = ((SymbolNode) nodes[0]).getName();
-                delimiter = source.startsWith(firstName.asJavaString(), cursor) ?
-                        "" : source.substring(cursor, cursor + 1);
-            } else if (!(nodes[0].childNodes().get(0) instanceof StrNode)) {
-                delimiter = source.substring(cursor, cursor + 1);
-            } else {
-                delimiter = "";
-            }
-        }
-        skip(delimiter);
-
-        List<JRightPadded<Expression>> nameNodes = new ArrayList<>(nodes.length);
-        if (delimiter.startsWith("%i") || delimiter.startsWith("%I")) {
-            // whitespace is only trimmed around symbol array names
-            for (Node node : nodes) {
-                nameNodes.add(padRight(
-                        node instanceof SymbolNode ?
-                                convertIdentifier(((SymbolNode) node).getName()) :
-                                convertExpression(((DSymbolNode) node).children()[0]), whitespace()));
-            }
-        } else if (nodes[0] instanceof SymbolNode) {
-            // whitespace on the end of non-array name symbols is actually part of the name...
-            nameNodes.add(padRight(convertIdentifier(((SymbolNode) nodes[0]).getName()), EMPTY));
-        } else { // instanceof DSymbolNode
-            nameNodes.add(padRight(convertExpression((((DSymbolNode) nodes[0]).children()[0])), whitespace()));
-        }
-
-        if (delimiter.startsWith("%")) {
-            skip(StringUtils.endDelimiter(delimiter));
-        }
-
-        if (delimiter.startsWith("%i") || delimiter.startsWith("%I")) {
-            return new Rb.DelimitedArray(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    delimiter,
-                    JContainer.build(EMPTY, nameNodes, Markers.EMPTY),
-                    null
-            );
-        } else {
-            return new Rb.Symbol(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    (explicitColon ? ":" : "") + delimiter,
-                    nameNodes.get(0).getElement(),
-                    null
-            );
-        }
-    }
-
-    @Override
-    public J visitTrueNode(TrueNode node) {
-        return new J.Literal(randomId(), sourceBefore("true"), Markers.EMPTY, true, "true",
-                null, JavaType.Primitive.Boolean);
-    }
-
-    @Override
-    public J visitVAliasNode(VAliasNode node) {
-        return new Rb.Alias(
-                randomId(),
-                sourceBefore("alias"),
-                Markers.EMPTY,
-                convertIdentifier(node.getNewName()),
-                convertIdentifier(node.getOldName())
-        );
-    }
-
-    @Override
-    public J visitVCallNode(VCallNode node) {
-        return convertIdentifier(node.getName());
-    }
-
-    @Override
-    public J visitWhenNode(WhenNode node) {
-        throw new UnsupportedOperationException("Multiple WhenNodes can potentially map to one J.Case, " +
-                                                "so the grouping of WhenNodes is handled in visitCaseNode " +
-                                                "and this method should never be called.");
-    }
-
-    @Override
-    public J visitWhileNode(WhileNode node) {
-        return whileOrUntilNode(node.getConditionNode(), node.getBodyNode());
-    }
-
-    @Override
-    public J visitUntilNode(UntilNode node) {
-        return whileOrUntilNode(node.getConditionNode(), node.getBodyNode());
-    }
-
-    private J whileOrUntilNode(Node conditionNode, Node bodyNode) {
-        Space prefix = whitespace();
-
-        if (source.startsWith("while", cursor) || source.startsWith("until", cursor)) {
-            Markers markers = whileOrUntil();
-            Space conditionPrefix = whitespace();
-            Expression conditionExpr = convertExpression(conditionNode);
-            boolean explicitDo = Pattern.compile("\\s+do").matcher(source).find(cursor);
-            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
-                    randomId(),
-                    conditionPrefix,
-                    explicitDo ?
-                            Markers.EMPTY.add(new ExplicitDo(randomId())) :
-                            Markers.EMPTY,
-                    padRight(conditionExpr, explicitDo ? sourceBefore("do") : EMPTY)
-            );
-
-            return new J.WhileLoop(
-                    randomId(),
-                    prefix,
-                    markers,
-                    condition,
-                    padRight(convertStatement(bodyNode), sourceBefore("end"))
-            );
-        } else {
-            JRightPadded<Statement> body = padRight(convertStatement(bodyNode), whitespace());
-            Markers markers = whileOrUntil();
-
-            Space conditionPrefix = whitespace();
-            Expression conditionExpr = convertExpression(conditionNode);
-            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
-                    randomId(),
-                    conditionPrefix,
-                    Markers.EMPTY,
-                    padRight(conditionExpr, EMPTY)
-            );
-
-            return new J.WhileLoop(
-                    randomId(),
-                    prefix,
-                    markers.add(new WhileModifier(randomId())),
-                    condition,
-                    body
-            );
-        }
-    }
-
-    private Markers whileOrUntil() {
-        Markers markers = Markers.EMPTY;
-        if (source.startsWith("until", cursor)) {
-            markers = markers.add(new Until(randomId()));
-            skip("until");
-        } else {
-            skip("while");
-        }
-        return markers;
-    }
-
-    @Override
-    public J visitXStrNode(XStrNode node) {
-        Space prefix = whitespace();
-        String value = node.getValue().toString();
-        String delimiter = source.charAt(cursor) == '`' ? "`" : source.substring(cursor, cursor + 3);
-        skip(delimiter);
-        skip(value);
-        skip(StringUtils.endDelimiter(delimiter));
-        return new Rb.ComplexString(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                delimiter,
-                JContainer.build(singletonList(
-                        padRight(new J.Literal(
-                                randomId(),
-                                EMPTY,
-                                Markers.EMPTY,
-                                value,
-                                value,
-                                null,
-                                JavaType.Primitive.String
-                        ), EMPTY)
-                )),
-                emptyList()
-        );
-    }
-
-    @Override
-    public J visitYieldNode(YieldNode node) {
-        return new Rb.Yield(
-                randomId(),
-                sourceBefore("yield"),
-                Markers.EMPTY,
-                convertArgs("(", node.getArgsNode(), null, ")")
-        );
-    }
-
-    @Override
-    public J visitZArrayNode(ZArrayNode node) {
-        return new Rb.Array(
-                randomId(),
-                sourceBefore("["),
-                Markers.EMPTY,
-                JContainer.<Expression>empty().withBefore(sourceBefore("]")),
-                null
-        );
-    }
-
-    @Override
-    public J visitZSuperNode(ZSuperNode node) {
-        return new J.MethodInvocation(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                null,
-                null,
-                convertIdentifier("super"),
-                JContainer.<Expression>empty().withMarkers(Markers.EMPTY.add(new OmitParentheses(randomId()))),
-                null
-        );
-    }
-
-    private J.Identifier convertIdentifier(RubySymbol name) {
-        return convertIdentifier(name.asJavaString());
-    }
-
-    private J.Identifier convertIdentifier(String name) {
-        return new J.Identifier(
-                randomId(),
-                sourceBefore(name),
-                Markers.EMPTY,
-                emptyList(),
-                name,
-                null,
-                null
-        );
-    }
-
-    private Statement convertStatement(@Nullable Node t) {
-        if (t == null) {
-            // e.g. the empty body of `if cond then end`; the surrounding whitespace lives in the
-            // padding around this element, so it must be a real element rather than null.
-            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
-        }
-        J j = convert(t);
-        if (!(j instanceof Statement)) {
-            j = new Rb.ExpressionStatement(randomId(), (Expression) j);
-        }
-        return (Statement) j;
-    }
-
-    private Expression convertExpression(@Nullable Node t) {
-        if (t == null) {
-            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
-        }
-        J j = convert(t);
-        if (!(j instanceof Expression)) {
-            return new Rb.StatementExpression(randomId(), (Statement) j);
-        }
-        return (Expression) j;
-    }
-
-    private TypeTree convertTypeTree(@Nullable Node t) {
-        return asTypeTree(convert(t));
-    }
-
-    private TypeTree asTypeTree(J j) {
-        if (j instanceof TypeTree) {
-            return (TypeTree) j;
-        }
-        return new Rb.ExpressionTypeTree(
-                randomId(),
-                j.getPrefix(),
-                Markers.EMPTY,
-                j.withPrefix(EMPTY)
-        );
-    }
-
-    private J convert(@Nullable Node t) {
-        if (t == null) {
-            //noinspection ConstantConditions
-            return null;
-        }
-        nodes = new Cursor(nodes, t);
-        //noinspection CaughtExceptionImmediatelyRethrown
-        try {
-            J j = maybeParenthesized(t);
-            nodes = nodes.getParentOrThrow();
-            return j;
-        } catch (Throwable ex) {
-            throw ex; // nice debug breakpoint
-        }
-    }
-
-    private <J2 extends J> J2 maybeParenthesized(Node t) {
-        for (OpenParenthesis paren : openParentheses) {
-            paren.addLeft(t);
-        }
-        J2 j = maybeOpenParentheses(t);
-        openParensCloseLeft();
-        j = maybeCloseParentheses(t, j);
-        return j;
-    }
-
-    private void openParensCloseLeft() {
-        for (OpenParenthesis paren : openParentheses) {
-            paren.closeLeft();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <J2 extends J> J2 maybeOpenParentheses(Node t) {
-        return peekWhitespace(0, (n, prefix) -> {
-            if (skip("(")) {
-                openParentheses.add(new OpenParenthesis(t, prefix));
-                return (J2) maybeOpenParentheses(t);
-            }
-            return null;
-        }).orElseGet(() -> (J2) t.accept(this));
-    }
-
-    private <J2 extends J> J2 maybeCloseParentheses(Node t, J2 j) {
-        return peekWhitespace(j, (j2, prefix) -> {
-            if (skip(")")) {
-                for (OpenParenthesis paren : new ArrayList<>(openParentheses)) {
-                    if (paren.isParenthesized(t)) {
-                        openParentheses.remove(paren);
-                        //noinspection unchecked
-                        return maybeCloseParentheses(t, (J2) new J.Parentheses<>(
-                                randomId(),
-                                requireNonNull(paren.getBefore()),
-                                Markers.EMPTY,
-                                padRight(j2, prefix)
-                        ));
+                    } else if (c != ' ' && c != '\t') {
+                        lineStart = false;
+                        break;
                     }
                 }
-            }
-            return null;
-        }).orElse(j);
-    }
-
-    private <J2 extends J> JContainer<J2> convertArgs(String before,
-                                                      @Nullable Node argsNode,
-                                                      @Nullable Node iterNode,
-                                                      String after) {
-        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
-        AtomicBoolean omitParentheses = new AtomicBoolean();
-
-        return peekWhitespace(collectArgsToList(argsNode), (args, prefix) -> {
-            if (source.startsWith(before, cursor)) {
-                skip(before);
-                omitParentheses.set(false);
-            } else {
-                markers.set(markers.get().add(new OmitParentheses(randomId())));
-                omitParentheses.set(true);
-            }
-
-            List<JRightPadded<J2>> mappedArgs = convertAll(args, n -> sourceBefore(","),
-                    n -> maybeTrailingComma(markers, omitParentheses.get() ? null : after));
-
-            if (iterNode != null) {
-                //noinspection unchecked
-                J2 blockPass = (J2) convert(iterNode);
-                Space suffix = EMPTY;
-                if (blockPass instanceof Rb.BlockArgument) {
-                    suffix = omitParentheses.get() ? EMPTY : sourceBefore(after);
-                }
-                mappedArgs = ListUtils.concat(
-                        mappedArgs,
-                        padRight(blockPass, suffix)
-                );
-            }
-
-            if (mappedArgs.isEmpty()) {
-                if (omitParentheses.get()) {
-                    return null;
-                } else {
-                    //noinspection unchecked
-                    mappedArgs = singletonList(padRight((J2) new J.Empty(randomId(), EMPTY, Markers.EMPTY),
-                            sourceBefore(after)));
+                if (lineStart) {
+                    return i;
                 }
             }
-
-            return JContainer.build(
-                    prefix,
-                    mappedArgs,
-                    markers.get()
-            );
-        }).orElseGet(() -> JContainer.<J2>empty().withMarkers(markers.get()));
-    }
-
-    private static List<Node> collectArgsToList(@Nullable Node argsNode) {
-        List<Node> args;
-        if (argsNode == null) {
-            args = new ArrayList<>(1);
-        } else if (argsNode instanceof ListNode) {
-            ListNode listNode = (ListNode) argsNode;
-            args = new ArrayList<>(listNode.size());
-            for (Node node : listNode.children()) {
-                if (node != null) {
-                    args.add(node);
-                }
-            }
-        } else if (argsNode instanceof ArgsNode) {
-            ArgsNode argsArgsNode = (ArgsNode) argsNode;
-            args = new ArrayList<>(argsArgsNode.getArgs().length + 1);
-            Collections.addAll(args, argsArgsNode.getArgs());
-            if (argsArgsNode.getBlock() != null) {
-                args.add(argsArgsNode.getBlock());
-            }
-            if (argsArgsNode.getRestArgNode() != null) {
-                args.add(argsArgsNode.getRestArgNode());
-            }
-            if (argsArgsNode.getKeyRest() != null) {
-                args.add(argsArgsNode.getKeyRest());
-            }
-        } else {
-            args = new ArrayList<>(2);
-            args.add(argsNode);
         }
-        return args;
-    }
-
-    private Space maybeTrailingComma(AtomicReference<Markers> markers, @Nullable String after) {
-        return peekWhitespace(0, (n, next) -> {
-            if (cursor < source.length() && source.charAt(cursor) == ',') {
-                cursor++;
-                markers.set(markers.get().add(new TrailingComma(randomId(),
-                        after == null ? EMPTY : sourceBefore(after))));
-                return next;
-            } else if (after != null) {
-                skip(after);
-                return next;
-            }
-            return null;
-        }).orElse(EMPTY);
-    }
-
-    private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Node> trees,
-                                                             Function<Node, Space> innerSuffix,
-                                                             Function<Node, Space> suffix) {
-        if (trees.isEmpty()) {
-            return emptyList();
-        }
-        List<JRightPadded<J2>> converted = new ArrayList<>(trees.size());
-        for (int i = 0; i < trees.size(); i++) {
-            @SuppressWarnings("unchecked") J2 j = (J2) convert(trees.get(i));
-            converted.add(padRight(j, (i == trees.size() - 1 ? suffix : innerSuffix).apply(trees.get(i))));
-        }
-        return converted;
-    }
-
-    private <T> JRightPadded<T> padRight(T tree, Space right) {
-        return new JRightPadded<>(tree, right, Markers.EMPTY);
-    }
-
-    private <T> JLeftPadded<T> padLeft(Space left, T tree) {
-        return new JLeftPadded<>(left, tree, Markers.EMPTY);
+        throw new IllegalStateException("Unterminated heredoc <<" + id + " in " + sourcePath);
     }
 
     private Space sourceBefore(String untilDelim) {
@@ -3277,105 +256,58 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private <T, U> Optional<U> peekWhitespace(T t, BiFunction<T, Space, U> conditional) {
-        int cursorBeforeWhitespace = cursor;
-        Queue<Rb.Heredoc> openHeredocsBeforeWhitespace = new ArrayDeque<>(openHeredocs);
+        int cursorBefore = cursor;
+        Deque<PendingHeredoc> heredocsBefore = new ArrayDeque<>(pendingHeredocs);
+        Map<Rb.Heredoc, Rb.Heredoc> finalizedBefore = finalizedHeredocs.isEmpty() ?
+                Collections.emptyMap() : new IdentityHashMap<>(finalizedHeredocs);
         U converted = conditional.apply(t, whitespace());
         if (converted != null) {
             return Optional.of(converted);
         }
-        openHeredocs = openHeredocsBeforeWhitespace;
-        cursor = cursorBeforeWhitespace;
+        cursor = cursorBefore;
+        pendingHeredocs = heredocsBefore;
+        finalizedHeredocs = finalizedBefore.isEmpty() && finalizedHeredocs.isEmpty() ?
+                finalizedHeredocs : new IdentityHashMap<>(finalizedBefore);
         return Optional.empty();
     }
 
-    private Space whitespace() {
-        String prefix = "";
-        Set<Rb.Heredoc> heredocsSplitByThis = new HashSet<>(openHeredocs.size());
-        do {
-            int next = indexOfNextNonWhitespace();
-            //noinspection StringConcatenationInLoop
-            prefix += source.substring(cursor, next);
-            cursor += prefix.length();
-            if (!openHeredocs.isEmpty() && prefix.contains("\n")) {
-                for (int i = cursor; i > 0; i--) {
-                    if (source.charAt(i - 1) == '\n') {
-                        prefix = source.substring(cursor - prefix.length(), i);
-                        cursor = i;
-                        break;
-                    }
-                }
-
-                Rb.Heredoc heredoc = openHeredocs.poll();
-                String delim = heredocDelimiters.get(heredoc);
-                String endDelim = delim.substring(3);
-                int i = cursor;
-
-                findEndDelim:
-                for (; i < source.length(); i++) {
-                    if (source.startsWith(endDelim, i)) {
-                        for (int j = i - 1; j > 0; j--) {
-                            char c = source.charAt(j);
-                            if (c == '\n') {
-                                break findEndDelim;
-                            } else if (c != ' ' && c != '\t') {
-                                continue findEndDelim;
-                            }
-                        }
-                    }
-                }
-
-                String value;
-                if (delim.charAt(2) == '~') {
-                    value = source.substring(cursor - prefix.length(), i);
-                    value = org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF(value);
-                } else {
-                    value = source.substring(cursor, i);
-                }
-                finalizedHeredocs.put(heredoc,
-                        heredoc.withValue(
-                                new J.Literal(
-                                        randomId(),
-                                        EMPTY,
-                                        Markers.EMPTY,
-                                        value,
-                                        delim + source.substring(cursor - prefix.length(), i) + endDelim,
-                                        null,
-                                        JavaType.Primitive.String
-                                )
-                        )
-                );
-                heredocsSplitByThis.add(heredoc);
-                cursor = i + endDelim.length();
-                Space heredocEnd = whitespace(); // note the potential here for recursion
-                finalizedHeredocs.put(heredoc, finalizedHeredocs.get(heredoc).withEnd(heredocEnd));
-            }
-        } while (!openHeredocs.isEmpty() && prefix.contains("\n"));
-
-        Space space = RubySpace.format(prefix);
-        for (Rb.Heredoc h : heredocsSplitByThis) {
-            finalizedHeredocs.put(h, finalizedHeredocs.get(h).withAroundValue(space));
-        }
+    /**
+     * Consumes everything up to {@code to} as prefix without scanning for comments. Used inside
+     * string literals, where {@code #} starts an interpolation rather than a comment and where the
+     * exact span of every part is already known.
+     */
+    private Space prefixTo(int to) {
+        Space space = RubySpace.format(source, cursor, to);
+        cursor = to;
         return space;
     }
 
     private boolean skip(@Nullable String token) {
-        if (token == null) {
-            //noinspection ConstantConditions
-            return false;
-        }
-        if (source.startsWith(token, cursor)) {
+        if (token != null && source.startsWith(token, cursor)) {
             cursor += token.length();
             return true;
         }
         return false;
     }
 
-    private int indexOfNextNonWhitespace() {
+    private boolean peekKeyword(String keyword) {
+        return peekKeywordAt(keyword, cursor);
+    }
+
+    private boolean peekKeywordAt(String keyword, int at) {
+        if (!source.startsWith(keyword, at)) {
+            return false;
+        }
+        int after = at + keyword.length();
+        return after >= source.length() || !Character.isJavaIdentifierPart(source.charAt(after));
+    }
+
+    private int indexOfNextNonWhitespace(int from) {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
 
         int length = source.length();
-        int i = cursor;
+        int i = from;
         for (; i < length; i++) {
             char current = source.charAt(i);
             if (inSingleLineComment) {
@@ -3401,13 +333,2357 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             }
             if (!inMultiLineComment && !Character.isWhitespace(current)) {
                 char next = i < source.length() - 1 ? source.charAt(i + 1) : '\0';
-
-                // we consider line continuations to be whitespace in Ruby
+                // line continuations count as whitespace in Ruby
                 if (current != '\\' || !(next == '\n' || next == '\r')) {
-                    break; // found it!
+                    break;
                 }
             }
         }
         return i;
+    }
+
+    // ------------------------------------------------------------------ padding
+
+    private <T> JRightPadded<T> padRight(T tree, Space right) {
+        return new JRightPadded<>(tree, right, Markers.EMPTY);
+    }
+
+    private <T> JLeftPadded<T> padLeft(Space left, T tree) {
+        return new JLeftPadded<>(left, tree, Markers.EMPTY);
+    }
+
+    private Space maybeTrailingComma(AtomicReference<Markers> markers, @Nullable String after) {
+        return peekWhitespace(0, (n, next) -> {
+            if (cursor < source.length() && source.charAt(cursor) == ',') {
+                cursor++;
+                markers.set(markers.get().add(new TrailingComma(randomId(),
+                        after == null ? EMPTY : sourceBefore(after))));
+                return next;
+            } else if (after != null) {
+                skip(after);
+                return next;
+            }
+            return null;
+        }).orElse(EMPTY);
+    }
+
+    // ------------------------------------------------------------------ conversion entry points
+
+    private J convert(Nodes.Node node) {
+        return node.accept(this);
+    }
+
+    private Expression convertExpression(Nodes.@Nullable Node node) {
+        if (node == null) {
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
+        J j = convert(node);
+        return j instanceof Expression ? (Expression) j :
+                new Rb.StatementExpression(randomId(), (Statement) j);
+    }
+
+    private Statement convertStatement(Nodes.@Nullable Node node) {
+        if (node == null) {
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
+        J j = convert(node);
+        return j instanceof Statement ? (Statement) j :
+                new Rb.ExpressionStatement(randomId(), (Expression) j);
+    }
+
+    private TypeTree convertTypeTree(Nodes.@Nullable Node node) {
+        return asTypeTree(convertExpression(node));
+    }
+
+    private TypeTree asTypeTree(J j) {
+        return j instanceof TypeTree ? (TypeTree) j :
+                new Rb.ExpressionTypeTree(randomId(), j.getPrefix(), Markers.EMPTY, j.withPrefix(EMPTY));
+    }
+
+    private List<JRightPadded<Statement>> statements(Nodes.@Nullable StatementsNode statements) {
+        if (statements == null || statements.body.length == 0) {
+            return emptyList();
+        }
+        List<JRightPadded<Statement>> converted = new ArrayList<>(statements.body.length);
+        for (Nodes.Node statement : statements.body) {
+            converted.add(padRight(convertStatement(statement), EMPTY));
+        }
+        return converted;
+    }
+
+    /**
+     * @return The statements as a single {@link Statement}, collapsing to the sole statement when
+     * there is exactly one so that the common case does not gain a synthetic block.
+     */
+    private Statement bodyStatement(Nodes.@Nullable StatementsNode statements) {
+        if (statements == null || statements.body.length == 0) {
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
+        if (statements.body.length == 1) {
+            return convertStatement(statements.body[0]);
+        }
+        return new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                statements(statements), EMPTY);
+    }
+
+    private List<JRightPadded<Statement>> bodyStatements(Nodes.@Nullable Node body) {
+        if (body == null) {
+            return emptyList();
+        }
+        if (body instanceof Nodes.StatementsNode) {
+            return statements((Nodes.StatementsNode) body);
+        }
+        return singletonList(padRight(convertStatement(body), EMPTY));
+    }
+
+    /**
+     * A {@code do ... end}, {@code class ... end} or {@code def ... end} body: the whitespace before
+     * the first statement is the block's prefix and the whitespace before the terminator is its end.
+     */
+    private J.Block keywordBlock(Nodes.@Nullable Node body, String terminator) {
+        Space prefix = whitespace();
+        List<JRightPadded<Statement>> statements = bodyStatements(body);
+        return new J.Block(randomId(), prefix, Markers.EMPTY, JRightPadded.build(false),
+                statements, sourceBefore(terminator));
+    }
+
+    private J.Identifier identifier(String name) {
+        return new J.Identifier(randomId(), sourceBefore(name), Markers.EMPTY, emptyList(), name,
+                null, null);
+    }
+
+    private J.Identifier identifier(Nodes.Node node) {
+        Space prefix = prefix(node);
+        String name = text(node);
+        cursor = charEnd(node);
+        return new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), name, null, null);
+    }
+
+    // ------------------------------------------------------------------ literals
+
+    @Override
+    public J visitIntegerNode(Nodes.IntegerNode node) {
+        Space prefix = prefix(node);
+        String valueSource = text(node);
+        cursor = charEnd(node);
+        return new J.Literal(randomId(), prefix, Markers.EMPTY, node.value, valueSource, null,
+                JavaType.Primitive.Long);
+    }
+
+    @Override
+    public J visitFloatNode(Nodes.FloatNode node) {
+        Space prefix = prefix(node);
+        String valueSource = text(node);
+        cursor = charEnd(node);
+        return new J.Literal(randomId(), prefix, Markers.EMPTY, node.value, valueSource, null,
+                JavaType.Primitive.Float);
+    }
+
+    @Override
+    public J visitTrueNode(Nodes.TrueNode node) {
+        return new J.Literal(randomId(), prefix(node), Markers.EMPTY, true, skipText(node), null,
+                JavaType.Primitive.Boolean);
+    }
+
+    @Override
+    public J visitFalseNode(Nodes.FalseNode node) {
+        return new J.Literal(randomId(), prefix(node), Markers.EMPTY, false, skipText(node), null,
+                JavaType.Primitive.Boolean);
+    }
+
+    private String skipText(Nodes.Node node) {
+        String text = text(node);
+        cursor = charEnd(node);
+        return text;
+    }
+
+    @Override
+    public J visitNilNode(Nodes.NilNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitSelfNode(Nodes.SelfNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitSourceEncodingNode(Nodes.SourceEncodingNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitSourceFileNode(Nodes.SourceFileNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitSourceLineNode(Nodes.SourceLineNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitImaginaryNode(Nodes.ImaginaryNode node) {
+        return new Rb.NumericDomain(
+                randomId(),
+                prefix(node),
+                Markers.EMPTY,
+                padRight(convertExpression(node.numeric), sourceBefore("i")),
+                Rb.NumericDomain.Domain.Complex,
+                null
+        );
+    }
+
+    @Override
+    public J visitRationalNode(Nodes.RationalNode node) {
+        Space prefix = prefix(node);
+        int numeratorEnd = charEnd(node) - 1;
+        J.Literal numerator = new J.Literal(randomId(), EMPTY, Markers.EMPTY, node.numerator,
+                source.substring(cursor, numeratorEnd), null, JavaType.Primitive.Long);
+        cursor = numeratorEnd;
+        return new Rb.NumericDomain(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                padRight(numerator, sourceBefore("r")),
+                Rb.NumericDomain.Domain.Rational,
+                null
+        );
+    }
+
+    @Override
+    public J visitBackReferenceReadNode(Nodes.BackReferenceReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitNumberedReferenceReadNode(Nodes.NumberedReferenceReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitItLocalVariableReadNode(Nodes.ItLocalVariableReadNode node) {
+        return identifier(node);
+    }
+
+    // ------------------------------------------------------------------ strings
+
+    /**
+     * A heredoc's own span covers only its {@code <<~ID} marker; the body sits further down the
+     * file and is claimed later by {@link #flushHeredocs()}.
+     */
+    private boolean isHeredocMarker(Nodes.Node node) {
+        String text = text(node);
+        if (!text.startsWith("<<")) {
+            return false;
+        }
+        int i = 2;
+        if (i < text.length() && (text.charAt(i) == '~' || text.charAt(i) == '-')) {
+            i++;
+        }
+        char quote = 0;
+        if (i < text.length() && (text.charAt(i) == '"' || text.charAt(i) == '\'' || text.charAt(i) == '`')) {
+            quote = text.charAt(i++);
+        }
+        int idStart = i;
+        while (i < text.length() && (Character.isLetterOrDigit(text.charAt(i)) || text.charAt(i) == '_')) {
+            i++;
+        }
+        if (i == idStart) {
+            return false;
+        }
+        return quote == 0 ? i == text.length() : i == text.length() - 1 && text.charAt(i) == quote;
+    }
+
+    private Rb.Heredoc heredoc(Nodes.Node node) {
+        Space prefix = prefix(node);
+        String marker = text(node);
+        cursor = charEnd(node);
+
+        int i = 2;
+        boolean squiggly = marker.charAt(i) == '~';
+        if (marker.charAt(i) == '~' || marker.charAt(i) == '-') {
+            i++;
+        }
+        String id = marker.substring(i);
+        if (!id.isEmpty() && (id.charAt(0) == '"' || id.charAt(0) == '\'' || id.charAt(0) == '`')) {
+            id = id.substring(1, id.length() - 1);
+        }
+
+        Rb.Heredoc placeholder = new Rb.Heredoc(randomId(), prefix, Markers.EMPTY, null, null, EMPTY);
+        pendingHeredocs.add(new PendingHeredoc(placeholder, marker, id, squiggly));
+        return placeholder;
+    }
+
+    @Override
+    public J visitStringNode(Nodes.StringNode node) {
+        if (isHeredocMarker(node)) {
+            return heredoc(node);
+        }
+        return stringLiteral(node, str(node.unescaped));
+    }
+
+    private J.Literal stringLiteral(Nodes.Node node, String value) {
+        Space prefix = prefix(node);
+        String valueSource = text(node);
+        cursor = charEnd(node);
+        return new J.Literal(randomId(), prefix, Markers.EMPTY, value, valueSource, null,
+                JavaType.Primitive.String);
+    }
+
+    @Override
+    public J visitInterpolatedStringNode(Nodes.InterpolatedStringNode node) {
+        if (isHeredocMarker(node)) {
+            return heredoc(node);
+        }
+        return interpolated(node, node.parts, emptyList());
+    }
+
+    @Override
+    public J visitInterpolatedXStringNode(Nodes.InterpolatedXStringNode node) {
+        return interpolated(node, node.parts, emptyList());
+    }
+
+    @Override
+    public J visitXStringNode(Nodes.XStringNode node) {
+        Space prefix = prefix(node);
+        String delimiter = readDelimiter(charStart(node));
+        String text = text(node);
+        String inner = text.substring(delimiter.length(),
+                text.length() - StringUtils.endDelimiter(delimiter).length());
+        cursor = charEnd(node);
+        return new Rb.ComplexString(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                delimiter,
+                JContainer.build(singletonList(padRight(new J.Literal(randomId(), EMPTY, Markers.EMPTY,
+                        str(node.unescaped), inner, null, JavaType.Primitive.String), EMPTY))),
+                emptyList()
+        );
+    }
+
+    @Override
+    public J visitRegularExpressionNode(Nodes.RegularExpressionNode node) {
+        return regularExpression(node, str(node.unescaped), regexpOptions(node));
+    }
+
+    @Override
+    public J visitMatchLastLineNode(Nodes.MatchLastLineNode node) {
+        return regularExpression(node, str(node.unescaped), regexpOptions(node));
+    }
+
+    private J regularExpression(Nodes.Node node, String value, List<Rb.ComplexString.RegexpOptions> options) {
+        Space prefix = prefix(node);
+        String delimiter = readDelimiter(charStart(node));
+        String text = text(node);
+        String endDelimiter = StringUtils.endDelimiter(delimiter);
+        String inner = text.substring(delimiter.length(),
+                text.length() - options.size() - endDelimiter.length());
+        cursor = charEnd(node);
+        return new Rb.ComplexString(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                delimiter,
+                JContainer.build(singletonList(padRight(new J.Literal(randomId(), EMPTY, Markers.EMPTY,
+                        value, inner, null, JavaType.Primitive.String), EMPTY))),
+                options
+        );
+    }
+
+    @Override
+    public J visitInterpolatedRegularExpressionNode(Nodes.InterpolatedRegularExpressionNode node) {
+        return interpolated(node, node.parts, regexpOptions(node));
+    }
+
+    @Override
+    public J visitInterpolatedMatchLastLineNode(Nodes.InterpolatedMatchLastLineNode node) {
+        return interpolated(node, node.parts, regexpOptions(node));
+    }
+
+    private List<Rb.ComplexString.RegexpOptions> regexpOptions(Nodes.RegularExpressionNode node) {
+        return regexpOptions(node, node.isIgnoreCase(), node.isExtended(), node.isMultiLine(),
+                node.isOnce(), node.isEucJp(), node.isAscii8bit(), node.isWindows31j(), node.isUtf8());
+    }
+
+    private List<Rb.ComplexString.RegexpOptions> regexpOptions(Nodes.MatchLastLineNode node) {
+        return regexpOptions(node, node.isIgnoreCase(), node.isExtended(), node.isMultiLine(),
+                node.isOnce(), node.isEucJp(), node.isAscii8bit(), node.isWindows31j(), node.isUtf8());
+    }
+
+    private List<Rb.ComplexString.RegexpOptions> regexpOptions(Nodes.InterpolatedRegularExpressionNode node) {
+        return regexpOptions(node, node.isIgnoreCase(), node.isExtended(), node.isMultiLine(),
+                node.isOnce(), node.isEucJp(), node.isAscii8bit(), node.isWindows31j(), node.isUtf8());
+    }
+
+    private List<Rb.ComplexString.RegexpOptions> regexpOptions(Nodes.InterpolatedMatchLastLineNode node) {
+        return regexpOptions(node, node.isIgnoreCase(), node.isExtended(), node.isMultiLine(),
+                node.isOnce(), node.isEucJp(), node.isAscii8bit(), node.isWindows31j(), node.isUtf8());
+    }
+
+    /**
+     * The regexp option characters have no location in Prism, so only their count comes from the
+     * flags; the characters themselves are read back from the tail of the node in source order.
+     */
+    private List<Rb.ComplexString.RegexpOptions> regexpOptions(Nodes.Node node, boolean... flags) {
+        int count = 0;
+        for (boolean flag : flags) {
+            if (flag) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            return emptyList();
+        }
+        String options = source.substring(charEnd(node) - count, charEnd(node));
+        List<Rb.ComplexString.RegexpOptions> mapped = new ArrayList<>(count);
+        for (int i = 0; i < options.length(); i++) {
+            switch (options.charAt(i)) {
+                case 'x':
+                    mapped.add(Rb.ComplexString.RegexpOptions.Extended);
+                    break;
+                case 'i':
+                    mapped.add(Rb.ComplexString.RegexpOptions.IgnoreCase);
+                    break;
+                case 'm':
+                    mapped.add(Rb.ComplexString.RegexpOptions.Multiline);
+                    break;
+                case 'j':
+                    mapped.add(Rb.ComplexString.RegexpOptions.Java);
+                    break;
+                case 'o':
+                    mapped.add(Rb.ComplexString.RegexpOptions.Once);
+                    break;
+                case 'n':
+                    mapped.add(Rb.ComplexString.RegexpOptions.None);
+                    break;
+                case 'e':
+                    mapped.add(Rb.ComplexString.RegexpOptions.EUCJPEncoding);
+                    break;
+                case 's':
+                    mapped.add(Rb.ComplexString.RegexpOptions.SJISEncoding);
+                    break;
+                case 'u':
+                    mapped.add(Rb.ComplexString.RegexpOptions.UTF8Encoding);
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unknown regexp option " + options.charAt(i));
+            }
+        }
+        return mapped;
+    }
+
+    /**
+     * Reads the opening delimiter of a string-like literal at {@code at}: a single quote character,
+     * or a percent literal such as {@code %r{} or {@code %[}.
+     */
+    private String readDelimiter(int at) {
+        char c = source.charAt(at);
+        if (c == '%') {
+            char kind = source.charAt(at + 1);
+            switch (kind) {
+                case 'q':
+                case 'Q':
+                case 'w':
+                case 'W':
+                case 'i':
+                case 'I':
+                case 's':
+                case 'x':
+                case 'r':
+                    return source.substring(at, at + 3);
+                default:
+                    return source.substring(at, at + 2);
+            }
+        }
+        return source.substring(at, at + 1);
+    }
+
+    /**
+     * Prism represents implicitly concatenated adjacent literals ({@code 'a' 'b'}) with the same
+     * node type as a single interpolated literal. They are told apart by where the first part
+     * starts: a concatenation's first part begins with its own opening delimiter, at the very start
+     * of the parent, while an interpolation's first part begins after the parent's delimiter.
+     */
+    private J interpolated(Nodes.Node node, Nodes.Node[] parts,
+                           List<Rb.ComplexString.RegexpOptions> options) {
+        if (parts.length > 1 && charStart(parts[0]) == charStart(node)) {
+            Space prefix = prefix(node);
+            Expression combined = convertExpression(parts[0]);
+            for (int i = 1; i < parts.length; i++) {
+                Space beforeOperator = whitespace();
+                combined = new Rb.Binary(
+                        randomId(),
+                        combined.getPrefix(),
+                        Markers.EMPTY,
+                        combined.withPrefix(EMPTY),
+                        padLeft(beforeOperator, Rb.Binary.Type.ImplicitStringConcatenation),
+                        convertExpression(parts[i]),
+                        null
+                );
+            }
+            return combined.withPrefix(prefix);
+        }
+
+        Space prefix = prefix(node);
+        String delimiter = readDelimiter(cursor);
+        skip(delimiter);
+        List<JRightPadded<J>> converted = new ArrayList<>(parts.length);
+        for (Nodes.Node part : parts) {
+            converted.add(padRight(interpolatedPart(part), EMPTY));
+        }
+        skip(StringUtils.endDelimiter(delimiter));
+        cursor = charEnd(node);
+        return new Rb.ComplexString(randomId(), prefix, Markers.EMPTY, delimiter,
+                JContainer.build(converted), options);
+    }
+
+    private J interpolatedPart(Nodes.Node part) {
+        if (part instanceof Nodes.StringNode) {
+            // The raw source slice preserves escapes exactly as written. It must not be scanned for
+            // whitespace because a segment can legitimately begin with a newline.
+            Space prefix = prefixTo(charStart(part));
+            String valueSource = text(part);
+            cursor = charEnd(part);
+            return new J.Literal(randomId(), prefix, Markers.EMPTY,
+                    str(((Nodes.StringNode) part).unescaped), valueSource, null,
+                    JavaType.Primitive.String);
+        }
+        return convert(part);
+    }
+
+    @Override
+    public J visitEmbeddedStatementsNode(Nodes.EmbeddedStatementsNode node) {
+        prefixTo(charStart(node));
+        skip("#{");
+        J tree = node.statements == null ?
+                new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                bodyStatement(node.statements);
+        return new Rb.ComplexString.Value(randomId(), Markers.EMPTY, tree, sourceBefore("}"));
+    }
+
+    @Override
+    public J visitEmbeddedVariableNode(Nodes.EmbeddedVariableNode node) {
+        prefixTo(charStart(node));
+        skip("#");
+        return new Rb.ComplexString.Value(randomId(), Markers.EMPTY, convert(node.variable), EMPTY);
+    }
+
+    // ------------------------------------------------------------------ symbols
+
+    @Override
+    public J visitSymbolNode(Nodes.SymbolNode node) {
+        return symbol(node, false);
+    }
+
+    /**
+     * @param label {@code true} when this symbol is a hash key written as {@code foo:}, whose
+     *              trailing colon belongs to the key/value separator rather than to the symbol.
+     */
+    private Rb.Symbol symbol(Nodes.SymbolNode node, boolean label) {
+        Space prefix = prefix(node);
+        int end = charEnd(node) - (label ? 1 : 0);
+        String text = source.substring(cursor, end);
+
+        String delimiter;
+        String name;
+        if (text.startsWith("%")) {
+            delimiter = text.substring(0, 3);
+            name = text.substring(3, text.length() - 1);
+        } else if (text.startsWith(":\"") || text.startsWith(":'")) {
+            delimiter = text.substring(0, 2);
+            name = text.substring(2, text.length() - 1);
+        } else if (text.startsWith(":")) {
+            delimiter = ":";
+            name = text.substring(1);
+        } else if (text.startsWith("\"") || text.startsWith("'")) {
+            delimiter = text.substring(0, 1);
+            name = text.substring(1, text.length() - 1);
+        } else {
+            delimiter = "";
+            name = text;
+        }
+        cursor = end;
+
+        return new Rb.Symbol(randomId(), prefix, Markers.EMPTY, delimiter,
+                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), name, null, null),
+                null);
+    }
+
+    @Override
+    public J visitInterpolatedSymbolNode(Nodes.InterpolatedSymbolNode node) {
+        Space prefix = prefix(node);
+        String delimiter = source.substring(cursor, charStart(node.parts[0]));
+        cursor = charStart(node.parts[0]);
+        Expression name;
+        if (node.parts.length == 1) {
+            name = convertExpression(node.parts[0]);
+        } else {
+            List<JRightPadded<J>> converted = new ArrayList<>(node.parts.length);
+            for (Nodes.Node part : node.parts) {
+                converted.add(padRight(interpolatedPart(part), EMPTY));
+            }
+            name = new Rb.ComplexString(randomId(), EMPTY, Markers.EMPTY, "",
+                    JContainer.build(converted), emptyList());
+        }
+        cursor = charEnd(node);
+        return new Rb.Symbol(randomId(), prefix, Markers.EMPTY, delimiter, name, null);
+    }
+
+    // ------------------------------------------------------------------ variable reads
+
+    @Override
+    public J visitLocalVariableReadNode(Nodes.LocalVariableReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitLocalVariableTargetNode(Nodes.LocalVariableTargetNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitInstanceVariableReadNode(Nodes.InstanceVariableReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitInstanceVariableTargetNode(Nodes.InstanceVariableTargetNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitClassVariableReadNode(Nodes.ClassVariableReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitClassVariableTargetNode(Nodes.ClassVariableTargetNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitGlobalVariableReadNode(Nodes.GlobalVariableReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitGlobalVariableTargetNode(Nodes.GlobalVariableTargetNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitConstantReadNode(Nodes.ConstantReadNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitConstantTargetNode(Nodes.ConstantTargetNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitConstantPathNode(Nodes.ConstantPathNode node) {
+        return constantPath(node, node.parent, str(node.name));
+    }
+
+    @Override
+    public J visitConstantPathTargetNode(Nodes.ConstantPathTargetNode node) {
+        return constantPath(node, node.parent, str(node.name));
+    }
+
+    private J constantPath(Nodes.Node node, Nodes.@Nullable Node parent, String name) {
+        Space prefix = prefix(node);
+        Expression left = parent == null ?
+                new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                convertExpression(parent);
+        return new J.MemberReference(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                padRight(left, sourceBefore("::")),
+                null,
+                padLeft(EMPTY, identifier(name)),
+                null,
+                null,
+                null
+        );
+    }
+
+    // ------------------------------------------------------------------ assignment
+
+    @Override
+    public J visitLocalVariableWriteNode(Nodes.LocalVariableWriteNode node) {
+        return assignment(node, str(node.name), node.value);
+    }
+
+    @Override
+    public J visitInstanceVariableWriteNode(Nodes.InstanceVariableWriteNode node) {
+        return assignment(node, str(node.name), node.value);
+    }
+
+    @Override
+    public J visitClassVariableWriteNode(Nodes.ClassVariableWriteNode node) {
+        return assignment(node, str(node.name), node.value);
+    }
+
+    @Override
+    public J visitGlobalVariableWriteNode(Nodes.GlobalVariableWriteNode node) {
+        return assignment(node, str(node.name), node.value);
+    }
+
+    @Override
+    public J visitConstantWriteNode(Nodes.ConstantWriteNode node) {
+        return assignment(node, str(node.name), node.value);
+    }
+
+    private J assignment(Nodes.Node node, String name, Nodes.Node value) {
+        Space prefix = prefix(node);
+        J.Identifier variable = identifier(name);
+        return new J.Assignment(randomId(), prefix, Markers.EMPTY, variable,
+                padLeft(sourceBefore("="), convertExpression(value)), null);
+    }
+
+    @Override
+    public J visitConstantPathWriteNode(Nodes.ConstantPathWriteNode node) {
+        Space prefix = prefix(node);
+        Expression target = convertExpression(node.target);
+        return new J.Assignment(randomId(), prefix, Markers.EMPTY, target,
+                padLeft(sourceBefore("="), convertExpression(node.value)), null);
+    }
+
+    @Override
+    public J visitLocalVariableOperatorWriteNode(Nodes.LocalVariableOperatorWriteNode node) {
+        return operatorWrite(node, str(node.name), str(node.binary_operator), node.value);
+    }
+
+    @Override
+    public J visitInstanceVariableOperatorWriteNode(Nodes.InstanceVariableOperatorWriteNode node) {
+        return operatorWrite(node, str(node.name), str(node.binary_operator), node.value);
+    }
+
+    @Override
+    public J visitClassVariableOperatorWriteNode(Nodes.ClassVariableOperatorWriteNode node) {
+        return operatorWrite(node, str(node.name), str(node.binary_operator), node.value);
+    }
+
+    @Override
+    public J visitGlobalVariableOperatorWriteNode(Nodes.GlobalVariableOperatorWriteNode node) {
+        return operatorWrite(node, str(node.name), str(node.binary_operator), node.value);
+    }
+
+    @Override
+    public J visitConstantOperatorWriteNode(Nodes.ConstantOperatorWriteNode node) {
+        return operatorWrite(node, str(node.name), str(node.binary_operator), node.value);
+    }
+
+    @Override
+    public J visitLocalVariableAndWriteNode(Nodes.LocalVariableAndWriteNode node) {
+        return operatorWrite(node, str(node.name), "&&", node.value);
+    }
+
+    @Override
+    public J visitInstanceVariableAndWriteNode(Nodes.InstanceVariableAndWriteNode node) {
+        return operatorWrite(node, str(node.name), "&&", node.value);
+    }
+
+    @Override
+    public J visitClassVariableAndWriteNode(Nodes.ClassVariableAndWriteNode node) {
+        return operatorWrite(node, str(node.name), "&&", node.value);
+    }
+
+    @Override
+    public J visitGlobalVariableAndWriteNode(Nodes.GlobalVariableAndWriteNode node) {
+        return operatorWrite(node, str(node.name), "&&", node.value);
+    }
+
+    @Override
+    public J visitConstantAndWriteNode(Nodes.ConstantAndWriteNode node) {
+        return operatorWrite(node, str(node.name), "&&", node.value);
+    }
+
+    @Override
+    public J visitLocalVariableOrWriteNode(Nodes.LocalVariableOrWriteNode node) {
+        return operatorWrite(node, str(node.name), "||", node.value);
+    }
+
+    @Override
+    public J visitInstanceVariableOrWriteNode(Nodes.InstanceVariableOrWriteNode node) {
+        return operatorWrite(node, str(node.name), "||", node.value);
+    }
+
+    @Override
+    public J visitClassVariableOrWriteNode(Nodes.ClassVariableOrWriteNode node) {
+        return operatorWrite(node, str(node.name), "||", node.value);
+    }
+
+    @Override
+    public J visitGlobalVariableOrWriteNode(Nodes.GlobalVariableOrWriteNode node) {
+        return operatorWrite(node, str(node.name), "||", node.value);
+    }
+
+    @Override
+    public J visitConstantOrWriteNode(Nodes.ConstantOrWriteNode node) {
+        return operatorWrite(node, str(node.name), "||", node.value);
+    }
+
+    private J operatorWrite(Nodes.Node node, String name, String operator, Nodes.Node value) {
+        Space prefix = prefix(node);
+        J.Identifier variable = identifier(name);
+        return operatorAssignment(prefix, variable, operator, value);
+    }
+
+    private J operatorAssignment(Space prefix, Expression target, String operator, Nodes.Node value) {
+        Object type = assignmentOperationType(operator);
+        Space before = sourceBefore(operator + "=");
+        if (type instanceof Rb.AssignmentOperation.Type) {
+            return new Rb.AssignmentOperation(randomId(), prefix, Markers.EMPTY, target,
+                    padLeft(before, (Rb.AssignmentOperation.Type) type), convertExpression(value), null);
+        }
+        return new J.AssignmentOperation(randomId(), prefix, Markers.EMPTY, target,
+                padLeft(before, (J.AssignmentOperation.Type) type), convertExpression(value), null);
+    }
+
+    private Object assignmentOperationType(String operator) {
+        switch (operator) {
+            case "+":
+                return J.AssignmentOperation.Type.Addition;
+            case "-":
+                return J.AssignmentOperation.Type.Subtraction;
+            case "*":
+                return J.AssignmentOperation.Type.Multiplication;
+            case "/":
+                return J.AssignmentOperation.Type.Division;
+            case "%":
+                return J.AssignmentOperation.Type.Modulo;
+            case "**":
+                return J.AssignmentOperation.Type.Exponentiation;
+            case "&&":
+                return Rb.AssignmentOperation.Type.And;
+            case "||":
+                return Rb.AssignmentOperation.Type.Or;
+            default:
+                throw new UnsupportedOperationException("Unsupported assignment operator " + operator);
+        }
+    }
+
+    @Override
+    public J visitCallOperatorWriteNode(Nodes.CallOperatorWriteNode node) {
+        return callWrite(node, node.receiver, str(node.read_name), str(node.binary_operator), node.value,
+                node.isSafeNavigation());
+    }
+
+    @Override
+    public J visitCallAndWriteNode(Nodes.CallAndWriteNode node) {
+        return callWrite(node, node.receiver, str(node.read_name), "&&", node.value, node.isSafeNavigation());
+    }
+
+    @Override
+    public J visitCallOrWriteNode(Nodes.CallOrWriteNode node) {
+        return callWrite(node, node.receiver, str(node.read_name), "||", node.value, node.isSafeNavigation());
+    }
+
+    private J callWrite(Nodes.Node node, Nodes.@Nullable Node receiver, String name, String operator,
+                        Nodes.Node value, boolean safeNavigation) {
+        Space prefix = prefix(node);
+        if (receiver == null) {
+            return operatorAssignment(prefix, identifier(name), operator, value);
+        }
+        Expression target = convertExpression(receiver);
+        Space beforeDot = whitespace();
+        skip(safeNavigation ? "&." : ".");
+        J.FieldAccess field = new J.FieldAccess(randomId(), EMPTY, Markers.EMPTY,
+                target, padLeft(beforeDot, identifier(name)), null);
+        return operatorAssignment(prefix, field, operator, value);
+    }
+
+    @Override
+    public J visitIndexOperatorWriteNode(Nodes.IndexOperatorWriteNode node) {
+        return indexWrite(node, node.receiver, node.arguments, str(node.binary_operator), node.value);
+    }
+
+    @Override
+    public J visitIndexAndWriteNode(Nodes.IndexAndWriteNode node) {
+        return indexWrite(node, node.receiver, node.arguments, "&&", node.value);
+    }
+
+    @Override
+    public J visitIndexOrWriteNode(Nodes.IndexOrWriteNode node) {
+        return indexWrite(node, node.receiver, node.arguments, "||", node.value);
+    }
+
+    private J indexWrite(Nodes.Node node, Nodes.Node receiver, Nodes.@Nullable ArgumentsNode arguments,
+                         String operator, Nodes.Node value) {
+        Space prefix = prefix(node);
+        J.ArrayAccess access = arrayAccess(EMPTY, receiver,
+                arguments == null ? new Nodes.Node[0] : arguments.arguments);
+        return operatorAssignment(prefix, access, operator, value);
+    }
+
+    @Override
+    public J visitMultiWriteNode(Nodes.MultiWriteNode node) {
+        Space prefix = prefix(node);
+
+        List<Nodes.Node> targets = new ArrayList<>();
+        Collections.addAll(targets, node.lefts);
+        if (node.rest != null && !(node.rest instanceof Nodes.ImplicitRestNode)) {
+            targets.add(node.rest);
+        }
+        Collections.addAll(targets, node.rights);
+
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        List<JRightPadded<Expression>> assignments = new ArrayList<>(targets.size());
+        for (int i = 0; i < targets.size(); i++) {
+            Expression target = convertExpression(targets.get(i));
+            assignments.add(padRight(target, i == targets.size() - 1 ?
+                    maybeTrailingComma(markers, null) : sourceBefore(",")));
+        }
+
+        Space initializerPrefix = sourceBefore("=");
+        List<JRightPadded<Expression>> initializers;
+        if (node.value instanceof Nodes.ArrayNode && source.charAt(charStart(node.value)) != '[') {
+            Nodes.Node[] values = ((Nodes.ArrayNode) node.value).elements;
+            initializers = new ArrayList<>(values.length);
+            for (int i = 0; i < values.length; i++) {
+                initializers.add(padRight(convertExpression(values[i]),
+                        i == values.length - 1 ? EMPTY : sourceBefore(",")));
+            }
+        } else {
+            initializers = singletonList(padRight(convertExpression(node.value), EMPTY));
+        }
+
+        return new Rb.MultipleAssignment(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                JContainer.build(EMPTY, assignments, markers.get()),
+                JContainer.build(initializerPrefix, initializers, Markers.EMPTY),
+                null
+        );
+    }
+
+    // ------------------------------------------------------------------ calls
+
+    @Override
+    public J visitCallNode(Nodes.CallNode node) {
+        String name = str(node.name);
+
+        if (name.equals("[]") && node.receiver != null) {
+            Space prefix = prefix(node);
+            return arrayAccess(prefix, node.receiver,
+                    node.arguments == null ? new Nodes.Node[0] : node.arguments.arguments);
+        }
+        if (name.equals("[]=") && node.receiver != null && node.arguments != null) {
+            return indexAssignment(node);
+        }
+        if (node.isAttributeWrite() && node.receiver != null && name.endsWith("=") &&
+            node.arguments != null && node.arguments.arguments.length == 1) {
+            return attributeAssignment(node, name);
+        }
+        if (node.isVariableCall() && node.receiver == null && node.arguments == null && node.block == null) {
+            return identifier(node);
+        }
+        if (node.receiver != null && node.arguments == null && node.block == null &&
+            UNARY_OPERATORS.containsKey(name) && node.startOffset < node.receiver.startOffset) {
+            return unary(node, name);
+        }
+        if (node.receiver != null && node.arguments != null && node.arguments.arguments.length == 1 &&
+            node.block == null && isInfixOperator(node, name)) {
+            return binary(node, name);
+        }
+
+        Space prefix = prefix(node);
+        if (node.receiver == null) {
+            J.Identifier methodName = identifier(name);
+            return new J.MethodInvocation(randomId(), prefix, Markers.EMPTY, null, null, methodName,
+                    callArguments(node.arguments, node.block), null);
+        }
+
+        Expression receiver = convertExpression(node.receiver);
+        Space beforeDot = whitespace();
+        Markers markers = Markers.EMPTY;
+        if (skip("&")) {
+            markers = markers.add(new SafeNavigation(randomId()));
+        }
+        if (skip("::")) {
+            markers = markers.add(new Colon2(randomId()));
+        } else {
+            skip(".");
+        }
+
+        J.Identifier methodName = identifier(name);
+        if (name.equals("new")) {
+            return new J.NewClass(
+                    randomId(),
+                    prefix,
+                    markers,
+                    padRight(new J.Empty(randomId(), EMPTY, markers), beforeDot),
+                    methodName.getPrefix(),
+                    asTypeTree(receiver),
+                    callArguments(node.arguments, node.block),
+                    null,
+                    null
+            );
+        }
+        return new J.MethodInvocation(randomId(), prefix, markers, padRight(receiver, beforeDot),
+                null, methodName, callArguments(node.arguments, node.block), null);
+    }
+
+    @Override
+    public J visitCallTargetNode(Nodes.CallTargetNode node) {
+        Space prefix = prefix(node);
+        Expression receiver = convertExpression(node.receiver);
+        Space beforeDot = whitespace();
+        Markers markers = Markers.EMPTY;
+        if (skip("&")) {
+            markers = markers.add(new SafeNavigation(randomId()));
+        }
+        skip(".");
+        String name = str(node.name);
+        return new J.FieldAccess(randomId(), prefix, markers, receiver,
+                padLeft(beforeDot, identifier(name.endsWith("=") ?
+                        name.substring(0, name.length() - 1) : name)), null);
+    }
+
+    @Override
+    public J visitIndexTargetNode(Nodes.IndexTargetNode node) {
+        Space prefix = prefix(node);
+        return arrayAccess(prefix, node.receiver,
+                node.arguments == null ? new Nodes.Node[0] : node.arguments.arguments);
+    }
+
+    @Override
+    public J visitMatchWriteNode(Nodes.MatchWriteNode node) {
+        return convert(node.call);
+    }
+
+    private J.ArrayAccess arrayAccess(Space prefix, Nodes.Node receiverNode, Nodes.Node[] indexNodes) {
+        Expression receiver = convertExpression(receiverNode);
+        Space beforeBracket = sourceBefore("[");
+        Expression index = index(indexNodes);
+        return new J.ArrayAccess(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                receiver,
+                new J.ArrayDimension(randomId(), beforeBracket, Markers.EMPTY,
+                        padRight(index, sourceBefore("]"))),
+                null
+        );
+    }
+
+    private Expression index(Nodes.Node[] indexNodes) {
+        if (indexNodes.length == 0) {
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
+        if (indexNodes.length == 1) {
+            return convertExpression(indexNodes[0]);
+        }
+        if (indexNodes.length == 2) {
+            Expression start = convertExpression(indexNodes[0]);
+            return new Rb.SubArrayIndex(randomId(), start.getPrefix(), Markers.EMPTY,
+                    start.withPrefix(EMPTY),
+                    padLeft(sourceBefore(","), convertExpression(indexNodes[1])));
+        }
+        List<JRightPadded<Expression>> elements = new ArrayList<>(indexNodes.length);
+        for (int i = 0; i < indexNodes.length; i++) {
+            elements.add(padRight(convertExpression(indexNodes[i]),
+                    i == indexNodes.length - 1 ? EMPTY : sourceBefore(",")));
+        }
+        return new Rb.Array(randomId(), EMPTY, Markers.EMPTY,
+                JContainer.build(EMPTY, elements, Markers.EMPTY.add(new OmitParentheses(randomId()))),
+                null);
+    }
+
+    private J indexAssignment(Nodes.CallNode node) {
+        Space prefix = prefix(node);
+        Nodes.Node[] all = node.arguments.arguments;
+        Nodes.Node[] indexes = Arrays.copyOf(all, all.length - 1);
+        J.ArrayAccess access = arrayAccess(EMPTY, node.receiver, indexes);
+        return new J.Assignment(randomId(), prefix, Markers.EMPTY, access,
+                padLeft(sourceBefore("="), convertExpression(all[all.length - 1])), null);
+    }
+
+    private J attributeAssignment(Nodes.CallNode node, String name) {
+        Space prefix = prefix(node);
+        Expression receiver = convertExpression(node.receiver);
+        Space beforeDot = whitespace();
+        Markers markers = Markers.EMPTY;
+        if (skip("&")) {
+            markers = markers.add(new SafeNavigation(randomId()));
+        }
+        skip(".");
+        J.FieldAccess field = new J.FieldAccess(randomId(), EMPTY, markers, receiver,
+                padLeft(beforeDot, identifier(name.substring(0, name.length() - 1))), null);
+        return new J.Assignment(randomId(), prefix, Markers.EMPTY, field,
+                padLeft(sourceBefore("="), convertExpression(node.arguments.arguments[0])), null);
+    }
+
+    // ------------------------------------------------------------------ operators
+
+    private static final Map<String, J.Unary.Type> UNARY_OPERATORS = new HashMap<>();
+
+    static {
+        UNARY_OPERATORS.put("!", J.Unary.Type.Not);
+        UNARY_OPERATORS.put("~", J.Unary.Type.Complement);
+        UNARY_OPERATORS.put("-@", J.Unary.Type.Negative);
+        UNARY_OPERATORS.put("+@", J.Unary.Type.Positive);
+    }
+
+    private J unary(Nodes.CallNode node, String name) {
+        Space prefix = prefix(node);
+        String operator = name.endsWith("@") ? name.substring(0, name.length() - 1) : name;
+        Markers markers = Markers.EMPTY;
+        if (operator.equals("!") && peekKeyword("not")) {
+            operator = "not";
+            markers = markers.add(new EnglishOperator(randomId()));
+        }
+        return new J.Unary(randomId(), prefix, markers,
+                padLeft(sourceBefore(operator), UNARY_OPERATORS.get(name)),
+                convertExpression(node.receiver), null);
+    }
+
+    private boolean isInfixOperator(Nodes.CallNode node, String name) {
+        if (!BINARY_OPERATORS.containsKey(name) && !RUBY_BINARY_OPERATORS.containsKey(name)) {
+            return false;
+        }
+        // `a.+(b)` is a method call written with a dot, not an infix expression
+        int at = indexOfNextNonWhitespace(charEnd(node.receiver));
+        return source.startsWith(name, at);
+    }
+
+    private J binary(Nodes.CallNode node, String name) {
+        Space prefix = prefix(node);
+        Expression left = convertExpression(node.receiver);
+        Space beforeOperator = sourceBefore(name);
+        Nodes.Node right = node.arguments.arguments[0];
+        J.Binary.Type javaType = BINARY_OPERATORS.get(name);
+        if (javaType != null) {
+            return new J.Binary(randomId(), prefix, Markers.EMPTY, left,
+                    padLeft(beforeOperator, javaType), convertExpression(right), null);
+        }
+        return new Rb.Binary(randomId(), prefix, Markers.EMPTY, left,
+                padLeft(beforeOperator, RUBY_BINARY_OPERATORS.get(name)), convertExpression(right), null);
+    }
+
+    private static final Map<String, J.Binary.Type> BINARY_OPERATORS = new HashMap<>();
+    private static final Map<String, Rb.Binary.Type> RUBY_BINARY_OPERATORS = new HashMap<>();
+
+    static {
+        BINARY_OPERATORS.put("+", J.Binary.Type.Addition);
+        BINARY_OPERATORS.put("-", J.Binary.Type.Subtraction);
+        BINARY_OPERATORS.put("*", J.Binary.Type.Multiplication);
+        BINARY_OPERATORS.put("/", J.Binary.Type.Division);
+        BINARY_OPERATORS.put("%", J.Binary.Type.Modulo);
+        BINARY_OPERATORS.put(">>", J.Binary.Type.RightShift);
+        BINARY_OPERATORS.put("<<", J.Binary.Type.LeftShift);
+        BINARY_OPERATORS.put("&", J.Binary.Type.BitAnd);
+        BINARY_OPERATORS.put("|", J.Binary.Type.BitOr);
+        BINARY_OPERATORS.put("^", J.Binary.Type.BitXor);
+        BINARY_OPERATORS.put("==", J.Binary.Type.Equal);
+        BINARY_OPERATORS.put("!=", J.Binary.Type.NotEqual);
+        BINARY_OPERATORS.put("<", J.Binary.Type.LessThan);
+        BINARY_OPERATORS.put("<=", J.Binary.Type.LessThanOrEqual);
+        BINARY_OPERATORS.put(">", J.Binary.Type.GreaterThan);
+        BINARY_OPERATORS.put(">=", J.Binary.Type.GreaterThanOrEqual);
+
+        RUBY_BINARY_OPERATORS.put("**", Rb.Binary.Type.Exponentiation);
+        RUBY_BINARY_OPERATORS.put("===", Rb.Binary.Type.Within);
+        RUBY_BINARY_OPERATORS.put("<=>", Rb.Binary.Type.Comparison);
+        RUBY_BINARY_OPERATORS.put("=~", Rb.Binary.Type.Match);
+    }
+
+    @Override
+    public J visitAndNode(Nodes.AndNode node) {
+        return logical(node, node.left, node.right, J.Binary.Type.And, "&&", "and");
+    }
+
+    @Override
+    public J visitOrNode(Nodes.OrNode node) {
+        return logical(node, node.left, node.right, J.Binary.Type.Or, "||", "or");
+    }
+
+    private J logical(Nodes.Node node, Nodes.Node left, Nodes.Node right, J.Binary.Type type,
+                      String symbolic, String english) {
+        Space prefix = prefix(node);
+        Expression leftExpr = convertExpression(left);
+        Space beforeOperator = whitespace();
+        boolean isEnglish = !source.startsWith(symbolic, cursor);
+        skip(isEnglish ? english : symbolic);
+        return new J.Binary(
+                randomId(),
+                prefix,
+                isEnglish ? Markers.EMPTY.add(new EnglishOperator(randomId())) : Markers.EMPTY,
+                leftExpr,
+                padLeft(beforeOperator, type),
+                convertExpression(right),
+                null
+        );
+    }
+
+    @Override
+    public J visitRangeNode(Nodes.RangeNode node) {
+        return range(node, node.left, node.right, node.isExcludeEnd() ?
+                Rb.Binary.Type.RangeExclusive : Rb.Binary.Type.RangeInclusive);
+    }
+
+    @Override
+    public J visitFlipFlopNode(Nodes.FlipFlopNode node) {
+        return range(node, node.left, node.right, node.isExcludeEnd() ?
+                Rb.Binary.Type.FlipFlopExclusive : Rb.Binary.Type.FlipFlopInclusive);
+    }
+
+    private J range(Nodes.Node node, Nodes.@Nullable Node left, Nodes.@Nullable Node right,
+                    Rb.Binary.Type type) {
+        Space prefix = prefix(node);
+        Expression leftExpr = left == null ?
+                new J.Empty(randomId(), EMPTY, Markers.EMPTY) : convertExpression(left);
+        Space beforeOperator = whitespace();
+        boolean exclusive = type == Rb.Binary.Type.RangeExclusive ||
+                            type == Rb.Binary.Type.FlipFlopExclusive;
+        skip(exclusive ? "..." : "..");
+        Expression rightExpr = right == null ?
+                new J.Empty(randomId(), EMPTY, Markers.EMPTY) : convertExpression(right);
+        return new Rb.Binary(randomId(), prefix, Markers.EMPTY, leftExpr,
+                padLeft(beforeOperator, type), rightExpr, null);
+    }
+
+    @Override
+    public J visitDefinedNode(Nodes.DefinedNode node) {
+        Space prefix = prefix(node);
+        skip("defined?");
+        // Prism models no node for the optional parentheses around the operand
+        Space beforeValue = whitespace();
+        Expression value;
+        if (skip("(")) {
+            value = new J.Parentheses<>(randomId(), beforeValue, Markers.EMPTY,
+                    padRight(convertExpression(node.value), sourceBefore(")")));
+        } else {
+            value = convertExpression(node.value).withPrefix(beforeValue);
+        }
+        return new Rb.Unary(randomId(), prefix, Markers.EMPTY, Rb.Unary.Type.Defined, value);
+    }
+
+    @Override
+    public J visitParenthesesNode(Nodes.ParenthesesNode node) {
+        Space prefix = prefix(node);
+        skip("(");
+        J body = node.body == null ?
+                new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                node.body instanceof Nodes.StatementsNode ?
+                        bodyStatement((Nodes.StatementsNode) node.body) :
+                        convert(node.body);
+        return new J.Parentheses<>(randomId(), prefix, Markers.EMPTY, padRight(body, sourceBefore(")")));
+    }
+
+    // ------------------------------------------------------------------ argument lists
+
+    /**
+     * @param block Either a {@code BlockArgumentNode} ({@code &b}, printed inside the parentheses)
+     *              or a {@code BlockNode} ({@code do...end} / <code>{...}</code>, printed after
+     *              them). The printer pulls a trailing {@link Rb.Block} back out of the container.
+     */
+    private JContainer<Expression> callArguments(Nodes.@Nullable ArgumentsNode arguments,
+                                                 Nodes.@Nullable Node block) {
+        List<Nodes.Node> args = new ArrayList<>();
+        if (arguments != null) {
+            Collections.addAll(args, arguments.arguments);
+        }
+        if (block instanceof Nodes.BlockArgumentNode) {
+            args.add(block);
+        }
+        Nodes.Node trailingBlock = block instanceof Nodes.BlockNode ? block : null;
+
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        AtomicReference<Boolean> parenthesized = new AtomicReference<>(Boolean.FALSE);
+
+        Optional<JContainer<Expression>> built = peekWhitespace(0, (n, prefix) -> {
+            // A `(` that starts exactly where the arguments start belongs to the first argument
+            // (`print ("x")`), not to the call.
+            boolean parens = source.startsWith("(", cursor) &&
+                             (arguments == null || cursor < charStart(arguments));
+            if (parens) {
+                skip("(");
+                parenthesized.set(Boolean.TRUE);
+            } else {
+                markers.set(markers.get().add(new OmitParentheses(randomId())));
+            }
+
+            List<JRightPadded<Expression>> mapped = new ArrayList<>(args.size());
+            for (int i = 0; i < args.size(); i++) {
+                Expression arg = convertExpression(args.get(i));
+                mapped.add(padRight(arg, i == args.size() - 1 ?
+                        maybeTrailingComma(markers, parens ? ")" : null) : sourceBefore(",")));
+            }
+
+            if (mapped.isEmpty()) {
+                if (!parens) {
+                    if (trailingBlock == null) {
+                        return null;
+                    }
+                } else {
+                    mapped = new ArrayList<>(singletonList(padRight(
+                            (Expression) new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(")"))));
+                }
+            }
+
+            if (trailingBlock != null) {
+                mapped.add(padRight((Expression) convert(trailingBlock), EMPTY));
+            }
+
+            return JContainer.build(prefix, mapped, markers.get());
+        });
+
+        return built.orElseGet(() -> JContainer.<Expression>empty().withMarkers(markers.get()));
+    }
+
+    @Override
+    public J visitBlockArgumentNode(Nodes.BlockArgumentNode node) {
+        Space prefix = prefix(node);
+        skip("&");
+        return new Rb.BlockArgument(randomId(), prefix, Markers.EMPTY,
+                node.expression == null ?
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                        convertExpression(node.expression));
+    }
+
+    @Override
+    public J visitForwardingArgumentsNode(Nodes.ForwardingArgumentsNode node) {
+        return identifier(node);
+    }
+
+    @Override
+    public J visitBlockNode(Nodes.BlockNode node) {
+        Space prefix = prefix(node);
+        boolean inline = source.charAt(cursor) == '{';
+        skip(inline ? "{" : "do");
+
+        JContainer<J> parameters = node.parameters == null ? null : blockParameters(node.parameters);
+        J.Block body = new J.Block(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(false),
+                bodyStatements(node.body), sourceBefore(inline ? "}" : "end"));
+
+        return new Rb.Block(randomId(), prefix, Markers.EMPTY, inline, parameters, body);
+    }
+
+    private JContainer<J> blockParameters(Nodes.Node parameters) {
+        Space before = whitespace();
+        boolean pipes = source.charAt(cursor) == '|';
+        skip(pipes ? "|" : "(");
+        List<Nodes.Node> params = new ArrayList<>();
+        if (parameters instanceof Nodes.BlockParametersNode) {
+            Nodes.BlockParametersNode block = (Nodes.BlockParametersNode) parameters;
+            if (block.parameters != null) {
+                collectParameters(block.parameters, params);
+            }
+            Collections.addAll(params, block.locals);
+        } else if (parameters instanceof Nodes.ParametersNode) {
+            collectParameters((Nodes.ParametersNode) parameters, params);
+        } else {
+            params.add(parameters);
+        }
+
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        List<JRightPadded<J>> mapped = new ArrayList<>(params.size());
+        for (int i = 0; i < params.size(); i++) {
+            J param = parameter(params.get(i));
+            mapped.add(padRight(param, i == params.size() - 1 ?
+                    maybeTrailingComma(markers, pipes ? "|" : ")") : sourceBefore(",")));
+        }
+        if (mapped.isEmpty()) {
+            mapped = singletonList(padRight((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY),
+                    sourceBefore(pipes ? "|" : ")")));
+        }
+        return JContainer.build(before, mapped, markers.get());
+    }
+
+    @Override
+    public J visitLambdaNode(Nodes.LambdaNode node) {
+        Space prefix = prefix(node);
+        skip("->");
+        Space parametersPrefix = whitespace();
+        List<JRightPadded<J>> params = node.parameters == null ?
+                emptyList() : blockParameters(node.parameters).getPadding().getElements();
+        return new J.Lambda(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                new J.Lambda.Parameters(randomId(), parametersPrefix, Markers.EMPTY, true, params),
+                EMPTY,
+                new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, JRightPadded.build(false),
+                        bodyStatements(node.body), sourceBefore("}")),
+                null
+        );
+    }
+
+    // ------------------------------------------------------------------ arrays and hashes
+
+    @Override
+    public J visitArrayNode(Nodes.ArrayNode node) {
+        Space prefix = prefix(node);
+        String delimiter = source.charAt(cursor) == '%' ? readDelimiter(cursor) : null;
+        if (delimiter != null) {
+            skip(delimiter);
+            int closing = charEnd(node) - StringUtils.endDelimiter(delimiter).length();
+            List<JRightPadded<Expression>> elements = new ArrayList<>(node.elements.length);
+            for (int i = 0; i < node.elements.length; i++) {
+                Expression element = delimitedArrayElement(node.elements[i]);
+                elements.add(padRight(element, prefixTo(i == node.elements.length - 1 ?
+                        closing : charStart(node.elements[i + 1]))));
+            }
+            cursor = charEnd(node);
+            return new Rb.DelimitedArray(randomId(), prefix, Markers.EMPTY, delimiter,
+                    JContainer.build(EMPTY, elements, Markers.EMPTY), null);
+        }
+        return array(prefix, node.elements);
+    }
+
+    /**
+     * Inside {@code %w}/{@code %i} literals the elements have no delimiters of their own, so they
+     * are read from their exact spans rather than by scanning for a delimiter.
+     */
+    private Expression delimitedArrayElement(Nodes.Node element) {
+        Space prefix = prefixTo(charStart(element));
+        if (element instanceof Nodes.StringNode) {
+            String valueSource = text(element);
+            cursor = charEnd(element);
+            return new J.Literal(randomId(), prefix, Markers.EMPTY,
+                    str(((Nodes.StringNode) element).unescaped), valueSource, null,
+                    JavaType.Primitive.String);
+        }
+        if (element instanceof Nodes.SymbolNode) {
+            String name = text(element);
+            cursor = charEnd(element);
+            return new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), name, null, null);
+        }
+        Nodes.Node[] parts = element instanceof Nodes.InterpolatedSymbolNode ?
+                ((Nodes.InterpolatedSymbolNode) element).parts :
+                element instanceof Nodes.InterpolatedStringNode ?
+                        ((Nodes.InterpolatedStringNode) element).parts : null;
+        if (parts != null) {
+            List<JRightPadded<J>> converted = new ArrayList<>(parts.length);
+            for (Nodes.Node part : parts) {
+                converted.add(padRight(interpolatedPart(part), EMPTY));
+            }
+            cursor = charEnd(element);
+            return new Rb.ComplexString(randomId(), prefix, Markers.EMPTY, "",
+                    JContainer.build(converted), emptyList());
+        }
+        return convertExpression(element).withPrefix(prefix);
+    }
+
+    private Rb.Array array(Space prefix, Nodes.Node[] elements) {
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        Space before = whitespace();
+        boolean brackets = source.startsWith("[", cursor);
+        if (brackets) {
+            skip("[");
+        } else {
+            markers.set(markers.get().add(new OmitParentheses(randomId())));
+        }
+        List<JRightPadded<Expression>> mapped = new ArrayList<>(elements.length);
+        for (int i = 0; i < elements.length; i++) {
+            mapped.add(padRight(convertExpression(elements[i]), i == elements.length - 1 ?
+                    maybeTrailingComma(markers, brackets ? "]" : null) : sourceBefore(",")));
+        }
+        if (mapped.isEmpty() && brackets) {
+            mapped = singletonList(padRight((Expression) new J.Empty(randomId(), EMPTY, Markers.EMPTY),
+                    sourceBefore("]")));
+        }
+        return new Rb.Array(randomId(), prefix, Markers.EMPTY,
+                JContainer.build(before, mapped, markers.get()), null);
+    }
+
+    @Override
+    public J visitSplatNode(Nodes.SplatNode node) {
+        Space prefix = prefix(node);
+        skip("*");
+        return new Rb.Splat(randomId(), prefix, Markers.EMPTY,
+                node.expression == null ?
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                        convertExpression(node.expression));
+    }
+
+    @Override
+    public J visitImplicitRestNode(Nodes.ImplicitRestNode node) {
+        return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+    }
+
+    @Override
+    public J visitImplicitNode(Nodes.ImplicitNode node) {
+        // `{x:}` and `in {x:}` both elide the value; nothing is printed for it
+        return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+    }
+
+    @Override
+    public J visitHashNode(Nodes.HashNode node) {
+        return hash(prefix(node), node.elements, null);
+    }
+
+    @Override
+    public J visitKeywordHashNode(Nodes.KeywordHashNode node) {
+        if (node.elements.length == 1 && node.elements[0] instanceof Nodes.AssocSplatNode) {
+            return convert(node.elements[0]);
+        }
+        return hash(prefix(node), node.elements, null);
+    }
+
+    @Override
+    public J visitAssocSplatNode(Nodes.AssocSplatNode node) {
+        Space prefix = prefix(node);
+        skip("**");
+        return convertExpression(node.value)
+                .withPrefix(prefix)
+                .withMarkers(Markers.EMPTY.add(new KeywordRestArgument(randomId())));
+    }
+
+    private Rb.Hash hash(Space prefix, Nodes.Node[] elements, Nodes.@Nullable Node rest) {
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        Space before = whitespace();
+        boolean braces = source.startsWith("{", cursor);
+        Markers hashMarkers = Markers.EMPTY;
+        if (braces) {
+            skip("{");
+        } else {
+            hashMarkers = hashMarkers.add(new OmitParentheses(randomId()));
+        }
+
+        List<Nodes.Node> all = new ArrayList<>(Arrays.asList(elements));
+        if (rest != null) {
+            all.add(rest);
+        }
+
+        List<JRightPadded<Expression>> pairs = new ArrayList<>(all.size());
+        for (int i = 0; i < all.size(); i++) {
+            Expression pair = all.get(i) instanceof Nodes.AssocNode ?
+                    keyValue((Nodes.AssocNode) all.get(i)) :
+                    convertExpression(all.get(i));
+            pairs.add(padRight(pair, i == all.size() - 1 ?
+                    maybeTrailingComma(markers, braces ? "}" : null) : sourceBefore(",")));
+        }
+        if (pairs.isEmpty()) {
+            pairs = singletonList(padRight((Expression) new J.Empty(randomId(), EMPTY, Markers.EMPTY),
+                    braces ? sourceBefore("}") : EMPTY));
+        }
+
+        return new Rb.Hash(randomId(), prefix, hashMarkers,
+                JContainer.build(before, pairs, markers.get()), null);
+    }
+
+    private Rb.Hash.KeyValue keyValue(Nodes.AssocNode node) {
+        Space prefix = prefix(node);
+        boolean label = node.key instanceof Nodes.SymbolNode && text(node.key).endsWith(":");
+        Expression key = label ?
+                symbol((Nodes.SymbolNode) node.key, true) :
+                convertExpression(node.key);
+        Space separatorPrefix = whitespace();
+        Rb.Hash.KeyValue.Separator separator;
+        if (label) {
+            skip(":");
+            separator = Rb.Hash.KeyValue.Separator.Colon;
+        } else {
+            skip("=>");
+            separator = Rb.Hash.KeyValue.Separator.Rocket;
+        }
+        return new Rb.Hash.KeyValue(randomId(), prefix, Markers.EMPTY, key,
+                padLeft(separatorPrefix, separator), convertExpression(node.value), null);
+    }
+
+    // ------------------------------------------------------------------ control flow
+
+    @Override
+    public J visitIfNode(Nodes.IfNode node) {
+        Space prefix = whitespace();
+        if (peekKeyword("if")) {
+            return conditional(node.predicate, node.statements, node.subsequent, "if", Markers.EMPTY)
+                    .withPrefix(prefix);
+        }
+        if (node.subsequent instanceof Nodes.ElseNode) {
+            return ternary(node).withPrefix(prefix);
+        }
+        return modifier(node.predicate, node.statements, "if", Markers.EMPTY).withPrefix(prefix);
+    }
+
+    @Override
+    public J visitUnlessNode(Nodes.UnlessNode node) {
+        Space prefix = whitespace();
+        Markers markers = Markers.EMPTY.add(new Unless(randomId()));
+        if (peekKeyword("unless")) {
+            return conditional(node.predicate, node.statements, node.else_clause, "unless", markers)
+                    .withPrefix(prefix);
+        }
+        return modifier(node.predicate, node.statements, "unless", markers).withPrefix(prefix);
+    }
+
+    private J.Ternary ternary(Nodes.IfNode node) {
+        return new J.Ternary(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                convertExpression(node.predicate),
+                padLeft(sourceBefore("?"), (Expression) bodyStatement(node.statements)),
+                padLeft(sourceBefore(":"),
+                        (Expression) bodyStatement(((Nodes.ElseNode) node.subsequent).statements)),
+                null
+        );
+    }
+
+    private J.If modifier(Nodes.Node predicate, Nodes.@Nullable StatementsNode statements,
+                          String keyword, Markers markers) {
+        Statement then = bodyStatement(statements);
+        JRightPadded<Statement> thenPart = padRight(then, whitespace());
+        skip(keyword);
+        Space conditionPrefix = whitespace();
+        return new J.If(
+                randomId(),
+                EMPTY,
+                markers.add(new IfModifier(randomId())),
+                new J.ControlParentheses<>(randomId(), conditionPrefix, Markers.EMPTY,
+                        padRight(convertExpression(predicate), EMPTY)),
+                thenPart,
+                null
+        );
+    }
+
+    private J.If conditional(Nodes.Node predicate, Nodes.@Nullable StatementsNode statements,
+                             Nodes.@Nullable Node subsequent, String keyword, Markers markers) {
+        skip(keyword);
+        Space conditionPrefix = whitespace();
+        Expression condition = convertExpression(predicate);
+        boolean explicitThen = source.startsWith("then", indexOfNextNonWhitespace(cursor));
+        J.ControlParentheses<Expression> control = new J.ControlParentheses<>(
+                randomId(),
+                conditionPrefix,
+                explicitThen ? Markers.EMPTY.add(new ExplicitThen(randomId())) : Markers.EMPTY,
+                padRight(condition, explicitThen ? sourceBefore("then") : EMPTY)
+        );
+
+        Statement then = bodyStatement(statements);
+        J.If.Else anElse = null;
+        JRightPadded<Statement> thenPart;
+        if (subsequent == null) {
+            thenPart = padRight(then, sourceBefore("end"));
+        } else {
+            thenPart = padRight(then, EMPTY);
+            Space elsePrefix = whitespace();
+            if (subsequent instanceof Nodes.IfNode) {
+                skip("els");
+                anElse = new J.If.Else(randomId(), elsePrefix, Markers.EMPTY,
+                        padRight(convertStatement(subsequent), EMPTY));
+            } else {
+                skip("else");
+                anElse = new J.If.Else(randomId(), elsePrefix, Markers.EMPTY,
+                        padRight(bodyStatement(((Nodes.ElseNode) subsequent).statements),
+                                sourceBefore("end")));
+            }
+        }
+        return new J.If(randomId(), EMPTY, markers, control, thenPart, anElse);
+    }
+
+    @Override
+    public J visitWhileNode(Nodes.WhileNode node) {
+        return loop(node, node.predicate, node.statements, Markers.EMPTY, "while");
+    }
+
+    @Override
+    public J visitUntilNode(Nodes.UntilNode node) {
+        return loop(node, node.predicate, node.statements, Markers.EMPTY.add(new Until(randomId())), "until");
+    }
+
+    private J loop(Nodes.Node node, Nodes.Node predicate, Nodes.@Nullable StatementsNode statements,
+                   Markers markers, String keyword) {
+        Space prefix = prefix(node);
+        boolean isModifier = statements != null && charStart(statements) == charStart(node);
+        if (!isModifier) {
+            skip(keyword);
+            Space conditionPrefix = whitespace();
+            Expression condition = convertExpression(predicate);
+            boolean explicitDo = peekKeywordAt("do", indexOfNextNonWhitespace(cursor));
+            return new J.WhileLoop(
+                    randomId(),
+                    prefix,
+                    markers,
+                    new J.ControlParentheses<>(randomId(), conditionPrefix,
+                            explicitDo ? Markers.EMPTY.add(new ExplicitDo(randomId())) : Markers.EMPTY,
+                            padRight(condition, explicitDo ? sourceBefore("do") : EMPTY)),
+                    padRight(bodyStatement(statements), sourceBefore("end"))
+            );
+        }
+        JRightPadded<Statement> body = padRight(bodyStatement(statements), whitespace());
+        skip(keyword);
+        Space conditionPrefix = whitespace();
+        return new J.WhileLoop(
+                randomId(),
+                prefix,
+                markers.add(new WhileModifier(randomId())),
+                new J.ControlParentheses<>(randomId(), conditionPrefix, Markers.EMPTY,
+                        padRight(convertExpression(predicate), EMPTY)),
+                body
+        );
+    }
+
+    @Override
+    public J visitForNode(Nodes.ForNode node) {
+        Space prefix = prefix(node);
+        skip("for");
+        Expression index = convertExpression(node.index);
+        JRightPadded<Statement> variable = padRight(variableDeclaration(index), sourceBefore("in"));
+        JRightPadded<Expression> iterable = padRight(convertExpression(node.collection), whitespace());
+        return new J.ForEachLoop(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                new J.ForEachLoop.Control(randomId(), EMPTY, Markers.EMPTY, variable, iterable),
+                padRight(bodyStatement(node.statements), sourceBefore("end"))
+        );
+    }
+
+    private J.VariableDeclarations variableDeclaration(Expression name) {
+        return new J.VariableDeclarations(
+                randomId(),
+                name.getPrefix(),
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
+                        randomId(), EMPTY, Markers.EMPTY, name.withPrefix(EMPTY), emptyList(), null, null
+                ), EMPTY))
+        );
+    }
+
+    @Override
+    public J visitBreakNode(Nodes.BreakNode node) {
+        Space prefix = prefix(node);
+        skip("break");
+        return new Rb.Break(randomId(), prefix, Markers.EMPTY,
+                new J.Break(randomId(), EMPTY, Markers.EMPTY, null), argumentValue(node.arguments));
+    }
+
+    @Override
+    public J visitNextNode(Nodes.NextNode node) {
+        Space prefix = prefix(node);
+        skip("next");
+        return new Rb.Next(randomId(), prefix, Markers.EMPTY,
+                new J.Continue(randomId(), EMPTY, Markers.EMPTY, null), argumentValue(node.arguments));
+    }
+
+    private Expression argumentValue(Nodes.@Nullable ArgumentsNode arguments) {
+        if (arguments == null || arguments.arguments.length == 0) {
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
+        if (arguments.arguments.length == 1) {
+            return convertExpression(arguments.arguments[0]);
+        }
+        return array(whitespace(), arguments.arguments);
+    }
+
+    @Override
+    public J visitRedoNode(Nodes.RedoNode node) {
+        Space prefix = prefix(node);
+        skip("redo");
+        return new Rb.Redo(randomId(), prefix, Markers.EMPTY);
+    }
+
+    @Override
+    public J visitRetryNode(Nodes.RetryNode node) {
+        Space prefix = prefix(node);
+        skip("retry");
+        return new Rb.Retry(randomId(), prefix, Markers.EMPTY);
+    }
+
+    @Override
+    public J visitReturnNode(Nodes.ReturnNode node) {
+        Space prefix = prefix(node);
+        skip("return");
+        return new J.Return(randomId(), prefix, Markers.EMPTY, argumentValue(node.arguments));
+    }
+
+    @Override
+    public J visitYieldNode(Nodes.YieldNode node) {
+        Space prefix = prefix(node);
+        skip("yield");
+        //noinspection unchecked
+        return new Rb.Yield(randomId(), prefix, Markers.EMPTY,
+                (JContainer<Statement>) (JContainer<?>) callArguments(node.arguments, null));
+    }
+
+    @Override
+    public J visitSuperNode(Nodes.SuperNode node) {
+        Space prefix = prefix(node);
+        J.Identifier name = identifier("super");
+        return new J.MethodInvocation(randomId(), prefix, Markers.EMPTY, null, null, name,
+                callArguments(node.arguments, node.block), null);
+    }
+
+    @Override
+    public J visitForwardingSuperNode(Nodes.ForwardingSuperNode node) {
+        Space prefix = prefix(node);
+        J.Identifier name = identifier("super");
+        return new J.MethodInvocation(randomId(), prefix, Markers.EMPTY, null, null, name,
+                callArguments(null, node.block), null);
+    }
+
+    @Override
+    public J visitPreExecutionNode(Nodes.PreExecutionNode node) {
+        Space prefix = prefix(node);
+        skip("BEGIN");
+        return new Rb.PreExecution(randomId(), prefix, Markers.EMPTY, braceBlock(node.statements));
+    }
+
+    @Override
+    public J visitPostExecutionNode(Nodes.PostExecutionNode node) {
+        Space prefix = prefix(node);
+        skip("END");
+        return new Rb.PostExecution(randomId(), prefix, Markers.EMPTY, braceBlock(node.statements));
+    }
+
+    private J.Block braceBlock(Nodes.@Nullable StatementsNode statements) {
+        Space prefix = sourceBefore("{");
+        return new J.Block(randomId(), prefix, Markers.EMPTY, JRightPadded.build(false),
+                statements(statements), sourceBefore("}"));
+    }
+
+    @Override
+    public J visitBeginNode(Nodes.BeginNode node) {
+        if (node.rescue_clause == null && node.else_clause == null && node.ensure_clause == null) {
+            Space prefix = whitespace();
+            skip("begin");
+            return new Rb.Begin(randomId(), prefix, Markers.EMPTY,
+                    new J.Block(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(false),
+                            statements(node.statements), sourceBefore("end")));
+        }
+        return rescue(node);
+    }
+
+    private J rescue(Nodes.BeginNode node) {
+        Space prefix = whitespace();
+        boolean explicitBegin = skip("begin");
+        Space tryPrefix = whitespace();
+
+        J.Block body = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                statements(node.statements), EMPTY);
+
+        List<J.Try.Catch> catches = new ArrayList<>(2);
+        for (Nodes.RescueNode r = node.rescue_clause; r != null; r = r.subsequent) {
+            catches.add(rescueClause(r));
+        }
+
+        J.Block elseBlock = null;
+        if (node.else_clause != null) {
+            Space elsePrefix = sourceBefore("else");
+            elseBlock = new J.Block(randomId(), elsePrefix, Markers.EMPTY, JRightPadded.build(false),
+                    statements(node.else_clause.statements), EMPTY);
+        }
+
+        Space tail = whitespace();
+        J.Block finallyBlock = null;
+        if (node.ensure_clause != null) {
+            skip("ensure");
+            finallyBlock = new J.Block(randomId(), tail, Markers.EMPTY, JRightPadded.build(false),
+                    statements(node.ensure_clause.statements), sourceBefore("end"));
+        } else {
+            if (elseBlock != null) {
+                elseBlock = elseBlock.withEnd(tail);
+            } else if (!catches.isEmpty()) {
+                catches = ListUtils.mapLast(catches, c -> c.withBody(c.getBody().withEnd(tail)));
+            } else {
+                body = body.withEnd(tail);
+            }
+            if (explicitBegin) {
+                skip("end");
+            }
+        }
+
+        return new Rb.Rescue(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                new J.Try(randomId(), tryPrefix, Markers.EMPTY, JContainer.empty(), body, catches,
+                        finallyBlock == null ? null : padLeft(EMPTY, finallyBlock)),
+                elseBlock
+        );
+    }
+
+    private J.Try.Catch rescueClause(Nodes.RescueNode node) {
+        Space prefix = sourceBefore("rescue");
+        Space typesPrefix = whitespace();
+
+        List<JRightPadded<NameTree>> exceptionTypes = new ArrayList<>(node.exceptions.length);
+        for (int i = 0; i < node.exceptions.length; i++) {
+            NameTree type = asTypeTree(convertExpression(node.exceptions[i]));
+            exceptionTypes.add(padRight(type, i == node.exceptions.length - 1 ? EMPTY : sourceBefore(",")));
+        }
+
+        Space beforeName = whitespace();
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> names = new ArrayList<>(1);
+        Space bodyPrefix = beforeName;
+        if (skip("=>")) {
+            names.add(padRight(new J.VariableDeclarations.NamedVariable(randomId(), beforeName,
+                    Markers.EMPTY, identifier(node.reference), emptyList(), null, null), EMPTY));
+            bodyPrefix = whitespace();
+        }
+
+        TypeTree exceptionType = exceptionTypes.size() == 1 ?
+                (TypeTree) exceptionTypes.get(0).getElement() :
+                new J.MultiCatch(randomId(), EMPTY, Markers.EMPTY, exceptionTypes);
+
+        return new J.Try.Catch(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY, padRight(
+                        new J.VariableDeclarations(randomId(), typesPrefix, Markers.EMPTY, emptyList(),
+                                emptyList(), exceptionType, null, names), EMPTY)),
+                new J.Block(randomId(), bodyPrefix, Markers.EMPTY, JRightPadded.build(false),
+                        statements(node.statements), EMPTY)
+        );
+    }
+
+    // ------------------------------------------------------------------ declarations
+
+    @Override
+    public J visitDefNode(Nodes.DefNode lazy) {
+        Nodes.DefNode node = lazy.isLazy() ? lazy.getNonLazy() : lazy;
+        Space prefix = whitespace();
+        skip("def");
+
+        Expression receiver = null;
+        Space receiverDot = null;
+        if (node.receiver != null) {
+            receiver = convertExpression(node.receiver);
+            receiverDot = sourceBefore(".");
+        }
+
+        J.MethodDeclaration.IdentifierWithAnnotations name =
+                new J.MethodDeclaration.IdentifierWithAnnotations(identifier(str(node.name)), emptyList());
+
+        JContainer<Statement> parameters = methodParameters(node.parameters);
+
+        List<JRightPadded<Statement>> bodyStatements = ListUtils.mapLast(bodyStatements(node.body), statement -> {
+            J element = statement.getElement();
+            if (element instanceof J.Return || !(element instanceof Expression)) {
+                return statement;
+            }
+            return statement.withElement(new J.Return(randomId(), element.getPrefix(),
+                    Markers.EMPTY.add(new ImplicitReturn(randomId())), ((Expression) element).withPrefix(EMPTY)));
+        });
+
+        J.Block body = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                bodyStatements, sourceBefore("end"));
+
+        //noinspection unchecked
+        J.MethodDeclaration method = new J.MethodDeclaration(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                name,
+                parameters,
+                emptyList(),
+                null,
+                body,
+                null,
+                null
+        );
+
+        if (receiver != null) {
+            return new Rb.ClassMethod(randomId(), method.getPrefix(), Markers.EMPTY, receiver,
+                    padLeft(receiverDot, method.withPrefix(EMPTY)));
+        }
+        return method;
+    }
+
+    private JContainer<Statement> methodParameters(Nodes.@Nullable ParametersNode parameters) {
+        List<Nodes.Node> params = new ArrayList<>();
+        if (parameters != null) {
+            collectParameters(parameters, params);
+        }
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        Optional<JContainer<J>> built = peekWhitespace(0, (n, prefix) -> {
+            boolean parens = source.startsWith("(", cursor);
+            if (parens) {
+                skip("(");
+            } else {
+                markers.set(markers.get().add(new OmitParentheses(randomId())));
+            }
+            List<JRightPadded<J>> mapped = new ArrayList<>(params.size());
+            for (int i = 0; i < params.size(); i++) {
+                J param = parameter(params.get(i));
+                if (param instanceof J.Identifier) {
+                    // `...` and other bare names still need to look like declarations
+                    param = variableDeclaration((J.Identifier) param);
+                }
+                mapped.add(padRight(param, i == params.size() - 1 ?
+                        maybeTrailingComma(markers, parens ? ")" : null) : sourceBefore(",")));
+            }
+            if (mapped.isEmpty()) {
+                if (!parens) {
+                    return null;
+                }
+                mapped = singletonList(padRight((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY),
+                        sourceBefore(")")));
+            }
+            return JContainer.build(prefix, mapped, markers.get());
+        });
+        //noinspection unchecked
+        return (JContainer<Statement>) (JContainer<?>) built.orElseGet(
+                () -> JContainer.<J>empty().withMarkers(markers.get()));
+    }
+
+    private void collectParameters(Nodes.ParametersNode parameters, List<Nodes.Node> into) {
+        List<Nodes.Node> collected = new ArrayList<>();
+        Collections.addAll(collected, parameters.requireds);
+        Collections.addAll(collected, parameters.optionals);
+        if (parameters.rest != null) {
+            collected.add(parameters.rest);
+        }
+        Collections.addAll(collected, parameters.posts);
+        Collections.addAll(collected, parameters.keywords);
+        if (parameters.keyword_rest != null) {
+            collected.add(parameters.keyword_rest);
+        }
+        if (parameters.block != null) {
+            collected.add(parameters.block);
+        }
+        collected.removeIf(p -> p instanceof Nodes.ImplicitRestNode);
+        collected.sort(Comparator.comparingInt(p -> p.startOffset));
+        into.addAll(collected);
+    }
+
+    private J parameter(Nodes.Node node) {
+        if (node instanceof Nodes.RequiredParameterNode) {
+            return variableDeclaration(identifier(node));
+        }
+        if (node instanceof Nodes.OptionalParameterNode) {
+            Nodes.OptionalParameterNode optional = (Nodes.OptionalParameterNode) node;
+            Space prefix = prefix(node);
+            J.Identifier name = identifier(str(optional.name));
+            return namedVariable(prefix, Markers.EMPTY, null, name,
+                    padLeft(sourceBefore("="), convertExpression(optional.value)));
+        }
+        if (node instanceof Nodes.RestParameterNode) {
+            Nodes.RestParameterNode rest = (Nodes.RestParameterNode) node;
+            Space prefix = prefix(node);
+            Space varargs = sourceBefore("*");
+            J.Identifier name = identifier(rest.name == null ? "" : str(rest.name));
+            return namedVariable(prefix, Markers.EMPTY, varargs, name, null);
+        }
+        if (node instanceof Nodes.KeywordRestParameterNode) {
+            Nodes.KeywordRestParameterNode rest = (Nodes.KeywordRestParameterNode) node;
+            Space prefix = prefix(node);
+            Space varargs = sourceBefore("**");
+            J.Identifier name = identifier(rest.name == null ? "" : str(rest.name));
+            return namedVariable(prefix, Markers.EMPTY.add(new KeywordRestArgument(randomId())),
+                    varargs, name, null);
+        }
+        if (node instanceof Nodes.RequiredKeywordParameterNode) {
+            Nodes.RequiredKeywordParameterNode kw = (Nodes.RequiredKeywordParameterNode) node;
+            Space prefix = prefix(node);
+            J.Identifier name = identifier(str(kw.name));
+            return namedVariable(prefix, Markers.EMPTY.add(new KeywordArgument(randomId())), null, name,
+                    padLeft(sourceBefore(":"), new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
+        }
+        if (node instanceof Nodes.OptionalKeywordParameterNode) {
+            Nodes.OptionalKeywordParameterNode kw = (Nodes.OptionalKeywordParameterNode) node;
+            Space prefix = prefix(node);
+            J.Identifier name = identifier(str(kw.name));
+            return namedVariable(prefix, Markers.EMPTY.add(new KeywordArgument(randomId())), null, name,
+                    padLeft(sourceBefore(":"), convertExpression(kw.value)));
+        }
+        if (node instanceof Nodes.BlockParameterNode) {
+            Nodes.BlockParameterNode block = (Nodes.BlockParameterNode) node;
+            Space prefix = prefix(node);
+            skip("&");
+            return new Rb.BlockArgument(randomId(), prefix, Markers.EMPTY,
+                    identifier(block.name == null ? "" : str(block.name)));
+        }
+        if (node instanceof Nodes.BlockLocalVariableNode) {
+            return identifier(node);
+        }
+        if (node instanceof Nodes.ForwardingParameterNode || node instanceof Nodes.NoKeywordsParameterNode) {
+            return identifier(node);
+        }
+        return convert(node);
+    }
+
+    private J.VariableDeclarations namedVariable(Space prefix, Markers markers, @Nullable Space varargs,
+                                                 J.Identifier name,
+                                                 @Nullable JLeftPadded<Expression> initializer) {
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix,
+                markers,
+                emptyList(),
+                emptyList(),
+                null,
+                varargs,
+                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
+                        randomId(), EMPTY, Markers.EMPTY, name, emptyList(), initializer, null), EMPTY))
+        );
+    }
+
+    @Override
+    public J visitClassNode(Nodes.ClassNode node) {
+        Space prefix = prefix(node);
+        skip("class");
+        J.Identifier name = identifier(node.constant_path);
+
+        JLeftPadded<TypeTree> extendings = null;
+        if (node.superclass != null) {
+            extendings = padLeft(sourceBefore("<"), convertTypeTree(node.superclass));
+        }
+
+        return new J.ClassDeclaration(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(),
+                new J.ClassDeclaration.Kind(randomId(), EMPTY, Markers.EMPTY, emptyList(),
+                        J.ClassDeclaration.Kind.Type.Class),
+                name,
+                null,
+                null,
+                extendings,
+                null,
+                null,
+                keywordBlock(node.body, "end"),
+                null
+        );
+    }
+
+    @Override
+    public J visitModuleNode(Nodes.ModuleNode node) {
+        Space prefix = prefix(node);
+        skip("module");
+        return new Rb.Module(randomId(), prefix, Markers.EMPTY, identifier(node.constant_path),
+                keywordBlock(node.body, "end"));
+    }
+
+    @Override
+    public J visitSingletonClassNode(Nodes.SingletonClassNode node) {
+        Space prefix = prefix(node);
+        skip("class");
+        return new Rb.OpenEigenclass(randomId(), prefix, Markers.EMPTY,
+                padLeft(sourceBefore("<<"), convertExpression(node.expression)),
+                keywordBlock(node.body, "end"));
+    }
+
+    @Override
+    public J visitAliasMethodNode(Nodes.AliasMethodNode node) {
+        Space prefix = prefix(node);
+        skip("alias");
+        return new Rb.Alias(randomId(), prefix, Markers.EMPTY,
+                aliasName(node.new_name), aliasName(node.old_name));
+    }
+
+    @Override
+    public J visitAliasGlobalVariableNode(Nodes.AliasGlobalVariableNode node) {
+        Space prefix = prefix(node);
+        skip("alias");
+        return new Rb.Alias(randomId(), prefix, Markers.EMPTY,
+                aliasName(node.new_name), aliasName(node.old_name));
+    }
+
+    private Expression aliasName(Nodes.Node node) {
+        return node instanceof Nodes.SymbolNode ? identifier(node) : convertExpression(node);
+    }
+
+    // ------------------------------------------------------------------ case / pattern matching
+
+    @Override
+    public J visitCaseNode(Nodes.CaseNode node) {
+        Space prefix = prefix(node);
+        skip("case");
+        J.ControlParentheses<Expression> selector = new J.ControlParentheses<>(randomId(), EMPTY,
+                Markers.EMPTY, padRight(convertExpression(node.predicate), EMPTY));
+
+        List<JRightPadded<Statement>> cases = new ArrayList<>(node.conditions.length);
+        for (Nodes.WhenNode when : node.conditions) {
+            cases.add(padRight(caseClause(when, when.conditions, when.statements, false), EMPTY));
+        }
+        return switchStatement(prefix, selector, cases, node.else_clause);
+    }
+
+    @Override
+    public J visitCaseMatchNode(Nodes.CaseMatchNode node) {
+        Space prefix = prefix(node);
+        skip("case");
+        J.ControlParentheses<Expression> selector = new J.ControlParentheses<>(randomId(), EMPTY,
+                Markers.EMPTY, padRight(convertExpression(node.predicate), EMPTY));
+
+        List<JRightPadded<Statement>> cases = new ArrayList<>(node.conditions.length);
+        for (Nodes.InNode in : node.conditions) {
+            cases.add(padRight(caseClause(in, new Nodes.Node[]{in.pattern}, in.statements, true), EMPTY));
+        }
+        return switchStatement(prefix, selector, cases, node.else_clause);
+    }
+
+    private J.Switch switchStatement(Space prefix, J.ControlParentheses<Expression> selector,
+                                     List<JRightPadded<Statement>> cases, Nodes.@Nullable ElseNode elseNode) {
+        J.Block caseBlock;
+        if (elseNode == null) {
+            caseBlock = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                    cases, sourceBefore("end"));
+        } else {
+            Space elsePrefix = sourceBefore("else");
+            JContainer<Statement> body = JContainer.build(whitespace(),
+                    statements(elseNode.statements), Markers.EMPTY);
+            cases = ListUtils.concat(cases, padRight((Statement) new J.Case(randomId(), elsePrefix,
+                    Markers.EMPTY, J.Case.Type.Statement, null, null, JContainer.empty(), null, body,
+                    null), EMPTY));
+            caseBlock = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                    cases, sourceBefore("end"));
+        }
+        return new J.Switch(randomId(), prefix, Markers.EMPTY, selector, caseBlock);
+    }
+
+    private J.Case caseClause(Nodes.Node node, Nodes.Node[] labels, Nodes.@Nullable StatementsNode statements,
+                              boolean pattern) {
+        Space prefix = prefix(node);
+        skip(pattern ? "in" : "when");
+        JContainer<J> caseLabels = caseLabels(labels);
+        Markers markers = pattern ? Markers.EMPTY.add(new PatternCase(randomId())) : Markers.EMPTY;
+        JContainer<Statement> body = JContainer.build(whitespace(), statements(statements), Markers.EMPTY);
+        return new J.Case(randomId(), prefix, markers, J.Case.Type.Statement, null, null, caseLabels,
+                null, body, null);
+    }
+
+    private JContainer<J> caseLabels(Nodes.Node[] labels) {
+        Space before = whitespace();
+        List<JRightPadded<J>> mapped = new ArrayList<>(labels.length);
+        for (int i = 0; i < labels.length; i++) {
+            mapped.add(padRight(convert(labels[i]), i == labels.length - 1 ? EMPTY : sourceBefore(",")));
+        }
+        JContainer<J> container = JContainer.build(before, mapped, Markers.EMPTY);
+        return peekWhitespace(container, (c, beforeBody) -> {
+            if (peekKeyword("then")) {
+                skip("then");
+                return c.withMarkers(c.getMarkers().add(new ExplicitThen(randomId())))
+                        .getPadding().withElements(ListUtils.mapLast(c.getPadding().getElements(),
+                                last -> last.withAfter(beforeBody)));
+            }
+            return null;
+        }).orElse(container);
+    }
+
+    @Override
+    public J visitMatchPredicateNode(Nodes.MatchPredicateNode node) {
+        Space prefix = prefix(node);
+        Expression left = convertExpression(node.value);
+        return new Rb.BooleanCheck(randomId(), prefix, Markers.EMPTY, left,
+                inlinePattern(node.pattern, "in", true), null);
+    }
+
+    @Override
+    public J visitMatchRequiredNode(Nodes.MatchRequiredNode node) {
+        Space prefix = prefix(node);
+        Expression left = convertExpression(node.value);
+        return new Rb.RightwardAssignment(randomId(), prefix, Markers.EMPTY, left,
+                inlinePattern(node.pattern, "=>", false), null);
+    }
+
+    private J.Case inlinePattern(Nodes.Node pattern, String keyword, boolean patternCase) {
+        Space prefix = whitespace();
+        skip(keyword);
+        JContainer<J> labels = JContainer.build(whitespace(),
+                singletonList(padRight(convert(pattern), EMPTY)), Markers.EMPTY);
+        Markers markers = patternCase ? Markers.EMPTY.add(new PatternCase(randomId())) : Markers.EMPTY;
+        return new J.Case(randomId(), prefix, markers, J.Case.Type.Statement, null, null, labels, null,
+                JContainer.empty(), null);
+    }
+
+    @Override
+    public J visitArrayPatternNode(Nodes.ArrayPatternNode node) {
+        List<Nodes.Node> elements = new ArrayList<>();
+        Collections.addAll(elements, node.requireds);
+        if (node.rest != null) {
+            elements.add(node.rest);
+        }
+        Collections.addAll(elements, node.posts);
+        return patternWithConstant(node, node.constant, elements.toArray(new Nodes.Node[0]), "[");
+    }
+
+    @Override
+    public J visitFindPatternNode(Nodes.FindPatternNode node) {
+        List<Nodes.Node> elements = new ArrayList<>();
+        if (node.left != null) {
+            elements.add(node.left);
+        }
+        Collections.addAll(elements, node.requireds);
+        if (node.right != null) {
+            elements.add(node.right);
+        }
+        return patternWithConstant(node, node.constant, elements.toArray(new Nodes.Node[0]), "[");
+    }
+
+    private J patternWithConstant(Nodes.Node node, Nodes.@Nullable Node constant, Nodes.Node[] elements,
+                                  String defaultDelimiter) {
+        Space prefix = prefix(node);
+        if (constant == null) {
+            return array(prefix, elements);
+        }
+        Expression constantExpr = convertExpression(constant);
+        Space beforeDelimiter = whitespace();
+        String delimiter = source.substring(cursor, cursor + 1);
+        skip(delimiter);
+        Rb.Array inner = new Rb.Array(randomId(), EMPTY, Markers.EMPTY, patternElements(elements), null);
+        return new Rb.StructPattern(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                constantExpr,
+                delimiter,
+                JContainer.build(beforeDelimiter,
+                        singletonList(padRight((Expression) inner,
+                                sourceBefore(StringUtils.endDelimiter(delimiter)))),
+                        Markers.EMPTY)
+        );
+    }
+
+    private JContainer<Expression> patternElements(Nodes.Node[] elements) {
+        List<JRightPadded<Expression>> mapped = new ArrayList<>(elements.length);
+        for (int i = 0; i < elements.length; i++) {
+            mapped.add(padRight(convertExpression(elements[i]),
+                    i == elements.length - 1 ? EMPTY : sourceBefore(",")));
+        }
+        if (mapped.isEmpty()) {
+            mapped = singletonList(padRight((Expression) new J.Empty(randomId(), EMPTY, Markers.EMPTY), EMPTY));
+        }
+        return JContainer.build(EMPTY, mapped, Markers.EMPTY.add(new OmitParentheses(randomId())));
+    }
+
+    @Override
+    public J visitHashPatternNode(Nodes.HashPatternNode node) {
+        Space prefix = prefix(node);
+        if (node.constant == null) {
+            return hash(prefix, node.elements, node.rest);
+        }
+        Expression constantExpr = convertExpression(node.constant);
+        Space beforeDelimiter = whitespace();
+        String delimiter = source.substring(cursor, cursor + 1);
+        skip(delimiter);
+        Rb.Hash inner = hash(EMPTY, node.elements, node.rest);
+        return new Rb.StructPattern(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                constantExpr,
+                delimiter,
+                JContainer.build(beforeDelimiter,
+                        singletonList(padRight((Expression) inner,
+                                sourceBefore(StringUtils.endDelimiter(delimiter)))),
+                        Markers.EMPTY)
+        );
+    }
+
+    @Override
+    public J visitNoKeywordsParameterNode(Nodes.NoKeywordsParameterNode node) {
+        return identifier(node);
     }
 }
