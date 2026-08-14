@@ -130,4 +130,30 @@ public class HashTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void bracketedConstructorWithTrailingComma() {
+        rewriteRun(
+          ruby(
+            """
+              x = Hash[
+                'a': 1,
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void bracketedConstructorWithoutTrailingComma() {
+        rewriteRun(
+          ruby(
+            """
+              x = Hash[
+                'a': 1
+              ]
+              """
+          )
+        );
+    }
 }

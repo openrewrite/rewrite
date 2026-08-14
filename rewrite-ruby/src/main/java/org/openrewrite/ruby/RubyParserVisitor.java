@@ -1515,13 +1515,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Expression receiver = convertExpression(receiverNode);
         Space beforeBracket = sourceBefore("[");
         Expression index = index(indexNodes);
+        // the `,` of `Hash['a': 1,]` closes the index, not any of the elements inside it
+        AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
+        Space afterIndex = maybeTrailingComma(markers, "]");
         return new J.ArrayAccess(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 receiver,
                 new J.ArrayDimension(randomId(), beforeBracket, Markers.EMPTY,
-                        padRight(index, sourceBefore("]"))),
+                        new JRightPadded<>(index, afterIndex, markers.get())),
                 null
         );
     }

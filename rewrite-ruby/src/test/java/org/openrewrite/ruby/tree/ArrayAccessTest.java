@@ -60,4 +60,17 @@ public class ArrayAccessTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          ruby(
+            """
+              a[0,]
+              a[0, 1,]
+              a[0, 1, 2,]
+              """
+          )
+        );
+    }
 }

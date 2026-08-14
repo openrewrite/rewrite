@@ -886,6 +886,25 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             p.append(after == null ? "" : after);
         }
 
+        /**
+         * Ruby allows a trailing comma inside `[]`, which {@link JavaPrinter} would not print.
+         */
+        @Override
+        public J visitArrayDimension(J.ArrayDimension arrayDimension, PrintOutputCapture<P> p) {
+            beforeSyntax(arrayDimension, Space.Location.DIMENSION_PREFIX, p);
+            p.append('[');
+            JRightPadded<Expression> index = arrayDimension.getPadding().getIndex();
+            visit(index.getElement(), p);
+            visitSpace(index.getAfter(), Space.Location.ARRAY_INDEX_SUFFIX, p);
+            index.getMarkers().findFirst(TrailingComma.class).ifPresent(comma -> {
+                p.append(',');
+                visitSpace(comma.getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+            });
+            p.append(']');
+            afterSyntax(arrayDimension, p);
+            return arrayDimension;
+        }
+
         @Override
         public J visitAssignmentOperation(J.AssignmentOperation assignOp, PrintOutputCapture<P> p) {
             String keyword = "";
