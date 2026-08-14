@@ -69,7 +69,7 @@ public class RubyParser implements Parser {
 
                 ParseResult parseResult;
                 synchronized (Runtime.INSTANCE) {
-                    parseResult = Runtime.INSTANCE.parseFile(path.toString(),
+                    parseResult = Runtime.INSTANCE.getParserManager().parseFile(path.toString(), 0,
                             new ByteArrayInputStream(source.getBytes(charset)), null);
                 }
                 if (!(parseResult instanceof RootNode)) {
