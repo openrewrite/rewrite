@@ -82,6 +82,27 @@ class RubyVisitorTest {
         assertThat(spaces).contains("   ", "  ");
     }
 
+    /**
+     * A wrapper whose type is its child's cannot set that type on a child that refuses one, so
+     * setting the type it already reports has to be a no-op. `&method(:x)` is the case that bit:
+     * a Rb.BlockArgument over a J.MethodInvocation, which every visitor pass walks.
+     */
+    @Test
+    void settingTheTypeAWrapperAlreadyHasChangesNothing() {
+        List<String> wrapped = new ArrayList<>();
+        new RubyIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                wrapped.add(method.getSimpleName());
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(parse("""
+          packages.flat_map(&method(:reduce))
+          """), 0);
+
+        assertThat(wrapped).contains("flat_map", "method");
+    }
+
     private static J parse(String source) {
         return (Rb.CompilationUnit) RubyParser.builder().build().parse(source)
                 .findFirst().orElseThrow();

@@ -509,7 +509,9 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public BlockArgument withType(@Nullable JavaType type) {
-            return withArgument(argument.withType(type));
+            // Identity check first: the argument may be a J.MethodInvocation, whose withType throws
+            // rather than accepting the type it already reports.
+            return type == getType() ? this : withArgument(argument.withType(type));
         }
 
         @Override
@@ -1118,7 +1120,7 @@ public interface Rb extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) withExpression(expression.withType(type));
+            return type == getType() ? (T) this : (T) withExpression(expression.withType(type));
         }
 
         @Transient
@@ -1166,6 +1168,9 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public ExpressionTypeTree withType(@Nullable JavaType type) {
+            if (type == getType()) {
+                return this;
+            }
             if (reference instanceof Expression) {
                 return withReference(((Expression) reference).withType(type));
             } else if (reference instanceof TypedTree) {
@@ -1388,7 +1393,7 @@ public interface Rb extends J {
         @SuppressWarnings("unchecked")
         @Override
         public Heredoc withType(@Nullable JavaType type) {
-            return withValue(value.withType(type));
+            return type == getType() ? this : withValue(value.withType(type));
         }
 
         @Override
