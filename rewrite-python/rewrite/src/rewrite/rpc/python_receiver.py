@@ -1084,6 +1084,55 @@ def _receive_search_result(marker, q: RpcReceiveQueue):
     return SearchResult(_id=new_id, _description=description)
 
 
+def _receive_recipe_that_made_changes(recipe, q: RpcReceiveQueue):
+    """Codec for receiving RecipeThatMadeChanges."""
+    from rewrite.markers import RecipeThatMadeChanges
+
+    # RecipeThatMadeChanges sends: name, displayName, instanceName, options, effort millis
+    name = q.receive(recipe.name if recipe else None)
+    display_name = q.receive(recipe.display_name if recipe else None)
+    instance_name = q.receive(recipe.instance_name if recipe else None)
+    options = q.receive(recipe.options if recipe else None)
+    effort = q.receive(recipe.estimated_effort_per_occurrence_millis if recipe else None)
+    return RecipeThatMadeChanges(name, display_name, instance_name, options, effort)
+
+
+def _send_recipe_that_made_changes(recipe, q):
+    """Codec for sending RecipeThatMadeChanges."""
+    q.get_and_send(recipe, lambda x: x.name)
+    q.get_and_send(recipe, lambda x: x.display_name)
+    q.get_and_send(recipe, lambda x: x.instance_name)
+    q.get_and_send(recipe, lambda x: x.options)
+    q.get_and_send(recipe, lambda x: x.estimated_effort_per_occurrence_millis)
+
+
+def _receive_recipes_that_made_changes(marker, q: RpcReceiveQueue):
+    """Codec for receiving RecipesThatMadeChanges."""
+    from rewrite.markers import RecipesThatMadeChanges
+
+    # RecipesThatMadeChanges sends: id, recipes (a list of stacks)
+    before_id = id_to_str(marker._id) if marker is not None and marker._id is not None else None
+    id_str = q.receive(before_id)
+
+    before_stacks = marker.recipes if marker is not None else None
+    stacks = q.receive_list(before_stacks, lambda stack: q.receive_list(stack) or [])
+
+    new_id = id_to_int(id_str) if id_str else (marker._id if marker else None)
+    return RecipesThatMadeChanges(_id=new_id, _recipes=stacks or [])
+
+
+def _send_recipes_that_made_changes(marker, q):
+    """Codec for sending RecipesThatMadeChanges."""
+    q.get_and_send(marker, lambda x: id_to_str(x._id))
+    # The stack key never travels; it only has to identify a stack within this process.
+    q.get_and_send_list(
+        marker,
+        lambda x: list(x.recipes) if x.recipes else [],
+        lambda stack: tuple(recipe.name for recipe in stack),
+        lambda stack: q.get_and_send_list(stack, lambda s: list(s), lambda recipe: recipe.name)
+    )
+
+
 def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
     """Codec for receiving ParseExceptionResult marker.
 
@@ -1570,7 +1619,8 @@ def _register_support_type_codecs():
 
 def _register_core_marker_codecs():
     """Register codecs for core marker types."""
-    from rewrite.markers import Markers, ParseExceptionResult, SearchResult
+    from rewrite.markers import (Markers, ParseExceptionResult, RecipeThatMadeChanges,
+                                 RecipesThatMadeChanges, SearchResult)
     from rewrite.rpc.receive_queue import (
         register_codec_with_both_names,
         make_dataclass_factory,
@@ -1591,6 +1641,21 @@ def _register_core_marker_codecs():
         _receive_search_result,
         make_dataclass_factory(SearchResult),
         sender=_send_search_result
+    )
+    # RecipeThatMadeChanges / RecipesThatMadeChanges - identity of the recipes that changed a file
+    register_codec_with_both_names(
+        'org.openrewrite.marker.RecipeThatMadeChanges',
+        RecipeThatMadeChanges,
+        _receive_recipe_that_made_changes,
+        make_dataclass_factory(RecipeThatMadeChanges),
+        sender=_send_recipe_that_made_changes
+    )
+    register_codec_with_both_names(
+        'org.openrewrite.marker.RecipesThatMadeChanges',
+        RecipesThatMadeChanges,
+        _receive_recipes_that_made_changes,
+        make_dataclass_factory(RecipesThatMadeChanges),
+        sender=_send_recipes_that_made_changes
     )
     # ParseExceptionResult - has specific fields to receive/send
     register_codec_with_both_names(
