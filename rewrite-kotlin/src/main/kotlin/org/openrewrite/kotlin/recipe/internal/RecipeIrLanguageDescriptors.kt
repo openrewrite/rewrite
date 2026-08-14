@@ -131,6 +131,12 @@ internal object RecipeIrLanguageDescriptors {
             visitorFqn = FqName("org.openrewrite.groovy.GroovyVisitor"),
             treeRootPackage = "org.openrewrite.groovy.tree.G",
         ),
+        LanguageDescriptor(
+            factoryName = "ruby",
+            scopeFqn = FqName("org.openrewrite.dsl.scopes.RubyScope"),
+            visitorFqn = FqName("org.openrewrite.ruby.RubyVisitor"),
+            treeRootPackage = "org.openrewrite.ruby.tree.Rb",
+        ),
     )
 
     /** Factory names → descriptors. Used by the FIR checker. */

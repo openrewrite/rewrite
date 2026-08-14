@@ -44,6 +44,14 @@ dependencies {
     compileOnly(project(":rewrite-scala"))
     compileOnly(project(":rewrite-javascript"))
     compileOnly(project(":rewrite-groovy"))
+    // rewrite-ruby targets Java 21 (JRuby 10 ships class file version 65), so it publishes no
+    // Java 8 variant for this Java 8 compile classpath to select. Only the generated
+    // `RubyScope.kt` reads it, and kotlinc accepts newer class files than its `jvmTarget`.
+    compileOnly(project(":rewrite-ruby")) {
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+        }
+    }
 
     // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib (clikt 3.5.0
     // would otherwise drag the jdk7/jdk8/common artifacts back to 1.6.20).
@@ -115,8 +123,8 @@ val generatedScopesDir = layout.buildDirectory.dir("generated/source/recipeDsl/m
 // rather than codegen'd: `KotlinVisitor` lives in rewrite-kotlin's own Java
 // sources, and `K.java` transitively depends on `internal/` classes that pull
 // in `kotlin-compiler-embeddable` Psi types — too heavy for a parallel
-// visitor-only JavaCompile to handle cleanly. The 13 cross-module languages
-// (java/yaml/xml/maven/json/properties/toml/hcl/python/csharp/scala/javascript/groovy)
+// visitor-only JavaCompile to handle cleanly. The 14 cross-module languages
+// (java/yaml/xml/maven/json/properties/toml/hcl/python/csharp/scala/javascript/groovy/ruby)
 // are codegen'd from their `.class` files on the compile classpath.
 
 val generateLanguageScopes by tasks.registering(GenerateLanguageScopesTask::class) {
@@ -137,6 +145,7 @@ val generateLanguageScopes by tasks.registering(GenerateLanguageScopesTask::clas
         LanguageDescriptor("scala", "ScalaScope", "org.openrewrite.scala.ScalaVisitor"),
         LanguageDescriptor("javascript", "JavaScriptScope", "org.openrewrite.javascript.JavaScriptVisitor"),
         LanguageDescriptor("groovy", "GroovyScope", "org.openrewrite.groovy.GroovyVisitor"),
+        LanguageDescriptor("ruby", "RubyScope", "org.openrewrite.ruby.RubyVisitor"),
     ))
 }
 

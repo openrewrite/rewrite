@@ -424,6 +424,9 @@ public abstract class LanguageHost internal constructor() {
 
     public fun javascript(block: org.openrewrite.dsl.scopes.JavaScriptScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
         register(org.openrewrite.dsl.scopes.JavaScriptScope().apply(block).build())
+
+    public fun ruby(block: org.openrewrite.dsl.scopes.RubyScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.RubyScope().apply(block).build())
 }
 
 /**
