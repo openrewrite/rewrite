@@ -39,6 +39,13 @@ java {
     }
 }
 
+// `RubyCorpusTest` is opt-in and needs these forwarded from the Gradle JVM to the test JVM.
+tasks.withType<Test>().configureEach {
+    for (property in listOf("ruby.corpus.dir", "ruby.corpus.report", "ruby.corpus.detail")) {
+        System.getProperty(property)?.let { systemProperty(property, it) }
+    }
+}
+
 tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()

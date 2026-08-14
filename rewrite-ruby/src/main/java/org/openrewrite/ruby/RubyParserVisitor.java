@@ -69,9 +69,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     /**
      * A heredoc's body is only known once the cursor reaches it, which is after the LST node has
-     * already been placed in the tree, so completed heredocs are swapped in by a final pass.
+     * already been placed in the tree, so the completed values are folded in by a final pass.
+     * Keyed by id rather than identity, because the placeholder in the tree may have been copied
+     * (e.g. re-prefixed) since it was queued.
      */
-    private Map<Rb.Heredoc, Rb.Heredoc> finalizedHeredocs = new IdentityHashMap<>();
+    private Map<UUID, Rb.Heredoc> finalizedHeredocs = new HashMap<>();
 
     public RubyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, PrismSource src,
                              boolean charsetBomMarked) {
@@ -126,8 +128,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return (Rb.CompilationUnit) new RubyIsoVisitor<Integer>() {
             @Override
             public Rb.Heredoc visitHeredoc(Rb.Heredoc heredoc, Integer p) {
-                Rb.Heredoc finalized = finalizedHeredocs.get(heredoc);
-                return finalized == null ? heredoc : finalized;
+                Rb.Heredoc finalized = finalizedHeredocs.get(heredoc.getId());
+                return finalized == null ? heredoc :
+                        heredoc.withValue(finalized.getValue())
+                                .withAroundValue(finalized.getAroundValue())
+                                .withEnd(finalized.getEnd());
             }
         }.visitNonNull(cu, 0);
     }
@@ -176,7 +181,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             if (newline >= 0 && newline < next) {
                 Space space = RubySpace.format(source, cursor, newline + 1);
                 cursor = newline + 1;
-                for (Rb.Heredoc flushed : flushHeredocs()) {
+                for (UUID flushed : flushHeredocs()) {
                     finalizedHeredocs.put(flushed, finalizedHeredocs.get(flushed).withAroundValue(space));
                 }
                 return space;
@@ -187,8 +192,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return space;
     }
 
-    private List<Rb.Heredoc> flushHeredocs() {
-        List<Rb.Heredoc> flushed = new ArrayList<>(pendingHeredocs.size());
+    private List<UUID> flushHeredocs() {
+        List<UUID> flushed = new ArrayList<>(pendingHeredocs.size());
         while (!pendingHeredocs.isEmpty()) {
             PendingHeredoc pending = pendingHeredocs.poll();
             int bodyStart = cursor;
@@ -218,8 +223,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 cursor = stop;
             }
 
-            finalizedHeredocs.put(pending.placeholder, heredoc.withEnd(end));
-            flushed.add(pending.placeholder);
+            finalizedHeredocs.put(pending.placeholder.getId(), heredoc.withEnd(end));
+            flushed.add(pending.placeholder.getId());
         }
         return flushed;
     }
@@ -258,8 +263,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     private <T, U> Optional<U> peekWhitespace(T t, BiFunction<T, Space, U> conditional) {
         int cursorBefore = cursor;
         Deque<PendingHeredoc> heredocsBefore = new ArrayDeque<>(pendingHeredocs);
-        Map<Rb.Heredoc, Rb.Heredoc> finalizedBefore = finalizedHeredocs.isEmpty() ?
-                Collections.emptyMap() : new IdentityHashMap<>(finalizedHeredocs);
+        Map<UUID, Rb.Heredoc> finalizedBefore = finalizedHeredocs.isEmpty() ?
+                Collections.emptyMap() : new HashMap<>(finalizedHeredocs);
         U converted = conditional.apply(t, whitespace());
         if (converted != null) {
             return Optional.of(converted);
@@ -267,7 +272,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         cursor = cursorBefore;
         pendingHeredocs = heredocsBefore;
         finalizedHeredocs = finalizedBefore.isEmpty() && finalizedHeredocs.isEmpty() ?
-                finalizedHeredocs : new IdentityHashMap<>(finalizedBefore);
+                finalizedHeredocs : new HashMap<>(finalizedBefore);
         return Optional.empty();
     }
 
@@ -315,8 +320,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 continue;
             } else if (length > i + 1) {
                 if (current == '#') {
+                    // deliberately does not skip the next character: an empty `#` comment line
+                    // would otherwise swallow the newline and take the following line with it
                     inSingleLineComment = true;
-                    i++;
                     continue;
                 } else if (i == 0 || i == source.length() - "=end".length() ||
                            source.charAt(i - 1) == '\n') {
@@ -424,6 +430,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         }
         return new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
                 statements(statements), EMPTY);
+    }
+
+    private Expression bodyExpression(Nodes.@Nullable StatementsNode statements) {
+        Statement statement = bodyStatement(statements);
+        return statement instanceof Expression ? (Expression) statement :
+                new Rb.StatementExpression(randomId(), statement);
     }
 
     private List<JRightPadded<Statement>> bodyStatements(Nodes.@Nullable Node body) {
@@ -1159,6 +1171,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 return J.AssignmentOperation.Type.Modulo;
             case "**":
                 return J.AssignmentOperation.Type.Exponentiation;
+            case "&":
+                return J.AssignmentOperation.Type.BitAnd;
+            case "|":
+                return J.AssignmentOperation.Type.BitOr;
+            case "^":
+                return J.AssignmentOperation.Type.BitXor;
+            case "<<":
+                return J.AssignmentOperation.Type.LeftShift;
+            case ">>":
+                return J.AssignmentOperation.Type.RightShift;
             case "&&":
                 return Rb.AssignmentOperation.Type.And;
             case "||":
@@ -1921,9 +1943,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 EMPTY,
                 Markers.EMPTY,
                 convertExpression(node.predicate),
-                padLeft(sourceBefore("?"), (Expression) bodyStatement(node.statements)),
+                padLeft(sourceBefore("?"), bodyExpression(node.statements)),
                 padLeft(sourceBefore(":"),
-                        (Expression) bodyStatement(((Nodes.ElseNode) node.subsequent).statements)),
+                        bodyExpression(((Nodes.ElseNode) node.subsequent).statements)),
                 null
         );
     }
@@ -1972,9 +1994,15 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                         padRight(convertStatement(subsequent), EMPTY));
             } else {
                 skip("else");
+                Statement elseBody = bodyStatement(((Nodes.ElseNode) subsequent).statements);
+                if (elseBody instanceof J.If) {
+                    // The printer reads a bare `J.If` in the else part as an `elsif`, so an `else`
+                    // whose whole body is a conditional has to be wrapped to stay distinguishable.
+                    elseBody = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                            singletonList(padRight(elseBody, EMPTY)), EMPTY);
+                }
                 anElse = new J.If.Else(randomId(), elsePrefix, Markers.EMPTY,
-                        padRight(bodyStatement(((Nodes.ElseNode) subsequent).statements),
-                                sourceBefore("end")));
+                        padRight(elseBody, sourceBefore("end")));
             }
         }
         return new J.If(randomId(), EMPTY, markers, control, thenPart, anElse);
@@ -2181,8 +2209,13 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         J.Block finallyBlock = null;
         if (node.ensure_clause != null) {
             skip("ensure");
+            List<JRightPadded<Statement>> ensured = statements(node.ensure_clause.statements);
+            Space beforeEnd = whitespace();
+            if (explicitBegin) {
+                skip("end");
+            }
             finallyBlock = new J.Block(randomId(), tail, Markers.EMPTY, JRightPadded.build(false),
-                    statements(node.ensure_clause.statements), sourceBefore("end"));
+                    ensured, beforeEnd);
         } else {
             if (elseBlock != null) {
                 elseBlock = elseBlock.withEnd(tail);
@@ -2199,7 +2232,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return new Rb.Rescue(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                explicitBegin ? Markers.EMPTY.add(new ExplicitBegin(randomId())) : Markers.EMPTY,
                 new J.Try(randomId(), tryPrefix, Markers.EMPTY, JContainer.empty(), body, catches,
                         finallyBlock == null ? null : padLeft(EMPTY, finallyBlock)),
                 elseBlock

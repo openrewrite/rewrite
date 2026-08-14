@@ -34,6 +34,63 @@ public class IfTest implements RewriteTest {
     }
 
     @Test
+    void unlessElse() {
+        rewriteRun(
+          ruby(
+            """
+              unless a
+                  puts "a"
+              else
+                  puts "b"
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * The nested `unless` modifier used to be picked up as the enclosing conditional, which dropped
+     * the outer `else`.
+     */
+    @Test
+    void elseAfterNestedUnlessModifier() {
+        rewriteRun(
+          ruby(
+            """
+              def m(a, b)
+                if a
+                  return [a, nil] unless b
+                  2
+                else
+                  3
+                end
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * The else body is itself a conditional, which must not be confused with an `elsif`.
+     */
+    @Test
+    void elseWholeBodyIsAConditional() {
+        rewriteRun(
+          ruby(
+            """
+              if a
+                puts "a"
+              else
+                unless b
+                  puts "b"
+                end
+              end
+              """
+          )
+        );
+    }
+
+    @Test
     void unlessStatement() {
         rewriteRun(
           ruby(

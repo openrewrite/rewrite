@@ -424,18 +424,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitRescue(Rb.Rescue rescue, PrintOutputCapture<P> p) {
         beforeSyntax(rescue, RubySpace.Location.RESCUE_PREFIX, p);
 
-        boolean noBegin = false;
-        Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Block) {
-            Object parentValue = parent.getParentTreeCursor().getValue();
-            if (parentValue instanceof J.MethodDeclaration ||
-                parentValue instanceof J.ClassDeclaration ||
-                parentValue instanceof Rb.ClassMethod ||
-                parentValue instanceof Rb.Module ||
-                parentValue instanceof Rb.Block) {
-                noBegin = true;
-            }
-        }
+        // A rescue attached directly to a `def`, block or class body borrows that construct's
+        // `end` and has no `begin` of its own.
+        boolean noBegin = !rescue.getMarkers().findFirst(ExplicitBegin.class).isPresent();
         if (!noBegin) {
             p.append("begin");
         }
@@ -782,6 +773,21 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 case Exponentiation:
                     keyword = "**=";
                     break;
+                case BitAnd:
+                    keyword = "&=";
+                    break;
+                case BitOr:
+                    keyword = "|=";
+                    break;
+                case BitXor:
+                    keyword = "^=";
+                    break;
+                case LeftShift:
+                    keyword = "<<=";
+                    break;
+                case RightShift:
+                    keyword = ">>=";
+                    break;
             }
             beforeSyntax(assignOp, Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
             visit(assignOp.getVariable(), p);
@@ -943,13 +949,12 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitElse(J.If.Else anElse, PrintOutputCapture<P> p) {
             beforeSyntax(anElse, Space.Location.ELSE_PREFIX, p);
-            J.If iff = getCursor().firstEnclosingOrThrow(J.If.class);
-            if (!iff.getMarkers().findFirst(Unless.class).isPresent()) {
-                if (anElse.getBody() instanceof J.If) {
-                    p.append("els"); // the nested `J.If` will print the remaining `if`
-                } else {
-                    p.append("else");
-                }
+            // An `unless` keeps its body in the then part, so an else part always stands for a
+            // literal `else` regardless of which keyword opened the conditional.
+            if (anElse.getBody() instanceof J.If) {
+                p.append("els"); // the nested `J.If` will print the remaining `if`
+            } else {
+                p.append("else");
             }
             visitStatement(anElse.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p);
             if (!(anElse.getBody() instanceof J.If)) {

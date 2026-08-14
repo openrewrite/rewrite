@@ -62,6 +62,21 @@ public class SpaceTest implements RewriteTest {
     }
 
     @Test
+    void emptyCommentLine() {
+        rewriteRun(
+          ruby(
+            """
+              # Example:
+              #
+              def foo(a, b)
+                a
+              end
+              """
+          )
+        );
+    }
+
+    @Test
     void multiLineComment() {
         rewriteRun(
           ruby(

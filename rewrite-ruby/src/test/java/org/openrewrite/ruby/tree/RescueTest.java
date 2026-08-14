@@ -182,6 +182,26 @@ public class RescueTest implements RewriteTest {
         );
     }
 
+    /**
+     * The `begin` is written out even though the enclosing `def` would also supply an `end`.
+     */
+    @Test
+    void explicitBeginInsideMethod() {
+        rewriteRun(
+          ruby(
+            """
+              def deliver_mail(mail)
+                begin
+                  mail.deliver
+                rescue Exception => e
+                  puts e
+                end
+              end
+              """
+          )
+        );
+    }
+
     @Test
     void rescueOnMethodDef() {
         rewriteRun(

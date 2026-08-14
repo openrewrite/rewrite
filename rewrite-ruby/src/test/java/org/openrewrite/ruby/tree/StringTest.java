@@ -228,6 +228,25 @@ public class StringTest implements RewriteTest {
         );
     }
 
+    /**
+     * The heredoc is the method's implicit return, so its node is re-created before the body is
+     * known and has to be matched back up by id rather than by identity.
+     */
+    @Test
+    void heredocAsImplicitReturn() {
+        rewriteRun(
+          ruby(
+            """
+              def sql
+                <<-SQL
+                  SELECT 1
+                SQL
+              end
+              """
+          )
+        );
+    }
+
     @Test
     void multipleHeredocs() {
         rewriteRun(
