@@ -1289,16 +1289,39 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return operatorAssignment(prefix, access, operator, value);
     }
 
+    /**
+     * A nested destructuring target — `(b, c)` in `a, (b, c) = ...` or in a block parameter list —
+     * is the same comma-separated target list as the top level, so it reuses {@link Rb.Array} with
+     * its brackets omitted, wrapped in parentheses when the source writes them.
+     */
+    @Override
+    public J visitMultiTargetNode(Nodes.MultiTargetNode node) {
+        Space prefix = prefix(node);
+        List<Nodes.Node> targets = multiTargets(node.lefts, node.rest, node.rights);
+        if (!skip("(")) {
+            return array(EMPTY, targets.toArray(new Nodes.Node[0])).withPrefix(prefix);
+        }
+        Rb.Array inner = array(EMPTY, targets.toArray(new Nodes.Node[0]));
+        return new J.Parentheses<>(randomId(), prefix, Markers.EMPTY,
+                padRight((Expression) inner, sourceBefore(")")));
+    }
+
+    private List<Nodes.Node> multiTargets(Nodes.Node[] lefts, Nodes.@Nullable Node rest,
+                                          Nodes.Node[] rights) {
+        List<Nodes.Node> targets = new ArrayList<>(lefts.length + rights.length + 1);
+        Collections.addAll(targets, lefts);
+        if (rest != null && !(rest instanceof Nodes.ImplicitRestNode)) {
+            targets.add(rest);
+        }
+        Collections.addAll(targets, rights);
+        return targets;
+    }
+
     @Override
     public J visitMultiWriteNode(Nodes.MultiWriteNode node) {
         Space prefix = prefix(node);
 
-        List<Nodes.Node> targets = new ArrayList<>();
-        Collections.addAll(targets, node.lefts);
-        if (node.rest != null && !(node.rest instanceof Nodes.ImplicitRestNode)) {
-            targets.add(node.rest);
-        }
-        Collections.addAll(targets, node.rights);
+        List<Nodes.Node> targets = multiTargets(node.lefts, node.rest, node.rights);
 
         AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
         List<JRightPadded<Expression>> assignments = new ArrayList<>(targets.size());
@@ -1310,7 +1333,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         Space initializerPrefix = sourceBefore("=");
         List<JRightPadded<Expression>> initializers;
-        if (node.value instanceof Nodes.ArrayNode && source.charAt(charStart(node.value)) != '[') {
+        if (node.value instanceof Nodes.ArrayNode && !bracketed((Nodes.ArrayNode) node.value)) {
             Nodes.Node[] values = ((Nodes.ArrayNode) node.value).elements;
             initializers = new ArrayList<>(values.length);
             for (int i = 0; i < values.length; i++) {
@@ -1803,7 +1826,25 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             return new Rb.DelimitedArray(randomId(), prefix, Markers.EMPTY, delimiter,
                     JContainer.build(EMPTY, elements, Markers.EMPTY), null);
         }
-        return array(prefix, node.elements);
+        return array(prefix, node.elements, bracketed(node));
+    }
+
+    /**
+     * Prism gives an array literal and an implicit array (`a, b = 1, 2`, `x = *y`) the same node
+     * type and models no location for the brackets, so they are told apart by the gap the `[` leaves
+     * between the array's own start and its first element.
+     */
+    private boolean bracketed(Nodes.ArrayNode node) {
+        return node.elements.length == 0 || charStart(node) < charStart(node.elements[0]);
+    }
+
+    /**
+     * A parameter name nested inside a destructured block parameter (`|(a, b)|`) is just a name;
+     * the top-level parameter list reaches these through {@link #parameter(Nodes.Node)} instead.
+     */
+    @Override
+    public J visitRequiredParameterNode(Nodes.RequiredParameterNode node) {
+        return identifier(node);
     }
 
     /**
@@ -1841,9 +1882,13 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private Rb.Array array(Space prefix, Nodes.Node[] elements) {
+        return array(prefix, elements, null);
+    }
+
+    private Rb.Array array(Space prefix, Nodes.Node[] elements, @Nullable Boolean bracketed) {
         AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
         Space before = whitespace();
-        boolean brackets = source.startsWith("[", cursor);
+        boolean brackets = bracketed == null ? source.startsWith("[", cursor) : bracketed;
         if (brackets) {
             skip("[");
         } else {
@@ -2100,8 +2145,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitForNode(Nodes.ForNode node) {
         Space prefix = prefix(node);
         skip("for");
-        Expression index = convertExpression(node.index);
-        JRightPadded<Statement> variable = padRight(variableDeclaration(index), sourceBefore("in"));
+        JRightPadded<Statement> variable = padRight(forVariables(node.index), sourceBefore("in"));
         JRightPadded<Expression> iterable = padRight(convertExpression(node.collection), whitespace());
         return new J.ForEachLoop(
                 randomId(),
@@ -2110,6 +2154,33 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 new J.ForEachLoop.Control(randomId(), EMPTY, Markers.EMPTY, variable, iterable),
                 padRight(bodyStatement(node.statements), sourceBefore("end"))
         );
+    }
+
+    /**
+     * `for a, b in pairs` declares one variable per target, so the multiple targets become the
+     * comma-separated names of a single declaration.
+     */
+    private J.VariableDeclarations forVariables(Nodes.Node index) {
+        if (!(index instanceof Nodes.MultiTargetNode)) {
+            return variableDeclaration(convertExpression(index));
+        }
+        Nodes.MultiTargetNode multi = (Nodes.MultiTargetNode) index;
+        Space prefix = prefix(multi);
+        List<Nodes.Node> targets = multiTargets(multi.lefts, multi.rest, multi.rights);
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> names = new ArrayList<>(targets.size());
+        for (int i = 0; i < targets.size(); i++) {
+            J target = convert(targets.get(i));
+            if (!(target instanceof J.Identifier)) {
+                throw new UnsupportedOperationException(String.format(
+                        "A `for` loop variable of type %s is not yet implemented (%s at offset %d)",
+                        targets.get(i).getClass().getSimpleName(), sourcePath, charStart(targets.get(i))));
+            }
+            names.add(padRight(new J.VariableDeclarations.NamedVariable(randomId(), target.getPrefix(),
+                            Markers.EMPTY, ((J.Identifier) target).withPrefix(EMPTY), emptyList(), null, null),
+                    i == targets.size() - 1 ? EMPTY : sourceBefore(",")));
+        }
+        return new J.VariableDeclarations(randomId(), prefix, Markers.EMPTY, emptyList(), emptyList(),
+                null, null, names);
     }
 
     private J.VariableDeclarations variableDeclaration(Expression name) {

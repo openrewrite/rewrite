@@ -69,6 +69,41 @@ public class RubyBlockTest implements RewriteTest {
     }
 
     @Test
+    void destructuredParameters() {
+        rewriteRun(
+          ruby(
+            """
+              h.each { |(a, b)| p a }
+              """
+          )
+        );
+    }
+
+    @Test
+    void destructuredParametersAfterPlainParameter() {
+        rewriteRun(
+          ruby(
+            """
+              h.each { |k, (v1, v2)| p k }
+              """
+          )
+        );
+    }
+
+    @Test
+    void destructuredParametersWithSplat() {
+        rewriteRun(
+          ruby(
+            """
+              h.each do |k, (v1, *rest)|
+                p k
+              end
+              """
+          )
+        );
+    }
+
+    @Test
     void blockArgument() {
         rewriteRun(
           ruby(

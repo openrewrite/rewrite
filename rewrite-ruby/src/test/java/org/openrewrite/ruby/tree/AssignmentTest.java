@@ -161,4 +161,59 @@ public class AssignmentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void bracketedArraysInParallelAssignment() {
+        rewriteRun(
+          ruby(
+            """
+              a, b = [1], [2]
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedDestructuring() {
+        rewriteRun(
+          ruby(
+            """
+              a, (b, c) = [1, [2, 3]]
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedDestructuringWithSplat() {
+        rewriteRun(
+          ruby(
+            """
+              a, (b, *c) = [1, [2, 3, 4]]
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedDestructuringOnly() {
+        rewriteRun(
+          ruby(
+            """
+              (a, b), c = [1, 2], 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void deeplyNestedDestructuring() {
+        rewriteRun(
+          ruby(
+            """
+              a, (b, (c, d)) = [1, [2, [3, 4]]]
+              """
+          )
+        );
+    }
 }
