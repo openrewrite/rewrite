@@ -29,18 +29,64 @@ Three things shape `RubyParserVisitor`:
   time the cursor crosses a newline, then folded into the tree by a final pass keyed by
   node id.
 
-Two Prism behaviors worth knowing: `partialScript` is on so that fragments with a
-top-level `next`/`break`/`return` parse, and Prism will not close a heredoc whose
+Three Prism behaviors worth knowing: `partialScript` is on so that fragments with a
+top-level `next`/`break`/`return` parse, `mainScript` is off so that a shebang naming
+something other than ruby is just a comment, and Prism will not close a heredoc whose
 terminator ends the file without a trailing newline, so it is always handed a
 newline-terminated copy of the bytes.
 
+Prism models no location for several tokens the printer has to put back, and in each
+case the source is read at a node offset rather than guessed:
+
+- **Brackets, parentheses and their absence.** An array literal and an implicit array
+  (`a, b = 1, 2`) share one node type, as do a parenthesized target list and a bare
+  one; they are told apart by the gap the delimiter leaves between the node's own start
+  and its first element. A parameter or argument list is written on the same line as
+  the name it follows, so a `(` opening the next line is a grouped expression.
+- **Operators and index calls.** `a.+(b)` and `x&.[](i)` are ordinary calls that share
+  a node with `a + b` and `x[i]`; what the source writes after the receiver decides.
+- **The `=` of an endless method**, found by peeking past the parameter list.
+- **The `begin` keyword.** The implicit begin of a `def`, block or class body spans the
+  whole construct, so only a node starting at the cursor has a `begin` of its own.
+
 Ruby syntax the visitor has not been taught reaches `defaultVisit`, which throws with
-the Prism node name. Known gaps: endless method definitions (`def x = expr`), `;` as a
-statement separator, `RescueModifierNode`, `MultiTargetNode`, pattern pins and captures.
+the Prism node name. Known gaps: pattern captures (`=> name`), alternation and pins,
+numbered block parameters (`_1`), `it`, `undef`, and compact class names
+(`class Foo::Bar`).
 
 `RubyCorpusTest` measures where those gaps bite. It is skipped unless
 `-Druby.corpus.dir=<dir>` is set, and prints a parse rate plus a histogram of failure
-causes.
+causes; alongside its report it writes `<report>.failures` (one `cause<TAB>path` line
+per file) and `<report>.messages` (the full message per file), since the histogram
+keeps only one sample per cause.
+
+## Mapping notes
+
+**`;` is a statement separator, and lives on the statement it follows.** A `;` after a
+statement is the existing `org.openrewrite.java.marker.Semicolon` marker on that
+statement's `JRightPadded`, whose suffix holds the space in front of it — the same
+place Java puts it, and the only place that prints in the right order. A `;` with
+nothing in front of it (`def x; end`, `if c; body end`, the second `;` of `a;;b`) is a
+`J.Empty` statement carrying the same marker, so the statement list still accounts for
+every byte and recipes see a real element rather than a hidden one. `bodyStatement`
+therefore keeps a `J.Block` whenever a separator is present instead of collapsing to
+the sole statement.
+
+**An endless method body is a `J.Block` marked `OmitBraces`** holding one statement:
+the block prefix is the space before the `=`, the statement prefix the space after it.
+`rewrite-scala` prints `def f = expr` the same way.
+
+**A nested destructuring target is `J.Parentheses` around a bracket-less `Rb.Array`**,
+which is the same shape as the top-level target list of `Rb.MultipleAssignment`. `for`
+loops instead spread their targets across the names of one `J.VariableDeclarations`,
+which is what `J.ForEachLoop.Control` can hold.
+
+**Both printers restore the other's cursor.** `RubyPrinter` and its inner
+`RubyJavaPrinter` hand each other the cursor to print a subtree; whoever hands it over
+puts its own back afterwards. Without that the outer printer is left inside the subtree
+it just delegated, and anything that reads its ancestors (`visitCase` choosing between
+`when`, `in` and `=>`, `visitVariable` looking for a keyword argument) reads the wrong
+ones.
 
 See `doc/adr/0012-ruby-parsing-via-jruby.md`.
 
