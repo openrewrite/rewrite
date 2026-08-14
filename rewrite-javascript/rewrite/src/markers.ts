@@ -28,6 +28,9 @@ export const MarkersKind = {
     MarkupInfo: "org.openrewrite.marker.Markup$Info",
     MarkupDebug: "org.openrewrite.marker.Markup$Debug",
 
+    RecipesThatMadeChanges: "org.openrewrite.marker.RecipesThatMadeChanges",
+    RecipeIdentity: "org.openrewrite.marker.RecipeIdentity",
+
     /**
      * A generic marker that is sent/received as a bare map because the type hasn't been
      * defined in both Java and JavaScript.
@@ -130,6 +133,31 @@ export const emptyMarkers: Markers = asRef({
     id: randomId(),
     markers: []
 });
+
+/**
+ * One frame of a {@link RecipesThatMadeChanges} stack: how the recipe is named, how it was
+ * configured, and what it is worth.
+ */
+export interface RecipeIdentity {
+    readonly kind: typeof MarkersKind.RecipeIdentity
+    readonly name: string
+    readonly displayName?: string
+    readonly instanceName?: string
+    /**
+     * Configured option values, carried as received. JavaScript does not interpret them.
+     */
+    readonly options?: { [name: string]: any }
+    readonly estimatedEffortPerOccurrenceMillis?: number
+}
+
+/**
+ * Records which recipe stacks changed a source file. JavaScript holds the stacks without
+ * interpreting them, so a marker served to this peer returns to the host intact.
+ */
+export interface RecipesThatMadeChanges extends Marker {
+    readonly kind: typeof MarkersKind.RecipesThatMadeChanges
+    readonly recipes: RecipeIdentity[][]
+}
 
 export interface SearchResult extends Marker {
     readonly kind: typeof MarkersKind.SearchResult,

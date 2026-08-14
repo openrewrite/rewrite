@@ -15,7 +15,17 @@
  */
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
-import {Markers, MarkersKind, MarkupDebug, MarkupError, MarkupInfo, MarkupWarn, SearchResult} from "../markers";
+import {
+    Markers,
+    MarkersKind,
+    MarkupDebug,
+    MarkupError,
+    MarkupInfo,
+    MarkupWarn,
+    RecipeIdentity,
+    RecipesThatMadeChanges,
+    SearchResult
+} from "../markers";
 import {asRef} from "../reference";
 import {updateIfChanged} from "../util";
 
@@ -90,6 +100,44 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
         await q.getAndSend(after, a => a.description);
+    }
+});
+
+// Field order mirrors Java's RecipeIdentity codec.
+RpcCodecs.registerCodec(MarkersKind.RecipeIdentity, {
+    async rpcReceive(before: RecipeIdentity, q: RpcReceiveQueue): Promise<RecipeIdentity> {
+        return updateIfChanged(before, {
+            name: await q.receive(before.name),
+            displayName: await q.receive(before.displayName),
+            instanceName: await q.receive(before.instanceName),
+            options: await q.receive(before.options),
+            estimatedEffortPerOccurrenceMillis: await q.receive(before.estimatedEffortPerOccurrenceMillis),
+        });
+    },
+
+    async rpcSend(after: RecipeIdentity, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.name);
+        await q.getAndSend(after, a => a.displayName);
+        await q.getAndSend(after, a => a.instanceName);
+        await q.getAndSend(after, a => a.options);
+        await q.getAndSend(after, a => a.estimatedEffortPerOccurrenceMillis);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.RecipesThatMadeChanges, {
+    async rpcReceive(before: RecipesThatMadeChanges, q: RpcReceiveQueue): Promise<RecipesThatMadeChanges> {
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            recipes: (await q.receiveList(before.recipes,
+                async stack => (await q.receiveList(stack))!))!,
+        });
+    },
+
+    async rpcSend(after: RecipesThatMadeChanges, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, m => m.id);
+        // The stack key never travels; it only has to identify a stack within this process.
+        await q.getAndSendList(after, m => m.recipes, stack => stack.map(r => r.name).join("\0"),
+            async stack => q.getAndSendList(stack, s => s, r => r.name));
     }
 });
 

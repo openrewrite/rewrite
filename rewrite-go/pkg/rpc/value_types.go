@@ -230,7 +230,6 @@ func init() {
 
 	// Java-side markers that may appear when recipes modify trees or during LST writing.
 	// These markers do NOT implement RpcCodec and are serialized as raw values.
-	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.RecipesThatMadeChanges"} })
 	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.LstProvenance"} })
 	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.BuildMetadata"} })
 	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.GitTreeEntry"} })

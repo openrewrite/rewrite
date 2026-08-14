@@ -20,13 +20,21 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
+import java.util.function.Function;
+
+import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
-public class RecipesThatMadeChanges implements Marker {
+public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeChanges> {
     @EqualsAndHashCode.Include
     UUID id;
 
@@ -36,5 +44,53 @@ public class RecipesThatMadeChanges implements Marker {
         List<List<Recipe>> recipeStackList = new ArrayList<>(1);
         recipeStackList.add(recipeStack);
         return new RecipesThatMadeChanges(Tree.randomId(), recipeStackList);
+    }
+
+    @Override
+    public void rpcSend(RecipesThatMadeChanges after, RpcSendQueue q) {
+        q.getAndSend(after, RecipesThatMadeChanges::getId);
+        q.getAndSendList(after, RecipesThatMadeChanges::identities, RecipesThatMadeChanges::stackKey, stack ->
+                q.getAndSendList(stack, Function.identity(), RecipeIdentity::getName, null));
+    }
+
+    @Override
+    public RecipesThatMadeChanges rpcReceive(RecipesThatMadeChanges before, RpcReceiveQueue q) {
+        UUID receivedId = q.receiveAndGet(before.getId(), UUID::fromString);
+        List<List<RecipeIdentity>> received = requireNonNull(
+                q.receiveList(before.identities(), stack -> q.receiveList(stack, null)));
+        return before
+                .withId(receivedId)
+                .withRecipes(received.stream()
+                        .map(stack -> (List<Recipe>) new ArrayList<Recipe>(stack))
+                        .collect(toList()));
+    }
+
+    /** Identifies a stack for the sender's own list diff; it never travels. */
+    private static String stackKey(List<RecipeIdentity> stack) {
+        StringBuilder key = new StringBuilder();
+        for (RecipeIdentity identity : stack) {
+            key.append(identity.getName()).append('\u0000');
+        }
+        return key.toString();
+    }
+
+    /**
+     * The recipe stacks as they travel: identity only. A received marker already holds
+     * {@link RecipeIdentity} frames, which pass through unchanged so that forwarding a marker on
+     * diffs against what was received rather than degrading it.
+     */
+    private List<List<RecipeIdentity>> identities() {
+        if (recipes == null) {
+            return emptyList();
+        }
+        List<List<RecipeIdentity>> identities = new ArrayList<>(recipes.size());
+        for (List<Recipe> stack : recipes) {
+            List<RecipeIdentity> stackIdentities = new ArrayList<>(stack.size());
+            for (Recipe recipe : stack) {
+                stackIdentities.add(RecipeIdentity.of(recipe));
+            }
+            identities.add(stackIdentities);
+        }
+        return identities;
     }
 }

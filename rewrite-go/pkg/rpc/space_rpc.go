@@ -165,6 +165,8 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Description }, nil)
+	case java.RecipesThatMadeChanges:
+		sendRecipesThatMadeChanges(m, q)
 	case golang.GroupedImport:
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
@@ -341,6 +343,8 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				m.Description = desc.(string)
 			}
 			return m
+		case java.RecipesThatMadeChanges:
+			return receiveRecipesThatMadeChanges(m, q)
 		case golang.GroupedImport:
 			// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 			idStr := receiveScalar[string](q, m.Ident.String())

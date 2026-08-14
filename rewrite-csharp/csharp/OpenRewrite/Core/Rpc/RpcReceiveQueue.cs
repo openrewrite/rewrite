@@ -114,7 +114,7 @@ public class RpcReceiveQueue
                 // New object or forward declaration with ref
                 if (message.ValueType != null && message.Value != null)
                 {
-                    // Non-codec type with inline value (e.g. RecipesThatMadeChanges)
+                    // Non-codec type with inline value (e.g. Markup)
                     before = DeserializeInline<T>(message.ValueType, message.Value);
                 }
                 else if (message.ValueType != null)
@@ -448,6 +448,7 @@ public class RpcReceiveQueue
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
+            "org.openrewrite.marker.RecipeIdentity" => typeof(RecipeIdentity),
             "org.openrewrite.Checksum" => typeof(Checksum),
             "org.openrewrite.FileAttributes" => typeof(FileAttributes),
 

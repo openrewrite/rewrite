@@ -13,19 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using Newtonsoft.Json;
+using OpenRewrite.Core.Rpc;
 
 namespace OpenRewrite.Core;
 
 /// <summary>
-/// Marker that records which recipes made changes to a source file.
-/// This is an opaque marker — C# stores the raw recipe data without interpreting it.
+/// Records which recipe stacks changed a source file, each frame carried as identity rather than as
+/// a recipe. C# holds the stacks without interpreting them, so a marker served to this peer returns
+/// to the host intact.
 /// </summary>
-public sealed class RecipesThatMadeChanges : Marker
+public sealed class RecipesThatMadeChanges(Guid id, IList<IList<RecipeIdentity>> recipes)
+    : Marker, IRpcCodec<RecipesThatMadeChanges>, IEquatable<RecipesThatMadeChanges>
 {
-    [JsonProperty("id")]
-    public Guid Id { get; init; }
+    public Guid Id { get; } = id;
+    public IList<IList<RecipeIdentity>> Recipes { get; } = recipes;
 
-    [JsonProperty("recipes")]
-    public object? Recipes { get; init; }
+    public void RpcSend(RecipesThatMadeChanges after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSendList(after, m => m.Recipes, stack => (object)stack, stack =>
+            q.GetAndSendList(stack, s => s, r => (object)r.Name, null));
+    }
+
+    public RecipesThatMadeChanges RpcReceive(RecipesThatMadeChanges before, RpcReceiveQueue q)
+    {
+        var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+        var recipes = q.ReceiveList(before.Recipes, stack => q.ReceiveList(stack, null)!);
+        return new RecipesThatMadeChanges(id, recipes ?? []);
+    }
+
+    public bool Equals(RecipesThatMadeChanges? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as RecipesThatMadeChanges);
+    public override int GetHashCode() => Id.GetHashCode();
 }
