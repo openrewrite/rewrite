@@ -204,8 +204,8 @@ func TestRegistryActivate(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find FindFoo recipe")
 	}
-	if found.Descriptor.DisplayName != "Find foo identifiers" {
-		t.Errorf("expected displayName %q, got %q", "Find foo identifiers", found.Descriptor.DisplayName)
+	if found.Listing.DisplayName != "Find foo identifiers" {
+		t.Errorf("expected displayName %q, got %q", "Find foo identifiers", found.Listing.DisplayName)
 	}
 
 	// All recipes

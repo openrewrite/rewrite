@@ -87,6 +87,18 @@ class TestRecipeMarketplace:
         assert descriptor.name == "org.openrewrite.python.RemovePass"
         assert recipe_class is RemovePass
 
+    def test_marketplace_holds_listing_not_descriptor(self):
+        """The marketplace holds a listing-weight view (with a precomputed count), not the full
+        descriptor; PrepareRecipe builds the full tree from the retained class."""
+        from rewrite.marketplace import RecipeListing
+        marketplace = RecipeMarketplace()
+        marketplace.install(RemovePass, Cleanup)
+
+        held, _recipe_class = marketplace.find_recipe("org.openrewrite.python.RemovePass")
+        assert isinstance(held, RecipeListing)
+        assert held.recipe_count >= 1
+        assert not hasattr(held, "recipe_list")  # not the full descriptor
+
     def test_find_recipe_not_found(self):
         """Test finding a recipe that doesn't exist."""
         marketplace = RecipeMarketplace()

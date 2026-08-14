@@ -21,7 +21,6 @@ import org.openrewrite.NlsRewrite;
 import org.openrewrite.config.CategoryDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
@@ -40,8 +39,8 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
     @Value
     public static class Row {
         /**
-         * Listing-weight fields. Emitters populate these and leave {@link #descriptor} null; the full
-         * descriptor is fetched lazily via {@code PrepareRecipe}.
+         * Listing-weight fields the host builds a {@link RecipeListing} from. The full descriptor is
+         * fetched lazily per recipe via {@code PrepareRecipe} when detail or execution is needed.
          */
         @Nullable String name;
 
@@ -61,13 +60,6 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
          * {@link RecipeListing#getRecipeCount()}).
          */
         int recipeCount;
-
-        /**
-         * The full, recursive recipe descriptor. Retained for backward compatibility with peers that
-         * still emit it, but nullable and no longer emitted by up-to-date engines — prefer the
-         * lightweight fields above. Will be removed once nothing emits it.
-         */
-        @Nullable RecipeDescriptor descriptor;
 
         List<List<CategoryDescriptor>> categoryPaths;
 
@@ -100,18 +92,15 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
     }
 
     /**
-     * The {@link RecipeListing} a row represents, attributed to {@code bundle}. Prefers the
-     * lightweight fields; a null {@link Row#name} means an older peer sent only {@link Row#descriptor},
-     * so fall back to deriving the listing from it.
+     * The {@link RecipeListing} a row represents, attributed to {@code bundle}, built from its
+     * listing-weight fields.
      */
     private static RecipeListing toListing(Row row, RecipeBundle bundle) {
-        return row.getName() != null ?
-                new RecipeListing(null, row.getName(), row.getDisplayName(), row.getDescription(),
-                        row.getEstimatedEffortPerOccurrence(),
-                        row.getOptions() != null ? row.getOptions() : emptyList(),
-                        row.getDataTables() != null ? row.getDataTables() : emptyList(),
-                        row.getRecipeCount(), bundle) :
-                RecipeListing.fromDescriptor(row.getDescriptor(), bundle);
+        return new RecipeListing(null, row.getName(), row.getDisplayName(), row.getDescription(),
+                row.getEstimatedEffortPerOccurrence(),
+                row.getOptions() != null ? row.getOptions() : emptyList(),
+                row.getDataTables() != null ? row.getDataTables() : emptyList(),
+                row.getRecipeCount(), bundle);
     }
 
     public static GetMarketplaceResponse fromMarketplace(RecipeMarketplace marketplace) {
@@ -144,7 +133,7 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
             rowByRecipeId.computeIfAbsent(recipe.getName(), recipeId ->
                     new Row(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
                             recipe.getEstimatedEffortPerOccurrence(), recipe.getOptions(),
-                            recipe.getDataTables(), recipe.getRecipeCount(), null,
+                            recipe.getDataTables(), recipe.getRecipeCount(),
                             new ArrayList<>(), recipe.getBundle().getPackageName())).categoryPaths.add(categoryPath);
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {

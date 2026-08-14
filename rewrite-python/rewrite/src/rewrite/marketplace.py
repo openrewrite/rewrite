@@ -16,13 +16,51 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Type, Union, TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, TYPE_CHECKING
 
 from rewrite.category import CategoryDescriptor
 from rewrite.recipe import Recipe, RecipeDescriptor
 
 if TYPE_CHECKING:
     pass
+
+
+@dataclass
+class RecipeListing:
+    """Listing-weight view the marketplace holds and serves for the InstallRecipes and
+    GetMarketplace RPC commands, so listing never materializes the full recursive descriptor.
+    The full tree is built lazily per recipe by PrepareRecipe. ``recipe_count`` is 1 + every
+    transitive recipe_list entry, computed once at install time (the host uses it as a sort key)."""
+    name: str
+    display_name: str
+    description: str
+    estimated_effort_per_occurrence: Any = None
+    options: Any = field(default_factory=list)
+    data_tables: Any = field(default_factory=list)
+    recipe_count: int = 1
+
+
+def _count_recipes(descriptor) -> int:
+    """The count of this recipe and all recipes nested transitively in its recipe_list."""
+    count = 1
+    for sub in descriptor.recipe_list:
+        count += _count_recipes(sub)
+    return count
+
+
+def to_listing(descriptor) -> RecipeListing:
+    """Derive the listing-weight view from a full descriptor, collapsing its recursive
+    recipe_list to a count."""
+    return RecipeListing(
+        name=descriptor.name,
+        display_name=descriptor.display_name,
+        description=descriptor.description,
+        estimated_effort_per_occurrence=descriptor.estimated_effort_per_occurrence,
+        options=descriptor.options,
+        data_tables=descriptor.data_tables,
+        recipe_count=_count_recipes(descriptor),
+    )
 
 
 class RecipeMarketplace:
@@ -45,12 +83,11 @@ class RecipeMarketplace:
         def __init__(self, descriptor: CategoryDescriptor):
             self.descriptor = descriptor
             self.categories: List[RecipeMarketplace.Category] = []
-            # Use recipe name as key since RecipeDescriptor contains unhashable Lists
-            self._recipes: Dict[str, Tuple[RecipeDescriptor, Optional[Type[Recipe]]]] = {}
+            self._recipes: Dict[str, Tuple[RecipeListing, Optional[Type[Recipe]]]] = {}
 
         @property
-        def recipes(self) -> Dict[str, Tuple[RecipeDescriptor, Optional[Type[Recipe]]]]:
-            """Get the recipes dict (name -> (descriptor, class))."""
+        def recipes(self) -> Dict[str, Tuple[RecipeListing, Optional[Type[Recipe]]]]:
+            """Get the recipes dict (name -> (listing, class))."""
             return self._recipes
 
         def install(
@@ -74,21 +111,22 @@ class RecipeMarketplace:
             """
             if len(category_path) == 0:
                 if isinstance(recipe, type) and issubclass(recipe, Recipe):
-                    # It's a Recipe class - instantiate to get descriptor
+                    # It's a Recipe class - instantiate once to derive its listing (the class is
+                    # retained so PrepareRecipe can later build the full tree).
                     try:
                         recipe_inst = recipe()
-                        desc = recipe_inst.descriptor()
+                        listing = to_listing(recipe_inst.descriptor())
                         # First-wins must match the host's name-keyed RecipeListing and
                         # RecipeAttribution.
-                        self._recipes.setdefault(desc.name, (desc, recipe))
+                        self._recipes.setdefault(listing.name, (listing, recipe))
                     except Exception as e:
                         raise RuntimeError(
                             f"Failed to install recipe {recipe}. "
                             f"Ensure the constructor can be called without arguments."
                         ) from e
                 else:
-                    # It's already a RecipeDescriptor
-                    self._recipes.setdefault(recipe.name, (recipe, None))
+                    # It's already a RecipeDescriptor (client-side hydration) - derive its listing.
+                    self._recipes.setdefault(recipe.name, (to_listing(recipe), None))
                 return
 
             # Get the first category in the path
@@ -111,7 +149,7 @@ class RecipeMarketplace:
 
         def find_recipe(
             self, name: str
-        ) -> Optional[Tuple[RecipeDescriptor, Optional[Type[Recipe]]]]:
+        ) -> Optional[Tuple[RecipeListing, Optional[Type[Recipe]]]]:
             """
             Find a recipe by its fully qualified name.
 
@@ -130,9 +168,9 @@ class RecipeMarketplace:
                     return found
             return None
 
-        def all_recipes(self) -> List[RecipeDescriptor]:
+        def all_recipes(self) -> List[RecipeListing]:
             """Get all recipes in this category and subcategories."""
-            result: List[RecipeDescriptor] = [desc for desc, _ in self._recipes.values()]
+            result: List[RecipeListing] = [listing for listing, _ in self._recipes.values()]
             for category in self.categories:
                 result.extend(category.all_recipes())
             return result
@@ -173,7 +211,7 @@ class RecipeMarketplace:
 
     def find_recipe(
         self, name: str
-    ) -> Optional[Tuple[RecipeDescriptor, Optional[Type[Recipe]]]]:
+    ) -> Optional[Tuple[RecipeListing, Optional[Type[Recipe]]]]:
         """
         Find a recipe by its fully qualified name.
 
@@ -185,7 +223,7 @@ class RecipeMarketplace:
         """
         return self.root.find_recipe(name)
 
-    def all_recipes(self) -> List[RecipeDescriptor]:
+    def all_recipes(self) -> List[RecipeListing]:
         """Get all recipes in the marketplace."""
         return self.root.all_recipes()
 

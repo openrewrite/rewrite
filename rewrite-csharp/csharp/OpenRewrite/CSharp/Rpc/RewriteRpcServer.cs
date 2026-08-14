@@ -700,28 +700,28 @@ public class RewriteRpcServer
             new() { DisplayName = category.Descriptor.DisplayName, Description = category.Descriptor.Description }
         };
 
-        foreach (var (descriptor, _) in category.Recipes)
+        foreach (var (_, (listing, _)) in category.Recipes)
         {
-            if (!rowByRecipeId.TryGetValue(descriptor.Name, out var row))
+            if (!rowByRecipeId.TryGetValue(listing.Name, out var row))
             {
-                // Emit listing-weight fields only: the host builds its marketplace from these without
-                // the full recursive descriptor, which it fetches lazily per recipe via PrepareRecipe.
-                // RecipeCount collapses the transitive RecipeList the host would otherwise only count.
+                // Serve the RecipeListing the marketplace already holds: RecipeCount was computed once
+                // at install, so listing never walks the descriptor tree. The host fetches the full
+                // descriptor lazily per recipe via PrepareRecipe.
                 row = new GetMarketplaceResponseRow
                 {
-                    Name = descriptor.Name,
-                    DisplayName = descriptor.DisplayName,
-                    Description = descriptor.Description,
-                    EstimatedEffortPerOccurrence = descriptor.EstimatedEffortPerOccurrence is { } ts
+                    Name = listing.Name,
+                    DisplayName = listing.DisplayName,
+                    Description = listing.Description,
+                    EstimatedEffortPerOccurrence = listing.EstimatedEffortPerOccurrence is { } ts
                         ? System.Xml.XmlConvert.ToString(ts) // ISO-8601 duration (e.g. "PT5M")
                         : null,
-                    Options = descriptor.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
-                    DataTables = descriptor.DataTables.Select(DataTableDescriptorDto.FromDescriptor).ToList(),
-                    RecipeCount = CountRecipes(descriptor),
+                    Options = listing.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
+                    DataTables = listing.DataTables.Select(DataTableDescriptorDto.FromDescriptor).ToList(),
+                    RecipeCount = listing.RecipeCount,
                     CategoryPaths = [],
-                    PackageName = _recipeOrigin.GetValueOrDefault(descriptor.Name)
+                    PackageName = _recipeOrigin.GetValueOrDefault(listing.Name)
                 };
-                rowByRecipeId[descriptor.Name] = row;
+                rowByRecipeId[listing.Name] = row;
             }
             row.CategoryPaths.Add(new List<CategoryDescriptorDto>(currentPath));
         }
@@ -730,18 +730,6 @@ public class RewriteRpcServer
         {
             CollectRecipes(rowByRecipeId, child, currentPath);
         }
-    }
-
-    // Returns 1 (this recipe) plus every transitive entry in its RecipeList. The host uses this as a
-    // sort key in place of the recursive RecipeList it would otherwise walk to compute it.
-    private static int CountRecipes(RecipeDescriptor descriptor)
-    {
-        var count = 1;
-        foreach (var sub in descriptor.RecipeList)
-        {
-            count += CountRecipes(sub);
-        }
-        return count;
     }
 
     [JsonRpcMethod("InstallRecipes", UseSingleObjectParameterDeserialization = true)]
@@ -1238,7 +1226,7 @@ public class RewriteRpcServer
             });
         }
 
-        var (descriptor, recipe) = found.Value;
+        var (_, recipe) = found.Value;
         if (recipe == null)
         {
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
@@ -2213,9 +2201,6 @@ public class GetMarketplaceResponseRow
     // 1 + every transitive RecipeList entry; the host uses it as a sort key.
     public int RecipeCount { get; set; }
 
-    // Retained for backward compatibility with peers that still emit the full recursive descriptor,
-    // but nullable and no longer emitted here — prefer the lightweight fields above.
-    public RecipeDescriptorDto? Descriptor { get; set; }
     public List<List<CategoryDescriptorDto>> CategoryPaths { get; set; } = [];
     public string? PackageName { get; set; }
 }

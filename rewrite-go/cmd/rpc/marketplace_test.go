@@ -21,9 +21,9 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
-// countRecipes must count a recipe plus every transitive entry in its RecipeList,
+// ToListing must count a recipe plus every transitive entry in its RecipeList,
 // not just its direct children — the host uses the value as a marketplace sort key.
-func TestCountRecipesIncludesTransitiveSubRecipes(t *testing.T) {
+func TestToListingCountsTransitiveSubRecipes(t *testing.T) {
 	desc := recipe.RecipeDescriptor{
 		Name: "root",
 		RecipeList: []recipe.RecipeDescriptor{
@@ -35,7 +35,7 @@ func TestCountRecipesIncludesTransitiveSubRecipes(t *testing.T) {
 			},
 		},
 	}
-	if got := countRecipes(desc); got != 3 {
-		t.Errorf("countRecipes = %d, want 3 (root + middle + leaf)", got)
+	if got := recipe.ToListing(desc).RecipeCount; got != 3 {
+		t.Errorf("ToListing(desc).RecipeCount = %d, want 3 (root + middle + leaf)", got)
 	}
 }

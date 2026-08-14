@@ -58,5 +58,9 @@ public class MarketplaceRecipeCountTest
         var root = rows.Single(r => r.DisplayName == "Root");
 
         Assert.Equal(3, root.RecipeCount); // root + middle + leaf
+
+        // Guard: the marketplace holds a RecipeListing (with the precomputed count), not a descriptor.
+        global::OpenRewrite.Core.RecipeListing held = marketplace.FindRecipe(typeof(RootRecipe).FullName!)!.Value.Listing;
+        Assert.Equal(3, held.RecipeCount);
     }
 }

@@ -15,17 +15,14 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {withMetrics0} from "./metrics";
-import {CategoryDescriptor, RecipeMarketplace} from "../../marketplace";
-import {Minutes, OptionDescriptor, RecipeDescriptor} from "../../recipe";
+import {CategoryDescriptor, RecipeListing, RecipeMarketplace} from "../../marketplace";
+import {Minutes, OptionDescriptor} from "../../recipe";
 import {DataTableDescriptor} from "../../data-table";
 
 export interface GetMarketplaceResponseRow {
     /**
-     * Listing-weight fields ({@link name} through {@link recipeCount}) carry everything the host
-     * needs to list the marketplace without materializing recipes. Up-to-date engines populate
-     * these and leave {@link descriptor} undefined; the full descriptor is fetched lazily per recipe
-     * via the separate PrepareRecipe RPC. A defined {@link name} selects this path in
-     * {@link toMarketplace}.
+     * Listing-weight fields the host builds a RecipeListing from. The full descriptor is fetched
+     * lazily per recipe via the separate PrepareRecipe RPC when detail or execution is needed.
      */
     readonly name?: string
     readonly displayName?: string
@@ -35,11 +32,6 @@ export interface GetMarketplaceResponseRow {
     readonly dataTables?: DataTableDescriptor[]
     /** 1 + every transitive recipeList entry; the host uses it as a sort key. */
     readonly recipeCount?: number
-    /**
-     * The full, recursive descriptor. Retained for backward compatibility with peers that still
-     * emit it, but no longer emitted by up-to-date engines — prefer the lightweight fields above.
-     */
-    readonly descriptor?: RecipeDescriptor
     readonly categoryPaths: CategoryDescriptor[][]
     /**
      * The package this recipe was contributed by, recorded at install time. Lets the host attribute
@@ -50,54 +42,31 @@ export interface GetMarketplaceResponseRow {
 }
 
 /**
- * 1 (this recipe) plus every transitive entry in its recipeList. The host uses this as a sort key
- * in place of the recursive recipeList it would otherwise walk to compute it.
+ * The {@link RecipeListing} a row stands for, built from its listing-weight fields.
  */
-function countRecipes(descriptor: RecipeDescriptor): number {
-    let count = 1;
-    for (const sub of descriptor.recipeList ?? []) {
-        count += countRecipes(sub);
-    }
-    return count;
+function rowToListing(row: GetMarketplaceResponseRow): RecipeListing {
+    const name = row.name ?? "";
+    return {
+        name,
+        displayName: row.displayName ?? name,
+        description: row.description ?? "",
+        estimatedEffortPerOccurrence: row.estimatedEffortPerOccurrence,
+        options: row.options,
+        dataTables: row.dataTables,
+        recipeCount: row.recipeCount ?? 1,
+    };
 }
 
 /**
- * Reconstructs the RecipeDescriptor a row stands for. Prefers the listing-weight fields (empty
- * recipeList/preconditions — detail is fetched lazily via PrepareRecipe); falls back to a
- * legacy peer's full {@link GetMarketplaceResponseRow.descriptor} when {@link name} is absent.
- */
-function rowToDescriptor(row: GetMarketplaceResponseRow): RecipeDescriptor {
-    if (row.name != null) {
-        const displayName = row.displayName ?? row.name;
-        return {
-            name: row.name,
-            displayName,
-            instanceName: displayName,
-            description: row.description ?? "",
-            tags: [],
-            estimatedEffortPerOccurrence: row.estimatedEffortPerOccurrence ?? 5,
-            options: row.options ?? [],
-            preconditions: [],
-            recipeList: [],
-            dataTables: row.dataTables ?? [],
-            maintainers: [],
-            contributors: [],
-            examples: [],
-        };
-    }
-    return row.descriptor!;
-}
-
-/**
- * Converts GetMarketplace response rows into a hydrated RecipeMarketplace.
+ * Converts GetMarketplace response rows into a hydrated RecipeMarketplace of {@link RecipeListing}s.
  * This is used by the RPC client to reconstruct the marketplace structure.
  */
 export async function toMarketplace(rows: GetMarketplaceResponseRow[]): Promise<RecipeMarketplace> {
     const marketplace = new RecipeMarketplace();
     for (const row of rows) {
-        const descriptor = rowToDescriptor(row);
+        const listing = rowToListing(row);
         for (const categoryPath of row.categoryPaths) {
-            await marketplace.root.install(descriptor, categoryPath);
+            await marketplace.root.install(listing, categoryPath);
         }
     }
     return marketplace;
@@ -112,10 +81,9 @@ export class GetMarketplace {
                 "GetMarketplace",
                 metricsCsv,
                 (context) => async () => {
-                    // Group recipes by name, collecting all category paths for each. Emit
-                    // listing-weight fields only: the host builds its marketplace from these
-                    // without the full recursive descriptor, which it fetches lazily per recipe
-                    // via PrepareRecipe. recipeCount collapses the transitive recipeList.
+                    // Serve the RecipeListings the marketplace already holds, grouping by name and
+                    // collecting each recipe's category paths. recipeCount was computed once at
+                    // install time; the full descriptor is fetched lazily per recipe via PrepareRecipe.
                     const rowByRecipeId = new Map<string, GetMarketplaceResponseRow & { categoryPaths: CategoryDescriptor[][] }>();
 
                     function collectRecipes(category: RecipeMarketplace.Category, categoryPath: CategoryDescriptor[]): void {
@@ -134,7 +102,7 @@ export class GetMarketplace {
                                     estimatedEffortPerOccurrence: recipe.estimatedEffortPerOccurrence,
                                     options: recipe.options,
                                     dataTables: recipe.dataTables,
-                                    recipeCount: countRecipes(recipe),
+                                    recipeCount: recipe.recipeCount,
                                     categoryPaths: [currentPath],
                                     packageName: recipeOrigin.get(recipe.name)
                                 });

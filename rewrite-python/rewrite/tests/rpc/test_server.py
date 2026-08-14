@@ -251,10 +251,10 @@ def test_handle_install_recipes_local_path_attributes_to_the_supplied_path(monke
 
 
 def test_count_recipes_includes_transitive_sub_recipes():
-    """recipeCount is 1 + every transitive recipe_list entry, not just direct children —
-    the host uses it as a marketplace sort key."""
+    """recipe_count is 1 + every transitive recipe_list entry, not just direct children —
+    computed once at install time; the host uses it as a marketplace sort key."""
     from types import SimpleNamespace
-    from rewrite.rpc.server import _count_recipes
+    from rewrite.marketplace import _count_recipes
 
     leaf = SimpleNamespace(recipe_list=[])
     middle = SimpleNamespace(recipe_list=[leaf])

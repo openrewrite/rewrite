@@ -16,7 +16,7 @@
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
-import {RecipeDescriptor, RecipeMarketplace} from "../../src";
+import {RecipeDescriptor, RecipeListing, RecipeMarketplace, toRecipeListing} from "../../src";
 import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
 
@@ -378,26 +378,35 @@ describe("InstallRecipes", () => {
             }, {unsafeCleanup: true});
         });
 
-        test("GetMarketplace recipeCount counts transitive sub-recipes", async () => {
+        test("toRecipeListing counts transitive sub-recipes", () => {
             // recipeCount must be 1 + every transitive recipeList entry, not just direct children —
-            // the host uses it as a marketplace sort key.
+            // computed once at install time; the host uses it as a marketplace sort key.
             const desc = (name: string, recipeList: RecipeDescriptor[] = []): RecipeDescriptor => ({
                 name, displayName: name, instanceName: name, description: "", tags: [],
                 estimatedEffortPerOccurrence: 5, options: [], preconditions: [],
                 recipeList, dataTables: [], maintainers: [], contributors: [], examples: []
             });
 
+            const listing = toRecipeListing(
+                desc("composite.root", [desc("composite.middle", [desc("composite.leaf")])]));
+
+            expect(listing.recipeCount).toBe(3); // root + middle + leaf
+        });
+
+        test("GetMarketplace serves the marketplace's stored RecipeListing", async () => {
+            // The marketplace holds RecipeListings; GetMarketplace serves the precomputed recipeCount
+            // straight off them rather than re-walking a descriptor tree.
             const marketplace = new RecipeMarketplace();
-            await marketplace.install(
-                desc("composite.root", [desc("composite.middle", [desc("composite.leaf")])]),
-                [{displayName: "Composite"}]
-            );
+            const listing: RecipeListing = {
+                name: "composite.root", displayName: "Root", description: "", recipeCount: 3
+            };
+            await marketplace.install(listing, [{displayName: "Composite"}]);
 
             const getMarketplace = captureGetMarketplace(marketplace, new Map());
             const rows = await getMarketplace();
 
             const row = rows.find(r => r.name === "composite.root");
-            expect(row?.recipeCount).toBe(3); // root + middle + leaf
+            expect(row?.recipeCount).toBe(3);
         });
 
         test("attributes npm-installed recipes to their package", async () => {
