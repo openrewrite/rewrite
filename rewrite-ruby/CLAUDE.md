@@ -2,24 +2,45 @@
 
 ## Parser front end
 
-This module parses Ruby with JRuby's **legacy `org.jruby.ast` AST**, reached through
-`Ruby.parseFile(String, InputStream, DynamicScope)`. JRuby 10 ships two parser front
-ends and still defaults to the legacy one, but the Prism provider is on the service
-path, so `RubyParser` pins the choice with the `jruby.parser.prism=false` system
-property before `JavaEmbedUtils.initialize` and guards the `RootNode` cast.
+This module parses Ruby with **Prism**, run standalone: `RubyParser` hands the source
+bytes to `org.ruby_lang.prism.wasm.Prism` with explicit `ParsingOptions` and loads the
+result with `Loader`. There is no `org.jruby.Ruby` runtime. The `jruby-base` dependency
+is kept only because it supplies and pins the Prism artifacts (`jruby-prism` →
+`prism-parser-api`/`prism-parser-wasm`).
 
-**Migrating to Prism (`org.ruby_lang.prism`) is the planned next stage.** The legacy
-AST exposes only 0-based line numbers — no columns, no offsets — which is why
-`RubyParserVisitor` re-lexes the source with its own `int cursor`. It also desugars
-exactly the constructs a lossless tree cannot afford to lose: `{x:, y:}` is
-indistinguishable from `{x: x, y: y}`, `def f(...)` is exploded into `*`/`**`/`&`
-parameters, and pattern captures/pins are flattened into hash pairs and bare variable
-reads. Prism gives every node a byte span plus first-class nodes for all of those.
+Compile against `org.ruby_lang.prism.*`. The same classes appear relocated as
+`org.jruby.internal.prism.*` inside `jruby-complete` — never depend on that jar.
 
-Therefore: **do not build new-syntax support on the legacy visitor.** Ruby 3.1+
-constructs (hash shorthand, `it`, endless methods, anonymous argument forwarding,
-`Data.define`, one-line pattern matching) are Prism work. Fixes to syntax the legacy
-visitor already handles are fair game.
+Three things shape `RubyParserVisitor`:
+
+- **Byte offsets.** Every Prism node carries `startOffset`/`length` as offsets into the
+  source *bytes*, while the LST and the printer work on the decoded `String`.
+  `PrismSource` owns both and translates between them; that translation is what makes
+  non-ASCII source round-trip. Use `prefix(node)` to consume up to a node's start — it
+  asserts the cursor landed exactly there, so a desync fails with file and offset
+  context instead of corrupting everything downstream.
+- **No comments, no token positions.** `ParseResult` has no comment array and the node
+  classes carry no `nameLoc`/`operatorLoc`/`openingLoc`, so whitespace, comments and
+  keywords are still re-lexed from the source with a linear `int cursor`. Node offsets
+  anchor that scanning; `peekWhitespace` survives only for genuinely optional tokens
+  (`then`, `do`, trailing commas).
+- **Heredocs live outside their node's span.** A heredoc node covers only its `<<~ID`
+  marker. Markers are queued as they are seen and their bodies are claimed the first
+  time the cursor crosses a newline, then folded into the tree by a final pass keyed by
+  node id.
+
+Two Prism behaviors worth knowing: `partialScript` is on so that fragments with a
+top-level `next`/`break`/`return` parse, and Prism will not close a heredoc whose
+terminator ends the file without a trailing newline, so it is always handed a
+newline-terminated copy of the bytes.
+
+Ruby syntax the visitor has not been taught reaches `defaultVisit`, which throws with
+the Prism node name. Known gaps: endless method definitions (`def x = expr`), `;` as a
+statement separator, `RescueModifierNode`, `MultiTargetNode`, pattern pins and captures.
+
+`RubyCorpusTest` measures where those gaps bite. It is skipped unless
+`-Druby.corpus.dir=<dir>` is set, and prints a parse rate plus a histogram of failure
+causes.
 
 See `doc/adr/0012-ruby-parsing-via-jruby.md`.
 
@@ -67,8 +88,9 @@ an LST element is printed, not containers for additional AST subtrees.
 to a rich type (J.* or Rb.*), never revert it back to J.Unknown.
 
 **Cursor management:** `RubyParserVisitor.peekWhitespace` is the only backtracking
-primitive; it snapshots both the cursor and the open-heredoc queue. Any speculative
-read must go through it rather than saving and restoring the cursor by hand.
+primitive; it snapshots the cursor and both heredoc maps. Any speculative read must go
+through it rather than saving and restoring the cursor by hand. Prefer anchoring to a
+node's offsets over speculating at all.
 
 **Whitespace is the parser's responsibility, not the printer's.** Every byte of the
 source must land in exactly one prefix, suffix or literal value. `rewriteRun(ruby("..."))`

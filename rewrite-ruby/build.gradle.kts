@@ -9,9 +9,10 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
 
-    // Pinned rather than `latest.release`: this is the artifact that produces the AST the parser is
-    // written against, matching how every other AST-producing dependency here is pinned. The JRuby
-    // major line also sets this module's Java floor, so a silent major bump would move the toolchain.
+    // Consumed for its Prism transitive (jruby-prism -> prism-parser-api/prism-parser-wasm), which
+    // produces the AST the parser is written against; no JRuby runtime is started. Pinned rather
+    // than `latest.release` because it is what fixes the Prism version, and because the JRuby major
+    // line sets this module's Java floor, so a silent major bump would move the toolchain.
     implementation("org.jruby:jruby-base:10.1.1.0")
 
     compileOnly(project(":rewrite-test"))

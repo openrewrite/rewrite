@@ -64,3 +64,24 @@ discarded at the Stage B cut-over.
 - `RubyParserVisitor`'s cursor arithmetic, backtracking and heredoc bookkeeping are written against
   line-granular positions. Stage B replaces that machinery rather than adapting it, so investment in
   it should be limited to keeping the current tests green.
+
+## Status: Stage B landed
+
+`RubyParserVisitor` now runs against `org.ruby_lang.prism.AbstractNodeVisitor` and `RubyParser` drives
+Prism standalone — source bytes through `ParsingOptions` and `Loader`, no `org.jruby.Ruby` runtime, no
+system-property pin. `jruby-base` stays as the dependency that supplies and versions the Prism
+artifacts. Node boundaries come from byte spans translated to char offsets, which is what fixed the
+emoji round-trip; `ParenthesesNode` retired the open-parenthesis backtracking; heredoc bodies are
+claimed off exact offsets when the cursor first crosses a newline, which is what made multiple
+heredocs on one line work.
+
+Prism has no comment list and no per-field locations, so whitespace, comments and keywords are still
+re-lexed from the source — anchored to node offsets rather than to line numbers. `partialScript` is
+on, because OpenRewrite is routinely handed fragments where `next`, `break` and `return` appear at the
+top level. Prism will not close a heredoc terminated at EOF without a trailing newline, so it is
+always handed a newline-terminated copy of the bytes.
+
+Ruby 3.x syntax the visitor has not been taught still reaches `defaultVisit` and throws. Measured over
+two corpora: redmine 998/1129 files (88%), dependabot-core 1855/2017 (92%). The largest remaining gaps
+are endless method definitions (`def x = expr`), `;` as a statement separator, `RescueModifierNode`
+and `MultiTargetNode`.
