@@ -44,4 +44,41 @@ public class AliasTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void symbolAlias() {
+        rewriteRun(
+          ruby(
+            """
+              alias :new_name :old_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void undef() {
+        rewriteRun(
+          ruby(
+            """
+              undef foo
+              undef :foo, :bar
+              undef method_missing, respond_to?
+              """
+          )
+        );
+    }
+
+    @Test
+    void undefInsideClass() {
+        rewriteRun(
+          ruby(
+            """
+              class Sealed
+                undef  :dup , :clone
+              end
+              """
+          )
+        );
+    }
 }

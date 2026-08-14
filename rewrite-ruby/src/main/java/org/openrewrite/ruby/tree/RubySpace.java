@@ -89,6 +89,9 @@ public class RubySpace {
         SUB_ARRAY_LENGTH_PREFIX,
         SUB_ARRAY_PREFIX,
         SYMBOL_PREFIX,
+        UNDEF_NAMES,
+        UNDEF_NAMES_SUFFIX,
+        UNDEF_PREFIX,
         YIELD_DATA,
         YIELD_DATA_SUFFIX,
     }

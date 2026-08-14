@@ -596,6 +596,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitUndef(Rb.Undef undef, PrintOutputCapture<P> p) {
+        beforeSyntax(undef, RubySpace.Location.UNDEF_PREFIX, p);
+        p.append("undef");
+        visitContainer("", undef.getPadding().getNames(), RubyContainer.Location.UNDEF_NAMES, ",", "", p);
+        afterSyntax(undef, p);
+        return undef;
+    }
+
+    @Override
     public J visitUnary(Rb.Unary unary, PrintOutputCapture<P> p) {
         beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
         p.append(unary.getOperator() == Rb.Unary.Type.Pin ? "^" : "defined?");

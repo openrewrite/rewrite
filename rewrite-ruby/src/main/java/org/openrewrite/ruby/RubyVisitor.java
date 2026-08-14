@@ -91,8 +91,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             a = (Rb.Alias) temp;
         }
-        a = a.withNewName((J.Identifier) visit(a.getNewName(), p));
-        a = a.withExistingName((J.Identifier) visit(a.getExistingName(), p));
+        a = a.withNewName(visitAndCast(a.getNewName(), p));
+        a = a.withExistingName(visitAndCast(a.getExistingName(), p));
         return a;
     }
 
@@ -422,6 +422,21 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
         o = o.withBody((J.Block) visit(o.getBody(), p));
         return o;
+    }
+
+    public J visitUndef(Rb.Undef undef, P p) {
+        Rb.Undef u = undef;
+        u = u.withPrefix(visitSpace(u.getPrefix(), RubySpace.Location.UNDEF_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(u, p);
+        if (!(temp instanceof Rb.Undef)) {
+            return temp;
+        } else {
+            u = (Rb.Undef) temp;
+        }
+        u = u.getPadding().withNames(visitContainer(u.getPadding().getNames(),
+                RubyContainer.Location.UNDEF_NAMES, p));
+        return u;
     }
 
     public J visitPatternBinding(Rb.PatternBinding patternBinding, P p) {

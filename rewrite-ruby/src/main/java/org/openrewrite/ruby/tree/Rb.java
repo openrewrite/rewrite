@@ -2481,6 +2481,82 @@ public interface Rb extends J {
         }
     }
 
+    /**
+     * {@code undef foo, :bar} removes method definitions. Its names take the same two forms as
+     * {@link Alias}: a bare {@link J.Identifier} or, written with a leading colon, an {@link Symbol}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Undef implements Rb, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JContainer<Expression> names;
+
+        public List<Expression> getNames() {
+            return names.getElements();
+        }
+
+        public Undef withNames(List<Expression> names) {
+            return getPadding().withNames(JContainer.withElements(this.names, names));
+        }
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            return v.visitUndef(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Undef t;
+
+            public JContainer<Expression> getNames() {
+                return t.names;
+            }
+
+            public Undef withNames(JContainer<Expression> names) {
+                return t.names == names ? t : new Undef(t.id, t.prefix, t.markers, names);
+            }
+        }
+    }
+
     @Value
     @With
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

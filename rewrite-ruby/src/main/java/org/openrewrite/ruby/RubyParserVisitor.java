@@ -2746,7 +2746,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         skip("alias");
         return new Rb.Alias(randomId(), prefix, Markers.EMPTY,
-                aliasName(node.new_name), aliasName(node.old_name));
+                methodName(node.new_name), methodName(node.old_name));
     }
 
     @Override
@@ -2754,11 +2754,32 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         skip("alias");
         return new Rb.Alias(randomId(), prefix, Markers.EMPTY,
-                aliasName(node.new_name), aliasName(node.old_name));
+                methodName(node.new_name), methodName(node.old_name));
     }
 
-    private Expression aliasName(Nodes.Node node) {
-        return node instanceof Nodes.SymbolNode ? identifier(node) : convertExpression(node);
+    @Override
+    public J visitUndefNode(Nodes.UndefNode node) {
+        Space prefix = prefix(node);
+        skip("undef");
+        List<JRightPadded<Expression>> names = new ArrayList<>(node.names.length);
+        for (int i = 0; i < node.names.length; i++) {
+            names.add(padRight(methodName(node.names[i]),
+                    i == node.names.length - 1 ? EMPTY : sourceBefore(",")));
+        }
+        return new Rb.Undef(randomId(), prefix, Markers.EMPTY,
+                JContainer.build(EMPTY, names, Markers.EMPTY));
+    }
+
+    /**
+     * The method named by an `alias` or `undef`. Prism gives a `SymbolNode` whether the source
+     * writes the name bare or as `:sym`, and only the leading colon tells them apart.
+     */
+    private Expression methodName(Nodes.Node node) {
+        if (!(node instanceof Nodes.SymbolNode)) {
+            return convertExpression(node);
+        }
+        return source.charAt(charStart(node)) == ':' ?
+                symbol((Nodes.SymbolNode) node, false) : identifier(node);
     }
 
     // ------------------------------------------------------------------ case / pattern matching
