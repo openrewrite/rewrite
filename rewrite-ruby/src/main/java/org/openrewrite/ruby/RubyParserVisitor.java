@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
@@ -2339,17 +2340,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         JContainer<Statement> parameters = methodParameters(node.parameters);
 
-        List<JRightPadded<Statement>> bodyStatements = ListUtils.mapLast(bodyStatements(node.body), statement -> {
-            J element = statement.getElement();
-            if (element instanceof J.Return || !(element instanceof Expression)) {
-                return statement;
-            }
-            return statement.withElement(new J.Return(randomId(), element.getPrefix(),
-                    Markers.EMPTY.add(new ImplicitReturn(randomId())), ((Expression) element).withPrefix(EMPTY)));
-        });
-
-        J.Block body = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
-                bodyStatements, sourceBefore("end"));
+        J.Block body = endlessBody(node.body);
+        if (body == null) {
+            body = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                    implicitReturn(bodyStatements(node.body)), sourceBefore("end"));
+        }
 
         //noinspection unchecked
         J.MethodDeclaration method = new J.MethodDeclaration(
@@ -2374,6 +2369,34 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     padLeft(receiverDot, method.withPrefix(EMPTY)));
         }
         return method;
+    }
+
+    private List<JRightPadded<Statement>> implicitReturn(List<JRightPadded<Statement>> statements) {
+        return ListUtils.mapLast(statements, statement -> {
+            J element = statement.getElement();
+            if (element instanceof J.Return || element instanceof J.Empty || !(element instanceof Expression)) {
+                return statement;
+            }
+            return statement.withElement(new J.Return(randomId(), element.getPrefix(),
+                    Markers.EMPTY.add(new ImplicitReturn(randomId())), ((Expression) element).withPrefix(EMPTY)));
+        });
+    }
+
+    /**
+     * An endless method (`def pi = 3.14`) has no `end`, so its body is a single-statement block
+     * marked {@link OmitBraces}. The block prefix holds the space before the `=`. Prism exposes no
+     * location for the `=`, so it is found by peeking past the parameter list.
+     */
+    private J.@Nullable Block endlessBody(Nodes.@Nullable Node body) {
+        Optional<Space> equals = peekWhitespace(0, (n, before) ->
+                source.startsWith("=", cursor) && !source.startsWith("==", cursor) ?
+                        before : null);
+        if (!equals.isPresent()) {
+            return null;
+        }
+        skip("=");
+        return new J.Block(randomId(), equals.get(), Markers.EMPTY.add(new OmitBraces(randomId())),
+                JRightPadded.build(false), implicitReturn(bodyStatements(body)), EMPTY);
     }
 
     private JContainer<Statement> methodParameters(Nodes.@Nullable ParametersNode parameters) {

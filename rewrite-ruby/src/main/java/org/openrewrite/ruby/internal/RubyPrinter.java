@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
@@ -229,9 +230,18 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 RubyContainer.Location.CLASS_METHOD_DECLARATION_PARAMETERS, ",",
                 omitParentheses ? "" : ")", p);
         visit(method.getMethod().getBody(), p);
-        p.append("end");
+        if (!isEndlessBody(method.getMethod().getBody())) {
+            p.append("end");
+        }
         afterSyntax(method, p);
         return method;
+    }
+
+    /**
+     * An endless method (`def pi = 3.14`) prints its body after an `=` and has no `end`.
+     */
+    private static boolean isEndlessBody(J.@Nullable Block body) {
+        return body != null && body.getMarkers().findFirst(OmitBraces.class).isPresent();
     }
 
     @Override
@@ -894,6 +904,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+            if (isEndlessBody(block)) {
+                p.append("=");
+            }
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
             visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
             afterSyntax(block, p);
@@ -1066,7 +1079,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                     JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",",
                     omitParentheses ? "" : ")", p);
             visit(method.getBody(), p);
-            p.append("end");
+            if (!isEndlessBody(method.getBody())) {
+                p.append("end");
+            }
             afterSyntax(method, p);
             return method;
         }

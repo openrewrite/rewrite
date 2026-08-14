@@ -184,4 +184,121 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    /**
+     * Ruby 3.0 endless method definitions.
+     */
+    @Test
+    void endless() {
+        rewriteRun(
+          ruby(
+            """
+              def pi = 3.14
+              """
+          )
+        );
+    }
+
+    @Test
+    void endlessWithParameters() {
+        rewriteRun(
+          ruby(
+            """
+              def area(r) = 3.14 * r * r
+              """
+          )
+        );
+    }
+
+    @Test
+    void endlessWithDefaultParameter() {
+        rewriteRun(
+          ruby(
+            """
+              def scale(n, by = 2) = n * by
+              """
+          )
+        );
+    }
+
+    @Test
+    void endlessClassMethod() {
+        rewriteRun(
+          ruby(
+            """
+              class Money
+                def self.zero = new(0)
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * Ruby 3.1 relaxed endless method bodies to allow a command call without parentheses.
+     */
+    @Test
+    void endlessCommandBody() {
+        rewriteRun(
+          ruby(
+            """
+              def log = puts "hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void endlessAmongOtherMethods() {
+        rewriteRun(
+          ruby(
+            """
+              class Money
+                def initialize(cents)
+                  @cents = cents
+                end
+
+                def to_s = "$#{@cents / 100.0}"
+
+                def zero?
+                  @cents == 0
+                end
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * Only the parenthesized form can omit the space before `=`; `def pi=3.14` is a setter
+     * definition to Ruby, not an endless method.
+     */
+    @Test
+    void endlessNoSpaceAroundEquals() {
+        rewriteRun(
+          ruby(
+            """
+              def pi()=3.14
+              """
+          )
+        );
+    }
+
+    /**
+     * A method named `==` must not be mistaken for an endless method body.
+     */
+    @Test
+    void equalityOperatorMethod() {
+        rewriteRun(
+          ruby(
+            """
+              class Money
+                def ==(other)
+                  other.cents == @cents
+                end
+              end
+              """
+          )
+        );
+    }
 }
