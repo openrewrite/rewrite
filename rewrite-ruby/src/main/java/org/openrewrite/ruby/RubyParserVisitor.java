@@ -2356,6 +2356,39 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         );
     }
 
+    /**
+     * `expr rescue fallback` is the same shape as a rescue clause with no exception types and a
+     * one-statement body; the {@link RescueModifier} marker records that it was written inline.
+     */
+    @Override
+    public J visitRescueModifierNode(Nodes.RescueModifierNode node) {
+        Space prefix = prefix(node);
+        J.Block body = new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                singletonList(padRight(convertStatement(node.expression), EMPTY)), EMPTY);
+
+        Space catchPrefix = sourceBefore("rescue");
+        J.VariableDeclarations parameter = new J.VariableDeclarations(randomId(), EMPTY, Markers.EMPTY,
+                emptyList(), emptyList(), new J.MultiCatch(randomId(), EMPTY, Markers.EMPTY, emptyList()),
+                null, emptyList());
+        J.Try.Catch handler = new J.Try.Catch(
+                randomId(),
+                catchPrefix,
+                Markers.EMPTY,
+                new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY, padRight(parameter, EMPTY)),
+                new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
+                        singletonList(padRight(convertStatement(node.rescue_expression), EMPTY)), EMPTY)
+        );
+
+        return new Rb.Rescue(
+                randomId(),
+                prefix,
+                Markers.EMPTY.add(new RescueModifier(randomId())),
+                new J.Try(randomId(), EMPTY, Markers.EMPTY, JContainer.empty(), body,
+                        singletonList(handler), null),
+                null
+        );
+    }
+
     private J.Try.Catch rescueClause(Nodes.RescueNode node) {
         Space prefix = sourceBefore("rescue");
         Space typesPrefix = whitespace();

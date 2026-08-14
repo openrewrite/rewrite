@@ -230,8 +230,65 @@ public class RescueTest implements RewriteTest {
                 raw_source
                 1
               end
-              
+
               content
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifier() {
+        rewriteRun(
+          ruby(
+            """
+              x = Integer(s) rescue nil
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierWithHashFallback() {
+        rewriteRun(
+          ruby(
+            """
+              config = YAML.load_file(path) rescue {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierInMethodBody() {
+        rewriteRun(
+          ruby(
+            """
+              def load(path)
+                YAML.load_file(path) rescue {}
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierOnStatement() {
+        rewriteRun(
+          ruby(
+            """
+              do_something rescue nil
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierChainedWithAssignmentOperator() {
+        rewriteRun(
+          ruby(
+            """
+              @count ||= Integer(input) rescue 0
               """
           )
         );
