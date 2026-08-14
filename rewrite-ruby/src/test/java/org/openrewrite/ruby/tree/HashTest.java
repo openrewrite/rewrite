@@ -86,4 +86,48 @@ public class HashTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void interpolatedStringLabel() {
+        rewriteRun(
+          ruby(
+            """
+              h = { "#{prefix}_URL": 1 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void interpolatedStringLabelInArgument() {
+        rewriteRun(
+          ruby(
+            """
+              f(a, "#{x}": 1)
+              """
+          )
+        );
+    }
+
+    @Test
+    void interpolatedStringRocketKey() {
+        rewriteRun(
+          ruby(
+            """
+              h = { "#{prefix}_URL" => 1, :"#{prefix}" => 2 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringLabel() {
+        rewriteRun(
+          ruby(
+            """
+              h = { "literal": 1, 'single': 2 }
+              """
+          )
+        );
+    }
 }

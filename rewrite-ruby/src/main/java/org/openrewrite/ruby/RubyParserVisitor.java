@@ -1012,6 +1012,14 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitInterpolatedSymbolNode(Nodes.InterpolatedSymbolNode node) {
+        return interpolatedSymbol(node, false);
+    }
+
+    /**
+     * @param label {@code true} when this symbol is a hash key written as {@code "#{x}":}, whose
+     *              trailing colon belongs to the key/value separator rather than to the symbol.
+     */
+    private Rb.Symbol interpolatedSymbol(Nodes.InterpolatedSymbolNode node, boolean label) {
         Space prefix = prefix(node);
         String delimiter = source.substring(cursor, charStart(node.parts[0]));
         cursor = charStart(node.parts[0]);
@@ -1026,7 +1034,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             name = new Rb.ComplexString(randomId(), EMPTY, Markers.EMPTY, "",
                     JContainer.build(converted), emptyList());
         }
-        cursor = charEnd(node);
+        cursor = charEnd(node) - (label ? 1 : 0);
         return new Rb.Symbol(randomId(), prefix, Markers.EMPTY, delimiter, name, null);
     }
 
@@ -2071,10 +2079,19 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     private Rb.Hash.KeyValue keyValue(Nodes.AssocNode node) {
         Space prefix = prefix(node);
-        boolean label = node.key instanceof Nodes.SymbolNode && text(node.key).endsWith(":");
-        Expression key = label ?
-                symbol((Nodes.SymbolNode) node.key, true) :
-                convertExpression(node.key);
+        // `a:`, `"a":` and `"#{a}":` all end at a colon that belongs to the separator rather than
+        // to the key; the `:"..."` form of either instead ends at its closing delimiter
+        boolean label = (node.key instanceof Nodes.SymbolNode ||
+                         node.key instanceof Nodes.InterpolatedSymbolNode) &&
+                        text(node.key).endsWith(":");
+        Expression key;
+        if (!label) {
+            key = convertExpression(node.key);
+        } else if (node.key instanceof Nodes.SymbolNode) {
+            key = symbol((Nodes.SymbolNode) node.key, true);
+        } else {
+            key = interpolatedSymbol((Nodes.InterpolatedSymbolNode) node.key, true);
+        }
         Space separatorPrefix = whitespace();
         Rb.Hash.KeyValue.Separator separator;
         if (label) {
