@@ -173,9 +173,9 @@ val pytestTest by tasks.registering(Exec::class) {
     description = "Run Python pytest tests"
 
     dependsOn(pythonInstall)
-    // Tests marked `requires_java_rpc` are skipped unless test-classpath.txt names a Java RPC
-    // server to spawn, so without this they pass by never running. Devs invoking pytest directly
-    // still need :generateTestClasspath once.
+    // Tests marked `requires_java_rpc` run only where test-classpath.txt names a Java RPC server to
+    // spawn, so generating it is part of running the suite. Devs invoking pytest directly still
+    // need :generateTestClasspath once.
     dependsOn(tasks.named("generateTestClasspath"))
 
     workingDir = pythonDir
@@ -195,8 +195,7 @@ val pytestTest by tasks.registering(Exec::class) {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(pythonDir.resolve("pyproject.toml"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    // Part of the cache key, so a Java-side change re-runs the tests that exercise it rather than
-    // replaying a cached pass against a stale classpath.
+    // Part of the cache key, so a Java-side change re-runs the tests that exercise it.
     inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
         .withNormalizer(ClasspathNormalizer::class)
     outputs.file(pythonDir.resolve("build/test-results/pytest/junit.xml"))
