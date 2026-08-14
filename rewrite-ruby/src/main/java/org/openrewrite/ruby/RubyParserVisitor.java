@@ -20,6 +20,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -407,29 +408,34 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private List<JRightPadded<Statement>> statements(Nodes.@Nullable StatementsNode statements) {
-        if (statements == null || statements.body.length == 0) {
-            return emptyList();
+        List<JRightPadded<Statement>> converted = new ArrayList<>(
+                statements == null ? 0 : statements.body.length);
+        if (statements != null) {
+            for (Nodes.Node statement : statements.body) {
+                emptySeparators(converted);
+                converted.add(separated(convertStatement(statement)));
+            }
         }
-        List<JRightPadded<Statement>> converted = new ArrayList<>(statements.body.length);
-        for (Nodes.Node statement : statements.body) {
-            converted.add(padRight(convertStatement(statement), EMPTY));
-        }
+        emptySeparators(converted);
         return converted;
     }
 
     /**
      * @return The statements as a single {@link Statement}, collapsing to the sole statement when
-     * there is exactly one so that the common case does not gain a synthetic block.
+     * there is exactly one so that the common case does not gain a synthetic block. A `;` anywhere
+     * in the list keeps the block, because only a right-padded statement can carry the separator.
      */
     private Statement bodyStatement(Nodes.@Nullable StatementsNode statements) {
-        if (statements == null || statements.body.length == 0) {
+        List<JRightPadded<Statement>> converted = statements(statements);
+        if (converted.isEmpty()) {
             return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
         }
-        if (statements.body.length == 1) {
-            return convertStatement(statements.body[0]);
+        JRightPadded<Statement> only = converted.get(0);
+        if (converted.size() == 1 && only.getAfter().isEmpty() && only.getMarkers().getMarkers().isEmpty()) {
+            return only.getElement();
         }
         return new J.Block(randomId(), EMPTY, Markers.EMPTY, JRightPadded.build(false),
-                statements(statements), EMPTY);
+                converted, EMPTY);
     }
 
     private Expression bodyExpression(Nodes.@Nullable StatementsNode statements) {
@@ -439,13 +445,52 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private List<JRightPadded<Statement>> bodyStatements(Nodes.@Nullable Node body) {
-        if (body == null) {
-            return emptyList();
-        }
         if (body instanceof Nodes.StatementsNode) {
             return statements((Nodes.StatementsNode) body);
         }
-        return singletonList(padRight(convertStatement(body), EMPTY));
+        List<JRightPadded<Statement>> converted = new ArrayList<>(1);
+        emptySeparators(converted);
+        if (body != null) {
+            converted.add(separated(convertStatement(body)));
+            emptySeparators(converted);
+        }
+        return converted;
+    }
+
+    /**
+     * A `;` after a statement rides on that statement's right padding as a {@link Semicolon}
+     * marker, with the space in front of it as the padding's suffix.
+     */
+    private JRightPadded<Statement> separated(Statement statement) {
+        return peekWhitespace(statement, (s, before) -> {
+            if (!source.startsWith(";", cursor)) {
+                return null;
+            }
+            cursor++;
+            return padRight(s, before).withMarkers(Markers.EMPTY.add(new Semicolon(randomId())));
+        }).orElseGet(() -> padRight(statement, EMPTY));
+    }
+
+    /**
+     * A `;` with no statement in front of it — after a `def`/`class`/`if` header, or doubled up as
+     * in {@code a;;b} — becomes a {@link J.Empty} statement carrying the {@link Semicolon} marker,
+     * so that the statement list still accounts for every byte.
+     */
+    private void emptySeparators(List<JRightPadded<Statement>> into) {
+        while (true) {
+            Optional<JRightPadded<Statement>> separator = peekWhitespace(0, (n, before) -> {
+                if (!source.startsWith(";", cursor)) {
+                    return null;
+                }
+                cursor++;
+                return padRight((Statement) new J.Empty(randomId(), before, Markers.EMPTY), EMPTY)
+                        .withMarkers(Markers.EMPTY.add(new Semicolon(randomId())));
+            });
+            if (!separator.isPresent()) {
+                return;
+            }
+            into.add(separator.get());
+        }
     }
 
     /**
@@ -2537,6 +2582,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 Markers.EMPTY, padRight(convertExpression(node.predicate), EMPTY));
 
         List<JRightPadded<Statement>> cases = new ArrayList<>(node.conditions.length);
+        emptySeparators(cases);
         for (Nodes.WhenNode when : node.conditions) {
             cases.add(padRight(caseClause(when, when.conditions, when.statements, false), EMPTY));
         }
@@ -2551,6 +2597,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 Markers.EMPTY, padRight(convertExpression(node.predicate), EMPTY));
 
         List<JRightPadded<Statement>> cases = new ArrayList<>(node.conditions.length);
+        emptySeparators(cases);
         for (Nodes.InNode in : node.conditions) {
             cases.add(padRight(caseClause(in, new Nodes.Node[]{in.pattern}, in.statements, true), EMPTY));
         }

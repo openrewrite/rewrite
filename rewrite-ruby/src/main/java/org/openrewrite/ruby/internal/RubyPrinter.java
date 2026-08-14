@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -64,6 +65,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         for (JRightPadded<Statement> statement : compilationUnit.getPadding().getStatements()) {
             visit(statement.getElement(), p);
             visitSpace(statement.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            visitMarkers(statement.getMarkers(), p);
         }
         visitSpace(compilationUnit.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         return compilationUnit;
@@ -570,6 +572,19 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         return yield;
     }
 
+    /**
+     * A `;` statement separator rides on the right padding of the statement it follows, so it
+     * prints from the padding's markers rather than from the statement itself.
+     */
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if (marker instanceof Semicolon) {
+            p.append(';');
+        }
+        //noinspection unchecked
+        return (M) marker;
+    }
+
     protected void beforeSyntax(J j, RubySpace.Location loc, PrintOutputCapture<P> p) {
         beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }
@@ -667,6 +682,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             JRightPadded<? extends J> node = nodes.get(i);
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
+            visitMarkers(node.getMarkers(), p);
             if (i < nodes.size() - 1) {
                 p.append(suffixBetween);
             } else {
@@ -745,7 +761,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-            if (marker instanceof org.openrewrite.java.marker.Semicolon) {
+            if (marker instanceof Semicolon) {
                 p.append(';');
             }
             return super.visitMarker(marker, p);
