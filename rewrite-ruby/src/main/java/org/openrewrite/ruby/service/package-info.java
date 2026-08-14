@@ -13,19 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.ruby.marker;
+@NullMarked
+@NonNullFields
+package org.openrewrite.ruby.service;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
-
-import java.util.UUID;
-
-/**
- * The "unless" keyword inverts an if condition.
- */
-@Value
-@With
-public class Unless implements Marker {
-    UUID id;
-}
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

@@ -4,6 +4,9 @@ plugins {
 }
 
 dependencies {
+    // Targeting Java 21 makes Gradle select rewrite-java's shadowed variant, which declares no
+    // transitive dependencies, so rewrite-core has to be requested directly (as rewrite-java-21 does).
+    api(project(":rewrite-core"))
     api(project(":rewrite-java"))
 
     // Pinned rather than `latest.release`: this is the artifact that produces the AST the parser is

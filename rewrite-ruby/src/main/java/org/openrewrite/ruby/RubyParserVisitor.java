@@ -125,12 +125,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         } else {
             elements = singletonList(padRight(convertExpression(node.getFirstNode()), sourceBefore(",")));
         }
-        elements = ListUtils.concat(elements, padRight(new Rb.Splat(
-                randomId(),
-                sourceBefore("*"),
-                Markers.EMPTY,
-                convertExpression(node.getSecondNode())
-        ), omitBrackets ? EMPTY : sourceBefore("]")));
+        // JRuby 10 hands back the SplatNode itself where 9.4 handed back the splatted value.
+        Expression splat = node.getSecondNode() instanceof SplatNode ?
+                convertExpression(node.getSecondNode()) :
+                new Rb.Splat(
+                        randomId(),
+                        sourceBefore("*"),
+                        Markers.EMPTY,
+                        convertExpression(node.getSecondNode())
+                );
+        elements = ListUtils.concat(elements, padRight(splat, omitBrackets ? EMPTY : sourceBefore("]")));
 
         return new Rb.Array(
                 randomId(),
@@ -291,6 +295,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitBeginNode(BeginNode node) {
+        // JRuby 10 wraps `begin ... rescue/ensure ... end` in a BeginNode that 9.4 did not emit.
+        // Rb.Rescue owns the begin/end keywords, so unwrap rather than nest.
+        if (node.getBodyNode() instanceof RescueNode || node.getBodyNode() instanceof EnsureNode) {
+            return convert(node.getBodyNode());
+        }
         Space prefix = sourceBefore("begin");
         J body = convert(node.getBodyNode());
         if (!(body instanceof J.Block)) {
@@ -2189,21 +2198,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         TypeTree exceptionType;
         if (exceptionTypes.size() == 1) {
-            J elem = exceptionTypes.get(0).getElement();
-            if (!(elem instanceof TypeTree)) {
-                elem = new Rb.ExpressionTypeTree(
-                        randomId(),
-                        elem.getPrefix(),
-                        Markers.EMPTY,
-                        elem.withPrefix(EMPTY)
-                );
-            }
-            exceptionType = (TypeTree) elem;
+            exceptionType = asTypeTree(exceptionTypes.get(0).getElement());
         } else {
-            //noinspection unchecked
             exceptionType = new J.MultiCatch(randomId(), EMPTY, Markers.EMPTY,
-                    exceptionTypes.stream().map(t -> (JRightPadded<NameTree>)
-                            (JRightPadded<?>) t).collect(toList()));
+                    exceptionTypes.stream()
+                            .map(t -> new JRightPadded<NameTree>(asTypeTree(t.getElement()), t.getAfter(), t.getMarkers()))
+                            .collect(toList()));
         }
 
         J.VariableDeclarations exceptionVariable = new J.VariableDeclarations(
@@ -3045,6 +3045,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private Statement convertStatement(@Nullable Node t) {
+        if (t == null) {
+            // e.g. the empty body of `if cond then end`; the surrounding whitespace lives in the
+            // padding around this element, so it must be a real element rather than null.
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
         J j = convert(t);
         if (!(j instanceof Statement)) {
             j = new Rb.ExpressionStatement(randomId(), (Expression) j);
@@ -3053,6 +3058,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private Expression convertExpression(@Nullable Node t) {
+        if (t == null) {
+            return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        }
         J j = convert(t);
         if (!(j instanceof Expression)) {
             return new Rb.StatementExpression(randomId(), (Statement) j);
@@ -3061,16 +3069,19 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     private TypeTree convertTypeTree(@Nullable Node t) {
-        J j = convert(t);
-        if (!(j instanceof TypeTree)) {
-            j = new Rb.ExpressionTypeTree(
-                    randomId(),
-                    j.getPrefix(),
-                    Markers.EMPTY,
-                    j.withPrefix(EMPTY)
-            );
+        return asTypeTree(convert(t));
+    }
+
+    private TypeTree asTypeTree(J j) {
+        if (j instanceof TypeTree) {
+            return (TypeTree) j;
         }
-        return (TypeTree) j;
+        return new Rb.ExpressionTypeTree(
+                randomId(),
+                j.getPrefix(),
+                Markers.EMPTY,
+                j.withPrefix(EMPTY)
+        );
     }
 
     private J convert(@Nullable Node t) {

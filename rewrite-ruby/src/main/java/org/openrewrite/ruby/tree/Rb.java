@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
@@ -27,6 +28,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
 import org.openrewrite.ruby.internal.RubyPrinter;
+import org.openrewrite.ruby.service.RubyWhitespaceValidationService;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -152,13 +154,23 @@ public interface Rb extends J {
         }
 
         /**
-         * Ruby has no auto-format implementation yet, and the Java one would rewrite Ruby whitespace
-         * into Java conventions. Fail loudly rather than corrupt the source.
+         * @throws UnsupportedOperationException for {@link AutoFormatService}; Ruby has no auto-format
+         * implementation yet and the Java one would rewrite Ruby whitespace into Java conventions.
          */
+        @SuppressWarnings("unchecked")
         @Override
         public <S1, T extends S1> T service(Class<S1> service) {
-            if (AutoFormatService.class.getName().equals(service.getName())) {
+            String serviceName = service.getName();
+            if (AutoFormatService.class.getName().equals(serviceName)) {
                 throw new UnsupportedOperationException("rewrite-ruby does not implement AutoFormatService");
+            }
+            try {
+                if (WhitespaceValidationService.class.getName().equals(serviceName)) {
+                    return (T) service.getClassLoader().loadClass(RubyWhitespaceValidationService.class.getName())
+                            .getConstructor().newInstance();
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
             return JavaSourceFile.super.service(service);
         }
