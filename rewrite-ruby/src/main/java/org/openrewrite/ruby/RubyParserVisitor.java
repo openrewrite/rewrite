@@ -89,15 +89,20 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     private static final class PendingHeredoc {
         final Rb.Heredoc placeholder;
-        final String marker;
         final String id;
         final boolean squiggly;
 
-        PendingHeredoc(Rb.Heredoc placeholder, String marker, String id, boolean squiggly) {
+        /**
+         * {@code <<~} and {@code <<-} accept an indented terminator; a plain {@code <<ID} requires
+         * it at column 0.
+         */
+        final boolean indentable;
+
+        PendingHeredoc(Rb.Heredoc placeholder, String id, boolean squiggly, boolean indentable) {
             this.placeholder = placeholder;
-            this.marker = marker;
             this.id = id;
             this.squiggly = squiggly;
+            this.indentable = indentable;
         }
     }
 
@@ -133,9 +138,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             public Rb.Heredoc visitHeredoc(Rb.Heredoc heredoc, Integer p) {
                 Rb.Heredoc finalized = finalizedHeredocs.get(heredoc.getId());
                 return finalized == null ? heredoc :
-                        heredoc.withValue(finalized.getValue())
-                                .withAroundValue(finalized.getAroundValue())
-                                .withEnd(finalized.getEnd());
+                        heredoc.withValue(finalized.getValue()).withEnd(finalized.getEnd());
             }
         }.visitNonNull(cu, 0);
     }
@@ -184,9 +187,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             if (newline >= 0 && newline < next) {
                 Space space = RubySpace.format(source, cursor, newline + 1);
                 cursor = newline + 1;
-                for (UUID flushed : flushHeredocs()) {
-                    finalizedHeredocs.put(flushed, finalizedHeredocs.get(flushed).withAroundValue(space));
-                }
+                flushHeredocs();
                 return space;
             }
         }
@@ -195,12 +196,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return space;
     }
 
-    private List<UUID> flushHeredocs() {
-        List<UUID> flushed = new ArrayList<>(pendingHeredocs.size());
+    private void flushHeredocs() {
         while (!pendingHeredocs.isEmpty()) {
             PendingHeredoc pending = pendingHeredocs.poll();
             int bodyStart = cursor;
-            int terminator = indexOfHeredocTerminator(bodyStart, pending.id);
+            int terminator = indexOfHeredocTerminator(bodyStart, pending.id, pending.indentable);
             String body = source.substring(bodyStart, terminator);
             cursor = terminator + pending.id.length();
 
@@ -209,7 +209,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     EMPTY,
                     Markers.EMPTY,
                     pending.squiggly ? org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF(body) : body,
-                    pending.marker + "\n" + body + pending.id,
+                    body,
                     null,
                     JavaType.Primitive.String
             ));
@@ -227,28 +227,35 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             }
 
             finalizedHeredocs.put(pending.placeholder.getId(), heredoc.withEnd(end));
-            flushed.add(pending.placeholder.getId());
         }
-        return flushed;
     }
 
-    private int indexOfHeredocTerminator(int from, String id) {
-        for (int i = from; i < source.length(); i++) {
-            if (source.startsWith(id, i)) {
-                boolean lineStart = true;
-                for (int j = i - 1; j >= 0; j--) {
-                    char c = source.charAt(j);
-                    if (c == '\n') {
-                        break;
-                    } else if (c != ' ' && c != '\t') {
-                        lineStart = false;
-                        break;
-                    }
-                }
-                if (lineStart) {
-                    return i;
+    /**
+     * A heredoc closes on a line that holds nothing but the terminator: leading blanks are allowed
+     * only for the indentable {@code <<~}/{@code <<-} forms, and nothing at all may follow the id.
+     * Returns the offset of the id itself.
+     */
+    private int indexOfHeredocTerminator(int from, String id, boolean indentable) {
+        for (int lineStart = from; lineStart <= source.length(); ) {
+            int candidate = lineStart;
+            if (indentable) {
+                while (candidate < source.length() &&
+                       (source.charAt(candidate) == ' ' || source.charAt(candidate) == '\t')) {
+                    candidate++;
                 }
             }
+            if (source.startsWith(id, candidate)) {
+                int after = candidate + id.length();
+                if (after >= source.length() || source.charAt(after) == '\n' ||
+                    (source.charAt(after) == '\r' && source.startsWith("\r\n", after))) {
+                    return candidate;
+                }
+            }
+            int newline = source.indexOf('\n', lineStart);
+            if (newline < 0) {
+                break;
+            }
+            lineStart = newline + 1;
         }
         throw new IllegalStateException("Unterminated heredoc <<" + id + " in " + sourcePath);
     }
@@ -670,7 +677,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         int i = 2;
         boolean squiggly = marker.charAt(i) == '~';
-        if (marker.charAt(i) == '~' || marker.charAt(i) == '-') {
+        boolean indentable = squiggly || marker.charAt(i) == '-';
+        if (indentable) {
             i++;
         }
         String id = marker.substring(i);
@@ -678,8 +686,10 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             id = id.substring(1, id.length() - 1);
         }
 
-        Rb.Heredoc placeholder = new Rb.Heredoc(randomId(), prefix, Markers.EMPTY, null, null, EMPTY);
-        pendingHeredocs.add(new PendingHeredoc(placeholder, marker, id, squiggly));
+        Rb.Heredoc placeholder = new Rb.Heredoc(randomId(), prefix, Markers.EMPTY, marker, id,
+                new J.Literal(randomId(), EMPTY, Markers.EMPTY, "", "", null, JavaType.Primitive.String),
+                EMPTY);
+        pendingHeredocs.add(new PendingHeredoc(placeholder, id, squiggly, indentable));
         return placeholder;
     }
 

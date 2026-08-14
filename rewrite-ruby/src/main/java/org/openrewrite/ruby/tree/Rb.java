@@ -1340,17 +1340,27 @@ public interface Rb extends J {
 
         Space prefix;
         Markers markers;
+
+        /**
+         * The opening token as written, e.g. {@code <<~SQL} or {@code <<-'EOS'}. It is the only
+         * part of the heredoc that prints where the node sits; the body follows the next newline.
+         */
+        String opener;
+
+        /**
+         * The terminator that closes the body, e.g. {@code SQL} for any of {@code <<SQL},
+         * {@code <<~SQL} or {@code <<-"SQL"}. Printed at the start of a line of its own.
+         */
+        String delimiter;
+
+        /**
+         * The body, whose {@code valueSource} is the source between the marker's line and the
+         * terminator and whose value is the text the heredoc evaluates to (dedented for {@code <<~}).
+         */
         J.Literal value;
 
         /**
-         * The space that is split (i.e. non-contiguous) because of the heredoc body.
-         * We know that the heredoc body will exist precisely after the first newline character
-         * and the remainder of the space will continue from there.
-         */
-        Space aroundValue;
-
-        /**
-         * The space after the end delimiter up to the next newline in the source code.
+         * The space after the terminator up to the next newline in the source code.
          */
         Space end;
 

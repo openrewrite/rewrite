@@ -75,6 +75,12 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             visitMarkers(statement.getMarkers(), p);
         }
         visitSpace(compilationUnit.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
+        // a heredoc whose body found no newline to follow (its statement was deleted, say) would
+        // otherwise be dropped from the output entirely
+        while (!openHeredocs.isEmpty()) {
+            p.append('\n');
+            appendHeredocBody(requireNonNull(openHeredocs.poll()), p);
+        }
         return compilationUnit;
     }
 
@@ -360,14 +366,44 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         return hash;
     }
 
+    /**
+     * Only the {@code <<~ID} marker prints here; the body is emitted by
+     * {@link RubyJavaPrinter#visitSpace} at the next newline, which is where Ruby puts it.
+     */
     @Override
     public J visitHeredoc(Rb.Heredoc heredoc, PrintOutputCapture<P> p) {
         beforeSyntax(heredoc, RubySpace.Location.HEREDOC_PREFIX, p);
-        String valueSource = requireNonNull(heredoc.getValue().getValueSource());
-        p.append(valueSource.substring(0, valueSource.indexOf('\n')));
+        p.append(heredoc.getOpener());
         openHeredocs.add(heredoc);
         afterSyntax(heredoc, p);
         return heredoc;
+    }
+
+    private void appendHeredocBody(Rb.Heredoc heredoc, PrintOutputCapture<P> p) {
+        J.Literal value = heredoc.getValue();
+        String body = value.getValueSource();
+        if (body == null) {
+            body = value.getValue() == null ? "" : value.getValue().toString();
+        }
+        p.append(body);
+        if (!startsALine(body)) {
+            // a recipe rewrote the body without a trailing newline; the terminator still needs one
+            p.append('\n');
+        }
+        p.append(heredoc.getDelimiter());
+        visitSpace(heredoc.getEnd(), Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    private static boolean startsALine(String body) {
+        for (int i = body.length() - 1; i >= 0; i--) {
+            char c = body.charAt(i);
+            if (c == '\n') {
+                return true;
+            } else if (c != ' ' && c != '\t' && c != '\r') {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -771,38 +807,31 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             }
         }
 
+        /**
+         * The bodies of the heredocs opened on a line follow the newline that ends it, whichever
+         * {@link Space} happens to hold that newline — matching on the identity of the space the
+         * parser split would break as soon as a recipe rebuilt it.
+         */
         @Override
         public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
             if (!openHeredocs.isEmpty()) {
-                Queue<Rb.Heredoc> around = new LinkedList<>();
-                for (Rb.Heredoc h : openHeredocs) {
-                    if (h.getAroundValue() == space) {
-                        around.add(h);
-                    }
-                }
-                openHeredocs.removeAll(around);
+                PrintOutputCapture<P> p2 = new PrintOutputCapture<>(p.getContext(), p.getMarkerPrinter());
+                super.visitSpace(space, loc, p2);
+                String printed = p2.getOut();
 
-                if (!around.isEmpty()) {
-                    PrintOutputCapture<P> p2 = new PrintOutputCapture<>(p.getContext(), p.getMarkerPrinter());
-                    super.visitSpace(space, loc, p2);
-                    String printed = p2.getOut();
-
-                    while (!around.isEmpty()) {
+                if (printed.indexOf('\n') >= 0) {
+                    Queue<Rb.Heredoc> flushing = new LinkedList<>(openHeredocs);
+                    openHeredocs.clear();
+                    while (!flushing.isEmpty()) {
                         int nextNewline = printed.indexOf('\n');
                         p.append(printed.substring(0, nextNewline + 1));
                         printed = printed.substring(nextNewline + 1);
-
-                        Rb.Heredoc heredoc = requireNonNull(around.poll());
-                        String valueSource = requireNonNull(heredoc.getValue().getValueSource());
-                        p.append(valueSource.substring(valueSource.indexOf('\n') + 1));
-
-                        visitSpace(heredoc.getEnd(), Space.Location.LANGUAGE_EXTENSION, p);
+                        appendHeredocBody(requireNonNull(flushing.poll()), p);
                     }
-
-                    p.append(printed); // print remainder after last heredoc
-
-                    return space;
                 }
+
+                p.append(printed); // print remainder after last heredoc
+                return space;
             }
             return super.visitSpace(space, loc, p);
         }

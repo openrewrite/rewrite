@@ -319,6 +319,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             h = (Rb.Heredoc) temp;
         }
         h = h.withValue((J.Literal) visit(h.getValue(), p));
+        h = h.withEnd(visitSpace(h.getEnd(), RubySpace.Location.HEREDOC_END, p));
         h = h.withType(visitType(h.getType(), p));
         return h;
     }

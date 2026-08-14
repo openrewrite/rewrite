@@ -25,9 +25,12 @@ Three things shape `RubyParserVisitor`:
   anchor that scanning; `peekWhitespace` survives only for genuinely optional tokens
   (`then`, `do`, trailing commas).
 - **Heredocs live outside their node's span.** A heredoc node covers only its `<<~ID`
-  marker. Markers are queued as they are seen and their bodies are claimed the first
+  opener. Openers are queued as they are seen and their bodies are claimed the first
   time the cursor crosses a newline, then folded into the tree by a final pass keyed by
-  node id.
+  node id. A body only closes on a line holding nothing but the terminator — indented
+  only for `<<~`/`<<-`, at column 0 for a plain `<<ID`. `Rb.Heredoc` keeps the opener and
+  the terminator as their own fields, and the printer replays the body at the first
+  newline it emits after the opener, so no recipe that rewrites whitespace can strand it.
 
 Three Prism behaviors worth knowing: `partialScript` is on so that fragments with a
 top-level `next`/`break`/`return` parse, `mainScript` is off so that a shebang naming
