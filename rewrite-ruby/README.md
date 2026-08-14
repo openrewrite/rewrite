@@ -23,6 +23,7 @@ Any Ruby syntax the visitor has not been taught reaches `defaultVisit`, which th
 | Ruby syntax | LST element | Example(s) | Why an `Rb` type? |
 |---|---|---|---|
 | Source file | `Rb.CompilationUnit` | any `.rb` file | Ruby files are a list of arbitrary statements. `J.CompilationUnit` holds only imports and class declarations. |
+| Data section | `Rb.DataSection` | `__END__` and everything after it | Ruby stops parsing at `__END__` and hands the rest to the program as `DATA`, so the text is held verbatim on the compilation unit rather than parsed. |
 | Array literal, implicit array | `Rb.Array` | `[1, 2]`, `a, b = 1, 2` | `J.NewArray` models a typed Java array creation. Ruby arrays are literals with optional brackets, so the same type also carries bracket-less target and argument lists. |
 | Hash literal | `Rb.Hash`, `Rb.Hash.KeyValue` | `{a: 1, "b" => 2}` | Java has no hash literal, and the two separators (`:` label vs `=>` rocket) are part of the syntax. |
 | Symbol | `Rb.Symbol` | `:name`, `:"with space"`, `%s(sym)` | An interned name with several delimiter spellings; no `J` equivalent. |

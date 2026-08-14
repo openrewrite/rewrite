@@ -118,6 +118,15 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = whitespace();
         List<JRightPadded<Statement>> statements = program == null ?
                 emptyList() : statements(program.statements);
+        Space eof = whitespace();
+        // Prism stops at `__END__` and reports the rest as the data section, which the cursor is
+        // now sitting on. Its own end offset can run past the source, so the text is taken from
+        // the cursor to the end rather than from the reported span.
+        Rb.DataSection dataSection = result.dataLocation == null ? null :
+                new Rb.DataSection(randomId(), EMPTY, Markers.EMPTY, source.substring(cursor));
+        if (dataSection != null) {
+            cursor = source.length();
+        }
         Rb.CompilationUnit cu = new Rb.CompilationUnit(
                 randomId(),
                 prefix,
@@ -128,7 +137,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 charsetBomMarked,
                 null,
                 statements,
-                whitespace()
+                eof,
+                dataSection
         );
         if (finalizedHeredocs.isEmpty()) {
             return cu;
@@ -157,8 +167,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return source.substring(charStart(node), charEnd(node));
     }
 
-    private static String str(byte[] bytes) {
-        return new String(bytes, StandardCharsets.UTF_8);
+    /**
+     * Prism hands back constant-pool and unescaped bytes in the source's own encoding, so they have
+     * to be decoded with the same charset the byte offsets were built from.
+     */
+    private String str(byte[] bytes) {
+        return new String(bytes, src.getCharset());
     }
 
     /**
@@ -337,14 +351,14 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             if (inSingleLineComment) {
                 inSingleLineComment = current != '\n';
                 continue;
+            } else if (current == '#') {
+                // deliberately does not skip the next character: an empty `#` comment line
+                // would otherwise swallow the newline and take the following line with it
+                inSingleLineComment = true;
+                continue;
             } else if (length > i + 1) {
-                if (current == '#') {
-                    // deliberately does not skip the next character: an empty `#` comment line
-                    // would otherwise swallow the newline and take the following line with it
-                    inSingleLineComment = true;
-                    continue;
-                } else if (i == 0 || i == source.length() - "=end".length() ||
-                           source.charAt(i - 1) == '\n') {
+                if (i == 0 || i == source.length() - "=end".length() ||
+                    source.charAt(i - 1) == '\n') {
                     if (source.startsWith("=begin", i)) {
                         inMultiLineComment = true;
                         i++;

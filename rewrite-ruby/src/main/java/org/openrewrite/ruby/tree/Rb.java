@@ -118,6 +118,16 @@ public interface Rb extends J {
         @With
         Space eof;
 
+        /**
+         * The {@code __END__} section, when the file has one. It sits after {@link #eof} because
+         * Ruby stops parsing at the {@code __END__} line and hands the rest to the program as
+         * {@code DATA}.
+         */
+        @Getter
+        @With
+        @Nullable
+        DataSection dataSection;
+
         public List<Statement> getStatements() {
             return JRightPadded.getElements(statements);
         }
@@ -139,7 +149,7 @@ public interface Rb extends J {
         public Rb.CompilationUnit withCharsetName(String charsetName) {
             return this.charsetName == charsetName ? this : new Rb.CompilationUnit(
                     this.typesInUse, this.padding, id, prefix, markers, sourcePath, fileAttributes,
-                    charsetName, charsetBomMarked, checksum, statements, eof
+                    charsetName, charsetBomMarked, checksum, statements, eof, dataSection
             );
         }
 
@@ -247,7 +257,7 @@ public interface Rb extends J {
             public Rb.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
                 return t.statements == statements ? t : new Rb.CompilationUnit(t.typesInUse, t.padding, t.id,
                         t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked,
-                        t.checksum, statements, t.eof);
+                        t.checksum, statements, t.eof, t.dataSection);
             }
 
             @Override
@@ -2125,6 +2135,31 @@ public interface Rb extends J {
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * The {@code __END__} line and everything after it, which Ruby does not parse: the program
+     * reads it back verbatim through {@code DATA}, so the text is held exactly as written.
+     */
+    @Value
+    @With
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class DataSection implements Rb {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        /**
+         * Everything from {@code __END__} to the end of the file, including that line's own newline.
+         */
+        String text;
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            return v.visitDataSection(this, p);
         }
     }
 

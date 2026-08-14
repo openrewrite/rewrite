@@ -113,7 +113,7 @@ public class RubyParser implements Parser {
                 PrismSource source = new PrismSource(text, charset);
 
                 ParseResult parseResult = parse(path, source);
-                Rb.CompilationUnit cu = new RubyParserVisitor(input.getPath(), input.getFileAttributes(),
+                Rb.CompilationUnit cu = new RubyParserVisitor(path, input.getFileAttributes(),
                         source, is.isCharsetBomMarked()).visitProgram(parseResult);
                 parsingListener.parsed(input, cu);
                 return requirePrintEqualsInput(cu, input, relativeTo, ctx);

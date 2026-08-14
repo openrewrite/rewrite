@@ -81,7 +81,16 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             p.append('\n');
             appendHeredocBody(requireNonNull(openHeredocs.poll()), p);
         }
+        visit(compilationUnit.getDataSection(), p);
         return compilationUnit;
+    }
+
+    @Override
+    public J visitDataSection(Rb.DataSection dataSection, PrintOutputCapture<P> p) {
+        beforeSyntax(dataSection, RubySpace.Location.DATA_SECTION_PREFIX, p);
+        p.append(dataSection.getText());
+        afterSyntax(dataSection, p);
+        return dataSection;
     }
 
     @Override

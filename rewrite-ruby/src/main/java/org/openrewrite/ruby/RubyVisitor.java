@@ -78,7 +78,15 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), statement ->
                 visitRightPadded(statement, RubyRightPadded.Location.COMPILATION_UNIT_STATEMENT_SUFFIX, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
+        c = c.withDataSection((Rb.DataSection) visit(c.getDataSection(), p));
         return c;
+    }
+
+    public J visitDataSection(Rb.DataSection dataSection, P p) {
+        Rb.DataSection d = dataSection;
+        d = d.withPrefix(visitSpace(d.getPrefix(), RubySpace.Location.DATA_SECTION_PREFIX, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
     }
 
     public J visitAlias(Rb.Alias alias, P p) {

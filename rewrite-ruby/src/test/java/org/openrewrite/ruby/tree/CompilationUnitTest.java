@@ -18,9 +18,69 @@ package org.openrewrite.ruby.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ruby.Assertions.ruby;
 
 public class CompilationUnitTest implements RewriteTest {
+
+    @Test
+    void dataSection() {
+        rewriteRun(
+          ruby(
+            """
+              puts DATA.read
+              __END__
+              name: value
+              - a list
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getDataSection())
+              .isNotNull()
+              .satisfies(data -> assertThat(data.getText())
+                .isEqualTo("__END__\nname: value\n- a list")))
+          )
+        );
+    }
+
+    @Test
+    void emptyDataSection() {
+        rewriteRun(
+          ruby(
+            """
+              puts 1
+              __END__
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDataSection() {
+        rewriteRun(
+          ruby(
+            "puts 1\n",
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getDataSection()).isNull())
+          )
+        );
+    }
+
+    /**
+     * Sinatra keeps its inline templates after {@code __END__}, where a `@@` line is data rather
+     * than Ruby.
+     */
+    @Test
+    void inlineTemplates() {
+        rewriteRun(
+          ruby(
+            """
+              get('/') { erb :index }
+              __END__
+
+              @@ index
+              %div.title Hello world
+              """
+          )
+        );
+    }
 
     /**
      * A shebang naming a wrapper rather than ruby itself, as `Rakefile` and `bin/` scripts do.

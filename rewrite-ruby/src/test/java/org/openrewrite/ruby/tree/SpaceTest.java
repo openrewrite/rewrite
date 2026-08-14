@@ -76,6 +76,31 @@ public class SpaceTest implements RewriteTest {
         );
     }
 
+    /**
+     * A `#` that is the last character of a file with no trailing newline is still a comment, and
+     * one that collects no text of its own.
+     */
+    @Test
+    void commentEndingTheFile() {
+        rewriteRun(
+          ruby("x = 1\n#")
+        );
+    }
+
+    @Test
+    void bareCommentIsTheWholeFile() {
+        rewriteRun(
+          ruby("#")
+        );
+    }
+
+    @Test
+    void commentEndingTheFileWithText() {
+        rewriteRun(
+          ruby("x = 1\n# ")
+        );
+    }
+
     @Test
     void multiLineComment() {
         rewriteRun(

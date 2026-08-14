@@ -45,6 +45,7 @@ public class RubySpace {
         COMPLEX_STRING_STRINGS_SUFFIX,
         COMPLEX_STRING_VALUE_PREFIX,
         COMPLEX_STRING_VALUE_SUFFIX,
+        DATA_SECTION_PREFIX,
         DELIMITED_ARRAY_ELEMENTS,
         DELIMITED_ARRAY_ELEMENT_SUFFIX,
         DELIMITED_ARRAY_PREFIX,
@@ -168,9 +169,10 @@ public class RubySpace {
                     }
             }
         }
-        // If a file ends with a single-line comment there may be no terminating newline
-        if (comment.length() > 0) {
-            comments.add(new RubyTextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
+        // If a file ends with a comment there may be no terminating newline. The state, not the
+        // buffer, is what says a comment is open: a bare `#` collects no text of its own.
+        if (inSingleLineComment || inMultiLineComment) {
+            comments.add(new RubyTextComment(inMultiLineComment, comment.toString(), prefix.toString(), Markers.EMPTY));
             prefix.setLength(0);
         }
 
