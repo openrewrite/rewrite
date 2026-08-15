@@ -364,4 +364,35 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void soleParentIsParenthesizedFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              val f = new (Int => Unit) {
+                def apply(i: Int): Unit = ()
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void mixinIsParenthesizedFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            class B
+            object O {
+              val h = new B with (Int => Unit) {
+                def apply(i: Int): Unit = ()
+              }
+            }
+            """
+          )
+        );
+    }
+
 }

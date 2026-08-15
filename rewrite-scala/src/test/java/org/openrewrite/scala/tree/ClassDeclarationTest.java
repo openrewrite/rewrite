@@ -799,4 +799,32 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parentIsParenthesizedFunctionType() {
+        rewriteRun(
+            scala(
+                """
+                trait T
+                class C extends T with (Int => Unit) {
+                  def apply(i: Int): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parentIsParenthesizedByNameFunctionType() {
+        rewriteRun(
+            scala(
+                """
+                trait T
+                class C extends T with (() => Unit) {
+                  def apply(): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
 }

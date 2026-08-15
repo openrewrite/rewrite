@@ -2185,7 +2185,8 @@ class ScalaTreeVisitor(
                 }
             } else {
                 // Simple interface/trait: new Runnable { ... }
-                val typeTree = visitTree(firstParent).asInstanceOf[TypeTree]
+                val typeTree = visitParentType(firstParent)
+                if (typeTree == null) throw unmappedException(firstParent)
                 (typeTree, null)
             }
         }
@@ -2201,16 +2202,12 @@ class ScalaTreeVisitor(
             sourceBefore("with"),
             Markers.EMPTY))
           for (i <- 1 until parents.size - 1) {
-            val tt = visitTree(parents(i)) match {
-              case t: TypeTree => t
-              case _ => throw unmappedException(parents(i))
-            }
+            val tt = visitParentType(parents(i))
+            if (tt == null) throw unmappedException(parents(i))
             mixinElements.add(new JRightPadded[TypeTree](tt, sourceBefore("with"), Markers.EMPTY))
           }
-          val lastTt = visitTree(parents.last) match {
-            case t: TypeTree => t
-            case _ => throw unmappedException(parents.last)
-          }
+          val lastTt = visitParentType(parents.last)
+          if (lastTt == null) throw unmappedException(parents.last)
           mixinElements.add(JRightPadded.build(lastTt))
           new J.IntersectionType(
             Tree.randomId(),
@@ -5361,11 +5358,13 @@ class ScalaTreeVisitor(
             val parent = sourceParents(i)
             val savedCursorWith = cursor
 
-            val implType: TypeTree = parentTypeTree(visitTree(parent)) match {
-              case tt: TypeTree => tt
-              case null =>
-                cursor = savedCursorWith
-                throw unmappedException(parent)
+            val implType: TypeTree = parent match {
+              case _: untpd.Parens => visitParentType(parent)
+              case _ => parentTypeTree(visitTree(parent))
+            }
+            if (implType == null) {
+              cursor = savedCursorWith
+              throw unmappedException(parent)
             }
             
             val sepMarkers = if (i - 1 < separators.size) {
@@ -8956,6 +8955,31 @@ class ScalaTreeVisitor(
    * arguments stay first-class LST nodes instead of being crammed into a
    * `J.Identifier` name. Returns null when no rich mapping fits, so callers can fall back.
    */
+  /** Visits a template parent. A parenthesized parent, as in `new X with (A => B)`, is a
+   *  type rather than an expression, so it is visited in type position and stays
+   *  parenthesized. Returns null when the parent maps to no type.
+   */
+  private def visitParentType(tree: Trees.Tree[?]): TypeTree = tree match {
+    case p: untpd.Parens =>
+      val prefix = extractPrefix(p.span)
+      val openIdx = positionOfNext("(", cursor)
+      if (openIdx >= 0) cursor = openIdx + 1
+      val inner = visitTypeTree(p.t)
+      if (inner == null) null
+      else {
+        val beforeClose = sourceBefore(")")
+        new J.ParenthesizedTypeTree(Tree.randomId(), prefix, Markers.EMPTY,
+          Collections.emptyList(),
+          new J.Parentheses[TypeTree](Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            new JRightPadded[TypeTree](inner, beforeClose, Markers.EMPTY)))
+      }
+    case other =>
+      visitTree(other) match {
+        case t: TypeTree => t
+        case _ => null
+      }
+  }
+
   private def parentTypeTree(visited: J): TypeTree = visited match {
     case tt: TypeTree => tt
     case nc: J.NewClass if nc.getClazz != null && nc.getPadding.getArguments != null =>
