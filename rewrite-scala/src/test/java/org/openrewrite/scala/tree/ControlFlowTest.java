@@ -408,4 +408,53 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void endIf() {
+        rewriteRun(
+            scala(
+                """
+                object O:
+                  def f(b: Boolean): Int =
+                    if b then
+                      1
+                    else
+                      2
+                    end if
+                """
+            )
+        );
+    }
+
+    @Test
+    void endWhile() {
+        rewriteRun(
+            scala(
+                """
+                object O:
+                  def f(): Unit =
+                    var i = 0
+                    while i < 3 do
+                      i = i + 1
+                    end while
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMatch() {
+        rewriteRun(
+            scala(
+                """
+                object O:
+                  def f(i: Int): Int =
+                    i match
+                      case _ => 1
+                    end match
+                """
+            )
+        );
+    }
+
 }

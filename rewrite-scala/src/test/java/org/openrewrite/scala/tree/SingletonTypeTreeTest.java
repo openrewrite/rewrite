@@ -51,4 +51,17 @@ class SingletonTypeTreeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void literalTypeInReturnPosition() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def unapply(s: String): true = true
+              }
+              """
+          )
+        );
+    }
 }

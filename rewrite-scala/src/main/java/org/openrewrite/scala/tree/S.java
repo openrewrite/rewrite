@@ -1743,6 +1743,51 @@ public interface S extends J {
     }
 
     /**
+     * A Scala literal type: the {@code true} of {@code def f(): true}, or {@code "a"}, {@code -1}.
+     * The literal itself is the type; there is no {@code .type} suffix as in {@link SingletonType}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class LiteralType implements S, TypeTree, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        // Not `J.Literal` so that negated literals like `-1` are captured too
+        @With @Getter
+        Expression literal;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public LiteralType(UUID id, Space prefix, Markers markers, Expression literal,
+                           @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.literal = literal;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitLiteralType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
      * Represents a Scala singleton type: {@code foo.type}.
      * The qualifier is any expression, typically an object/module reference.
      */

@@ -137,3 +137,45 @@ case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }
+
+/**
+ * A Scala 3 end marker closing a definition, e.g. the `end X` of `class X: ... end X`.
+ * Holds the verbatim source from the end of the element's own content through the
+ * marker, so it covers the newline and indent ahead of it — a method body is an
+ * expression with no trailing space of its own. Dotty checks end markers and then
+ * discards them, so there is no tree to map them to.
+ */
+case class EndMarker(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `+` or `-` variance marker on a kind parameter of a higher-kinded type
+ * parameter, as in the `F[-_, +_]` of `def f[F[-_, +_]]`. The variance is source
+ * syntax the wildcard itself does not carry.
+ */
+case class KindParameterVariance(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The access modifier on a class's primary constructor, e.g. the `private` in
+ * `class X private (i: Int)`. Holds the verbatim source text including the space
+ * ahead of it, which the printer emits between the class name and the `(`.
+ */
+case class ConstructorModifier(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The keyword introducing one parent in a class declaration's parent list. Scala 3
+ * accepts either `with` or `,` and the two may be mixed (`extends A, B with C`), so
+ * each parent after the first carries the separator that introduces it.
+ */
+case class ParentSeparator(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}

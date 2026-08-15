@@ -618,4 +618,106 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void commaSeparatedParents() {
+        rewriteRun(
+            scala(
+                """
+                trait A
+                trait B
+                class C extends A, B
+                """
+            )
+        );
+    }
+
+    @Test
+    void privateConstructor() {
+        rewriteRun(
+            scala(
+                """
+                final class X private ()
+                """
+            )
+        );
+    }
+
+    @Test
+    void qualifiedPrivateConstructor() {
+        rewriteRun(
+            scala(
+                """
+                class X private[scala] (val x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void usingWithAnnotatedParameter() {
+        rewriteRun(
+            scala(
+                """
+                class X(using @deprecated ctx: String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMarker() {
+        rewriteRun(
+            scala(
+                """
+                class X:
+                  def f(): Int = 1
+                end X
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMarkerAfterBracedBody() {
+        rewriteRun(
+            scala(
+                """
+                class X {
+                  def f(): Int = 1
+                }
+                end X
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMarkerOnTrait() {
+        rewriteRun(
+            scala(
+                """
+                trait T:
+                  def f(): Int
+                end T
+                """
+            )
+        );
+    }
+
+    @Test
+    void nestedEndMarkers() {
+        rewriteRun(
+            scala(
+                """
+                class X:
+                  def f(): Int =
+                    1
+                  end f
+                end X
+                """
+            )
+        );
+    }
+
 }

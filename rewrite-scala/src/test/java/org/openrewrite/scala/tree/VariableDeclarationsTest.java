@@ -227,4 +227,32 @@ class VariableDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void endMarkerOnVal() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              val x =
+                1
+              end x
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnGiven() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              given x: Int = 1
+              end x
+            """
+          )
+        );
+    }
+
 }

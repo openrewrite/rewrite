@@ -1103,4 +1103,44 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void varianceOnHigherKindedTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            trait X[To, From] {
+              def substituteBoth[F[-_, +_]](ftf: F[To, From]): F[From, To]
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnMethod() {
+        rewriteRun(
+          scala(
+            """
+            object Test:
+              def foo(): Int =
+                1
+              end foo
+            """
+          )
+        );
+    }
+    @Test
+    void implicitParameterWithAnnotation() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo[B](implicit @implicitNotFound("m") ev: Ordering[B]): Unit = ()
+            }
+            """
+          )
+        );
+    }
+
 }
