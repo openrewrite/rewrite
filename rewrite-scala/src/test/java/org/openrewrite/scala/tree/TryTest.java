@@ -535,4 +535,21 @@ class TryTest implements RewriteTest {
             """
         ));
     }
+    @Test
+    void endMarkerOnTry() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              def f(): Int =
+                try
+                  1
+                catch
+                  case _: Exception => 0
+                end try
+            """
+          )
+        );
+    }
+
 }

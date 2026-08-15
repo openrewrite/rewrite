@@ -4701,12 +4701,13 @@ class ScalaTreeVisitor(
       case null => throw unmappedException(forTree.body)
     }
 
+    val forMarkers = withEndMarker(Markers.EMPTY.addIfAbsent(ScalaForLoop.create()), forTree.span)
     updateCursor(forTree.span.end)
 
     val forEachLoop = new J.ForEachLoop(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY.addIfAbsent(ScalaForLoop.create()),
+      forMarkers,
       control,
       JRightPadded.build(body)
     )
@@ -7212,8 +7213,11 @@ class ScalaTreeVisitor(
 
     val finallyBlock = buildTryFinalizer(parsedTry.finalizer)
 
+    val parsedTryMarkers = withEndMarker(Markers.EMPTY, parsedTry.span)
     updateCursor(parsedTry.span.end)
-    buildTryNode(prefix, body, catches, finallyBlock)
+    val parsedTryNode = buildTryNode(prefix, body, catches, finallyBlock)
+    if (parsedTryMarkers.getMarkers.isEmpty) parsedTryNode
+    else parsedTryNode.withMarkers[J](parsedTryNode.getMarkers.add(parsedTryMarkers.getMarkers.get(0)))
   }
 
   private def visitTryImpl(tryTree: Trees.Try[?]): J = {
@@ -7228,8 +7232,11 @@ class ScalaTreeVisitor(
 
     val finallyBlock = buildTryFinalizer(tryTree.finalizer)
 
+    val tryMarkers = withEndMarker(Markers.EMPTY, tryTree.span)
     updateCursor(tryTree.span.end)
-    buildTryNode(prefix, body, catches, finallyBlock)
+    val tryNode = buildTryNode(prefix, body, catches, finallyBlock)
+    if (tryMarkers.getMarkers.isEmpty) tryNode
+    else tryNode.withMarkers[J](tryNode.getMarkers.add(tryMarkers.getMarkers.get(0)))
   }
 
   /** Visit the `try` body, wrapping a bare statement/expression in an OmitBraces block. */
@@ -8118,8 +8125,15 @@ class ScalaTreeVisitor(
 
     val endPos = Math.max(0, ext.span.end - offsetAdjustment)
     val remaining = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
+    var extEndMarker: String = null
     val endSpace = if (isExtBraceless) {
-      Space.format(remaining)
+      // dotty's span covers a trailing `end extension`, which is not whitespace
+      endMarkerAt(cursor, endPos) match {
+        case Some((start, text)) =>
+          extEndMarker = source.substring(cursor, start + text.length)
+          Space.EMPTY
+        case None => Space.format(remaining)
+      }
     } else {
       val closeBrace = remaining.lastIndexOf('}')
       if (closeBrace > 0) Space.format(remaining.substring(0, closeBrace)) else Space.EMPTY
@@ -8130,7 +8144,10 @@ class ScalaTreeVisitor(
     } else Markers.EMPTY
     val body = new J.Block(Tree.randomId(), blockPrefix, blockMarkers,
       JRightPadded.build(false), methodStmts, endSpace)
-    S.ExtensionMethods.build(Tree.randomId(), prefix, Markers.EMPTY, typeParameters, parameters, body)
+    val extMarkers =
+      if (extEndMarker == null) Markers.EMPTY
+      else Markers.EMPTY.add(EndMarker(Tree.randomId(), extEndMarker))
+    S.ExtensionMethods.build(Tree.randomId(), prefix, extMarkers, typeParameters, parameters, body)
   }
 
   /** Build the type-parameter clause `[A, B]` of an extension, advancing the cursor past `]`. */

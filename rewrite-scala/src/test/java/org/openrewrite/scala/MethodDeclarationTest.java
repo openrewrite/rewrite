@@ -1143,4 +1143,31 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void endMarkerOnExtension() {
+        rewriteRun(
+          scala(
+            """
+            extension (x: Int)
+              def double: Int = x * 2
+            end extension
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnExtensionWithSeveralMethods() {
+        rewriteRun(
+          scala(
+            """
+            extension (x: Int)
+              def a: Int = x
+              def b: Int = x
+            end extension
+            """
+          )
+        );
+    }
+
 }
