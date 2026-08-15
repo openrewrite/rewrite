@@ -659,8 +659,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (elem instanceof J.VariableDeclarations) {
                 J.VariableDeclarations vd = (J.VariableDeclarations) elem;
                 visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                for (J.Modifier m : vd.getModifiers()) {
+                    if (isClauseKeyword(m)) {
+                        visit(m, p);
+                    }
+                }
                 visit(vd.getLeadingAnnotations(), p);
-                visit(vd.getModifiers(), p);
+                for (J.Modifier m : vd.getModifiers()) {
+                    if (!isClauseKeyword(m)) {
+                        visit(m, p);
+                    }
+                }
                 boolean omitName = !vd.getVariables().isEmpty() && vd.getVariables().get(0).getMarkers().findFirst(
                         org.openrewrite.scala.marker.OmitName.class).isPresent();
                 if (!omitName && !vd.getVariables().isEmpty()) {

@@ -1170,4 +1170,17 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void curriedImplicitParameterWithAnnotation() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def map[B](f: Int => B)(implicit @implicitNotFound("m") ev: Ordering[B]): Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }

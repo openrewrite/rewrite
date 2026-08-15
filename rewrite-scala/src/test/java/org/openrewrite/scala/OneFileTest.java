@@ -10,8 +10,8 @@ class OneFileTest {
     @Test
     void one() throws Exception {
         String[] paths = {
-          "/tmp/scala-corpus/cats-effect/kernel/jvm/src/main/scala/cats/effect/kernel/AsyncPlatform.scala",
-          "/tmp/scala-corpus/cats-effect/core/shared/src/main/scala/cats/effect/IO.scala"};
+          "/tmp/scala-corpus/scala3/library/src/scala/Enumeration.scala",
+          "/tmp/scala-corpus/cats-effect/tests/shared/src/test/scala/cats/effect/std/QueueSuite.scala"};
         StringBuilder sb = new StringBuilder();
         for (String ps : paths) {
             Path path = Paths.get(ps);
