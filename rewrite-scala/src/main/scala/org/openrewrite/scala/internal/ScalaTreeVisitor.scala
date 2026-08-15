@@ -622,7 +622,7 @@ class ScalaTreeVisitor(
     // Create the annotation type: an Ident for a simple name (@deprecated) or a
     // Select chain for a qualified name (@scala.annotation.implicitNotFound).
     val annotTypeTree: NameTree = tpt match {
-      case id: Trees.Ident[?] => ident(id.name.toString)
+      case id: Trees.Ident[?] => ident(id.name.toString, quoted = isBacktickQuoted(id.span))
       case sel: Trees.Select[?] =>
         // Qualified name: skip the leading '@', then map the Select chain to a J.FieldAccess.
         val selStart = Math.max(0, sel.span.start - offsetAdjustment)
@@ -10197,7 +10197,23 @@ class ScalaTreeVisitor(
     val funcSource = extractSource(func.span)
     cursor = savedCursorBeforeFunc
     hasParentheses = funcSource.trim.startsWith("(")
-    val arrowIndex = positionOfNextIn(funcSource, "=>", 0)
+    // A parameter's own type can contain an arrow (`(cb: Int => Unit) => 1`), so the
+    // lambda's arrow is the first one after the parameter list.
+    val afterParamList = if (hasParentheses) {
+      var depth = 0
+      var i = funcSource.indexOf('(')
+      var close = -1
+      while (i >= 0 && i < funcSource.length && close < 0) {
+        funcSource.charAt(i) match {
+          case '(' => depth += 1
+          case ')' => depth -= 1; if (depth == 0) close = i
+          case _ =>
+        }
+        i += 1
+      }
+      if (close >= 0) close + 1 else 0
+    } else 0
+    val arrowIndex = positionOfNextIn(funcSource, "=>", afterParamList)
 
     // When parenthesized, advance cursor past `(` so the first parameter's
     // extractPrefix captures the whitespace between `(` and the first arg.
