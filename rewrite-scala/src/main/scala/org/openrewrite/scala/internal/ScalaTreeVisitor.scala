@@ -9002,6 +9002,7 @@ class ScalaTreeVisitor(
     }
   }
 
+
   /** Visits a template parent. A parenthesized parent, as in `new X with (A => B)`, is a
    *  type rather than an expression, so it is visited in type position and stays
    *  parenthesized. Returns null when the parent maps to no type.
@@ -9345,6 +9346,10 @@ class ScalaTreeVisitor(
       else if (c == '/' && i + 1 < end && source.charAt(i + 1) == '*') { inBlockComment = true; i += 2 }
       else if (c == '(' || c == '[') {
         val close = positionOfMatchingClose(c, if (c == '(') ')' else ']', i + 1)
+        i = if (close >= 0) close + 1 else end
+      } else if (c == '^' && i + 1 < end && source.charAt(i + 1) == '{') {
+        // a capture set's brace belongs to the return type, not the body
+        val close = positionOfMatchingClose('{', '}', i + 2)
         i = if (close >= 0) close + 1 else end
       } else if (c == '{') return true
       else if (c == '=') return false

@@ -82,4 +82,18 @@ class AnnotatedExprTest implements RewriteTest {
         );
     }
 
+    @Test
+    void captureSetWithExplicitSet() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            trait T {
+              def f(): List[Int]^{this} = Nil
+            }
+            """
+          )
+        );
+    }
+
 }
