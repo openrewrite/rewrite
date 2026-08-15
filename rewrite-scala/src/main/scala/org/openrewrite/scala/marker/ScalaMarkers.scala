@@ -139,6 +139,26 @@ case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * A Scala 3 `derives` clause, as in `case class C(i: Int) derives CanEqual`. Holds the
+ * verbatim source from `derives` up to the body delimiter, which the printer emits
+ * between the parent list and the body.
+ */
+case class DerivesClause(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * A self-type clause opening a template body, as in `trait T { self => ... }` or
+ * `trait T:\n  this: U =>`. Holds the verbatim source from the body delimiter through
+ * the `=>`. Dotty keeps the clause out of the body, so there is no statement to map it to.
+ */
+case class SelfType(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * A Scala 3 end marker closing a definition, e.g. the `end X` of `class X: ... end X`.
  * Holds the verbatim source from the end of the element's own content through the
  * marker, so it covers the newline and indent ahead of it — a method body is an

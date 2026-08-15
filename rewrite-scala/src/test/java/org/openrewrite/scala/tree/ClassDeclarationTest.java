@@ -720,4 +720,83 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void selfTypeAlias() {
+        rewriteRun(
+            scala(
+                """
+                trait T { self =>
+                  def f(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeAnnotation() {
+        rewriteRun(
+            scala(
+                """
+                trait U
+                trait T { this: U =>
+                  def f(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeInIndentedBody() {
+        rewriteRun(
+            scala(
+                """
+                trait U
+                trait T:
+                  this: U =>
+                  def f(): Int = 1
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeOnObject() {
+        rewriteRun(
+            scala(
+                """
+                object O { self =>
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void derivesClause() {
+        rewriteRun(
+            scala(
+                """
+                case class C(i: Int) derives CanEqual {
+                  def f(): Int = i
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void derivesMultipleWithIndentedBody() {
+        rewriteRun(
+            scala(
+                """
+                case class C(i: Int) derives CanEqual, Show:
+                  def f(): Int = i
+                """
+            )
+        );
+    }
+
 }

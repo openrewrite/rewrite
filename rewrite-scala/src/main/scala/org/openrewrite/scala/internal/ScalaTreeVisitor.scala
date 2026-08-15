@@ -36,10 +36,12 @@ import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
 import org.openrewrite.scala.marker.OmitImportBraces
 import org.openrewrite.scala.marker.PackageObject
+import org.openrewrite.scala.marker.DerivesClause
 import org.openrewrite.scala.marker.EndMarker
 import org.openrewrite.scala.marker.KindParameterVariance
 import org.openrewrite.scala.marker.ParentSeparator
 import org.openrewrite.scala.marker.SObject
+import org.openrewrite.scala.marker.SelfType
 import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TrailingComma
 import org.openrewrite.scala.marker.TypeProjection
@@ -3886,6 +3888,8 @@ class ScalaTreeVisitor(
         val visitedSpans = new java.util.HashSet[Int]()
         // Sort by source position to preserve source order (Dotty may reorder imports)
         val sortedBody = tmpl.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
+        val moduleEnd = if (md.span.exists) Math.max(0, md.span.end - offsetAdjustment) else source.length
+        val selfTypeText = consumeSelfType(sortedBody, moduleEnd)
         sortedBody.foreach { stat =>
           val isSynth = stat.span.isSynthetic || {
             def containsTripleQuestion(t: Trees.Tree[?]): Boolean = t match {
@@ -3943,9 +3947,12 @@ class ScalaTreeVisitor(
           }
         }
         
-        val blockMarkers = if (isBraceless) {
+        var blockMarkers = if (isBraceless) {
           Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
         } else Markers.EMPTY
+        if (selfTypeText != null) {
+          blockMarkers = blockMarkers.add(SelfType(Tree.randomId(), selfTypeText))
+        }
 
         new J.Block(
           Tree.randomId(),
@@ -4907,6 +4914,7 @@ class ScalaTreeVisitor(
     val hasAnnotations = td.mods.annotations.nonEmpty
     // Set while extracting the body, read when the declaration's markers are built
     var endMarkerText: String = null
+    var derivesText: String = null
 
     // Handle annotations first
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
@@ -5452,12 +5460,12 @@ class ScalaTreeVisitor(
                 result
               }
               if (braceIndex >= 0 && (colonIndex < 0 || braceIndex < colonIndex)) {
-                val prefix = Space.format(afterCursor.substring(0, braceIndex))
+                val prefix = splitDerives(afterCursor.substring(0, braceIndex), t => derivesText = t)
                 cursor = cursor + braceIndex + 1
                 prefix
               } else if (colonIndex >= 0) {
                 isClassBraceless = true
-                val prefix = Space.format(afterCursor.substring(0, colonIndex))
+                val prefix = splitDerives(afterCursor.substring(0, colonIndex), t => derivesText = t)
                 cursor = cursor + colonIndex + 1
                 prefix
               } else {
@@ -5480,6 +5488,9 @@ class ScalaTreeVisitor(
           // Sort by source position to preserve source order
           val sortedBody = template.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
           val classEndForBody = if (td.span.exists) Math.max(0, td.span.end - offsetAdjustment) else source.length
+          // A self-type clause (`self =>`, `this: T =>`) sits between the body delimiter and the
+          // first statement. Dotty keeps it out of the body, so nothing else claims the source.
+          val selfTypeText = consumeSelfType(sortedBody, classEndForBody)
           for (idx <- sortedBody.indices) {
             val stat = sortedBody(idx)
             val isSyntheticStat = stat.span.isSynthetic || {
@@ -5553,9 +5564,12 @@ class ScalaTreeVisitor(
             } else Space.EMPTY
           } else Space.EMPTY
 
-          val classBlockMarkers = if (isClassBraceless) {
+          var classBlockMarkers = if (isClassBraceless) {
             Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
           } else Markers.EMPTY
+          if (selfTypeText != null) {
+            classBlockMarkers = classBlockMarkers.add(SelfType(Tree.randomId(), selfTypeText))
+          }
 
           new J.Block(
             Tree.randomId(),
@@ -5583,6 +5597,9 @@ class ScalaTreeVisitor(
     } else Markers.EMPTY
     if (endMarkerText != null) {
       classDeclMarkers = classDeclMarkers.add(EndMarker(Tree.randomId(), endMarkerText))
+    }
+    if (derivesText != null) {
+      classDeclMarkers = classDeclMarkers.add(DerivesClause(Tree.randomId(), derivesText))
     }
 
     new J.ClassDeclaration(
@@ -9132,6 +9149,41 @@ class ScalaTreeVisitor(
         cursor = start + text.length
         markers.add(EndMarker(Tree.randomId(), source.substring(from, cursor)))
       case _ => markers
+    }
+  }
+
+  /** Splits a `derives` clause out of the text ahead of a body delimiter, handing it to
+   *  {@code claim}. What remains is whitespace and belongs in the body's prefix.
+   */
+  private def splitDerives(text: String, claim: String => Unit): Space = {
+    val idx = positionOfNextIn(text, "derives", 0)
+    if (idx < 0) Space.format(text)
+    else {
+      // the clause keeps the space ahead of it; only the run before the delimiter is prefix
+      val clauseEnd = text.stripTrailing().length
+      claim(text.substring(0, clauseEnd))
+      Space.format(text.substring(clauseEnd))
+    }
+  }
+
+  /** Consumes a template's self-type clause, returning its verbatim source or null.
+   *  The `=>` can only belong to a self type here: any body statement starts later.
+   */
+  private def consumeSelfType(sortedBody: Seq[Trees.Tree[?]], bodyEnd: Int): String = {
+    val firstStatStart = sortedBody.collectFirst {
+      case st if st.span.exists && !st.span.isSynthetic => Math.max(0, st.span.start - offsetAdjustment)
+    }.getOrElse(bodyEnd)
+    if (cursor >= firstStatStart || firstStatStart > source.length) {
+      null
+    } else {
+      val between = source.substring(cursor, firstStatStart)
+      val arrow = positionOfNextIn(between, "=>", 0)
+      if (arrow < 0) null
+      else {
+        val text = between.substring(0, arrow + 2)
+        cursor = cursor + arrow + 2
+        text
+      }
     }
   }
 

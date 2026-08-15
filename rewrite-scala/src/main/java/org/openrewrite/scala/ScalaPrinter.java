@@ -1072,6 +1072,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visitContainer(" permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", "", p);
             }
 
+            classDecl.getMarkers().findFirst(org.openrewrite.scala.marker.DerivesClause.class)
+                    .ifPresent(m -> p.append(m.text()));
             visit(classDecl.getBody(), p);
             afterSyntax(classDecl, p);
             return classDecl;
@@ -1118,10 +1120,30 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
+        String selfType = block.getMarkers()
+                .findFirst(org.openrewrite.scala.marker.SelfType.class)
+                .map(org.openrewrite.scala.marker.SelfType::text)
+                .orElse(null);
+        if (selfType != null &&
+            !block.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent() &&
+            !block.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            // Braced body: the clause follows the `{`
+            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+            p.append('{');
+            p.append(selfType);
+            visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+            visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            p.append('}');
+            afterSyntax(block, p);
+            return block;
+        }
         // OmitBraces blocks print statements without { } — used for braceless bodies,
         // synthetic lambda body blocks, and expression-position blocks
         if (block.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent()) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+            if (selfType != null) {
+                p.append(selfType);
+            }
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
             visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
             afterSyntax(block, p);
@@ -1131,6 +1153,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (block.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
             p.append(':');
+            if (selfType != null) {
+                p.append(selfType);
+            }
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
             visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
             afterSyntax(block, p);
