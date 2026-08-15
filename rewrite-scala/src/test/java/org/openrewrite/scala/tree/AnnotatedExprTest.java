@@ -54,4 +54,32 @@ class AnnotatedExprTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void captureSetSuffixOnType() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            trait T {
+              def f(xs: IterableOnce[Int]^): Int = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void captureSetSuffixInReturnType() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            trait T {
+              def f(): Iterator[Int]^ = Iterator.empty
+            }
+            """
+          )
+        );
+    }
+
 }

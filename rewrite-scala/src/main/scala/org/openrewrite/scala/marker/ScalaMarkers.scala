@@ -149,6 +149,16 @@ case class DerivesClause(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * A Scala 3 capture set written as a suffix on a type: the `^` of `IterableOnce[A]^` or
+ * the `^{it}` of `C^{it}`. Dotty desugars it to a synthetic `retains` annotation that has
+ * no `@` in source, so the suffix is kept verbatim and printed after the type.
+ */
+case class CaptureSet(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * A self-type clause opening a template body, as in `trait T { self => ... }` or
  * `trait T:\n  this: U =>`. Holds the verbatim source from the body delimiter through
  * the `=>`. Dotty keeps the clause out of the body, so there is no statement to map it to.

@@ -1092,6 +1092,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // A Scala 3 end marker closes the element it is attached to, after its body
         j.getMarkers().findFirst(org.openrewrite.scala.marker.EndMarker.class)
                 .ifPresent(m -> p.append(m.text()));
+        j.getMarkers().findFirst(org.openrewrite.scala.marker.CaptureSet.class)
+                .ifPresent(m -> p.append(m.text()));
         super.afterSyntax(j, p);
     }
 

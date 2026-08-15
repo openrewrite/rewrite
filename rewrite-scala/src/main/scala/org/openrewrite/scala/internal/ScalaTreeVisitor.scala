@@ -54,6 +54,7 @@ import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
 import org.openrewrite.scala.marker.ContextFunctionArrow
+import org.openrewrite.scala.marker.CaptureSet
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
 import org.openrewrite.scala.marker.RightAssociative
@@ -7881,6 +7882,27 @@ class ScalaTreeVisitor(
     // the latter.
     val prefix = extractPrefix(ann.span)
     val arg: J = visitTree(ann.arg)
+    // Capture-checking syntax (`T^`, `T^{it}`) desugars to a synthetic `retains` annotation
+    // with no `@` in source, so it stays a suffix on the type it follows.
+    val captureText = consumeCaptureSet()
+    if (captureText != null) {
+      updateCursor(ann.span.end)
+      // The wrapped type carries the space ahead of it. Callers that position the cursor
+      // at the type leave the extracted prefix empty, so recover it from the source.
+      val typePrefix = if (prefix != Space.EMPTY) prefix else {
+        val start = Math.max(0, ann.span.start - offsetAdjustment)
+        var b = start
+        while (b > 0 && (source.charAt(b - 1) == ' ' || source.charAt(b - 1) == '\t')) b -= 1
+        if (b < start) Space.format(source.substring(b, start)) else Space.EMPTY
+      }
+      return arg match {
+        case tt: TypeTree =>
+          val prefixed: TypeTree = tt.withPrefix[TypeTree](typePrefix)
+          prefixed.withMarkers[TypeTree](
+            prefixed.getMarkers.add(CaptureSet(Tree.randomId(), captureText))).asInstanceOf[J]
+        case other => other
+      }
+    }
     val annotStart = Math.max(0, ann.annot.span.start - offsetAdjustment)
     val between = if (cursor < annotStart && annotStart <= source.length) source.substring(cursor, annotStart) else ""
     val colonIdx = positionOfNextIn(between, ":", 0)
@@ -8962,6 +8984,24 @@ class ScalaTreeVisitor(
    * arguments stay first-class LST nodes instead of being crammed into a
    * `J.Identifier` name. Returns null when no rich mapping fits, so callers can fall back.
    */
+  /** Consumes a capture-set suffix (`^`, `^{it}`) at the cursor, returning its source. */
+  private def consumeCaptureSet(): String = {
+    var i = cursor
+    while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
+    if (i >= source.length || source.charAt(i) != '^') {
+      null
+    } else {
+      var end = i + 1
+      if (end < source.length && source.charAt(end) == '{') {
+        val close = positionOfMatchingClose('{', '}', end + 1)
+        if (close >= 0) end = close + 1
+      }
+      val text = source.substring(cursor, end)
+      cursor = end
+      text
+    }
+  }
+
   /** Visits a template parent. A parenthesized parent, as in `new X with (A => B)`, is a
    *  type rather than an expression, so it is visited in type position and stays
    *  parenthesized. Returns null when the parent maps to no type.
