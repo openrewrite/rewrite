@@ -21,7 +21,7 @@ import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
-import org.openrewrite.scala.marker.{IndentedSyntax, PackageSemicolon}
+import org.openrewrite.scala.marker.{IndentedSyntax, OmitBraces, PackageSemicolon}
 import org.openrewrite.scala.tree.S
 
 import java.util
@@ -153,9 +153,8 @@ class ScalaASTConverter {
       val converted: Statement = stat match {
         case pkg: Trees.PackageDef[?] if isBracedPackage(pkg, visitor) =>
           buildBracedPackage(pkg, visitor)
-        case _: Trees.PackageDef[?] =>
-          // Non-braced nested package — not yet modeled, skip.
-          null
+        case pkg: Trees.PackageDef[?] =>
+          buildChainedPackage(pkg, visitor)
         case other =>
           visitor.visitTree(other) match {
             case _: J.Empty => null
@@ -200,6 +199,35 @@ class ScalaASTConverter {
    * (so nested/sibling braced packages are handled uniformly). The `{`/`}` are owned
    * by the body [[J.Block]]; the [[J.Package]] head carries only `package <name>`.
    */
+  /**
+   * A chained package clause (`package a` followed by `package b`) scopes everything after
+   * it, exactly as a braced one scopes its body, so it becomes an S.PackageDeclaration whose
+   * block omits the braces.
+   */
+  private def buildChainedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): S.PackageDeclaration = {
+    val prefix = visitor.extractPrefix(pkgDef.span)
+
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
+    val namePkg = new J.Package(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
+      Collections.emptyList()
+    )
+    visitor.updateCursor(pkgDef.pid.span.end)
+
+    val body = new J.Block(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+      JRightPadded.build(false),
+      convertBody(pkgDef.stats, visitor),
+      Space.EMPTY
+    )
+    new S.PackageDeclaration(Tree.randomId(), prefix, Markers.EMPTY, namePkg, body)
+  }
+
   private def buildBracedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): S.PackageDeclaration = {
     val prefix = visitor.extractPrefix(pkgDef.span)
 

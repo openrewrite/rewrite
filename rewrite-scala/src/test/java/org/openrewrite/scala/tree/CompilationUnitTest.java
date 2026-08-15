@@ -727,4 +727,36 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void chainedPackageClauses() {
+        rewriteRun(
+          scala(
+            """
+            package a
+            package b
+
+            class X
+            """
+          )
+        );
+    }
+
+    @Test
+    void chainedPackageClausesWithImportAndMembers() {
+        rewriteRun(
+          scala(
+            """
+            package dotty.tools
+            package dotc
+            package cc
+
+            import core.*
+
+            class X
+            object O
+            """
+          )
+        );
+    }
+
 }
