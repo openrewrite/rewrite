@@ -3196,6 +3196,21 @@ class ScalaTreeVisitor(
             "sealed", J.Modifier.Type.Sealed, Collections.emptyList()))
           lastModifierKeywordEnd = modifierEndPos + "sealed".length
           modifierEndPos += "sealed ".length
+        } else if (remaining.startsWith("transparent ")) {
+          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
+            "transparent", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "transparent".length
+          modifierEndPos += "transparent ".length
+        } else if (remaining.startsWith("inline ")) {
+          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
+            "inline", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "inline".length
+          modifierEndPos += "inline ".length
+        } else if (remaining.startsWith("opaque ")) {
+          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
+            "opaque", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "opaque".length
+          modifierEndPos += "opaque ".length
         } else {
           scanning = false
         }
@@ -9536,6 +9551,7 @@ class ScalaTreeVisitor(
 
   /** Modifiers legal on a class/trait primary-constructor parameter. */
   private val constructorParamModifierKeywords: List[(String, J.Modifier.Type)] = List(
+    ("inline", J.Modifier.Type.LanguageExtension),
     ("override", J.Modifier.Type.LanguageExtension),
     ("private", J.Modifier.Type.Private),
     ("protected", J.Modifier.Type.Protected),

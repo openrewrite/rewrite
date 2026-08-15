@@ -255,4 +255,31 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void inlineVal() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              inline val X = 8
+              private inline val Y = 9
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void inlineGiven() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              inline given x: Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }
