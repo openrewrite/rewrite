@@ -420,4 +420,20 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void wildcardImportAfterTrailingComment() {
+        // The `*` reaches the compilation unit's EOF space, which parses comments;
+        // a bare `*` there is not a block-comment delimiter.
+        rewriteRun(
+          scala(
+            """
+            package p
+
+            import core.*
+            // trailing
+            """
+          )
+        );
+    }
+
 }

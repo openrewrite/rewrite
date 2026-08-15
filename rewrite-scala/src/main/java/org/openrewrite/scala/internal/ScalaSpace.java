@@ -109,8 +109,11 @@ public final class ScalaSpace {
                     } else if (last == '/' && blockDepth > 0) {
                         blockDepth++;
                         comment.append(c); // the '/' is already in the comment buffer
-                    } else {
+                    } else if (blockDepth > 0) {
                         comment.append(c);
+                    } else {
+                        // A bare `*` outside a comment, as in a `import a.*` wildcard
+                        prefix.append(c);
                     }
                     break;
                 default:
