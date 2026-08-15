@@ -5274,8 +5274,15 @@ class ScalaTreeVisitor(
     } else {
       // No `(` in source — non-constructor class definition. Emit an empty container
       // marked with OmitParentheses so the printer skips emitting `(...)`.
-      JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
-        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
+      // The modifier can still stand alone, as in `class Byte private extends AnyVal`.
+      val ctorMarkers = new util.ArrayList[org.openrewrite.marker.Marker]()
+      ctorMarkers.add(new OmitParentheses(Tree.randomId()))
+      if (afterCtorModifier > cursor) {
+        ctorMarkers.add(org.openrewrite.scala.marker.ConstructorModifier(
+          Tree.randomId(), source.substring(cursor, afterCtorModifier)))
+        cursor = afterCtorModifier
+      }
+      JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](), Markers.build(ctorMarkers))
     }
     
     // Extract extends/implements from Template
@@ -9439,7 +9446,11 @@ class ScalaTreeVisitor(
     ("override", J.Modifier.Type.LanguageExtension),
     ("implicit", J.Modifier.Type.LanguageExtension),
     ("sealed", J.Modifier.Type.Sealed),
-    ("lazy", J.Modifier.Type.LanguageExtension)
+    ("lazy", J.Modifier.Type.LanguageExtension),
+    ("transparent", J.Modifier.Type.LanguageExtension),
+    ("inline", J.Modifier.Type.LanguageExtension),
+    ("opaque", J.Modifier.Type.LanguageExtension),
+    ("infix", J.Modifier.Type.LanguageExtension)
   )
 
   /** Modifiers legal on a class/trait primary-constructor parameter. */

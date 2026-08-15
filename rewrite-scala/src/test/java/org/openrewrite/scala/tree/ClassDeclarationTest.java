@@ -827,4 +827,32 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void constructorModifierWithoutParameterList() {
+        rewriteRun(
+            scala(
+                """
+                final abstract class Byte private extends AnyVal {
+                  def toByte: Byte
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void scala3Modifiers() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  transparent inline def f(): Int = 1
+                  private inline def g(): Int = 2
+                  infix def and(o: Int): Int = o
+                }
+                """
+            )
+        );
+    }
+
 }

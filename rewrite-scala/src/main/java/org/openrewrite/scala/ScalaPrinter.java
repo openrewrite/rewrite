@@ -980,12 +980,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // J.VariableDeclarations modeled like a Scala parameter (no implicit val/var,
             // type comes after the name with `:`). We can't fall through to visitVariableDeclarations
             // because that one is for field/local declarations and always emits a val/var keyword.
+            if (classDecl.getPadding().getPrimaryConstructor() != null) {
+                // The modifier can stand alone, without a parameter list
+                classDecl.getPadding().getPrimaryConstructor().getMarkers()
+                        .findFirst(org.openrewrite.scala.marker.ConstructorModifier.class)
+                        .ifPresent(m -> p.append(m.text()));
+            }
             if (classDecl.getPadding().getPrimaryConstructor() != null &&
                 !classDecl.getPadding().getPrimaryConstructor().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                 JContainer<Statement> primaryConstructor = classDecl.getPadding().getPrimaryConstructor();
-                primaryConstructor.getMarkers()
-                        .findFirst(org.openrewrite.scala.marker.ConstructorModifier.class)
-                        .ifPresent(m -> p.append(m.text()));
                 visitSpace(primaryConstructor.getBefore(), Space.Location.RECORD_STATE_VECTOR, p);
                 p.append('(');
                 List<JRightPadded<Statement>> ctorElements = primaryConstructor.getPadding().getElements();
