@@ -778,9 +778,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(scu.getPackageDeclaration(), p);
         }
 
-        for (int i = 0; i < scu.getStatements().size(); i++) {
-            Statement statement = scu.getStatements().get(i);
-            visit(statement, p);
+        for (JRightPadded<Statement> rp : scu.getPadding().getStatements()) {
+            visit(rp.getElement(), p);
+            visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                p.append(';');
+            }
         }
 
         visitSpace(scu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);

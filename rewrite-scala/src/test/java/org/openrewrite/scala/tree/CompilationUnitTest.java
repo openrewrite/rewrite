@@ -593,4 +593,138 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingSemicolonAfterTopLevelClass() {
+        rewriteRun(
+          scala(
+            """
+            class X;
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonBetweenTopLevelClasses() {
+        rewriteRun(
+          scala(
+            """
+            class A;
+            class B
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingSemicolonAfterTopLevelImport() {
+        rewriteRun(
+          scala(
+            """
+            import scala.collection.mutable;
+            class X
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonAfterTopLevelVals() {
+        rewriteRun(
+          scala(
+            """
+            val a = 1;
+            val b = 2;
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonInObjectBody() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              val a = 1;
+              def f(): Int = 1;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterLastStatementInIndentedBody() {
+        rewriteRun(
+          scala(
+            """
+            class X:
+              val a = 1
+              // trailing
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterIndentedMethodBody() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              def f(): Int =
+                1
+              // trailing
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterIndentedVal() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              val x =
+                1
+              // note
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterIfExpression() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              def f(b: Boolean): Int =
+                if b then
+                  1
+                else
+                  2
+                // done
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterMatch() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              def f(i: Int): Int =
+                i match
+                  case _ => 1
+                // done
+            """
+          )
+        );
+    }
+
 }

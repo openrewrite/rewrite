@@ -35,12 +35,12 @@ import java.util.{Collections, List as JList}
  */
 class CompilationUnitResult(
                              val packageDecl: J.Package,
-                             val statements: JList[Statement],
+                             val statements: JList[JRightPadded[Statement]],
                              val lastCursorPosition: Int
                            ) {
   def getPackageDecl: J.Package = packageDecl
 
-  def getStatements: JList[Statement] = statements
+  def getStatements: JList[JRightPadded[Statement]] = statements
 
   def getLastCursorPosition: Int = lastCursorPosition
 }
@@ -54,7 +54,7 @@ class ScalaASTConverter {
    * Converts a Scala parse result to compilation unit components.
    */
   def convertToCompilationUnit(parseResult: ScalaParseResult, source: String, typeFactory: JavaTypeFactory = null): CompilationUnitResult = {
-    val statements = new util.ArrayList[Statement]()
+    val statements = new util.ArrayList[JRightPadded[Statement]]()
     var packageDecl: J.Package = null
 
     // Use the context from the parse result (carries type info from batch compilation)
@@ -89,7 +89,7 @@ class ScalaASTConverter {
       case pkgDef: Trees.PackageDef[?] if isBracedPackage(pkgDef, visitor) =>
         // A single top-level braced package is a scope that owns its body, so it
         // becomes a statement rather than the compilation unit's package header.
-        statements.add(buildBracedPackage(pkgDef, visitor))
+        statements.add(JRightPadded.build(buildBracedPackage(pkgDef, visitor)))
       case pkgDef: Trees.PackageDef[?] =>
         // Extract package declaration and create J.Package using the visitor
         // This ensures the cursor is properly updated
@@ -120,18 +120,17 @@ class ScalaASTConverter {
         // Top-level import (no enclosing package).
         val converted = visitor.visitTree(imp)
         converted match {
-          case stmt: Statement => statements.add(stmt)
+          case stmt: Statement => statements.add(JRightPadded.build(stmt))
           case null => // Skip null returns
           case _ => // Skip non-statements
         }
       case _ =>
         // Single statement
-        System.out.println(s"Processing single statement: ${tree.getClass.getSimpleName}")
         val converted = visitor.visitTree(tree)
         converted match {
           case null => // Skip null returns
           case _: J.Empty => // Skip empty nodes
-          case stmt: Statement => statements.add(stmt)
+          case stmt: Statement => statements.add(JRightPadded.build(stmt))
           case _ => // Skip non-statements
         }
     }
@@ -145,28 +144,34 @@ class ScalaASTConverter {
    * Braced packages nested among the statements become [[S.PackageDeclaration]] so
    * they keep their own scope; non-braced nested packages are not yet modeled.
    */
-  private def convertBody(rawStats: Seq[Trees.Tree[?]], visitor: ScalaTreeVisitor): util.ArrayList[Statement] = {
-    val out = new util.ArrayList[Statement]()
+  private def convertBody(rawStats: Seq[Trees.Tree[?]], visitor: ScalaTreeVisitor): util.ArrayList[JRightPadded[Statement]] = {
+    val out = new util.ArrayList[JRightPadded[Statement]]()
     // Sort by source position to ensure source order is preserved —
     // the Dotty parser may reorder brace imports internally.
     val sortedStats = rawStats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-    sortedStats.foreach {
-      case pkg: Trees.PackageDef[?] if isBracedPackage(pkg, visitor) =>
-        out.add(buildBracedPackage(pkg, visitor))
-      case _: Trees.PackageDef[?] =>
-        // Non-braced nested package — not yet modeled, skip.
-      case imp: Trees.Import[?] =>
-        visitor.visitTree(imp) match {
-          case stmt: Statement => out.add(stmt)
-          case _ =>
-        }
-      case stat =>
-        visitor.visitTree(stat) match {
-          case null =>
-          case _: J.Empty =>
-          case stmt: Statement => out.add(stmt)
-          case _ =>
-        }
+    sortedStats.zipWithIndex.foreach { case (stat, idx) =>
+      val converted: Statement = stat match {
+        case pkg: Trees.PackageDef[?] if isBracedPackage(pkg, visitor) =>
+          buildBracedPackage(pkg, visitor)
+        case _: Trees.PackageDef[?] =>
+          // Non-braced nested package — not yet modeled, skip.
+          null
+        case other =>
+          visitor.visitTree(other) match {
+            case _: J.Empty => null
+            case stmt: Statement => stmt
+            case _ => null
+          }
+      }
+      if (converted != null) {
+        // An explicit `;` separating top-level statements rides on the padding
+        val statEnd = if (stat.span.exists) Math.max(0, stat.span.end - visitor.getOffsetAdjustment) else visitor.getCursor
+        val nextStart = sortedStats.drop(idx + 1).collectFirst {
+          case n if n.span.exists => Math.max(0, n.span.start - visitor.getOffsetAdjustment)
+        }.getOrElse(visitor.getSourceLength)
+        val (trailingSpace, markers) = visitor.consumeTrailingSemicolon(statEnd, nextStart)
+        out.add(new JRightPadded[Statement](converted, trailingSpace, markers))
+      }
     }
     out
   }
@@ -221,7 +226,7 @@ class ScalaASTConverter {
 
     val bodyStmts = convertBody(pkgDef.stats, visitor)
     val rpStmts = new util.ArrayList[JRightPadded[Statement]]()
-    bodyStmts.forEach(s => rpStmts.add(JRightPadded.build(s)))
+    rpStmts.addAll(bodyStmts)
 
     // Consume the space before `}` (becomes the block end) and the `}` itself.
     val afterStart = visitor.getCursor - srcOffset
@@ -345,7 +350,9 @@ class ScalaASTConverter {
    * Converts a Scala parse result to a list of statements (backward compatibility).
    */
   def convertToStatements(parseResult: ScalaParseResult, source: String): JList[Statement] = {
-    convertToCompilationUnit(parseResult, source, null).statements
+    val out = new util.ArrayList[Statement]()
+    convertToCompilationUnit(parseResult, source, null).statements.forEach(rp => out.add(rp.getElement))
+    out
   }
 
   /**

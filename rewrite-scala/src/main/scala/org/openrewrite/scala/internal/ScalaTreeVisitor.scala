@@ -207,6 +207,8 @@ class ScalaTreeVisitor(
 
   def getOffsetAdjustment: Int = offsetAdjustment
 
+  def getSourceLength: Int = source.length
+
   def updateCursor(position: Int): Unit = {
     val adjustedPosition = Math.max(0, position - offsetAdjustment)
     if (adjustedPosition > cursor && adjustedPosition <= source.length) {
@@ -3896,11 +3898,27 @@ class ScalaTreeVisitor(
             containsTripleQuestion(stat)
           }
           if (stat.span.exists && !isSynth && visitedSpans.add(stat.span.start)) {
-            visitTree(stat) match {
-              case stmt: Statement => statements.add(JRightPadded.build(stmt))
-              case expr: Expression =>
-                statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-              case _ =>
+            val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
+            val visited: Statement = visitTree(stat) match {
+              case stmt: Statement => stmt
+              case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
+              case _ => null
+            }
+            if (visited != null) {
+              val nextStart = {
+                var k = sortedBody.indexOf(stat) + 1
+                var ns = if (md.span.exists) Math.max(0, md.span.end - offsetAdjustment) else source.length
+                while (k < sortedBody.size) {
+                  val nxt = sortedBody(k)
+                  if (nxt.span.exists && !nxt.span.isSynthetic) {
+                    ns = Math.max(0, nxt.span.start - offsetAdjustment)
+                    k = sortedBody.size
+                  } else k += 1
+                }
+                ns
+              }
+              val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+              statements.add(new JRightPadded[Statement](visited, trailingSpace, rpMarkers))
             }
           }
         }
@@ -9222,7 +9240,7 @@ class ScalaTreeVisitor(
    * separator on the same line and consume it. Returns the JRightPadded
    * trailing space and markers; advances `cursor`.
    */
-  private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
+  def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
     val trailStart = Math.max(statEnd, cursor)
     // When the statement's rhs sits on its own line, Dotty extends the statement
     // span to include the trailing `;`, so the cursor already moved past it. The
