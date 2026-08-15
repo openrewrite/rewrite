@@ -158,4 +158,19 @@ class FunctionTypeTest implements RewriteTest {
         assertThat(ref.get()).as("should find an S.FunctionType").isNotNull();
         return ref.get();
     }
+    @Test
+    void parameterListHoldsAnArrow() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(k: (Int => Unit) => Unit): Int = 1
+              def g(k: (Int => Unit, Long) => Unit): Int = 1
+              def h(): (Int => Unit) => Unit = ???
+            }
+            """
+          )
+        );
+    }
+
 }

@@ -8806,6 +8806,26 @@ class ScalaTreeVisitor(
    * argument is itself a synthetic `ValDef` whose `tpt` carries the actual parameter
    * type and source span.
    */
+  /** Index just past a leading parenthesized group in {@code text}, or 0 when it has none. */
+  private def closeOfLeadingParen(text: String): Int = {
+    val open = text.indexWhere(!Character.isWhitespace(_))
+    if (open < 0 || text.charAt(open) != '(') 0
+    else {
+      var depth = 0
+      var i = open
+      var close = -1
+      while (i < text.length && close < 0) {
+        text.charAt(i) match {
+          case '(' => depth += 1
+          case ')' => depth -= 1; if (depth == 0) close = i
+          case _ =>
+        }
+        i += 1
+      }
+      if (close >= 0) close + 1 else 0
+    }
+  }
+
   private def visitFunctionType(func: untpd.Function): S.FunctionType = {
     val funcStart = Math.max(0, func.span.start - offsetAdjustment)
     val funcEnd = Math.max(0, func.span.end - offsetAdjustment)
@@ -8818,8 +8838,9 @@ class ScalaTreeVisitor(
       source.substring(funcStart, funcEnd)
     } else ""
 
-    // Find the arrow within the function-type source.
-    val relArrowIdx = positionOfNextIn(funcSource, "=>", 0)
+    // Find the arrow within the function-type source. A parenthesized parameter list can
+    // hold an arrow of its own (`(A => Unit) => B`), so the type's arrow follows the list.
+    val relArrowIdx = positionOfNextIn(funcSource, "=>", closeOfLeadingParen(funcSource))
     val arrowAbs = if (relArrowIdx >= 0) funcStart + relArrowIdx else funcEnd
 
     // Detect whether the parameter list is parenthesized. A single unnamed param like
