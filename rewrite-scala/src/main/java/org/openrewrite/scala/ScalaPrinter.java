@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.Expression;
@@ -1087,6 +1088,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
     }
     
+    @Override
+    protected void beforeSyntax(Space prefix, Markers markers, Space.@Nullable Location loc, PrintOutputCapture<P> p) {
+        // `f(using ctx)`: the keyword opens the argument list, ahead of the first argument
+        markers.findFirst(org.openrewrite.scala.marker.UsingArguments.class)
+                .ifPresent(m -> p.append(m.text()));
+        super.beforeSyntax(prefix, markers, loc, p);
+    }
+
     @Override
     protected void afterSyntax(J j, PrintOutputCapture<P> p) {
         // A Scala 3 end marker closes the element it is attached to, after its body

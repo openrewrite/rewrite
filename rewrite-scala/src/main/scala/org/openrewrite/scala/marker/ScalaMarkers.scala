@@ -159,6 +159,16 @@ case class CaptureSet(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * The `using` keyword opening a call-site argument list, as in `f(using ctx)`. Carried by
+ * the first argument, which every printer path emits, and holds the source from the `(`
+ * through the keyword.
+ */
+case class UsingArguments(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * A self-type clause opening a template body, as in `trait T { self => ... }` or
  * `trait T:\n  this: U =>`. Holds the verbatim source from the body delimiter through
  * the `=>`. Dotty keeps the clause out of the body, so there is no statement to map it to.

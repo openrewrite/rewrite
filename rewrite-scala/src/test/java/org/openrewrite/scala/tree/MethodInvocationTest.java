@@ -514,4 +514,61 @@ class MethodInvocationTest implements RewriteTest {
             );
         }
     }
+    @Test
+    void usingArgument() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(using s: String): Int = 1
+              val r = f(using "a")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void usingArgumentInCurriedCall() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Int)(using s: String): Int = x
+              val r = f(1)(using "a")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void usingArgumentOnSelect() {
+        rewriteRun(
+          scala(
+            """
+            class C { def g(using s: String): Int = 1 }
+            object O {
+              val c = new C
+              val r = c.g(using "a")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void usingArgumentsMultiple() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(using a: Int, b: Int): Int = a
+              val r = f(using 1, 2)
+            }
+            """
+          )
+        );
+    }
+
 }

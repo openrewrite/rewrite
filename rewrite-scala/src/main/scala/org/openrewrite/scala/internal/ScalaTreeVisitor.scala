@@ -44,6 +44,7 @@ import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.SelfType
 import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TrailingComma
+import org.openrewrite.scala.marker.UsingArguments
 import org.openrewrite.scala.marker.TypeProjection
 import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
@@ -497,6 +498,7 @@ class ScalaTreeVisitor(
           val openIdx = positionOfNext("(", cursor)
           argContainerPrefix = if (openIdx > cursor) ScalaSpace.format(source, cursor, openIdx) else Space.EMPTY
           if (openIdx >= 0) cursor = openIdx + 1
+          val usingText1 = consumeUsingKeyword()
           for (i <- app.args.indices) {
             val arg = app.args(i)
             val argExpr = asExpression(visitTree(arg))
@@ -514,6 +516,7 @@ class ScalaTreeVisitor(
           }
           val closeParen = positionOfNext(")", cursor)
           if (closeParen >= 0) cursor = closeParen + 1
+          withUsing(args, usingText1)
         }
 
         updateCursor(app.span.end)
@@ -849,6 +852,7 @@ class ScalaTreeVisitor(
 
     val args = new util.ArrayList[JRightPadded[Expression]]()
     var argContainerPrefix = Space.EMPTY
+    var usingText2: String = null
     val markers = new util.ArrayList[org.openrewrite.marker.Marker]()
     import org.openrewrite.scala.marker.FunctionApplication
     markers.add(FunctionApplication.create())
@@ -896,6 +900,7 @@ class ScalaTreeVisitor(
         }
         cursor = parenPos + 1
       }
+      usingText2 = consumeUsingKeyword()
 
       for ((arg, i) <- app.args.zipWithIndex) {
         val visited = visitTree(arg)
@@ -933,6 +938,7 @@ class ScalaTreeVisitor(
     }
 
     val methodName = ident("apply")
+    withUsing(args, usingText2)
 
     new J.MethodInvocation(
       Tree.randomId(),
@@ -1088,6 +1094,7 @@ class ScalaTreeVisitor(
 
         val functionAfterSpace = if (firstNonWs > cursor) ScalaSpace.format(source, cursor, firstNonWs) else Space.EMPTY
         if (firstNonWs < source.length) cursor = firstNonWs + 1 // past `(`
+        val fnCallUsing = consumeUsingKeyword()
 
         for (i <- app.args.indices) {
           val arg = app.args(i)
@@ -1108,6 +1115,7 @@ class ScalaTreeVisitor(
         val closeParen = positionOfNext(")", cursor)
         if (closeParen >= 0) cursor = closeParen + 1
         finishAtAppEnd()
+        withUsing(outerArgs, fnCallUsing)
         return S.FunctionCall.build(Tree.randomId(), prefix, Markers.EMPTY,
           new JRightPadded(fn, functionAfterSpace, Markers.EMPTY),
           JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
@@ -1123,6 +1131,7 @@ class ScalaTreeVisitor(
         val select = asExpression(visitTree(app.fun))
         val openIdx = positionOfNext("(", cursor)
         if (openIdx >= 0) cursor = openIdx + 1
+        val curriedUsing = consumeUsingKeyword()
         val outerArgs = new util.ArrayList[JRightPadded[Expression]]()
         for (i <- app.args.indices) {
           val arg = app.args(i)
@@ -1145,6 +1154,7 @@ class ScalaTreeVisitor(
           val end = Math.max(0, app.span.end - offsetAdjustment)
           if (end > cursor && end <= source.length) cursor = end
         }
+        withUsing(outerArgs, curriedUsing)
         val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
@@ -1164,6 +1174,7 @@ class ScalaTreeVisitor(
     val isColonArg = !isBlockArg && firstArgNonWs >= 0 && firstArgNonWs < source.length &&
       source.charAt(firstArgNonWs) == ':'
 
+    var usingText3: String = null
     var argContainerPrefix = Space.EMPTY
     val args = new util.ArrayList[JRightPadded[Expression]]()
 
@@ -1211,6 +1222,7 @@ class ScalaTreeVisitor(
           }
           cursor = parenPos + 1
         }
+        usingText3 = consumeUsingKeyword()
       }
 
       for (i <- app.args.indices) {
@@ -1270,6 +1282,7 @@ class ScalaTreeVisitor(
 
     val name = ident(methodName, nameSpace, quoted = methodNameQuoted)
 
+    withUsing(args, usingText3)
     val argContainer = JContainer.build(
       argContainerPrefix,
       args,
@@ -9002,6 +9015,29 @@ class ScalaTreeVisitor(
     }
   }
 
+
+  /** Consumes a call-site `using` keyword at the cursor, returning the source through it. */
+  private def consumeUsingKeyword(): String = {
+    var i = cursor
+    while (i < source.length && source.charAt(i).isWhitespace) i += 1
+    val end = i + "using".length
+    if (end <= source.length && source.startsWith("using", i) &&
+        (end >= source.length || !(Character.isLetterOrDigit(source.charAt(end)) || source.charAt(end) == '_'))) {
+      val text = source.substring(cursor, end)
+      cursor = end
+      text
+    } else null
+  }
+
+  /** Attaches a consumed `using` keyword to the first argument, which every printer path emits. */
+  private def withUsing(args: util.ArrayList[JRightPadded[Expression]], text: String): Unit = {
+    if (text != null && !args.isEmpty) {
+      val first = args.get(0)
+      val elem = first.getElement
+      val marked = elem.withMarkers[Expression](elem.getMarkers.add(UsingArguments(Tree.randomId(), text)))
+      args.set(0, first.withElement(marked))
+    }
+  }
 
   /** Visits a template parent. A parenthesized parent, as in `new X with (A => B)`, is a
    *  type rather than an expression, so it is visited in type position and stays
