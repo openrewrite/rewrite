@@ -295,7 +295,7 @@ def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
     assert routed["install"] == r
 
 
-def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
+def test_hub_release_keeps_each_childs_ref_table_intact():
     import rewrite.rpc.server as server
 
     server._hub_tree["T"] = object()
@@ -304,16 +304,15 @@ def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
     server._hub_send_refs["A"] = {10: ("before-1", 1), 11: ("before-2", 2),
                                   12: ("from-file", 3), 13: ("from-file", 4)}
     server._hub_send_next["A"] = 4
-    server._hub_send_checkpoint[("A", "T")] = 2
 
     server._hub_release("T")
 
-    # only the refs this file introduced are dropped; the pre-file ones survive
-    assert sorted(n for _, n in server._hub_send_refs["A"].values()) == [1, 2]
-    assert server._hub_send_next["A"] == 2          # counter rewound so the next file re-ADDs
+    # The child no longer drops refs on Evict, so the facade must not either -- rewinding here
+    # would re-ADD ref 3 for a different object while the child still holds the old one.
+    assert sorted(n for _, n in server._hub_send_refs["A"].values()) == [1, 2, 3, 4]
+    assert server._hub_send_next["A"] == 4
     assert "T" not in server._hub_tree
     assert ("A", "T") not in server._hub_served
-    assert ("A", "T") not in server._hub_send_checkpoint
 
 
 class _PreconditionChildren(_FakeChildren):
@@ -404,8 +403,7 @@ def _print_python(cu) -> str:
 
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
-    for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_send_next",
-                 "_hub_send_checkpoint", "local_objects"):
+    for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_send_next", "local_objects"):
         monkeypatch.setattr(server, name, {})
 
 
@@ -467,10 +465,9 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
 
 def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
     """A built-in visitor may delete the file outright. The facade has to let go of it the same way
-    a broadcast Evict would: drop the tree, forget what each child was served, and rewind that
-    child's send-ref numbering — otherwise the next file reuses ref numbers the child no longer
-    holds. Nothing after the delete may run, and the child must be told DELETE, not served a
-    resurrected tree."""
+    a broadcast Evict would: drop the tree and forget what each child was served, while leaving that
+    child's interned refs in place. Nothing after the delete may run, and the child must be told
+    DELETE, not served a resurrected tree."""
     import rewrite.rpc.server as server
     from rewrite.python.visitor import PythonVisitor
 
@@ -496,7 +493,9 @@ def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monke
 
     server._hub_acquire(tree_id, sft)
     server._hub_serve_child(bundle, tree_id, sft)      # child now holds this file and its refs
-    assert server._hub_send_next[bundle] > 0
+    served_refs = dict(server._hub_send_refs[bundle])
+    served_next = server._hub_send_next[bundle]
+    assert served_next > 0
 
     results = server._hub_local_visit([{"visitor": "Delete"}, {"visitor": "Later"}],
                                       {"treeId": tree_id, "sourceFileType": sft})
@@ -506,12 +505,11 @@ def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monke
                         "hasNewMessages": False, "searchResultIds": []}]
     assert ran_after == []
 
-    # The facade no longer owns the file, and every per-child table it seeded is rolled back.
+    # The facade no longer owns the file, but the child's refs stay valid for the next one.
     assert tree_id not in server._hub_tree
     assert (bundle, tree_id) not in server._hub_served
-    assert (bundle, tree_id) not in server._hub_send_checkpoint
-    assert server._hub_send_refs[bundle] == {}
-    assert server._hub_send_next[bundle] == 0
+    assert server._hub_send_refs[bundle] == served_refs
+    assert server._hub_send_next[bundle] == served_next
 
     # So a child asking for it again is told the file is gone rather than served a stale tree.
     assert server._hub_serve_child(bundle, tree_id, sft) == [

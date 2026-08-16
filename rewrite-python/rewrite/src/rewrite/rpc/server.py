@@ -67,9 +67,6 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
-# Per-source-file remote_refs high-water, captured before a file is first visited so
-# handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
-_ref_checkpoints: Dict[str, int] = {}
 
 # Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
 _metrics_file = None
@@ -1110,15 +1107,14 @@ def handle_reset(params: dict) -> bool:
     _local_object_ids.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
-    _ref_checkpoints.clear()
 
     logger.info("Reset: cleared all cached state")
     return True
 
 
 def handle_evict(params: dict) -> bool:
-    """Handle an Evict RPC notification - drop one source file's tree and roll back the
-    refs it introduced, bounding memory to roughly one source file at a time. Recipe,
+    """Handle an Evict RPC notification - drop one source file's tree. Interned refs are
+    deliberately kept so the next file reuses them; only Reset clears them. Recipe,
     accumulator, and execution-context state (keyed separately) is left intact.
     """
     obj_id = params.get('id')
@@ -1126,10 +1122,6 @@ def handle_evict(params: dict) -> bool:
         return True
     local_objects.pop(obj_id, None)
     remote_objects.pop(obj_id, None)
-    checkpoint = _ref_checkpoints.pop(obj_id, None)
-    if checkpoint is not None:
-        for ref_id in [k for k in remote_refs if k > checkpoint]:
-            del remote_refs[ref_id]
     return True
 
 
@@ -2062,9 +2054,6 @@ def handle_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot the remote_refs high-water for this file before fetching its tree (first visit wins).
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
-
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2119,9 +2108,6 @@ def handle_batch_visit(params: dict) -> dict:
     logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
 
     ctx = _context_for(p_id)
-
-    # Snapshot the remote_refs high-water for this file before fetching its tree.
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2345,7 +2331,6 @@ _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritati
 _hub_send_refs: Dict[str, Dict] = {}        # bundle -> send ref map      (facade -> child)
 _hub_send_next: Dict[str, int] = {}         # bundle -> next send ref number
 _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
-_hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
 
 def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
     """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
@@ -2376,9 +2361,6 @@ def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) 
     q = RpcSendQueue(source_file_type)
     q.refs = _hub_send_refs.setdefault(bundle, {})
     q.next_ref = _hub_send_next.get(bundle, 0)
-    # Remember where this child's ref numbering stood before this file, so Evict can roll it back
-    # in lockstep with the child's own rollback (see _hub_release).
-    _hub_send_checkpoint.setdefault((bundle, obj_id), q.next_ref)
     data = q.generate(tree, _hub_served.get((bundle, obj_id)))
     _hub_send_next[bundle] = q.next_ref
     _hub_served[(bundle, obj_id)] = tree
@@ -2409,21 +2391,12 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
 
 
 def _hub_release(obj_id: str) -> None:
-    """The rollback must be symmetric with the child's own Evict: the child drops the refs this file
-    introduced from its receive map, so if the facade kept them in its send map it would emit a
-    GET_REF for a ref the child no longer has ("Received reference to unknown object").
+    """Drop the facade's copy of one file's tree. The send ref map is deliberately left alone and
+    stays symmetric with the child's receive map, which no longer drops refs on Evict either.
     """
     _hub_tree.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
-    for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
-        bundle = key[0]
-        checkpoint = _hub_send_checkpoint.pop(key)
-        refs = _hub_send_refs.get(bundle)
-        if refs is not None:
-            for ref_key in [k for k, (_, num) in refs.items() if num > checkpoint]:
-                del refs[ref_key]
-        _hub_send_next[bundle] = checkpoint
 
 
 def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
@@ -2869,7 +2842,7 @@ def _rss_bytes():
 
 def _record_metric(method: str, duration_ms: float, error: str) -> None:
     """Append one row of timing + cache residency. refs counts remote_refs only: Python's send-side
-    refs live on a per-call RpcSendQueue, the only cross-call ref cache handle_evict rolls back."""
+    refs live on a per-call RpcSendQueue, so remote_refs is the only cross-call ref cache."""
     if _metrics_writer is None:
         return
     used, peak = _rss_bytes()

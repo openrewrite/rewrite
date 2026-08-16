@@ -44,7 +44,6 @@ export class Visit {
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
-                  captureRefCheckpoint: (treeId: string) => void,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
                   dataTableStore: () => DataTableStore | undefined,
                   metricsCsv?: string): void {
@@ -59,7 +58,6 @@ export class Visit {
                     if (store && p instanceof ExecutionContext) {
                         p.messages[DATA_TABLE_STORE] = store;
                     }
-                    captureRefCheckpoint(request.treeId);
                     const before: Tree = await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
                     context.target = extractSourcePath(before, cursor);

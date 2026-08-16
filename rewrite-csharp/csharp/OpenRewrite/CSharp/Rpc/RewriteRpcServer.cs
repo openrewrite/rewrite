@@ -87,12 +87,6 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
-    /// Ref high-water per source file (send-side _localRefs count, receive-side max _remoteRefs
-    /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
-    /// </summary>
-    private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
-
-    /// <summary>
     /// DependencyTypes pages its (potentially hundreds-of-MB) response: the full RpcObjectData list
     /// is built once, cached keyed by coordinate, and handed back one
     /// <see cref="DependencyTypesBatchSize"/> slice per repeated identical request — the Java
@@ -1448,7 +1442,6 @@ public class RewriteRpcServer
         }
 
         // Fetch tree from the remote (Java) process
-        CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
 
         if (phase != "scan" && phase != "edit")
@@ -1503,7 +1496,6 @@ public class RewriteRpcServer
         }
 
         var sw = Stopwatch.StartNew();
-        CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var fetchMs = sw.ElapsedMilliseconds;
 
@@ -1806,35 +1798,15 @@ public class RewriteRpcServer
         _remoteObjects.Clear();
         _localRefs.Clear();
         _remoteRefs.Clear();
-        _refCheckpoints.Clear();
         _preparedRecipes.Clear();
         _recipeAccumulators.Clear();
         _executionContexts.Clear();
     }
 
     /// <summary>
-    /// Records the ref high-water before a source file is first visited (first visit wins), so
-    /// <see cref="Evict"/> can roll back exactly the refs that file introduced.
-    /// </summary>
-    private void CaptureRefCheckpoint(string treeId)
-    {
-        _refCheckpoints.GetOrAdd(treeId, _ =>
-        {
-            var remoteMax = -1;
-            foreach (var key in _remoteRefs.Keys)
-            {
-                if (key > remoteMax)
-                {
-                    remoteMax = key;
-                }
-            }
-            return (_localRefs.Count, remoteMax);
-        });
-    }
-
-    /// <summary>
-    /// Drops one source file's tree and rolls back the refs it introduced; recipe/accumulator/
-    /// context state (keyed separately) is preserved. Fire-and-forget, so it returns no response.
+    /// Drops one source file's tree. Interned refs are deliberately kept so the next file reuses
+    /// them; only Reset clears them. Recipe/accumulator/context state (keyed separately) is
+    /// preserved. Fire-and-forget, so it returns no response.
     /// </summary>
     [JsonRpcMethod("Evict", UseSingleObjectParameterDeserialization = true)]
     public void Evict(EvictRequest request)
@@ -1845,23 +1817,6 @@ public class RewriteRpcServer
         }
         _localObjects.TryRemove(request.Id, out _);
         _remoteObjects.TryRemove(request.Id, out _);
-        if (_refCheckpoints.TryRemove(request.Id, out var cp))
-        {
-            foreach (var kv in _localRefs)
-            {
-                if (kv.Value > cp.LocalRefs)
-                {
-                    _localRefs.TryRemove(kv.Key, out _);
-                }
-            }
-            foreach (var key in _remoteRefs.Keys)
-            {
-                if (key > cp.RemoteRefsMax)
-                {
-                    _remoteRefs.TryRemove(key, out _);
-                }
-            }
-        }
     }
 
     /// <summary>

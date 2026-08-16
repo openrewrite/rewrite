@@ -45,8 +45,10 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
@@ -199,8 +201,8 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     /**
-     * {@link RewriteRpc#evict} drops the tree from both peers and rolls the client's ref maps
-     * back to the pre-file checkpoint.
+     * {@link RewriteRpc#evict} drops the tree from both peers but leaves every interned ref in
+     * place, so the next source file reuses them instead of re-sending what they stand for.
      */
     @SneakyThrows
     @Test
@@ -212,9 +214,6 @@ class RewriteRpcTest implements RewriteTest {
         String id = original.getId().toString();
         String sourceFileType = PlainText.class.getName();
 
-        // High-water before the client fetches anything, so evict rolls back exactly this exchange.
-        int[] checkpoint = client.refCheckpoint();
-
         // Server holds the tree; client fetches it → both peers cache it.
         server.localObjects.put(id, original);
         client.getObject(id, sourceFileType);
@@ -223,12 +222,14 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(server.localObjects).containsKey(id);
         assertThat(server.remoteObjects).containsKey(id);
 
-        client.evict(id, checkpoint[0], checkpoint[1]);
+        Set<Integer> refsBefore = new HashSet<>(client.remoteRefs.keySet());
 
-        // Client cleared synchronously, including refs rolled back to the checkpoint.
+        client.evict(id);
+
+        // Trees cleared synchronously; refs survive, which is what makes cross-file interning work.
         assertThat(client.localObjects).doesNotContainKey(id);
         assertThat(client.remoteObjects).doesNotContainKey(id);
-        assertThat(client.remoteRefs.keySet()).allMatch(ref -> ref <= checkpoint[1]);
+        assertThat(client.remoteRefs.keySet()).containsExactlyInAnyOrderElementsOf(refsBefore);
 
         // The Evict notification is fire-and-forget; wait for the server to apply it.
         long deadline = System.currentTimeMillis() + 5_000;

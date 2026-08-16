@@ -125,7 +125,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return sourceSetEditor.apply(sourceSet, sourceFile -> {
                 BatchState scanBatch = new BatchState();
                 Set<RewriteRpc> touched = newSetFromMap(new IdentityHashMap<>());
-                Map<RewriteRpc, int[]> refCheckpoints = new IdentityHashMap<>();
 
                 SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = leaf(recipeStack);
@@ -140,11 +139,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
                         String scanVisitorName = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getScanVisitor() : null;
 
-                        if (scanVisitorName != null) {
-                            captureRpc(currentRpc, touched, refCheckpoints);
-                        }
-
                         if (currentRpc != null && scanVisitorName != null) {
+                            touched.add(currentRpc);
+
                             // Flush if switching to a different RPC instance
                             if (scanBatch.rpc != null && scanBatch.rpc != currentRpc) {
                                 flushScanBatch(scanBatch, source);
@@ -204,7 +201,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     flushScanBatch(scanBatch, result);
                 }
 
-                evictSourceFile(sourceFile, touched, refCheckpoints);
+                evictSourceFile(sourceFile, touched);
                 return result;
             });
         }
@@ -230,29 +227,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     /**
-     * Record a peer this file touched, snapshotting its ref high-water on first sight so
-     * {@link #evictSourceFile} can roll back exactly the refs this file introduced.
+     * Drop this source file's tree from every RPC peer that visited it, bounding each peer's tree
+     * cache to ~one file at a time. Interned refs survive so the next file reuses them.
      */
-    private static void captureRpc(@Nullable RewriteRpc rpc, Set<RewriteRpc> touched,
-                                   Map<RewriteRpc, int[]> refCheckpoints) {
-        if (rpc != null && touched.add(rpc)) {
-            refCheckpoints.put(rpc, rpc.refCheckpoint());
-        }
-    }
-
-    /**
-     * Drop this source file's tree from every RPC peer that visited it, rolling each peer's
-     * ref maps back to the pre-file checkpoint. Bounds RPC-server memory to ~one file at a time.
-     */
-    private static void evictSourceFile(@Nullable SourceFile sourceFile, Set<RewriteRpc> touched,
-                                        Map<RewriteRpc, int[]> refCheckpoints) {
+    private static void evictSourceFile(@Nullable SourceFile sourceFile, Set<RewriteRpc> touched) {
         if (sourceFile == null || touched.isEmpty()) {
             return;
         }
         String id = sourceFile.getId().toString();
         for (RewriteRpc rpc : touched) {
-            int[] cp = refCheckpoints.get(rpc);
-            rpc.evict(id, cp[0], cp[1]);
+            rpc.evict(id);
         }
     }
 
@@ -355,7 +339,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         recipeRunStats.recordSourceVisited(sourceFile);
         BatchState batch = new BatchState();
         Set<RewriteRpc> touched = newSetFromMap(new IdentityHashMap<>());
-        Map<RewriteRpc, int[]> refCheckpoints = new IdentityHashMap<>();
 
         SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
             Recipe recipe = leaf(recipeStack);
@@ -364,7 +347,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
 
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
-            captureRpc(currentRpc, touched, refCheckpoints);
+            if (currentRpc != null) {
+                touched.add(currentRpc);
+            }
 
             // Flush batch if switching to a different RPC or non-RPC recipe
             if (batch.rpc != null && batch.rpc != currentRpc) {
@@ -488,7 +473,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
 
         // Recipe errors are handled inside the reduce, so this runs on every normal return.
-        evictSourceFile(sourceFile, touched, refCheckpoints);
+        evictSourceFile(sourceFile, touched);
         return result;
     }
 

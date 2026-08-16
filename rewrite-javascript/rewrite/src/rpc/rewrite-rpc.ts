@@ -75,10 +75,6 @@ export class RewriteRpc {
     readonly remoteRefs: Map<number, any> = new Map();
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
-    // Ref high-water per source file, captured before it is first visited so an Evict rolls
-    // back exactly the refs it introduced. `send` = localRefs snapshot, `recvMax` = max remoteRefs key.
-    readonly refCheckpoints: Map<string, { send: number, recvMax: number }> = new Map();
-
     private remoteLanguages?: string[];
     private readonly logger?: rpc.Logger;
     private traceGetObject: TraceGetObject = {receive: false, send: false};
@@ -111,19 +107,6 @@ export class RewriteRpc {
         // Need this indirection, otherwise `this` will be undefined when executed in the handlers.
         const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
-        // First visit of the file wins.
-        const captureRefCheckpoint = (treeId: string) => {
-            if (this.refCheckpoints.has(treeId)) {
-                return;
-            }
-            let recvMax = -1;
-            for (const k of this.remoteRefs.keys()) {
-                if (k > recvMax) {
-                    recvMax = k;
-                }
-            }
-            this.refCheckpoints.set(treeId, {send: this.localRefs.snapshot(), recvMax});
-        };
         const traceGetObject = () => this.traceGetObject.send;
         const dataTableStore = () => this.configuredDataTableStore;
 
@@ -132,8 +115,8 @@ export class RewriteRpc {
         // GetMarketplace builds rows so the host can attribute each recipe to its own bundle.
         const recipeOrigin: Map<string, string> = new Map();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, captureRefCheckpoint, getCursor, dataTableStore, options.metricsCsv);
-        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, captureRefCheckpoint, getCursor, dataTableStore, options.metricsCsv);
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
         SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
@@ -164,7 +147,6 @@ export class RewriteRpc {
             this.remoteObjects.clear();
             this.remoteRefs.clear();
             this.localRefs.clear();
-            this.refCheckpoints.clear();
             preparedRecipes.clear();
             this.remoteLanguages = undefined;
         };
@@ -181,24 +163,15 @@ export class RewriteRpc {
             }
         )
 
-        // Drop one source file's tree + roll back the refs it introduced. Fire-and-forget
-        // notification (no reply), so recipe/accumulator/context state is left intact.
+        // Drop one source file's tree. Interned refs are deliberately kept so the next file
+        // reuses them; only Reset clears them. Fire-and-forget notification (no reply), so
+        // recipe/accumulator/context state is left intact.
         this.connection.onNotification(
             new rpc.NotificationType<{ id: string }>("Evict"),
             (params) => {
                 const id = params.id;
                 this.localObjects.delete(id);
                 this.remoteObjects.delete(id);
-                const cp = this.refCheckpoints.get(id);
-                if (cp !== undefined) {
-                    this.localRefs.rollbackTo(cp.send);
-                    for (const k of [...this.remoteRefs.keys()]) {
-                        if (k > cp.recvMax) {
-                            this.remoteRefs.delete(k);
-                        }
-                    }
-                    this.refCheckpoints.delete(id);
-                }
             }
         )
 
