@@ -1465,6 +1465,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             skip(".");
         }
 
+        // `Foo.(a)` elides the `call` that Prism still reports as the name
+        if (name.equals("call") && !peekKeywordAt("call", indexOfNextNonWhitespace(cursor))) {
+            markers = markers.add(new ImplicitCall(randomId()));
+        }
+
         J.Identifier methodName = identifier(name);
         if (name.equals("new")) {
             return new J.NewClass(
@@ -2048,17 +2053,21 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     private Rb.Hash hash(Space prefix, Nodes.Node[] elements, Nodes.@Nullable Node rest) {
         AtomicReference<Markers> markers = new AtomicReference<>(Markers.EMPTY);
         Space before = whitespace();
-        boolean braces = source.startsWith("{", cursor);
+
+        List<Nodes.Node> all = new ArrayList<>(Arrays.asList(elements));
+        if (rest != null) {
+            all.add(rest);
+        }
+
+        // a brace-less hash whose first key is itself a hash (`eq({} => 0)`) also starts with `{`,
+        // so the brace only belongs to this hash when it sits ahead of the first pair
+        boolean braces = source.startsWith("{", cursor) &&
+                         (all.isEmpty() || cursor < charStart(all.get(0)));
         Markers hashMarkers = Markers.EMPTY;
         if (braces) {
             skip("{");
         } else {
             hashMarkers = hashMarkers.add(new OmitParentheses(randomId()));
-        }
-
-        List<Nodes.Node> all = new ArrayList<>(Arrays.asList(elements));
-        if (rest != null) {
-            all.add(rest);
         }
 
         List<JRightPadded<Expression>> pairs = new ArrayList<>(all.size());
