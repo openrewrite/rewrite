@@ -45,14 +45,14 @@ describe("recipes", () => {
         await activate(marketplace);
         const result = marketplace.findRecipe("org.openrewrite.example.text.change-text");
         expect(result).toBeDefined();
-        const [descriptor, RecipeClass] = result!;
+        const [listing, RecipeClass] = result!;
         expect(RecipeClass).toBeDefined();
         expect(new RecipeClass!()).toBeInstanceOf(ChangeText);
 
-        expect(descriptor).toEqual({
+        // The marketplace holds a listing-weight view; the full descriptor is fetched via PrepareRecipe.
+        expect(listing).toEqual({
             name: "org.openrewrite.example.text.change-text",
             displayName: "Change text",
-            instanceName: "Change text to 'undefined'",
             description: "Change the text of a file.",
             estimatedEffortPerOccurrence: 5,
             options: [
@@ -64,13 +64,11 @@ describe("recipes", () => {
                     value: undefined
                 }
             ],
-            preconditions: [],
-            recipeList: [],
-            tags: [],
             dataTables: [],
-            maintainers: [],
-            contributors: [],
-            examples: []
+            recipeCount: 1
         });
+        // Guard: the marketplace holds a listing, not the full descriptor.
+        expect(listing).not.toHaveProperty("recipeList");
+        expect(listing).not.toHaveProperty("instanceName");
     });
 });

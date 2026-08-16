@@ -1496,17 +1496,26 @@ def _collect_marketplace_rows(
     def collect(category, category_path: List[dict]) -> None:
         current_path = [*category_path, _category_descriptor_to_dict(category.descriptor)]
 
-        for _recipe_name, (recipe_desc, _recipe_class) in category.recipes.items():
-            if recipe_filter is not None and recipe_desc.name not in recipe_filter:
+        for _recipe_name, (listing, _recipe_class) in category.recipes.items():
+            if recipe_filter is not None and listing.name not in recipe_filter:
                 continue
-            existing = next((r for r in rows if r['descriptor']['name'] == recipe_desc.name), None)
+            existing = next((r for r in rows if r['name'] == listing.name), None)
             if existing:
                 existing['categoryPaths'].append(current_path)
             else:
+                # Serve the RecipeListing the marketplace already holds: recipeCount was computed
+                # once at install time, so listing never walks the descriptor tree. The host fetches
+                # the full descriptor lazily via PrepareRecipe.
                 rows.append({
-                    'descriptor': _recipe_descriptor_to_dict(recipe_desc),
+                    'name': listing.name,
+                    'displayName': listing.display_name,
+                    'description': listing.description,
+                    'estimatedEffortPerOccurrence': listing.estimated_effort_per_occurrence,
+                    'options': _options_to_dicts(listing),
+                    'dataTables': listing.data_tables,
+                    'recipeCount': listing.recipe_count,
                     'categoryPaths': [current_path],
-                    'packageName': _attribution.package_for(recipe_desc.name),
+                    'packageName': _attribution.package_for(listing.name),
                 })
 
         for subcategory in category.categories:
@@ -1551,6 +1560,22 @@ def _delegate_descriptor(name: str) -> dict:
     }
 
 
+def _options_to_dicts(descriptor) -> List[dict]:
+    """Convert a descriptor's own (non-recursive) options to dicts for JSON serialization."""
+    return [
+        {
+            'name': name,
+            'value': _serialize_value(value),
+            'displayName': opt.display_name,
+            'description': opt.description,
+            'example': opt.example,
+            'required': opt.required,
+            'valid': opt.valid,
+        }
+        for name, value, opt in descriptor.options
+    ]
+
+
 def _recipe_descriptor_to_dict(descriptor) -> dict:
     """Convert a RecipeDescriptor to a dict for JSON serialization."""
     return {
@@ -1559,18 +1584,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
         'description': descriptor.description,
         'tags': descriptor.tags,
         'estimatedEffortPerOccurrence': descriptor.estimated_effort_per_occurrence,
-        'options': [
-            {
-                'name': name,
-                'value': _serialize_value(value),
-                'displayName': opt.display_name,
-                'description': opt.description,
-                'example': opt.example,
-                'required': opt.required,
-                'valid': opt.valid,
-            }
-            for name, value, opt in descriptor.options
-        ],
+        'options': _options_to_dicts(descriptor),
         'preconditions': [],
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
         'dataTables': descriptor.data_tables,

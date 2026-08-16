@@ -17,24 +17,50 @@ package org.openrewrite.rpc.request;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.NlsRewrite;
 import org.openrewrite.config.CategoryDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 
 public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row> {
     @Value
     public static class Row {
-        RecipeDescriptor descriptor;
+        /**
+         * Listing-weight fields the host builds a {@link RecipeListing} from. The full descriptor is
+         * fetched lazily per recipe via {@code PrepareRecipe} when detail or execution is needed.
+         */
+        @Nullable String name;
+
+        @Nullable @NlsRewrite.DisplayName String displayName;
+
+        @Nullable @NlsRewrite.Description String description;
+
+        @Nullable Duration estimatedEffortPerOccurrence;
+
+        @Nullable List<OptionDescriptor> options;
+
+        @Nullable List<DataTableDescriptor> dataTables;
+
+        /**
+         * The count of this recipe plus all of its transitive sub-recipes. Emitters must compute it
+         * as {@code 1 + all transitive recipeList entries}; the host uses it as a sort key (see
+         * {@link RecipeListing#getRecipeCount()}).
+         */
+        int recipeCount;
+
         List<List<CategoryDescriptor>> categoryPaths;
 
         /**
@@ -57,25 +83,47 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
                     !recipe.getPackageName().equals(bundle.getPackageName())) {
                 continue;
             }
+            RecipeListing listing = toListing(recipe, bundle);
             for (List<CategoryDescriptor> categoryPath : recipe.getCategoryPaths()) {
-                marketplace.install(RecipeListing.fromDescriptor(recipe.getDescriptor(), bundle), categoryPath);
+                marketplace.install(listing, categoryPath);
             }
         }
         return marketplace;
     }
 
-    public static GetMarketplaceResponse fromMarketplace(RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
+    /**
+     * The {@link RecipeListing} a row represents, attributed to {@code bundle}, built from its
+     * listing-weight fields.
+     */
+    private static RecipeListing toListing(Row row, RecipeBundle bundle) {
+        return new RecipeListing(null, row.getName(), row.getDisplayName(), row.getDescription(),
+                row.getEstimatedEffortPerOccurrence(),
+                row.getOptions() != null ? row.getOptions() : emptyList(),
+                row.getDataTables() != null ? row.getDataTables() : emptyList(),
+                row.getRecipeCount(), bundle);
+    }
+
+    public static GetMarketplaceResponse fromMarketplace(RecipeMarketplace marketplace) {
         Map<String, Row> rowByRecipeId = new LinkedHashMap<>();
         for (RecipeMarketplace.Category category : marketplace.getCategories()) {
-            fromCategory(resolvers, rowByRecipeId, category, new ArrayList<>());
+            fromCategory(rowByRecipeId, category, new ArrayList<>());
         }
         GetMarketplaceResponse response = new GetMarketplaceResponse();
         response.addAll(rowByRecipeId.values());
         return response;
     }
 
-    private static void fromCategory(List<RecipeBundleResolver> resolvers,
-                                     Map<String, Row> rowByRecipeId,
+    /**
+     * @deprecated Use {@link #fromMarketplace(RecipeMarketplace)}. The {@code resolvers} argument is
+     * no longer needed: rows are emitted listing-weight straight off each {@link RecipeListing}, so no
+     * recipe is resolved or described here.
+     */
+    @Deprecated
+    public static GetMarketplaceResponse fromMarketplace(RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
+        return fromMarketplace(marketplace);
+    }
+
+    private static void fromCategory(Map<String, Row> rowByRecipeId,
                                      RecipeMarketplace.Category category,
                                      List<CategoryDescriptor> parentCategory) {
         List<CategoryDescriptor> categoryPath = new ArrayList<>(parentCategory);
@@ -83,11 +131,13 @@ public class GetMarketplaceResponse extends ArrayList<GetMarketplaceResponse.Row
                 category.getDescription(), emptySet(), false, 0, false));
         for (RecipeListing recipe : category.getRecipes()) {
             rowByRecipeId.computeIfAbsent(recipe.getName(), recipeId ->
-                    new Row(recipe.describe(resolvers), new ArrayList<>(),
-                            recipe.getBundle().getPackageName())).categoryPaths.add(categoryPath);
+                    new Row(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
+                            recipe.getEstimatedEffortPerOccurrence(), recipe.getOptions(),
+                            recipe.getDataTables(), recipe.getRecipeCount(),
+                            new ArrayList<>(), recipe.getBundle().getPackageName())).categoryPaths.add(categoryPath);
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
-            fromCategory(resolvers, rowByRecipeId, child, categoryPath);
+            fromCategory(rowByRecipeId, child, categoryPath);
         }
     }
 }

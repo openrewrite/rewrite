@@ -159,17 +159,17 @@ public class RecipeMarketplace
     public IReadOnlyList<Category> Categories => _root.SubCategories;
 
     /// <summary>
-    /// Find a recipe by its fully qualified name. Returns the descriptor and optionally the live recipe instance.
+    /// Find a recipe by its fully qualified name. Returns the listing and optionally the live recipe instance.
     /// </summary>
-    public (RecipeDescriptor Descriptor, Recipe? Recipe)? FindRecipe(string name)
+    public (RecipeListing Listing, Recipe? Recipe)? FindRecipe(string name)
     {
         return _root.FindRecipe(name);
     }
 
     /// <summary>
-    /// Recursively collect all recipe descriptors in the marketplace.
+    /// Recursively collect all recipe listings in the marketplace.
     /// </summary>
-    public List<RecipeDescriptor> AllRecipes()
+    public List<RecipeListing> AllRecipes()
     {
         return _root.AllRecipes();
     }
@@ -181,7 +181,9 @@ public class RecipeMarketplace
     {
         public CategoryDescriptor Descriptor { get; }
         private readonly List<Category> _categories = [];
-        private readonly Dictionary<RecipeDescriptor, Recipe?> _recipes = new();
+        // Keyed by recipe name, holding the listing-weight view and (when installed from a class) the
+        // live recipe instance PrepareRecipe uses to build the full tree.
+        private readonly Dictionary<string, (RecipeListing Listing, Recipe? Recipe)> _recipes = new();
 
         public Category(CategoryDescriptor descriptor)
         {
@@ -189,13 +191,15 @@ public class RecipeMarketplace
         }
 
         public IReadOnlyList<Category> SubCategories => _categories;
-        public IReadOnlyDictionary<RecipeDescriptor, Recipe?> Recipes => _recipes;
+        public IReadOnlyDictionary<string, (RecipeListing Listing, Recipe? Recipe)> Recipes => _recipes;
 
         internal void Install(Recipe recipe, ReadOnlySpan<CategoryDescriptor> categoryPath)
         {
             if (categoryPath.IsEmpty)
             {
-                _recipes[recipe.GetDescriptor()] = recipe;
+                // Derive the listing once at install; retain the instance for PrepareRecipe.
+                var descriptor = recipe.GetDescriptor();
+                _recipes[descriptor.Name] = (RecipeListing.From(descriptor), recipe);
                 return;
             }
 
@@ -207,7 +211,7 @@ public class RecipeMarketplace
         {
             if (categoryPath.IsEmpty)
             {
-                _recipes[descriptor] = null;
+                _recipes[descriptor.Name] = (RecipeListing.From(descriptor), null);
                 return;
             }
 
@@ -228,13 +232,10 @@ public class RecipeMarketplace
             return newCategory;
         }
 
-        public (RecipeDescriptor Descriptor, Recipe? Recipe)? FindRecipe(string name)
+        public (RecipeListing Listing, Recipe? Recipe)? FindRecipe(string name)
         {
-            foreach (var (descriptor, recipe) in _recipes)
-            {
-                if (descriptor.Name == name)
-                    return (descriptor, recipe);
-            }
+            if (_recipes.TryGetValue(name, out var entry))
+                return entry;
 
             foreach (var category in _categories)
             {
@@ -246,9 +247,13 @@ public class RecipeMarketplace
             return null;
         }
 
-        public List<RecipeDescriptor> AllRecipes()
+        public List<RecipeListing> AllRecipes()
         {
-            var result = new List<RecipeDescriptor>(_recipes.Keys);
+            var result = new List<RecipeListing>();
+            foreach (var (listing, _) in _recipes.Values)
+            {
+                result.Add(listing);
+            }
             foreach (var category in _categories)
             {
                 result.AddRange(category.AllRecipes());

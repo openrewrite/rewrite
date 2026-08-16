@@ -1409,8 +1409,19 @@ func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
 	return cols, nil
 }
 
+// marketplaceRow carries listing-weight metadata only: the host builds a RecipeListing from these
+// fields without materializing recipes. The full recursive descriptor is deliberately not shipped —
+// the host fetches it lazily per recipe via the separate PrepareRecipe RPC. RecipeCount collapses
+// the transitive recipeList the host would otherwise only count.
 type marketplaceRow struct {
-	Descriptor    marketplaceDescriptor   `json:"descriptor"`
+	Name                         string                  `json:"name"`
+	DisplayName                  string                  `json:"displayName"`
+	Description                  string                  `json:"description"`
+	EstimatedEffortPerOccurrence *string                 `json:"estimatedEffortPerOccurrence"`
+	Options                      []marketplaceOption     `json:"options"`
+	DataTables                   []any                   `json:"dataTables"`
+	// RecipeCount is 1 + every transitive recipeList entry; the host uses it as a sort key.
+	RecipeCount   int                     `json:"recipeCount"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
 	// PackageName is the package that contributed this recipe (nil when unattributed, e.g. a
 	// local-path install), so the host attributes each row to its own bundle.
@@ -1459,7 +1470,10 @@ type marketplaceCategory struct {
 func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 	var rows []marketplaceRow
 	for _, reg := range s.registry.AllRegistrations() {
-		desc := reg.Descriptor
+		// Serve the RecipeListing the registry already holds: RecipeCount was computed once at
+		// registration, so listing never walks the descriptor tree. The full descriptor is fetched
+		// lazily per recipe via PrepareRecipe.
+		listing := reg.Listing
 
 		var categoryPath []marketplaceCategory
 		for _, cat := range reg.Categories {
@@ -1474,11 +1488,16 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 		}
 
 		var packageName *string
-		if origin, ok := s.recipeOrigin[desc.Name]; ok {
+		if origin, ok := s.recipeOrigin[listing.Name]; ok {
 			packageName = &origin
 		}
 		rows = append(rows, marketplaceRow{
-			Descriptor:    marketplaceDescriptorFromRecipe(desc),
+			Name:          listing.Name,
+			DisplayName:   listing.DisplayName,
+			Description:   listing.Description,
+			Options:       marketplaceOptions(listing.Options),
+			DataTables:    marketplaceDataTables(listing.DataTables),
+			RecipeCount:   listing.RecipeCount,
 			CategoryPaths: [][]marketplaceCategory{categoryPath},
 			PackageName:   packageName,
 		})
@@ -1513,9 +1532,10 @@ func delegateDescriptor(name string) marketplaceDescriptor {
 	}
 }
 
-func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
-	options := make([]marketplaceOption, 0, len(desc.Options))
-	for _, opt := range desc.Options {
+// marketplaceOptions converts a recipe's own (non-recursive) options to wire format.
+func marketplaceOptions(opts []recipe.OptionDescriptor) []marketplaceOption {
+	options := make([]marketplaceOption, 0, len(opts))
+	for _, opt := range opts {
 		var example *string
 		if opt.Example != "" {
 			example = &opt.Example
@@ -1535,6 +1555,25 @@ func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDe
 			Valid:       valid,
 		})
 	}
+	return options
+}
+
+// marketplaceDataTables converts a recipe's own (non-recursive) data tables to wire format.
+func marketplaceDataTables(dts []recipe.DataTableDescriptor) []any {
+	dataTables := make([]any, 0, len(dts))
+	for _, dt := range dts {
+		dataTables = append(dataTables, marketplaceDataTable{
+			Name:        dt.Name,
+			DisplayName: dt.DisplayName,
+			Description: dt.Description,
+			Columns:     marketplaceColumns(dt.Columns),
+		})
+	}
+	return dataTables
+}
+
+func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
+	options := marketplaceOptions(desc.Options)
 
 	recipeList := make([]marketplaceDescriptor, 0, len(desc.RecipeList))
 	for _, sub := range desc.RecipeList {
@@ -1546,15 +1585,7 @@ func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDe
 		preconditions = append(preconditions, marketplaceDescriptorFromRecipe(pre))
 	}
 
-	dataTables := make([]any, 0, len(desc.DataTables))
-	for _, dt := range desc.DataTables {
-		dataTables = append(dataTables, marketplaceDataTable{
-			Name:        dt.Name,
-			DisplayName: dt.DisplayName,
-			Description: dt.Description,
-			Columns:     marketplaceColumns(dt.Columns),
-		})
-	}
+	dataTables := marketplaceDataTables(desc.DataTables)
 
 	maintainers := make([]any, 0, len(desc.Maintainers))
 	for _, m := range desc.Maintainers {
@@ -1728,9 +1759,15 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		// (stale/missing CLI-built binary) instead of "Unknown recipe: <uuid>".
 		s.preparedRecipes[recipeID] = instance
 		s.preparedRecipeNames[recipeID] = req.ID
+		// A constructor-less registration always carries its descriptor; fall back to a name-only
+		// stand-in for the (broken-binary) edge case where it doesn't.
+		descriptor := delegateDescriptor(req.ID)
+		if reg.Descriptor != nil {
+			descriptor = marketplaceDescriptorFromRecipe(*reg.Descriptor)
+		}
 		return prepareRecipeResponse{
 			ID:                recipeID,
-			Descriptor:        marketplaceDescriptorFromRecipe(reg.Descriptor),
+			Descriptor:        descriptor,
 			EditVisitor:       "edit:" + recipeID,
 			EditPreconditions: []any{},
 			ScanPreconditions: []any{},

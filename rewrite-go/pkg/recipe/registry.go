@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 )
 
 type CategoryDescriptor struct {
@@ -29,9 +30,52 @@ type CategoryDescriptor struct {
 
 type RecipeConstructor func(options map[string]any) Recipe
 
+// RecipeListing is the listing-weight view the registry holds and serves for the InstallRecipes and
+// GetMarketplace RPC commands, so listing never materializes the full recursive descriptor. The full
+// tree is built lazily per recipe by PrepareRecipe. RecipeCount is 1 + every transitive RecipeList
+// entry, computed once at registration (the host uses it as a sort key).
+type RecipeListing struct {
+	Name                         string
+	DisplayName                  string
+	Description                  string
+	EstimatedEffortPerOccurrence time.Duration
+	Options                      []OptionDescriptor
+	DataTables                   []DataTableDescriptor
+	RecipeCount                  int
+}
+
+// ToListing derives the listing-weight view from a full descriptor, collapsing its recursive
+// RecipeList to a count.
+func ToListing(desc RecipeDescriptor) RecipeListing {
+	return RecipeListing{
+		Name:                         desc.Name,
+		DisplayName:                  desc.DisplayName,
+		Description:                  desc.Description,
+		EstimatedEffortPerOccurrence: desc.EstimatedEffortPerOccurrence,
+		Options:                      desc.Options,
+		DataTables:                   desc.DataTables,
+		RecipeCount:                  countRecipes(desc),
+	}
+}
+
+func countRecipes(desc RecipeDescriptor) int {
+	count := 1
+	for _, sub := range desc.RecipeList {
+		count += countRecipes(sub)
+	}
+	return count
+}
+
 type Registration struct {
-	Descriptor  RecipeDescriptor
+	// Listing is the listing-weight view served for GetMarketplace, computed once at registration.
+	Listing     RecipeListing
 	Constructor RecipeConstructor
+
+	// Descriptor is retained only for descriptor-only registrations that lack a runnable Constructor
+	// (the installer's bootstrap listing binary); PrepareRecipe returns it when the recipe can't be
+	// instantiated here. Nil for normal registrations, which rebuild the full descriptor from
+	// Constructor on PrepareRecipe.
+	Descriptor *RecipeDescriptor
 
 	// Categories is the category path from shallowest to deepest
 	// (e.g., []CategoryDescriptor{{DisplayName: "Go"}, {DisplayName: "Cleanup"}}).
@@ -98,7 +142,7 @@ func (r *Registry) Register(prototype Recipe, categories ...CategoryDescriptor) 
 	constructor := newReflectConstructor(prototype)
 
 	reg := &Registration{
-		Descriptor:  desc,
+		Listing:     ToListing(desc),
 		Constructor: constructor,
 		Categories:  categories,
 	}
@@ -130,8 +174,10 @@ func (r *Registry) registerSubRecipes(rec Recipe) {
 			// A child that is also registered as a top-level recipe is
 			// already resolvable via byName; FindRecipe checks byName first.
 			child := sub
+			// Sub-recipes are resolved by name only to be prepared (via Constructor); they never
+			// surface in GetMarketplace, so they need no Listing, and PrepareRecipe describes the
+			// instance rather than a stored descriptor.
 			r.subByName[name] = &Registration{
-				Descriptor:  Describe(child),
 				Constructor: func(map[string]any) Recipe { return child },
 			}
 			r.registerSubRecipes(child)
@@ -161,9 +207,11 @@ func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []Ca
 			return
 		}
 	}
+	descCopy := desc
 	reg := &Registration{
-		Descriptor:  desc,
+		Listing:     ToListing(desc),
 		Constructor: func(options map[string]any) Recipe { return nil },
+		Descriptor:  &descCopy,
 		Categories:  categories,
 	}
 	r.byName[desc.Name] = reg
@@ -181,12 +229,12 @@ func (r *Registry) FindRecipe(name string) (*Registration, bool) {
 	return reg, ok
 }
 
-func (r *Registry) AllRecipes() []RecipeDescriptor {
+func (r *Registry) AllRecipes() []RecipeListing {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	result := make([]RecipeDescriptor, 0, len(r.byName))
+	result := make([]RecipeListing, 0, len(r.byName))
 	for _, reg := range r.byName {
-		result = append(result, reg.Descriptor)
+		result = append(result, reg.Listing)
 	}
 	return result
 }

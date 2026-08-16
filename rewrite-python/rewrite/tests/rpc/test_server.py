@@ -250,6 +250,19 @@ def test_handle_install_recipes_local_path_attributes_to_the_supplied_path(monke
     assert attribution.package_for("org.local.Sample") == supplied   # the path, not "sample-dist"
 
 
+def test_count_recipes_includes_transitive_sub_recipes():
+    """recipe_count is 1 + every transitive recipe_list entry, not just direct children —
+    computed once at install time; the host uses it as a marketplace sort key."""
+    from types import SimpleNamespace
+    from rewrite.marketplace import _count_recipes
+
+    leaf = SimpleNamespace(recipe_list=[])
+    middle = SimpleNamespace(recipe_list=[leaf])
+    root = SimpleNamespace(recipe_list=[middle])
+
+    assert _count_recipes(root) == 3  # root + middle + leaf
+
+
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():
     from rewrite.recipe import RecipeDescriptor
     from rewrite.rpc.server import _recipe_descriptor_to_dict
@@ -297,7 +310,7 @@ def test_get_marketplace_row_carries_package_name(monkeypatch):
 
     rows = server._collect_marketplace_rows(marketplace)
 
-    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.MyRecipe")
+    row = next(r for r in rows if r["name"] == "org.example.MyRecipe")
     assert row["packageName"] == "my-recipes-package"
 
 
@@ -335,7 +348,7 @@ def test_handle_install_recipes_local_path_attributes_to_the_path(tmp_path, monk
     assert server._attribution.package_for("org.example.MyRecipe") == str(local)
     # And GetMarketplace surfaces that path as the row's origin, so the host keeps the recipe.
     rows = server._collect_marketplace_rows(marketplace)
-    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.MyRecipe")
+    row = next(r for r in rows if r["name"] == "org.example.MyRecipe")
     assert row["packageName"] == str(local)
 
 
@@ -360,7 +373,7 @@ def test_get_marketplace_row_unattributed_has_none_package_name(monkeypatch):
 
     rows = server._collect_marketplace_rows(marketplace)
 
-    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.Unattributed")
+    row = next(r for r in rows if r["name"] == "org.example.Unattributed")
     assert row["packageName"] is None
 
 

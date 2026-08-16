@@ -87,6 +87,18 @@ class TestRecipeMarketplace:
         assert descriptor.name == "org.openrewrite.python.RemovePass"
         assert recipe_class is RemovePass
 
+    def test_marketplace_holds_listing_not_descriptor(self):
+        """The marketplace holds a listing-weight view (with a precomputed count), not the full
+        descriptor; PrepareRecipe builds the full tree from the retained class."""
+        from rewrite.marketplace import RecipeListing
+        marketplace = RecipeMarketplace()
+        marketplace.install(RemovePass, Cleanup)
+
+        held, _recipe_class = marketplace.find_recipe("org.openrewrite.python.RemovePass")
+        assert isinstance(held, RecipeListing)
+        assert held.recipe_count >= 1
+        assert not hasattr(held, "recipe_list")  # not the full descriptor
+
     def test_find_recipe_not_found(self):
         """Test finding a recipe that doesn't exist."""
         marketplace = RecipeMarketplace()
@@ -280,7 +292,7 @@ class TestPerPackageAttribution:
 
         # Each row carries its origin packageName, so the host attributes each recipe to the
         # package that actually contributed it instead of the single requested bundle.
-        package_of = {r["descriptor"]["name"]: r["packageName"]
+        package_of = {r["name"]: r["packageName"]
                       for r in server.handle_get_marketplace({})}
 
         assert package_of["org.openrewrite.test.pkga.RecipeA"] == "pkg-a"
@@ -307,7 +319,7 @@ class TestPerPackageAttribution:
         # pkg-b contributed nothing, so no GetMarketplace row is attributed to it, and pkg-a's
         # recipe keeps its own attribution.
         assert b_response["recipesInstalled"] == 0
-        package_of = {r["descriptor"]["name"]: r["packageName"]
+        package_of = {r["name"]: r["packageName"]
                       for r in server.handle_get_marketplace({})}
         assert package_of["org.openrewrite.test.pkga.RecipeA"] == "pkg-a"
         assert "pkg-b" not in package_of.values()
@@ -329,15 +341,15 @@ class TestPerPackageAttribution:
 
         # Filter by pkg-a
         rows_a = server.handle_get_marketplace({"packageName": "pkg-a"})
-        assert {r["descriptor"]["name"] for r in rows_a} == {"org.openrewrite.test.pkga.RecipeA"}
+        assert {r["name"] for r in rows_a} == {"org.openrewrite.test.pkga.RecipeA"}
 
         # Filter by pkg-b
         rows_b = server.handle_get_marketplace({"packageName": "pkg-b"})
-        assert {r["descriptor"]["name"] for r in rows_b} == {"org.openrewrite.test.pkgb.RecipeB"}
+        assert {r["name"] for r in rows_b} == {"org.openrewrite.test.pkgb.RecipeB"}
 
         # No filter still returns everything for callers that want the full marketplace.
         rows_all = server.handle_get_marketplace({})
-        assert {r["descriptor"]["name"] for r in rows_all} == {
+        assert {r["name"] for r in rows_all} == {
             "org.openrewrite.test.pkga.RecipeA",
             "org.openrewrite.test.pkgb.RecipeB",
         }
@@ -357,4 +369,4 @@ class TestPerPackageAttribution:
 
         # Query with underscore form.
         rows = server.handle_get_marketplace({"packageName": "openrewrite_migrate_python"})
-        assert {r["descriptor"]["name"] for r in rows} == {"org.openrewrite.test.pkga.RecipeA"}
+        assert {r["name"] for r in rows} == {"org.openrewrite.test.pkga.RecipeA"}

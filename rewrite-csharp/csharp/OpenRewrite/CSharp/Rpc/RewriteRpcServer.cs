@@ -700,17 +700,28 @@ public class RewriteRpcServer
             new() { DisplayName = category.Descriptor.DisplayName, Description = category.Descriptor.Description }
         };
 
-        foreach (var (descriptor, _) in category.Recipes)
+        foreach (var (_, (listing, _)) in category.Recipes)
         {
-            if (!rowByRecipeId.TryGetValue(descriptor.Name, out var row))
+            if (!rowByRecipeId.TryGetValue(listing.Name, out var row))
             {
+                // Serve the RecipeListing the marketplace already holds: RecipeCount was computed once
+                // at install, so listing never walks the descriptor tree. The host fetches the full
+                // descriptor lazily per recipe via PrepareRecipe.
                 row = new GetMarketplaceResponseRow
                 {
-                    Descriptor = RecipeDescriptorDto.FromDescriptor(descriptor),
+                    Name = listing.Name,
+                    DisplayName = listing.DisplayName,
+                    Description = listing.Description,
+                    EstimatedEffortPerOccurrence = listing.EstimatedEffortPerOccurrence is { } ts
+                        ? System.Xml.XmlConvert.ToString(ts) // ISO-8601 duration (e.g. "PT5M")
+                        : null,
+                    Options = listing.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
+                    DataTables = listing.DataTables.Select(DataTableDescriptorDto.FromDescriptor).ToList(),
+                    RecipeCount = listing.RecipeCount,
                     CategoryPaths = [],
-                    PackageName = _recipeOrigin.GetValueOrDefault(descriptor.Name)
+                    PackageName = _recipeOrigin.GetValueOrDefault(listing.Name)
                 };
-                rowByRecipeId[descriptor.Name] = row;
+                rowByRecipeId[listing.Name] = row;
             }
             row.CategoryPaths.Add(new List<CategoryDescriptorDto>(currentPath));
         }
@@ -1215,7 +1226,7 @@ public class RewriteRpcServer
             });
         }
 
-        var (descriptor, recipe) = found.Value;
+        var (_, recipe) = found.Value;
         if (recipe == null)
         {
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
@@ -2180,7 +2191,20 @@ public class EvictRequest
 
 public class GetMarketplaceResponseRow
 {
-    public RecipeDescriptorDto Descriptor { get; set; } = null!;
+    // Listing-weight fields (Name through RecipeCount) carry everything the host needs to list the
+    // marketplace without materializing recipes. Up-to-date engines populate these and leave
+    // Descriptor null; the host fetches the full descriptor lazily per recipe via PrepareRecipe.
+    public string? Name { get; set; }
+    public string? DisplayName { get; set; }
+    public string? Description { get; set; }
+
+    [JsonConverter(typeof(DurationWireConverter))]
+    public string? EstimatedEffortPerOccurrence { get; set; }
+    public List<OptionDescriptorDto> Options { get; set; } = [];
+    public List<DataTableDescriptorDto> DataTables { get; set; } = [];
+    // 1 + every transitive RecipeList entry; the host uses it as a sort key.
+    public int RecipeCount { get; set; }
+
     public List<List<CategoryDescriptorDto>> CategoryPaths { get; set; } = [];
     public string? PackageName { get; set; }
 }
@@ -2287,6 +2311,45 @@ public class OptionDescriptorDto
             Valid = d.Valid?.ToList(),
             Required = d.Required,
             Value = d.Value
+        };
+    }
+}
+
+public class DataTableDescriptorDto
+{
+    public string Name { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<ColumnDescriptorDto> Columns { get; set; } = [];
+
+    public static DataTableDescriptorDto FromDescriptor(DataTableDescriptor d)
+    {
+        return new DataTableDescriptorDto
+        {
+            Name = d.Name,
+            DisplayName = d.DisplayName,
+            Description = d.Description,
+            Columns = d.Columns.Select(ColumnDescriptorDto.FromDescriptor).ToList()
+        };
+    }
+}
+
+public class ColumnDescriptorDto
+{
+    public string Name { get; set; } = "";
+    // C#'s ColumnDescriptor carries no column type; emit an empty string so the wire field
+    // (which the Java peer's ColumnDescriptor treats as non-null) is present.
+    public string Type { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Description { get; set; } = "";
+
+    public static ColumnDescriptorDto FromDescriptor(ColumnDescriptor d)
+    {
+        return new ColumnDescriptorDto
+        {
+            Name = d.Name,
+            DisplayName = d.DisplayName,
+            Description = d.Description
         };
     }
 }

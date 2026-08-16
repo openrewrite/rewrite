@@ -90,8 +90,8 @@ func TestCompositeChildrenNotInMarketplace(t *testing.T) {
 	}
 
 	for _, reg := range r.AllRegistrations() {
-		if childNames[reg.Descriptor.Name] {
-			t.Errorf("child recipe %q must not appear in AllRegistrations (marketplace)", reg.Descriptor.Name)
+		if childNames[reg.Listing.Name] {
+			t.Errorf("child recipe %q must not appear in AllRegistrations (marketplace)", reg.Listing.Name)
 		}
 	}
 	for _, desc := range r.AllRecipes() {
@@ -104,8 +104,8 @@ func TestCompositeChildrenNotInMarketplace(t *testing.T) {
 	var walk func(c *Category)
 	walk = func(c *Category) {
 		for _, reg := range c.Recipes {
-			if childNames[reg.Descriptor.Name] {
-				t.Errorf("child recipe %q must not appear in the category tree", reg.Descriptor.Name)
+			if childNames[reg.Listing.Name] {
+				t.Errorf("child recipe %q must not appear in the category tree", reg.Listing.Name)
 			}
 		}
 		for _, sub := range c.Subcategories {
@@ -114,5 +114,23 @@ func TestCompositeChildrenNotInMarketplace(t *testing.T) {
 	}
 	for _, cat := range r.Categories() {
 		walk(cat)
+	}
+}
+
+// TestRegistryHoldsListingNotDescriptor verifies the registry holds a listing-weight view (with the
+// transitive count precomputed) rather than the full recursive descriptor for executable recipes.
+func TestRegistryHoldsListingNotDescriptor(t *testing.T) {
+	r := NewRegistry()
+	r.Register(newComposite(), CategoryDescriptor{DisplayName: "Example"})
+
+	reg, ok := r.FindRecipe("com.example.Composite")
+	if !ok {
+		t.Fatal("expected to find the composite recipe")
+	}
+	if reg.Descriptor != nil {
+		t.Error("an executable registration must not hold a resident descriptor")
+	}
+	if reg.Listing.RecipeCount != 3 {
+		t.Errorf("Listing.RecipeCount = %d, want 3 (composite + Keep + Negate)", reg.Listing.RecipeCount)
 	}
 }

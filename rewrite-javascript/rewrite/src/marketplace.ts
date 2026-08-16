@@ -13,12 +13,56 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Recipe, RecipeDescriptor} from "./recipe";
+import {Minutes, OptionDescriptor, Recipe, RecipeDescriptor} from "./recipe";
+import {DataTableDescriptor} from "./data-table";
 
 export type RecipeConstructor = new (options?: any) => Recipe;
 
-function isRecipeConstructor(recipe: RecipeConstructor | RecipeDescriptor): recipe is RecipeConstructor {
+/**
+ * Listing-weight view of a recipe: everything the marketplace needs to answer InstallRecipes and
+ * GetMarketplace without holding the full recursive descriptor. The full tree is materialized lazily
+ * per recipe by PrepareRecipe. recipeCount is 1 + every transitive recipeList entry, computed once at
+ * install time (the host uses it as a sort key).
+ */
+export interface RecipeListing {
+    readonly name: string
+    readonly displayName: string
+    readonly description: string
+    readonly estimatedEffortPerOccurrence?: Minutes
+    readonly options?: ({ name: string, value?: any } & OptionDescriptor)[]
+    readonly dataTables?: DataTableDescriptor[]
+    readonly recipeCount: number
+}
+
+function isRecipeConstructor(recipe: RecipeConstructor | RecipeListing): recipe is RecipeConstructor {
     return typeof recipe === 'function';
+}
+
+/**
+ * The count of this recipe and all recipes nested transitively in its recipeList.
+ */
+function countRecipes(descriptor: RecipeDescriptor): number {
+    let count = 1;
+    for (const sub of descriptor.recipeList ?? []) {
+        count += countRecipes(sub);
+    }
+    return count;
+}
+
+/**
+ * Derives the listing-weight view from a full descriptor, collapsing its recursive recipeList to a
+ * count. Called once at install time so the marketplace never re-walks the tree to list.
+ */
+export function toRecipeListing(descriptor: RecipeDescriptor): RecipeListing {
+    return {
+        name: descriptor.name,
+        displayName: descriptor.displayName ?? descriptor.name,
+        description: descriptor.description ?? "",
+        estimatedEffortPerOccurrence: descriptor.estimatedEffortPerOccurrence,
+        options: descriptor.options,
+        dataTables: descriptor.dataTables,
+        recipeCount: countRecipes(descriptor),
+    };
 }
 
 export class RecipeMarketplace {
@@ -29,16 +73,16 @@ export class RecipeMarketplace {
 
     /**
      * Install a recipe into the marketplace under the specified category path.
-     * If a RecipeConstructor is provided, it is instantiated to extract its descriptor.
-     * If a RecipeDescriptor is provided, it is used directly (for client-side hydration).
-     * Categories are specified top-down (shallowest to deepest).
-     * Intermediate categories are created as needed.
+     * A RecipeConstructor is instantiated once to derive its {@link RecipeListing} (and the
+     * constructor is retained so PrepareRecipe can later build the full tree). A RecipeListing is
+     * stored directly (for client-side hydration). Categories are specified top-down (shallowest to
+     * deepest); intermediate categories are created as needed.
      *
-     * @param recipe The recipe class or descriptor to install
+     * @param recipe The recipe class or listing to install
      * @param categoryPath Category path from shallowest to deepest (e.g., ["Java", "Search"])
      */
     public async install(
-        recipe: RecipeConstructor | RecipeDescriptor,
+        recipe: RecipeConstructor | RecipeListing,
         categoryPath: CategoryDescriptor[]
     ): Promise<void> {
         await this.root.install(recipe, categoryPath);
@@ -48,11 +92,11 @@ export class RecipeMarketplace {
         return this.root.categories;
     }
 
-    public findRecipe(name: string): [RecipeDescriptor, RecipeConstructor | undefined] | undefined {
+    public findRecipe(name: string): [RecipeListing, RecipeConstructor | undefined] | undefined {
         return this.root.findRecipe(name)
     }
 
-    public allRecipes(): RecipeDescriptor[] {
+    public allRecipes(): RecipeListing[] {
         return this.root.allRecipes()
     }
 }
@@ -60,7 +104,7 @@ export class RecipeMarketplace {
 export namespace RecipeMarketplace {
     export class Category {
         readonly categories: Category[] = [];
-        readonly recipes: Map<RecipeDescriptor, RecipeConstructor | undefined> = new Map();
+        readonly recipes: Map<RecipeListing, RecipeConstructor | undefined> = new Map();
 
         constructor(
             readonly descriptor: CategoryDescriptor,
@@ -69,23 +113,23 @@ export namespace RecipeMarketplace {
 
         /**
          * Install a recipe into this category or a subcategory.
-         * If a RecipeConstructor is provided, it is instantiated to extract its descriptor.
-         * If a RecipeDescriptor is provided, it is used directly (for client-side hydration).
-         * Categories are specified top-down (shallowest to deepest).
-         * Intermediate categories are created as needed.
+         * A RecipeConstructor is instantiated once to derive its {@link RecipeListing} (the
+         * constructor is retained for PrepareRecipe). A RecipeListing is stored directly (for
+         * client-side hydration). Categories are specified top-down (shallowest to deepest);
+         * intermediate categories are created as needed.
          *
-         * @param recipe The recipe class or descriptor to install
+         * @param recipe The recipe class or listing to install
          * @param categoryPath Category path from shallowest to deepest
          */
         public async install(
-            recipe: RecipeConstructor | RecipeDescriptor,
+            recipe: RecipeConstructor | RecipeListing,
             categoryPath: CategoryDescriptor[]
         ): Promise<void> {
             if (categoryPath.length === 0) {
                 if (isRecipeConstructor(recipe)) {
                     try {
                         const recipeInst = new recipe({});
-                        this.recipes.set(await recipeInst.descriptor(), recipe);
+                        this.recipes.set(toRecipeListing(await recipeInst.descriptor()), recipe);
                     } catch (e) {
                         // Surface the underlying cause inline: it is dropped at the
                         // JSON-RPC serialization boundary (only `message` survives), so
@@ -123,7 +167,7 @@ export namespace RecipeMarketplace {
             return newCategory;
         }
 
-        public findRecipe(name: string): [RecipeDescriptor, RecipeConstructor | undefined] | undefined {
+        public findRecipe(name: string): [RecipeListing, RecipeConstructor | undefined] | undefined {
             for (const [recipe, ctor] of this.recipes.entries()) {
                 if (recipe.name === name) {
                     return [recipe, ctor];
@@ -138,8 +182,8 @@ export namespace RecipeMarketplace {
             return undefined;
         }
 
-        public allRecipes(): RecipeDescriptor[] {
-            const result: RecipeDescriptor[] = [...this.recipes.keys()];
+        public allRecipes(): RecipeListing[] {
+            const result: RecipeListing[] = [...this.recipes.keys()];
             for (const category of this.categories) {
                 result.push(...category.allRecipes());
             }

@@ -101,8 +101,8 @@ public class MarketplaceOriginAttributionTest : IDisposable
 
         var rows = server.GetMarketplace().GetAwaiter().GetResult();
 
-        var alpha = rows.Single(r => r.Descriptor.Name == "AlphaPlugin.AlphaRecipe");
-        var beta = rows.Single(r => r.Descriptor.Name == "BetaPlugin.BetaRecipe");
+        var alpha = rows.Single(r => r.Name == "AlphaPlugin.AlphaRecipe");
+        var beta = rows.Single(r => r.Name == "BetaPlugin.BetaRecipe");
 
         Assert.Equal(_alphaDll, alpha.PackageName);
         Assert.Equal(_betaDll, beta.PackageName);
