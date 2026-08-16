@@ -43,7 +43,7 @@ func newTypeMapper() *typeMapper {
 	}
 }
 
-func (m *typeMapper) mapType(t types.Type) java.JavaType {
+func (m *typeMapper) mapType(t types.Type) (result java.JavaType) {
 	if t == nil {
 		return nil
 	}
@@ -51,7 +51,17 @@ func (m *typeMapper) mapType(t types.Type) java.JavaType {
 		return cached
 	}
 
-	result := m.doMapType(t)
+	// A type checker that gave up part-way leaves types whose internals
+	// trip its own assertions when walked (Named.Underlying on an
+	// unresolved cycle, say). Attribution is best-effort, so an
+	// unwalkable type degrades to Unknown and its neighbours survive.
+	defer func() {
+		if r := recover(); r != nil {
+			result = java.UnknownType
+		}
+	}()
+
+	result = m.doMapType(t)
 	if result != nil {
 		m.cache[t] = result
 	}

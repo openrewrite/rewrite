@@ -145,7 +145,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	if asts[0].Name != nil {
 		pkgName = asts[0].Name.Name
 	}
-	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
+	checkTypes(&conf, pkgName, fset, asts, typeInfo)
 
 	mapper := newTypeMapper()
 	cus := make([]*golang.CompilationUnit, 0, len(files))
@@ -162,6 +162,16 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		cus = append(cus, ctx.mapFile(asts[i], f.Path))
 	}
 	return cus, nil
+}
+
+// checkTypes populates typeInfo as far as the type checker gets. Some
+// malformed-but-parseable inputs — a type cycle routed through an alias,
+// for one — make go/types panic instead of reporting an error, and type
+// attribution is best-effort: whatever it filled in before giving up is
+// still usable, and the LST does not depend on it.
+func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) {
+	defer func() { recover() }()
+	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
 }
 
 // PackageNameOf returns the package clause name of a Go source file, or ""
