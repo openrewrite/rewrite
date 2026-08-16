@@ -1306,6 +1306,9 @@ func (p *GoPrinter) VisitCommClause(cc *golang.CommClause, param any) java.J {
 	for _, rp := range cc.Body {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.afterSyntax(cc.Markers, out)
 	return cc

@@ -231,3 +231,18 @@ func TestParseConsecutiveEmptyStatements(t *testing.T) {
 	src := "package main\n\nfunc f() {\n\tx := 0\n\t; ;\n\t_ = x\n}\n"
 	assertRoundtrip(t, src)
 }
+
+func TestParseSemicolonInSelectClauseBody(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func Send(c chan int) int {
+				select {
+				default:
+					return 1;
+				}
+				return 2;
+			}
+		`))
+}
