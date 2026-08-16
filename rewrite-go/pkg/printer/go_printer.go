@@ -105,6 +105,9 @@ func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) 
 	for _, rp := range cu.Statements {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 
 	p.afterSyntax(cu.Markers, out)
@@ -145,9 +148,8 @@ func (p *GoPrinter) VisitBlock(block *java.Block, param any) java.J {
 	out.Append("{")
 	for _, rp := range block.Statements {
 		p.Visit(rp.Element, out)
-		// If the source had `;` separating this statement from the
-		// next, the parser captured the leading space as After and
-		// stamped a Semicolon marker on the RightPadded.
+		// An explicit `;` in the source is recorded as a marker on the
+		// RightPadded, with the space before it as After.
 		p.visitSpace(rp.After, out)
 		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
 			out.Append(";")
@@ -626,6 +628,9 @@ func (p *GoPrinter) VisitCase(c *java.Case, param any) java.J {
 	for _, rp := range c.Body {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.afterSyntax(c.Markers, out)
 	return c

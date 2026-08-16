@@ -247,14 +247,21 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 
 	// Top-level declarations (functions, types, vars, consts - excluding imports)
 	var stmts []java.RightPadded[java.Statement]
-	for _, decl := range file.Decls {
+	for i, decl := range file.Decls {
 		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
 			continue
 		}
 		stmt := ctx.mapDecl(decl)
-		if stmt != nil {
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: stmt})
+		if stmt == nil {
+			continue
 		}
+		rp := java.RightPadded[java.Statement]{Element: stmt}
+		boundary := len(ctx.src)
+		if i+1 < len(file.Decls) {
+			boundary = ctx.file.Offset(file.Decls[i+1].Pos())
+		}
+		ctx.takeSemicolon(&rp, boundary)
+		stmts = append(stmts, rp)
 	}
 	eof := java.EmptySpace
 	if ctx.cursor < len(ctx.src) {
@@ -995,15 +1002,41 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 	return java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers}
 }
 
+// takeSemicolon claims an explicit `;` written between the element just
+// mapped and `boundary`, the offset where the next one starts. Go's
+// tokenizer inserts semicolons at end of line and reports neither the
+// inserted nor the written one in the AST, so the `;` in `g(); g()` and
+// the one in `g();` alike are recoverable only from the source text.
+// The whitespace before it becomes RightPadded.After and a Semicolon
+// marker tells the printer to re-emit it.
+func (ctx *parseContext) takeSemicolon(rp *java.RightPadded[java.Statement], boundary int) {
+	// The tokenizer would have inserted one at the line break, so a `;`
+	// past it terminates something else — an empty statement, or the
+	// next entry in an enclosing list.
+	if eol := ctx.endOfLine(); boundary <= 0 || eol < boundary {
+		boundary = eol
+	}
+	semiOffset := ctx.findNextBefore(';', boundary)
+	if semiOffset < 0 {
+		return
+	}
+	rp.After = ctx.prefix(ctx.file.Pos(semiOffset))
+	ctx.skip(1) // ";"
+	rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
+}
+
+// endOfLine returns the offset of the newline ending the cursor's line,
+// or the end of source if it is the last line.
+func (ctx *parseContext) endOfLine() int {
+	for i := ctx.cursor; i < len(ctx.src); i++ {
+		if ctx.src[i] == '\n' {
+			return i
+		}
+	}
+	return len(ctx.src)
+}
+
 // mapBlockStmt maps a block statement.
-//
-// Multi-statements-per-line (`_ = 1; _ = 2`) carry a literal `;` that
-// Go's tokenizer recognizes but doesn't surface as part of either
-// statement's AST. To round-trip the source, we look for an inline `;`
-// between this statement and the next, capture the leading whitespace
-// as RightPadded.After, mark the entry with a Semicolon marker, and
-// advance the cursor past the `;`. The Block printer emits `;` when
-// the marker is present.
 func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *java.Block {
 	prefix := ctx.prefix(block.Lbrace)
 	ctx.skip(1) // "{"
@@ -1016,34 +1049,11 @@ func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *java.Block {
 		}
 		rp := java.RightPadded[java.Statement]{Element: mapped}
 
-		// Detect inline `;` separator. Go inserts implicit semicolons
-		// at end-of-line, so a literal `;` between two statements only
-		// appears when they share a source line (or when a `;` appears
-		// before the closing `}` on the last statement's line). We
-		// avoid scanning comments/strings for stray `;` bytes by
-		// gating on line numbers from the tokenizer.
-		stmtEndLine := ctx.file.Position(stmt.End()).Line
-		var nextStartLine int
+		boundary := ctx.file.Offset(block.Rbrace)
 		if i+1 < len(block.List) {
-			nextStartLine = ctx.file.Position(block.List[i+1].Pos()).Line
-		} else {
-			nextStartLine = ctx.file.Position(block.Rbrace).Line
+			boundary = ctx.file.Offset(block.List[i+1].Pos())
 		}
-		if stmtEndLine == nextStartLine {
-			// Same line — look for the explicit `;`.
-			boundary := 0
-			if i+1 < len(block.List) {
-				boundary = ctx.file.Offset(block.List[i+1].Pos())
-			} else {
-				boundary = ctx.file.Offset(block.Rbrace)
-			}
-			semiOffset := ctx.findNextBefore(';', boundary)
-			if semiOffset >= 0 {
-				rp.After = ctx.prefix(ctx.file.Pos(semiOffset))
-				ctx.skip(1) // consume ";"
-				rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
-			}
-		}
+		ctx.takeSemicolon(&rp, boundary)
 
 		stmts = append(stmts, rp)
 	}
@@ -1465,11 +1475,18 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 
 	// Body statements
 	var body []java.RightPadded[java.Statement]
-	for _, stmt := range clause.Body {
+	for i, stmt := range clause.Body {
 		mapped := ctx.mapStmt(stmt)
-		if mapped != nil {
-			body = append(body, java.RightPadded[java.Statement]{Element: mapped})
+		if mapped == nil {
+			continue
 		}
+		rp := java.RightPadded[java.Statement]{Element: mapped}
+		boundary := 0
+		if i+1 < len(clause.Body) {
+			boundary = ctx.file.Offset(clause.Body[i+1].Pos())
+		}
+		ctx.takeSemicolon(&rp, boundary)
+		body = append(body, rp)
 	}
 
 	return &java.Case{
@@ -1519,11 +1536,18 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClaus
 	}
 
 	var body []java.RightPadded[java.Statement]
-	for _, stmt := range clause.Body {
+	for i, stmt := range clause.Body {
 		mapped := ctx.mapStmt(stmt)
-		if mapped != nil {
-			body = append(body, java.RightPadded[java.Statement]{Element: mapped})
+		if mapped == nil {
+			continue
 		}
+		rp := java.RightPadded[java.Statement]{Element: mapped}
+		boundary := 0
+		if i+1 < len(clause.Body) {
+			boundary = ctx.file.Offset(clause.Body[i+1].Pos())
+		}
+		ctx.takeSemicolon(&rp, boundary)
+		body = append(body, rp)
 	}
 
 	return &golang.CommClause{
