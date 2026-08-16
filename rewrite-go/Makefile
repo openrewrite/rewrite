@@ -1,4 +1,4 @@
-.PHONY: test parity sweep reduce fuzz
+.PHONY: test parity sweep reduce fuzz types
 
 # Default test run — what CI executes. Build-tag-gated tests stay out.
 test:
@@ -34,6 +34,14 @@ sweep:
 #   make fuzz CORPUS=/tmp/go-corpus
 fuzz:
 	GO_CORPUS=$(CORPUS) go test -tags parityaudit ./test/ -run TestFuzzTokenGaps -timeout 180m -v
+
+# Count how many of a corpus's type slots came back resolved, per node
+# field. Round-trip fidelity says nothing about attribution, so a change
+# made to stop a crash can hollow out the type graph unnoticed.
+#
+#   make types CORPUS=/tmp/go-corpus
+types:
+	GO_CORPUS=$(CORPUS) go test -tags parityaudit ./test/ -run TestTypeAttribution -timeout 120m -v
 
 # Shrink one failing corpus file to a minimal reproducer.
 #

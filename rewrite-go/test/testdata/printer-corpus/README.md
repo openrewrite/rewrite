@@ -94,6 +94,19 @@ some other bug. Turn the result into an ordinary test in the topic file
 that covers that syntax — `rewriteRun` already asserts both byte-equal
 round-trip and a clean tree, so a minimal reproducer is a complete test.
 
+## Measuring type attribution
+
+```sh
+make types CORPUS=/tmp/go-corpus
+```
+
+None of the three classes above look at types, so a change that trades
+attribution for termination — a recover, a depth bound, a cache that
+collapses one type onto another — leaves every one of them unmoved.
+`make types` counts, per node field, how many type slots came back
+resolved, `Unknown`, or nil. Compare two builds by running it on each:
+a field that reads 0.00% across the corpus is one nothing populates.
+
 ## Fuzzing the gaps between tokens
 
 ```sh
