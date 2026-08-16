@@ -450,25 +450,18 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) java.Statement {
 	ctx.skip(1) // "("
 
 	var elements []java.RightPadded[java.Statement]
-	for _, s := range decl.Specs {
+	for i, s := range decl.Specs {
 		spec := s.(*ast.ValueSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		vd := ctx.mapValueSpec(spec, innerPrefix, keyword)
 		vd.Markers.Entries = append(vd.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
-		elements = append(elements, java.RightPadded[java.Statement]{Element: vd})
+		elements = append(elements, ctx.terminateSpec(vd, decl, i))
 	}
 
 	rparenPrefix := ctx.prefix(decl.Rparen)
 	ctx.skip(1) // ")"
 
-	if len(elements) > 0 {
-		elements[len(elements)-1].After = rparenPrefix
-	} else if len(rparenPrefix.Comments) > 0 {
-		elements = append(elements, java.RightPadded[java.Statement]{
-			Element: &java.Empty{ID: uuid.New()},
-			After:   rparenPrefix,
-		})
-	}
+	elements = closeSpecGroup(elements, rparenPrefix)
 
 	kind := golang.DeclVar
 	if keyword == "const" {
@@ -586,25 +579,18 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) java.Statement {
 	ctx.skip(1) // "("
 
 	var elements []java.RightPadded[java.Statement]
-	for _, s := range decl.Specs {
+	for i, s := range decl.Specs {
 		spec := s.(*ast.TypeSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		td := ctx.mapTypeSpec(spec, innerPrefix)
 		td.Markers.Entries = append(td.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
-		elements = append(elements, java.RightPadded[java.Statement]{Element: td})
+		elements = append(elements, ctx.terminateSpec(td, decl, i))
 	}
 
 	rparenPrefix := ctx.prefix(decl.Rparen)
 	ctx.skip(1) // ")"
 
-	if len(elements) > 0 {
-		elements[len(elements)-1].After = rparenPrefix
-	} else if len(rparenPrefix.Comments) > 0 {
-		elements = append(elements, java.RightPadded[java.Statement]{
-			Element: &java.Empty{ID: uuid.New()},
-			After:   rparenPrefix,
-		})
-	}
+	elements = closeSpecGroup(elements, rparenPrefix)
 
 	specs := &java.Container[java.Statement]{Before: lparenPrefix, Elements: elements}
 	return &golang.TypeDecl{
@@ -1046,6 +1032,48 @@ func (ctx *parseContext) endOfLine() int {
 		}
 	}
 	return len(ctx.src)
+}
+
+// closeSpecGroup parks the space before a declaration group's `)`. The
+// last element's After normally holds it, but when that element claimed
+// a trailing `;` its After is already spoken for, so the space rides an
+// Empty — the same slot an otherwise empty group's comments use.
+func closeSpecGroup(elements []java.RightPadded[java.Statement], rparenPrefix java.Space) []java.RightPadded[java.Statement] {
+	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
+		elements[n-1].After = rparenPrefix
+		return elements
+	}
+	if len(elements) == 0 && len(rparenPrefix.Comments) == 0 && rparenPrefix.Whitespace == "" {
+		return elements
+	}
+	return append(elements, java.RightPadded[java.Statement]{
+		Element: &java.Empty{ID: uuid.New()},
+		After:   rparenPrefix,
+	})
+}
+
+// terminateSpec wraps one spec of a parenthesized declaration group,
+// claiming the explicit `;` some sources write after it.
+func (ctx *parseContext) terminateSpec(stmt java.Statement, decl *ast.GenDecl, i int) java.RightPadded[java.Statement] {
+	rp := java.RightPadded[java.Statement]{Element: stmt}
+	boundary := ctx.file.Offset(decl.Rparen)
+	if i+1 < len(decl.Specs) {
+		boundary = ctx.file.Offset(decl.Specs[i+1].Pos())
+	}
+	ctx.takeSemicolon(&rp, boundary)
+	return rp
+}
+
+// terminate wraps a field-list entry, claiming the explicit `;` some
+// sources write after it.
+func (ctx *parseContext) terminate(stmt java.Statement, fl *ast.FieldList, i int) java.RightPadded[java.Statement] {
+	rp := java.RightPadded[java.Statement]{Element: stmt}
+	boundary := ctx.file.Offset(fl.Closing)
+	if i+1 < len(fl.List) {
+		boundary = ctx.file.Offset(fl.List[i+1].Pos())
+	}
+	ctx.takeSemicolon(&rp, boundary)
+	return rp
 }
 
 // mapBlockStmt maps a block statement.
@@ -2985,7 +3013,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 	ctx.skip(1) // "{"
 
 	var stmts []java.RightPadded[java.Statement]
-	for _, field := range fl.List {
+	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded type (e.g., `io.Reader` in struct)
 			typeExpr := ctx.mapTypeExpr(field.Type)
@@ -3002,7 +3030,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 			if field.Tag != nil {
 				ctx.mapStructTag(vd, field.Tag)
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
+			stmts = append(stmts, ctx.terminate(vd, fl, i))
 		} else {
 			// Named field(s): `X int` or `X, Y int`
 			var vars []java.RightPadded[*java.VariableDeclarator]
@@ -3036,7 +3064,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 			if field.Tag != nil {
 				ctx.mapStructTag(vd, field.Tag)
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
+			stmts = append(stmts, ctx.terminate(vd, fl, i))
 		}
 	}
 
@@ -3304,7 +3332,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	ctx.skip(1) // "{"
 
 	var stmts []java.RightPadded[java.Statement]
-	for _, field := range fl.List {
+	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded interface type (e.g., `io.Reader`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
@@ -3317,7 +3345,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
 				},
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
+			stmts = append(stmts, ctx.terminate(vd, fl, i))
 		} else {
 			// Method signature: `Name(params) returnType`
 			name := ctx.mapIdent(field.Names[0])
@@ -3337,7 +3365,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 				ReturnType: returnType,
 				// Body is nil — interface method has no body
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: md})
+			stmts = append(stmts, ctx.terminate(md, fl, i))
 		}
 	}
 

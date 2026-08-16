@@ -82,3 +82,63 @@ func TestParseSemicolonBeforeClosingBrace(t *testing.T) {
 			func f() { g(); }
 		`))
 }
+
+func TestParseSemicolonAfterInterfaceMethod(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type T interface {
+				M() string;
+			}
+		`))
+}
+
+func TestParseSemicolonAfterEmbeddedInterface(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type A interface{}
+
+			type T interface {
+				A;
+				M()
+			}
+		`))
+}
+
+func TestParseSemicolonAfterStructField(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type T struct {
+				a int;
+				b int;
+			}
+		`))
+}
+
+func TestParseSemicolonInGroupedTypeDecl(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type (
+				A int;
+				B int;
+			)
+		`))
+}
+
+func TestParseSemicolonInGroupedVarDecl(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			var (
+				a int;
+			)
+		`))
+}

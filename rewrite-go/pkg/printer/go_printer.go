@@ -552,14 +552,23 @@ func (p *GoPrinter) VisitDeclarationBlock(db *golang.DeclarationBlock, param any
 	if db.Specs != nil {
 		p.visitSpace(db.Specs.Before, out)
 		out.Append("(")
-		for _, rp := range db.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
+		p.printSpecGroup(db.Specs.Elements, out)
 		out.Append(")")
 	}
 	p.afterSyntax(db.Markers, out)
 	return db
+}
+
+// printSpecGroup emits the specs of a parenthesized `var`/`const`/`type`
+// group, including any explicit `;` written after one.
+func (p *GoPrinter) printSpecGroup(elements []java.RightPadded[java.Statement], out *PrintOutputCapture) {
+	for _, rp := range elements {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
+	}
 }
 
 func (p *GoPrinter) VisitVariableDeclarator(vd *java.VariableDeclarator, param any) java.J {
@@ -1340,10 +1349,7 @@ func (p *GoPrinter) VisitTypeDecl(td *golang.TypeDecl, param any) java.J {
 		// Grouped: type ( ... )
 		p.visitSpace(td.Specs.Before, out)
 		out.Append("(")
-		for _, rp := range td.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
+		p.printSpecGroup(td.Specs.Elements, out)
 		out.Append(")")
 	} else {
 		// Single: type Name[TypeParams] Type
