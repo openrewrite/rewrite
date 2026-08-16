@@ -72,16 +72,15 @@ export class ParseProject {
                     context.target = request.projectPath;
 
                     // Dynamic import to break circular dependency
-                    const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
+                    const {ProjectParser} = await import("../../javascript/index.js");
 
                     const projectPath = path.resolve(request.projectPath);
                     setLastParsedProject(projectPath);
-                    const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
                     // Use relativeTo if specified, otherwise default to projectPath
                     const relativeTo = request.relativeTo ? path.resolve(request.relativeTo) : projectPath;
 
-                    // Use ProjectParser for file discovery and Prettier detection
-                    const projectParser = new ProjectParser(projectPath, {exclusions});
+                    // Undefined when unset, so the parser can match exclusions to its discovery mode.
+                    const projectParser = new ProjectParser(projectPath, {exclusions: request.exclusions});
                     const discovered = await projectParser.discoverFiles();
                     const prettierLoader = await projectParser.createPrettierLoader();
 

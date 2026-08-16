@@ -22,11 +22,15 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.GolangParser;
+import org.openrewrite.golang.GolangVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -269,6 +273,35 @@ class GoRpcPrintRoundTripIntegTest {
                 \t}
                 }
                 """);
+    }
+
+    @Test
+    void switchSelectorReSendKeepsTagPrefix() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source =
+                """
+                package main
+
+                func f(x int) {
+                \tswitch v := x; v {
+                \tcase 1:
+                \t}
+                }
+                """;
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+        assertThat(cu).as("parse must yield a Go.CompilationUnit, not a ParseError: %s", cu)
+                .isInstanceOf(org.openrewrite.golang.tree.Go.CompilationUnit.class);
+
+        SourceFile mutated = (SourceFile) new GolangVisitor<Integer>() {
+            @Override
+            public J visitSwitch(J.Switch aSwitch, Integer p) {
+                J.Switch s = (J.Switch) super.visitSwitch(aSwitch, p);
+                return s.withSelector(s.getSelector().withPrefix(Space.build(" ", emptyList())));
+            }
+        }.visitNonNull(cu, 0);
+
+        assertThat(rpc.print(mutated)).isEqualTo(source);
     }
 
     @Test

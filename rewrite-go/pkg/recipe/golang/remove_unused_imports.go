@@ -59,6 +59,7 @@ func (v *removeUnusedImportsVisitor) VisitCompilationUnit(cu *golang.Compilation
 		return cu
 	}
 	refs := internal.ReferencedPackages(cu)
+	quals := internal.ReferencedQualifiers(cu)
 	for _, rp := range cu.Imports.Elements {
 		imp := rp.Element
 		if imp == nil {
@@ -73,9 +74,10 @@ func (v *removeUnusedImportsVisitor) VisitCompilationUnit(cu *golang.Compilation
 		if internal.AliasName(imp) == "." {
 			continue
 		}
-		if !refs[internal.ImportPath(imp)] {
-			cu = internal.RemoveFromBlock(cu, imp)
+		if refs[internal.ImportPath(imp)] || quals[internal.PackageName(imp)] {
+			continue
 		}
+		cu = internal.RemoveFromBlock(cu, imp)
 	}
 	return cu
 }

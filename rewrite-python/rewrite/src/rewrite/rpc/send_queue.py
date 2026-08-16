@@ -325,6 +325,10 @@ class RpcSendQueue:
             # Opaque value (see _get_value_type): its wire payload is every field except the
             # synthetic 'kind' tag the receiver added. Emit that back as the value.
             return {k: v for k, v in obj.items() if k != 'kind'}
+        if isinstance(obj, dict):
+            # A plain mapping is JSON-native and travels as itself, as it does on every other
+            # peer. Sequences take the send_list protocol instead.
+            return obj
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):

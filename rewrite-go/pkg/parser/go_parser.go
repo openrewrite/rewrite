@@ -1416,8 +1416,15 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		}
 		exprs = java.Container[java.Expression]{Elements: elements}
 	} else {
-		// default:
+		// default: mirror the shape every other parser produces — a single
+		// J.Identifier named "default" as the sole case label, so a visitor
+		// indexing J.Case.getCaseLabels().get(0) stays safe.
 		ctx.skip(len("default"))
+		exprs = java.Container[java.Expression]{
+			Elements: []java.RightPadded[java.Expression]{
+				{Element: &java.Identifier{ID: uuid.New(), Name: "default"}},
+			},
+		}
 	}
 
 	// Skip the colon
@@ -1428,13 +1435,8 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		ctx.skip(1) // ":"
 	}
 
-	// For case: last expression's After gets the space before colon
-	// For default: exprs.Before gets the space before colon
-	if len(exprs.Elements) > 0 {
-		exprs.Elements[len(exprs.Elements)-1].After = colonPrefix
-	} else {
-		exprs.Before = colonPrefix
-	}
+	// The last label's After gets the space before the colon.
+	exprs.Elements[len(exprs.Elements)-1].After = colonPrefix
 
 	// Body statements
 	var body []java.RightPadded[java.Statement]
@@ -1646,15 +1648,33 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			post := ctx.mapStmt(stmt.Post)
 			postRP := java.RightPadded[java.Statement]{Element: post}
 			control.Update = &postRP
+		} else {
+			// `for init; cond; {}` — no update clause. J.ForLoop.Control keeps
+			// update as a single-element list across every other parser, so a
+			// visitor can index it at 0; fill the slot with a J.Empty rather
+			// than leaving it null.
+			control.Update = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
 		}
-	} else if stmt.Cond != nil {
-		// Condition-only: for cond {}
-		cond := ctx.mapExpr(stmt.Cond)
-		control.Prefix, cond = hoistLeftPrefix(cond)
-		condRP := java.RightPadded[java.Expression]{Element: cond}
-		control.Condition = &condRP
+	} else {
+		// Condition-only `for cond {}` or infinite `for {}`: Go writes no `;`
+		// clause separators. Fill init and update with J.Empty placeholders so
+		// J.ForLoop.Control keeps the single-element-list shape every other
+		// parser produces — indexing getInit()/getUpdate() at 0 stays safe —
+		// and mark them synthetic so GoPrinter omits the placeholders and their
+		// separators.
+		if stmt.Cond != nil {
+			cond := ctx.mapExpr(stmt.Cond)
+			control.Prefix, cond = hoistLeftPrefix(cond)
+			condRP := java.RightPadded[java.Expression]{Element: cond}
+			control.Condition = &condRP
+		}
+		control.Init = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
+		control.Update = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
+		control.Markers = java.Markers{
+			ID:      uuid.New(),
+			Entries: []java.Marker{golang.NewImplicitForClauses()},
+		}
 	}
-	// else: infinite loop, all nil
 
 	body := ctx.mapBlockStmt(stmt.Body)
 

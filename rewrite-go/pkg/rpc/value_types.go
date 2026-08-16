@@ -114,6 +114,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.InterfaceMethod{}), "org.openrewrite.golang.marker.InterfaceMethod")
 	RegisterValueType(reflect.TypeOf(golang.SelectStmt{}), "org.openrewrite.golang.marker.SelectStmt")
 	RegisterValueType(reflect.TypeOf(golang.TypeSwitchGuard{}), "org.openrewrite.golang.marker.TypeSwitchGuard")
+	RegisterValueType(reflect.TypeOf(golang.ImplicitForClauses{}), "org.openrewrite.golang.marker.ImplicitForClauses")
 	RegisterValueType(reflect.TypeOf(golang.StructTag{}), "org.openrewrite.golang.marker.StructTag")
 	RegisterValueType(reflect.TypeOf(golang.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
 	RegisterValueType(reflect.TypeOf(java.SearchResult{}), "org.openrewrite.marker.SearchResult")
@@ -229,7 +230,6 @@ func init() {
 
 	// Java-side markers that may appear when recipes modify trees or during LST writing.
 	// These markers do NOT implement RpcCodec and are serialized as raw values.
-	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.RecipesThatMadeChanges"} })
 	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.LstProvenance"} })
 	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.BuildMetadata"} })
 	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.GitTreeEntry"} })
@@ -251,6 +251,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.InterfaceMethod", func() any { return golang.InterfaceMethod{} })
 	RegisterFactory("org.openrewrite.golang.marker.SelectStmt", func() any { return golang.SelectStmt{} })
 	RegisterFactory("org.openrewrite.golang.marker.TypeSwitchGuard", func() any { return golang.TypeSwitchGuard{} })
+	RegisterFactory("org.openrewrite.golang.marker.ImplicitForClauses", func() any { return golang.ImplicitForClauses{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTag", func() any { return golang.StructTag{} })
 	RegisterFactory("org.openrewrite.golang.marker.TrailingComma", func() any { return golang.TrailingComma{} })
 	// Semicolon: RpcCodec on the Java side; sends only `id`. Replaces the

@@ -101,6 +101,14 @@ _PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
 
+# knownInstance descriptors carry no moduleName, and most of the singletons ty
+# reports live in `typing`. These `knownInstanceKind`s are the ones that don't.
+_KNOWN_INSTANCE_FQNS: Dict[str, str] = {
+    'Range': 'range',
+    'FunctoolsPartial': 'functools.partial',
+    'FunctoolsPartialCall': 'functools.partial',
+}
+
 
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
     """The names ``__all__`` declares via top-level literal list/tuple assignments
@@ -438,6 +446,8 @@ class PythonTypeMapping:
             if class_name in _PYTHON_PRIMITIVES:
                 return _PYTHON_PRIMITIVES[class_name]
 
+            module_name = descriptor.get('moduleName')
+
             # Resolve base class: prefer classId (enriched with supertypes/methods)
             class_id = descriptor.get('classId')
             if class_id is None:
@@ -449,25 +459,33 @@ class PythonTypeMapping:
                 if not isinstance(base_class, JavaType.Class):
                     base_class = self._create_class_type(class_name)
             else:
-                module_name = descriptor.get('moduleName')
                 if module_name and module_name != 'builtins':
                     base_class = self._create_class_type(f"{module_name}.{class_name}")
                 else:
                     base_class = self._create_class_type(class_name)
 
-            # If typeArgs present, wrap in Parameterized
-            type_args = descriptor.get('typeArgs')
-            if type_args:
-                resolved_args = []
-                for arg_id in type_args:
-                    arg_type = self._resolve_type(arg_id)
-                    if arg_type is not None:
-                        resolved_args.append(arg_type)
-                if resolved_args:
-                    param = JavaType.Parameterized()
-                    param._type = base_class
-                    param._type_parameters = resolved_args
-                    return param
+            # `tuple` has a single generic parameter, so typeArgs conflates
+            # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
+            # elements from `tuple` without being generic, so only `tuple` takes them.
+            tuple_elements = (descriptor.get('tupleElements')
+                              if class_name == 'tuple' and module_name == 'builtins'
+                              else None)
+            if isinstance(tuple_elements, list):
+                arg_ids = [element.get('typeId') for element in tuple_elements
+                           if isinstance(element, dict)]
+            else:
+                arg_ids = descriptor.get('typeArgs') or []
+
+            resolved_args = []
+            for arg_id in arg_ids:
+                arg_type = self._resolve_type(arg_id) if arg_id is not None else None
+                if arg_type is not None:
+                    resolved_args.append(arg_type)
+            if resolved_args:
+                param = JavaType.Parameterized()
+                param._type = base_class
+                param._type_parameters = resolved_args
+                return param
 
             return base_class
 
@@ -713,10 +731,13 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind == 'knownInstance':
-            class_name = descriptor.get('className', '')
-            if class_name:
-                return self._create_class_type(f"typing.{class_name}")
-            return _UNKNOWN
+            fqn = _KNOWN_INSTANCE_FQNS.get(descriptor.get('knownInstanceKind', ''))
+            if fqn is None:
+                class_name = descriptor.get('className', '')
+                if not class_name:
+                    return _UNKNOWN
+                fqn = f"typing.{class_name}"
+            return self._create_class_type(fqn)
 
         elif kind == 'typeAlias':
             # Resolve through to the underlying value type when available

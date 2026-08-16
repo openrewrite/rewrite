@@ -674,6 +674,70 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(3);
     }
 
+    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
+              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Test
+    void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
+        var cus = kp().parse(
+          """
+            package org.openrewrite.test
+
+            class Outer {
+                enum class Measure(val label: Int) {
+                    One(1), Two(2), Three(3), Four(4), Five(5), Six(6)
+                }
+            }
+            """,
+          """
+            package org.openrewrite.test
+
+            import org.openrewrite.test.Outer.Measure.*
+
+            class OuterTest {
+                fun used(): List<Any> {
+                    return listOf(One, Two, Three, Four, Five)
+                }
+
+                fun parameterized(measure: Outer.Measure): Int {
+                    return measure.label
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(detector.build()));
+
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(5);
+    }
+
+    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
+              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Test
+    void staticStarImportCountsStaticallyImportedMethods() {
+        var cus = kp().parse(
+          """
+            package org.openrewrite.test
+
+            import java.util.Objects.*
+
+            class StaticMethods {
+                fun check(a: Any?, b: Any?): Boolean {
+                    requireNonNull(a)
+                    return equals(a, b) && hash(a, b) != 0 && isNull(b)
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(detector.build()));
+
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(4);
+    }
+
     @Test
     void detectMethodArgs() {
         var cus = kp().parse(
