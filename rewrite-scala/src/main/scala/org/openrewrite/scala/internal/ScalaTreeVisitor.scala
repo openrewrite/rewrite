@@ -7482,11 +7482,11 @@ class ScalaTreeVisitor(
     // Scala 3 selector-style match `selector.match { ... }`: the `match` keyword is preceded
     // by a `.`. Record it via a marker so the dot isn't stored as (non-whitespace) Space.
     val beforeMatch = if (mi > 0) ms.substring(0, mi) else ""
-    val dotIdx = beforeMatch.indexOf('.')
+    val dotIdx = positionOfNextIn(beforeMatch, ".", 0)
     val isDottedMatch = dotIdx >= 0
     val matchKeywordSpace =
-      if (isDottedMatch) Space.format(beforeMatch.substring(0, dotIdx))
-      else if (mi > 0) Space.format(beforeMatch)
+      if (isDottedMatch) ScalaSpace.format(beforeMatch.substring(0, dotIdx))
+      else if (mi > 0) ScalaSpace.format(beforeMatch)
       else Space.EMPTY
     if (mi >= 0) cursor = cursor + mi + 5
     // Scala 3 `x match\n  case ...` has no `{` before the cases — detect that form.

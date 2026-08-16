@@ -605,4 +605,17 @@ class MatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void blockCommentBeforeMatchKeyword() {
+        rewriteRun(
+          scala(
+            """
+            def tupleArity(tp: Int): Int = tp/*.dealias*/ match {
+              case _ => 1
+            }
+            """
+          )
+        );
+    }
 }
