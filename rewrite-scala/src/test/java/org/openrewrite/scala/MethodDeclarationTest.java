@@ -1252,6 +1252,9 @@ class MethodDeclarationTest implements RewriteTest {
               inline def g(a: Int, inline op: Boolean, b: Int): Boolean = op
               inline def h(inline op: => Int): Int = op
               inline def i[A](using inline z: List[A]): List[A] = z
+              inline def j(
+                inline op: Boolean
+              ): Boolean = op
             }
             """
           )

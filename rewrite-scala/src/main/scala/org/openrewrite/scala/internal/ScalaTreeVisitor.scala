@@ -7187,7 +7187,7 @@ class ScalaTreeVisitor(
     // `def f(using inline x: T)`.
     def consumeInlineKeyword(): Boolean = {
       var i = cursor
-      while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
+      while (i < source.length && Character.isWhitespace(source.charAt(i))) i += 1
       val end = i + "inline".length
       if (source.startsWith("inline", i) &&
           (end >= source.length || !(Character.isLetterOrDigit(source.charAt(end)) || source.charAt(end) == '_'))) {
@@ -7213,8 +7213,6 @@ class ScalaTreeVisitor(
           Space.EMPTY
         } else extractPrefix(vd.span)
       } else extractPrefix(vd.span)
-    } else if (vd.mods != null && vd.mods.is(Flags.Implicit)) {
-      extractPrefix(vd.span)
     } else if (consumeInlineKeyword()) {
       Space.EMPTY
     } else extractPrefix(vd.span)
