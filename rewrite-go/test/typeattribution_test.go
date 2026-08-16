@@ -47,9 +47,6 @@ func TestTypeAttribution(t *testing.T) {
 	}
 	files := stride(collectGoFiles(t, root), envInt("GO_TYPES_FILES", 2000))
 	if os.Getenv("GO_TYPES_PACKAGE") != "" {
-		// Attribution is a property of a package, not a file: a reference
-		// to a sibling package resolves only when the importer can reach
-		// it. Grouping by directory measures what a project parse sees.
 		files = packageMatesOf(t, root, files)
 	}
 
@@ -215,10 +212,8 @@ var javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 
 type typeWalker struct {
 	counts map[string]*slotCount
-	// empty counts the slots that came back nil or Unknown, keyed by the
-	// field the node sits in as well as its own. An identifier's role —
-	// package qualifier, label, field key — decides whether Go has a type
-	// for it at all, and the node alone does not say which it is.
+	// empty is keyed by the field the node sits in as well as its own,
+	// because an identifier's role decides whether Go has a type for it.
 	empty map[string]int
 	seen  map[uintptr]bool
 }

@@ -2310,8 +2310,6 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
 			if mi.MethodType == nil {
-				// A struct field of func type is a selection on a value,
-				// not a method; its signature is the field's own type.
 				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name)
 			}
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
