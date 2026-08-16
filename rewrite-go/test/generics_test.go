@@ -123,3 +123,32 @@ func TestParseTildeConstraint(t *testing.T) {
 			}
 		`))
 }
+
+// A method whose parameter re-instantiates its own receiver describes an
+// infinite family of instantiations. Type attribution must stop walking
+// it rather than recurse until the stack is gone.
+func TestParseSelfInstantiatingGeneric(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type R[P any] int
+
+			func (R[P]) m(R[R[P]]) {}
+		`))
+}
+
+func TestParseMutuallyRecursiveGenerics(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type A[P any] int
+
+			type B[P any] int
+
+			func (A[P]) m(B[B[P]]) {}
+
+			func (B[P]) m(A[A[P]]) {}
+		`))
+}

@@ -34,7 +34,16 @@ type typeMapper struct {
 	// ownPkg, when set (exported-types enumeration only), limits full class bodies
 	// to the enumerated modules; foreign named types become FQN-only ShallowClass refs.
 	ownPkg func(pkgPath string) bool
+	// depth counts nested mapType frames. See maxTypeDepth.
+	depth int
 }
+
+// maxTypeDepth bounds how deep type attribution follows a type into its
+// components. A method whose parameter re-instantiates its own receiver —
+// `func (R[P]) m(R[R[P]])` — describes an infinite family of distinct
+// instantiations, each a fresh *types.Named that no cache can collapse.
+// Real Go nests types nowhere near this deep.
+const maxTypeDepth = 64
 
 func newTypeMapper() *typeMapper {
 	return &typeMapper{
@@ -50,6 +59,11 @@ func (m *typeMapper) mapType(t types.Type) (result java.JavaType) {
 	if cached, ok := m.cache[t]; ok {
 		return cached
 	}
+	if m.depth >= maxTypeDepth {
+		return java.UnknownType
+	}
+	m.depth++
+	defer func() { m.depth-- }()
 
 	// A type checker that gave up part-way leaves types whose internals
 	// trip its own assertions when walked (Named.Underlying on an
