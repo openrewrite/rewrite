@@ -834,7 +834,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 		}
 
 		var markers java.Markers
-		if trailingCommaOff := ctx.findNextPositionOf(',', int(results.Closing)-ctx.file.Base()); len(elements) > 0 && trailingCommaOff >= 0 {
+		if trailingCommaOff := ctx.findNextBefore(',', int(results.Closing)-ctx.file.Base()); len(elements) > 0 && trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(results.Closing)
@@ -1616,7 +1616,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 		// syntactically 3-clause. Detect by scanning for `;` in the
 		// header — but skip rune/string literals so a `';'` inside the
 		// condition (e.g. `for tok != ';'`) isn't mistaken for one.
-		if ctx.findNextPositionOf(';', bodyStart) >= 0 {
+		if ctx.findNextBefore(';', bodyStart) >= 0 {
 			is3Clause = true
 		}
 	}
@@ -1628,7 +1628,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			// The whitespace after "for" is read onto the init clause; hoist it
 			// onto the control so it stays attached to the outermost element.
 			control.Prefix, init = hoistLeftPrefix(init)
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			var after java.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1638,7 +1638,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			control.Init = &initRP
 		} else {
 			// No init but semicolons present: `for ; cond; post {}`
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			var after java.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1650,7 +1650,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 
 		if stmt.Cond != nil {
 			cond := ctx.mapExpr(stmt.Cond)
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			after := java.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1659,7 +1659,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			condRP := java.RightPadded[java.Expression]{Element: cond, After: after}
 			control.Condition = &condRP
 		} else {
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			after := java.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -3369,32 +3369,22 @@ func mapBinaryOp(op token.Token) java.BinaryOperator {
 	}
 }
 
+// findNext returns the byte offset of the next occurrence of ch at or
+// after the cursor, or -1.
 func (ctx *parseContext) findNext(ch byte) int {
-	for i := ctx.cursor; i < len(ctx.src); i++ {
-		if ctx.src[i] == ch {
-			return i
-		}
-	}
-	return -1
+	return ctx.findNextBefore(ch, 0)
 }
 
 // findNextBefore returns the byte offset of the next occurrence of ch from the
-// current cursor, but only if it appears before the `before` byte offset.
+// current cursor, but only if it appears before the `before` byte offset; a
+// `before` of 0 means scan to end of src.
+//
+// The scan steps over Go rune literals ('...'), interpreted string literals
+// ("..."), raw string literals (`...`), and `//` / `/* */` comments. Every
+// character the parser looks for this way — a `,` between arguments, the `;`
+// in a `for` header, the `:` of a label — is syntax, and one written inside a
+// comment or a string is text that happens to look like it.
 func (ctx *parseContext) findNextBefore(ch byte, before int) int {
-	for i := ctx.cursor; i < len(ctx.src) && i < before; i++ {
-		if ctx.src[i] == ch {
-			return i
-		}
-	}
-	return -1
-}
-
-// findNextPositionOf is like findNextBefore but skips over Go rune
-// literals ('...'), interpreted string literals ("..."), raw string literals
-// (`...`), and `//` / `/* */` comments while scanning. A `before` of 0 means
-// scan to end of src. Used for syntactic markers like `;` in a `for` header
-// that can otherwise hide inside a `';'` rune literal or a `/* ; */` comment.
-func (ctx *parseContext) findNextPositionOf(ch byte, before int) int {
 	end := len(ctx.src)
 	if before > 0 && before < end {
 		end = before
