@@ -17,7 +17,9 @@ import * as fs from 'fs';
 import * as rpc from "vscode-jsonrpc/node";
 import {Cursor, isSourceFile, SourceFile} from "../../tree";
 
-const CSV_HEADER = 'request,target,durationMs,memoryUsedBytes,memoryMaxBytes,localObjects,remoteObjects,refs';
+// `timestamp` leads, as it does in the Go, Python and C# writers, so a profile can align this
+// peer's residency against samples taken outside it (RSS, GC, the host's own metrics).
+const CSV_HEADER = 'timestamp,request,target,durationMs,memoryUsedBytes,memoryMaxBytes,localObjects,remoteObjects,refs';
 
 // Optional provider of current RPC cache sizes, appended to each metrics row so a profile
 // shows cache residency (flat with per-file Evict, monotonic without). Set by RewriteRpc.
@@ -172,7 +174,7 @@ function recordMetrics(
     const memoryMaxBytes = memEnd.heapTotal;
     const cache = cacheSizeProvider?.() ?? {local: 0, remote: 0, refs: 0};
 
-    const csvRow = `${request},${target},${durationMs},${memoryUsedBytes},${memoryMaxBytes},${cache.local},${cache.remote},${cache.refs}\n`;
+    const csvRow = `${new Date(endTime).toISOString()},${request},${target},${durationMs},${memoryUsedBytes},${memoryMaxBytes},${cache.local},${cache.remote},${cache.refs}\n`;
 
     try {
         fs.appendFileSync(metricsCsv, csvRow);
