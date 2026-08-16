@@ -1,0 +1,18 @@
+root = true
+
+[*]
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[**/src/{test,integTest}/**.java]
+indent_size = 4
+ij_continuation_indent_size = 2
+trim_trailing_whitespace = false
+
+[*/rewrite/{test,tests,fixtures}/**]
+trim_trailing_whitespace = false
+
+# Golden files are compared byte for byte.
+[**/resources/**]
+insert_final_newline = false
+trim_trailing_whitespace = false

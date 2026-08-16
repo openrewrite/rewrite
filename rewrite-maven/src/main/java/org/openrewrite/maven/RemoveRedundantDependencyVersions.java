@@ -24,6 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
 import org.openrewrite.semver.Semver;
@@ -115,20 +116,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        Validated<Object> validated = Validated.none();
-        if (except != null) {
-            for (int i = 0; i < except.size(); i++) {
-                final String retainVersion = except.get(i);
-                validated = validated.and(Validated.test(
-                        String.format("except[%d]", i),
-                        "did not look like a two-or-three-part GAV",
-                        retainVersion,
-                        maybeGav -> {
-                            final int gavParts = maybeGav.split(":").length;
-                            return gavParts == 2 || gavParts == 3;
-                        }));
-            }
-        }
+        Validated<Object> validated = RetainVersions.validate("except", except);
         if (onlyIfVersionsMatch != null && onlyIfManagedVersionIs != null) {
             validated = validated.and(Validated.invalid("onlyIfVersionsMatch", onlyIfVersionsMatch, "is deprecated in favor of onlyIfManagedVersionIs, and they cannot be used together"));
         }
@@ -366,6 +354,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     return true;
                 }
                 for (final String gav : except) {
+                    if (StringUtils.isBlank(gav)) {
+                        continue;
+                    }
                     String[] split = gav.split(":");
                     String exceptedGroupId = split[0];
                     String exceptedArtifactId = split[1];

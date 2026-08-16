@@ -19,7 +19,6 @@ so an undrained stderr pipe would wedge it just like the real binary can.
 """
 import os
 import stat
-import sys
 import textwrap
 
 import pytest
@@ -53,17 +52,42 @@ FAKE_SERVER = textwrap.dedent('''\
 ''')
 
 
-@pytest.fixture
-def client(tmp_path, monkeypatch):
+WEDGED_SERVER = textwrap.dedent('''\
+    #!/usr/bin/env python3
+    import json
+    import sys
+
+    for line in sys.stdin:
+        req = json.loads(line)
+        if req["method"] == "initialize":
+            sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": {"ok": True}}) + "\\n")
+            sys.stdout.flush()
+''')
+
+
+def _install_server(tmp_path, monkeypatch, source):
     server = tmp_path / "fake-ty-types"
-    server.write_text(FAKE_SERVER)
+    server.write_text(source)
     server.chmod(server.stat().st_mode | stat.S_IEXEC)
     if os.name == 'nt':
         pytest.skip("fake server uses a shebang launcher")
     monkeypatch.setattr(TyTypesClient, '_find_binary', staticmethod(lambda: server))
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    _install_server(tmp_path, monkeypatch, FAKE_SERVER)
     c = TyTypesClient()
     yield c
     c.shutdown()
+
+
+@pytest.fixture
+def wedged_client(tmp_path, monkeypatch):
+    _install_server(tmp_path, monkeypatch, WEDGED_SERVER)
+    c = TyTypesClient()
+    yield c
+    c._kill()
 
 
 def test_round_trip(client):
@@ -83,7 +107,7 @@ def test_timeout_returns_none_then_recovers(client):
 
 
 def test_unread_big_responses_do_not_deadlock(client):
-    # Windows-hang regression: abandoned ~64KB responses must be absorbed; interleaved successes keep the breaker from tripping.
+    # Interleaved successes reset the breaker, so a failure here means the undrained pipe.
     assert client.initialize("/some/project")
     for i in range(20):
         assert client.get_types(f"/some/project/big-slow-0.2-{i}.py", timeout=0.01) is None
@@ -96,5 +120,14 @@ def test_consecutive_timeouts_shut_the_process_down(client):
     for i in range(3):
         assert client.get_types(f"/some/project/slow-5-{i}.py", timeout=0.05) is None
     assert not client.is_available
-    # Degrades fast instead of waiting on a dead process.
     assert client.get_types("/some/project/ok.py", timeout=5) is None
+
+
+def test_shutdown_when_its_own_request_trips_the_breaker(wedged_client):
+    assert wedged_client.initialize("/some/project")
+    # One short of the breaker, so the "shutdown" request supplies the last strike.
+    for i in range(TyTypesClient._MAX_CONSECUTIVE_TIMEOUTS - 1):
+        assert wedged_client.get_types(f"/some/project/f{i}.py", timeout=0.05) is None
+
+    wedged_client.shutdown()
+    assert not wedged_client.is_available

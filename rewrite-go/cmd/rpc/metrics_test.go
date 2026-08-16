@@ -70,7 +70,7 @@ func TestMetricsCSVHeaderWritten(t *testing.T) {
 	s.closeMetrics()
 
 	header, rows := readMetricsCSV(t, csvPath)
-	want := []string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes"}
+	want := []string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes", "local_objects", "remote_objects", "refs"}
 	if len(header) != len(want) {
 		t.Fatalf("header columns: want %v, got %v", want, header)
 	}
@@ -100,8 +100,8 @@ func TestMetricsCSVRowPerRequest(t *testing.T) {
 		t.Fatalf("rows: want %d, got %d (%v)", len(calls), len(rows), rows)
 	}
 	for i, row := range rows {
-		if len(row) != 6 {
-			t.Errorf("row[%d] columns: want 6, got %d (%v)", i, len(row), row)
+		if len(row) != 9 {
+			t.Errorf("row[%d] columns: want 9, got %d (%v)", i, len(row), row)
 			continue
 		}
 		if row[1] != calls[i] {
@@ -177,13 +177,13 @@ func TestMetricsCSVConcurrentLoad(t *testing.T) {
 	if len(rows) != total {
 		t.Fatalf("rows: want %d, got %d", total, len(rows))
 	}
-	// Every row must have 4 columns and a parseable timestamp+duration.
+	// Every row must have 9 columns and a parseable timestamp+duration.
 	// If writes interleaved, csv.NewReader.ReadAll above would fail or
 	// produce malformed rows; we re-validate here in case ReadAll silently
 	// padded.
 	for i, row := range rows {
-		if len(row) != 6 {
-			t.Fatalf("row[%d] columns: want 6, got %d (%v)", i, len(row), row)
+		if len(row) != 9 {
+			t.Fatalf("row[%d] columns: want 9, got %d (%v)", i, len(row), row)
 		}
 		if row[1] != "GetLanguages" {
 			t.Errorf("row[%d].method: want GetLanguages, got %q", i, row[1])

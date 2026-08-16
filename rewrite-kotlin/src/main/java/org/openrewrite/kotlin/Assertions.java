@@ -474,7 +474,7 @@ public final class Assertions {
             return inPackageDeclaration() || inImport() || isClassName() ||
                     isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
-                    isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument();
+                    isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument() || isThisLabel();
         }
 
         private boolean isNamedArgument() {
@@ -563,6 +563,11 @@ public final class Assertions {
 
         private boolean isLabel() {
             return getCursor().firstEnclosing(J.Label.class) != null;
+        }
+
+        private boolean isThisLabel() {
+            // The label of `this@Foo` names an enclosing class or lambda, not a typed expression
+            return getCursor().getParentTreeCursor().getValue() instanceof K.This;
         }
 
         private boolean isAnnotationField(J.Identifier ident) {

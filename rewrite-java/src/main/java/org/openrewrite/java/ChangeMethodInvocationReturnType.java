@@ -47,7 +47,10 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     @Option(displayName = "New method invocation return type",
             description = "The fully qualified new return type of method invocation. " +
                     "Parameterized types like `java.util.Set<java.lang.String>` are supported; " +
-                    "`java.lang` type arguments may use their simple name, e.g. `java.util.List<String>`.",
+                    "`java.lang` type arguments may use their simple name, e.g. `java.util.List<String>`. " +
+                    "Nested types may be written with a `$` separator, e.g. `mockwebserver3.MockResponse$Builder`; " +
+                    "dots also work, e.g. `mockwebserver3.MockResponse.Builder`, in which case the first segment " +
+                    "that is followed only by segments starting with an uppercase letter is taken to be the outermost type.",
             example = "long")
     String newReturnType;
 
@@ -63,6 +66,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        String returnTypeExpression = newReturnType.replace('$', '.');
+        String returnTypeSignature = binaryName(newReturnType);
         return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean methodUpdated;
@@ -71,8 +76,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 JavaType.Method type = m.getMethodType();
-                if (methodMatcher.matches(method) && type != null && !newReturnType.equals(type.getReturnType().toString())) {
-                    type = type.withReturnType(JavaType.buildType(newReturnType));
+                if (methodMatcher.matches(method) && type != null && !returnTypeSignature.equals(type.getReturnType().toString())) {
+                    type = type.withReturnType(JavaType.buildType(returnTypeSignature));
                     m = m.withMethodType(type);
                     if (m.getName().getType() != null) {
                         m = m.withName(m.getName().withType(type));
@@ -94,7 +99,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     return mv;
                 }
 
-                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(newReturnType + " __typePlaceholder__").contextSensitive();
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(returnTypeExpression + " __typePlaceholder__").contextSensitive();
                 List<String> stubs = synthesizeStubsForTypeAttribution(newReturnType);
                 if (!stubs.isEmpty()) {
                     templateBuilder.javaParser(JavaParser.fromJavaVersion().dependsOn(stubs.toArray(new String[0])));
@@ -142,21 +147,104 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     private static List<String> synthesizeStubsForTypeAttribution(String type) {
         Map<String, Integer> fqnToArity = new LinkedHashMap<>();
         collectStubTypes(type, fqnToArity);
-        List<String> stubs = new ArrayList<>();
+        Map<String, Map<String, StubClass>> topLevelByPackage = new LinkedHashMap<>();
         for (Map.Entry<String, Integer> entry : fqnToArity.entrySet()) {
-            String fqn = entry.getKey();
-            int lastDot = fqn.lastIndexOf('.');
-            StringBuilder typeParameters = new StringBuilder();
-            for (int i = 0; i < entry.getValue(); i++) {
-                typeParameters.append(i == 0 ? "<T" : ", T").append(i);
+            List<String> names = splitPackageAndTypeNames(entry.getKey());
+            Map<String, StubClass> topLevel = topLevelByPackage.computeIfAbsent(names.get(0), p -> new LinkedHashMap<>());
+            StubClass stubClass = topLevel.computeIfAbsent(names.get(1), n -> new StubClass());
+            for (int i = 2; i < names.size(); i++) {
+                stubClass = stubClass.nested.computeIfAbsent(names.get(i), n -> new StubClass());
             }
-            if (entry.getValue() > 0) {
-                typeParameters.append('>');
+            stubClass.arity = Math.max(stubClass.arity, entry.getValue());
+        }
+        List<String> stubs = new ArrayList<>();
+        for (Map.Entry<String, Map<String, StubClass>> byPackage : topLevelByPackage.entrySet()) {
+            for (Map.Entry<String, StubClass> topLevel : byPackage.getValue().entrySet()) {
+                StringBuilder stub = new StringBuilder();
+                if (!byPackage.getKey().isEmpty()) {
+                    stub.append("package ").append(byPackage.getKey()).append("; ");
+                }
+                appendStubClass(stub, topLevel.getKey(), topLevel.getValue(), true);
+                stubs.add(stub.toString());
             }
-            stubs.add("package " + fqn.substring(0, lastDot) + "; public class " +
-                    fqn.substring(lastDot + 1) + typeParameters + " {}");
         }
         return stubs;
+    }
+
+    /**
+     * @return the package name, possibly empty, followed by each type simple name from outermost to innermost.
+     */
+    private static List<String> splitPackageAndTypeNames(String fqn) {
+        int dollar = fqn.indexOf('$');
+        String[] segments = (dollar == -1 ? fqn : fqn.substring(0, dollar)).split("\\.");
+        int firstType = segments.length - 1;
+        for (int i = 0; i < segments.length; i++) {
+            boolean nestedFromHere = true;
+            for (int j = i; j < segments.length; j++) {
+                if (segments[j].isEmpty() || !Character.isUpperCase(segments[j].charAt(0))) {
+                    nestedFromHere = false;
+                    break;
+                }
+            }
+            if (nestedFromHere) {
+                firstType = i;
+                break;
+            }
+        }
+        List<String> names = new ArrayList<>();
+        StringBuilder packageName = new StringBuilder();
+        for (int i = 0; i < firstType; i++) {
+            if (packageName.length() > 0) {
+                packageName.append('.');
+            }
+            packageName.append(segments[i]);
+        }
+        names.add(packageName.toString());
+        for (int i = firstType; i < segments.length; i++) {
+            names.add(segments[i]);
+        }
+        if (dollar != -1) {
+            for (String nested : fqn.substring(dollar + 1).split("\\$")) {
+                if (!nested.isEmpty()) {
+                    names.add(nested);
+                }
+            }
+        }
+        return names;
+    }
+
+    private static String binaryName(String type) {
+        int lt = type.indexOf('<');
+        List<String> names = splitPackageAndTypeNames(lt == -1 ? type : type.substring(0, lt));
+        StringBuilder binaryName = new StringBuilder(names.get(0));
+        for (int i = 1; i < names.size(); i++) {
+            if (binaryName.length() > 0) {
+                binaryName.append(i == 1 ? '.' : '$');
+            }
+            binaryName.append(names.get(i));
+        }
+        return lt == -1 ? binaryName.toString() : binaryName.append(type.substring(lt)).toString();
+    }
+
+    private static void appendStubClass(StringBuilder stub, String name, StubClass stubClass, boolean topLevel) {
+        stub.append("public ").append(topLevel ? "" : "static ").append("class ").append(name);
+        for (int i = 0; i < stubClass.arity; i++) {
+            stub.append(i == 0 ? "<T" : ", T").append(i);
+        }
+        if (stubClass.arity > 0) {
+            stub.append('>');
+        }
+        stub.append(" {");
+        for (Map.Entry<String, StubClass> nested : stubClass.nested.entrySet()) {
+            stub.append(' ');
+            appendStubClass(stub, nested.getKey(), nested.getValue(), false);
+        }
+        stub.append('}');
+    }
+
+    private static class StubClass {
+        final Map<String, StubClass> nested = new LinkedHashMap<>();
+        int arity;
     }
 
     private static void collectStubTypes(String type, Map<String, Integer> fqnToArity) {

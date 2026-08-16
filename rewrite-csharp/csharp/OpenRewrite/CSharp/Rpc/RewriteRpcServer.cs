@@ -1006,7 +1006,7 @@ public class RewriteRpcServer
     {
         var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
-        if (requestedVersion != null)
+        if (!string.IsNullOrWhiteSpace(requestedVersion))
             addArgs += $" --version {requestedVersion}";
         RunDotnet(addArgs);
 
@@ -1743,11 +1743,15 @@ public class RewriteRpcServer
     /// Returns the (possibly modified) tree.
     /// </summary>
     public Tree VisitOnRemote(string visitorName, string treeId, string? sourceFileType,
-        string? pId = null)
+        string? pId = null, Dictionary<string, object?>? visitorOptions = null)
     {
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<VisitResponse>(
             "Visit",
-            new VisitRequest { VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType, PId = pId }
+            new VisitRequest
+            {
+                VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType,
+                PId = pId, VisitorOptions = visitorOptions
+            }
         ).GetAwaiter().GetResult();
 
         Log.Debug("RPC VisitOnRemote: {VisitorName} on {TreeId} => modified={Modified}",
@@ -2362,6 +2366,12 @@ public class VisitRequest
     public string? PId { get; set; }
     [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
+
+    /// <summary>
+    /// Constructor/property values for a visitor the peer instantiates by class name
+    /// (see Java's <c>PreparedRecipeCache.instantiateVisitor</c>).
+    /// </summary>
+    public Dictionary<string, object?>? VisitorOptions { get; set; }
 }
 
 public class VisitResponse

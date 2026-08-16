@@ -68,6 +68,22 @@ func ImportPath(imp *java.Import) string {
 	return strings.Trim(raw, `"`+"`")
 }
 
+// PackageName returns the qualifier used to reference the import: its alias, else the last path segment ("" for blank/dot imports).
+func PackageName(imp *java.Import) string {
+	switch alias := AliasName(imp); alias {
+	case "":
+		path := ImportPath(imp)
+		if i := strings.LastIndex(path, "/"); i >= 0 {
+			return path[i+1:]
+		}
+		return path
+	case "_", ".":
+		return ""
+	default:
+		return alias
+	}
+}
+
 // AliasName returns the alias used by an Import: a custom identifier for
 // `import alias "path"`, "_" for blank imports, "." for dot imports, or
 // "" when the import uses the default (last segment of the path).
@@ -175,18 +191,31 @@ func IsLocal(importPath, modulePath string) bool {
 // Aliases and dot imports are handled uniformly — the package's import
 // path is what we track, regardless of how the user named it.
 func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
-	refs := map[string]bool{}
-	if cu == nil {
-		return refs
-	}
-	v := visitor.Init(&referencedPackagesVisitor{refs: refs})
-	v.Visit(cu, nil)
+	refs, _ := referencedImports(cu)
 	return refs
+}
+
+// ReferencedQualifiers returns the identifiers used lexically as package qualifiers (left of the dot), the attribution-free signal goimports relies on.
+func ReferencedQualifiers(cu *golang.CompilationUnit) map[string]bool {
+	_, quals := referencedImports(cu)
+	return quals
+}
+
+func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
+	refs = map[string]bool{}
+	quals = map[string]bool{}
+	if cu == nil {
+		return refs, quals
+	}
+	v := visitor.Init(&referencedPackagesVisitor{refs: refs, quals: quals})
+	v.Visit(cu, nil)
+	return refs, quals
 }
 
 type referencedPackagesVisitor struct {
 	visitor.GoVisitor
-	refs map[string]bool
+	refs  map[string]bool
+	quals map[string]bool
 }
 
 func (v *referencedPackagesVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
@@ -206,7 +235,19 @@ func (v *referencedPackagesVisitor) VisitMethodInvocation(mi *java.MethodInvocat
 			v.refs[path] = true
 		}
 	}
+	if mi.Select != nil {
+		if id, ok := mi.Select.Element.(*java.Identifier); ok {
+			v.quals[id.Name] = true
+		}
+	}
 	return v.GoVisitor.VisitMethodInvocation(mi, p)
+}
+
+func (v *referencedPackagesVisitor) VisitFieldAccess(fa *java.FieldAccess, p any) java.J {
+	if id, ok := fa.Target.(*java.Identifier); ok {
+		v.quals[id.Name] = true
+	}
+	return v.GoVisitor.VisitFieldAccess(fa, p)
 }
 
 // pkgPathOf returns the package import path implied by an FQN. The

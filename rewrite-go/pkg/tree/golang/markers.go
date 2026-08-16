@@ -50,3 +50,16 @@ func NewSemicolon() Semicolon {
 func NewGoProject(projectName, modulePath string) GoProject {
 	return GoProject{Ident: uuid.New(), ProjectName: projectName, ModulePath: modulePath}
 }
+
+// ImplicitForClauses marks a J.ForLoop.Control whose init/update are synthetic
+// J.Empty placeholders (Go's `for cond {}` / `for {}`), so the printer omits
+// them and their `;`. Mirrors org.openrewrite.golang.marker.ImplicitForClauses.
+type ImplicitForClauses struct {
+	Ident uuid.UUID
+}
+
+func (m ImplicitForClauses) ID() uuid.UUID { return m.Ident }
+
+func NewImplicitForClauses() ImplicitForClauses {
+	return ImplicitForClauses{Ident: uuid.New()}
+}

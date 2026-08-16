@@ -222,20 +222,33 @@ public class FindTypes extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
-            if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                    "class".equals(fa.getName().getSimpleName())) {
-                return found(fa, ctx);
+            if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type)) {
+                if ("class".equals(fa.getName().getSimpleName())) {
+                    return found(fa, ctx);
+                }
+                // Identifiers under a field access are left to the enclosing name's `visitTypeName`, which covers
+                // qualified type names (`a.A1`) but not the type qualifying a static member access (`A1.CONST`).
+                // A null field type distinguishes an identifier naming the type from one that is a value of it.
+                if (fa.getTarget() instanceof J.Identifier &&
+                        ((J.Identifier) fa.getTarget()).getFieldType() == null &&
+                        getCursor().firstEnclosing(J.Import.class) == null) {
+                    return fa.withTarget(found((J.Identifier) fa.getTarget(), getCursor(), ctx));
+                }
             }
             return fa;
         }
 
         private <J2 extends TypedTree> J2 found(J2 j, ExecutionContext ctx) {
+            return found(j, getCursor().getParentTreeCursor(), ctx);
+        }
+
+        private <J2 extends TypedTree> J2 found(J2 j, Cursor parent, ExecutionContext ctx) {
             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
             if (!j.getMarkers().findFirst(SearchResult.class).isPresent()) {
                 // Avoid double-counting results in the data table
                 typeUses.insertRow(ctx, new TypeUses.Row(
                         getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                        j.printTrimmed(getCursor().getParentTreeCursor()),
+                        j.printTrimmed(parent),
                         fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
                 ));
             }

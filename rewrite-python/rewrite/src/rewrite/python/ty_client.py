@@ -71,8 +71,6 @@ class TyTypesClient:
         self._initialized = False
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
-        self._responses: queue.Queue = queue.Queue()
-        self._consecutive_timeouts = 0
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
         #
@@ -125,8 +123,9 @@ class TyTypesClient:
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
 
-        # Daemon threads drain both pipes: select() is sockets-only on Windows, and an undrained pipe deadlocks ty once its buffer fills.
-        self._responses = queue.Queue()
+        # Draining both pipes keeps ty from deadlocking on a full buffer; threads
+        # because a pipe read cannot be bounded on Windows.
+        self._responses: queue.Queue = queue.Queue()
         self._consecutive_timeouts = 0
         threading.Thread(target=self._drain_stdout, args=(self._process,),
                          name="ty-types-stdout", daemon=True).start()
@@ -297,7 +296,8 @@ class TyTypesClient:
             self.session_types.clear()
             self._start_process()
 
-        # Bounded so a wedged ty degrades to untyped instead of hanging; large because ty indexes the whole project up front.
+        # Bounded so a wedged ty degrades to untyped instead of hanging; large
+        # because ty indexes the whole project up front.
         result = self._send_request("initialize", {"projectRoot": project_root},
                                     timeout=600)
         if result and result.get("ok"):
@@ -342,15 +342,16 @@ class TyTypesClient:
 
     def shutdown(self) -> None:
         """Gracefully shut down the ty-types process."""
-        if self._process is None:
+        # Local: the "shutdown" request can trip the breaker, whose ``_kill`` detaches ``self._process``.
+        process = self._process
+        if process is None:
             return
 
         try:
             self._send_request("shutdown", timeout=5)
-            self._process.wait(timeout=5)
+            process.wait(timeout=5)
         except (subprocess.TimeoutExpired, OSError):
-            if self._process is not None:
-                self._process.kill()
+            process.kill()
         finally:
             self._process = None
             self._initialized = False

@@ -252,7 +252,7 @@ val goTest = tasks.register<Exec>("goTest") {
     commandLine("go", "run", "gotest.tools/gotestsum@latest",
         "--junitfile", junitXmlFile.relativeTo(projectDir).path,
         "--format", gotestFormat,
-        "--", "-count=1", "./test/...")
+        "--", "-count=1", "./...")
 
     dependsOn(generateTestClasspath)
 

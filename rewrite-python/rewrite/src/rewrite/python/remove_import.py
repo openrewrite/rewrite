@@ -19,8 +19,9 @@ from typing import Optional, Set
 
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded
-from rewrite.java.tree import Identifier, Import, MethodDeclaration, Space
+from rewrite.java.tree import Identifier, Import, Space
 from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn
+from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -142,6 +143,7 @@ class RemoveImport(PythonVisitor):
     def _collect_used_identifiers(self, cu: CompilationUnit) -> Set[str]:
         """Collect all identifiers used in the code (excluding imports)."""
         used: Set[str] = set()
+        bindings = LocalBindings()
 
         class UsageCollector(PythonVisitor):
             def __init__(self):
@@ -165,12 +167,7 @@ class RemoveImport(PythonVisitor):
                     self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if not self.in_import:
-                    # Inside a function scope, identifiers with field_type are
-                    # local variables (shadowing the import), not actual uses.
-                    if self.cursor.first_enclosing(MethodDeclaration) is not None:
-                        if ident.field_type is not None:
-                            return ident
+                if not self.in_import and not bindings.is_bound(self.cursor, ident.simple_name):
                     used.add(ident.simple_name)
                 return ident
 

@@ -288,7 +288,8 @@ public class Autodetect extends NamedStyles {
 
     private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
         Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
-                .filter(entry -> entry.getKey().indentDepth != 0)
+                // A prefix with more tabs than its block depth has a negative delta, from which no tab size can be inferred
+                .filter(entry -> entry.getKey().indentDepth > 0)
                 .flatMap(entry -> entry.getValue().entrySet().stream()
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
@@ -1000,17 +1001,25 @@ public class Autodetect extends NamedStyles {
 
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
-                        int count = 0;
+                        String importedTypeName = anImport.getTypeName();
+                        Set<String> staticMembers = new HashSet<>();
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                            if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
-                                count++;
+                            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(variable.getOwner());
+                            if (variable.hasFlags(Flag.Static) &&
+                                owner != null && importedTypeName.equals(owner.getFullyQualifiedName())) {
+                                staticMembers.add(variable.getName());
+                            }
+                        }
+                        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+                            if (method.hasFlags(Flag.Static) &&
+                                importedTypeName.equals(method.getDeclaringType().getFullyQualifiedName())) {
+                                staticMembers.add(method.getName());
                             }
                         }
 
                         importLayoutStatistics.minimumFoldedStaticImports = Math.min(
                                 importLayoutStatistics.minimumFoldedStaticImports,
-                                count
+                                staticMembers.size()
                         );
                     } else {
                         Set<String> fqns = new HashSet<>();
