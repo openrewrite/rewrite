@@ -142,3 +142,44 @@ func TestParseSemicolonInGroupedVarDecl(t *testing.T) {
 			)
 		`))
 }
+
+// The init clause of an `if`, `switch` or type switch may be empty while
+// its `;` is still written.
+
+func TestParseSemicolonEmptySwitchInit(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				switch ; {
+				case true:
+					return
+				}
+			}
+		`))
+}
+
+func TestParseSemicolonEmptyIfInit(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				if ; true {
+				}
+			}
+		`))
+}
+
+func TestParseSemicolonEmptyTypeSwitchInit(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f(x any) {
+				switch ; x.(type) {
+				}
+			}
+		`))
+}

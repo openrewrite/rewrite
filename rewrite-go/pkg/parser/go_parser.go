@@ -1355,18 +1355,7 @@ func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) java.Statement {
 func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("if"))
 
-	var init *java.RightPadded[java.Statement]
-	if stmt.Init != nil {
-		initStmt := ctx.mapStmt(stmt.Init)
-		semicolonOffset := ctx.findNext(';')
-		var after java.Space
-		if semicolonOffset >= 0 {
-			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
-			ctx.skip(1) // ";"
-		}
-		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
-		init = &rp
-	}
+	init := ctx.mapInitClause(stmt.Init, stmt.Cond.Pos())
 
 	cond := ctx.mapExpr(stmt.Cond)
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1417,6 +1406,31 @@ func controlParentheses(inner java.Expression) *java.ControlParentheses {
 // wrapWithInit wraps an inner if/switch in a golang.StatementWithInit when an
 // init clause is present, moving the keyword prefix onto the wrapper and
 // leaving the inner statement prefix-less. With no init it returns inner as-is.
+// mapInitClause maps the `<stmt>;` that may precede an `if` or `switch`
+// header. Go allows the statement to be empty while its `;` is written,
+// and reports no node for either half of `switch ; {`, so the `;` is
+// found by scanning up to where the header ends. A java.Empty stands in
+// for the absent statement.
+func (ctx *parseContext) mapInitClause(init ast.Stmt, headerEnd token.Pos) *java.RightPadded[java.Statement] {
+	var element java.Statement
+	if init != nil {
+		element = ctx.mapStmt(init)
+	}
+	semicolonOffset := ctx.findNextBefore(';', ctx.file.Offset(headerEnd))
+	if semicolonOffset < 0 {
+		if element == nil {
+			return nil
+		}
+		return &java.RightPadded[java.Statement]{Element: element}
+	}
+	after := ctx.prefix(ctx.file.Pos(semicolonOffset))
+	ctx.skip(1) // ";"
+	if element == nil {
+		element = &java.Empty{ID: uuid.New()}
+	}
+	return &java.RightPadded[java.Statement]{Element: element, After: after}
+}
+
 func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inner java.Statement) java.Statement {
 	if init == nil {
 		return inner
@@ -1434,18 +1448,7 @@ func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inn
 func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
-	var init *java.RightPadded[java.Statement]
-	if stmt.Init != nil {
-		initStmt := ctx.mapStmt(stmt.Init)
-		semicolonOffset := ctx.findNext(';')
-		var after java.Space
-		if semicolonOffset >= 0 {
-			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
-			ctx.skip(1) // ";"
-		}
-		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
-		init = &rp
-	}
+	init := ctx.mapInitClause(stmt.Init, stmt.Body.Lbrace)
 
 	var tag *java.RightPadded[java.Expression]
 	if stmt.Tag != nil {
@@ -1605,18 +1608,7 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClaus
 func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
-	var init *java.RightPadded[java.Statement]
-	if stmt.Init != nil {
-		initStmt := ctx.mapStmt(stmt.Init)
-		semicolonOffset := ctx.findNext(';')
-		var after java.Space
-		if semicolonOffset >= 0 {
-			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
-			ctx.skip(1)
-		}
-		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
-		init = &rp
-	}
+	init := ctx.mapInitClause(stmt.Init, stmt.Assign.Pos())
 
 	// The assign is `x.(type)` (ExprStmt) or `v := x.(type)` (AssignStmt)
 	var tag *java.RightPadded[java.Expression]
