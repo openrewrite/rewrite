@@ -2728,7 +2728,16 @@ class ScalaTreeVisitor(
       if (afterChar == ',') {
         val sepSpace = ScalaSpace.format(source.substring(afterSel, q))
         cursor = q + 1
-        selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), sepSpace, Markers.EMPTY))
+        if (idx == selectors.size - 1) {
+          // Scala 3 allows a trailing comma before the closing brace
+          val afterComma = indexOfNextNonWhitespace(cursor)
+          val tailSpace = ScalaSpace.format(source.substring(cursor, afterComma))
+          cursor = afterComma
+          selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), tailSpace,
+            Markers.EMPTY.add(TrailingComma.create(sepSpace))))
+        } else {
+          selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), sepSpace, Markers.EMPTY))
+        }
       } else if (afterChar == '}') {
         val tailSpace = ScalaSpace.format(source.substring(afterSel, q))
         cursor = q

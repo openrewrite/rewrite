@@ -436,4 +436,20 @@ class ImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingCommaInSelectors() {
+        rewriteRun(
+          scala(
+            """
+            import java.math.{
+              BigDecimal => BigDec,
+              MathContext,
+              RoundingMode => JRM,
+            }
+            class X
+            """
+          )
+        );
+    }
+
 }
