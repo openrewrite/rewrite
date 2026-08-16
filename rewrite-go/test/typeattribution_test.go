@@ -20,6 +20,7 @@ package test
 
 import (
 	"fmt"
+	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -141,6 +142,67 @@ func packageMatesOf(t *testing.T, root string, sample []string) []string {
 	return out
 }
 
+// moduleRootOf finds the directory owning `path`'s go.mod, which is what
+// an importer resolves against. A corpus root holds many repositories,
+// and sources from one cannot satisfy another's imports.
+func moduleRootOf(corpusRoot, path string) string {
+	for d := path; strings.HasPrefix(d, corpusRoot) && d != corpusRoot; d = filepath.Dir(d) {
+		if _, err := os.Stat(filepath.Join(d, "go.mod")); err == nil {
+			return d
+		}
+	}
+	// No go.mod above it: treat the repository directory as the module.
+	rel, err := filepath.Rel(corpusRoot, path)
+	if err != nil || rel == "." {
+		return corpusRoot
+	}
+	return filepath.Join(corpusRoot, strings.SplitN(rel, string(filepath.Separator), 2)[0])
+}
+
+// lockedImporter serializes a ProjectImporter, which caches the packages
+// it resolves and so cannot be shared between workers as it stands.
+type lockedImporter struct {
+	mu    sync.Mutex
+	inner *parser.ProjectImporter
+}
+
+func (l *lockedImporter) Import(path string) (*types.Package, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.inner.Import(path)
+}
+
+var (
+	importerMu    sync.Mutex
+	importerCache = map[string]*lockedImporter{}
+)
+
+// importerFor builds one importer per module and hands it out again on
+// later calls: reading a repository's sources is the expensive part, and
+// every directory in it resolves against the same set.
+func importerFor(moduleRoot string) *lockedImporter {
+	importerMu.Lock()
+	defer importerMu.Unlock()
+	if li, ok := importerCache[moduleRoot]; ok {
+		return li
+	}
+	pi := parser.NewProjectImporter(filepath.Base(moduleRoot), nil)
+	pi.SetProjectRoot(moduleRoot)
+	_ = filepath.Walk(moduleRoot, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		if b, err := os.ReadFile(p); err == nil {
+			rel, _ := filepath.Rel(moduleRoot, p)
+			pi.AddSource(rel, string(b))
+		}
+		return nil
+	})
+	li := &lockedImporter{inner: pi}
+	importerCache[moduleRoot] = li
+	return li
+}
+
 // parseGroup parses one directory as a package when GO_TYPES_PACKAGE is
 // set, and a single file otherwise.
 func parseGroup(root, path string) []*golang.CompilationUnit {
@@ -157,19 +219,7 @@ func parseGroup(root, path string) []*golang.CompilationUnit {
 		return []*golang.CompilationUnit{cu}
 	}
 
-	pi := parser.NewProjectImporter(filepath.Base(root), nil)
-	pi.SetProjectRoot(root)
-	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".go") {
-			return nil
-		}
-		if b, err := os.ReadFile(p); err == nil {
-			rel, _ := filepath.Rel(root, p)
-			pi.AddSource(rel, string(b))
-		}
-		return nil
-	})
-	gp.Importer = pi
+	gp.Importer = importerFor(moduleRootOf(root, path))
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
