@@ -246,3 +246,26 @@ func TestParseSemicolonInSelectClauseBody(t *testing.T) {
 			}
 		`))
 }
+
+// A `;` is claimed only when it is the very next token; one further off
+// terminates the enclosing statement, or sits inside the tag expression.
+
+func TestParseSemicolonAfterSwitchStatement(t *testing.T) {
+	src := "package main\n\nfunc g() {}\n\nfunc f() { switch { case true: g() }; g() }\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseSemicolonAfterSelectStatement(t *testing.T) {
+	src := "package main\n\nfunc g() {}\n\nfunc f(c chan int) { select { case <-c: g() }; g() }\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseSemicolonInsideSwitchTag(t *testing.T) {
+	src := "package main\n\nfunc g(f func()) bool { return true }\n\nfunc f() {\n\tswitch g(func() { for i := 0; i < 3; i++ {} }) {\n\tcase true:\n\t}\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseEmptyStatementOnItsOwnLine(t *testing.T) {
+	src := "package main\n\nfunc g() {}\n\nfunc f() {\n\tg()\n\t;\n\tg()\n}\n"
+	assertRoundtrip(t, src)
+}

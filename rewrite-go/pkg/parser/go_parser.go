@@ -1039,28 +1039,43 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 // the written one in the AST, so a `;` in the source is recoverable only
 // from the source text.
 func takeSemicolon[T any](ctx *parseContext, rp *java.RightPadded[T], boundary int) {
-	// The tokenizer would have inserted one at the line break, so a `;`
-	// past it terminates something else — an empty statement, or the
-	// next entry in an enclosing list.
-	if eol := ctx.endOfLine(); boundary <= 0 || eol < boundary {
-		boundary = eol
-	}
-	semiOffset := ctx.findNextBefore(';', boundary)
-	if semiOffset < 0 {
+	// Only the very next token can be this element's terminator. One
+	// further off belongs to something else — the statement enclosing
+	// the list, or an expression still to be mapped. `boundary`, where
+	// the caller knows one, is where the next element starts: a `;` at
+	// or past it is that element's.
+	off := ctx.nextTokenOffset()
+	if off < 0 || ctx.src[off] != ';' || (boundary > 0 && off >= boundary) {
 		return
 	}
-	rp.After = ctx.prefix(ctx.file.Pos(semiOffset))
+	rp.After = ctx.prefix(ctx.file.Pos(off))
 	ctx.skip(1) // ";"
 	rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
 }
 
-func (ctx *parseContext) endOfLine() int {
-	for i := ctx.cursor; i < len(ctx.src); i++ {
-		if ctx.src[i] == '\n' {
+// nextTokenOffset returns the offset of the first byte at or after the
+// cursor that is neither whitespace nor part of a comment, or -1.
+func (ctx *parseContext) nextTokenOffset() int {
+	i := ctx.cursor
+	for i < len(ctx.src) {
+		switch c := ctx.src[i]; {
+		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
+			i++
+		case c == '/' && i+1 < len(ctx.src) && ctx.src[i+1] == '/':
+			for i < len(ctx.src) && ctx.src[i] != '\n' {
+				i++
+			}
+		case c == '/' && i+1 < len(ctx.src) && ctx.src[i+1] == '*':
+			i += 2
+			for i+1 < len(ctx.src) && !(ctx.src[i] == '*' && ctx.src[i+1] == '/') {
+				i++
+			}
+			i += 2
+		default:
 			return i
 		}
 	}
-	return len(ctx.src)
+	return -1
 }
 
 // closeSpecGroup parks the space before a declaration group's `)`. The
