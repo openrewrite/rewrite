@@ -365,6 +365,7 @@ public class RpcSendQueue
             {
                 "JRightPadded" or "JLeftPadded" or "JContainer" or "JavaType" =>
                     $"org.openrewrite.java.tree.{name}",
+                "JavaSourceSet" => "org.openrewrite.java.marker.JavaSourceSet",
                 _ => $"org.openrewrite.java.tree.J${name}",
             },
             "OpenRewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",

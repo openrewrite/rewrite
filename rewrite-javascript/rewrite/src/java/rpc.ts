@@ -22,7 +22,7 @@ import {TypeVisitor} from "./type-visitor";
 import {updateIfChanged} from "../util";
 import Space = J.Space;
 
-class TypeSender extends TypeVisitor<RpcSendQueue> {
+export class TypeSender extends TypeVisitor<RpcSendQueue> {
     protected async visitPrimitive(primitive: Type.Primitive, q: RpcSendQueue): Promise<Type | undefined> {
         await q.getAndSend(primitive, p => p.keyword);
         return primitive;
@@ -138,7 +138,7 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
     }
 }
 
-class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
+export class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
     async preVisit(_type: Type, _q: RpcReceiveQueue): Promise<Type | undefined> {
         // Don't call default preVisit to avoid circular references
         return _type;
