@@ -183,3 +183,31 @@ func TestParseSemicolonEmptyTypeSwitchInit(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseSemicolonAfterImport(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "go/ast";
+
+			func f(list []ast.Expr) {
+			}
+		`))
+}
+
+func TestParseSemicolonAfterGroupedImport(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"go/ast";
+				"fmt";
+			)
+
+			func f(list []ast.Expr) {
+				fmt.Println(list)
+			}
+		`))
+}

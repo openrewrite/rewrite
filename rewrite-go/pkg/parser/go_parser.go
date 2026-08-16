@@ -259,7 +259,7 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 		if i+1 < len(file.Decls) {
 			boundary = ctx.file.Offset(file.Decls[i+1].Pos())
 		}
-		ctx.takeSemicolon(&rp, boundary)
+		takeSemicolon(ctx, &rp, boundary)
 		stmts = append(stmts, rp)
 	}
 	eof := java.EmptySpace
@@ -312,23 +312,16 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		}
 	}
 
-	for _, spec := range first.Specs {
+	for i, spec := range first.Specs {
 		is := spec.(*ast.ImportSpec)
-		imp := ctx.mapImportSpec(is)
-		elements = append(elements, java.RightPadded[*java.Import]{Element: imp})
+		rp := java.RightPadded[*java.Import]{Element: ctx.mapImportSpec(is)}
+		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, first, i))
+		elements = append(elements, rp)
 	}
 
 	if first.Lparen.IsValid() {
-		closeParen := ctx.prefix(first.Rparen)
+		elements = closeImportGroup(elements, ctx.prefix(first.Rparen))
 		ctx.skip(1) // skip ")"
-		if len(elements) > 0 {
-			elements[len(elements)-1].After = closeParen
-		} else if len(closeParen.Comments) > 0 {
-			elements = append(elements, java.RightPadded[*java.Import]{
-				Element: &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}},
-				After:   closeParen,
-			})
-		}
 	}
 
 	// Subsequent import blocks: attach ImportBlock marker to first import of each
@@ -353,18 +346,15 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		if grouped {
 			closeParen := ctx.prefix(importDecl.Rparen)
 			ctx.skip(1) // skip ")"
-			if len(importDecl.Specs) > 0 {
-				elements[len(elements)-1].After = closeParen
-			} else if len(closeParen.Comments) > 0 {
+			if len(importDecl.Specs) == 0 {
 				imp := &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}}
 				imp.Markers = java.Markers{
 					ID:      uuid.New(),
 					Entries: []java.Marker{importBlockMarker},
 				}
-				elements = append(elements, java.RightPadded[*java.Import]{
-					Element: imp,
-					After:   closeParen,
-				})
+				elements = append(elements, java.RightPadded[*java.Import]{Element: imp, After: closeParen})
+			} else {
+				elements = closeImportGroup(elements, closeParen)
 			}
 		}
 		prevGrouped = grouped
@@ -386,8 +376,40 @@ func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]java
 				Entries: []java.Marker{marker},
 			}
 		}
-		*elements = append(*elements, java.RightPadded[*java.Import]{Element: imp})
+		rp := java.RightPadded[*java.Import]{Element: imp}
+		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, decl, j))
+		*elements = append(*elements, rp)
 	}
+}
+
+// importSpecBoundary is where spec i of an import declaration ends: the
+// next spec, or the `)` of a grouped block. An ungrouped `import "x";`
+// has neither, and relies on takeSemicolon's line cap.
+func importSpecBoundary(ctx *parseContext, decl *ast.GenDecl, i int) int {
+	if i+1 < len(decl.Specs) {
+		return ctx.file.Offset(decl.Specs[i+1].Pos())
+	}
+	if decl.Rparen.IsValid() {
+		return ctx.file.Offset(decl.Rparen)
+	}
+	return 0
+}
+
+// closeImportGroup parks the space before a grouped import's `)`, on an
+// Empty-qualid Import when the last spec claimed a semicolon and its
+// After is spoken for.
+func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java.Space) []java.RightPadded[*java.Import] {
+	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
+		elements[n-1].After = closeParen
+		return elements
+	}
+	if len(elements) == 0 && len(closeParen.Comments) == 0 && closeParen.Whitespace == "" {
+		return elements
+	}
+	return append(elements, java.RightPadded[*java.Import]{
+		Element: &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}},
+		After:   closeParen,
+	})
 }
 
 // mapImportSpec maps a single import spec.
@@ -1009,7 +1031,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 // inserts semicolons at end of line and reports neither the inserted nor
 // the written one in the AST, so a `;` in the source is recoverable only
 // from the source text.
-func (ctx *parseContext) takeSemicolon(rp *java.RightPadded[java.Statement], boundary int) {
+func takeSemicolon[T any](ctx *parseContext, rp *java.RightPadded[T], boundary int) {
 	// The tokenizer would have inserted one at the line break, so a `;`
 	// past it terminates something else — an empty statement, or the
 	// next entry in an enclosing list.
@@ -1059,7 +1081,7 @@ func (ctx *parseContext) terminateSpec(stmt java.Statement, decl *ast.GenDecl, i
 	if i+1 < len(decl.Specs) {
 		boundary = ctx.file.Offset(decl.Specs[i+1].Pos())
 	}
-	ctx.takeSemicolon(&rp, boundary)
+	takeSemicolon(ctx, &rp, boundary)
 	return rp
 }
 
@@ -1070,7 +1092,7 @@ func (ctx *parseContext) terminate(stmt java.Statement, fl *ast.FieldList, i int
 	if i+1 < len(fl.List) {
 		boundary = ctx.file.Offset(fl.List[i+1].Pos())
 	}
-	ctx.takeSemicolon(&rp, boundary)
+	takeSemicolon(ctx, &rp, boundary)
 	return rp
 }
 
@@ -1091,7 +1113,7 @@ func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *java.Block {
 		if i+1 < len(block.List) {
 			boundary = ctx.file.Offset(block.List[i+1].Pos())
 		}
-		ctx.takeSemicolon(&rp, boundary)
+		takeSemicolon(ctx, &rp, boundary)
 
 		stmts = append(stmts, rp)
 	}
@@ -1526,7 +1548,7 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		if i+1 < len(clause.Body) {
 			boundary = ctx.file.Offset(clause.Body[i+1].Pos())
 		}
-		ctx.takeSemicolon(&rp, boundary)
+		takeSemicolon(ctx, &rp, boundary)
 		body = append(body, rp)
 	}
 
@@ -1587,7 +1609,7 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClaus
 		if i+1 < len(clause.Body) {
 			boundary = ctx.file.Offset(clause.Body[i+1].Pos())
 		}
-		ctx.takeSemicolon(&rp, boundary)
+		takeSemicolon(ctx, &rp, boundary)
 		body = append(body, rp)
 	}
 

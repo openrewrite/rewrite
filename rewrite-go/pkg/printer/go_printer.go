@@ -98,6 +98,9 @@ func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) 
 			}
 			p.Visit(rp.Element, out)
 			p.visitSpace(rp.After, out)
+			if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+				out.Append(";")
+			}
 		}
 		if isGrouped {
 			out.Append(")")
