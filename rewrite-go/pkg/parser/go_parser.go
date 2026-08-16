@@ -3218,11 +3218,11 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 		if c.Kind != java.LineComment {
 			break
 		}
-		name, args, ok := parseDirective(c.Text)
+		name, sep, args, ok := parseDirective(c.Text)
 		if !ok {
 			break
 		}
-		anns = append(anns, buildDirectiveAnnotation(name, args, java.Space{Whitespace: pendingPrefixWS}))
+		anns = append(anns, buildDirectiveAnnotation(name, sep, args, java.Space{Whitespace: pendingPrefixWS}))
 		pendingPrefixWS = c.Suffix
 		i++
 	}
@@ -3237,41 +3237,42 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 }
 
 // parseDirective tries to parse a `//PREFIX:NAME [ARGS]` line into
-// (name, args, ok). The full directive name returned is `PREFIX:NAME`
-// — preserved exactly as authors write it (`go:noinline`,
-// `lint:ignore`). `args` is the trimmed text after the first space (or
-// "" when absent).
+// (name, sep, args, ok). The full directive name returned is
+// `PREFIX:NAME` — preserved exactly as authors write it
+// (`go:noinline`, `lint:ignore`). `sep` is the whitespace between name
+// and args, which authors do not always write as one space.
 //
 // Recognized prefixes: `go`, `lint`. (Other vendor-specific prefixes
 // like `nolint` aren't of the form `PREFIX:NAME` and are left as
 // regular comments.)
-func parseDirective(text string) (name, args string, ok bool) {
+func parseDirective(text string) (name, sep, args string, ok bool) {
 	if !strings.HasPrefix(text, "//") {
-		return "", "", false
+		return "", "", "", false
 	}
 	inner := text[2:]
 	colonIdx := strings.Index(inner, ":")
 	if colonIdx <= 0 {
-		return "", "", false
+		return "", "", "", false
 	}
 	prefix := inner[:colonIdx]
 	if !isDirectivePrefix(prefix) {
-		return "", "", false
+		return "", "", "", false
 	}
 	rest := inner[colonIdx+1:]
 	spaceIdx := strings.IndexAny(rest, " \t")
 	if spaceIdx < 0 {
 		if rest == "" {
-			return "", "", false
+			return "", "", "", false
 		}
-		return prefix + ":" + rest, "", true
+		return prefix + ":" + rest, "", "", true
 	}
 	dirName := rest[:spaceIdx]
 	if dirName == "" {
-		return "", "", false
+		return "", "", "", false
 	}
 	dirArgs := strings.TrimLeft(rest[spaceIdx:], " \t")
-	return prefix + ":" + dirName, dirArgs, true
+	sep = rest[spaceIdx : len(rest)-len(dirArgs)]
+	return prefix + ":" + dirName, sep, dirArgs, true
 }
 
 func isDirectivePrefix(p string) bool {
@@ -3282,7 +3283,7 @@ func isDirectivePrefix(p string) bool {
 	return false
 }
 
-func buildDirectiveAnnotation(name, args string, prefix java.Space) *java.Annotation {
+func buildDirectiveAnnotation(name, sep, args string, prefix java.Space) *java.Annotation {
 	ann := &java.Annotation{
 		ID:     uuid.New(),
 		Prefix: prefix,
@@ -3293,7 +3294,7 @@ func buildDirectiveAnnotation(name, args string, prefix java.Space) *java.Annota
 	}
 	if args != "" {
 		ann.Arguments = &java.Container[java.Expression]{
-			Before: java.Space{Whitespace: " "},
+			Before: java.Space{Whitespace: sep},
 			Elements: []java.RightPadded[java.Expression]{
 				{Element: &java.Literal{
 					ID:     uuid.New(),
