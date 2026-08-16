@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
@@ -24,6 +25,38 @@ import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodTargetToStaticTest implements RewriteTest {
 
+    @Language("java")
+    private static final String A_NON_STATIC = """
+      package a;
+      public class A {
+         public void nonStatic() {}
+      }
+      """;
+
+    @Language("java")
+    private static final String B_STATIC = """
+      package b;
+      public class B {
+         public static void nonStatic() {}
+      }
+      """;
+
+    @Language("java")
+    private static final String A_VALUE = """
+      package a;
+      public class A {
+         public String value() { return "a"; }
+      }
+      """;
+
+    @Language("java")
+    private static final String B_VALUE = """
+      package b;
+      public class B {
+         public static String value() { return "b"; }
+      }
+      """;
+
     @Test
     void targetToStatic() {
         rewriteRun(
@@ -31,14 +64,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false),
             new ChangeMethodName("b.B nonStatic()", "foo", null, null)
           ),
-          java(
-            """
-              package a;
-              public class A {
-                 public void nonStatic() {}
-              }
-              """
-          ),
+          java(A_NON_STATIC),
           java(
             """
               package b;
@@ -189,22 +215,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void receiverMethodCallIsNotDropped() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public void nonStatic() {}
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static void nonStatic() {}
-              }
-              """
-          ),
+          java(A_NON_STATIC),
+          java(B_STATIC),
           java(
             """
               import a.A;
@@ -230,22 +242,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void receiverExpressionsThatCanThrowAreNotDropped() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public void nonStatic() {}
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static void nonStatic() {}
-              }
-              """
-          ),
+          java(A_NON_STATIC),
+          java(B_STATIC),
           java(
             """
               import a.A;
@@ -254,10 +252,10 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  A field = new A();
                  A[] array = new A[1];
 
-                 public void test(C other, Object o) {
+                 public void test(C other, Object value) {
                      other.field.nonStatic();
                      array[0].nonStatic();
-                     ((A) o).nonStatic();
+                     ((A) value).nonStatic();
                  }
               }
               """
@@ -269,22 +267,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void volatileFieldReceiverIsNotDropped() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public void nonStatic() {}
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static void nonStatic() {}
-              }
-              """
-          ),
+          java(A_NON_STATIC),
+          java(B_STATIC),
           java(
             """
               import a.A;
@@ -315,14 +299,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               }
               """
           ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static void nonStatic() {}
-              }
-              """
-          ),
+          java(B_STATIC),
           java(
             """
               import a.A;
@@ -367,22 +344,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void variableReceiversAreDropped() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public void nonStatic() {}
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static void nonStatic() {}
-              }
-              """
-          ),
+          java(A_NON_STATIC),
+          java(B_STATIC),
           java(
             """
               import a.A;
@@ -421,22 +384,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void qualifiedFieldReceiversAreDropped() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public void nonStatic() {}
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static void nonStatic() {}
-              }
-              """
-          ),
+          java(A_NON_STATIC),
+          java(B_STATIC),
           java(
             """
               import a.A;
@@ -490,7 +439,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               package a;
               public class A {
                  public String value() { return "a"; }
-                 public String value(String s) { return s; }
+                 public String value(String input) { return input; }
               }
               """
           ),
@@ -499,7 +448,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               package b;
               public class B {
                  public static String value() { return "b"; }
-                 public static String value(String s) { return s; }
+                 public static String value(String input) { return input; }
               }
               """
           ),
@@ -508,8 +457,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               import a.A;
 
               class C {
-                 public void test(A x, A y) {
-                     x.value(y.value());
+                 public void test(A receiver, A argument) {
+                     receiver.value(argument.value());
                  }
               }
               """,
@@ -518,7 +467,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               import b.B;
 
               class C {
-                 public void test(A x, A y) {
+                 public void test(A receiver, A argument) {
                      B.value(B.value());
                  }
               }
@@ -539,14 +488,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               }
               """
           ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static String value() { return "b"; }
-              }
-              """
-          ),
+          java(B_VALUE),
           java(
             """
               import a.A;
@@ -677,14 +619,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               }
               """
           ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static String value() { return "b"; }
-              }
-              """
-          ),
+          java(B_VALUE),
           java(
             """
               import a.A;
@@ -710,14 +645,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void thisReceiversAreReplaced() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A value()", "b.B", null, null, false)),
-          java(
-            """
-              package b;
-              public class B {
-                 public static String value() { return "b"; }
-              }
-              """
-          ),
+          java(B_VALUE),
           java(
             """
               package a;
@@ -775,22 +703,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void memberReferenceOnMethodCallIsNotChanged() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A value()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public String value() { return "a"; }
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static String value() { return "b"; }
-              }
-              """
-          ),
+          java(A_VALUE),
+          java(B_VALUE),
           java(
             """
               import a.A;
@@ -818,22 +732,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void memberReferenceOnVariableIsNotChanged() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A value()", "b.B", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public String value() { return "a"; }
-              }
-              """
-          ),
-          java(
-            """
-              package b;
-              public class B {
-                 public static String value() { return "b"; }
-              }
-              """
-          ),
+          java(A_VALUE),
+          java(B_VALUE),
           java(
             """
               import a.A;
@@ -841,8 +741,8 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               import java.util.function.Supplier;
 
               class C {
-                 public Supplier<String> test(A a) {
-                     return a::value;
+                 public Supplier<String> test(A receiver) {
+                     return receiver::value;
                  }
               }
               """
