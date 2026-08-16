@@ -165,4 +165,32 @@ class ObjectDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void endMarkerOnIndentedObject() {
+        rewriteRun(
+          scala(
+            """
+            object Conversion:
+              extension [T](x: T)
+                def underlying: T = x
+            end Conversion
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnNestedObject() {
+        rewriteRun(
+          scala(
+            """
+            object Outer:
+              object experimental:
+                val x = 1
+              end experimental
+            """
+          )
+        );
+    }
+
 }

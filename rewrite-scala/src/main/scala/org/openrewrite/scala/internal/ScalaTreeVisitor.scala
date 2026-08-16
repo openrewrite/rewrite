@@ -3643,6 +3643,8 @@ class ScalaTreeVisitor(
   }
 
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
+    // Set while extracting a braceless body, read when the declaration's markers are built
+    var moduleEndMarker: String = null
     val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
 
     val leadingAnnotations = new util.ArrayList[J.Annotation]()
@@ -3981,9 +3983,17 @@ class ScalaTreeVisitor(
         if (cursor < source.length && md.span.exists) {
           val endPos = Math.max(0, md.span.end - offsetAdjustment)
           if (isBraceless) {
-            // No closing brace for braceless syntax
+            // No closing brace for braceless syntax. Dotty's span covers a trailing `end`
+            // marker, which is not whitespace.
             if (cursor < endPos) {
-              endSpace = ScalaSpace.format(source, cursor, Math.min(endPos, source.length))
+              val bodyEnd = Math.min(endPos, source.length)
+              endMarkerAt(cursor, bodyEnd) match {
+                case Some((start, text)) =>
+                  moduleEndMarker = source.substring(cursor, start + text.length)
+                  endSpace = Space.EMPTY
+                case None =>
+                  endSpace = ScalaSpace.format(source, cursor, bodyEnd)
+              }
             }
             cursor = endPos
           } else {
@@ -4030,7 +4040,11 @@ class ScalaTreeVisitor(
     } else {
       Markers.build(Collections.singletonList(SObject.create()))
     }
-    val objectMarkers = withEndMarker(objectBaseMarkers, md.span)
+    // an `end Foo` closing an indented object can sit beyond dotty's span; try the span first,
+    // then claim by name
+    val objectMarkers = if (moduleEndMarker != null)
+      objectBaseMarkers.add(EndMarker(Tree.randomId(), moduleEndMarker))
+    else withEndMarker(objectBaseMarkers, md.span)
 
     // Update cursor to end of module def
     if (md.span.exists) {
@@ -5659,6 +5673,10 @@ class ScalaTreeVisitor(
     }
     if (derivesText != null) {
       classDeclMarkers = classDeclMarkers.add(DerivesClause(Tree.randomId(), derivesText))
+    }
+    if (endMarkerText == null) {
+      // an `end Foo` closing an indented body can sit beyond dotty's span
+      classDeclMarkers = withEndMarker(classDeclMarkers, td.span, td.name.toString)
     }
 
     new J.ClassDeclaration(
