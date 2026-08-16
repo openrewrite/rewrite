@@ -4934,7 +4934,14 @@ class ScalaTreeVisitor(
               }
               idx
             }
-            if (semiIdx >= 0) {
+            // The continuation of a comma-separated import group (`import a.*, b.*`) owns
+            // the comma ahead of it, which it reads back to for its own prefix.
+            val nextIsImportContinuation = i < block.stats.length - 1 &&
+              block.stats(i + 1).isInstanceOf[Trees.ImportOrExport[?]] &&
+              positionOfNextIn(between, ",", 0) >= 0
+            if (nextIsImportContinuation) {
+              cursor = trailStart
+            } else if (semiIdx >= 0) {
               trailingSpace = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
               rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
               cursor = trailStart + semiIdx + 1

@@ -375,6 +375,23 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void commaContinuationInsideBlock() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f: Int = {
+                import scala.util.*, scala.math.*
+                import java.util.List, java.util.Map, java.util.Set
+                1
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void commaContinuationBrace() {
         rewriteRun(
           scala(
