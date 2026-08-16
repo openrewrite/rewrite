@@ -97,7 +97,7 @@ public class DependencyManagementDependencyRequiresVersion extends Recipe {
                     Set<ResolvedGroupArtifactVersion> visited = new HashSet<>();
                     for (MavenResolutionResult ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
                         if (!visited.add(ancestor.getPom().getGav())) {
-                            // A cyclic ancestry is not a model that can be reasoned about.
+                            // The parent chain contains a cycle, so leave the dependency unchanged.
                             return true;
                         }
                         // A resolved ancestor only reflects the profiles active when it was parsed
@@ -143,9 +143,14 @@ public class DependencyManagementDependencyRequiresVersion extends Recipe {
              */
             private @Nullable String resolve(Xml.Tag tag, String childName) {
                 String value = getResolutionResult().getPom().getValue(tag.getChildValue(childName).orElse(null));
-                return value == null || value.contains("${") ? null : value;
+                return value == null || containsUnresolvedPlaceholder(value) ? null : value;
             }
         };
+    }
+
+    // A surviving `${` means Maven could not resolve the property, so the value is unusable for comparison
+    private static boolean containsUnresolvedPlaceholder(String value) {
+        return value.contains("${");
     }
 
     private static boolean importsBom(@Nullable List<ManagedDependency> dependencyManagement) {
