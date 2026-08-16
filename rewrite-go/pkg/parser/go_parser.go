@@ -1676,10 +1676,14 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 // mapEmptyStmt maps an empty statement (bare semicolons).
 func (ctx *parseContext) mapEmptyStmt(stmt *ast.EmptyStmt) *java.Empty {
 	prefix := ctx.prefix(stmt.Pos())
+	empty := &java.Empty{ID: uuid.New(), Prefix: prefix}
+	// An empty statement is a `;` on its own; the implicit kind stands
+	// for the one the tokenizer inserts at a line break and has no text.
 	if !stmt.Implicit {
-		ctx.skip(1) // explicit ";"
+		ctx.skip(1) // ";"
+		empty.Markers = java.AddMarker(empty.Markers, golang.NewSemicolon())
 	}
-	return &java.Empty{ID: uuid.New(), Prefix: prefix}
+	return empty
 }
 
 // mapForStmt maps a for statement (classic 3-clause, condition-only, or infinite).

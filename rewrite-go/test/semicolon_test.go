@@ -216,3 +216,18 @@ func TestParseImplicitSeparatorAfterIfInit(t *testing.T) {
 	src := "package main\n\nfunc g() {}\n\nfunc f() {\n\tx := true\n\tif g()\n\t(x) {\n\t}\n}\n"
 	assertRoundtrip(t, src)
 }
+
+func TestParseEmptyStatement(t *testing.T) {
+	src := "package main\n\nfunc f() {\n\t;\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseLabelledEmptyStatement(t *testing.T) {
+	src := "package main\n\nfunc f() {\nL:\n\t;\n\tgoto L\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseConsecutiveEmptyStatements(t *testing.T) {
+	src := "package main\n\nfunc f() {\n\tx := 0\n\t; ;\n\t_ = x\n}\n"
+	assertRoundtrip(t, src)
+}

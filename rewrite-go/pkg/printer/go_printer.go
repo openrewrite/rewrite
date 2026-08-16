@@ -1393,6 +1393,9 @@ func (p *GoPrinter) VisitTypeDecl(td *golang.TypeDecl, param any) java.J {
 func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(empty.Prefix, empty.Markers, out)
+	if java.FindMarker[golang.Semicolon](empty.Markers) != nil {
+		out.Append(";")
+	}
 	p.afterSyntax(empty.Markers, out)
 	return empty
 }
