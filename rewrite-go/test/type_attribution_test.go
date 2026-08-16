@@ -319,6 +319,7 @@ type assignmentWalker struct {
 	onAssignment        func(*java.Assignment)
 	onArrayType         func(*java.ArrayType)
 	onMethodDeclaration func(*java.MethodDeclaration)
+	onMethodInvocation  func(*java.MethodInvocation)
 }
 
 func (v *assignmentWalker) VisitAssignment(a *java.Assignment, p any) java.J {
@@ -376,4 +377,42 @@ func (v *assignmentWalker) VisitMethodDeclaration(m *java.MethodDeclaration, p a
 
 func forEachMethodDeclaration(cu java.Tree, f func(*java.MethodDeclaration)) {
 	visitor.Init(&assignmentWalker{onMethodDeclaration: f}).Visit(cu, nil)
+}
+
+func TestTypeAttributionCallThroughFuncValue(t *testing.T) {
+	src := "package main\n\ntype H func(a int) int\n\ntype S struct{ cb func(a int) int }\n\nfunc f(s S, h H) {\n\tfn := func(a int) int { return a }\n\t_ = fn(1)\n\t_ = s.cb(2)\n\t_ = h(3)\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	byName := map[string]*java.JavaTypeMethod{}
+	forEachMethodInvocation(cu, func(m *java.MethodInvocation) {
+		if m.Name != nil {
+			byName[m.Name.Name] = m.MethodType
+		}
+	})
+	for _, name := range []string{"fn", "cb", "h"} {
+		mt, ok := byName[name]
+		if !ok {
+			t.Fatalf("no call to %q found", name)
+		}
+		if mt == nil {
+			t.Errorf("call through %q has no method type", name)
+			continue
+		}
+		if got := len(mt.ParameterTypes); got != 1 {
+			t.Errorf("%q parameter types: got %d, want 1", name, got)
+		}
+	}
+}
+
+func (v *assignmentWalker) VisitMethodInvocation(m *java.MethodInvocation, p any) java.J {
+	if v.onMethodInvocation != nil {
+		v.onMethodInvocation(m)
+	}
+	return v.GoVisitor.VisitMethodInvocation(m, p)
+}
+
+func forEachMethodInvocation(cu java.Tree, f func(*java.MethodInvocation)) {
+	visitor.Init(&assignmentWalker{onMethodInvocation: f}).Visit(cu, nil)
 }

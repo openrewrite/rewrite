@@ -2309,21 +2309,38 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	if selExpr, ok := calleeAst.(*ast.SelectorExpr); ok {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
+			if mi.MethodType == nil {
+				// A struct field of func type is a selection on a value,
+				// not a method; its signature is the field's own type.
+				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name)
+			}
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
 			// Qualified identifier (pkg.Func) — not a selection, but Sel is in Uses
-			if fn, ok := obj.(*types.Func); ok {
-				mi.MethodType = ctx.mapper.mapMethodObject(fn)
-			}
+			mi.MethodType = ctx.calleeSignature(obj, selExpr.Sel.Name)
 		}
 	} else if ident, ok := calleeAst.(*ast.Ident); ok {
 		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
-			if fn, ok := obj.(*types.Func); ok {
-				mi.MethodType = ctx.mapper.mapMethodObject(fn)
-			}
+			mi.MethodType = ctx.calleeSignature(obj, ident.Name)
 		}
 	}
 
 	return mi
+}
+
+// calleeSignature is the signature a call goes through, whether the
+// callee is a declared function or a value of func type — a parameter, a
+// local, a struct field. A builtin has no signature to give.
+func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.JavaTypeMethod {
+	if obj == nil {
+		return nil
+	}
+	if fn, ok := obj.(*types.Func); ok {
+		return ctx.mapper.mapMethodObject(fn)
+	}
+	if sig, ok := obj.Type().Underlying().(*types.Signature); ok {
+		return ctx.mapper.mapSignature(sig, name, nil)
+	}
+	return nil
 }
 
 // isGenericInstantiation reports whether x — the operand of an *ast.IndexExpr
