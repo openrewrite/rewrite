@@ -1052,8 +1052,7 @@ func closeSpecGroup(elements []java.RightPadded[java.Statement], rparenPrefix ja
 	})
 }
 
-// terminateSpec wraps one spec of a parenthesized declaration group,
-// claiming the explicit `;` some sources write after it.
+// terminateSpec wraps spec i of a parenthesized declaration group.
 func (ctx *parseContext) terminateSpec(stmt java.Statement, decl *ast.GenDecl, i int) java.RightPadded[java.Statement] {
 	rp := java.RightPadded[java.Statement]{Element: stmt}
 	boundary := ctx.file.Offset(decl.Rparen)
@@ -1064,8 +1063,7 @@ func (ctx *parseContext) terminateSpec(stmt java.Statement, decl *ast.GenDecl, i
 	return rp
 }
 
-// terminate wraps a field-list entry, claiming the explicit `;` some
-// sources write after it.
+// terminate wraps entry i of a struct or interface field list.
 func (ctx *parseContext) terminate(stmt java.Statement, fl *ast.FieldList, i int) java.RightPadded[java.Statement] {
 	rp := java.RightPadded[java.Statement]{Element: stmt}
 	boundary := ctx.file.Offset(fl.Closing)
