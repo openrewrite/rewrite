@@ -373,6 +373,22 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedMethodWithEmptyFirstParameterList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f()(c: Int): Int = c
+                  def g()(using c: Int): Unit = {
+                    ()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void multilineParameterListWithClosingParenOnOwnLine() {
         rewriteRun(
             scala(

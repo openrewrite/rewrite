@@ -6756,14 +6756,6 @@ class ScalaTreeVisitor(
           if (closeParen >= 0) cursor = closeParen + 1
         }
 
-        // Build additional param lists as J.Lambda.Parameters for later wrapping
-        for (extraList <- valueParamLists.tail) {
-          val extraParams = extraList.collect { case vd: Trees.ValDef[?] => vd }
-          if (extraParams.nonEmpty) {
-            curriedParamLists.add(visitParamListAsLambdaParams(extraParams))
-          }
-        }
-
         JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
         buildEmptyParamList()
@@ -6778,6 +6770,17 @@ class ScalaTreeVisitor(
       // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
         Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+    }
+
+    // Visited here so the cursor stays in token order: the curried lists sit between the
+    // first list and the return type, whose `:` the scan below looks for.
+    if (valueParamLists.nonEmpty) {
+      for (extraList <- valueParamLists.tail) {
+        val extraParams = extraList.collect { case vd: Trees.ValDef[?] => vd }
+        if (extraParams.nonEmpty) {
+          curriedParamLists.add(visitParamListAsLambdaParams(extraParams))
+        }
+      }
     }
 
     // Handle return type `: ReturnType` — only if explicitly written in source
