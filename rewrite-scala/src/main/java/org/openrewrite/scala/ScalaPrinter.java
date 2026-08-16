@@ -43,6 +43,7 @@ import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TrailingComma;
+import org.openrewrite.scala.marker.ThenKeyword;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
@@ -280,7 +281,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitIf(J.If iff, PrintOutputCapture<P> p) {
         if (!iff.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
-            return super.visitIf(iff, p);
+            Optional<ThenKeyword> then = iff.getMarkers().findFirst(ThenKeyword.class);
+            if (!then.isPresent()) {
+                return super.visitIf(iff, p);
+            }
+            beforeSyntax(iff, Space.Location.IF_PREFIX, p);
+            p.append("if");
+            visit(iff.getIfCondition(), p);
+            p.append(then.get().text());
+            visit(iff.getThenPart(), p);
+            if (iff.getElsePart() != null) {
+                visit(iff.getElsePart(), p);
+            }
+            afterSyntax(iff, p);
+            return iff;
         }
         // Scala 3 paren-less form: `if cond then thenp [else elsep]`
         beforeSyntax(iff, Space.Location.IF_PREFIX, p);

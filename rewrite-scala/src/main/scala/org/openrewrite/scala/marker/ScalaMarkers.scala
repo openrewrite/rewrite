@@ -239,6 +239,15 @@ case class ConstructorModifier(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * The `then` of a Scala 3 `if (cond) then ...`, which is optional after a parenthesized
+ * condition. Holds the verbatim source from the closing `)` through the keyword.
+ */
+case class ThenKeyword(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * The keyword introducing one parent in a class declaration's parent list. Scala 3
  * accepts either `with` or `,` and the two may be mixed (`extends A, B with C`), so
  * each parent after the first carries the separator that introduces it.

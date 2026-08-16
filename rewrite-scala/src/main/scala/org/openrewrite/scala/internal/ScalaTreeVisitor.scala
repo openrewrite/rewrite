@@ -42,6 +42,7 @@ import org.openrewrite.scala.marker.EndMarker
 import org.openrewrite.scala.marker.KindParameterVariance
 import org.openrewrite.scala.marker.ParentSeparator
 import org.openrewrite.scala.marker.SObject
+import org.openrewrite.scala.marker.ThenKeyword
 import org.openrewrite.scala.marker.SelfType
 import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TrailingComma
@@ -4325,15 +4326,17 @@ class ScalaTreeVisitor(
     // For Scala 3 `if cond then ...`, advance the cursor past the `then` keyword
     // (which sits between the condition and the then-branch). The space before `then`
     // is absorbed into afterCondSpace; space after is the thenp's prefix.
-    if (ifIsParenless) {
-      val thenpStart = Math.max(0, ifTree.thenp.span.start - offsetAdjustment)
-      if (cursor < thenpStart && thenpStart <= source.length) {
-        val between = source.substring(cursor, thenpStart)
-        val thenIdx = positionOfNextIn(between, "then", 0)
-        if (thenIdx >= 0) {
-          afterCondSpace = Space.format(between.substring(0, thenIdx))
-          cursor = cursor + thenIdx + 4
-        }
+    var thenKeywordText: String = null
+    val thenpStart = Math.max(0, ifTree.thenp.span.start - offsetAdjustment)
+    if (cursor < thenpStart && thenpStart <= source.length) {
+      val between = source.substring(cursor, thenpStart)
+      val thenIdx = positionOfNextIn(between, "then", 0)
+      if (thenIdx >= 0) {
+        // A parenthesized condition may be followed by `then` as well, and there the
+        // keyword sits outside the control parentheses.
+        if (ifIsParenless) afterCondSpace = Space.format(between.substring(0, thenIdx))
+        else thenKeywordText = between.substring(0, thenIdx + 4)
+        cursor = cursor + thenIdx + 4
       }
     }
 
@@ -4386,6 +4389,8 @@ class ScalaTreeVisitor(
     
     val ifBaseMarkers = if (ifIsParenless)
       Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+    else if (thenKeywordText != null)
+      Markers.build(Collections.singletonList(ThenKeyword(Tree.randomId(), thenKeywordText)))
     else Markers.EMPTY
     val ifMarkers = withEndMarker(ifBaseMarkers, ifTree.span)
 

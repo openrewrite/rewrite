@@ -254,6 +254,24 @@ class ControlFlowTest implements RewriteTest {
     }
 
     @Test
+    void thenAfterParenthesizedCondition() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Boolean): Int = if (x) then 1 else 2
+                  def g(x: Boolean): Int =
+                    if (x) then
+                      1
+                    else
+                      2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void forLoop() {
         rewriteRun(
             scala(
