@@ -209,7 +209,9 @@ func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	if wrapped {
 		p.Visit(wrapper.Init.Element, out)
 		p.visitSpace(wrapper.Init.After, out)
-		out.Append(";")
+		if java.FindMarker[golang.Semicolon](wrapper.Init.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	// The condition is a ControlParentheses (matching J.If), but Go has no parens,
 	// so emit only its inner element. The wrapper's own spaces are empty for
@@ -605,7 +607,9 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	if wrapped {
 		p.Visit(wrapper.Init.Element, out)
 		p.visitSpace(wrapper.Init.After, out)
-		out.Append(";")
+		if java.FindMarker[golang.Semicolon](wrapper.Init.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	if sw.Tag != nil {
 		p.Visit(sw.Tag.Element, out)

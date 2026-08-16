@@ -1438,28 +1438,25 @@ func controlParentheses(inner java.Expression) *java.ControlParentheses {
 // init clause is present, moving the keyword prefix onto the wrapper and
 // leaving the inner statement prefix-less. With no init it returns inner as-is.
 // mapInitClause maps the `<stmt>;` that may precede an `if` or `switch`
-// header. Go allows the statement to be empty while its `;` is written,
-// and reports no node for either half of `switch ; {`, so the `;` is
-// found by scanning up to where the header ends. A java.Empty stands in
-// for the absent statement.
+// header. Either half may be absent — Go reports no node for either half
+// of `switch ; {`, and writes no `;` when the tokenizer's line-break one
+// separates the clause from the condition — so a java.Empty stands in
+// for the missing statement and a Semicolon marker records a written
+// separator.
 func (ctx *parseContext) mapInitClause(init ast.Stmt, headerEnd token.Pos) *java.RightPadded[java.Statement] {
 	var element java.Statement
 	if init != nil {
 		element = ctx.mapStmt(init)
 	}
-	semicolonOffset := ctx.findNextBefore(';', ctx.file.Offset(headerEnd))
-	if semicolonOffset < 0 {
-		if element == nil {
+	rp := java.RightPadded[java.Statement]{Element: element}
+	takeSemicolon(ctx, &rp, ctx.file.Offset(headerEnd))
+	if rp.Element == nil {
+		if java.FindMarker[golang.Semicolon](rp.Markers) == nil {
 			return nil
 		}
-		return &java.RightPadded[java.Statement]{Element: element}
+		rp.Element = &java.Empty{ID: uuid.New()}
 	}
-	after := ctx.prefix(ctx.file.Pos(semicolonOffset))
-	ctx.skip(1) // ";"
-	if element == nil {
-		element = &java.Empty{ID: uuid.New()}
-	}
-	return &java.RightPadded[java.Statement]{Element: element, After: after}
+	return &rp
 }
 
 func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inner java.Statement) java.Statement {

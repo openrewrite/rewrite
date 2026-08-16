@@ -211,3 +211,10 @@ func TestParseSemicolonAfterGroupedImport(t *testing.T) {
 			}
 		`))
 }
+
+// The separator between an init clause and the condition may be the one
+// Go's tokenizer inserts at the line break rather than a written `;`.
+func TestParseImplicitSeparatorAfterIfInit(t *testing.T) {
+	src := "package main\n\nfunc g() {}\n\nfunc f() {\n\tx := true\n\tif g()\n\t(x) {\n\t}\n}\n"
+	assertRoundtrip(t, src)
+}
