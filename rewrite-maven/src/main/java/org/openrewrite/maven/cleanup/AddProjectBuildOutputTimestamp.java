@@ -30,7 +30,7 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class AddProjectBuildOutputTimestamp extends Recipe {
 
-    // The ZIP format epoch starts in 1980, and this is the earliest value accepted by Maven's ZIP-producing toolchain
+    // DOS/ZIP timestamps have 2-second resolution, so this is the first representable instant after the 1980 epoch
     private static final String EARLIEST_ZIP_COMPATIBLE_TIMESTAMP = "1980-01-01T00:00:02Z";
 
     @Option(displayName = "Timestamp",
