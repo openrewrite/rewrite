@@ -36,8 +36,8 @@ fuzz:
 	GO_CORPUS=$(CORPUS) go test -tags parityaudit ./test/ -run TestFuzzTokenGaps -timeout 180m -v
 
 # Count how many of a corpus's type slots came back resolved, per node
-# field. Round-trip fidelity says nothing about attribution, so a change
-# made to stop a crash can hollow out the type graph unnoticed.
+# field. See test/testdata/printer-corpus/README.md for what to read into
+# the numbers.
 #
 #   make types CORPUS=/tmp/go-corpus
 types:

@@ -34,11 +34,7 @@ import (
 )
 
 // TestTypeAttribution counts how many of a corpus's type slots came back
-// resolved. Round-trip fidelity and Space soundness say nothing about
-// attribution, so a change made to stop a crash can quietly hollow out
-// the type graph while every other metric holds steady.
-//
-// Slots are counted per (node type, field): `java.Identifier.Type` and
+// resolved, per (node type, field): `java.Identifier.Type` and
 // `java.MethodInvocation.MethodType` are separate populations, because a
 // regression usually shows up in one of them rather than in the total.
 //
