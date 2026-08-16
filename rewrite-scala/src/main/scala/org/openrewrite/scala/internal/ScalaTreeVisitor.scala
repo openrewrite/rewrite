@@ -3666,8 +3666,9 @@ class ScalaTreeVisitor(
     var isEnumCase = false
     // When annotations were consumed, cursor sits after them; modifierText must
     // be derived from the post-annotation position, not the ModuleDef span start.
-    val modifierScanStart = if (hasAnnotations) cursor else adjustedStart
-    if (modifierScanStart >= cursor && adjustedEnd <= source.length) {
+    // A companion object's span starts back at its class, so scan from the cursor, which is
+    // already past everything consumed so far.
+    if (cursor < adjustedEnd && adjustedEnd <= source.length) {
       val sourceSnippet = source.substring(cursor, adjustedEnd)
       objectIndex = findKeyword(sourceSnippet, "object")
       val caseIndex = findKeyword(sourceSnippet, "case")

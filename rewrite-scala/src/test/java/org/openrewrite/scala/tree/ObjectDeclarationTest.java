@@ -148,4 +148,21 @@ class ObjectDeclarationTest implements RewriteTest {
             )
         );
     }
+    @Test
+    void privateCompanionObject() {
+        rewriteRun(
+          scala(
+            """
+            package p
+
+            private[p] final class B
+
+            private object B {
+              val x = 1
+            }
+            """
+          )
+        );
+    }
+
 }
