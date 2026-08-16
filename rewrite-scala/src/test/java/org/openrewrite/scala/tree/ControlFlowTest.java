@@ -254,6 +254,25 @@ class ControlFlowTest implements RewriteTest {
     }
 
     @Test
+    void doAfterParenthesizedHead() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(it: Iterator[Int]): Unit =
+                    while (it.hasNext) do
+                      println(it.next())
+                  def g(xs: List[Int]): Unit = for (x <- xs) do println(x)
+                  def h(xs: List[Int], ys: List[Int]): Unit =
+                    for (x <- xs; y <- ys) do
+                      println(x + y)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void thenAfterParenthesizedCondition() {
         rewriteRun(
             scala(

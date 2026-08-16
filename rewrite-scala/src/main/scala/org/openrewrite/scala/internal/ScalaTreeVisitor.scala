@@ -42,6 +42,7 @@ import org.openrewrite.scala.marker.EndMarker
 import org.openrewrite.scala.marker.KindParameterVariance
 import org.openrewrite.scala.marker.ParentSeparator
 import org.openrewrite.scala.marker.CasePattern
+import org.openrewrite.scala.marker.DoKeyword
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.ThenKeyword
 import org.openrewrite.scala.marker.SelfType
@@ -4517,15 +4518,15 @@ class ScalaTreeVisitor(
     }
 
     // Scala 3 `while cond do ...` — advance the cursor past the `do` keyword.
-    if (whileIsParenless) {
-      val bodyStart = Math.max(0, whileTree.body.span.start - offsetAdjustment)
-      if (cursor < bodyStart && bodyStart <= source.length) {
-        val between = source.substring(cursor, bodyStart)
-        val doIdx = positionOfNextIn(between, "do", 0)
-        if (doIdx >= 0) {
-          afterCondSpace = Space.format(between.substring(0, doIdx))
-          cursor = cursor + doIdx + 2
-        }
+    var doKeywordText: String = null
+    val whileBodyStart = Math.max(0, whileTree.body.span.start - offsetAdjustment)
+    if (cursor < whileBodyStart && whileBodyStart <= source.length) {
+      val between = source.substring(cursor, whileBodyStart)
+      val doIdx = positionOfNextIn(between, "do", 0)
+      if (doIdx >= 0) {
+        if (whileIsParenless) afterCondSpace = Space.format(between.substring(0, doIdx))
+        else doKeywordText = between.substring(0, doIdx + 2)
+        cursor = cursor + doIdx + 2
       }
     }
 
@@ -4538,6 +4539,8 @@ class ScalaTreeVisitor(
 
     val whileBaseMarkers = if (whileIsParenless)
       Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+    else if (doKeywordText != null)
+      Markers.build(Collections.singletonList(DoKeyword(Tree.randomId(), doKeywordText)))
     else Markers.EMPTY
     val whileMarkers = withEndMarker(whileBaseMarkers, whileTree.span)
 
@@ -4784,6 +4787,18 @@ class ScalaTreeVisitor(
       JRightPadded.build(iterable).withAfter(iterableAfter)
     )
 
+    // Scala 3 allows `do` after the parenthesized generator.
+    var doKeywordText: String = null
+    val forBodyStart = Math.max(0, forTree.body.span.start - offsetAdjustment)
+    if (cursor < forBodyStart && forBodyStart <= source.length) {
+      val between = source.substring(cursor, forBodyStart)
+      val doIdx = positionOfNextIn(between, "do", 0)
+      if (doIdx >= 0) {
+        doKeywordText = between.substring(0, doIdx + 2)
+        cursor = cursor + doIdx + 2
+      }
+    }
+
     // Visit the body — wrap non-Statement expressions so `for (x <- xs) x + 1` parses
     val bodyJ = visitTree(forTree.body)
     val body: Statement = bodyJ match {
@@ -4792,7 +4807,10 @@ class ScalaTreeVisitor(
       case null => throw unmappedException(forTree.body)
     }
 
-    val forMarkers = withEndMarker(Markers.EMPTY.addIfAbsent(ScalaForLoop.create()), forTree.span)
+    val forBaseMarkers = if (doKeywordText != null)
+      Markers.EMPTY.addIfAbsent(ScalaForLoop.create()).add(DoKeyword(Tree.randomId(), doKeywordText))
+    else Markers.EMPTY.addIfAbsent(ScalaForLoop.create())
+    val forMarkers = withEndMarker(forBaseMarkers, forTree.span)
     updateCursor(forTree.span.end)
 
     val forEachLoop = new J.ForEachLoop(
@@ -8610,6 +8628,7 @@ class ScalaTreeVisitor(
     }
 
     // Capture space before body / `yield` / `do`
+    var doKeywordText: String = null
     val bodyStart = Math.max(0, body.span.start - offsetAdjustment)
     val rawBetween = if (cursor < bodyStart && bodyStart <= source.length) source.substring(cursor, bodyStart) else ""
     val beforeBody: Space = if (yielding) {
@@ -8619,24 +8638,26 @@ class ScalaTreeVisitor(
         cursor = cursor + yieldIdx + "yield".length
         s
       } else Space.EMPTY
-    } else if (isParenless) {
-      // Paren-less `do` form: capture space before `do`, advance past `do`.
-      // Whitespace after `do` becomes the body's prefix.
+    } else {
+      // Capture the space before `do` and advance past it; whitespace after `do`
+      // becomes the body's prefix.
       val doIdx = positionOfNextIn(rawBetween, "do", 0)
       if (doIdx >= 0) {
-        val s = Space.format(rawBetween.substring(0, doIdx))
+        if (!isParenless) doKeywordText = rawBetween.substring(0, doIdx + "do".length)
         cursor = cursor + doIdx + "do".length
-        s
-      } else Space.EMPTY
-    } else {
-      Space.format(rawBetween)
+        if (isParenless) Space.format(rawBetween.substring(0, doIdx)) else Space.EMPTY
+      } else if (isParenless) Space.EMPTY
+      else Space.format(rawBetween)
     }
-    if (!yielding && !isParenless) cursor = bodyStart
+    if (!yielding && !isParenless && doKeywordText == null) cursor = bodyStart
 
     val bodyJ = visitTree(body)
     updateCursor(spanEnd)
 
-    S.For.build(Tree.randomId(), prefix, Markers.EMPTY, enumerators, openBracket,
+    val forMarkers = if (doKeywordText != null)
+      Markers.build(Collections.singletonList(DoKeyword(Tree.randomId(), doKeywordText)))
+    else Markers.EMPTY
+    S.For.build(Tree.randomId(), prefix, forMarkers, enumerators, openBracket,
       yielding, beforeBody, bodyJ, null)
   }
 

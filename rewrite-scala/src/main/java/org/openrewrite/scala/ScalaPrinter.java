@@ -44,6 +44,7 @@ import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TrailingComma;
 import org.openrewrite.scala.marker.CasePattern;
+import org.openrewrite.scala.marker.DoKeyword;
 import org.openrewrite.scala.marker.ThenKeyword;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
@@ -263,7 +264,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitWhileLoop(J.WhileLoop whileLoop, PrintOutputCapture<P> p) {
         if (!whileLoop.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
-            return super.visitWhileLoop(whileLoop, p);
+            Optional<DoKeyword> doKeyword = whileLoop.getMarkers().findFirst(DoKeyword.class);
+            if (!doKeyword.isPresent()) {
+                return super.visitWhileLoop(whileLoop, p);
+            }
+            beforeSyntax(whileLoop, Space.Location.WHILE_PREFIX, p);
+            p.append("while");
+            visit(whileLoop.getCondition(), p);
+            p.append(doKeyword.get().text());
+            visit(whileLoop.getBody(), p);
+            afterSyntax(whileLoop, p);
+            return whileLoop;
         }
         // Scala 3 paren-less form: `while cond do body`
         beforeSyntax(whileLoop, Space.Location.WHILE_PREFIX, p);
@@ -1251,6 +1262,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(iterable.getElement(), p);
             visitSpace(iterable.getAfter(), JRightPadded.Location.FOREACH_ITERABLE.getAfterLocation(), p);
             p.append(')');
+            forEachLoop.getMarkers().findFirst(DoKeyword.class).ifPresent(m -> p.append(m.text()));
 
             // Print the body
             visitStatement(forEachLoop.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p);
@@ -2253,10 +2265,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append(close);
         }
         visitSpace(forLoop.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p);
+        Optional<DoKeyword> doKeyword = forLoop.getMarkers().findFirst(DoKeyword.class);
         if (forLoop.isYielding()) {
             p.append("yield");
         } else if (parenless) {
             p.append("do");
+        } else if (doKeyword.isPresent()) {
+            p.append(doKeyword.get().text());
         }
         visit(forLoop.getBody(), p);
         afterSyntax(forLoop, p);
