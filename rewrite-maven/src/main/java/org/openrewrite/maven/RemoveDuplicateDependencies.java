@@ -40,6 +40,9 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveDuplicateDependencies extends Recipe {
 
+    // Maven's implicit <type> when the tag is absent
+    private static final String DEFAULT_DEPENDENCY_TYPE = "jar";
+
     String displayName = "Remove duplicate Maven dependencies";
 
     String description = "Removes duplicated dependencies in the `<dependencies>` and `<dependencyManagement>` sections of the `pom.xml`. " +
@@ -183,7 +186,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                 // An omitted field is not generally the same as one restating its default, as it can also come from
                 // `<dependencyManagement>`; `type` is defaulted anyway to keep collapsing a bare declaration onto
                 // one spelling out `<type>jar</type>`, as `removeDependencyWithDefaultType` expects.
-                fields.putIfAbsent("type", singletonList("jar"));
+                fields.putIfAbsent("type", singletonList(DEFAULT_DEPENDENCY_TYPE));
                 return fields;
             }
 
@@ -203,6 +206,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                         // Not part of the value Maven reads
                     } else if (child instanceof Xml.Tag) {
                         Xml.Tag nested = (Xml.Tag) child;
+                        // Serializes nested tags into a key that is only ever compared for equality, never parsed
                         value.append(nested.getName()).append('=').append(fieldValue(nested)).append(';');
                         plainText = false;
                     } else {
@@ -247,7 +251,7 @@ public class RemoveDuplicateDependencies extends Recipe {
 
             private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
                 String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-                String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
+                String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse(DEFAULT_DEPENDENCY_TYPE));
                 if (tag.getChildValue("scope").filter("import"::equalsIgnoreCase).isPresent()) {
                     String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(null));
                     if (artifactId == null) {
