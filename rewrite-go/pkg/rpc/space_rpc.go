@@ -227,10 +227,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Tag.Source }, nil)
 	case golang.TrailingComma:
-		// TrailingComma.rpcSend sends: id (UUID string), before whitespace, after whitespace
+		// TrailingComma.rpcSend sends: id (UUID string), before space, after space
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before.Whitespace }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before }, func(x any) { sendSpace(x.(java.Space), q) })
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After }, func(x any) { sendSpace(x.(java.Space), q) })
 	case golang.Semicolon:
 		// Semicolon.rpcSend sends: id (UUID string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.Semicolon).Ident.String() }, nil)
@@ -495,10 +495,8 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 					m.Ident = parsed
 				}
 			}
-			beforeWs := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: beforeWs}
-			afterWs := receiveScalar[string](q, m.After.Whitespace)
-			m.After = java.Space{Whitespace: afterWs}
+			m.Before = receiveValue(q, m.Before, func(e java.Space) any { return receiveSpace(e, q) })
+			m.After = receiveValue(q, m.After, func(e java.Space) any { return receiveSpace(e, q) })
 			return m
 		case golang.Semicolon:
 			idStr := receiveScalar[string](q, m.Ident.String())

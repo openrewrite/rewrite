@@ -17,8 +17,7 @@ package org.openrewrite.javascript.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.internal.rpc.JavaSpaceRpcCodec;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -36,13 +35,13 @@ public class DelegatedYield implements Marker, RpcCodec<DelegatedYield> {
     @Override
     public void rpcSend(DelegatedYield after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, DelegatedYield::getPrefix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, DelegatedYield::getPrefix, space -> JavaSpaceRpcCodec.sendSpace(space, q));
     }
 
     @Override
     public DelegatedYield rpcReceive(DelegatedYield before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withPrefix(q.receive(before.getPrefix(), space -> new JavaReceiver().visitSpace(space, q)));
+                .withPrefix(q.receive(before.getPrefix(), space -> JavaSpaceRpcCodec.receiveSpace(space, q)));
     }
 }
