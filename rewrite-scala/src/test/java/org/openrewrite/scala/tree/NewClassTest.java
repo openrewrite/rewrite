@@ -395,4 +395,18 @@ class NewClassTest implements RewriteTest {
         );
     }
 
+    @Test
+    void constructorWithThreeArgumentLists() {
+        rewriteRun(
+          scala(
+            """
+            class M[A](s: String)(f: Int => Int)(g: Int => Int)
+            object O {
+              val m = new M[Int]("x")(identity)(identity)
+            }
+            """
+          )
+        );
+    }
+
 }

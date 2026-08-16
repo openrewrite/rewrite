@@ -955,8 +955,27 @@ class ScalaTreeVisitor(
     )
   }
 
+  /** Prefix for an application whose callee is a `new` expression. Dotty's Apply span for a
+   *  curried constructor call starts at the type, leaving `new` in the gap ahead of it, where
+   *  it would be absorbed as whitespace and then printed a second time by the NewClass.
+   */
+  private def extractPrefixKeepingNew(span: Spans.Span): Space = {
+    val start = Math.max(0, span.start - offsetAdjustment)
+    if (start <= cursor || start > source.length) extractPrefix(span)
+    else {
+      val gap = source.substring(cursor, start)
+      val idx = positionOfNextIn(gap, "new", 0)
+      if (idx < 0) extractPrefix(span)
+      else {
+        val sp = ScalaSpace.format(source, cursor, cursor + idx)
+        cursor = cursor + idx
+        sp
+      }
+    }
+  }
+
   private def visitMethodInvocation(app: Trees.Apply[?]): J = {
-    val prefix = extractPrefix(app.span)
+    val prefix = extractPrefixKeepingNew(app.span)
 
     // Note: We deliberately don't create J.ArrayAccess for explicit .apply() calls.
     // In Scala, arr.apply(0) is an explicit method call and should be represented as such.
