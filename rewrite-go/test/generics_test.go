@@ -180,3 +180,26 @@ func TestParseTrailingCommaInGenericTypeReference(t *testing.T) {
 			]
 		`))
 }
+
+// Mutual recursion through method parameters names a fresh type at every
+// nesting, so nothing that keys on type identity can collapse the chain.
+func TestParseSelfInstantiatingGenericChain(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "unsafe"
+
+			type R[P any] int
+
+			func (R[P]) m1(R[R[P]]) {}
+
+			func (R[P]) m4([unsafe.Sizeof(new(R[R[P]]))]int) {}
+
+			type M[P any] int
+
+			func (R[P]) m5(M[M[P]]) {}
+
+			func (M[P]) m(R[R[P]]) {}
+		`))
+}

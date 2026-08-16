@@ -36,6 +36,9 @@ type typeMapper struct {
 	ownPkg func(pkgPath string) bool
 	// depth counts nested mapType frames. See maxTypeDepth.
 	depth int
+	// mappingOrigin holds the class for each generic type whose mapping
+	// is still on the stack, keyed by the type's uninstantiated origin.
+	mappingOrigin map[*types.Named]*java.JavaTypeClass
 }
 
 // maxTypeDepth bounds how deep type attribution follows a type into its
@@ -47,8 +50,9 @@ const maxTypeDepth = 64
 
 func newTypeMapper() *typeMapper {
 	return &typeMapper{
-		cache:      make(map[types.Type]java.JavaType),
-		namedCache: make(map[*types.Named]*java.JavaTypeClass),
+		cache:         make(map[types.Type]java.JavaType),
+		namedCache:    make(map[*types.Named]*java.JavaTypeClass),
+		mappingOrigin: make(map[*types.Named]*java.JavaTypeClass),
 	}
 }
 
@@ -199,6 +203,17 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 		return cached
 	}
 
+	// `func (R[P]) m(R[R[P]])` names a fresh *types.Named at every
+	// nesting, so pointer identity never repeats and the caches never
+	// hit. An instantiation reached while its own generic is still being
+	// mapped resolves to that one instead.
+	origin := named.Origin()
+	if origin != nil && origin != named {
+		if cls, ok := m.mappingOrigin[origin]; ok {
+			return cls
+		}
+	}
+
 	obj := named.Obj()
 	fqn := fullyQualifiedName(obj)
 
@@ -208,6 +223,12 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	}
 	// Cache early to break cycles
 	m.namedCache[named] = cls
+	if origin != nil {
+		if _, ok := m.mappingOrigin[origin]; !ok {
+			m.mappingOrigin[origin] = cls
+			defer delete(m.mappingOrigin, origin)
+		}
+	}
 	m.cache[named] = cls
 
 	// Map the underlying type to determine kind and populate members/methods
