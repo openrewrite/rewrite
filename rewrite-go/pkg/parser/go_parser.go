@@ -403,9 +403,8 @@ func importSpecBoundary(ctx *parseContext, decl *ast.GenDecl, i int) int {
 	return 0
 }
 
-// closeImportGroup parks the space before a grouped import's `)`, on an
-// Empty-qualid Import when the last spec claimed a semicolon and its
-// After is spoken for.
+// closeImportGroup parks the space before a grouped import's `)`, the
+// way closeSpecGroup does for a declaration group.
 func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java.Space) []java.RightPadded[*java.Import] {
 	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
 		elements[n-1].After = closeParen
@@ -1438,11 +1437,10 @@ func controlParentheses(inner java.Expression) *java.ControlParentheses {
 // init clause is present, moving the keyword prefix onto the wrapper and
 // leaving the inner statement prefix-less. With no init it returns inner as-is.
 // mapInitClause maps the `<stmt>;` that may precede an `if` or `switch`
-// header. Either half may be absent — Go reports no node for either half
-// of `switch ; {`, and writes no `;` when the tokenizer's line-break one
-// separates the clause from the condition — so a java.Empty stands in
-// for the missing statement and a Semicolon marker records a written
-// separator.
+// header. Either half may be absent: `switch ; {` has no statement, and
+// a line break can separate clause from condition in place of a written
+// `;`. A java.Empty stands in for the one, a Semicolon marker records
+// the other.
 func (ctx *parseContext) mapInitClause(init ast.Stmt, headerEnd token.Pos) *java.RightPadded[java.Statement] {
 	var element java.Statement
 	if init != nil {
@@ -2255,8 +2253,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	} else {
 		closePrefix := ctx.prefix(expr.Rparen)
 		ctx.skip(1) // ")"
-		// An empty list has no element whose After could hold what sits
-		// before the `)`, so an Empty carries it.
+		// No element means no After to park the closing space in.
 		if !closePrefix.IsEmpty() {
 			argElements = append(argElements, java.RightPadded[java.Expression]{
 				Element: &java.Empty{ID: uuid.New()},
@@ -2665,7 +2662,7 @@ func (ctx *parseContext) mapTypeArgsSingle(expr *ast.IndexExpr) *java.Container[
 
 // closeTypeArgs consumes a type argument list's `]`, claiming a trailing
 // comma into a marker so it does not end up in the whitespace before the
-// bracket. The last element's After takes that whitespace otherwise.
+// bracket.
 func (ctx *parseContext) closeTypeArgs(elements []java.RightPadded[java.Expression], rbrack token.Pos) java.Markers {
 	if commaOff := ctx.findNextBefore(',', ctx.file.Offset(rbrack)); commaOff >= 0 {
 		before := ctx.prefix(ctx.file.Pos(commaOff))
@@ -3201,7 +3198,6 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 			},
 		}
 	}
-	// The tag's own trailing padding sits after the last value.
 	last := annotations[len(annotations)-1].Arguments.Elements
 	last[len(last)-1].After = java.Space{Whitespace: rest}
 	vd.LeadingAnnotations = annotations

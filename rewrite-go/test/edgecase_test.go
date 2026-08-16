@@ -395,9 +395,6 @@ func TestParseBitwiseComplement(t *testing.T) {
 		`))
 }
 
-// A file written by an editor that marks the encoding starts with a
-// UTF-8 BOM, which Go's scanner ignores. It belongs to the file's
-// encoding, not its prefix, and must come back on the way out.
 func TestParseByteOrderMark(t *testing.T) {
 	src := "\ufeffpackage main\n\nfunc f() {\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
@@ -458,13 +455,11 @@ func assertRoundtrip(t *testing.T, src string) {
 	}
 }
 
-// A parenthesized call is a legal expression statement.
 func TestParseParenthesizedCallStatement(t *testing.T) {
 	src := "package main\n\nfunc h() {}\n\nfunc f() {\n\t(h())\n}\n"
 	assertRoundtrip(t, src)
 }
 
-// FieldAccess is a statement in the Java model this one mirrors.
 func TestParseFieldAccessStatement(t *testing.T) {
 	src := "package main\n\nvar x struct{ Y int }\n\nfunc f() {\n\tx.Y\n}\n"
 	assertRoundtrip(t, src)

@@ -94,8 +94,6 @@ func TestParseParenthesizedExpression(t *testing.T) {
 		`))
 }
 
-// gofmt writes no space before a type assertion's dot, so anything
-// there — including a comment — is only ever hand-written.
 func TestParseSpaceBeforeTypeAssertionDot(t *testing.T) {
 	src := "package main\n\nfunc f(e any) {\n\tx := e  .(error)\n\t_ = x\n}\n"
 	assertRoundtrip(t, src)

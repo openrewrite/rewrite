@@ -122,4 +122,3 @@ func failureClass(src string) (class string) {
 	}
 	return ""
 }
-
