@@ -31,6 +31,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
+import java.io.FilterInputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -45,6 +47,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.openrewrite.internal.StringUtils.readFully;
 
@@ -82,6 +85,13 @@ public class RewriteRpcProcess extends Thread {
 
     @Nullable
     private Thread rssSamplerThread;
+
+    @Nullable
+    private Thread byteSamplerThread;
+
+    private final AtomicLong bytesOut = new AtomicLong();
+
+    private final AtomicLong bytesIn = new AtomicLong();
 
     @Nullable
     private IOException startupFailure;
@@ -227,8 +237,18 @@ public class RewriteRpcProcess extends Thread {
         module.addSerializer(Path.class, new PathSerializer());
         module.addDeserializer(Path.class, new PathDeserializer());
         JsonMessageFormatter formatter = new JsonMessageFormatter(module);
-        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
-                process.getInputStream(), process.getOutputStream());
+
+        // Counting the framed streams is the only place a peer's real wire volume can be read.
+        // Off unless REWRITE_RPC_BYTES_MS is set, so the common path keeps the raw streams.
+        InputStream fromPeer = process.getInputStream();
+        OutputStream toPeer = process.getOutputStream();
+        if (System.getenv("REWRITE_RPC_BYTES_MS") != null) {
+            fromPeer = new CountingInputStream(fromPeer, bytesIn);
+            toPeer = new CountingOutputStream(toPeer, bytesOut);
+            startByteSampler();
+        }
+
+        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, fromPeer, toPeer);
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
@@ -239,6 +259,10 @@ public class RewriteRpcProcess extends Thread {
         if (rssSamplerThread != null) {
             rssSamplerThread.interrupt();
             rssSamplerThread = null;
+        }
+        if (byteSamplerThread != null) {
+            byteSamplerThread.interrupt();
+            byteSamplerThread = null;
         }
         if (shutdownHook != null) {
             try {
@@ -302,11 +326,8 @@ public class RewriteRpcProcess extends Thread {
         if (intervalMs <= 0) {
             return;
         }
-        long pid;
-        try {
-            // Process.pid() is Java 9+, but this module compiles at Java 8 source level.
-            pid = (long) Process.class.getMethod("pid").invoke(p);
-        } catch (Exception e) {
+        long pid = processPid(p);
+        if (pid < 0) {
             return;
         }
         Path rssCsv = dir.resolve("rpc-rss-" + pid + ".csv");
@@ -332,6 +353,119 @@ public class RewriteRpcProcess extends Thread {
         sampler.setDaemon(true);
         sampler.start();
         this.rssSamplerThread = sampler;
+    }
+
+    /**
+     * Samples cumulative wire volume in each direction, symmetric with {@link #startRssSampler()}.
+     * The framed streams are the only place a peer's real byte cost can be read; everything above
+     * them counts messages, which says nothing about how large those messages were. A final row is
+     * written once the peer exits, so a total is never lost between samples.
+     */
+    private void startByteSampler() {
+        String intervalEnv = System.getenv("REWRITE_RPC_BYTES_MS");
+        Path dir = workingDirectory;
+        Process p = process;
+        if (intervalEnv == null || dir == null || p == null) {
+            return;
+        }
+        long intervalMs;
+        try {
+            intervalMs = Long.parseLong(intervalEnv.trim());
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (intervalMs <= 0) {
+            return;
+        }
+        long pid = processPid(p);
+        if (pid < 0) {
+            return;
+        }
+        Path bytesCsv = dir.resolve("rpc-bytes-" + pid + ".csv");
+        Thread sampler = new Thread(() -> {
+            try (OutputStream out = Files.newOutputStream(bytesCsv,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                out.write("timestamp_ms,bytes_out,bytes_in\n".getBytes());
+                out.flush();
+                try {
+                    while (p.isAlive() && !Thread.currentThread().isInterrupted()) {
+                        writeByteSample(out);
+                        Thread.sleep(intervalMs);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                writeByteSample(out);
+            } catch (IOException ignored) {
+                // Best-effort profiling; never disturb the run.
+            }
+        }, "rpc-bytes-sampler");
+        sampler.setDaemon(true);
+        sampler.start();
+        this.byteSamplerThread = sampler;
+    }
+
+    private void writeByteSample(OutputStream out) throws IOException {
+        out.write((System.currentTimeMillis() + "," + bytesOut.get() + "," + bytesIn.get() + "\n").getBytes());
+        out.flush();
+    }
+
+    /** {@code Process.pid()} is Java 9+, but this module compiles at Java 8 source level. */
+    private static long processPid(Process p) {
+        try {
+            return (long) Process.class.getMethod("pid").invoke(p);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private static final class CountingInputStream extends FilterInputStream {
+        private final AtomicLong count;
+
+        CountingInputStream(InputStream in, AtomicLong count) {
+            super(in);
+            this.count = count;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = super.read();
+            if (b != -1) {
+                count.incrementAndGet();
+            }
+            return b;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int n = super.read(b, off, len);
+            if (n > 0) {
+                count.addAndGet(n);
+            }
+            return n;
+        }
+    }
+
+    private static final class CountingOutputStream extends FilterOutputStream {
+        private final AtomicLong count;
+
+        CountingOutputStream(OutputStream out, AtomicLong count) {
+            super(out);
+            this.count = count;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write(b);
+            count.incrementAndGet();
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            // FilterOutputStream's default loops a byte at a time; delegate the whole array.
+            out.write(b, off, len);
+            count.addAndGet(len);
+        }
     }
 
     /** Resident set size of {@code pid} in KiB via {@code ps} (macOS + Linux), or -1 on failure. */
