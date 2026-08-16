@@ -150,8 +150,6 @@ func (p *GoPrinter) VisitBlock(block *java.Block, param any) java.J {
 	out.Append("{")
 	for _, rp := range block.Statements {
 		p.Visit(rp.Element, out)
-		// An explicit `;` in the source is recorded as a marker on the
-		// RightPadded, with the space before it as After.
 		p.visitSpace(rp.After, out)
 		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
 			out.Append(";")

@@ -166,9 +166,8 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 
 // checkTypes populates typeInfo as far as the type checker gets. Some
 // malformed-but-parseable inputs — a type cycle routed through an alias,
-// for one — make go/types panic instead of reporting an error, and type
-// attribution is best-effort: whatever it filled in before giving up is
-// still usable, and the LST does not depend on it.
+// for one — make go/types panic rather than report an error, and the LST
+// does not depend on type information being complete.
 func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) {
 	defer func() { recover() }()
 	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
@@ -1020,12 +1019,10 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 }
 
 // takeSemicolon claims an explicit `;` written between the element just
-// mapped and `boundary`, the offset where the next one starts. Go's
-// tokenizer inserts semicolons at end of line and reports neither the
-// inserted nor the written one in the AST, so the `;` in `g(); g()` and
-// the one in `g();` alike are recoverable only from the source text.
-// The whitespace before it becomes RightPadded.After and a Semicolon
-// marker tells the printer to re-emit it.
+// mapped and `boundary`, where the next one starts. Go's tokenizer
+// inserts semicolons at end of line and reports neither the inserted nor
+// the written one in the AST, so a `;` in the source is recoverable only
+// from the source text.
 func (ctx *parseContext) takeSemicolon(rp *java.RightPadded[java.Statement], boundary int) {
 	// The tokenizer would have inserted one at the line break, so a `;`
 	// past it terminates something else — an empty statement, or the
@@ -1042,8 +1039,6 @@ func (ctx *parseContext) takeSemicolon(rp *java.RightPadded[java.Statement], bou
 	rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
 }
 
-// endOfLine returns the offset of the newline ending the cursor's line,
-// or the end of source if it is the last line.
 func (ctx *parseContext) endOfLine() int {
 	for i := ctx.cursor; i < len(ctx.src); i++ {
 		if ctx.src[i] == '\n' {
@@ -3087,8 +3082,7 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 
 	pairs := parseStructTagPairs(raw)
 	if len(pairs) == 0 {
-		// No `key:"value"` in it, but the text is still source. One
-		// annotation with no arguments holds it and prints back as-is.
+		// No `key:"value"` in it, but the text is still source.
 		vd.LeadingAnnotations = []*java.Annotation{{
 			ID:             uuid.New(),
 			Prefix:         outerPrefix,
@@ -3421,8 +3415,6 @@ func mapBinaryOp(op token.Token) java.BinaryOperator {
 	}
 }
 
-// findNext returns the byte offset of the next occurrence of ch at or
-// after the cursor, or -1.
 func (ctx *parseContext) findNext(ch byte) int {
 	return ctx.findNextBefore(ch, 0)
 }
