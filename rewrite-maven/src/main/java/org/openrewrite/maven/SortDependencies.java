@@ -212,14 +212,15 @@ public class SortDependencies extends Recipe {
             private String profileValue(Profile profile, String property, Profile inactiveProfile) {
                 return profile == inactiveProfile || remainsActive(profile) ?
                         Objects.toString(profile.getProperties().get(property), "") :
-                        "${" + property + "}";
+                        // Returning the placeholder itself keeps the property unresolved
+                        asPlaceholder(property);
             }
 
             private String pomValue(String property, ResolvedPom pom) {
                 if (pom.getRequested().getProperties().containsKey(property)) {
                     return Objects.toString(pom.getRequested().getProperties().get(property), "");
                 }
-                return requireNonNull(pom.getValue("${" + property + "}"));
+                return requireNonNull(pom.getValue(asPlaceholder(property)));
             }
 
             private boolean isEffectivelyActive(Profile profile) {
@@ -238,6 +239,10 @@ public class SortDependencies extends Recipe {
                         profile.isActive(activeProfiles);
             }
         };
+    }
+
+    private static String asPlaceholder(String property) {
+        return "${" + property + "}";
     }
 
     private static class DependencyGroup {
