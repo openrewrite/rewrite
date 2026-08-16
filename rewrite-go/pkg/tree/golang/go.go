@@ -979,6 +979,37 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
+// ExpressionStatement wraps an Expression standing in statement
+// position — `(h())`, which J.Parentheses alone cannot represent.
+type ExpressionStatement struct {
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	Expression java.Expression
+}
+
+func (*ExpressionStatement) IsTree()      {}
+func (*ExpressionStatement) IsJ()         {}
+func (*ExpressionStatement) IsStatement() {}
+
+func (n *ExpressionStatement) WithPrefix(prefix java.Space) *ExpressionStatement {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionStatement {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 type StatementExpression struct {
 	ID        uuid.UUID
 	Prefix    java.Space

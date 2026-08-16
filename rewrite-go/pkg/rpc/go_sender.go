@@ -250,6 +250,13 @@ func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 	return mt
 }
 
+func (s *GoSender) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(es, func(v any) any { return v.(*golang.ExpressionStatement).Expression },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return es
+}
+
 func (s *GoSender) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(se, func(v any) any { return v.(*golang.StatementExpression).Statement },

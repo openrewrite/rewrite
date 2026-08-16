@@ -1175,6 +1175,14 @@ func (p *GoPrinter) VisitMapType(mt *golang.MapType, param any) java.J {
 	return mt
 }
 
+func (p *GoPrinter) VisitExpressionStatement(es *golang.ExpressionStatement, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(es.Prefix, es.Markers, out)
+	p.Visit(es.Expression, out)
+	p.afterSyntax(es.Markers, out)
+	return es
+}
+
 func (p *GoPrinter) VisitStatementExpression(se *golang.StatementExpression, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(se.Prefix, se.Markers, out)

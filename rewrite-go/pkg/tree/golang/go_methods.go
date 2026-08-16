@@ -322,6 +322,18 @@ func (n *Slice) WithID(id uuid.UUID) java.J {
 func (n *Slice) GetPrefix() java.Space    { return n.Prefix }
 func (n *Slice) GetMarkers() java.Markers { return n.Markers }
 
+func (n *ExpressionStatement) GetID() uuid.UUID { return n.ID }
+func (n *ExpressionStatement) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *ExpressionStatement) GetPrefix() java.Space    { return n.Prefix }
+func (n *ExpressionStatement) GetMarkers() java.Markers { return n.Markers }
+
 func (n *StatementExpression) GetID() uuid.UUID { return n.ID }
 func (n *StatementExpression) WithID(id uuid.UUID) java.J {
 	if n.ID == id {

@@ -457,3 +457,15 @@ func assertRoundtrip(t *testing.T, src string) {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
 }
+
+// A parenthesized call is a legal expression statement.
+func TestParseParenthesizedCallStatement(t *testing.T) {
+	src := "package main\n\nfunc h() {}\n\nfunc f() {\n\t(h())\n}\n"
+	assertRoundtrip(t, src)
+}
+
+// FieldAccess is a statement in the Java model this one mirrors.
+func TestParseFieldAccessStatement(t *testing.T) {
+	src := "package main\n\nvar x struct{ Y int }\n\nfunc f() {\n\tx.Y\n}\n"
+	assertRoundtrip(t, src)
+}

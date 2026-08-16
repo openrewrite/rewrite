@@ -58,6 +58,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*golang.StatementWithInit)(nil)), "org.openrewrite.golang.tree.Go$StatementWithInit")
 	RegisterValueType(reflect.TypeOf((*golang.CommClause)(nil)), "org.openrewrite.golang.tree.Go$CommClause")
 	RegisterValueType(reflect.TypeOf((*golang.IndexList)(nil)), "org.openrewrite.golang.tree.Go$IndexList")
+	RegisterValueType(reflect.TypeOf((*golang.ExpressionStatement)(nil)), "org.openrewrite.golang.tree.Go$ExpressionStatement")
 	RegisterValueType(reflect.TypeOf((*golang.StatementExpression)(nil)), "org.openrewrite.golang.tree.Go$StatementExpression")
 
 	// J (shared Java-like) node types
@@ -184,6 +185,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.tree.Go$StatementWithInit", func() any { return &golang.StatementWithInit{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$CommClause", func() any { return &golang.CommClause{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$IndexList", func() any { return &golang.IndexList{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$ExpressionStatement", func() any { return &golang.ExpressionStatement{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$StatementExpression", func() any { return &golang.StatementExpression{ID: uuid.New()} })
 
 	RegisterFactory("org.openrewrite.java.tree.J$Identifier", func() any { return &java.Identifier{ID: uuid.New()} })

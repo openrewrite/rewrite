@@ -229,6 +229,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitSlice(n, p)
 	case *golang.MapType:
 		return v.self().VisitMapType(n, p)
+	case *golang.ExpressionStatement:
+		return v.self().VisitExpressionStatement(n, p)
 	case *golang.StatementExpression:
 		return v.self().VisitStatementExpression(n, p)
 	case *golang.PointerType:
@@ -344,6 +346,7 @@ type VisitorI interface {
 	VisitKeyValue(kv *golang.KeyValue, p any) java.J
 	VisitSlice(s *golang.Slice, p any) java.J
 	VisitMapType(mt *golang.MapType, p any) java.J
+	VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J
 	VisitStatementExpression(se *golang.StatementExpression, p any) java.J
 	VisitPointerType(pt *golang.PointerType, p any) java.J
 	VisitChannel(ch *golang.Channel, p any) java.J
@@ -1552,6 +1555,20 @@ func (v *GoVisitor) VisitMapType(mt *golang.MapType, p any) java.J {
 	c.Key.Element = keyElem
 	c.Key.After = keyAfter
 	c.Value = value
+	return &c
+}
+
+func (v *GoVisitor) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	prefix := v.self().VisitSpace(es.Prefix, p)
+	markers := v.visitMarkers(es.Markers, p)
+	expr := visitExpression(v, es.Expression, p)
+	if java.SpaceEqual(prefix, es.Prefix) && java.MarkersEqual(markers, es.Markers) && expr == es.Expression {
+		return es
+	}
+	c := *es
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Expression = expr
 	return &c
 }
 

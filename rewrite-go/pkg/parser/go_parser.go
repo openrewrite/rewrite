@@ -1374,7 +1374,10 @@ func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) java.Statement {
 	if s, ok := expr.(java.Statement); ok {
 		return s
 	}
-	return nil
+	// `(h())` and a bare selector are expressions the J model has no
+	// statement node for; the wrapper puts them in statement position.
+	prefix, expr := hoistLeftPrefix(expr)
+	return &golang.ExpressionStatement{ID: uuid.New(), Prefix: prefix, Expression: expr}
 }
 
 // mapIfStmt maps an if statement. A plain `if cond { }` maps to java.If

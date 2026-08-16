@@ -1111,6 +1111,48 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // ExpressionStatement — wraps an Expression in statement position
+    // ---------------------------------------------------------------
+
+    /**
+     * Wraps an {@link Expression} so it can appear in statement position.
+     * Go allows a parenthesized call to stand alone as a statement,
+     * {@code (h())}, which {@link J.Parentheses} alone cannot represent.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class ExpressionStatement implements Go, Statement {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression expression;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitExpressionStatement(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    // ---------------------------------------------------------------
     // StatementExpression — wraps a Statement in expression position
     // ---------------------------------------------------------------
 

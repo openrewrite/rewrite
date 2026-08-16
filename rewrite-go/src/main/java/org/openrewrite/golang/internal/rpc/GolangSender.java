@@ -129,6 +129,12 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitExpressionStatement(Go.ExpressionStatement es, RpcSendQueue q) {
+        q.getAndSend(es, Go.ExpressionStatement::getExpression, el -> visit(el, q));
+        return es;
+    }
+
+    @Override
     public J visitStatementExpression(Go.StatementExpression se, RpcSendQueue q) {
         q.getAndSend(se, Go.StatementExpression::getStatement, el -> visit(el, q));
         return se;

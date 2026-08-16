@@ -274,6 +274,14 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 	return mt
 }
 
+func (r *GoReceiver) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *es
+	es = &c
+	es.Expression = receiveValue(q, es.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	return es
+}
+
 func (r *GoReceiver) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *se
