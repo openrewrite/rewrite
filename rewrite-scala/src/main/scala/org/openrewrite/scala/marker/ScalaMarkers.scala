@@ -257,6 +257,16 @@ case class ThenKeyword(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * The `inline` of a Scala 3 `inline if`, which modifies an expression rather than a
+ * declaration and so has no modifier list to sit in. Holds the verbatim source from the
+ * keyword up to the expression's own keyword.
+ */
+case class InlineKeyword(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * The `do` of a Scala 3 `while (cond) do ...` or `for (...) do ...`, which is optional
  * after a parenthesized head. Holds the verbatim source from the closing `)` through
  * the keyword.

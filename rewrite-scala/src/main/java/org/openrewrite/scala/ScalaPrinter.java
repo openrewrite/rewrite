@@ -1132,6 +1132,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         markers.findFirst(org.openrewrite.scala.marker.UsingArguments.class)
                 .ifPresent(m -> p.append(m.text()));
         super.beforeSyntax(prefix, markers, loc, p);
+        // Scala 3 `inline if`: the keyword precedes the expression it modifies
+        markers.findFirst(org.openrewrite.scala.marker.InlineKeyword.class)
+                .ifPresent(m -> p.append(m.text()));
     }
 
     @Override

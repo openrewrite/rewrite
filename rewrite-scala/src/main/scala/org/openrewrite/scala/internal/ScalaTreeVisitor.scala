@@ -33,6 +33,7 @@ import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.InfixTypeNotation
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
+import org.openrewrite.scala.marker.InlineKeyword
 import org.openrewrite.scala.marker.OmitBraces
 import org.openrewrite.scala.marker.OmitImportBraces
 import org.openrewrite.scala.marker.PackageObject
@@ -4239,6 +4240,18 @@ class ScalaTreeVisitor(
   private def visitIf(ifTree: Trees.If[?]): J = {
     val prefix = extractPrefix(ifTree.span)
 
+    // Scala 3 `inline if`: the keyword opens the tree's span, ahead of the `if`.
+    var inlineKeywordText: String = null
+    val beforeIfLimit = Math.min(source.length, Math.max(cursor, Math.max(0, ifTree.cond.span.start - offsetAdjustment)))
+    if (cursor < beforeIfLimit) {
+      val head = source.substring(cursor, beforeIfLimit)
+      val ifIdx = positionOfNextIn(head, "if", 0)
+      if (ifIdx > 0 && positionOfNextIn(head.substring(0, ifIdx), "inline", 0) >= 0) {
+        inlineKeywordText = head.substring(0, ifIdx)
+        cursor = cursor + ifIdx
+      }
+    }
+
 
     // Find where the condition parentheses start
     val adjustedStart = Math.max(0, ifTree.span.start - offsetAdjustment)
@@ -4403,7 +4416,10 @@ class ScalaTreeVisitor(
     else if (thenKeywordText != null)
       Markers.build(Collections.singletonList(ThenKeyword(Tree.randomId(), thenKeywordText)))
     else Markers.EMPTY
-    val ifMarkers = withEndMarker(ifBaseMarkers, ifTree.span)
+    val ifInlineMarkers = if (inlineKeywordText != null)
+      ifBaseMarkers.add(InlineKeyword(Tree.randomId(), inlineKeywordText))
+    else ifBaseMarkers
+    val ifMarkers = withEndMarker(ifInlineMarkers, ifTree.span)
 
     // Update cursor to end of the if expression
     updateCursor(ifTree.span.end)

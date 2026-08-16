@@ -254,6 +254,21 @@ class ControlFlowTest implements RewriteTest {
     }
 
     @Test
+    void inlineIf() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  inline def f(inline b: Boolean): Int =
+                    inline if b then 1 else 2
+                  inline def g(inline b: Boolean): Int = inline if (b) 1 else 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void doAfterParenthesizedHead() {
         rewriteRun(
             scala(
