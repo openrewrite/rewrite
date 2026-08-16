@@ -239,6 +239,15 @@ case class ConstructorModifier(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * The `case` of a for-comprehension generator that filters by pattern,
+ * `for case (k, v) <- pairs do ...`.
+ */
+case class CasePattern(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * The `then` of a Scala 3 `if (cond) then ...`, which is optional after a parenthesized
  * condition. Holds the verbatim source from the closing `)` through the keyword.
  */

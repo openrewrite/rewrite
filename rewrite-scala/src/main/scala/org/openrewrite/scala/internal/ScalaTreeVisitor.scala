@@ -41,6 +41,7 @@ import org.openrewrite.scala.marker.DerivesClause
 import org.openrewrite.scala.marker.EndMarker
 import org.openrewrite.scala.marker.KindParameterVariance
 import org.openrewrite.scala.marker.ParentSeparator
+import org.openrewrite.scala.marker.CasePattern
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.ThenKeyword
 import org.openrewrite.scala.marker.SelfType
@@ -8340,6 +8341,7 @@ class ScalaTreeVisitor(
       case _ => (S.For.Enumerator.Kind.Guard, null, enumTree, "if")
     }
 
+    var casePattern = false
     val enumPrefix: Space = if (kind == S.For.Enumerator.Kind.Guard) {
       // Locate the `if` keyword. Everything before `if` is this enumerator's prefix.
       val rhsStart = Math.max(0, rhsTree.span.start - offsetAdjustment)
@@ -8351,7 +8353,19 @@ class ScalaTreeVisitor(
         s
       } else Space.EMPTY
     } else {
-      extractPrefix(enumTree.span)
+      // `for case (k, v) <- pairs` filters by pattern. Dotty leaves the keyword out of both
+      // the enumerator and the pattern, so consume it here; the pattern keeps the space
+      // that follows.
+      val lhsStart = Math.max(0, lhsTree.span.start - offsetAdjustment)
+      val lead = if (cursor < lhsStart && lhsStart <= source.length) source.substring(cursor, lhsStart) else ""
+      val caseIdx = positionOfNextIn(lead, "case", 0)
+      if (caseIdx >= 0) {
+        casePattern = true
+        cursor = cursor + caseIdx + 4
+        Space.format(lead.substring(0, caseIdx))
+      } else {
+        extractPrefix(enumTree.span)
+      }
     }
 
     var lhs: J = null
@@ -8418,7 +8432,10 @@ class ScalaTreeVisitor(
       } else Space.EMPTY
     }
 
-    val enumerator = new S.For.Enumerator(Tree.randomId(), enumPrefix, Markers.EMPTY,
+    val enumMarkers = if (casePattern)
+      Markers.build(Collections.singletonList(CasePattern(Tree.randomId())))
+    else Markers.EMPTY
+    val enumerator = new S.For.Enumerator(Tree.randomId(), enumPrefix, enumMarkers,
       kind, lhs, beforeOp, rhs)
     new JRightPadded(enumerator, after, rpMarkers)
   }

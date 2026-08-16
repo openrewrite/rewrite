@@ -43,6 +43,7 @@ import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TrailingComma;
+import org.openrewrite.scala.marker.CasePattern;
 import org.openrewrite.scala.marker.ThenKeyword;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
@@ -2264,6 +2265,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     public J visitForEnumerator(S.For.Enumerator enumerator, PrintOutputCapture<P> p) {
         beforeSyntax(enumerator.getPrefix(), enumerator.getMarkers(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (enumerator.getMarkers().findFirst(CasePattern.class).isPresent()) {
+            p.append("case");
+        }
         switch (enumerator.getKind()) {
             case Generator:
                 if (enumerator.getLhs() != null) visit(enumerator.getLhs(), p);

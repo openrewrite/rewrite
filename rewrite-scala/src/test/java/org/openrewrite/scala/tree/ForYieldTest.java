@@ -152,6 +152,27 @@ class ForYieldTest implements RewriteTest {
     }
 
     @Test
+    void casePatternGenerator() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(xs: List[(Int, Int)]): List[Int] =
+                  for case (a, b) <- xs yield a
+                def g(xs: List[Any]): Unit =
+                  for case s: String <- xs do println(s)
+                def h(xs: List[Any]): Unit = {
+                  for {
+                    case s: String <- xs
+                  } println(s)
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void namedGivenBinding() {
         rewriteRun(
           scala(
