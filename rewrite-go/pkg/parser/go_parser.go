@@ -3142,9 +3142,12 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: quote})
 	}
 
-	pairs := parseStructTagPairs(raw)
-	if len(pairs) == 0 {
-		// No `key:"value"` in it, but the text is still source.
+	// Anything the scan could not read as a pair is source all the same;
+	// only whitespace has a slot on the last value, so a tag with other
+	// leftovers is kept whole instead of decomposed.
+	pairs, rest := parseStructTagPairs(raw)
+	if len(pairs) == 0 || strings.TrimSpace(rest) != "" {
+		// The text is still source even when no pair reads out of it.
 		vd.LeadingAnnotations = []*java.Annotation{{
 			ID:             uuid.New(),
 			Prefix:         outerPrefix,
@@ -3181,6 +3184,9 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 			},
 		}
 	}
+	// The tag's own trailing padding sits after the last value.
+	last := annotations[len(annotations)-1].Arguments.Elements
+	last[len(last)-1].After = java.Space{Whitespace: rest}
 	vd.LeadingAnnotations = annotations
 }
 
@@ -3310,7 +3316,7 @@ type structTagPair struct {
 // Returns whatever pairs it parsed up to the first malformed section;
 // gofmt'd input is always well-formed but defensive scanning matches
 // stdlib behavior.
-func parseStructTagPairs(tag string) []structTagPair {
+func parseStructTagPairs(tag string) ([]structTagPair, string) {
 	var pairs []structTagPair
 	i := 0
 	for i < len(tag) {
@@ -3321,7 +3327,7 @@ func parseStructTagPairs(tag string) []structTagPair {
 		}
 		prefixWS := tag[prefStart:i]
 		if i == len(tag) {
-			break
+			return pairs, prefixWS
 		}
 		// Read key.
 		keyStart := i
@@ -3329,7 +3335,7 @@ func parseStructTagPairs(tag string) []structTagPair {
 			i++
 		}
 		if i == keyStart || i+1 >= len(tag) || tag[i] != ':' || tag[i+1] != '"' {
-			break
+			return pairs, tag[prefStart:]
 		}
 		key := tag[keyStart:i]
 		i++ // skip `:`
@@ -3343,13 +3349,13 @@ func parseStructTagPairs(tag string) []structTagPair {
 			i++
 		}
 		if i >= len(tag) {
-			break
+			return pairs, tag[prefStart:]
 		}
 		i++ // skip closing `"`
 		quotedValue := tag[valueStart:i]
 		unquoted, err := strconv.Unquote(quotedValue)
 		if err != nil {
-			break
+			return pairs, tag[prefStart:]
 		}
 		pairs = append(pairs, structTagPair{
 			PrefixWS:      prefixWS,
@@ -3358,7 +3364,7 @@ func parseStructTagPairs(tag string) []structTagPair {
 			UnquotedValue: unquoted,
 		})
 	}
-	return pairs
+	return pairs, ""
 }
 
 // mapFieldListAsInterfaceBody maps an interface's method list to a Block.

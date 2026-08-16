@@ -240,3 +240,26 @@ func TestStructTag_InterpretedStringWithControlEscapeRoundtrip(t *testing.T) {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
 }
+
+func TestStructTag_TrailingPaddingRoundtrip(t *testing.T) {
+	src := "package main\n\ntype X struct {\n\tField int `json:\"a\" `\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+func TestStructTag_TrailingGarbageRoundtrip(t *testing.T) {
+	// Nothing after the pair parses as another one; it is still source.
+	src := "package main\n\ntype X struct {\n\tField int `json:\"a\" zzz`\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
