@@ -148,7 +148,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append(m.getKeyword());
         }
         visit(typeParam.getName(), p);
-        typeParam.getMarkers().findFirst(org.openrewrite.scala.marker.ContextBoundSuffix.class)
+        typeParam.getMarkers().findFirst(org.openrewrite.scala.marker.TypeParameterBounds.class)
                 .ifPresent(m -> p.append(m.text()));
 
         // Print bounds if present using Scala syntax.

@@ -57,7 +57,7 @@ import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
 import org.openrewrite.scala.marker.ContextFunctionArrow
 import org.openrewrite.scala.marker.CaptureSet
-import org.openrewrite.scala.marker.ContextBoundSuffix
+import org.openrewrite.scala.marker.TypeParameterBounds
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
 import org.openrewrite.scala.marker.RightAssociative
@@ -9668,13 +9668,17 @@ class ScalaTreeVisitor(
     case _ => null
   }
   
-  /** Consumes `: Bound` clauses sitting at the cursor inside a type-parameter list, returning
-   *  their verbatim source. Stops at the `,` or `]` that closes the parameter.
+  /** Consumes bound clauses sitting at the cursor inside a type-parameter list — `: Bound`,
+   *  `<: Bound` or `>: Bound` — returning their verbatim source. Stops at the `,` or `]` that
+   *  closes the parameter.
    */
-  private def consumeStrayContextBounds(): String = {
+  private def consumeStrayBounds(): String = {
     var i = cursor
     while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
-    if (i >= source.length || source.charAt(i) != ':') null
+    val opensBound = i < source.length && (source.charAt(i) == ':' ||
+      ((source.charAt(i) == '<' || source.charAt(i) == '>') &&
+        i + 1 < source.length && source.charAt(i + 1) == ':'))
+    if (!opensBound) null
     else {
       var depth = 0
       var end = i
@@ -9846,10 +9850,10 @@ class ScalaTreeVisitor(
     // - TypeBoundsTree: upper/lower bounds like `<: Comparable` or `>: Null`
     // - untpd.ContextBounds: context bounds like `: ClassTag` (wraps TypeBoundsTree + cxBounds list)
     // Each bound is wrapped in J.TypeBound to carry its Kind (Upper/Lower).
-    // Dotty does not record a context bound on a higher-kinded parameter's rhs, so `F[_]: Monad`
-    // leaves the bound unclaimed in source.
-    val strayContextBounds: String = tparam.rhs match {
-      case _: untpd.LambdaTypeTree => consumeStrayContextBounds()
+    // Dotty records bounds on a higher-kinded parameter's rhs as the kind itself, so the bounds
+    // written in source, `F[_]: Monad` or `It[a] <: Iterable[a]`, are left unclaimed.
+    val strayBounds: String = tparam.rhs match {
+      case _: untpd.LambdaTypeTree => consumeStrayBounds()
       case _ => null
     }
 
@@ -9951,8 +9955,8 @@ class ScalaTreeVisitor(
       name,
       bounds
     ).withMarkers(
-      if (strayContextBounds == null) Markers.EMPTY
-      else Markers.EMPTY.add(ContextBoundSuffix(Tree.randomId(), strayContextBounds)))
+      if (strayBounds == null) Markers.EMPTY
+      else Markers.EMPTY.add(TypeParameterBounds(Tree.randomId(), strayBounds)))
   }
 
   /**

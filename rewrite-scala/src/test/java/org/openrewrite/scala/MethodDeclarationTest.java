@@ -1199,4 +1199,18 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upperBoundOnHigherKindedTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def f[It[a] <: Iterable[a], A](x: A): A = x
+              def g[It1[a] <: Iterable[a], El2, It2[a] <: Iterable[a]](x: El2): El2 = x
+            }
+            """
+          )
+        );
+    }
+
 }
