@@ -631,7 +631,13 @@ class ScalaTreeVisitor(
     // Create the annotation type: an Ident for a simple name (@deprecated) or a
     // Select chain for a qualified name (@scala.annotation.implicitNotFound).
     val annotTypeTree: NameTree = tpt match {
-      case id: Trees.Ident[?] => ident(id.name.toString, quoted = isBacktickQuoted(id.span))
+      case id: Trees.Ident[?] =>
+        // `T @ unchecked`: the space between `@` and the name belongs to the name
+        val nameStart = Math.max(0, id.span.start - offsetAdjustment)
+        val atIdx = if (nameStart <= source.length) source.lastIndexOf('@', nameStart) else -1
+        val afterAt = if (atIdx >= 0 && atIdx + 1 < nameStart) Space.format(source.substring(atIdx + 1, nameStart))
+          else Space.EMPTY
+        ident(id.name.toString, afterAt, quoted = isBacktickQuoted(id.span))
       case sel: Trees.Select[?] =>
         // Qualified name: skip the leading '@', then map the Select chain to a J.FieldAccess.
         val selStart = Math.max(0, sel.span.start - offsetAdjustment)
@@ -3552,6 +3558,9 @@ class ScalaTreeVisitor(
     }
     if (isGiven) {
       markerList.add(org.openrewrite.scala.marker.Given(Tree.randomId()))
+    }
+    if (valVarKeyword == "var") {
+      markerList.add(org.openrewrite.scala.marker.VarKeyword(Tree.randomId()))
     }
     val variableMarkers = {
       val base = if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)

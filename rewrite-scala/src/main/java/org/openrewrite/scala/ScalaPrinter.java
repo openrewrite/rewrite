@@ -1349,6 +1349,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
         }
 
+        // An explicit `final` does not decide the keyword: `final var` is legal
+        if (multiVariable.getMarkers().findFirst(org.openrewrite.scala.marker.VarKeyword.class).isPresent()) {
+            valVarKeyword = "var";
+        }
+
         // Print val/var/given (unless it's a lambda parameter)
         if (!isLambdaParam) {
             if (valVarPrefix != null) {

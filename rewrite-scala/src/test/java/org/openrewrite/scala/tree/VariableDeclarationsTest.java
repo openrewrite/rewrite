@@ -282,4 +282,17 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void finalVar() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              private final var isBlocked: Boolean = false
+            }
+            """
+          )
+        );
+    }
+
 }

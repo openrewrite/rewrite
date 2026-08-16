@@ -88,6 +88,15 @@ case class Curried(id: UUID) extends Marker {
  * Carries the source text between the last annotation/modifier and the
  * `val`/`var`/`given` keyword for Scala variable declarations.
  */
+/**
+ * Marks a `J.VariableDeclarations` written with `var`. A `val` is implicitly final, but an
+ * explicit `final` says nothing about which keyword the source used, and `final var` is legal.
+ */
+case class VarKeyword(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
 case class ValVarKeyword(id: UUID, beforeKeyword: String) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]

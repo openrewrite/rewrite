@@ -126,4 +126,20 @@ class AnnotatedExprTest implements RewriteTest {
         );
     }
 
+    @Test
+    void spaceBetweenAtAndAnnotationName() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Any): Int = x match {
+                case tree: String @ unchecked => 1
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
 }
