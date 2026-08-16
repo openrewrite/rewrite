@@ -595,6 +595,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     boolean omit = bodyBlock.getMarkers().findFirst(
                             org.openrewrite.scala.marker.OmitBraces.class).isPresent();
                     if (omit && bodyBlock.getStatements().size() == 1) {
+                        visitSpace(bodyBlock.getPrefix(), Space.Location.BLOCK_PREFIX, p);
                         visit(bodyBlock.getStatements().get(0), p);
                     } else {
                         visit(actualBody, p);

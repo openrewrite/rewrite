@@ -826,6 +826,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedAuxiliaryConstructor() {
+        rewriteRun(
+          scala(
+            """
+              class A(a: Int) {
+                def this()(implicit o: Ordering[Int]) = this(0)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void auxiliaryConstructorWithBlockBody() {
         rewriteRun(
           scala(
