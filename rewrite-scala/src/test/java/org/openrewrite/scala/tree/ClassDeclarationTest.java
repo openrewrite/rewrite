@@ -455,6 +455,14 @@ class ClassDeclarationTest implements RewriteTest {
                 """
             )
         );
+        // parseModifierKeywords — modifier keyword in block comment between modifiers
+        rewriteRun(
+            scala(
+                """
+                private /*final*/ case class SomePrintedTree(phase: String)
+                """
+            )
+        );
     }
 
     @Test

@@ -9655,19 +9655,8 @@ class ScalaTreeVisitor(
     i
   }
   
-  /** Find a keyword in text, ensuring it's a whole word (not part of an identifier). */
-  private def findKeyword(text: String, keyword: String): Int = {
-    var pos = 0
-    while (pos < text.length) {
-      val idx = text.indexOf(keyword, pos)
-      if (idx < 0) return -1
-      val before = idx == 0 || !Character.isLetterOrDigit(text.charAt(idx - 1))
-      val after = idx + keyword.length >= text.length || !Character.isLetterOrDigit(text.charAt(idx + keyword.length))
-      if (before && after) return idx
-      pos = idx + 1
-    }
-    -1
-  }
+  /** Find a keyword in text, as a whole word and outside of comments. */
+  private def findKeyword(text: String, keyword: String): Int = positionOfNextIn(text, keyword, 0)
 
   /**
    * Parse modifier keywords out of a raw text window — the source text between the
