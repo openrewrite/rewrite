@@ -124,9 +124,10 @@ export interface Checksum {
 
 export interface FileAttributes {
     kind: typeof TreeKind.FileAttributes
-    readonly creationDate?: Date
-    readonly lastModifiedTime?: Date
-    readonly lastAccessTime?: Date
+    // ISO-8601, as sent by org.openrewrite.FileAttributes#rpcSend
+    readonly creationDate?: string
+    readonly lastModifiedTime?: string
+    readonly lastAccessTime?: string
     readonly isReadable: boolean
     readonly isWritable: boolean
     readonly isExecutable: boolean

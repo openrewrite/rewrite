@@ -19,7 +19,7 @@ namespace OpenRewrite.Core;
 
 /// <summary>
 /// Represents file attributes. Mirrors org.openrewrite.FileAttributes.
-/// Time fields are stored as opaque objects to round-trip Java's ZonedDateTime.
+/// Time fields are stored as opaque objects to round-trip the ISO-8601 strings Java sends.
 /// </summary>
 public sealed class FileAttributes(
     object? creationTime,
