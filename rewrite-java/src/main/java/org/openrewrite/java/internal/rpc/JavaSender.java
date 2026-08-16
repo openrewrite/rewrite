@@ -635,11 +635,15 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
                         TextComment tc = (TextComment) c;
                         q.getAndSend(tc, TextComment::isMultiline);
                         q.getAndSend(tc, TextComment::getText);
+                        q.getAndSend(c, Comment::getSuffix);
+                        q.getAndSend(c, Comment::getMarkers);
+                    } else if (c instanceof Javadoc.DocComment) {
+                        // A doc comment is a tree, so it is decomposed rather than inlined; its own
+                        // suffix and markers travel as part of that tree, not as Comment fields.
+                        new JavadocSender(this).visit((Javadoc.DocComment) c, q);
                     } else {
                         throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                     }
-                    q.getAndSend(c, Comment::getSuffix);
-                    q.getAndSend(c, Comment::getMarkers);
                 });
         q.getAndSend(space, Space::getWhitespace);
     }

@@ -617,6 +617,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                                 .withText(q.receive(((TextComment) c).getText()))
                                 .withSuffix(q.receive(c.getSuffix()))
                                 .withMarkers(q.receive(c.getMarkers()));
+                    } else if (c instanceof Javadoc.DocComment) {
+                        return (Comment) new JavadocReceiver(this).visit((Javadoc.DocComment) c, q);
                     }
                     return c;
                 }))
