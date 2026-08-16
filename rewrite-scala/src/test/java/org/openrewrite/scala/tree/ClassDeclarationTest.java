@@ -855,4 +855,17 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedHigherKindedTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                trait Q[F[_[_], _]] {
+                  def f(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
 }

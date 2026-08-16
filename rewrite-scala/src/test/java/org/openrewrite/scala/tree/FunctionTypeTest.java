@@ -173,4 +173,18 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void pureFunctionArrow() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            object O {
+              def f(g: Int -> Long): Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }

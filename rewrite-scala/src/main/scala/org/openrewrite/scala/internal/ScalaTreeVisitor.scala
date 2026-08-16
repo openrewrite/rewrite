@@ -36,6 +36,7 @@ import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
 import org.openrewrite.scala.marker.OmitImportBraces
 import org.openrewrite.scala.marker.PackageObject
+import org.openrewrite.scala.marker.PureFunctionArrow
 import org.openrewrite.scala.marker.DerivesClause
 import org.openrewrite.scala.marker.EndMarker
 import org.openrewrite.scala.marker.KindParameterVariance
@@ -8840,7 +8841,12 @@ class ScalaTreeVisitor(
 
     // Find the arrow within the function-type source. A parenthesized parameter list can
     // hold an arrow of its own (`(A => Unit) => B`), so the type's arrow follows the list.
-    val relArrowIdx = positionOfNextIn(funcSource, "=>", closeOfLeadingParen(funcSource))
+    val arrowSearchFrom = closeOfLeadingParen(funcSource)
+    val fatArrowIdx = positionOfNextIn(funcSource, "=>", arrowSearchFrom)
+    // capture checking writes a pure function as `A -> B`
+    val pureArrowIdx = positionOfNextIn(funcSource, "->", arrowSearchFrom)
+    val isPureArrow = pureArrowIdx >= 0 && (fatArrowIdx < 0 || pureArrowIdx < fatArrowIdx)
+    val relArrowIdx = if (isPureArrow) pureArrowIdx else fatArrowIdx
     val arrowAbs = if (relArrowIdx >= 0) funcStart + relArrowIdx else funcEnd
 
     // Detect whether the parameter list is parenthesized. A single unnamed param like
@@ -8927,7 +8933,9 @@ class ScalaTreeVisitor(
 
     if (funcEnd > cursor) cursor = funcEnd
 
-    val funcMarkers = if (isContextArrow)
+    val funcMarkers = if (isPureArrow)
+      Markers.build(Collections.singletonList(PureFunctionArrow(Tree.randomId())))
+    else if (isContextArrow)
       Markers.build(Collections.singletonList(new ContextFunctionArrow(java.util.UUID.randomUUID())))
     else Markers.EMPTY
 
@@ -9886,7 +9894,10 @@ class ScalaTreeVisitor(
                                     baseNameStart: Int, prefix: Space): J.ParameterizedType = {
     val varianceLen = if (baseNameStart < source.length &&
       (source.charAt(baseNameStart) == '+' || source.charAt(baseNameStart) == '-')) 1 else 0
-    val nameLen = td.name.toString.length + varianceLen
+    // a wildcard kind parameter is one character in source, whatever dotty named it
+    val rawName = td.name.toString
+    val sourceNameLen = if (rawName == "_" || rawName.startsWith("_$")) 1 else rawName.length
+    val nameLen = sourceNameLen + varianceLen
     val bracketPos = baseNameStart + nameLen
     val clazzName = source.substring(baseNameStart, Math.min(source.length, bracketPos))
     val clazz: NameTree = ident(clazzName, Space.EMPTY)

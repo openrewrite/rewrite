@@ -169,6 +169,14 @@ case class UsingArguments(id: UUID, text: String) extends Marker {
 }
 
 /**
+ * A function type written with the capture-checking pure arrow, `A -> B`, rather than `=>`.
+ */
+case class PureFunctionArrow(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * A self-type clause opening a template body, as in `trait T { self => ... }` or
  * `trait T:\n  this: U =>`. Holds the verbatim source from the body delimiter through
  * the `=>`. Dotty keeps the clause out of the body, so there is no statement to map it to.

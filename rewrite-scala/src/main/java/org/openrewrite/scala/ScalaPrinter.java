@@ -2084,6 +2084,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visitSpace(rt.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
         if (functionType.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
             p.append("?=>");
+        } else if (functionType.getMarkers()
+                .findFirst(org.openrewrite.scala.marker.PureFunctionArrow.class).isPresent()) {
+            p.append("->");
         } else {
             p.append("=>");
         }
