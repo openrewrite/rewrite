@@ -1228,4 +1228,33 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void noSpaceBeforeBodyEquals() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def desc(sym: Int)= {
+                1
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void inlineExtensionParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              extension (inline x: String)
+                inline def foo: Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }

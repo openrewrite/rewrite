@@ -6820,6 +6820,7 @@ class ScalaTreeVisitor(
 
     // Handle method body
     var beforeEqualsSpace: Space = Space.EMPTY
+    var sawEquals = false
     val body: J.Block = dd.rhs match {
       case rhs if isProcedureSyntax && rhs.span.isSynthetic =>
         // Procedure syntax: Scala 3 parser replaces body with `_root_.scala.Predef.???`.
@@ -6834,6 +6835,7 @@ class ScalaTreeVisitor(
           if (equalsIdx >= 0) {
             beforeEquals = Space.format(beforeBody.substring(0, equalsIdx))
             cursor = cursor + equalsIdx + 1
+            sawEquals = true
           }
         }
         beforeEqualsSpace = beforeEquals
@@ -6913,7 +6915,9 @@ class ScalaTreeVisitor(
     if (isCurried) {
       markerList.add(new Curried(Tree.randomId()))
     }
-    if (beforeEqualsSpace != Space.EMPTY) {
+    // Record the run before `=` even when empty, so the printer does not fall back to the
+    // body's prefix and print it on both sides of the `=`.
+    if (sawEquals) {
       markerList.add(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.create(beforeEqualsSpace))
     }
     if (endMarkerText != null) {
@@ -8177,7 +8181,12 @@ class ScalaTreeVisitor(
       var i = 0
       while (i < firstClause.size) {
         val pTree = firstClause.get(i)
-        val pJ = visitTree(pTree)
+        // Parameter position: a ValDef here can carry `inline`, whose keyword the general
+        // definition path would mistake for part of the name.
+        val pJ = pTree match {
+          case vd: Trees.ValDef[?] => visitMethodParameter(vd)
+          case other => visitTree(other)
+        }
         val pStmt: Statement = pJ match {
           case s: Statement => s
           case _ => throw new UnsupportedOperationException(
