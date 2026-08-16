@@ -263,3 +263,14 @@ func TestStructTag_TrailingGarbageRoundtrip(t *testing.T) {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
 }
+
+func TestStructTag_RawStringKeepsCarriageReturn(t *testing.T) {
+	src := "package main\n\ntype X struct {\n\tA int `json:\"a\"\r`\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}

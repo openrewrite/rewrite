@@ -3160,19 +3160,23 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 //     gofmt'd input is exact.
 func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.BasicLit) {
 	outerPrefix := ctx.prefix(tag.Pos())
-	ctx.skip(len(tag.Value))
+	// A raw string's carriage returns are absent from tag.Value, so the
+	// literal is read from the source range instead: the cursor has to
+	// clear every byte, and the tag has to print back as written.
+	src := string(ctx.src[ctx.file.Offset(tag.Pos()):ctx.file.Offset(tag.End())])
+	ctx.skip(len(src))
 
-	// tag.Value includes the delimiters. Unquoting an interpreted string
-	// resolves its escapes, so `"json:\"a\""` yields the same pairs as
-	// the raw-string spelling.
-	raw, err := strconv.Unquote(tag.Value)
-	if err != nil {
-		raw = tag.Value
-	}
-	quote := "`"
-	if len(tag.Value) > 0 && tag.Value[0] == '"' {
-		quote = `"`
-		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: quote})
+	// A raw string carries its content verbatim; an interpreted one needs
+	// its escapes resolved so `"json:\"a\""` yields the same pairs as
+	// the raw spelling.
+	raw := src
+	if len(raw) >= 2 && raw[0] == '`' {
+		raw = raw[1 : len(raw)-1]
+	} else {
+		if unquoted, err := strconv.Unquote(raw); err == nil {
+			raw = unquoted
+		}
+		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: `"`})
 	}
 
 	// Anything the scan could not read as a pair is source all the same;
