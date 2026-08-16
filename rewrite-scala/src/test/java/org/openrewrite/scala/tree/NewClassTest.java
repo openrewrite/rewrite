@@ -423,6 +423,9 @@ class NewClassTest implements RewriteTest {
               }
               val c = new Object():
                 override def toString: String = "c"
+              val d = new Object {
+                def f(i: Int): Int = i
+              }
             }
             """
           )
