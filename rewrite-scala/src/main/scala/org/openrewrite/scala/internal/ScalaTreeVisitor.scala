@@ -8041,17 +8041,11 @@ class ScalaTreeVisitor(
     val captureText = consumeCaptureSet()
     if (captureText != null) {
       updateCursor(ann.span.end)
-      // The wrapped type carries the space ahead of it. Callers that position the cursor
-      // at the type leave the extracted prefix empty, so recover it from the source.
-      val typePrefix = if (prefix != Space.EMPTY) prefix else {
-        val start = Math.max(0, ann.span.start - offsetAdjustment)
-        var b = start
-        while (b > 0 && (source.charAt(b - 1) == ' ' || source.charAt(b - 1) == '\t')) b -= 1
-        if (b < start) Space.format(source.substring(b, start)) else Space.EMPTY
-      }
       return arg match {
         case tt: TypeTree =>
-          val prefixed: TypeTree = tt.withPrefix[TypeTree](typePrefix)
+          // The wrapped type carries the space ahead of it, which an enclosing type such as
+          // the `|` of `T^{this} | Null` has already claimed when the prefix comes back empty.
+          val prefixed: TypeTree = tt.withPrefix[TypeTree](prefix)
           prefixed.withMarkers[TypeTree](
             prefixed.getMarkers.add(CaptureSet(Tree.randomId(), captureText))).asInstanceOf[J]
         case other => other

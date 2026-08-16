@@ -127,6 +127,22 @@ class AnnotatedExprTest implements RewriteTest {
     }
 
     @Test
+    void captureSetSuffixInsideEnclosingType() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            class C {
+              var it: Iterator[Int]^{this} | Null = null
+              def go(f: Iterable[Int]^{this} => Int): Int = 1
+              def trySplit(): Iterator[Int]^{this} | Null = null
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void spaceBetweenAtAndAnnotationName() {
         rewriteRun(
           scala(
