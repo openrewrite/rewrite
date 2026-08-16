@@ -833,16 +833,31 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 			}
 		}
 
-		closePrefix := ctx.prefix(results.Closing)
-		ctx.skip(1) // ")"
-
-		if len(elements) > 0 {
-			elements[len(elements)-1].After = closePrefix
+		var markers java.Markers
+		if trailingCommaOff := ctx.findNextPositionOf(',', int(results.Closing)-ctx.file.Base()); len(elements) > 0 && trailingCommaOff >= 0 {
+			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
+			ctx.skip(1) // ","
+			commaAfter := ctx.prefix(results.Closing)
+			ctx.skip(1) // ")"
+			markers = java.Markers{
+				ID: uuid.New(),
+				Entries: []java.Marker{golang.TrailingComma{
+					Ident:  uuid.New(),
+					Before: commaBefore,
+					After:  commaAfter,
+				}},
+			}
+		} else {
+			closePrefix := ctx.prefix(results.Closing)
+			ctx.skip(1) // ")"
+			if len(elements) > 0 {
+				elements[len(elements)-1].After = closePrefix
+			}
 		}
 
 		return &golang.TypeList{
 			ID:    uuid.New(),
-			Types: java.Container[java.Statement]{Before: before, Elements: elements},
+			Types: java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers},
 		}
 	}
 

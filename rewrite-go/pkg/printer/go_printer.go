@@ -1217,11 +1217,16 @@ func (p *GoPrinter) VisitTypeList(tl *golang.TypeList, param any) java.J {
 	p.beforeSyntax(tl.Prefix, tl.Markers, out)
 	p.visitSpace(tl.Types.Before, out)
 	out.Append("(")
+	tc := java.FindMarker[golang.TrailingComma](tl.Types.Markers)
 	for i, rp := range tl.Types.Elements {
 		p.Visit(rp.Element, out)
 		if i < len(tl.Types.Elements)-1 {
 			p.visitSpace(rp.After, out)
 			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
 		} else {
 			p.visitSpace(rp.After, out)
 		}

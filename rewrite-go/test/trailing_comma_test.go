@@ -175,3 +175,29 @@ func TestParseTrailingCommaMapOfSlices(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseTrailingCommaFuncResults(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() (
+				a int,
+				b error,
+			) {
+				return 0, nil
+			}
+		`))
+}
+
+func TestParseTrailingCommaSingleFuncResult(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() (h int,
+			) {
+				return 0
+			}
+		`))
+}
