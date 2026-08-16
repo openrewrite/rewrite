@@ -96,4 +96,34 @@ class AnnotatedExprTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parenthesizedAnnotatedType() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(g: (Int => Long) @unchecked): Int = 1
+              def h(g: (Int ?=> Long) @unchecked): Int = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void tupleAnnotatedTypeArgument() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Any): Int = x match {
+                case it: Iterable[(Int, Long) @unchecked] => 1
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
 }

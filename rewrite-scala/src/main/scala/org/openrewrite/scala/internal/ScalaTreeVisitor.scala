@@ -8003,7 +8003,14 @@ class ScalaTreeVisitor(
     // right LST node: `S.AnnotatedExpression` for the former, `S.AnnotatedType` for
     // the latter.
     val prefix = extractPrefix(ann.span)
-    val arg: J = visitTree(ann.arg)
+    // A parenthesized annotated arg is a type, `(Context ?=> Symbol) @unchecked`, and
+    // J.Parentheses is not a TypeTree. The parenthesized type form is also an Expression,
+    // so it still serves an annotated expression.
+    val arg: J = ann.arg match {
+      case p: untpd.Parens => Option(visitParentType(p)).map(_.asInstanceOf[J]).getOrElse(visitTree(ann.arg))
+      case t: untpd.Tuple => Option(visitTypeTree(t)).map(_.asInstanceOf[J]).getOrElse(visitTree(ann.arg))
+      case _ => visitTree(ann.arg)
+    }
     // Capture-checking syntax (`T^`, `T^{it}`) desugars to a synthetic `retains` annotation
     // with no `@` in source, so it stays a suffix on the type it follows.
     val captureText = consumeCaptureSet()
@@ -8041,6 +8048,12 @@ class ScalaTreeVisitor(
     if (isAnnotatedType) {
       val typeExpr: TypeTree = arg match {
         case tt: TypeTree => tt
+        // `(Context ?=> Symbol) @unchecked`: the parenthesized form is a type, and
+        // J.Parentheses is not a TypeTree
+        case par: J.Parentheses[?] if par.getTree.isInstanceOf[TypeTree] =>
+          val inner = par.withPrefix[J.Parentheses[TypeTree]](Space.EMPTY)
+          new J.ParenthesizedTypeTree(Tree.randomId(), par.getPrefix, Markers.EMPTY,
+            Collections.emptyList(), inner)
         case _ => throw new UnsupportedOperationException(
           s"Annotated.arg in type position did not produce a TypeTree: ${ann.arg.getClass.getSimpleName}")
       }
