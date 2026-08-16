@@ -85,8 +85,7 @@ public class SortDependencies extends Recipe {
                         .sorted(Comparator.<DependencyGroup, Boolean>comparing(
                             group -> "test".equals(group.tag.getChildValue("scope").orElse(null))
                         ).thenComparing(
-                            group -> group.tag.getChildValue("groupId").orElse("") + ":" +
-                                     group.tag.getChildValue("artifactId").orElse("")
+                            group -> groupArtifactSortKey(group.tag)
                         ))
                         .collect(Collectors.toList());
 
@@ -243,6 +242,12 @@ public class SortDependencies extends Recipe {
 
     private static String asPlaceholder(String property) {
         return "${" + property + "}";
+    }
+
+    // Compared only as a whole key; `:` cannot occur in a groupId or artifactId
+    private static String groupArtifactSortKey(Xml.Tag dependency) {
+        return dependency.getChildValue("groupId").orElse("") + ":" +
+               dependency.getChildValue("artifactId").orElse("");
     }
 
     private static class DependencyGroup {
