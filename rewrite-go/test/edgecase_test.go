@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -391,4 +393,38 @@ func TestParseBitwiseComplement(t *testing.T) {
 				return ^x
 			}
 		`))
+}
+
+// A file written by an editor that marks the encoding starts with a
+// UTF-8 BOM, which Go's scanner ignores. It belongs to the file's
+// encoding, not its prefix, and must come back on the way out.
+func TestParseByteOrderMark(t *testing.T) {
+	src := "\ufeffpackage main\n\nfunc f() {\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if !cu.CharsetBomMarked {
+		t.Error("CharsetBomMarked should be set")
+	}
+	if cu.Prefix.Whitespace != "" {
+		t.Errorf("Prefix should not hold the BOM, got %q", cu.Prefix.Whitespace)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+func TestParseWithoutByteOrderMark(t *testing.T) {
+	src := "package main\n\nfunc f() {\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if cu.CharsetBomMarked {
+		t.Error("CharsetBomMarked should be unset")
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
 }

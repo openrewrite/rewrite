@@ -234,7 +234,14 @@ func (ctx *parseContext) prefixAndSkip(pos token.Pos, length int) java.Space {
 }
 
 // mapFile maps an ast.File to a CompilationUnit.
+const utf8BOM = "\ufeff"
+
 func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.CompilationUnit {
+	bomMarked := strings.HasPrefix(string(ctx.src), utf8BOM)
+	if bomMarked {
+		ctx.skip(len(utf8BOM))
+	}
+
 	// "package" keyword
 	prefix := ctx.prefixAndSkip(file.Package, len("package"))
 
@@ -268,13 +275,14 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 	}
 
 	return &golang.CompilationUnit{
-		ID:          uuid.New(),
-		Prefix:      prefix,
-		SourcePath:  sourcePath,
-		PackageDecl: &paddedPkgName,
-		Imports:     imports,
-		Statements:  stmts,
-		EOF:         eof,
+		ID:               uuid.New(),
+		Prefix:           prefix,
+		SourcePath:       sourcePath,
+		CharsetBomMarked: bomMarked,
+		PackageDecl:      &paddedPkgName,
+		Imports:          imports,
+		Statements:       stmts,
+		EOF:              eof,
 	}
 }
 

@@ -92,7 +92,7 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	cu = &c
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
-	q.Receive(nil, nil) // charsetBomMarked
+	cu.CharsetBomMarked = receiveScalar[bool](q, cu.CharsetBomMarked)
 	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
 	q.Receive(nil, func(v any) any {
 		receiveScalar[string](q, "") // algorithm

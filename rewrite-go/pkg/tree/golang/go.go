@@ -23,14 +23,18 @@ import (
 )
 
 type CompilationUnit struct {
-	ID          uuid.UUID
-	Prefix      java.Space
-	Markers     java.Markers
-	SourcePath  string
-	PackageDecl *java.RightPadded[*java.Identifier] // `package main`
-	Imports     *java.Container[*java.Import]       // nil if no imports
-	Statements  []java.RightPadded[java.Statement]  // top-level declarations
-	EOF         java.Space
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	SourcePath string
+	// CharsetBomMarked reports a leading UTF-8 BOM. Go's scanner ignores
+	// one, so it is part of how the file is encoded rather than anything
+	// the tree models.
+	CharsetBomMarked bool
+	PackageDecl      *java.RightPadded[*java.Identifier] // `package main`
+	Imports          *java.Container[*java.Import]       // nil if no imports
+	Statements       []java.RightPadded[java.Statement]  // top-level declarations
+	EOF              java.Space
 }
 
 func (*CompilationUnit) IsTree()       {}

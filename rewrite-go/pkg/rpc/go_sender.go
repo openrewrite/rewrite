@@ -71,8 +71,7 @@ func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.
 	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).SourcePath }, nil)
 	// charset - Go doesn't track this, send empty/default
 	q.GetAndSend(cu, func(_ any) any { return "UTF-8" }, nil)
-	// charsetBomMarked
-	q.GetAndSend(cu, func(_ any) any { return false }, nil)
+	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).CharsetBomMarked }, nil)
 	// checksum
 	q.GetAndSend(cu, func(_ any) any { return nil }, nil)
 	// fileAttributes

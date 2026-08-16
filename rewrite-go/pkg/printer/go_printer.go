@@ -64,6 +64,9 @@ func (p *GoPrinter) afterSyntax(markers java.Markers, out *PrintOutputCapture) {
 
 func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	if cu.CharsetBomMarked {
+		out.Append("\ufeff")
+	}
 	p.beforeSyntax(cu.Prefix, cu.Markers, out)
 	out.Append("package")
 
