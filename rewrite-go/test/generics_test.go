@@ -124,9 +124,8 @@ func TestParseTildeConstraint(t *testing.T) {
 		`))
 }
 
-// A method whose parameter re-instantiates its own receiver describes an
-// infinite family of instantiations. Type attribution must stop walking
-// it rather than recurse until the stack is gone.
+// A parameter that re-instantiates its own receiver names an infinite
+// family of types, one fresh *types.Named per nesting.
 func TestParseSelfInstantiatingGeneric(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`
@@ -181,8 +180,6 @@ func TestParseTrailingCommaInGenericTypeReference(t *testing.T) {
 		`))
 }
 
-// Mutual recursion through method parameters names a fresh type at every
-// nesting, so nothing that keys on type identity can collapse the chain.
 func TestParseSelfInstantiatingGenericChain(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`

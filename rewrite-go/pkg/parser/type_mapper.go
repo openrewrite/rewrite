@@ -36,15 +36,13 @@ type typeMapper struct {
 	ownPkg func(pkgPath string) bool
 	// depth counts nested mapType frames. See maxTypeDepth.
 	depth int
-	// mappingOrigin holds the class for each generic type whose mapping
-	// is still on the stack, keyed by the type's uninstantiated origin.
+	// mappingOrigin holds the class for each generic whose mapping is
+	// still on the stack, keyed by its origin. See mapNamed.
 	mappingOrigin map[*types.Named]*java.JavaTypeClass
 }
 
 // maxTypeDepth bounds how deep type attribution follows a type into its
-// components. A method whose parameter re-instantiates its own receiver —
-// `func (R[P]) m(R[R[P]])` — describes an infinite family of distinct
-// instantiations, each a fresh *types.Named that no cache can collapse.
+// components, so a shape the caches cannot collapse still terminates.
 // Real Go nests types nowhere near this deep.
 const maxTypeDepth = 64
 
