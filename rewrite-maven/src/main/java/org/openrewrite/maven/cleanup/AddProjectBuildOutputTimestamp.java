@@ -30,6 +30,9 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class AddProjectBuildOutputTimestamp extends Recipe {
 
+    // The ZIP format epoch starts in 1980, and this is the earliest value accepted by Maven's ZIP-producing toolchain
+    private static final String EARLIEST_ZIP_COMPATIBLE_TIMESTAMP = "1980-01-01T00:00:02Z";
+
     @Option(displayName = "Timestamp",
             description = "ISO 8601 timestamp, integer seconds since the epoch, or property reference such as " +
                           "`${git.commit.author.time}`. Defaults to `1980-01-01T00:00:02Z`, the earliest value " +
@@ -56,7 +59,7 @@ public class AddProjectBuildOutputTimestamp extends Recipe {
     public List<Recipe> getRecipeList() {
         return singletonList(new AddProperty(
                 "project.build.outputTimestamp",
-                timestamp == null ? "1980-01-01T00:00:02Z" : timestamp,
+                timestamp == null ? EARLIEST_ZIP_COMPATIBLE_TIMESTAMP : timestamp,
                 true,
                 false));
     }
