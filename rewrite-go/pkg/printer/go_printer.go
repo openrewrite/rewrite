@@ -17,7 +17,7 @@
 package printer
 
 import (
-	"strings"
+	"strconv"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -498,15 +498,14 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 			p.visitSpace(ann.Prefix, body)
 			p.printAnnotationBody(ann, body)
 		}
-		out.Append(quote)
 		if quote == "`" {
-			out.Append(body.String())
+			out.Append(quote + body.String() + quote)
 		} else {
-			// An interpreted string re-escapes what a raw string carries
-			// literally.
-			out.Append(strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(body.String()))
+			// An interpreted string spells out what a raw string carries
+			// literally — the quotes and backslashes in `json:"a"`, and
+			// any control character in the key or value.
+			out.Append(strconv.Quote(body.String()))
 		}
-		out.Append(quote)
 	}
 	// Then initializers
 	firstInit := true

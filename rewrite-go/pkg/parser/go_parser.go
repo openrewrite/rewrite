@@ -3143,18 +3143,20 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 
 	annotations := make([]*java.Annotation, len(pairs))
 	for i, p := range pairs {
-		var annPrefix java.Space
+		// The first pair's Prefix is the space outside the delimiter, so
+		// its own padding — which is inside — rides the key instead.
+		annPrefix := java.Space{Whitespace: p.PrefixWS}
+		var keyPrefix java.Space
 		if i == 0 {
-			annPrefix = outerPrefix
-		} else {
-			annPrefix = java.Space{Whitespace: p.PrefixWS}
+			annPrefix, keyPrefix = outerPrefix, java.Space{Whitespace: p.PrefixWS}
 		}
 		annotations[i] = &java.Annotation{
 			ID:     uuid.New(),
 			Prefix: annPrefix,
 			AnnotationType: &java.Identifier{
-				ID:   uuid.New(),
-				Name: p.Key,
+				ID:     uuid.New(),
+				Prefix: keyPrefix,
+				Name:   p.Key,
 			},
 			Arguments: &java.Container[java.Expression]{
 				Elements: []java.RightPadded[java.Expression]{
