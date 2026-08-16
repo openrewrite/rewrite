@@ -745,15 +745,32 @@ func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
 		elements = append(elements, java.RightPadded[java.J]{Element: tp, After: after})
 	}
 
-	closePrefix := ctx.prefix(fl.Closing)
-	ctx.skip(1) // "]"
-	if len(elements) > 0 {
-		elements[len(elements)-1].After = closePrefix
+	var markers java.Markers
+	if trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base()); len(elements) > 0 && trailingCommaOff >= 0 {
+		commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
+		ctx.skip(1) // ","
+		commaAfter := ctx.prefix(fl.Closing)
+		ctx.skip(1) // "]"
+		markers = java.Markers{
+			ID: uuid.New(),
+			Entries: []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}},
+		}
+	} else {
+		closePrefix := ctx.prefix(fl.Closing)
+		ctx.skip(1) // "]"
+		if len(elements) > 0 {
+			elements[len(elements)-1].After = closePrefix
+		}
 	}
 
 	return &java.TypeParameters{
 		ID:             uuid.New(),
 		Prefix:         before,
+		Markers:        markers,
 		TypeParameters: elements,
 	}
 }

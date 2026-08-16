@@ -201,3 +201,27 @@ func TestParseTrailingCommaSingleFuncResult(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseTrailingCommaGenericTypeParams(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type S[
+				T any,
+				U any,
+			] struct{}
+		`))
+}
+
+func TestParseTrailingCommaGenericFuncTypeParams(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f[
+				T any,
+			]() {
+			}
+		`))
+}

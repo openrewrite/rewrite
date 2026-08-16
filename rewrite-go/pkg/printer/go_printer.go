@@ -330,11 +330,18 @@ func (p *GoPrinter) VisitTypeParameters(tps *java.TypeParameters, param any) jav
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tps.Prefix, tps.Markers, out)
 	out.Append("[")
+	tc := java.FindMarker[golang.TrailingComma](tps.Markers)
 	for i, rp := range tps.TypeParameters {
 		p.Visit(rp.Element, out)
-		p.visitSpace(rp.After, out)
 		if i < len(tps.TypeParameters)-1 {
+			p.visitSpace(rp.After, out)
 			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
+		} else {
+			p.visitSpace(rp.After, out)
 		}
 	}
 	out.Append("]")
