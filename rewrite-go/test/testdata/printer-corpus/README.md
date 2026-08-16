@@ -107,6 +107,18 @@ collapses one type onto another — leaves every one of them unmoved.
 resolved, `Unknown`, or nil. Compare two builds by running it on each:
 a field that reads 0.00% across the corpus is one nothing populates.
 
+Attribution is a property of a package, not of a file: a reference to a
+sibling resolves only when the importer can reach it. `GO_TYPES_PACKAGE=1`
+parses whole directories through a `ProjectImporter`, which is what a
+project parse does and what the numbers should be read against — per-file
+figures understate a real run by roughly ten points.
+
+A nil slot is not automatically a gap. `Identifier.FieldType` follows
+rewrite-java's rule that a variable type exists only for a `VarSymbol`,
+so a method name, a type name and a package qualifier all carry nil by
+contract. The report also lists empty slots keyed by the field the node
+sits in, which is what separates those from the ones worth chasing.
+
 ## Fuzzing the gaps between tokens
 
 ```sh
