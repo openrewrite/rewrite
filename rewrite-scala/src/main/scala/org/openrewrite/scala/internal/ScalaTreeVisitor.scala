@@ -3208,43 +3208,8 @@ class ScalaTreeVisitor(
       val leadingWs = sourceSnippet.length - trimmedSnippet.length
       modifierEndPos = leadingWs
 
-      // Check for access modifiers (including scoped: private[scope], protected[this])
-      if (trimmedSnippet.startsWith("private")) {
-        var keyword = "private"
-        var keyLen = keyword.length
-        val afterKw = trimmedSnippet.substring(keyLen)
-        if (afterKw.startsWith("[")) {
-          val cb = positionOfNextIn(afterKw, "]", 0)
-          if (cb >= 0) { keyword = "private" + afterKw.substring(0, cb + 1); keyLen = keyword.length }
-        }
-        val modPrefix = if (leadingWs > 0) ScalaSpace.format(sourceSnippet.substring(0, leadingWs)) else Space.EMPTY
-        modifiers.add(new J.Modifier(
-          Tree.randomId(), modPrefix, Markers.EMPTY,
-          keyword, J.Modifier.Type.Private, Collections.emptyList()
-        ))
-        modifierEndPos = leadingWs + keyLen
-        lastModifierKeywordEnd = modifierEndPos
-        if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
-      } else if (trimmedSnippet.startsWith("protected")) {
-        var keyword = "protected"
-        var keyLen = keyword.length
-        val afterKw = trimmedSnippet.substring(keyLen)
-        if (afterKw.startsWith("[")) {
-          val cb = positionOfNextIn(afterKw, "]", 0)
-          if (cb >= 0) { keyword = "protected" + afterKw.substring(0, cb + 1); keyLen = keyword.length }
-        }
-        val modPrefix = if (leadingWs > 0) ScalaSpace.format(sourceSnippet.substring(0, leadingWs)) else Space.EMPTY
-        modifiers.add(new J.Modifier(
-          Tree.randomId(), modPrefix, Markers.EMPTY,
-          keyword, J.Modifier.Type.Protected, Collections.emptyList()
-        ))
-        modifierEndPos = leadingWs + keyLen
-        lastModifierKeywordEnd = modifierEndPos
-        if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
-      }
-      
-      // Check for remaining modifiers (in any order) before val/var/def
-      // These include: implicit, override, abstract, final, lazy, sealed
+      // Modifiers in any order before val/var/given: the access modifiers (which may carry
+      // a scope, `private[scope]`), plus implicit, override, abstract, final, lazy, sealed
       var scanning = true
       while (scanning && modifierEndPos < sourceSnippet.length) {
         val remaining = sourceSnippet.substring(modifierEndPos)
@@ -3256,7 +3221,29 @@ class ScalaTreeVisitor(
           else if (leadingWs > 0) ScalaSpace.format(sourceSnippet.substring(0, leadingWs))
           else Space.EMPTY
 
-        if (remaining.startsWith("final ")) {
+        val accessKeyword =
+          if (remaining.startsWith("private")) "private"
+          else if (remaining.startsWith("protected")) "protected"
+          else null
+        val scopedAccessKeyword = if (accessKeyword == null) null else {
+          val afterKw = remaining.substring(accessKeyword.length)
+          val closeBracket = if (afterKw.startsWith("[")) positionOfNextIn(afterKw, "]", 0) else -1
+          if (closeBracket >= 0) accessKeyword + afterKw.substring(0, closeBracket + 1) else accessKeyword
+        }
+        // An identifier can open with the same letters, as in `privateName`
+        val isAccessModifier = scopedAccessKeyword != null &&
+          remaining.length > scopedAccessKeyword.length &&
+          !Character.isLetterOrDigit(remaining.charAt(scopedAccessKeyword.length))
+
+        if (isAccessModifier) {
+          modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
+            scopedAccessKeyword,
+            if (accessKeyword == "private") J.Modifier.Type.Private else J.Modifier.Type.Protected,
+            Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + scopedAccessKeyword.length
+          modifierEndPos = lastModifierKeywordEnd
+          if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
+        } else if (remaining.startsWith("final ")) {
           hasExplicitFinal = true
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "final", J.Modifier.Type.Final, Collections.emptyList()))

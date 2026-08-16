@@ -283,6 +283,22 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    void accessModifierAfterAnotherModifier() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              override implicit protected val a: String = "a"
+              implicit protected val b: String = "b"
+              lazy private val c: String = "c"
+              override private[this] val d: String = "d"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void finalVar() {
         rewriteRun(
           scala(
