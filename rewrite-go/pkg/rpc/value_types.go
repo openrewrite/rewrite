@@ -117,6 +117,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.TypeSwitchGuard{}), "org.openrewrite.golang.marker.TypeSwitchGuard")
 	RegisterValueType(reflect.TypeOf(golang.ImplicitForClauses{}), "org.openrewrite.golang.marker.ImplicitForClauses")
 	RegisterValueType(reflect.TypeOf(golang.StructTag{}), "org.openrewrite.golang.marker.StructTag")
+	RegisterValueType(reflect.TypeOf(golang.TypeAssertionDot{}), "org.openrewrite.golang.marker.TypeAssertionDot")
 	RegisterValueType(reflect.TypeOf(golang.StructTagQuote{}), "org.openrewrite.golang.marker.StructTagQuote")
 	RegisterValueType(reflect.TypeOf(golang.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
 	RegisterValueType(reflect.TypeOf(java.SearchResult{}), "org.openrewrite.marker.SearchResult")
@@ -256,6 +257,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.TypeSwitchGuard", func() any { return golang.TypeSwitchGuard{} })
 	RegisterFactory("org.openrewrite.golang.marker.ImplicitForClauses", func() any { return golang.ImplicitForClauses{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTag", func() any { return golang.StructTag{} })
+	RegisterFactory("org.openrewrite.golang.marker.TypeAssertionDot", func() any { return golang.TypeAssertionDot{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTagQuote", func() any { return golang.StructTagQuote{} })
 	RegisterFactory("org.openrewrite.golang.marker.TrailingComma", func() any { return golang.TrailingComma{} })
 	// Semicolon: RpcCodec on the Java side; sends only `id`. Replaces the

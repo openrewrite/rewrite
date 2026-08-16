@@ -1329,6 +1329,15 @@ type StructTag struct {
 
 func (s StructTag) ID() uuid.UUID { return s.Ident }
 
+// TypeAssertionDot carries the spacing before the `.` of a type
+// assertion, which no node's prefix covers: `e /*c*/ .(error)`.
+type TypeAssertionDot struct {
+	Ident  uuid.UUID
+	Before java.Space
+}
+
+func (t TypeAssertionDot) ID() uuid.UUID { return t.Ident }
+
 // StructTagQuote records which string literal delimiter a struct tag was
 // written with. The tag itself is modelled as LeadingAnnotations, which
 // carry its keys and values but not the quoting; absent this marker the

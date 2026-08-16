@@ -1015,6 +1015,9 @@ func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)
 	// Go type assertion: expr.(Type)
 	p.Visit(tc.Expr, out)
+	if d := java.FindMarker[golang.TypeAssertionDot](tc.Markers); d != nil {
+		p.visitSpace(d.Before, out)
+	}
 	out.Append(".")
 	p.Visit(tc.Clazz, out)
 	p.afterSyntax(tc.Markers, out)

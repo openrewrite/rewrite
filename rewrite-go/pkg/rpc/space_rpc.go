@@ -203,6 +203,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before.Whitespace }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After.Whitespace }, nil)
+	case golang.TypeAssertionDot:
+		// TypeAssertionDot.rpcSend sends: id (UUID string), before whitespace
+		q.GetAndSend(m, func(x any) any { return x.(golang.TypeAssertionDot).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.TypeAssertionDot).Before.Whitespace }, nil)
 	case golang.StructTagQuote:
 		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
@@ -463,6 +467,15 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 					Source: valueSource,
 				}
 			}
+			return m
+		case golang.TypeAssertionDot:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Before = java.Space{Whitespace: receiveScalar[string](q, m.Before.Whitespace)}
 			return m
 		case golang.StructTagQuote:
 			idStr := receiveScalar[string](q, m.Ident.String())

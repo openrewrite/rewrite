@@ -2820,12 +2820,19 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 		Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
 	}
 
-	_ = dotPrefix // space between Expr and the dot; gofmt never emits it
+	var markers java.Markers
+	if !dotPrefix.IsEmpty() {
+		markers = java.Markers{
+			ID:      uuid.New(),
+			Entries: []java.Marker{golang.TypeAssertionDot{Ident: uuid.New(), Before: dotPrefix}},
+		}
+	}
 	return &java.TypeCast{
-		ID:     uuid.New(),
-		Prefix: prefix,
-		Clazz:  clazz,
-		Expr:   x,
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Markers: markers,
+		Clazz:   clazz,
+		Expr:    x,
 	}
 }
 
