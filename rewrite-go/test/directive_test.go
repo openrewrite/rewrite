@@ -238,3 +238,14 @@ func TestParseDirectiveWithTabSeparator(t *testing.T) {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
 }
+
+func TestParseDirectiveWithTrailingSpaceOnly(t *testing.T) {
+	src := "package main\n\n//go:noinline \nfunc f() {\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}

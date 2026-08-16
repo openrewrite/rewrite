@@ -3320,16 +3320,18 @@ func buildDirectiveAnnotation(name, sep, args string, prefix java.Space) *java.A
 			Name: name,
 		},
 	}
-	if args != "" {
-		ann.Arguments = &java.Container[java.Expression]{
-			Before: java.Space{Whitespace: sep},
-			Elements: []java.RightPadded[java.Expression]{
+	// The separator is source even where it runs to the end of the line
+	// with no argument behind it.
+	if sep != "" || args != "" {
+		ann.Arguments = &java.Container[java.Expression]{Before: java.Space{Whitespace: sep}}
+		if args != "" {
+			ann.Arguments.Elements = []java.RightPadded[java.Expression]{
 				{Element: &java.Literal{
 					ID:     uuid.New(),
 					Source: args,
 					Value:  args,
 				}},
-			},
+			}
 		}
 	}
 	return ann
