@@ -2242,7 +2242,29 @@ class ScalaTreeVisitor(
 
                       JContainer.build(beforeParenSpace, args, Markers.EMPTY)
                     } else {
-                      null
+                      // Dotty models `new Foo { ... }` and `new Foo() { ... }` alike, so the
+                      // empty list is read from the source: a container prints `()`, null
+                      // prints nothing.
+                      val typeEnd = Math.max(0, newInner.tpt.span.end - offsetAdjustment)
+                      val searchStart = Math.max(cursor, typeEnd)
+                      val appEnd = Math.max(0, app.span.end - offsetAdjustment)
+                      val between = if (searchStart < appEnd && appEnd <= source.length)
+                        source.substring(searchStart, appEnd) else ""
+                      val open = positionOfNextIn(between, "(", 0)
+                      val close = if (open >= 0) positionOfNextIn(between, ")", open + 1) else -1
+                      if (close > open) {
+                        val elements = new util.ArrayList[JRightPadded[Expression]]()
+                        if (close > open + 1) {
+                          val interior = new J.Empty(Tree.randomId(),
+                            ScalaSpace.format(between.substring(open + 1, close)), Markers.EMPTY)
+                          elements.add(JRightPadded.build(interior.asInstanceOf[Expression]))
+                        }
+                        val beforeParenSpace = ScalaSpace.format(between.substring(0, open))
+                        updateCursor(searchStart + close + 1)
+                        JContainer.build(beforeParenSpace, elements, Markers.EMPTY)
+                      } else {
+                        null
+                      }
                     }
 
                     // Capture any remaining curried parameter lists verbatim.

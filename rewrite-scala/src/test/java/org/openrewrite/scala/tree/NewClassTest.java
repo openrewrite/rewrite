@@ -410,6 +410,26 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void anonymousClassWithEmptyArgumentList() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              val a = new Object() {
+                override def toString: String = "a"
+              }
+              val b = new Object {
+                override def toString: String = "b"
+              }
+              val c = new Object():
+                override def toString: String = "c"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void trailingCommaInConstructorArguments() {
         rewriteRun(
           scala(
