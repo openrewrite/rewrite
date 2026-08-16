@@ -125,17 +125,26 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 			before = newObj(*msg.ValueType)
 		}
 		before = hydrateGenericMarker(before, msg.Value)
+		// The remote inlines a value only when it has no codec for the type, so a typed ADD with
+		// no value means sub-field messages follow. Anything that reaches a branch below without
+		// consuming them leaves the queue desynchronized, and Go is the one peer where that used
+		// to happen silently — every other receiver already fails loudly here.
+		codecExpected := msg.State == Add && msg.ValueType != nil && msg.Value == nil
 		var after any
 		if onChange != nil {
 			after = onChange(before)
 		} else if !isNilValue(before) && getValueType(before) != nil {
 			if t, ok := before.(java.Tree); ok {
 				after = defaultReceiver.Visit(t, q)
+			} else if codecExpected {
+				panic(missingCodec(*msg.ValueType))
 			} else {
 				after = before
 			}
 		} else if msg.Value != nil {
 			after = msg.Value
+		} else if codecExpected {
+			panic(missingCodec(*msg.ValueType))
 		} else {
 			after = before
 		}
@@ -150,6 +159,12 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 	default:
 		panic(fmt.Sprintf("unsupported state: %v", msg.State))
 	}
+}
+
+func missingCodec(valueType string) string {
+	return fmt.Sprintf("no RPC codec registered on the Go side for %q. "+
+		"The remote side has a codec and sent property messages that will not be consumed, "+
+		"causing RPC queue desynchronization.", valueType)
 }
 
 // hydrateGenericMarker applies a message's inline data map to a codec-less
