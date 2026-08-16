@@ -143,9 +143,14 @@ public class DependencyManagementDependencyRequiresVersion extends Recipe {
              */
             private @Nullable String resolve(Xml.Tag tag, String childName) {
                 String value = getResolutionResult().getPom().getValue(tag.getChildValue(childName).orElse(null));
-                return value == null || value.contains("${") ? null : value;
+                return value == null || containsUnresolvedPlaceholder(value) ? null : value;
             }
         };
+    }
+
+    // A surviving `${` means Maven could not resolve the property, so the value is unusable for comparison
+    private static boolean containsUnresolvedPlaceholder(String value) {
+        return value.contains("${");
     }
 
     private static boolean importsBom(@Nullable List<ManagedDependency> dependencyManagement) {
