@@ -2348,10 +2348,10 @@ class ScalaTreeVisitor(
           } else if (colonIndex >= 0) {
             (':', colonIndex)
           } else {
-            (' ', -1)
+            (NoBodyDelimiter, -1)
           }
         } else {
-          (' ', -1)
+          (NoBodyDelimiter, -1)
         }
 
         val body = if (bodyDelimiterIndex >= 0) {
@@ -8080,6 +8080,9 @@ class ScalaTreeVisitor(
       JRightPadded.build(false), stmts, endSpace)
     new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeFor(rtt.span))
   }
+
+  /** Stands in for the delimiter of an anonymous class that has no body. */
+  private val NoBodyDelimiter: Char = '\u0000'
 
   private def visitAnnotated(ann: Trees.Annotated[?]): J = {
     // Dotty's `Annotated` covers both annotated expressions (`e: @ann`, with colon) and
