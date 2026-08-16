@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -45,9 +46,16 @@ func TestTypeAttribution(t *testing.T) {
 		t.Skip("GO_CORPUS not set")
 	}
 	files := stride(collectGoFiles(t, root), envInt("GO_TYPES_FILES", 2000))
+	if os.Getenv("GO_TYPES_PACKAGE") != "" {
+		// Attribution is a property of a package, not a file: a reference
+		// to a sibling package resolves only when the importer can reach
+		// it. Grouping by directory measures what a project parse sees.
+		files = packageMatesOf(t, root, files)
+	}
 
 	var mu sync.Mutex
 	totals := map[string]*slotCount{}
+	emptySites := map[string]int{}
 
 	var wg sync.WaitGroup
 	work := make(chan string)
@@ -56,8 +64,11 @@ func TestTypeAttribution(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for path := range work {
-				counts := attributionOf(root, path)
+				counts, empty := attributionOf(root, path)
 				mu.Lock()
+				for k, n := range empty {
+					emptySites[k] += n
+				}
 				for k, v := range counts {
 					c := totals[k]
 					if c == nil {
@@ -96,6 +107,15 @@ func TestTypeAttribution(t *testing.T) {
 		c := totals[k]
 		fmt.Fprintf(&sb, "%-52s %10d %10d %10d %7.2f%%\n", k, c.resolved, c.unknown, c.nil_, c.pct())
 	}
+	sites := make([]string, 0, len(emptySites))
+	for k := range emptySites {
+		sites = append(sites, k)
+	}
+	sort.Slice(sites, func(i, j int) bool { return emptySites[sites[i]] > emptySites[sites[j]] })
+	fmt.Fprintf(&sb, "\nempty slots by where the node sits\n")
+	for _, k := range sites[:min(len(sites), envInt("GO_TYPES_SITES", 40))] {
+		fmt.Fprintf(&sb, "%10d  %s\n", emptySites[k], k)
+	}
 	t.Logf("\n%s", sb.String())
 }
 
@@ -109,22 +129,85 @@ func (c *slotCount) pct() float64 {
 	return 100 * float64(c.resolved) / float64(c.total())
 }
 
-func attributionOf(root, path string) (counts map[string]*slotCount) {
-	counts = map[string]*slotCount{}
+// packageMatesOf expands a file sample to whole directories, so each
+// file is parsed alongside the siblings that define what it references.
+func packageMatesOf(t *testing.T, root string, sample []string) []string {
+	dirs := map[string]bool{}
+	for _, f := range sample {
+		dirs[filepath.Dir(f)] = true
+	}
+	var out []string
+	for d := range dirs {
+		out = append(out, d)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// parseGroup parses one directory as a package when GO_TYPES_PACKAGE is
+// set, and a single file otherwise.
+func parseGroup(root, path string) []*golang.CompilationUnit {
+	gp := parser.NewGoParser()
+	if os.Getenv("GO_TYPES_PACKAGE") == "" {
+		src, err := os.ReadFile(path)
+		if err != nil || !parser.MatchBuildContext(gp.BuildContext, filepath.Base(path), string(src)) {
+			return nil
+		}
+		cu, err := gp.Parse(filepath.Base(path), string(src))
+		if err != nil {
+			return nil
+		}
+		return []*golang.CompilationUnit{cu}
+	}
+
+	pi := parser.NewProjectImporter(filepath.Base(root), nil)
+	pi.SetProjectRoot(root)
+	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		if b, err := os.ReadFile(p); err == nil {
+			rel, _ := filepath.Rel(root, p)
+			pi.AddSource(rel, string(b))
+		}
+		return nil
+	})
+	gp.Importer = pi
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil
+	}
+	byPkg := map[string][]parser.FileInput{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
+			continue
+		}
+		full := filepath.Join(path, e.Name())
+		b, err := os.ReadFile(full)
+		if err != nil || !parser.MatchBuildContext(gp.BuildContext, e.Name(), string(b)) {
+			continue
+		}
+		pkg := parser.PackageNameOf(full, string(b))
+		byPkg[pkg] = append(byPkg[pkg], parser.FileInput{Path: e.Name(), Content: string(b)})
+	}
+	var out []*golang.CompilationUnit
+	for _, inputs := range byPkg {
+		if cus, err := gp.ParsePackage(inputs); err == nil {
+			out = append(out, cus...)
+		}
+	}
+	return out
+}
+
+func attributionOf(root, path string) (counts map[string]*slotCount, empty map[string]int) {
+	counts, empty = map[string]*slotCount{}, map[string]int{}
 	defer func() { recover() }()
 
-	src, err := os.ReadFile(path)
-	if err != nil {
-		return
+	for _, cu := range parseGroup(root, path) {
+		w := &typeWalker{counts: counts, empty: empty, seen: map[uintptr]bool{}}
+		w.walk(reflect.ValueOf(cu), "", "", "<root>")
 	}
-	if !parser.MatchBuildContext(parser.NewGoParser().BuildContext, filepath.Base(path), string(src)) {
-		return
-	}
-	cu, err := parser.NewGoParser().Parse(filepath.Base(path), string(src))
-	if err != nil {
-		return
-	}
-	(&typeWalker{counts: counts, seen: map[uintptr]bool{}}).walk(reflect.ValueOf(cu), "")
 	return
 }
 
@@ -132,10 +215,15 @@ var javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 
 type typeWalker struct {
 	counts map[string]*slotCount
-	seen   map[uintptr]bool
+	// empty counts the slots that came back nil or Unknown, keyed by the
+	// field the node sits in as well as its own. An identifier's role —
+	// package qualifier, label, field key — decides whether Go has a type
+	// for it at all, and the node alone does not say which it is.
+	empty map[string]int
+	seen  map[uintptr]bool
 }
 
-func (w *typeWalker) count(slot string, v reflect.Value) {
+func (w *typeWalker) count(slot, site string, v reflect.Value) {
 	c := w.counts[slot]
 	if c == nil {
 		c = &slotCount{}
@@ -144,14 +232,18 @@ func (w *typeWalker) count(slot string, v reflect.Value) {
 	switch {
 	case v.IsNil():
 		c.nil_++
+		w.empty[site+" [nil]"]++
 	case v.Interface() == java.UnknownType:
 		c.unknown++
+		w.empty[site+" [unknown]"]++
 	default:
 		c.resolved++
 	}
 }
 
-func (w *typeWalker) walk(v reflect.Value, owner string) {
+// walk threads two things: `owner`, the type of the node a field belongs
+// to, and `site`, the field of the enclosing node that this one sits in.
+func (w *typeWalker) walk(v reflect.Value, owner, path, site string) {
 	if !v.IsValid() {
 		return
 	}
@@ -168,16 +260,16 @@ func (w *typeWalker) walk(v reflect.Value, owner string) {
 				return
 			}
 			w.seen[v.Pointer()] = true
-			owner = strings.TrimPrefix(v.Type().String(), "*")
+			owner, site = strings.TrimPrefix(v.Type().String(), "*"), path
 		}
-		w.walk(v.Elem(), owner)
+		w.walk(v.Elem(), owner, path, site)
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			w.walk(v.Index(i), owner)
+			w.walk(v.Index(i), owner, path, site)
 		}
 	case reflect.Map:
 		for _, k := range v.MapKeys() {
-			w.walk(v.MapIndex(k), owner)
+			w.walk(v.MapIndex(k), owner, path, site)
 		}
 	case reflect.Struct:
 		if v.Type().Implements(javaTypeIface) {
@@ -185,7 +277,7 @@ func (w *typeWalker) walk(v reflect.Value, owner string) {
 		}
 		if n := v.Type().Name(); n != "" && !strings.HasPrefix(n, "Container") &&
 			!strings.HasPrefix(n, "RightPadded") && !strings.HasPrefix(n, "LeftPadded") {
-			owner = v.Type().String()
+			owner, site = v.Type().String(), path
 		}
 		for i := 0; i < v.NumField(); i++ {
 			f := v.Type().Field(i)
@@ -194,10 +286,10 @@ func (w *typeWalker) walk(v reflect.Value, owner string) {
 			}
 			fv := v.Field(i)
 			if isTypeSlot(f.Type) {
-				w.count(owner+"."+f.Name, fv)
+				w.count(owner+"."+f.Name, site+" -> "+owner+"."+f.Name, fv)
 				continue
 			}
-			w.walk(fv, owner+"."+f.Name)
+			w.walk(fv, owner, owner+"."+f.Name, site)
 		}
 	}
 }

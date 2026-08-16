@@ -316,8 +316,9 @@ func TestTypeAttributionSliceType(t *testing.T) {
 
 type assignmentWalker struct {
 	visitor.GoVisitor
-	onAssignment func(*java.Assignment)
-	onArrayType  func(*java.ArrayType)
+	onAssignment        func(*java.Assignment)
+	onArrayType         func(*java.ArrayType)
+	onMethodDeclaration func(*java.MethodDeclaration)
 }
 
 func (v *assignmentWalker) VisitAssignment(a *java.Assignment, p any) java.J {
@@ -340,4 +341,39 @@ func forEachAssignment(cu java.Tree, f func(*java.Assignment)) {
 
 func forEachArrayType(cu java.Tree, f func(*java.ArrayType)) {
 	visitor.Init(&assignmentWalker{onArrayType: f}).Visit(cu, nil)
+}
+
+func TestTypeAttributionFuncLit(t *testing.T) {
+	src := "package main\n\nvar fn = func(a int) int { return a }\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var found int
+	forEachMethodDeclaration(cu, func(m *java.MethodDeclaration) {
+		found++
+		if m.MethodType == nil {
+			t.Fatal("function literal has no method type")
+		}
+		if got := len(m.MethodType.ParameterTypes); got != 1 {
+			t.Errorf("parameter types: got %d, want 1", got)
+		}
+		if prim, ok := m.MethodType.ReturnType.(*java.JavaTypePrimitive); !ok || prim.Keyword != "int" {
+			t.Errorf("return type: got %v, want int", m.MethodType.ReturnType)
+		}
+	})
+	if found != 1 {
+		t.Fatalf("expected 1 method declaration, found %d", found)
+	}
+}
+
+func (v *assignmentWalker) VisitMethodDeclaration(m *java.MethodDeclaration, p any) java.J {
+	if v.onMethodDeclaration != nil {
+		v.onMethodDeclaration(m)
+	}
+	return v.GoVisitor.VisitMethodDeclaration(m, p)
+}
+
+func forEachMethodDeclaration(cu java.Tree, f func(*java.MethodDeclaration)) {
+	visitor.Init(&assignmentWalker{onMethodDeclaration: f}).Visit(cu, nil)
 }

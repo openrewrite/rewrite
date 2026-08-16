@@ -2880,6 +2880,13 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 		ReturnType: returnType,
 		Body:       body,
 	}
+	// A literal has no name to look up, so its signature comes from the
+	// expression rather than from Defs.
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		if sig, ok := tv.Type.(*types.Signature); ok {
+			md.MethodType = ctx.mapper.mapSignature(sig, "", nil)
+		}
+	}
 	// Wrap in StatementExpression so the MethodDeclaration (a Statement) can
 	// appear in expression contexts like return statements, assignments, and
 	// call arguments.
