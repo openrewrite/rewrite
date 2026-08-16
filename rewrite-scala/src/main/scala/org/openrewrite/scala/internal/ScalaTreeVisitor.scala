@@ -507,16 +507,21 @@ class ScalaTreeVisitor(
             val arg = app.args(i)
             val argExpr = asExpression(visitTree(arg))
             val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            var lastMarkers = Markers.EMPTY
             val afterSpace = if (i == app.args.size - 1) {
               val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-              if (closePos > argEnd) ScalaSpace.format(source, argEnd, closePos) else Space.EMPTY
+              if (closePos > argEnd) {
+                val (sp, mk) = trailingCommaBefore(argEnd, closePos)
+                lastMarkers = mk
+                sp
+              } else Space.EMPTY
             } else {
               val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
               val space = if (commaPos > argEnd) ScalaSpace.format(source, argEnd, commaPos) else Space.EMPTY
               if (commaPos >= cursor) cursor = commaPos + 1
               space
             }
-            args.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+            args.add(new JRightPadded(argExpr, afterSpace, lastMarkers))
           }
           val closeParen = positionOfNext(")", cursor)
           if (closeParen >= 0) cursor = closeParen + 1
@@ -926,10 +931,10 @@ class ScalaTreeVisitor(
           } else {
             val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
             val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-            val beforeClose = if (closePos > argEnd) {
-              ScalaSpace.format(source, argEnd, closePos)
-            } else Space.EMPTY
-            args.add(new JRightPadded(expr, beforeClose, Markers.EMPTY))
+            val (beforeClose, lastMarkers) = if (closePos > argEnd) {
+              trailingCommaBefore(argEnd, closePos)
+            } else (Space.EMPTY, Markers.EMPTY)
+            args.add(new JRightPadded(expr, beforeClose, lastMarkers))
           }
         }
       }
@@ -972,6 +977,20 @@ class ScalaTreeVisitor(
         cursor = cursor + idx
         sp
       }
+    }
+  }
+
+  /** Splits the run before a closing `)` into a trailing-comma marker and the space that
+   *  follows it, so a source trailing comma round-trips instead of sitting in whitespace.
+   */
+  private def trailingCommaBefore(from: Int, to: Int): (Space, Markers) = {
+    if (from >= to || to > source.length) (Space.EMPTY, Markers.EMPTY)
+    else {
+      val between = source.substring(from, to)
+      val commaIdx = positionOfNextIn(between, ",", 0)
+      if (commaIdx < 0) (ScalaSpace.format(source, from, to), Markers.EMPTY)
+      else (Space.format(between.substring(commaIdx + 1)),
+        Markers.EMPTY.add(TrailingComma.create(Space.format(between.substring(0, commaIdx)))))
     }
   }
 
@@ -1123,16 +1142,21 @@ class ScalaTreeVisitor(
           val arg = app.args(i)
           val argExpr = asExpression(visitTree(arg))
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+          var lastMarkers = Markers.EMPTY
           val afterSpace = if (i == app.args.size - 1) {
             val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-            if (closePos > argEnd) ScalaSpace.format(source, argEnd, closePos) else Space.EMPTY
+            if (closePos > argEnd) {
+              val (sp, mk) = trailingCommaBefore(argEnd, closePos)
+              lastMarkers = mk
+              sp
+            } else Space.EMPTY
           } else {
             val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
             val space = if (commaPos > argEnd) ScalaSpace.format(source, argEnd, commaPos) else Space.EMPTY
             if (commaPos >= cursor) cursor = commaPos + 1
             space
           }
-          outerArgs.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+          outerArgs.add(new JRightPadded(argExpr, afterSpace, lastMarkers))
         }
 
         val closeParen = positionOfNext(")", cursor)
@@ -1160,16 +1184,21 @@ class ScalaTreeVisitor(
           val arg = app.args(i)
           val argExpr = asExpression(visitTree(arg))
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+          var lastMarkers = Markers.EMPTY
           val afterSpace = if (i == app.args.size - 1) {
             val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-            if (closePos > argEnd) ScalaSpace.format(source, argEnd, closePos) else Space.EMPTY
+            if (closePos > argEnd) {
+              val (sp, mk) = trailingCommaBefore(argEnd, closePos)
+              lastMarkers = mk
+              sp
+            } else Space.EMPTY
           } else {
             val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
             val space = if (commaPos > argEnd) ScalaSpace.format(source, argEnd, commaPos) else Space.EMPTY
             if (commaPos >= cursor) cursor = commaPos + 1
             space
           }
-          outerArgs.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+          outerArgs.add(new JRightPadded(argExpr, afterSpace, lastMarkers))
         }
         val closeParen = positionOfNext(")", cursor)
         if (closeParen >= 0) cursor = closeParen + 1
@@ -1985,15 +2014,15 @@ class ScalaTreeVisitor(
           // Apply the prefix space to the expression
           val exprWithPrefix: Expression = expr.withPrefix(argPrefix)
 
-          // For the last arg, capture trailing whitespace before ')'.
-          val afterSpace = if (i == app.args.size - 1) {
+          // For the last arg, capture the run before ')', which can hold a trailing comma.
+          val (afterSpace, lastMarkers) = if (i == app.args.size - 1) {
             val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
             val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-            if (closePos > argEnd) ScalaSpace.format(source, argEnd, closePos)
-            else Space.EMPTY
-          } else Space.EMPTY
+            if (closePos > argEnd) trailingCommaBefore(argEnd, closePos)
+            else (Space.EMPTY, Markers.EMPTY)
+          } else (Space.EMPTY, Markers.EMPTY)
 
-          args.add(new JRightPadded[Expression](exprWithPrefix, afterSpace, Markers.EMPTY))
+          args.add(new JRightPadded[Expression](exprWithPrefix, afterSpace, lastMarkers))
         case j: J =>
           // Scala statement-as-expression (e.g. if/else, match, block, try) wrapped so it
           // can sit in an argument list. Apply argPrefix and trailing space the same way
@@ -9199,10 +9228,19 @@ class ScalaTreeVisitor(
     var i = 0
     while (i < items.size) {
       val elem = convert(items(i))
-      val after =
-        if (i < last) sourceBefore(",")
-        else sourceBefore(endDelim)
-      padded.add(JRightPadded.build(elem).withAfter(after))
+      if (i < last) {
+        padded.add(JRightPadded.build(elem).withAfter(sourceBefore(",")))
+      } else {
+        // the run before the closing delimiter can hold a trailing comma
+        val delimIdx = positionOfNext(endDelim)
+        if (delimIdx < 0) {
+          padded.add(JRightPadded.build(elem).withAfter(sourceBefore(endDelim)))
+        } else {
+          val (after, elemMarkers) = trailingCommaBefore(cursor, delimIdx)
+          cursor = delimIdx + endDelim.length
+          padded.add(new JRightPadded(elem, after, elemMarkers))
+        }
+      }
       i += 1
     }
     JContainer.build(prefix, padded, markers)

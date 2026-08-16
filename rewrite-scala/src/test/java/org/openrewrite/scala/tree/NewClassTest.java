@@ -409,4 +409,21 @@ class NewClassTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingCommaInConstructorArguments() {
+        rewriteRun(
+          scala(
+            """
+            class C(a: Int, b: Int)
+            object O {
+              val c = new C(
+                1,
+                2,
+              )
+            }
+            """
+          )
+        );
+    }
+
 }

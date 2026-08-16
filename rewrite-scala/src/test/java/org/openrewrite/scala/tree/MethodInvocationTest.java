@@ -571,4 +571,21 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingCommaInArguments() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(a: Int, b: Int): Int = a
+              val r = f(
+                1,
+                2,
+              )
+            }
+            """
+          )
+        );
+    }
+
 }
