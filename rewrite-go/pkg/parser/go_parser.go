@@ -2255,7 +2255,9 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	} else {
 		closePrefix := ctx.prefix(expr.Rparen)
 		ctx.skip(1) // ")"
-		if len(closePrefix.Comments) > 0 {
+		// An empty list has no element whose After could hold what sits
+		// before the `)`, so an Empty carries it.
+		if !closePrefix.IsEmpty() {
 			argElements = append(argElements, java.RightPadded[java.Expression]{
 				Element: &java.Empty{ID: uuid.New()},
 				After:   closePrefix,
@@ -2463,7 +2465,7 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	} else {
 		closePrefix := ctx.prefix(expr.Rbrace)
 		ctx.skip(1) // "}"
-		if len(closePrefix.Comments) > 0 {
+		if !closePrefix.IsEmpty() {
 			elements = append(elements, java.RightPadded[java.Expression]{
 				Element: &java.Empty{ID: uuid.New()},
 				After:   closePrefix,

@@ -20,8 +20,6 @@ package test
 
 import (
 	"fmt"
-	goparser "go/parser"
-	"go/token"
 	"os"
 	"strings"
 	"testing"
@@ -125,9 +123,3 @@ func failureClass(src string) (class string) {
 	return ""
 }
 
-// goParses gates candidates on Go's own parser so reduction explores
-// only valid programs — otherwise it converges on syntax errors.
-func goParses(src string) bool {
-	_, err := goparser.ParseFile(token.NewFileSet(), "reduce.go", src, goparser.ParseComments)
-	return err == nil
-}

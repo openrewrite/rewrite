@@ -428,3 +428,32 @@ func TestParseWithoutByteOrderMark(t *testing.T) {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
 }
+
+// gofmt writes no space inside an empty argument list or composite
+// literal, so hand-written spacing there is the only source of it.
+
+func TestParseSpaceInsideEmptyCallArguments(t *testing.T) {
+	src := "package main\n\nfunc g() int { return 0 }\n\nfunc f() {\n\tx := g( )\n\t_ = x\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseSpaceInsideEmptyMethodCallArguments(t *testing.T) {
+	src := "package main\n\ntype T struct{}\n\nfunc (T) M() {}\n\nfunc f() {\n\tvar t T\n\tt.M(\n\t)\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseSpaceInsideEmptyCompositeLiteral(t *testing.T) {
+	src := "package main\n\nfunc f() {\n\t_ = []int{ }\n\t_ = map[string]int{\n\t}\n\t_ = struct{}{ }\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func assertRoundtrip(t *testing.T, src string) {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
