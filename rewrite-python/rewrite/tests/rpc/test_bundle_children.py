@@ -122,7 +122,7 @@ def test_broadcast_evict_fans_out_to_live_children(tmp_path):
     bc.install("pkgb", "pkgb")
 
     bc.broadcast_evict({"id": "tree-1"})
-    # every live child is told to evict the file so each rolls back its own ref map
+    # every live child is told to evict the file so each drops its own copy of the tree
     assert ("Evict", {"id": "tree-1"}) in bc._children["pkga"].requests
     assert ("Evict", {"id": "tree-1"}) in bc._children["pkgb"].requests
 
