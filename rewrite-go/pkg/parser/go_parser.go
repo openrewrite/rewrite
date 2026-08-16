@@ -1335,9 +1335,22 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 		ID:       uuid.New(),
 		Prefix:   prefix,
 		Markers:  markers,
+		Type:     ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 		Variable: lhs,
 		Value:    java.LeftPadded[java.Expression]{Before: opPrefix, Element: rhs},
 	}
+}
+
+// assignedType is the type of what an assignment writes, taken from the
+// value where the target carries none — the blank identifier is the one
+// that does not.
+func (ctx *parseContext) assignedType(lhs, rhs ast.Expr) java.JavaType {
+	for _, e := range []ast.Expr{lhs, rhs} {
+		if tv, ok := ctx.typeInfo.Types[e]; ok && tv.Type != nil {
+			return ctx.mapper.mapType(tv.Type)
+		}
+	}
+	return nil
 }
 
 func mapAssignmentOp(tok token.Token) (java.AssignmentOperator, bool) {
@@ -2643,12 +2656,16 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 		}
 	}
 
-	return &java.ArrayType{
+	at := &java.ArrayType{
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		Dimension:   java.LeftPadded[java.Space]{Element: closePrefix},
 		ElementType: elt,
 	}
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		at.Type = ctx.mapper.mapType(tv.Type)
+	}
+	return at
 }
 
 // mapParameterizedType maps a single-type-arg generic instantiation in a type position,

@@ -275,3 +275,69 @@ func main() {
 		t.Fatal("expected non-nil compilation unit")
 	}
 }
+
+func TestTypeAttributionAssignment(t *testing.T) {
+	src := "package main\n\nfunc f() {\n\tx := 1\n\tx = 2\n\t_ = x\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var found int
+	forEachAssignment(cu, func(a *java.Assignment) {
+		found++
+		if a.Type == nil {
+			t.Errorf("assignment %d has no type", found)
+		} else if prim, ok := a.Type.(*java.JavaTypePrimitive); !ok || prim.Keyword != "int" {
+			t.Errorf("assignment %d type: got %v, want int", found, a.Type)
+		}
+	})
+	if found != 3 {
+		t.Fatalf("expected 3 assignments, found %d", found)
+	}
+}
+
+func TestTypeAttributionSliceType(t *testing.T) {
+	src := "package main\n\nvar xs []int\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var found int
+	forEachArrayType(cu, func(a *java.ArrayType) {
+		found++
+		if a.Type == nil {
+			t.Error("slice type has no type")
+		}
+	})
+	if found != 1 {
+		t.Fatalf("expected 1 array type, found %d", found)
+	}
+}
+
+type assignmentWalker struct {
+	visitor.GoVisitor
+	onAssignment func(*java.Assignment)
+	onArrayType  func(*java.ArrayType)
+}
+
+func (v *assignmentWalker) VisitAssignment(a *java.Assignment, p any) java.J {
+	if v.onAssignment != nil {
+		v.onAssignment(a)
+	}
+	return v.GoVisitor.VisitAssignment(a, p)
+}
+
+func (v *assignmentWalker) VisitArrayType(a *java.ArrayType, p any) java.J {
+	if v.onArrayType != nil {
+		v.onArrayType(a)
+	}
+	return v.GoVisitor.VisitArrayType(a, p)
+}
+
+func forEachAssignment(cu java.Tree, f func(*java.Assignment)) {
+	visitor.Init(&assignmentWalker{onAssignment: f}).Visit(cu, nil)
+}
+
+func forEachArrayType(cu java.Tree, f func(*java.ArrayType)) {
+	visitor.Init(&assignmentWalker{onArrayType: f}).Visit(cu, nil)
+}

@@ -1,0 +1,217 @@
+//go:build parityaudit
+
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package test
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"sort"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
+
+// TestTypeAttribution counts how many of a corpus's type slots came back
+// resolved. Round-trip fidelity and Space soundness say nothing about
+// attribution, so a change made to stop a crash can quietly hollow out
+// the type graph while every other metric holds steady.
+//
+// Slots are counted per (node type, field): `java.Identifier.Type` and
+// `java.MethodInvocation.MethodType` are separate populations, because a
+// regression usually shows up in one of them rather than in the total.
+//
+//	GO_CORPUS=/tmp/go-corpus go test -tags parityaudit ./test/ -run TestTypeAttribution -timeout 60m
+func TestTypeAttribution(t *testing.T) {
+	root := os.Getenv("GO_CORPUS")
+	if root == "" {
+		t.Skip("GO_CORPUS not set")
+	}
+	files := stride(collectGoFiles(t, root), envInt("GO_TYPES_FILES", 2000))
+
+	var mu sync.Mutex
+	totals := map[string]*slotCount{}
+
+	var wg sync.WaitGroup
+	work := make(chan string)
+	for w := 0; w < runtime.NumCPU(); w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range work {
+				counts := attributionOf(root, path)
+				mu.Lock()
+				for k, v := range counts {
+					c := totals[k]
+					if c == nil {
+						c = &slotCount{}
+						totals[k] = c
+					}
+					c.resolved += v.resolved
+					c.unknown += v.unknown
+					c.nil_ += v.nil_
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	for _, f := range files {
+		work <- f
+	}
+	close(work)
+	wg.Wait()
+
+	keys := make([]string, 0, len(totals))
+	var all slotCount
+	for k, v := range totals {
+		keys = append(keys, k)
+		all.resolved += v.resolved
+		all.unknown += v.unknown
+		all.nil_ += v.nil_
+	}
+	sort.Slice(keys, func(i, j int) bool { return totals[keys[i]].total() > totals[keys[j]].total() })
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "files: %d\n", len(files))
+	fmt.Fprintf(&sb, "%-52s %10s %10s %10s %8s\n", "slot", "resolved", "unknown", "nil", "resolved%")
+	fmt.Fprintf(&sb, "%-52s %10d %10d %10d %7.2f%%\n", "TOTAL", all.resolved, all.unknown, all.nil_, all.pct())
+	for _, k := range keys {
+		c := totals[k]
+		fmt.Fprintf(&sb, "%-52s %10d %10d %10d %7.2f%%\n", k, c.resolved, c.unknown, c.nil_, c.pct())
+	}
+	t.Logf("\n%s", sb.String())
+}
+
+type slotCount struct{ resolved, unknown, nil_ int }
+
+func (c *slotCount) total() int { return c.resolved + c.unknown + c.nil_ }
+func (c *slotCount) pct() float64 {
+	if c.total() == 0 {
+		return 0
+	}
+	return 100 * float64(c.resolved) / float64(c.total())
+}
+
+func attributionOf(root, path string) (counts map[string]*slotCount) {
+	counts = map[string]*slotCount{}
+	defer func() { recover() }()
+
+	src, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	if !parser.MatchBuildContext(parser.NewGoParser().BuildContext, filepath.Base(path), string(src)) {
+		return
+	}
+	cu, err := parser.NewGoParser().Parse(filepath.Base(path), string(src))
+	if err != nil {
+		return
+	}
+	(&typeWalker{counts: counts, seen: map[uintptr]bool{}}).walk(reflect.ValueOf(cu), "")
+	return
+}
+
+var javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
+
+type typeWalker struct {
+	counts map[string]*slotCount
+	seen   map[uintptr]bool
+}
+
+func (w *typeWalker) count(slot string, v reflect.Value) {
+	c := w.counts[slot]
+	if c == nil {
+		c = &slotCount{}
+		w.counts[slot] = c
+	}
+	switch {
+	case v.IsNil():
+		c.nil_++
+	case v.Interface() == java.UnknownType:
+		c.unknown++
+	default:
+		c.resolved++
+	}
+}
+
+func (w *typeWalker) walk(v reflect.Value, owner string) {
+	if !v.IsValid() {
+		return
+	}
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface:
+		if v.IsNil() {
+			return
+		}
+		if v.Kind() == reflect.Ptr {
+			if v.Type().Implements(javaTypeIface) {
+				return // inside the type graph, not a slot on a node
+			}
+			if w.seen[v.Pointer()] {
+				return
+			}
+			w.seen[v.Pointer()] = true
+			owner = strings.TrimPrefix(v.Type().String(), "*")
+		}
+		w.walk(v.Elem(), owner)
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			w.walk(v.Index(i), owner)
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			w.walk(v.MapIndex(k), owner)
+		}
+	case reflect.Struct:
+		if v.Type().Implements(javaTypeIface) {
+			return
+		}
+		if n := v.Type().Name(); n != "" && !strings.HasPrefix(n, "Container") &&
+			!strings.HasPrefix(n, "RightPadded") && !strings.HasPrefix(n, "LeftPadded") {
+			owner = v.Type().String()
+		}
+		for i := 0; i < v.NumField(); i++ {
+			f := v.Type().Field(i)
+			if f.PkgPath != "" {
+				continue
+			}
+			fv := v.Field(i)
+			if isTypeSlot(f.Type) {
+				w.count(owner+"."+f.Name, fv)
+				continue
+			}
+			w.walk(fv, owner+"."+f.Name)
+		}
+	}
+}
+
+// isTypeSlot reports whether a field holds attribution rather than tree
+// structure: the JavaType interface itself, or a pointer to one of the
+// concrete types a node names directly.
+func isTypeSlot(t reflect.Type) bool {
+	if t.Kind() == reflect.Interface {
+		return t == javaTypeIface
+	}
+	return t.Kind() == reflect.Ptr && t.Implements(javaTypeIface)
+}

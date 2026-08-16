@@ -608,8 +608,9 @@ func (s *JavaSender) VisitArrayType(at *java.ArrayType, p any) java.J {
 	// dimension (left-padded)
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Dimension },
 		func(v any) { sendLeftPadded(s, v, q) })
-	// type
-	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Type }, nil)
+	// type (as ref)
+	q.GetAndSend(at, func(v any) any { return AsRef(v.(*java.ArrayType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return at
 }
 
