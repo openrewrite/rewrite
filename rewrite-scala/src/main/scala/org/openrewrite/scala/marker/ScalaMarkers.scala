@@ -177,6 +177,16 @@ case class PureFunctionArrow(id: UUID) extends Marker {
 }
 
 /**
+ * Context bounds on a higher-kinded type parameter, as in the `: Monad` of `[F[_]: Monad]`.
+ * Dotty records context bounds on the parameter's rhs only for a plain parameter, so for a
+ * higher-kinded one the source is kept verbatim and printed after the name.
+ */
+case class ContextBoundSuffix(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * A self-type clause opening a template body, as in `trait T { self => ... }` or
  * `trait T:\n  this: U =>`. Holds the verbatim source from the body delimiter through
  * the `=>`. Dotty keeps the clause out of the body, so there is no statement to map it to.

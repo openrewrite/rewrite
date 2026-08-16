@@ -1183,4 +1183,20 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void contextBoundOnHigherKindedTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            trait Monad[F[_]]
+            trait Par[F[_]]
+            object Test {
+              def f[F[_]: Monad, A](x: A): A = x
+              def g[F[_]: Monad: Par](x: Int): Int = x
+            }
+            """
+          )
+        );
+    }
+
 }

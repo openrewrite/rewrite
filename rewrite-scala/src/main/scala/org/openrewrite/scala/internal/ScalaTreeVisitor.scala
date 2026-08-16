@@ -57,6 +57,7 @@ import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
 import org.openrewrite.scala.marker.ContextFunctionArrow
 import org.openrewrite.scala.marker.CaptureSet
+import org.openrewrite.scala.marker.ContextBoundSuffix
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
 import org.openrewrite.scala.marker.RightAssociative
@@ -9667,6 +9668,32 @@ class ScalaTreeVisitor(
     case _ => null
   }
   
+  /** Consumes `: Bound` clauses sitting at the cursor inside a type-parameter list, returning
+   *  their verbatim source. Stops at the `,` or `]` that closes the parameter.
+   */
+  private def consumeStrayContextBounds(): String = {
+    var i = cursor
+    while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
+    if (i >= source.length || source.charAt(i) != ':') null
+    else {
+      var depth = 0
+      var end = i
+      var done = false
+      while (!done && end < source.length) {
+        source.charAt(end) match {
+          case '[' | '(' => depth += 1; end += 1
+          case ']' | ')' if depth > 0 => depth -= 1; end += 1
+          case ']' | ',' if depth == 0 => done = true
+          case '\n' => done = true
+          case _ => end += 1
+        }
+      }
+      val text = source.substring(cursor, end)
+      cursor = end
+      text
+    }
+  }
+
   private def visitTypeParameter(tparam: Trees.TypeDef[?]): J.TypeParameter = {
     val prefix = extractPrefix(tparam.span)
 
@@ -9819,6 +9846,13 @@ class ScalaTreeVisitor(
     // - TypeBoundsTree: upper/lower bounds like `<: Comparable` or `>: Null`
     // - untpd.ContextBounds: context bounds like `: ClassTag` (wraps TypeBoundsTree + cxBounds list)
     // Each bound is wrapped in J.TypeBound to carry its Kind (Upper/Lower).
+    // Dotty does not record a context bound on a higher-kinded parameter's rhs, so `F[_]: Monad`
+    // leaves the bound unclaimed in source.
+    val strayContextBounds: String = tparam.rhs match {
+      case _: untpd.LambdaTypeTree => consumeStrayContextBounds()
+      case _ => null
+    }
+
     val bounds: JContainer[TypeTree] = tparam.rhs match {
       case cb: untpd.ContextBounds =>
         // Context bounds: [T: ClassTag] or [T: Ordering : Show]
@@ -9916,7 +9950,9 @@ class ScalaTreeVisitor(
       modifiers,
       name,
       bounds
-    )
+    ).withMarkers(
+      if (strayContextBounds == null) Markers.EMPTY
+      else Markers.EMPTY.add(ContextBoundSuffix(Tree.randomId(), strayContextBounds)))
   }
 
   /**
