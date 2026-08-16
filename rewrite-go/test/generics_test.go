@@ -152,3 +152,31 @@ func TestParseMutuallyRecursiveGenerics(t *testing.T) {
 			func (B[P]) m(A[A[P]]) {}
 		`))
 }
+
+func TestParseTrailingCommaInTypeArguments(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func NewMap[K any, V any]() int { return 0 }
+
+			var m = NewMap[
+				string,
+				int,
+			]()
+		`))
+}
+
+func TestParseTrailingCommaInGenericTypeReference(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type M[K any, V any] struct{}
+
+			var m M[
+				string,
+				int,
+			]
+		`))
+}

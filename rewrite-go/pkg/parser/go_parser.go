@@ -2632,13 +2632,36 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expressi
 func (ctx *parseContext) mapTypeArgsSingle(expr *ast.IndexExpr) *java.Container[java.Expression] {
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
-	typeArg := ctx.mapTypeExpr(expr.Index)
-	rbrackPrefix := ctx.prefix(expr.Rbrack)
-	ctx.skip(1) // "]"
+	elements := []java.RightPadded[java.Expression]{{Element: ctx.mapTypeExpr(expr.Index)}}
+	markers := ctx.closeTypeArgs(elements, expr.Rbrack)
 	return &java.Container[java.Expression]{
 		Before:   lbrackPrefix,
-		Elements: []java.RightPadded[java.Expression]{{Element: typeArg, After: rbrackPrefix}},
+		Elements: elements,
+		Markers:  markers,
 	}
+}
+
+// closeTypeArgs consumes a type argument list's `]`, claiming a trailing
+// comma into a marker so it does not end up in the whitespace before the
+// bracket. The last element's After takes that whitespace otherwise.
+func (ctx *parseContext) closeTypeArgs(elements []java.RightPadded[java.Expression], rbrack token.Pos) java.Markers {
+	if commaOff := ctx.findNextBefore(',', ctx.file.Offset(rbrack)); commaOff >= 0 {
+		before := ctx.prefix(ctx.file.Pos(commaOff))
+		ctx.skip(1) // ","
+		after := ctx.prefix(rbrack)
+		ctx.skip(1) // "]"
+		return java.Markers{
+			ID: uuid.New(),
+			Entries: []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: before,
+				After:  after,
+			}},
+		}
+	}
+	elements[len(elements)-1].After = ctx.prefix(rbrack)
+	ctx.skip(1) // "]"
+	return java.Markers{}
 }
 
 // mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,
@@ -2671,16 +2694,15 @@ func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Contain
 				after = ctx.prefix(ctx.file.Pos(commaOffset))
 				ctx.skip(1) // ","
 			}
-		} else {
-			after = ctx.prefix(expr.Rbrack)
 		}
 		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
-	ctx.skip(1) // "]"
+	markers := ctx.closeTypeArgs(elements, expr.Rbrack)
 
 	return &java.Container[java.Expression]{
 		Before:   lbrackPrefix,
 		Elements: elements,
+		Markers:  markers,
 	}
 }
 

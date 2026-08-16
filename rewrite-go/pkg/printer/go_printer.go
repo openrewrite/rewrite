@@ -412,16 +412,7 @@ func (p *GoPrinter) VisitMethodInvocation(mi *java.MethodInvocation, param any) 
 		p.Visit(mi.Name, out)
 	}
 	if mi.TypeParameters != nil {
-		p.visitSpace(mi.TypeParameters.Before, out)
-		out.Append("[")
-		for i, rp := range mi.TypeParameters.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-			if i < len(mi.TypeParameters.Elements)-1 {
-				out.Append(",")
-			}
-		}
-		out.Append("]")
+		p.printTypeArgs(mi.TypeParameters, out)
 	}
 	p.visitSpace(mi.Arguments.Before, out)
 	out.Append("(")
@@ -1074,21 +1065,33 @@ func (p *GoPrinter) VisitIndexList(il *golang.IndexList, param any) java.J {
 	return il
 }
 
+// printTypeArgs emits the `[T, U]` of a generic instantiation.
+func (p *GoPrinter) printTypeArgs(args *java.Container[java.Expression], out *PrintOutputCapture) {
+	p.visitSpace(args.Before, out)
+	out.Append("[")
+	tc := java.FindMarker[golang.TrailingComma](args.Markers)
+	for i, rp := range args.Elements {
+		p.Visit(rp.Element, out)
+		if i < len(args.Elements)-1 {
+			p.visitSpace(rp.After, out)
+			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
+		} else {
+			p.visitSpace(rp.After, out)
+		}
+	}
+	out.Append("]")
+}
+
 func (p *GoPrinter) VisitParameterizedType(pt *java.ParameterizedType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(pt.Prefix, pt.Markers, out)
 	p.Visit(pt.Clazz, out)
 	if pt.TypeParameters != nil {
-		p.visitSpace(pt.TypeParameters.Before, out)
-		out.Append("[")
-		for i, rp := range pt.TypeParameters.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-			if i < len(pt.TypeParameters.Elements)-1 {
-				out.Append(",")
-			}
-		}
-		out.Append("]")
+		p.printTypeArgs(pt.TypeParameters, out)
 	}
 	p.afterSyntax(pt.Markers, out)
 	return pt
