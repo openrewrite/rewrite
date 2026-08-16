@@ -187,3 +187,45 @@ func TestStructTag_NonStructDoesNotEmitAnnotations(t *testing.T) {
 		}
 	}
 }
+
+func TestStructTag_InterpretedStringRoundtrip(t *testing.T) {
+	// A tag may be any string literal, not just a raw one.
+	src := "package main\n\ntype X struct {\n\tField string \"json:\\\"a\\\"\"\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+	vd := parseStructAndFindField(t, src, "Field")
+	if len(vd.LeadingAnnotations) != 1 {
+		t.Fatalf("LeadingAnnotations: got %d, want 1", len(vd.LeadingAnnotations))
+	}
+	if name := vd.LeadingAnnotations[0].AnnotationType.(*java.Identifier).Name; name != "json" {
+		t.Errorf("key: got %q, want %q", name, "json")
+	}
+}
+
+func TestStructTag_WithoutKeyValuePairsRoundtrip(t *testing.T) {
+	// `reflect.StructTag` finds no pairs here, but the text is source.
+	src := "package main\n\ntype X struct {\n\tField func() \"x\"\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+func TestStructTag_RawWithoutKeyValuePairsRoundtrip(t *testing.T) {
+	src := "package main\n\ntype X struct {\n\tField int `x`\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}

@@ -3072,17 +3072,28 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 	outerPrefix := ctx.prefix(tag.Pos())
 	ctx.skip(len(tag.Value))
 
-	// tag.Value includes the wrapping backticks (or quotes).
-	raw := tag.Value
-	if len(raw) >= 2 {
-		first, last := raw[0], raw[len(raw)-1]
-		if (first == '`' && last == '`') || (first == '"' && last == '"') {
-			raw = raw[1 : len(raw)-1]
-		}
+	// tag.Value includes the delimiters. Unquoting an interpreted string
+	// resolves its escapes, so `"json:\"a\""` yields the same pairs as
+	// the raw-string spelling.
+	raw, err := strconv.Unquote(tag.Value)
+	if err != nil {
+		raw = tag.Value
+	}
+	quote := "`"
+	if len(tag.Value) > 0 && tag.Value[0] == '"' {
+		quote = `"`
+		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: quote})
 	}
 
 	pairs := parseStructTagPairs(raw)
 	if len(pairs) == 0 {
+		// No `key:"value"` in it, but the text is still source. One
+		// annotation with no arguments holds it and prints back as-is.
+		vd.LeadingAnnotations = []*java.Annotation{{
+			ID:             uuid.New(),
+			Prefix:         outerPrefix,
+			AnnotationType: &java.Identifier{ID: uuid.New(), Name: raw},
+		}}
 		return
 	}
 

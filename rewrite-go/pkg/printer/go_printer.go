@@ -17,6 +17,8 @@
 package printer
 
 import (
+	"strings"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -495,15 +497,27 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 	// chose Option 1 in the design discussion: lossy on non-canonical
 	// input, exact on gofmt'd input).
 	if len(vd.LeadingAnnotations) > 0 && p.insideStructType() {
+		quote := "`"
+		if q := java.FindMarker[golang.StructTagQuote](vd.Markers); q != nil {
+			quote = q.Quote
+		}
 		first := vd.LeadingAnnotations[0]
 		p.visitSpace(first.Prefix, out)
-		out.Append("`")
-		p.printAnnotationBody(first, out)
+		body := NewPrintOutputCaptureWithMarkers(out.markerPrinter)
+		p.printAnnotationBody(first, body)
 		for _, ann := range vd.LeadingAnnotations[1:] {
-			p.visitSpace(ann.Prefix, out)
-			p.printAnnotationBody(ann, out)
+			p.visitSpace(ann.Prefix, body)
+			p.printAnnotationBody(ann, body)
 		}
-		out.Append("`")
+		out.Append(quote)
+		if quote == "`" {
+			out.Append(body.String())
+		} else {
+			// An interpreted string re-escapes what a raw string carries
+			// literally.
+			out.Append(strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(body.String()))
+		}
+		out.Append(quote)
 	}
 	// Then initializers
 	firstInit := true

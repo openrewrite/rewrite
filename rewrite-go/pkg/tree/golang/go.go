@@ -1294,6 +1294,17 @@ type StructTag struct {
 
 func (s StructTag) ID() uuid.UUID { return s.Ident }
 
+// StructTagQuote records which string literal delimiter a struct tag was
+// written with. The tag itself is modelled as LeadingAnnotations, which
+// carry its keys and values but not the quoting; absent this marker the
+// printer writes a raw string.
+type StructTagQuote struct {
+	Ident uuid.UUID
+	Quote string // "`" or `"`
+}
+
+func (s StructTagQuote) ID() uuid.UUID { return s.Ident }
+
 // ConstDecl is a marker on VariableDeclarations indicating `const` instead of `var`.
 type ConstDecl struct {
 	Ident uuid.UUID
