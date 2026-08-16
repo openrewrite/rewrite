@@ -53,7 +53,7 @@ class ScalaSweepTest {
                         Matcher mm = Pattern.compile("~~\\(non-whitespace\\)~~>(.{0,25})", Pattern.DOTALL).matcher(v.printAll());
                         String c = mm.find() ? wsCause(mm.group(1)) : "?";
                         wsCause.merge(c, 1, Integer::sum);
-                        if (c.equals("type ascription") && wsSamples.size() < 10) wsSamples.add(sf.getSourcePath() + "  |" + mm.group(1).replace("\n","\\n") + "|");
+                        if (c.equals("inline modifier") && wsSamples.size() < 10) wsSamples.add(sf.getSourcePath() + "  |" + mm.group(1).replace("\n","\\n") + "|");
                     }
                 } catch (UnsupportedOperationException ignored) {}
             }

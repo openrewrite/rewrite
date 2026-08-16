@@ -1213,4 +1213,19 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void inlineParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              inline def f(inline op: Boolean): Boolean = op
+              inline def g(a: Int, inline op: Boolean, b: Int): Boolean = op
+              inline def h(inline op: => Int): Int = op
+            }
+            """
+          )
+        );
+    }
+
 }

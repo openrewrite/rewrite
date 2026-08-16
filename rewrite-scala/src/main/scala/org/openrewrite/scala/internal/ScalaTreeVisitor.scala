@@ -7101,7 +7101,23 @@ class ScalaTreeVisitor(
     val paramModifiers = new util.ArrayList[J.Modifier]()
     val isUsing = vd.mods != null && vd.mods.is(Flags.Given)
     val isScala2Implicit = vd.mods != null && vd.mods.is(Flags.Implicit) && !isUsing
-    val prefix: Space = if (isScala2Implicit || isUsing) {
+    // The untyped tree carries no flag for an `inline` parameter and its span opens on the
+    // keyword, so read it from the source at the cursor.
+    val inlineAt = if (isUsing || (vd.mods != null && vd.mods.is(Flags.Implicit))) -1 else {
+      var i = cursor
+      while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
+      val end = i + "inline".length
+      if (source.startsWith("inline", i) &&
+          (end >= source.length || !(Character.isLetterOrDigit(source.charAt(end)) || source.charAt(end) == '_'))) i
+      else -1
+    }
+    val prefix: Space = if (inlineAt >= 0) {
+      paramModifiers.add(new J.Modifier(Tree.randomId(),
+        if (inlineAt > cursor) Space.format(source.substring(cursor, inlineAt)) else Space.EMPTY,
+        Markers.EMPTY, "inline", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+      cursor = inlineAt + "inline".length
+      Space.EMPTY
+    } else if (isScala2Implicit || isUsing) {
       val keyword = if (isUsing) "using" else "implicit"
       val spanStart = Math.max(0, vd.span.start - offsetAdjustment)
       if (cursor < spanStart && spanStart <= source.length) {
