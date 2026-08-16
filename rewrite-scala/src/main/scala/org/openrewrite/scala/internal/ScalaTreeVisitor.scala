@@ -278,6 +278,8 @@ class ScalaTreeVisitor(
       case stt: Trees.SingletonTypeTree[?] => visitSingletonTypeTree(stt)
       case rtt: Trees.RefinedTypeTree[?] => visitRefinedTypeTree(rtt)
       case ann: Trees.Annotated[?] => visitAnnotated(ann)
+      // Capture checking wraps a result type; the wrapper itself has no source of its own
+      case car: untpd.CapturesAndResult => visitTree(car.parent)
       case mac: untpd.MacroTree => visitMacroTree(mac)
       case ext: untpd.ExtMethods => visitExtMethods(ext)
       case forYield: untpd.ForYield => visitForYield(forYield)

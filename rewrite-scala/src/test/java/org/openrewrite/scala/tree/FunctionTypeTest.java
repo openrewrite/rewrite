@@ -187,4 +187,19 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void byNameParameterUnderCaptureChecking() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            object O {
+              def fill[T](n: Int)(elem: => T): Int = n
+              def f(g: => Int^): Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }
