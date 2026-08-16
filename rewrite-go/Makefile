@@ -1,4 +1,4 @@
-.PHONY: test parity sweep reduce
+.PHONY: test parity sweep reduce fuzz
 
 # Default test run — what CI executes. Build-tag-gated tests stay out.
 test:
@@ -26,6 +26,14 @@ SWEEP_OUT ?= /tmp/go-sweep
 sweep:
 	GO_CORPUS=$(CORPUS) GO_CORPUS_OUT=$(SWEEP_OUT) \
 		go test -tags parityaudit ./test/ -run TestSweep -timeout 180m -v
+
+# Widen the gap between adjacent tokens of corpus files and check the
+# result still round-trips. Finds spacing bugs the corpus cannot, since
+# gofmt leaves exactly one canonical gap between any two tokens.
+#
+#   make fuzz CORPUS=/tmp/go-corpus
+fuzz:
+	GO_CORPUS=$(CORPUS) go test -tags parityaudit ./test/ -run TestFuzzTokenGaps -timeout 180m -v
 
 # Shrink one failing corpus file to a minimal reproducer.
 #

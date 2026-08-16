@@ -93,3 +93,20 @@ classification, so it converges on the construct at fault rather than on
 some other bug. Turn the result into an ordinary test in the topic file
 that covers that syntax — `rewriteRun` already asserts both byte-equal
 round-trip and a clean tree, so a minimal reproducer is a complete test.
+
+## Fuzzing the gaps between tokens
+
+```sh
+make fuzz CORPUS=/tmp/go-corpus
+```
+
+Real Go is overwhelmingly gofmt'd, which leaves exactly one canonical
+amount of space between any two tokens. `make fuzz` widens that gap —
+with a block comment, extra spaces, a tab, a newline — and checks the
+result still round-trips. It reaches the places a corpus of formatted
+code never does: whether an empty argument list keeps `( )`, whether a
+directive keeps two spaces before its arguments.
+
+Failures are grouped by the same normalized signature the sweep uses,
+and reported one line per distinct cause with a file and offset to
+reproduce from.
