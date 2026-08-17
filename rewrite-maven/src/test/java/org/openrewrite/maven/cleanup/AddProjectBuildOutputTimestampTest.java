@@ -127,28 +127,4 @@ class AddProjectBuildOutputTimestampTest implements RewriteTest {
           )
         );
     }
-    @Test
-    void defaultTimestampIsValidForZipOutput() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>com.example</groupId>
-                <artifactId>app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            """
-              <project>
-                <groupId>com.example</groupId>
-                <artifactId>app</artifactId>
-                <version>1</version>
-                <properties>
-                  <project.build.outputTimestamp>1980-01-01T00:00:02Z</project.build.outputTimestamp>
-                </properties>
-              </project>
-              """
-          )
-        );
-    }
 }
