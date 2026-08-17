@@ -51,7 +51,7 @@ func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) jav
 	// lives on the first child (e.g., MethodInvocation's Select).
 	// The cursor here walks the template, so the position a capture lands in is
 	// the placeholder's own.
-	return parenthesize(setLeadingPrefix(val, ident.Prefix), v.Cursor())
+	return parenthesized(setLeadingPrefix(val, ident.Prefix), v.Cursor())
 }
 
 // substitute applies the substitution visitor to the template tree,

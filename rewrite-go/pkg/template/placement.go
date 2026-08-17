@@ -17,10 +17,8 @@
 package template
 
 import (
-	"github.com/google/uuid"
-
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/format"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parenthesize"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -31,61 +29,19 @@ func placeAt(result java.J, site *visitor.Cursor) java.J {
 	if !ok {
 		return result
 	}
-	out := parenthesize(setLeadingPrefix(result, getLeadingPrefix(replaced)), site)
+	out := parenthesized(setLeadingPrefix(result, getLeadingPrefix(replaced)), site)
 	if formatted, ok := format.AutoFormat(out, nil, nil, site.Parent()).(java.J); ok {
 		return formatted
 	}
 	return out
 }
 
-// parenthesize wraps e in parentheses when the position it lands in binds
-// tighter than e does, which is what keeps a substitution from changing how the
-// surrounding expression groups. site is the node e replaces.
-func parenthesize(e java.J, site *visitor.Cursor) java.J {
-	expr, ok := e.(java.Expression)
-	if !ok || !needsParens(expr, site) {
-		return e
+// parenthesized applies parenthesize.Maybe to anything that is an expression.
+// A template result can be a statement or a declaration, which never regroups.
+func parenthesized(j java.J, site *visitor.Cursor) java.J {
+	expr, ok := j.(java.Expression)
+	if !ok {
+		return j
 	}
-	inner := setLeadingPrefix(expr, java.Space{})
-	return &java.Parentheses{
-		ID:     uuid.New(),
-		Prefix: getLeadingPrefix(expr),
-		Tree:   java.RightPadded[java.Expression]{Element: inner.(java.Expression)},
-	}
-}
-
-func needsParens(e java.Expression, site *visitor.Cursor) bool {
-	prec, _, _, isBinary := format.BinaryOperands(e)
-	if !isBinary || site == nil || site.Parent() == nil {
-		return false
-	}
-	replaced := site.Value()
-	switch parent := site.Parent().Value().(type) {
-	case *java.Unary, *golang.Unary:
-		return true
-	// A primary expression is what these apply to, so an operator inside one
-	// has to be grouped away from it.
-	case *java.FieldAccess, *java.ArrayAccess, *golang.TypeAssertion:
-		return true
-	case *java.MethodInvocation:
-		return parent.Select != nil && any(parent.Select.Element) == any(replaced)
-	default:
-		enclosing, isExpr := site.Parent().Value().(java.Expression)
-		if !isExpr {
-			return false
-		}
-		outer, left, right, ok := format.BinaryOperands(enclosing)
-		if !ok {
-			return false
-		}
-		// Go's binary operators are left-associative, so an equally binding
-		// right operand regroups where a left one does not.
-		if any(right) == any(replaced) {
-			return prec <= outer
-		}
-		if any(left) == any(replaced) {
-			return prec < outer
-		}
-		return false
-	}
+	return parenthesize.Maybe(expr, site)
 }
