@@ -27,7 +27,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -82,7 +83,7 @@ public class SortDependencies extends Recipe {
                         ).thenComparing(
                             group -> groupArtifactSortKey(group.tag)
                         ))
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 List<DependencyGroup> reorderedGroups = new ArrayList<>(groups);
                 int replacementIndex = 0;
