@@ -413,3 +413,14 @@ func TestTabsAndIndents_OutdentsLabels(t *testing.T) {
 		t.Errorf("want %q\ngot  %q", want, out)
 	}
 }
+
+func TestBinarySpacing_SiblingArgumentsKeepTheirDepth(t *testing.T) {
+	// The parenthesised argument lowers the depth for its own contents only.
+	out := applyVisitor(t,
+		"package p\n\nfunc f(g func(int, int), max int) {\n\tg(-(max - 1), max - 1)\n}\n",
+		format.NewBinarySpacingVisitor(nil))
+	want := "package p\n\nfunc f(g func(int, int), max int) {\n\tg(-(max - 1), max-1)\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}

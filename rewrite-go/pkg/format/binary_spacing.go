@@ -96,8 +96,10 @@ func (v *BinarySpacingVisitor) VisitGoBinary(bin *golang.Binary, p any) java.J {
 // VisitParentheses undoes one level of nesting, since the parentheses already
 // group what the depth is standing in for.
 func (v *BinarySpacingVisitor) VisitParentheses(parens *java.Parentheses, p any) java.J {
+	depth := v.depth
 	out := *parens
-	out.Tree.Element = v.operand(parens.Tree.Element, reduceDepth(v.depth))
+	out.Tree.Element = v.operand(parens.Tree.Element, reduceDepth(depth))
+	v.depth = depth
 	return &out
 }
 
@@ -215,10 +217,12 @@ func (v *BinarySpacingVisitor) operand(e java.Expression, depth int) java.Expres
 }
 
 func (v *BinarySpacingVisitor) operandList(elements []java.RightPadded[java.Expression], depth int) []java.RightPadded[java.Expression] {
+	outer := v.depth
 	out := append([]java.RightPadded[java.Expression](nil), elements...)
 	for i := range out {
 		out[i].Element = v.operand(out[i].Element, depth)
 	}
+	v.depth = outer
 	return out
 }
 

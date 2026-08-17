@@ -189,12 +189,10 @@ func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPad
 }
 
 // VisitLabel sits a label one level out from the statements around it, and
-// leaves the statement it labels at their level.
+// leaves the statement it labels — and any comment ahead of the label — at
+// their level.
 func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
-	depth := v.depth
-	v.depth = reduceIndentDepth(depth)
-	out := l.WithPrefix(v.reindentSpace(l.Prefix))
-	v.depth = depth
+	out := l.WithPrefix(v.reindentClauseLeadIn(l.Prefix))
 
 	copied := *out
 	statement := l.Statement
@@ -277,23 +275,41 @@ func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation,
 // depth is taken from the enclosing statement rather than from the operand.
 func (v *TabsAndIndentsVisitor) VisitBinary(b *java.Binary, p any) java.J {
 	out := *b
-	v.depth++
-	if right, ok := transformPrefix(b.Right, v.reindentSpace).(java.Expression); ok {
-		out.Right = right
-	}
-	v.depth--
-	return v.GoVisitor.VisitBinary(&out, p)
+	out.Left = v.visitOperand(b.Left, false, p)
+	out.Right = v.visitOperand(b.Right, true, p)
+	return &out
 }
 
 // VisitGoBinary applies VisitBinary's rule to Go's own binary expressions.
 func (v *TabsAndIndentsVisitor) VisitGoBinary(b *golang.Binary, p any) java.J {
 	out := *b
-	v.depth++
-	if right, ok := transformPrefix(b.Right, v.reindentSpace).(java.Expression); ok {
-		out.Right = right
+	out.Left = v.visitOperand(b.Left, false, p)
+	out.Right = v.visitOperand(b.Right, true, p)
+	return &out
+}
+
+// visitOperand indents an operand that continues on its own line, and descends
+// into it at that level so an operand wrapping inside one lands a level
+// further in. Only the right-hand operand can start a continuation line; the
+// left one opens the expression.
+func (v *TabsAndIndentsVisitor) visitOperand(e java.Expression, continues bool, p any) java.Expression {
+	if e == nil {
+		return nil
 	}
-	v.depth--
-	return v.GoVisitor.VisitGoBinary(&out, p)
+	wraps := continues && breaksLine(getPrefix(e))
+	if wraps {
+		v.depth++
+		if fixed, ok := transformPrefix(e, v.reindentSpace).(java.Expression); ok {
+			e = fixed
+		}
+	}
+	if next, ok := v.Visit(e, p).(java.Expression); ok {
+		e = next
+	}
+	if wraps {
+		v.depth--
+	}
+	return e
 }
 
 // VisitCommClause aligns a select clause the way VisitCase aligns a switch
@@ -333,11 +349,11 @@ func ownsItsLeadIn(t java.Tree) bool {
 	return false
 }
 
-// reindentClauseLeadIn re-indents what runs up to a `case` or `default`
-// keyword, which aligns with the enclosing `switch` or `select` one level out
-// from the clause bodies. A comment ahead of the keyword belongs to the body
-// above it and is indented with that body, unless it was written at the
-// keyword's own level, where it reads as introducing the clause and stays.
+// reindentClauseLeadIn re-indents what runs up to a keyword that sits one level
+// out from the statements around it — `case`, `default`, a label. A comment
+// ahead of the keyword belongs to those statements and is indented with them,
+// unless it was written at the keyword's own level, where it reads as
+// introducing what follows and stays.
 func (v *TabsAndIndentsVisitor) reindentClauseLeadIn(s java.Space) java.Space {
 	body := strings.Repeat("\t", v.depth)
 	keyword := strings.Repeat("\t", reduceIndentDepth(v.depth))
