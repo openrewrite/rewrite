@@ -1151,6 +1151,7 @@ type Unary struct {
 	Markers    java.Markers
 	Operator   java.LeftPadded[UnaryOperator] // Before = space before the operator token
 	Expression java.Expression
+	Type       java.JavaType
 }
 
 func (*Unary) IsTree()       {}

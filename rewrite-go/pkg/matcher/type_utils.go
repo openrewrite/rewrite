@@ -225,6 +225,8 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return n.Type
 	case *java.ArrayType:
 		return n.Type
+	case *java.ParameterizedType:
+		return n.Type
 	case *java.Parentheses:
 		return TypeOfExpression(n.Tree.Element)
 	case *java.ControlParentheses:
@@ -244,6 +246,8 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 			}
 		}
 	case *golang.Composite:
+		return n.Type
+	case *golang.Unary:
 		return n.Type
 	case *java.Assignment:
 		return n.Type

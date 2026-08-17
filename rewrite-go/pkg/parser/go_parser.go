@@ -1975,6 +1975,7 @@ func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *java.Unary {
 		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Before: opPrefix, Element: op},
 		Operand:  operand,
+		Type:     ctx.valueTypeOf(stmt.X),
 	}
 }
 
@@ -2500,6 +2501,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	case token.AND:
 		return &golang.Unary{
@@ -2507,6 +2509,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.AddressOf},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	case token.ARROW:
 		return &golang.Unary{
@@ -2514,6 +2517,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Receive},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -2536,6 +2540,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Element: op},
 		Operand:  operand,
+		Type:     ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2645,6 +2650,7 @@ func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) java.Expression {
 		Prefix:     prefix,
 		Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
 		Expression: operand,
+		Type:       ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2785,6 +2791,7 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expressi
 		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsSingle(expr),
+		Type:           ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2836,6 +2843,7 @@ func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java
 		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsMulti(expr),
+		Type:           ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2887,7 +2895,22 @@ func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 			Prefix: lbrackPrefix,
 			Index:  java.RightPadded[java.Expression]{Element: index, After: rbrackPrefix},
 		},
+		Type: ctx.valueTypeOf(expr),
 	}
+}
+
+// valueTypeOf is the type an expression evaluates to. A comma-ok map index is
+// typed `(V, ok)`, of which only V is the expression's value.
+func (ctx *parseContext) valueTypeOf(expr ast.Expr) java.JavaType {
+	tv, ok := ctx.typeInfo.Types[expr]
+	if !ok {
+		return nil
+	}
+	t := tv.Type
+	if tuple, ok := t.(*types.Tuple); ok && tuple.Len() > 0 {
+		t = tuple.At(0).Type()
+	}
+	return ctx.mapper.mapType(t)
 }
 
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).

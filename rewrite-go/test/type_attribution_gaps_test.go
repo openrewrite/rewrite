@@ -31,8 +31,32 @@ import (
 
 type invocationCollector struct {
 	visitor.GoVisitor
-	invocations []*java.MethodInvocation
-	composites  []*golang.Composite
+	invocations        []*java.MethodInvocation
+	composites         []*golang.Composite
+	arrayAccesses      []*java.ArrayAccess
+	unaries            []*java.Unary
+	goUnaries          []*golang.Unary
+	parameterizedTypes []*java.ParameterizedType
+}
+
+func (v *invocationCollector) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
+	v.arrayAccesses = append(v.arrayAccesses, aa)
+	return v.GoVisitor.VisitArrayAccess(aa, p)
+}
+
+func (v *invocationCollector) VisitUnary(u *java.Unary, p any) java.J {
+	v.unaries = append(v.unaries, u)
+	return v.GoVisitor.VisitUnary(u, p)
+}
+
+func (v *invocationCollector) VisitGoUnary(u *golang.Unary, p any) java.J {
+	v.goUnaries = append(v.goUnaries, u)
+	return v.GoVisitor.VisitGoUnary(u, p)
+}
+
+func (v *invocationCollector) VisitParameterizedType(pt *java.ParameterizedType, p any) java.J {
+	v.parameterizedTypes = append(v.parameterizedTypes, pt)
+	return v.GoVisitor.VisitParameterizedType(pt, p)
 }
 
 func (v *invocationCollector) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
@@ -399,4 +423,87 @@ func f() {
 
 	assert.Equal(t, "fmt", matcher.DeclaringTypeFQN(invocationNamed(t, c, "Println")))
 	assert.True(t, matcher.IsResolved(invocationNamed(t, c, "Println")))
+}
+
+// An index, a unary operator and a generic instantiation each carry the type
+// they evaluate to.
+
+func TestArrayAccessCarriesItsResultType(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+func f(xs []int, m map[string]bool, arr [3]byte, s string) {
+	_ = xs[0]
+	_ = m["k"]
+	v, ok := m["k"]
+	_, _ = v, ok
+	_ = arr[1]
+	_ = s[0]
+}
+`)
+
+	var types []string
+	for _, aa := range c.arrayAccesses {
+		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(aa)))
+	}
+	// The comma-ok form evaluates to V.
+	assert.Equal(t, []string{"int", "boolean", "boolean", "byte", "byte"}, types)
+}
+
+func TestUnaryCarriesItsResultType(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+func f(n int, b bool) {
+	_ = -n
+	_ = !b
+	_ = ^n
+	n++
+}
+`)
+
+	var types []string
+	for _, u := range c.unaries {
+		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(u)))
+	}
+	assert.Equal(t, []string{"int", "boolean", "int", "int"}, types)
+}
+
+func TestGoUnaryCarriesItsResultType(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+import "crypto/tls"
+
+func f(p *int, ch chan string) {
+	_ = &tls.Config{}
+	_ = *p
+	_ = <-ch
+}
+`)
+
+	var types []string
+	for _, u := range c.goUnaries {
+		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(u)))
+	}
+	// Go pointers are transparent for refactoring, so `&T{}` is typed T.
+	assert.Equal(t, []string{"crypto/tls.Config", "int", "String"}, types)
+}
+
+func TestParameterizedTypeCarriesItsType(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+type Box[T any] struct{ v T }
+
+type Pair[K comparable, V any] struct {
+	k K
+	v V
+}
+
+func f(b Box[int], p Pair[string, int]) {
+}
+`)
+
+	var types []string
+	for _, pt := range c.parameterizedTypes {
+		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(pt)))
+	}
+	assert.Equal(t, []string{"main.Box", "main.Pair"}, types)
 }

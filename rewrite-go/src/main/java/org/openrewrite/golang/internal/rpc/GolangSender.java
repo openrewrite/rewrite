@@ -267,6 +267,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitGoUnary(Go.Unary unary, RpcSendQueue q) {
         q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
         q.getAndSend(unary, Go.Unary::getExpression, el -> visit(el, q));
+        q.getAndSend(unary, u -> Reference.asRef(u.getType()), type -> visitType(getValueNonNull(type), q));
         return unary;
     }
 

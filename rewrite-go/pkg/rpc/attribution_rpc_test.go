@@ -39,8 +39,32 @@ func roundTripSource(t *testing.T, src string) java.Tree {
 
 type attributionCollector struct {
 	visitor.GoVisitor
-	invocations []*java.MethodInvocation
-	composites  []*golang.Composite
+	invocations        []*java.MethodInvocation
+	composites         []*golang.Composite
+	arrayAccesses      []*java.ArrayAccess
+	unaries            []*java.Unary
+	goUnaries          []*golang.Unary
+	parameterizedTypes []*java.ParameterizedType
+}
+
+func (v *attributionCollector) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
+	v.arrayAccesses = append(v.arrayAccesses, aa)
+	return v.GoVisitor.VisitArrayAccess(aa, p)
+}
+
+func (v *attributionCollector) VisitUnary(u *java.Unary, p any) java.J {
+	v.unaries = append(v.unaries, u)
+	return v.GoVisitor.VisitUnary(u, p)
+}
+
+func (v *attributionCollector) VisitGoUnary(u *golang.Unary, p any) java.J {
+	v.goUnaries = append(v.goUnaries, u)
+	return v.GoVisitor.VisitGoUnary(u, p)
+}
+
+func (v *attributionCollector) VisitParameterizedType(pt *java.ParameterizedType, p any) java.J {
+	v.parameterizedTypes = append(v.parameterizedTypes, pt)
+	return v.GoVisitor.VisitParameterizedType(pt, p)
 }
 
 func (v *attributionCollector) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
@@ -83,4 +107,21 @@ func TestConversionAndBuiltinMarkersSurviveRpcRoundTrip(t *testing.T) {
 	}
 	assert.Equal(t, 1, conversions, "Conversion marker lost on round-trip")
 	assert.Equal(t, 1, builtins, "Builtin marker lost on round-trip")
+}
+
+func TestResultTypesSurviveRpcRoundTrip(t *testing.T) {
+	c := collectRoundTripped(t, "package main\n\ntype Box[T any] struct{ v T }\n\nfunc f(xs []int, n int, p *int, b Box[string]) {\n\t_ = xs[0]\n\t_ = -n\n\t_ = *p\n}\n")
+
+	require.Len(t, c.unaries, 1)
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.unaries[0].Type))
+	require.Len(t, c.goUnaries, 1)
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.goUnaries[0].Type))
+	require.Len(t, c.parameterizedTypes, 1)
+	assert.Equal(t, "main.Box", matcher.GetFullyQualifiedName(c.parameterizedTypes[0].Type))
+
+	// The J.ArrayAccess codec every RPC peer shares carries indexed and
+	// dimension only, so the type an index resolves to is Go-side state.
+	// Widening it is a lockstep change across all peers.
+	require.Len(t, c.arrayAccesses, 1)
+	assert.Nil(t, c.arrayAccesses[0].Type)
 }
