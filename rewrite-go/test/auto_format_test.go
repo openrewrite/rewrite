@@ -403,3 +403,13 @@ func TestTabsAndIndents_CaseLeadInComments(t *testing.T) {
 		}
 	}
 }
+
+func TestTabsAndIndents_OutdentsLabels(t *testing.T) {
+	out := applyVisitor(t,
+		"package p\n\nfunc f() {\nloop:\nfor {\nbreak loop\n}\nif true {\ninner:\nfor {\nbreak inner\n}\n}\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc f() {\nloop:\n\tfor {\n\t\tbreak loop\n\t}\n\tif true {\n\tinner:\n\t\tfor {\n\t\t\tbreak inner\n\t\t}\n\t}\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}

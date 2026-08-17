@@ -82,23 +82,23 @@ func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit,
 
 // VisitDeclarationBlock indents the specs of a `var (…)` or `const (…)` group.
 func (v *TabsAndIndentsVisitor) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
-	if db.Specs != nil {
-		c := *db
-		c.Specs = v.indentSpecs(db.Specs)
-		db = &c
+	if db.Specs == nil {
+		return v.GoVisitor.VisitDeclarationBlock(db, p)
 	}
-	return v.GoVisitor.VisitDeclarationBlock(db, p)
+	out := *db
+	out.Specs = v.indentSpecs(db.Specs, p)
+	return &out
 }
 
 // VisitTypeDecl indents the specs of a `type (…)` group. An ungrouped
 // declaration has no Specs and is indented by its enclosing block.
 func (v *TabsAndIndentsVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
-	if td.Specs != nil {
-		c := *td
-		c.Specs = v.indentSpecs(td.Specs)
-		td = &c
+	if td.Specs == nil {
+		return v.GoVisitor.VisitTypeDecl(td, p)
 	}
-	return v.GoVisitor.VisitTypeDecl(td, p)
+	out := *td
+	out.Specs = v.indentSpecs(td.Specs, p)
+	return &out
 }
 
 // VisitComposite indents the elements of a composite literal that spans
@@ -141,9 +141,9 @@ func (v *TabsAndIndentsVisitor) reindentTrailingComma(m java.Markers) java.Marke
 }
 
 // indentSpecs indents the body of a parenthesized declaration group.
-func (v *TabsAndIndentsVisitor) indentSpecs(c *java.Container[java.Statement]) *java.Container[java.Statement] {
+func (v *TabsAndIndentsVisitor) indentSpecs(c *java.Container[java.Statement], p any) *java.Container[java.Statement] {
 	out := *c
-	out.Elements = indentElements(v, c.Elements)
+	out.Elements = indentSubtrees(v, c.Elements, p)
 	return &out
 }
 
@@ -187,6 +187,26 @@ func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPad
 		out[i] = rp
 	}
 	return out
+}
+
+// VisitLabel sits a label one level out from the statements around it, and
+// leaves the statement it labels at their level.
+func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
+	depth := v.depth
+	v.depth = reduceIndentDepth(depth)
+	out := l.WithPrefix(v.reindentSpace(l.Prefix))
+	v.depth = depth
+
+	copied := *out
+	statement := l.Statement
+	if fixed, ok := transformPrefix(statement, v.reindentSpace).(java.Statement); ok {
+		statement = fixed
+	}
+	if next, ok := v.Visit(statement, p).(java.Statement); ok {
+		statement = next
+	}
+	copied.Statement = statement
+	return &copied
 }
 
 // VisitBlock dispatches the body at depth+1 and re-indents each
@@ -311,7 +331,7 @@ func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement
 // itself rather than leaving that to the block holding it.
 func ownsItsLeadIn(t java.Tree) bool {
 	switch t.(type) {
-	case *java.Case, *golang.CommClause:
+	case *java.Case, *golang.CommClause, *java.Label:
 		return true
 	}
 	return false
