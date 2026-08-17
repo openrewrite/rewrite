@@ -27,13 +27,14 @@ import (
 //
 //  1. MinimumViableSpacingVisitor      — separation the tokens require
 //  2. DocCommentVisitor                — canonical doc comment text
-//  3. SpacesVisitor                    — intra-line spacing
-//  4. TabsAndIndentsVisitor            — indentation
+//  3. BinarySpacingVisitor             — blanks around binary operators
+//  4. SpacesVisitor                    — intra-line spacing
+//  5. TabsAndIndentsVisitor            — indentation
 //
 // then the passes that decide what the lines are, once their text is final:
 //
-//  5. BlankLinesVisitor                — collapse blank-line runs
-//  6. RemoveTrailingWhitespaceVisitor  — strip trailing space/tabs
+//  6. BlankLinesVisitor                — collapse blank-line runs
+//  7. RemoveTrailingWhitespaceVisitor  — strip trailing space/tabs
 //
 // Phase two runs last because the earlier passes rewrite a line's text and can
 // add or drop whole lines, so a line structure normalized ahead of them would
@@ -56,6 +57,7 @@ func (v *AutoFormatVisitor) Visit(t java.Tree, p any) java.Tree {
 	}
 	v.DoAfterVisit(NewMinimumViableSpacingVisitor(v.stopAfter))
 	v.DoAfterVisit(NewDocCommentVisitor(v.stopAfter))
+	v.DoAfterVisit(NewBinarySpacingVisitor(v.stopAfter))
 	v.DoAfterVisit(NewSpacesVisitor(v.stopAfter))
 	v.DoAfterVisit(NewTabsAndIndentsVisitor(v.stopAfter))
 	v.DoAfterVisit(NewBlankLinesVisitor(v.stopAfter))

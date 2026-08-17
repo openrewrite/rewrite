@@ -25,7 +25,6 @@ import (
 
 // SpacesVisitor enforces gofmt's intra-line spacing rules:
 //
-//   - One space around binary operators (`a + b`, not `a+b`).
 //   - No space around unary operators (`!x`, `-y`).
 //   - One space after commas in argument/parameter lists
 //     (RightPadded.After fields don't get touched here — they precede
@@ -54,13 +53,6 @@ func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
 	out := v.GoVisitor.Visit(t, p)
 	v.noteVisited(t)
 	return out
-}
-
-func (v *SpacesVisitor) VisitBinary(bin *java.Binary, p any) java.J {
-	bin = v.GoVisitor.VisitBinary(bin, p).(*java.Binary)
-	bin.Operator.Before = ensureSingleSpace(bin.Operator.Before)
-	bin = bin.WithRight(ensureLeadingSingleSpace(bin.Right))
-	return bin
 }
 
 func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {

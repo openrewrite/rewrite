@@ -159,47 +159,10 @@ func main() {
 	assert.Equal(t, want, out)
 }
 
-func TestSpaces_NormalizesBinaryOperatorSpacing(t *testing.T) {
-	src := `package main
-
-func main() {
-	a := 1+2
-	_ = a
-}
-`
-	want := `package main
-
-func main() {
-	a := 1 + 2
-	_ = a
-}
-`
-	out := applyVisitor(t, src, format.NewSpacesVisitor(nil))
-	assert.Equal(t, want, out)
-}
-
 // Regression: when the right operand of `:=` is itself a Binary, the
 // leading single-space-after-`:=` lives on the leftmost leaf of the
 // Binary tree (e.g., the Literal `1` in `1+2+3`). Setting Binary.Prefix
 // directly would double the space.
-func TestSpaces_NoSpaceDoublingWithBinaryOperand(t *testing.T) {
-	src := `package main
-
-func main() {
-	a := 1+2+3
-	_ = a
-}
-`
-	want := `package main
-
-func main() {
-	a := 1 + 2 + 3
-	_ = a
-}
-`
-	out := applyVisitor(t, src, format.NewSpacesVisitor(nil))
-	assert.Equal(t, want, out)
-}
 
 // Regression: same delegation rule when the assigned expression is a
 // FieldAccess — the space-after-`:=` lives on FieldAccess.Target.Prefix.
@@ -386,6 +349,34 @@ func TestTabsAndIndents_IndentsWrappedBinary(t *testing.T) {
 	}
 	for name, io := range cases {
 		if out := applyVisitor(t, io[0], format.NewTabsAndIndentsVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}
+
+func TestBinarySpacing(t *testing.T) {
+	cases := map[string][2]string{
+		"one precedence keeps blanks": {
+			"package p\n\nfunc f() int {\n\ta := 1+2\n\treturn a\n}\n",
+			"package p\n\nfunc f() int {\n\ta := 1 + 2\n\treturn a\n}\n"},
+		"chain of one precedence keeps blanks": {
+			"package p\n\nfunc f() int {\n\ta := 1+2+3\n\treturn a\n}\n",
+			"package p\n\nfunc f() int {\n\ta := 1 + 2 + 3\n\treturn a\n}\n"},
+		"tighter operator loses them": {
+			"package p\n\nfunc f(x, y, z int) int {\n\tb := x * y + z\n\treturn b\n}\n",
+			"package p\n\nfunc f(x, y, z int) int {\n\tb := x*y + z\n\treturn b\n}\n"},
+		"both sides of a sum tighten": {
+			"package p\n\nfunc f(x, y int) int {\n\tg := 2 * x + 3 * y\n\treturn g\n}\n",
+			"package p\n\nfunc f(x, y int) int {\n\tg := 2*x + 3*y\n\treturn g\n}\n"},
+		"nesting inside an index tightens": {
+			"package p\n\nfunc f(s []int, i int) int {\n\td := s[i + 1]\n\treturn d\n}\n",
+			"package p\n\nfunc f(s []int, i int) int {\n\td := s[i+1]\n\treturn d\n}\n"},
+		"nesting inside a comparison tightens": {
+			"package p\n\nfunc f(a, b, c int) bool {\n\treturn a > b - c\n}\n",
+			"package p\n\nfunc f(a, b, c int) bool {\n\treturn a > b-c\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewBinarySpacingVisitor(nil)); out != io[1] {
 			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
 		}
 	}
