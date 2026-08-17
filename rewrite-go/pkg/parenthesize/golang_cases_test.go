@@ -71,6 +71,7 @@ func TestVisitorRestoresGrammarRequiredParentheses(t *testing.T) {
 // produce something Go still accepts, which covers spellings no hand-written
 // case list thinks of.
 func TestVisitorRegroupsStdlibToParseableCode(t *testing.T) {
+	restored := 0
 	for _, rel := range []string{
 		"net/http/cookie.go",
 		"strings/replace.go",
@@ -93,10 +94,8 @@ func TestVisitorRegroupsStdlibToParseableCode(t *testing.T) {
 			if _, err := goparser.ParseFile(gotoken.NewFileSet(), rel, got, 0); err != nil {
 				t.Fatalf("regrouped source does not parse: %v", err)
 			}
-			// Without something to put back, the comparison below holds for a
-			// visitor that does nothing at all.
-			if got == ungrouped {
-				t.Fatalf("no parentheses were put back, so the file proves nothing")
+			if got != ungrouped {
+				restored++
 			}
 			// Reading the result back and stripping it again lands on the same
 			// text only if the parentheses put back group it as it grouped
@@ -110,6 +109,12 @@ func TestVisitorRegroupsStdlibToParseableCode(t *testing.T) {
 			}
 		})
 	}
+	// Files whose parentheses are all redundant round-trip without any being
+	// put back, and hold for a visitor that does nothing. The corpus as a whole
+	// has to exercise one that does not.
+	if restored == 0 {
+		t.Errorf("no file needed a parenthesis restored, so the corpus proves nothing")
+	}
 }
 
 func firstDiff(a, b string) int {
@@ -119,4 +124,26 @@ func firstDiff(a, b string) int {
 		}
 	}
 	return min(len(a), len(b))
+}
+
+// Positions that read unambiguously already, where a parenthesis would be noise.
+func TestVisitorLeavesUnambiguousPositionsAlone(t *testing.T) {
+	for _, tc := range []struct{ name, body string }{
+		{"composite in if body", "func c(i int) {\n\tif i > 0 {\n\t\t_ = T{}\n\t}\n}\n"},
+		{"composite in for body", "func c(i int) {\n\tfor i > 0 {\n\t\t_ = T{}\n\t}\n}\n"},
+		{"composite in case body", "func c(i int) {\n\tswitch i {\n\tcase 0:\n\t\t_ = T{}\n\t}\n}\n"},
+		{"slice bounds", "func c(a []int, i, j int) {\n\t_ = a[i+1 : j+2]\n\t_ = a[i+1 : j+2 : j+3]\n}\n"},
+		{"index expression", "func c(a []int, i int) {\n\t_ = a[i+1]\n}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			src := caseHeader + tc.body
+			cu, err := parser.NewGoParser().Parse("cases.go", src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := printer.Print(NewVisitor().Visit(cu, nil)); got != src {
+				t.Errorf("parentheses were added\n got:\n%s\nwant:\n%s", got, src)
+			}
+		})
+	}
 }

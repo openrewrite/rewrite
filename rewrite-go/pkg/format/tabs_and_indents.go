@@ -114,14 +114,17 @@ func specsDelta(specs *java.Container[java.Statement], child java.Tree) int {
 }
 
 // listDelta mirrors eachElement: the first element to start a line of its own
-// moves the list in a level, and the elements after it stay there.
+// moves the list in a level, and the elements after it stay there. A child that
+// is not in the list at all sits outside it, as a composite literal's type
+// expression and a method invocation's select do.
 func listDelta[T java.Tree](elements []java.RightPadded[T], child java.Tree) int {
+	delta := 0
 	for _, rp := range elements {
 		if breaksLine(getPrefix(rp.Element)) {
-			return 1
+			delta = 1
 		}
 		if any(rp.Element) == any(child) {
-			return 0
+			return delta
 		}
 	}
 	return 0

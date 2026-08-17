@@ -70,10 +70,17 @@ func Needed(e java.Expression, site *visitor.Cursor) bool {
 	case *java.Unary, *golang.Unary:
 		// Two operators in a row run together into one token.
 		return needsDelimiting(e)
-	// These apply to a primary expression, so anything else under one has to be
-	// grouped away from it.
-	case *java.FieldAccess, *java.ArrayAccess, *golang.TypeAssertion, *golang.Slice:
-		return needsDelimiting(e)
+	// Each of these applies to a primary expression, so anything else in that
+	// one slot has to be grouped away from it. The slots beside it — an index,
+	// a slice bound, an asserted type — are delimited already.
+	case *java.FieldAccess:
+		return any(parent.Target) == any(replaced) && needsDelimiting(e)
+	case *java.ArrayAccess:
+		return any(parent.Indexed) == any(replaced) && needsDelimiting(e)
+	case *golang.Slice:
+		return any(parent.Indexed) == any(replaced) && needsDelimiting(e)
+	case *golang.TypeAssertion:
+		return any(parent.Left.Element) == any(replaced) && needsDelimiting(e)
 	// The callee slot holds the type a conversion names, which is subject to
 	// the same rule.
 	case *java.MethodInvocation:
@@ -131,8 +138,9 @@ func bracesReadAsABlock(e java.Expression, site *visitor.Cursor) bool {
 		switch parent := c.Value().(type) {
 		case *java.If, *java.Switch, *java.ForLoop, *java.ForEachLoop, *golang.StatementWithInit:
 			return true
-		// Anything already delimited settles where the brace belongs.
-		case *java.Parentheses, *golang.Composite:
+		// Anything already delimited settles where the brace belongs. A block
+		// is the clause's own body, which the keyword is long done with.
+		case *java.Parentheses, *golang.Composite, *java.Block, *java.Case, *golang.CommClause:
 			return false
 		case *java.MethodInvocation:
 			if parent.Select == nil || any(parent.Select.Element) != any(child) {

@@ -142,7 +142,9 @@ func (v *RewriteVisitor) Visit(t java.Tree, p any) java.Tree {
 		return result
 	}
 
-	replaced := v.after.Apply(visitor.NewCursor(v.Cursor(), j), match)
+	// The cursor names t, not the visited j: rewriting a descendant leaves j a
+	// new node, while the parent Apply consults still holds t.
+	replaced := v.after.Apply(visitor.NewCursor(v.Cursor(), t), match)
 	if replaced == nil {
 		return result
 	}

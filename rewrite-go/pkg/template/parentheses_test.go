@@ -97,3 +97,9 @@ func TestTemplateLeavesTighterCapturedOperandAlone(t *testing.T) {
 		fmt.Sprintf(`g(%s)`, parenX), fmt.Sprintf(`%s + 2`, parenX),
 		`g(a * b)`, `a*b + 2`)
 }
+
+func TestTemplateParenthesizesAfterNestedRewrite(t *testing.T) {
+	replacingCall(t, "NestedRewrite",
+		fmt.Sprintf(`g(%s)`, parenX), fmt.Sprintf(`%s + 1`, parenX),
+		`c * g(g(a))`, `c * (a + 1 + 1)`)
+}

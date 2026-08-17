@@ -123,6 +123,31 @@ func TestSubtreeIndentMatchesWholeFile(t *testing.T) {
 	assertSubtreeIndentMatches(t, "nesting.go", nestingCorpus)
 }
 
+func TestSubtreeIndentMatchesWholeFileOutsideLists(t *testing.T) {
+	assertSubtreeIndentMatches(t, "outside.go", outsideListCorpus)
+}
+
+const outsideListCorpus = `package main
+
+import "strings"
+
+func c(y string) {
+	_ = strings.NewReplacer(
+		"a",
+		"b",
+	).Replace(
+		y,
+	)
+	_ = struct {
+		a int
+		b int
+	}{
+		a: 1,
+		b: 2,
+	}
+}
+`
+
 func TestSubtreeIndentMatchesWholeFileOnStdlib(t *testing.T) {
 	for _, rel := range []string{
 		"net/http/cookie.go",
