@@ -1014,9 +1014,8 @@ func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J 
 	return paren
 }
 
-// VisitTypeCast renders J's prefix cast. Go's own `x.(T)` is a
-// TypeAssertion; a TypeCast reaches this printer only from a synthesized
-// or Java-side tree.
+// VisitTypeCast renders J's prefix cast, which reaches this printer from
+// a synthesized or Java-side tree; Go's own `x.(T)` is a TypeAssertion.
 func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)

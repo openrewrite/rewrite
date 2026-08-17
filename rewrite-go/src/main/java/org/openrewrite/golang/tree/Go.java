@@ -1115,9 +1115,9 @@ public interface Go extends J {
     // ---------------------------------------------------------------
 
     /**
-     * Go's {@code x.(T)}. {@link J.TypeCast} models a prefix cast and so
-     * has nowhere to hold what stands between the expression and the dot,
-     * which the left element's padding carries here.
+     * Go's postfix {@code x.(T)}, where {@link J.TypeCast} is a prefix
+     * cast. The left expression is right-padded, so its padding holds what
+     * stands before the dot — a space, or a comment.
      */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
