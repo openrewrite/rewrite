@@ -2362,25 +2362,44 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
 			if mi.MethodType == nil {
-				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name)
+				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name, selection.Recv())
 			}
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
 			// Qualified identifier (pkg.Func) — not a selection, but Sel is in Uses
-			mi.MethodType = ctx.calleeSignature(obj, selExpr.Sel.Name)
+			mi.MethodType = ctx.calleeSignature(obj, selExpr.Sel.Name, nil)
 		}
 	} else if ident, ok := calleeAst.(*ast.Ident); ok {
 		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
-			mi.MethodType = ctx.calleeSignature(obj, ident.Name)
+			mi.MethodType = ctx.calleeSignature(obj, ident.Name, nil)
 		}
+	}
+
+	if marker := ctx.callKindMarker(expr.Fun); marker != nil {
+		mi.Markers = java.AddMarker(mi.Markers, marker)
 	}
 
 	return mi
 }
 
+// callKindMarker reports whether a call's callee denotes a type (making the
+// call a conversion) or one of Go's predeclared functions.
+func (ctx *parseContext) callKindMarker(callee ast.Expr) java.Marker {
+	if tv, ok := ctx.typeInfo.Types[callee]; ok && tv.IsType() {
+		return golang.NewConversion()
+	}
+	if ident, ok := callee.(*ast.Ident); ok {
+		if _, ok := ctx.typeInfo.Uses[ident].(*types.Builtin); ok {
+			return golang.NewBuiltin()
+		}
+	}
+	return nil
+}
+
 // calleeSignature is the signature a call goes through, whether the
 // callee is a declared function or a value of func type — a parameter, a
-// local, a struct field. A builtin has no signature to give.
-func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.JavaTypeMethod {
+// local, a struct field. recv is the type the callee was selected from,
+// nil for a bare identifier. A builtin has no signature to give.
+func (ctx *parseContext) calleeSignature(obj types.Object, name string, recv types.Type) *java.JavaTypeMethod {
 	if obj == nil {
 		return nil
 	}
@@ -2389,12 +2408,15 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.Ja
 	}
 	if sig, ok := obj.Type().Underlying().(*types.Signature); ok {
 		// A named func type is what the call goes through, the way an
-		// interface is for a method; an unnamed one names nothing.
+		// interface is for a method. An unnamed one names nothing, so a
+		// func-typed field falls back to the type that declares it.
 		var declaring *java.JavaTypeClass
+		// mapType is the depth-bounded, panic-guarded entry; the
+		// mapNamed underneath it is not.
 		if _, ok := obj.Type().(*types.Named); ok {
-			// mapType is the depth-bounded, panic-guarded entry; the
-			// mapNamed underneath it is not.
 			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
+		} else if recv != nil {
+			declaring, _ = ctx.mapper.mapType(recv).(*java.JavaTypeClass)
 		}
 		return ctx.mapper.mapSignature(sig, name, declaring)
 	}
@@ -2581,13 +2603,19 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 		}
 	}
 
-	return &golang.Composite{
+	comp := &golang.Composite{
 		ID:       uuid.New(),
 		Prefix:   prefix,
 		Markers:  compMarkers,
 		TypeExpr: typeExpr,
 		Elements: java.Container[java.Expression]{Before: lbracePrefix, Elements: elements},
 	}
+	// The literal's own type, which an elided inner literal (`[]T{{...}}`)
+	// has no type expression to state.
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		comp.Type = ctx.mapper.mapType(tv.Type)
+	}
+	return comp
 }
 
 // mapParenExpr maps a parenthesized expression.

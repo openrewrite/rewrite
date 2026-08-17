@@ -94,6 +94,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitComposite(Go.Composite composite, RpcSendQueue q) {
         q.getAndSend(composite, Go.Composite::getTypeExpr, el -> visit(el, q));
         q.getAndSend(composite, c -> c.getPadding().getElements(), el -> visitContainer(el, q));
+        q.getAndSend(composite, c -> Reference.asRef(c.getType()), type -> visitType(getValueNonNull(type), q));
         return composite;
     }
 

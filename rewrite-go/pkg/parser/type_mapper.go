@@ -500,8 +500,14 @@ func (m *typeMapper) mapMethodObject(fn *types.Func) *java.JavaTypeMethod {
 		if ptr, ok := recvType.(*types.Pointer); ok {
 			recvType = ptr.Elem()
 		}
-		if named, ok := recvType.(*types.Named); ok {
-			declaringType = m.mapNamed(named)
+		switch r := recvType.(type) {
+		case *types.Named:
+			declaringType = m.mapNamed(r)
+		case *types.Interface:
+			// A method reached through an inline `interface{ ... }`
+			// receiver. The interface names nothing, but its method set is
+			// what the call goes through.
+			declaringType, _ = m.mapType(r).(*java.JavaTypeClass)
 		}
 	} else {
 		// Package-level function

@@ -188,7 +188,7 @@ func TestHasSourcePathMatchesGoMod(t *testing.T) {
 func TestUsesMethodMatchesInvocationInTree(t *testing.T) {
 	// given a compilation unit containing fmt.Println(...)
 	mi := &java.MethodInvocation{
-		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{Name: "fmt"}},
+		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{Name: "fmt", Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"}}},
 		Name:   &java.Identifier{Name: "Println"},
 	}
 	cu := &golang.CompilationUnit{

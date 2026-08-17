@@ -222,6 +222,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.TypeSwitchGuard).Ident.String() }, nil)
 	case golang.ImplicitForClauses:
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImplicitForClauses).Ident.String() }, nil)
+	case golang.Conversion:
+		q.GetAndSend(m, func(x any) any { return x.(golang.Conversion).Ident.String() }, nil)
+	case golang.Builtin:
+		q.GetAndSend(m, func(x any) any { return x.(golang.Builtin).Ident.String() }, nil)
 	case golang.StructTag:
 		// StructTag.rpcSend sends: id (UUID string), tag valueSource (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Ident.String() }, nil)
@@ -460,6 +464,22 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			}
 			return m
 		case golang.ImplicitForClauses:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			return m
+		case golang.Conversion:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			return m
+		case golang.Builtin:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {

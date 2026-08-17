@@ -97,7 +97,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     public J visitComposite(Go.Composite composite, RpcReceiveQueue q) {
         return composite
                 .withTypeExpr(q.receive(composite.getTypeExpr(), el -> (Expression) visitNonNull(el, q)))
-                .getPadding().withElements(q.receive(composite.getPadding().getElements(), el -> visitContainer(el, q)));
+                .getPadding().withElements(q.receive(composite.getPadding().getElements(), el -> visitContainer(el, q)))
+                .withType(q.receive(composite.getType(), type -> visitType(type, q)));
     }
 
     @Override

@@ -201,6 +201,8 @@ func (s *GoSender) VisitComposite(c *golang.Composite, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(c, func(v any) any { return v.(*golang.Composite).Elements },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return AsRef(v.(*golang.Composite).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return c
 }
 
