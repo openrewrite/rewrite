@@ -21,6 +21,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"go/build"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -229,15 +230,18 @@ func sweepOne(root, path string) (res sweepResult) {
 		res.Bucket = "unreadable"
 		return
 	}
-	// Files the host build context excludes never reach the parser, so
-	// they are outside the corpus rather than failures.
-	if !parser.MatchBuildContext(parser.NewGoParser().BuildContext, filepath.Base(path), string(src)) {
+	// A file guarded by `//go:build` reaches the parser only under a
+	// context that selects it, and the host's is one of many. Grading it
+	// under the first context that takes it covers the platform-specific
+	// halves of the standard library, which no single host sees.
+	gp := parserSelecting(filepath.Base(path), string(src))
+	if gp == nil {
 		res.Class = "skipped"
 		res.Bucket = "build-constrained"
 		return
 	}
 
-	cu, err := parser.NewGoParser().Parse(filepath.Base(path), string(src))
+	cu, err := gp.Parse(filepath.Base(path), string(src))
 	if err != nil {
 		res.Class = "parse_error"
 		res.Bucket = "error: " + normalizeErr(err.Error())
@@ -267,6 +271,35 @@ func sweepOne(root, path string) (res sweepResult) {
 
 	res.Class = "sound"
 	return
+}
+
+// auditContexts span the GOOS/GOARCH combinations that between them
+// select nearly every build-constrained file; one excluded from all of
+// them is genuinely unreachable.
+var auditContexts = []struct{ goos, goarch string }{
+	{"linux", "amd64"},
+	{"linux", "arm64"},
+	{"darwin", "arm64"},
+	{"windows", "amd64"},
+	{"freebsd", "amd64"},
+	{"plan9", "386"},
+	{"js", "wasm"},
+}
+
+// parserSelecting returns a parser whose build context takes the file,
+// or nil when none does.
+func parserSelecting(name, content string) *parser.GoParser {
+	if parser.MatchBuildContext(build.Default, name, content) {
+		return parser.NewGoParser()
+	}
+	for _, c := range auditContexts {
+		bc := build.Default
+		bc.GOOS, bc.GOARCH = c.goos, c.goarch
+		if parser.MatchBuildContext(bc, name, content) {
+			return parser.NewGoParserWithBuildContext(bc)
+		}
+	}
+	return nil
 }
 
 // hiddenSite names the LST field that owns an offending Space. Without
