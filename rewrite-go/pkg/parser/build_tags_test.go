@@ -104,6 +104,22 @@ func TestMatchBuildContextCompilerTag(t *testing.T) {
 	}
 }
 
+const constrainedName = "constrained.go"
+
+// matchFile asks go/build itself, which needs the source on disk.
+func matchFile(t *testing.T, ctx build.Context, name, content string) bool {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	want, err := ctx.MatchFile(dir, name)
+	if err != nil {
+		t.Fatalf("MatchFile: %v", err)
+	}
+	return want
+}
+
 func TestMatchBuildContextAgreesWithGoBuild(t *testing.T) {
 	ctx := gcContext()
 	for _, content := range []string{
@@ -112,17 +128,52 @@ func TestMatchBuildContextAgreesWithGoBuild(t *testing.T) {
 		"//go:build gc && !purego\n\npackage p\n",
 		"// +build gc\n\npackage p\n",
 	} {
-		dir := t.TempDir()
-		const name = "constrained.go"
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
-			t.Fatalf("write fixture: %v", err)
+		if got := parser.MatchBuildContext(ctx, constrainedName, content); got != matchFile(t, ctx, constrainedName, content) {
+			t.Errorf("MatchBuildContext(%q) = %v, go/build disagrees", content, got)
 		}
-		want, err := ctx.MatchFile(dir, name)
-		if err != nil {
-			t.Fatalf("MatchFile: %v", err)
+	}
+}
+
+// TestMatchBuildContextAgreesWithGoBuildAcrossGOOS exercises the GOOS aliases
+// (android implies linux, ios implies darwin, illumos implies solaris), which a
+// linux-only context leaves invisible. go/build applies them to constraint tags
+// and filename suffixes alike, so both are swept here.
+func TestMatchBuildContextAgreesWithGoBuildAcrossGOOS(t *testing.T) {
+	names := []string{
+		"constrained.go",
+		"foo_linux.go", "foo_darwin.go", "foo_solaris.go",
+		"foo_android.go", "foo_ios.go", "foo_illumos.go", "foo_windows.go",
+		"foo_linux_amd64.go", "foo_darwin_arm64.go",
+		"foo_amd64.go", "foo_handler.go",
+	}
+	contents := []string{
+		"package p\n",
+		"//go:build gc\n\npackage p\n",
+		"//go:build linux\n\npackage p\n",
+		"//go:build darwin\n\npackage p\n",
+		"//go:build solaris\n\npackage p\n",
+		"//go:build unix\n\npackage p\n",
+	}
+	for _, goos := range []string{"linux", "android", "darwin", "ios", "solaris", "illumos", "windows"} {
+		for _, goarch := range []string{"amd64", "arm64"} {
+			for _, name := range names {
+				for _, content := range contents {
+					ctx := gcContext()
+					ctx.GOOS, ctx.GOARCH = goos, goarch
+					if got := parser.MatchBuildContext(ctx, name, content); got != matchFile(t, ctx, name, content) {
+						t.Errorf("%s/%s %s %q = %v, go/build disagrees", goos, goarch, name, content, got)
+					}
+				}
+			}
 		}
-		if got := parser.MatchBuildContext(ctx, name, content); got != want {
-			t.Errorf("MatchBuildContext(%q) = %v, go/build says %v", content, got, want)
-		}
+	}
+}
+
+func TestMatchBuildContextBoringcryptoAliasesGoexperiment(t *testing.T) {
+	ctx := gcContext()
+	ctx.ToolTags = append(append([]string{}, ctx.ToolTags...), "goexperiment.boringcrypto")
+	const content = "//go:build boringcrypto\n\npackage p\n"
+	if got := parser.MatchBuildContext(ctx, constrainedName, content); got != matchFile(t, ctx, constrainedName, content) {
+		t.Errorf("MatchBuildContext(%q) = %v, go/build disagrees", content, got)
 	}
 }

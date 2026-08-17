@@ -29,7 +29,8 @@ import (
 // have file content in-memory rather than on disk.
 //
 // The constraint evaluator recognizes:
-//   - GOOS/GOARCH name tags (matches when ctx.GOOS == tag etc.)
+//   - GOOS/GOARCH name tags (matches when ctx.GOOS == tag etc.), plus the
+//     aliases android→linux, ios→darwin and illumos→solaris
 //   - the compiler name in buildCtx.Compiler ("gc" or "gccgo")
 //   - "cgo" if buildCtx.CgoEnabled is true
 //   - language version tags (e.g. "go1.21") if at or below the configured
@@ -85,14 +86,13 @@ func matchOSArchFilename(buildCtx build.Context, name string) bool {
 		prev = parts[n-2]
 	}
 
+	// Suffixes resolve through matchTag, so the GOOS aliases reach filenames
+	// too: foo_linux.go builds for android.
 	if knownOS(prev) && knownArch(last) {
-		return prev == buildCtx.GOOS && last == buildCtx.GOARCH
+		return matchTag(buildCtx, prev) && matchTag(buildCtx, last)
 	}
-	if knownOS(last) {
-		return last == buildCtx.GOOS
-	}
-	if knownArch(last) {
-		return last == buildCtx.GOARCH
+	if knownOS(last) || knownArch(last) {
+		return matchTag(buildCtx, last)
 	}
 	return true
 }
@@ -137,10 +137,19 @@ func matchTag(buildCtx build.Context, tag string) bool {
 		return true
 	case buildCtx.Compiler:
 		return true
+	case "linux":
+		return buildCtx.GOOS == "android"
+	case "darwin":
+		return buildCtx.GOOS == "ios"
+	case "solaris":
+		return buildCtx.GOOS == "illumos"
 	case "cgo":
 		return buildCtx.CgoEnabled
 	case "unix":
 		return knownUnixOS(buildCtx.GOOS)
+	case "boringcrypto":
+		// Legacy spelling of the goexperiment tag.
+		tag = "goexperiment.boringcrypto"
 	}
 	for _, t := range buildCtx.BuildTags {
 		if t == tag {
