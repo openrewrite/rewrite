@@ -4062,7 +4062,9 @@ class ScalaTreeVisitor(
             val closeBraceIdx = remaining.lastIndexOf('}')
             if (closeBraceIdx >= 0) {
               endSpace = Space.format(remaining.substring(0, closeBraceIdx))
-              cursor = endPos
+              // Stop at the `}`. Dotty's span reaches past it to a trailing `end` marker,
+              // which the caller claims by name.
+              cursor = cursor + closeBraceIdx + 1
             }
           }
         }
@@ -4105,7 +4107,7 @@ class ScalaTreeVisitor(
     // then claim by name
     val objectMarkers = if (moduleEndMarker != null)
       objectBaseMarkers.add(EndMarker(Tree.randomId(), moduleEndMarker))
-    else withEndMarker(objectBaseMarkers, md.span)
+    else withEndMarker(objectBaseMarkers, md.span, md.name.toString)
 
     // Update cursor to end of module def
     if (md.span.exists) {

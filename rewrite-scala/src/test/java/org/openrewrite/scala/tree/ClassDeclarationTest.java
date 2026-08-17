@@ -876,4 +876,23 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void accessModifierOfFollowingClassIsNotClaimed() {
+        rewriteRun(
+            scala(
+                """
+                class Foo
+
+                private class Bar
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration bar = (J.ClassDeclaration) cu.getStatements().get(1);
+                    assertThat(bar.getSimpleName()).isEqualTo("Bar");
+                    assertThat(bar.getModifiers()).singleElement()
+                      .extracting(J.Modifier::getType).isEqualTo(J.Modifier.Type.Private);
+                })
+            )
+        );
+    }
+
 }

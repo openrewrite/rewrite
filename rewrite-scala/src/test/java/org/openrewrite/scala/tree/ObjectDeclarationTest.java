@@ -193,4 +193,18 @@ class ObjectDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void endMarkerAfterBracedBody() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f: Int = 1
+            }
+            end O
+            """
+          )
+        );
+    }
+
 }
