@@ -1071,6 +1071,31 @@ func takeSemicolon[T any](ctx *parseContext, rp *java.RightPadded[T], boundary i
 	rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
 }
 
+// literalSource is the source text of the string literal at pos,
+// delimiters included, found by scanning to the closing one: an
+// interpreted string ends at an unescaped quote, a raw string at the
+// next backtick.
+func (ctx *parseContext) literalSource(pos token.Pos) string {
+	start := ctx.file.Offset(pos)
+	if start >= len(ctx.src) {
+		return ""
+	}
+	quote := ctx.src[start]
+	i := start + 1
+	for i < len(ctx.src) {
+		c := ctx.src[i]
+		if quote == '"' && c == '\\' {
+			i += 2
+			continue
+		}
+		i++
+		if c == quote {
+			break
+		}
+	}
+	return string(ctx.src[start:i])
+}
+
 // boundaryAt is the offset of pos, or -1 when the position is absent so
 // that a scan bounded by it finds nothing rather than running to EOF.
 func (ctx *parseContext) boundaryAt(pos token.Pos) int {
@@ -3235,10 +3260,10 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 //     gofmt'd input is exact.
 func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.BasicLit) {
 	outerPrefix := ctx.prefix(tag.Pos())
-	// A raw string's carriage returns are absent from tag.Value, so the
-	// literal is read from the source range instead: the cursor has to
-	// clear every byte, and the tag has to print back as written.
-	src := string(ctx.src[ctx.file.Offset(tag.Pos()):ctx.file.Offset(tag.End())])
+	// A raw string's carriage returns are absent from tag.Value, and
+	// BasicLit.End() derives from that value in some Go releases, so the
+	// literal's extent is found by scanning for its closing delimiter.
+	src := ctx.literalSource(tag.Pos())
 	ctx.skip(len(src))
 
 	// A raw string carries its content verbatim; an interpreted one needs
