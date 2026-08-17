@@ -34,7 +34,6 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.AmpersandIntersection;
-import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.Implicit;
@@ -1319,13 +1318,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
-        // asInstanceOf handling
+        // The parser builds a J.MethodInvocation for `asInstanceOf`; a J.TypeCast reaches
+        // here only from a recipe, and Scala spells a cast this way.
         beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
         visit(typeCast.getExpression(), p);
-        Optional<AsInstanceOfPrefix> asInstanceOfPrefix = typeCast.getMarkers().findFirst(AsInstanceOfPrefix.class);
-        if (asInstanceOfPrefix.isPresent()) {
-            visitSpace(asInstanceOfPrefix.get().getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
-        }
         p.append(".asInstanceOf");
         if (typeCast.getClazz() instanceof J.ControlParentheses) {
             J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();

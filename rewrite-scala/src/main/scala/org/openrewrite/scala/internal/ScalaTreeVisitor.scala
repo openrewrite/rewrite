@@ -55,7 +55,6 @@ import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.CommaContinuation
 import org.openrewrite.scala.marker.FunctionApplication
-import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
@@ -5900,76 +5899,51 @@ class ScalaTreeVisitor(
       case sel: Trees.Select[?] =>
         // Check if this is asInstanceOf
         if (sel.name.toString == "asInstanceOf" && ta.args.size == 1) {
-          // This is a type cast operation: obj.asInstanceOf[Type]
-          
-          // Visit the expression being cast (with its own prefix)
-          // The expression (sel.qualifier) is the object before .asInstanceOf
-          val expr = visitTree(sel.qualifier) match {
+          // `asInstanceOf` is a method on `Any`, and Dotty gives it the same tree as any
+          // other generic call, so it is modelled as one: the name's prefix holds the run
+          // after the `.`, and the type argument list is the method's type parameters.
+          val select = visitTree(sel.qualifier) match {
             case e: Expression => e
             case j: J => new S.StatementExpression(Tree.randomId(), j)
             case null => throw unmappedException(ta)
           }
-          
-          // Capture whitespace between the qualifier and ".asInstanceOf"
-          // (e.g. when ".asInstanceOf" sits on its own line as part of a chain).
-          val asInstanceOfEnd = Math.max(0, sel.span.end - offsetAdjustment)
-          val asInstanceOfNameLen = "asInstanceOf".length
-          val dotPos = asInstanceOfEnd - asInstanceOfNameLen - 1
-          val asInstanceOfPrefix: Space =
-            if (cursor >= 0 && cursor <= dotPos && dotPos <= source.length) {
-              ScalaSpace.format(source.substring(cursor, dotPos))
-            } else {
-              Space.EMPTY
-            }
 
-          updateCursor(sel.span.end)
-          
-          // Now handle the type argument in brackets
-          // Extract any space before the opening bracket
-          val typeArgStart = ta.args.head.span.start - offsetAdjustment
-          val spaceBeforeBracket = if (cursor < typeArgStart && typeArgStart <= source.length) {
-            val between = source.substring(cursor, typeArgStart)
-            // Find the bracket position
-            val bracketPos = positionOfNextIn(between, "[", 0)
-            if (bracketPos >= 0) {
-              cursor = cursor + bracketPos + 1  // Move past the bracket
-              Space.format(between.substring(0, bracketPos))
-            } else {
-              Space.EMPTY
-            }
-          } else {
-            Space.EMPTY
-          }
-          
-          // Visit the target type. Use the type-position helper so that function types
-          // (`A => B`), tuple types, union/intersection types, etc. are mapped to a
-          // `TypeTree` rather than being misread as expressions.
+          val dotIdx = positionOfNext(".", cursor)
+          val selectAfter = if (dotIdx > cursor) ScalaSpace.format(source, cursor, dotIdx) else Space.EMPTY
+          if (dotIdx >= cursor) cursor = dotIdx + 1
+          val nameStart = indexOfNextNonWhitespace(cursor)
+          val namePrefix = if (nameStart > cursor) ScalaSpace.format(source, cursor, nameStart) else Space.EMPTY
+          cursor = nameStart + "asInstanceOf".length
+
+          val openBracket = positionOfNext("[", cursor)
+          val beforeBracket = if (openBracket > cursor) ScalaSpace.format(source, cursor, openBracket) else Space.EMPTY
+          if (openBracket >= cursor) cursor = openBracket + 1
+
+          // The target type goes through the type-position helper so function types
+          // (`A => B`), tuple, union and intersection types map to a `TypeTree`.
           val targetType = visitTypeTree(ta.args.head) match {
             case tt: TypeTree => tt
             case null => throw unmappedException(ta)
           }
-          
-          // Update cursor past the closing bracket
+          val closeBracket = positionOfNext("]", cursor)
+          val beforeClose = if (closeBracket > cursor) ScalaSpace.format(source, cursor, closeBracket) else Space.EMPTY
+          if (closeBracket >= cursor) cursor = closeBracket + 1
           updateCursor(ta.span.end)
 
-          val typeCastMarkers =
-            if (asInstanceOfPrefix.getWhitespace.nonEmpty || !asInstanceOfPrefix.getComments.isEmpty) {
-              Markers.EMPTY.addIfAbsent(AsInstanceOfPrefix.create(asInstanceOfPrefix))
-            } else {
-              Markers.EMPTY
-            }
+          val typeArgs = new util.ArrayList[JRightPadded[Expression]]()
+          typeArgs.add(new JRightPadded(targetType.asInstanceOf[Expression], beforeClose, Markers.EMPTY))
+          val noArgs = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+            Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
 
-          return new J.TypeCast(
+          return new J.MethodInvocation(
             Tree.randomId(),
-            Space.EMPTY,  // TypeCast itself has no prefix - the space is handled by the variable initializer
-            typeCastMarkers,
-            new J.ControlParentheses[TypeTree](
-              Tree.randomId(),
-              spaceBeforeBracket,
-              Markers.EMPTY,
-              JRightPadded.build(targetType)
-            ),
-            expr
+            Space.EMPTY,
+            Markers.EMPTY,
+            new JRightPadded(select, selectAfter, Markers.EMPTY),
+            JContainer.build(beforeBracket, typeArgs, Markers.EMPTY),
+            ident("asInstanceOf", namePrefix),
+            noArgs,
+            methodTypeOfTree(ta)
           )
         }
         

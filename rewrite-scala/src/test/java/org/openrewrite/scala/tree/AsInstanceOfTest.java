@@ -16,11 +16,13 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
-class TypeCastTest implements RewriteTest {
+class AsInstanceOfTest implements RewriteTest {
 
     @Test
     void simpleCast() {
@@ -173,4 +175,43 @@ class TypeCastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newlineBetweenDotAndKeyword() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val obj: Any = 1
+              val num = obj.
+                asInstanceOf[Int]
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void isAMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val obj: Any = 1
+              val num = obj.asInstanceOf[Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration test = (J.ClassDeclaration) cu.getStatements().get(0);
+                J.VariableDeclarations num = (J.VariableDeclarations) test.getBody().getStatements().get(1);
+                J.MethodInvocation cast = (J.MethodInvocation) num.getVariables().get(0).getInitializer();
+                assertThat(cast.getSimpleName()).isEqualTo("asInstanceOf");
+                assertThat(cast.getArguments()).isEmpty();
+                assertThat(cast.getTypeParameters()).singleElement()
+                  .isInstanceOfSatisfying(J.Identifier.class, t -> assertThat(t.getSimpleName()).isEqualTo("Int"));
+            })
+          )
+        );
+    }
+
 }
