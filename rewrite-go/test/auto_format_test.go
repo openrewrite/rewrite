@@ -62,47 +62,9 @@ func TestRemoveTrailingWhitespace_StripsTrailingTabsFromLines(t *testing.T) {
 // block lives on the *leftmost descendant* of that statement (e.g.
 // Variable.Prefix), not on Asg.Prefix. The visitor walks the leftmost
 // spine via transformLeftmostPrefix to find it.
-func TestBlankLines_StripsLeadingBlankLineAtBlockStart(t *testing.T) {
-	src := `package main
-
-func main() {
-
-	a := 1
-	_ = a
-}
-`
-	want := `package main
-
-func main() {
-	a := 1
-	_ = a
-}
-`
-	out := applyVisitor(t, src, format.NewBlankLinesVisitor(nil))
-	assert.Equal(t, want, out)
-}
 
 // Regression: the trailing blank line above the closing brace lives on
 // Block.End — straightforward direct manipulation.
-func TestBlankLines_StripsTrailingBlankLineAtBlockEnd(t *testing.T) {
-	src := `package main
-
-func main() {
-	a := 1
-	_ = a
-
-}
-`
-	want := `package main
-
-func main() {
-	a := 1
-	_ = a
-}
-`
-	out := applyVisitor(t, src, format.NewBlankLinesVisitor(nil))
-	assert.Equal(t, want, out)
-}
 
 func TestBlankLines_CapsRunOfBlankLinesInBlock(t *testing.T) {
 	src := `package main
@@ -222,7 +184,7 @@ func TestAutoFormat_FullPipelineEndToEnd(t *testing.T) {
 	// start of body, wrong indent on nested block + its body,
 	// missing space around `+`. Expect all four passes to fire.
 	src := "package main\n\nfunc main() {   \n\n\n\tif true {\n\ta := 1+2\n\t_ = a\n\t}\n}\n"
-	want := "package main\n\nfunc main() {\n\tif true {\n\t\ta := 1 + 2\n\t\t_ = a\n\t}\n}\n"
+	want := "package main\n\nfunc main() {\n\n\tif true {\n\t\ta := 1 + 2\n\t\t_ = a\n\t}\n}\n"
 	out := applyVisitor(t, src, format.NewAutoFormatVisitor(nil))
 	assert.Equal(t, want, out)
 }
@@ -396,6 +358,28 @@ func TestBinarySpacingInSlices(t *testing.T) {
 	}
 	for name, io := range cases {
 		if out := applyVisitor(t, io[0], format.NewBinarySpacingVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}
+
+func TestBlankLinesAtBlockBraces(t *testing.T) {
+	cases := map[string][2]string{
+		"a function body keeps one": {
+			"package p\n\nfunc f() {\n\n\ta := 1\n\t_ = a\n\n}\n",
+			"package p\n\nfunc f() {\n\n\ta := 1\n\t_ = a\n\n}\n"},
+		"a function body caps a run at one": {
+			"package p\n\nfunc f() {\n\n\n\ta := 1\n\t_ = a\n\n\n}\n",
+			"package p\n\nfunc f() {\n\n\ta := 1\n\t_ = a\n\n}\n"},
+		"a struct body sits flush": {
+			"package p\n\ntype T struct {\n\n\tA int\n\n}\n",
+			"package p\n\ntype T struct {\n\tA int\n}\n"},
+		"an interface body sits flush": {
+			"package p\n\ntype I interface {\n\n\tM() int\n\n}\n",
+			"package p\n\ntype I interface {\n\tM() int\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewBlankLinesVisitor(nil)); out != io[1] {
 			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
 		}
 	}
