@@ -247,7 +247,7 @@ type Composite struct {
 	Prefix   java.Space
 	Markers  java.Markers
 	TypeExpr java.Expression                 // nil for untyped composite literals
-	Elements java.Container[java.Expression] // Before = space before `{`, elements, last After = space before `}`
+	Elements java.Container[java.Expression] // Before = space between TypeExpr and `{`, empty when untyped; last After = space before `}`
 }
 
 func (*Composite) IsTree()       {}
