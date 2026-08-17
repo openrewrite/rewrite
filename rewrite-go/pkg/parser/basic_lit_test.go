@@ -20,6 +20,10 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -30,9 +34,7 @@ func litRHS(t *testing.T, src string) *java.Literal {
 	t.Helper()
 	rhs := firstAssignRHS(t, src)
 	lit, ok := rhs.(*java.Literal)
-	if !ok {
-		t.Fatalf("expected *java.Literal, got %T", rhs)
-	}
+	require.Truef(t, ok, "expected *java.Literal, got %T", rhs)
 	return lit
 }
 
@@ -69,9 +71,7 @@ func TestBasicLitDecodedValue(t *testing.T) {
 			if lit.Value != tc.wantValue {
 				t.Errorf("Value = %#v (%T), want %#v (%T)", lit.Value, lit.Value, tc.wantValue, tc.wantValue)
 			}
-			if lit.Source != tc.wantSource {
-				t.Errorf("Source = %q, want %q", lit.Source, tc.wantSource)
-			}
+			assert.Equal(t, lit.Source, tc.wantSource, "Source")
 		})
 	}
 }
@@ -81,9 +81,7 @@ func TestBasicLitDecodedValue(t *testing.T) {
 func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("g.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	var found *java.Literal
 	visitor.Walk(cu, func(n java.Tree) bool {
 		if lit, ok := n.(*java.Literal); ok {
@@ -94,9 +92,7 @@ func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
 		}
 		return true
 	})
-	if found == nil {
-		t.Fatalf("no *java.Literal of primitive type %q found", keyword)
-	}
+	require.NotNilf(t, found, "no *java.Literal of primitive type %q found", keyword)
 	return found
 }
 

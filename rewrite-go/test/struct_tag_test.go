@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -34,9 +38,7 @@ import (
 func parseStructAndFindField(t *testing.T, src, fieldName string) *java.VariableDeclarations {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	for _, rp := range cu.Statements {
 		td, ok := rp.Element.(*golang.TypeDecl)
 		if !ok {
@@ -73,16 +75,10 @@ func TestStructTag_SingleKeyParsesIntoOneAnnotation(t *testing.T) {
 	if id, ok := ann.AnnotationType.(*java.Identifier); !ok || id.Name != "json" {
 		t.Errorf("AnnotationType: got %+v, want Identifier{Name:\"json\"}", ann.AnnotationType)
 	}
-	if ann.Arguments == nil || len(ann.Arguments.Elements) != 1 {
-		t.Fatalf("Arguments: got %+v, want 1 element", ann.Arguments)
-	}
+	require.Falsef(t, ann.Arguments == nil || len(ann.Arguments.Elements) != 1, "Arguments: got %+v, want 1 element", ann.Arguments)
 	lit, ok := ann.Arguments.Elements[0].Element.(*java.Literal)
-	if !ok {
-		t.Fatalf("Arguments[0]: got %T, want *Literal", ann.Arguments.Elements[0].Element)
-	}
-	if lit.Source != `"name"` {
-		t.Errorf("Arguments[0].Source: got %q, want %q", lit.Source, `"name"`)
-	}
+	require.Truef(t, ok, "Arguments[0]: got %T, want *Literal", ann.Arguments.Elements[0].Element)
+	assert.Equalf(t, `"name"`, lit.Source, "Arguments[0].Source: got %q, want %q", lit.Source, `"name"`)
 	if v, _ := lit.Value.(string); v != "name" {
 		t.Errorf("Arguments[0].Value: got %v, want %q", lit.Value, "name")
 	}
@@ -112,9 +108,7 @@ func TestStructTag_MultipleKeysParseIntoMultipleAnnotations(t *testing.T) {
 		t.Errorf("[1] Source: got %q, want %q", lit.Source, `"email_address"`)
 	}
 	// Inter-pair whitespace lives on the second annotation's Prefix.
-	if second.Prefix.Whitespace != " " {
-		t.Errorf("[1] Prefix.Whitespace: got %q, want %q", second.Prefix.Whitespace, " ")
-	}
+	assert.Equalf(t, " ", second.Prefix.Whitespace, "[1] Prefix.Whitespace: got %q, want %q", second.Prefix.Whitespace, " ")
 }
 
 func TestStructTag_NoMarkerLeftBehind(t *testing.T) {
@@ -131,39 +125,27 @@ func TestStructTag_NoMarkerLeftBehind(t *testing.T) {
 func TestStructTag_RoundtripGofmtdInput(t *testing.T) {
 	src := "package main\n\ntype User struct {\n\tName  string `json:\"name\"`\n\tEmail string `json:\"email,omitempty\" db:\"email_address\"`\n\tID    int    `json:\"-\"`\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	got := printer.Print(cu)
-	if got != src {
-		t.Errorf("roundtrip mismatch\nexpected:\n%s\nactual:\n%s", src, got)
-	}
+	assert.Equal(t, src, got, "roundtrip mismatch")
 }
 
 func TestStructTag_RoundtripWithEscapes(t *testing.T) {
 	// A backslash-escaped quote inside the value must roundtrip.
 	src := "package main\n\ntype X struct {\n\tField string `json:\"a\\\"b\"`\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	got := printer.Print(cu)
-	if got != src {
-		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
-	}
+	assert.Equal(t, src, got, "roundtrip mismatch")
 }
 
 func TestStructTag_DashValueRoundtrip(t *testing.T) {
 	// `json:"-"` is the convention for "skip this field".
 	src := "package main\n\ntype X struct {\n\tField string `json:\"-\"`\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	got := printer.Print(cu)
-	if got != src {
-		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
-	}
+	assert.Equal(t, src, got, "roundtrip mismatch")
 	vd := parseStructAndFindField(t, src, "Field")
 	lit := vd.LeadingAnnotations[0].Arguments.Elements[0].Element.(*java.Literal)
 	if v, _ := lit.Value.(string); v != "-" {
@@ -176,9 +158,7 @@ func TestStructTag_NonStructDoesNotEmitAnnotations(t *testing.T) {
 	// the parser should not emit any LeadingAnnotations on them.
 	src := "package main\n\nvar x int = 1\n\nfunc f() {\n\ty := 2\n\t_ = y\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	for _, rp := range cu.Statements {
 		if vd, ok := rp.Element.(*java.VariableDeclarations); ok {
 			if len(vd.LeadingAnnotations) > 0 {
