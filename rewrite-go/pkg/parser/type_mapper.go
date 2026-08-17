@@ -467,10 +467,10 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 }
 
 // ownerType is what a variable belongs to: the declaring type for a
-// field, the package for a variable declared at package scope, the
-// enclosing function for a local or parameter. go/types leads from a
-// struct to its fields but not back, so a field's owner comes from the
-// index built while mapping the struct.
+// field, the package for one declared at package scope wherever it is
+// read from, the enclosing function for a local or parameter. go/types
+// leads from a struct to its fields but not back, so a field's owner
+// comes from the index built while mapping the struct.
 func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaType {
 	if v.IsField() {
 		if owner, ok := m.fieldOwner[v]; ok {
@@ -478,8 +478,6 @@ func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaT
 		}
 		return nil
 	}
-	// A package-scoped variable belongs to its package wherever it is
-	// read from, which is not the function doing the reading.
 	if pkg := v.Pkg(); pkg != nil && v.Parent() == pkg.Scope() {
 		return &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: pkg.Path()}
 	}

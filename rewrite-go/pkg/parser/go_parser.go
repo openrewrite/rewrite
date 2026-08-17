@@ -2367,8 +2367,8 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.Ja
 		// interface is for a method; an unnamed one names nothing.
 		var declaring *java.JavaTypeClass
 		if _, ok := obj.Type().(*types.Named); ok {
-			// Through mapType, which bounds the walk and contains a
-			// type the checker left unwalkable.
+			// mapType is the depth-bounded, panic-guarded entry; the
+			// mapNamed underneath it is not.
 			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
 		}
 		return ctx.mapper.mapSignature(sig, name, declaring)
@@ -3254,9 +3254,9 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 	} else {
 		unquoted, err := strconv.Unquote(raw)
 		if err != nil {
-			// go/parser rejects a literal Unquote cannot read, so this
-			// is unreachable; strip the delimiters so that if it ever is
-			// reached the printer does not write them twice.
+			// Unreachable: go/parser rejects a literal Unquote cannot
+			// read. Stripping keeps the printer from writing the
+			// delimiters twice if it ever is reached.
 			unquoted = strings.Trim(raw, `"`)
 		}
 		raw = unquoted

@@ -25,9 +25,8 @@ import (
 	"testing"
 )
 
-// Files this parser excludes under every audit context but go/build
-// accepts under at least one are false rejections: never graded, and
-// invisible in the skipped count.
+// A file excluded under every audit context that go/build would take is
+// a false rejection. See printer-corpus/README.md.
 func TestFalseRejections(t *testing.T) {
 	root := os.Getenv("GO_CORPUS")
 	if root == "" {
