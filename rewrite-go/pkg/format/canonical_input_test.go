@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -54,6 +55,8 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 
 	var checked, changed int
 	var examples []string
+	kinds := map[string]int{}
+	kindExamples := map[string]string{}
 	for _, f := range files {
 		content, err := os.ReadFile(f)
 		if err != nil {
@@ -97,6 +100,20 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 			continue
 		}
 		changed++
+		{
+			g, w := strings.Split(got, "\n"), strings.Split(src, "\n")
+			for i := range g {
+				if i < len(w) && g[i] != w[i] {
+					kind, _ := classifyLine(g[i], w[i])
+					kinds[kind]++
+					if _, seen := kindExamples[kind]; !seen {
+						kindExamples[kind] = filepath.Base(f) +
+							"\n         want |" + w[i] + "|\n         got  |" + g[i] + "|"
+					}
+					break
+				}
+			}
+		}
 		if len(examples) < 6 {
 			for i, line := range strings.Split(got, "\n") {
 				want := strings.Split(src, "\n")
@@ -109,6 +126,14 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 		}
 	}
 	t.Logf("gofmtCleanFilesChecked=%d changed=%d", checked, changed)
+	keys := make([]string, 0, len(kinds))
+	for k := range kinds {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return kinds[keys[i]] > kinds[keys[j]] })
+	for _, k := range keys {
+		t.Logf("  %5d files  %s\n         e.g. %s", kinds[k], k, kindExamples[k])
+	}
 	for _, e := range examples {
 		t.Logf("  %s", e)
 	}
