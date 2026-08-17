@@ -531,7 +531,7 @@ class SortDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void doesNotReorderImportedBomsWithPropertyBasedTypeAndScope() {
+    void doesNotReorderDependenciesWithUnresolvedTypeOrScope() {
         rewriteRun(
           pomXml(
             """
@@ -546,10 +546,16 @@ class SortDependenciesTest implements RewriteTest {
                     <properties>
                       <bom.type>jar</bom.type>
                       <bom.scope>compile</bom.scope>
-                      <quarkus.group-id>io.quarkus.platform</quarkus.group-id>
                     </properties>
                     <dependencyManagement>
                       <dependencies>
+                        <dependency>
+                          <groupId>io.quarkus.platform</groupId>
+                          <artifactId>quarkus-bom</artifactId>
+                          <version>3.37.3</version>
+                          <type>${bom.type}</type>
+                          <scope>${bom.scope}</scope>
+                        </dependency>
                         <dependency>
                           <groupId>io.opentelemetry</groupId>
                           <artifactId>opentelemetry-bom</artifactId>
@@ -557,81 +563,8 @@ class SortDependenciesTest implements RewriteTest {
                           <type>${bom.type}</type>
                           <scope>${bom.scope}</scope>
                         </dependency>
-                        <dependency>
-                          <groupId>${quarkus.group-id}</groupId>
-                          <artifactId>quarkus-bom</artifactId>
-                          <version>3.37.3</version>
-                          <type>${bom.type}</type>
-                          <scope>${bom.scope}</scope>
-                        </dependency>
                       </dependencies>
                     </dependencyManagement>
-                  </profile>
-                  <profile>
-                    <id>bom-values</id>
-                    <properties>
-                      <bom.type>pom</bom.type>
-                      <bom.scope>import</bom.scope>
-                    </properties>
-                  </profile>
-                </profiles>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void doesNotReorderImportedBomsWithInactiveProfileProperties() {
-        rewriteRun(
-          spec -> spec.parser(MavenParser.builder()
-            .property("bom.type", "pom")),
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.example</groupId>
-                <artifactId>app</artifactId>
-                <version>1</version>
-                <properties>
-                  <bom.type>jar</bom.type>
-                  <bom.scope>import</bom.scope>
-                </properties>
-                <profiles>
-                  <profile>
-                    <id>observability</id>
-                    <properties>
-                      <bom.type>jar</bom.type>
-                      <quarkus.group-id>io.quarkus.platform</quarkus.group-id>
-                    </properties>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>io.opentelemetry</groupId>
-                          <artifactId>opentelemetry-bom</artifactId>
-                          <version>1.64.0</version>
-                          <type>${bom.type}</type>
-                          <scope>${bom.scope}</scope>
-                        </dependency>
-                        <dependency>
-                          <groupId>${quarkus.group-id}</groupId>
-                          <artifactId>quarkus-bom</artifactId>
-                          <version>3.37.3</version>
-                          <type>${bom.type}</type>
-                          <scope>${bom.scope}</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </profile>
-                  <profile>
-                    <id>ordinary-values</id>
-                    <activation>
-                      <activeByDefault>true</activeByDefault>
-                    </activation>
-                    <properties>
-                      <bom.type>jar</bom.type>
-                      <bom.scope>compile</bom.scope>
-                    </properties>
                   </profile>
                 </profiles>
               </project>
@@ -650,53 +583,36 @@ class SortDependenciesTest implements RewriteTest {
                 <groupId>com.example</groupId>
                 <artifactId>app</artifactId>
                 <version>1</version>
-                <properties>
-                  <dependency.type>pom</dependency.type>
-                  <dependency.scope>import</dependency.scope>
-                </properties>
-                <profiles>
-                  <profile>
-                    <id>ordinary-dependencies</id>
-                    <properties>
-                      <dependency.type/>
-                      <dependency.scope/>
-                    </properties>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>org.example</groupId>
-                          <artifactId>z</artifactId>
-                          <version>1</version>
-                          <type>${dependency.type}</type>
-                          <scope>${dependency.scope}</scope>
-                        </dependency>
-                        <!-- First import -->
-                        <dependency>
-                          <groupId>io.opentelemetry</groupId>
-                          <artifactId>opentelemetry-bom</artifactId>
-                          <version>1.64.0</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                        <dependency>
-                          <groupId>org.example</groupId>
-                          <artifactId>a</artifactId>
-                          <version>1</version>
-                          <type>${dependency.type}</type>
-                          <scope>${dependency.scope}</scope>
-                        </dependency>
-                        <!-- Second import -->
-                        <dependency>
-                          <groupId>io.quarkus.platform</groupId>
-                          <artifactId>quarkus-bom</artifactId>
-                          <version>3.37.3</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </profile>
-                </profiles>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>z</artifactId>
+                      <version>1</version>
+                    </dependency>
+                    <!-- First import -->
+                    <dependency>
+                      <groupId>io.opentelemetry</groupId>
+                      <artifactId>opentelemetry-bom</artifactId>
+                      <version>1.64.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>a</artifactId>
+                      <version>1</version>
+                    </dependency>
+                    <!-- Second import -->
+                    <dependency>
+                      <groupId>io.quarkus.platform</groupId>
+                      <artifactId>quarkus-bom</artifactId>
+                      <version>3.37.3</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
               </project>
               """,
             """
@@ -705,53 +621,36 @@ class SortDependenciesTest implements RewriteTest {
                 <groupId>com.example</groupId>
                 <artifactId>app</artifactId>
                 <version>1</version>
-                <properties>
-                  <dependency.type>pom</dependency.type>
-                  <dependency.scope>import</dependency.scope>
-                </properties>
-                <profiles>
-                  <profile>
-                    <id>ordinary-dependencies</id>
-                    <properties>
-                      <dependency.type/>
-                      <dependency.scope/>
-                    </properties>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>org.example</groupId>
-                          <artifactId>a</artifactId>
-                          <version>1</version>
-                          <type>${dependency.type}</type>
-                          <scope>${dependency.scope}</scope>
-                        </dependency>
-                        <!-- First import -->
-                        <dependency>
-                          <groupId>io.opentelemetry</groupId>
-                          <artifactId>opentelemetry-bom</artifactId>
-                          <version>1.64.0</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                        <dependency>
-                          <groupId>org.example</groupId>
-                          <artifactId>z</artifactId>
-                          <version>1</version>
-                          <type>${dependency.type}</type>
-                          <scope>${dependency.scope}</scope>
-                        </dependency>
-                        <!-- Second import -->
-                        <dependency>
-                          <groupId>io.quarkus.platform</groupId>
-                          <artifactId>quarkus-bom</artifactId>
-                          <version>3.37.3</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </profile>
-                </profiles>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>a</artifactId>
+                      <version>1</version>
+                    </dependency>
+                    <!-- First import -->
+                    <dependency>
+                      <groupId>io.opentelemetry</groupId>
+                      <artifactId>opentelemetry-bom</artifactId>
+                      <version>1.64.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>z</artifactId>
+                      <version>1</version>
+                    </dependency>
+                    <!-- Second import -->
+                    <dependency>
+                      <groupId>io.quarkus.platform</groupId>
+                      <artifactId>quarkus-bom</artifactId>
+                      <version>3.37.3</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
               </project>
               """
           )

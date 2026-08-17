@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.maven.tree.Profile;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
@@ -28,11 +27,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
-
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -146,102 +141,21 @@ public class SortDependencies extends Recipe {
             }
 
             private boolean isImportedBom(Xml.Tag tag) {
-                ResolvedPom pom = getResolutionResult().getPom();
-                return isValueOrUnresolvedPlaceholder(tag, "type", "pom", pom) &&
-                       isValueOrUnresolvedPlaceholder(tag, "scope", "import", pom);
+                return matches(tag, "type", "pom") && matches(tag, "scope", "import");
             }
 
-            private boolean isValueOrUnresolvedPlaceholder(Xml.Tag tag, String childName, String expected,
-                                                            ResolvedPom pom) {
-                return tag.getChildValue(childName)
-                        .map(value -> isValueOrUnresolvedPlaceholder(value, expected, pom))
-                        .orElse(false);
-            }
-
-            private boolean isValueOrUnresolvedPlaceholder(String value, String expected, ResolvedPom pom) {
-                String resolvedValue = inactiveProfile()
-                        .map(profile -> resolveProfileAwareValue(value, pom, profile))
-                        .orElseGet(() -> requireNonNull(pom.getValue(value)));
-                return isValueOrUnresolvedPlaceholder(resolvedValue, expected);
-            }
-
-            private boolean isValueOrUnresolvedPlaceholder(String value, String expected) {
-                return ResolvedPom.placeholderHelper.hasPlaceholders(value) || expected.equals(value.trim());
-            }
-
-            private String resolveProfileAwareValue(String value, ResolvedPom pom,
-                                                    Profile inactiveProfile) {
-                return ResolvedPom.placeholderHelper.replacePlaceholders(
-                        value, property -> profileOrPomValue(property, pom, inactiveProfile));
-            }
-
-            private Optional<Profile> inactiveProfile() {
-                return getCursor().getPathAsStream(Xml.Tag.class::isInstance)
-                        .map(Xml.Tag.class::cast)
-                        .filter(tag -> "profile".equals(tag.getName()))
-                        .findFirst()
-                        .flatMap(profile -> profile.getChildValue("id"))
-                        .flatMap(this::requestedProfile)
-                        .filter(profile -> !isEffectivelyActive(profile));
-            }
-
-            private Optional<Profile> requestedProfile(String profileId) {
-                return getResolutionResult().getPom().getRequested().getProfiles().stream()
-                        .filter(profile -> profileId.equals(profile.getId()))
-                        .findFirst();
-            }
-
-            private String profileOrPomValue(String property, ResolvedPom pom,
-                                             Profile inactiveProfile) {
-                String systemValue = System.getProperty(property);
-                if (systemValue != null) {
-                    return systemValue;
+            private boolean matches(Xml.Tag tag, String childName, String expected) {
+                String value = tag.getChildValue(childName).orElse(null);
+                if (value == null) {
+                    return false;
                 }
-                String userValue = getResolutionResult().getUserProperties().get(property);
-                if (userValue != null) {
-                    return userValue;
-                }
-                return pom.getRequested().getProfiles().stream()
-                        .filter(profile -> profile.getProperties().containsKey(property))
-                        .map(profile -> profileValue(profile, property, inactiveProfile))
-                        .findFirst()
-                        .orElseGet(() -> pomValue(property, pom));
-            }
-
-            private String profileValue(Profile profile, String property, Profile inactiveProfile) {
-                return profile == inactiveProfile || remainsActive(profile) ?
-                        Objects.toString(profile.getProperties().get(property), "") :
-                        // Returning the placeholder itself keeps the property unresolved
-                        asPlaceholder(property);
-            }
-
-            private String pomValue(String property, ResolvedPom pom) {
-                if (pom.getRequested().getProperties().containsKey(property)) {
-                    return Objects.toString(pom.getRequested().getProperties().get(property), "");
-                }
-                return requireNonNull(pom.getValue(asPlaceholder(property)));
-            }
-
-            private boolean isEffectivelyActive(Profile profile) {
-                List<String> activeProfiles = getResolutionResult().getActiveProfiles();
-                boolean hasActivePomProfile = getResolutionResult().getPom().getRequested().getProfiles().stream()
-                        .anyMatch(candidate -> candidate.isActive(activeProfiles));
-                return hasActivePomProfile ? profile.isActive(activeProfiles) :
-                        profile.getActivation() != null &&
-                        Boolean.TRUE.equals(profile.getActivation().getActiveByDefault());
-            }
-
-            private boolean remainsActive(Profile profile) {
-                List<String> activeProfiles = getResolutionResult().getActiveProfiles();
-                return activeProfiles.isEmpty() ?
-                        profile.getActivation() != null && profile.getActivation().isActive() :
-                        profile.isActive(activeProfiles);
+                String resolved = getResolutionResult().getPom().getValue(value);
+                // A placeholder that the effective model can't resolve, such as one defined only in an
+                // inactive profile, might still be an import; leave those dependencies where they are.
+                return resolved == null || ResolvedPom.placeholderHelper.hasPlaceholders(resolved) ||
+                       expected.equals(resolved.trim());
             }
         };
-    }
-
-    private static String asPlaceholder(String property) {
-        return "${" + property + "}";
     }
 
     // Compared only as a whole key; `:` cannot occur in a groupId or artifactId
