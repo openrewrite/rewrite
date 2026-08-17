@@ -552,4 +552,18 @@ class TryTest implements RewriteTest {
         );
     }
 
+    @Test
+    void catchWithPartialFunctionExpression() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(part0: String, badPart: PartialFunction[Throwable, String]): String =
+                try part0 catch badPart
+            }
+            """
+          )
+        );
+    }
+
 }

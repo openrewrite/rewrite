@@ -7375,11 +7375,10 @@ class ScalaTreeVisitor(
     // The handler is a synthetic Match whose case clauses are the catch patterns.
     val catches: JLeftPadded[J.Block] =
       if (!parsedTry.handler.isEmpty && parsedTry.handler.span.exists) {
-        val cases: List[Trees.CaseDef[?]] = parsedTry.handler match {
-          case matchTree: Trees.Match[?] => matchTree.cases
-          case _ => Nil
+        parsedTry.handler match {
+          case matchTree: Trees.Match[?] => buildCatchBlock(matchTree.cases)
+          case handler => buildCatchExpression(handler)
         }
-        buildCatchBlock(cases)
       } else null
 
     val finallyBlock = buildTryFinalizer(parsedTry.finalizer)
@@ -7462,6 +7461,26 @@ class ScalaTreeVisitor(
       else Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
     val casesBlock = new J.Block(Tree.randomId(), blockPrefix, blockMarkers, JRightPadded.build(false), caseStatements, endSpace)
     JLeftPadded.build(casesBlock).withBefore(beforeCatch)
+  }
+
+  /** Build the handler of `try expr catch handler`, where the handler is a partial-function
+   *  expression rather than a list of `case` clauses. */
+  private def buildCatchExpression(handler: Trees.Tree[?]): JLeftPadded[J.Block] = {
+    val catchAbs = positionOfNext("catch")
+    val beforeCatch = if (catchAbs > cursor) ScalaSpace.format(source, cursor, catchAbs) else Space.EMPTY
+    if (catchAbs >= cursor) cursor = catchAbs + "catch".length
+    val stmt: Statement = visitTree(handler) match {
+      case s: Statement => s
+      case e: Expression => new S.ExpressionStatement(Tree.randomId(), e)
+      case j: J => new S.ExpressionStatement(Tree.randomId(), new S.StatementExpression(Tree.randomId(), j))
+      case null => throw unmappedException(handler)
+    }
+    val stmts = new util.ArrayList[JRightPadded[Statement]]()
+    stmts.add(JRightPadded.build(stmt))
+    val block = new J.Block(Tree.randomId(), Space.EMPTY,
+      Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+      JRightPadded.build(false), stmts, Space.EMPTY)
+    JLeftPadded.build(block).withBefore(beforeCatch)
   }
 
   /** Visit the `finally` block, if present, capturing the space before the `finally` keyword. */
