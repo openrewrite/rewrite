@@ -27,8 +27,11 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
+import java.time.ZonedDateTime;
 import java.util.*;
 
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -149,6 +152,29 @@ class RpcReceiveQueueTest {
                 .writerFor(new TypeReference<Map<String, String>>() {})
                 .writeValueAsString(after))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void fileAttributeTimestampsTravelAsStrings() {
+        ZonedDateTime created = ZonedDateTime.parse("2026-08-16T10:15:30.123456789+02:00[Europe/Berlin]");
+        FileAttributes before = new FileAttributes(created, created.plusHours(1), created.plusHours(2),
+          true, true, false, 100);
+
+        sq.send(before, null, null);
+
+        // A raw ZonedDateTime is written as a bare epoch number and arrives as a Double -- a CCE
+        // in rpcReceive, and even coerced it would have lost the zone and the nanos below.
+        List<RpcObjectData> timestamps = batches.stream().flatMap(List::stream).collect(toList()).subList(1, 4);
+        assertThat(timestamps).allSatisfy(data -> {
+            assertThat(data.getValueType()).isNull();
+            assertThat((Object) data.getValue()).isInstanceOf(String.class);
+        });
+
+        FileAttributes after = rq.receive(null);
+        assertThat(after).isEqualTo(before);
+        assertThat(after.getCreationTime()).isEqualTo(created);
+        assertThat(requireNonNull(after.getCreationTime()).getZone()).isEqualTo(created.getZone());
+        assertThat(after.getCreationTime().getNano()).isEqualTo(123456789);
     }
 
     @Test

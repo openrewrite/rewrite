@@ -23,6 +23,8 @@ import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import org.openrewrite.rpc.Reference;
+
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 public class GolangSender extends GolangVisitor<RpcSendQueue> {
@@ -126,6 +128,20 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
         q.getAndSend(mapType, Go.MapType::getValue, el -> visit(el, q));
         return mapType;
+    }
+
+    @Override
+    public J visitTypeAssertion(Go.TypeAssertion ta, RpcSendQueue q) {
+        q.getAndSend(ta, t -> t.getPadding().getLeft(), el -> visitRightPadded(el, q));
+        q.getAndSend(ta, Go.TypeAssertion::getAssertedType, el -> visit(el, q));
+        q.getAndSend(ta, t -> Reference.asRef(t.getType()), type -> visitType(getValueNonNull(type), q));
+        return ta;
+    }
+
+    @Override
+    public J visitExpressionStatement(Go.ExpressionStatement es, RpcSendQueue q) {
+        q.getAndSend(es, Go.ExpressionStatement::getExpression, el -> visit(el, q));
+        return es;
     }
 
     @Override

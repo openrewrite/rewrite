@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -263,18 +265,10 @@ func TestNewRecipeMetadata(t *testing.T) {
 		WithAfter(`y`),
 	)
 
-	if r.Name() != "org.openrewrite.golang.MyRecipe" {
-		t.Errorf("Name() = %q", r.Name())
-	}
-	if r.DisplayName() != "My Recipe" {
-		t.Errorf("DisplayName() = %q", r.DisplayName())
-	}
-	if r.Description() != "Does something useful." {
-		t.Errorf("Description() = %q", r.Description())
-	}
-	if len(r.Tags()) != 2 || r.Tags()[0] != "cleanup" {
-		t.Errorf("Tags() = %v", r.Tags())
-	}
+	assert.Equal(t, "org.openrewrite.golang.MyRecipe", r.Name(), "Name")
+	assert.Equal(t, "My Recipe", r.DisplayName(), "DisplayName")
+	assert.Equal(t, "Does something useful.", r.Description(), "Description")
+	assert.False(t, len(r.Tags()) != 2 || r.Tags()[0] != "cleanup", "Tags")
 }
 
 type myRecipe struct {

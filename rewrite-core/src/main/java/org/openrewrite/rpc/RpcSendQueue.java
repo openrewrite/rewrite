@@ -245,7 +245,11 @@ public class RpcSendQueue {
         @Override
         protected @Nullable String computeValue(Class<?> afterType) {
             Package pkg = afterType.getPackage();
-            if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
+            String pkgName = pkg == null ? "" : pkg.getName();
+            if (afterType.isPrimitive() || afterType.isArray() || pkgName.startsWith("java.lang") ||
+                // JDK value types have no codec on either side, so a valueType only buys the
+                // receiver a bogus Objenesis instance it discards. Send them as scalars.
+                pkgName.startsWith("java.time") || pkgName.startsWith("java.math") ||
                 afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType) ||
                 Map.class.isAssignableFrom(afterType)) {
                 // A plain Map (like a Collection) is serialized structurally and needs no

@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -29,18 +33,10 @@ func TestProjectImporterStubsRequiredModule(t *testing.T) {
 	pi.AddRequire("github.com/x/y")
 
 	pkg, err := pi.Import("github.com/x/y")
-	if err != nil {
-		t.Fatalf("Import returned error: %v", err)
-	}
-	if pkg == nil {
-		t.Fatal("expected stub package, got nil")
-	}
-	if pkg.Path() != "github.com/x/y" {
-		t.Errorf("Path: want %q, got %q", "github.com/x/y", pkg.Path())
-	}
-	if pkg.Name() != "y" {
-		t.Errorf("Name: want %q, got %q", "y", pkg.Name())
-	}
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "expected stub package, got nil")
+	assert.Equalf(t, "github.com/x/y", pkg.Path(), "Path: want %q", "github.com/x/y")
+	assert.Equalf(t, "y", pkg.Name(), "Name: want %q", "y")
 }
 
 func TestProjectImporterStubMatchesSubPath(t *testing.T) {
@@ -50,15 +46,9 @@ func TestProjectImporterStubMatchesSubPath(t *testing.T) {
 	// `import "github.com/x/y/sub"` should also stub-resolve, because the
 	// require covers the whole module subtree.
 	pkg, err := pi.Import("github.com/x/y/sub")
-	if err != nil {
-		t.Fatalf("Import returned error: %v", err)
-	}
-	if pkg == nil {
-		t.Fatal("expected stub package for sub-path, got nil")
-	}
-	if pkg.Name() != "sub" {
-		t.Errorf("Name: want %q, got %q", "sub", pkg.Name())
-	}
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "expected stub package for sub-path, got nil")
+	assert.Equalf(t, "sub", pkg.Name(), "Name: want %q", "sub")
 }
 
 func TestProjectImporterUnknownPathFallsThroughToError(t *testing.T) {
@@ -86,9 +76,7 @@ func TestGoProjectThirdPartyImportResolves(t *testing.T) {
 		// identifier should now have a non-nil Type. Without require-driven
 		// stubbing this would be nil.
 		ids := collectIdentTypes(cu)
-		if ids["y"] == nil {
-			t.Errorf("expected `y` import identifier to have a non-nil Type via the require stub; got nil")
-		}
+		assert.NotNil(t,ids["y"], "expected `y` import identifier to have a non-nil Type via the require stub; got nil")
 	}
 
 	spec := test.NewRecipeSpec()

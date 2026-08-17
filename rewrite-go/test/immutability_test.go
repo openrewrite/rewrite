@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -51,9 +53,7 @@ var immutabilitySamples = map[string]string{
 func TestVisitDoesNotMutateOriginal(t *testing.T) {
 	for name, src := range immutabilitySamples {
 		cu, err := parser.NewGoParser().Parse("p.go", src)
-		if err != nil {
-			t.Fatalf("%s: parse: %v", name, err)
-		}
+		require.NoErrorf(t, err, "%s: parse", name)
 		before := printer.Print(cu)
 		r := &renamer{}
 		visitor.Init(r)
@@ -71,9 +71,7 @@ func TestVisitDoesNotMutateOriginal(t *testing.T) {
 func TestNoOpVisitPreservesIdentity(t *testing.T) {
 	for name, src := range immutabilitySamples {
 		cu, err := parser.NewGoParser().Parse("p.go", src)
-		if err != nil {
-			t.Fatalf("%s: parse: %v", name, err)
-		}
+		require.NoErrorf(t, err, "%s: parse", name)
 		v := &visitor.GoVisitor{}
 		visitor.Init(v)
 		got := v.Visit(cu, nil)

@@ -23,14 +23,18 @@ import (
 )
 
 type CompilationUnit struct {
-	ID          uuid.UUID
-	Prefix      java.Space
-	Markers     java.Markers
-	SourcePath  string
-	PackageDecl *java.RightPadded[*java.Identifier] // `package main`
-	Imports     *java.Container[*java.Import]       // nil if no imports
-	Statements  []java.RightPadded[java.Statement]  // top-level declarations
-	EOF         java.Space
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	SourcePath string
+	// CharsetBomMarked reports a leading UTF-8 BOM. Go's scanner ignores
+	// one, so it is part of how the file is encoded rather than anything
+	// the tree models.
+	CharsetBomMarked bool
+	PackageDecl      *java.RightPadded[*java.Identifier] // `package main`
+	Imports          *java.Container[*java.Import]       // nil if no imports
+	Statements       []java.RightPadded[java.Statement]  // top-level declarations
+	EOF              java.Space
 }
 
 func (*CompilationUnit) IsTree()       {}
@@ -975,6 +979,71 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
+// ExpressionStatement wraps an Expression standing in statement
+// position — `(h())`, which J.Parentheses alone cannot represent.
+type ExpressionStatement struct {
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	Expression java.Expression
+}
+
+func (*ExpressionStatement) IsTree()      {}
+func (*ExpressionStatement) IsJ()         {}
+func (*ExpressionStatement) IsStatement() {}
+
+func (n *ExpressionStatement) WithPrefix(prefix java.Space) *ExpressionStatement {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionStatement {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeAssertion is Go's postfix `x.(T)`, where J.TypeCast is a prefix
+// cast. The left expression is right-padded, so its padding holds what
+// stands before the dot — a space, or a comment.
+type TypeAssertion struct {
+	ID           uuid.UUID
+	Prefix       java.Space
+	Markers      java.Markers
+	Left         java.RightPadded[java.Expression] // After = space before `.`
+	AssertedType *java.ControlParentheses          // `(T)`
+	Type         java.JavaType                     // the result type (nullable)
+}
+
+func (*TypeAssertion) IsTree()       {}
+func (*TypeAssertion) IsJ()          {}
+func (*TypeAssertion) IsExpression() {}
+
+func (n *TypeAssertion) WithPrefix(prefix java.Space) *TypeAssertion {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeAssertion) WithMarkers(markers java.Markers) *TypeAssertion {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 type StatementExpression struct {
 	ID        uuid.UUID
 	Prefix    java.Space
@@ -1293,6 +1362,17 @@ type StructTag struct {
 }
 
 func (s StructTag) ID() uuid.UUID { return s.Ident }
+
+// StructTagQuote records which string literal delimiter a struct tag was
+// written with. The tag itself is modelled as LeadingAnnotations, which
+// carry its keys and values but not the quoting; absent this marker the
+// printer writes a raw string.
+type StructTagQuote struct {
+	Ident uuid.UUID
+	Quote string // "`" or `"`
+}
+
+func (s StructTagQuote) ID() uuid.UUID { return s.Ident }
 
 // ConstDecl is a marker on VariableDeclarations indicating `const` instead of `var`.
 type ConstDecl struct {

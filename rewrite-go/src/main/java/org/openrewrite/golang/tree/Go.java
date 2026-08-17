@@ -1111,6 +1111,138 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // TypeAssertion (x.(T))
+    // ---------------------------------------------------------------
+
+    /**
+     * Go's postfix {@code x.(T)}, where {@link J.TypeCast} is a prefix
+     * cast. The left expression is right-padded, so its padding holds what
+     * stands before the dot — a space, or a comment.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeAssertion implements Go, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> left;
+
+        public Expression getLeft() {
+            return left.getElement();
+        }
+
+        public Go.TypeAssertion withLeft(Expression left) {
+            return getPadding().withLeft(this.left.withElement(left));
+        }
+
+        @With
+        @Getter
+        J.ControlParentheses<Expression> assertedType;
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitTypeAssertion(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.TypeAssertion t;
+
+            public JRightPadded<Expression> getLeft() {
+                return t.left;
+            }
+
+            public Go.TypeAssertion withLeft(JRightPadded<Expression> left) {
+                return t.left == left ? t : new Go.TypeAssertion(t.padding, t.id, t.prefix, t.markers, left, t.assertedType, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // ExpressionStatement — wraps an Expression in statement position
+    // ---------------------------------------------------------------
+
+    /**
+     * Wraps an {@link Expression} so it can appear in statement position.
+     * Go allows a parenthesized call to stand alone as a statement,
+     * {@code (h())}, which {@link J.Parentheses} alone cannot represent.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class ExpressionStatement implements Go, Statement {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression expression;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitExpressionStatement(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    // ---------------------------------------------------------------
     // StatementExpression — wraps a Statement in expression position
     // ---------------------------------------------------------------
 
