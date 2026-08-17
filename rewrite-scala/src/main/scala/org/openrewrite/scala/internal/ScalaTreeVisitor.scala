@@ -1468,7 +1468,6 @@ class ScalaTreeVisitor(
         elements.asScala.toSeq, identity, ")", initPrefix, Markers.EMPTY)
     }
 
-    // Update cursor to end of expression
     updateCursor(app.span.end)
 
     new J.NewArray(
@@ -3566,10 +3565,8 @@ class ScalaTreeVisitor(
       }
     }
     
-    // Claim a trailing end marker before the cursor moves past it
     val endMarkerMarkers = withEndMarker(Markers.EMPTY, vd.span, vd.name.toString)
 
-    // Update cursor to end of ValDef
     updateCursor(vd.span.end)
 
     // Create variable declarator
@@ -4069,8 +4066,7 @@ class ScalaTreeVisitor(
         if (cursor < source.length && md.span.exists) {
           val endPos = Math.max(0, md.span.end - offsetAdjustment)
           if (isBraceless) {
-            // No closing brace for braceless syntax. Dotty's span covers a trailing `end`
-            // marker, which is not whitespace.
+            // No closing brace for braceless syntax.
             if (cursor < endPos) {
               val bodyEnd = Math.min(endPos, source.length)
               endMarkerAt(cursor, bodyEnd) match {
@@ -4087,8 +4083,7 @@ class ScalaTreeVisitor(
             val closeBraceIdx = remaining.lastIndexOf('}')
             if (closeBraceIdx >= 0) {
               endSpace = Space.format(remaining.substring(0, closeBraceIdx))
-              // Stop at the `}`. Dotty's span reaches past it to a trailing `end` marker,
-              // which the caller claims by name.
+              // The body ends at the `}`; a marker beyond it is the caller's to claim.
               cursor = cursor + closeBraceIdx + 1
             }
           }
@@ -4128,13 +4123,10 @@ class ScalaTreeVisitor(
     } else {
       Markers.build(Collections.singletonList(SObject.create()))
     }
-    // an `end Foo` closing an indented object can sit beyond dotty's span; try the span first,
-    // then claim by name
     val objectMarkers = if (moduleEndMarker != null)
       objectBaseMarkers.add(EndMarker(Tree.randomId(), moduleEndMarker))
     else withEndMarker(objectBaseMarkers, md.span, md.name.toString)
 
-    // Update cursor to end of module def
     if (md.span.exists) {
       cursor = Math.max(cursor, md.span.end - offsetAdjustment)
     }
@@ -4448,7 +4440,6 @@ class ScalaTreeVisitor(
     else ifBaseMarkers
     val ifMarkers = withEndMarker(ifInlineMarkers, ifTree.span)
 
-    // Update cursor to end of the if expression
     updateCursor(ifTree.span.end)
 
     new J.If(
@@ -4596,7 +4587,6 @@ class ScalaTreeVisitor(
     else Markers.EMPTY
     val whileMarkers = withEndMarker(whileBaseMarkers, whileTree.span)
 
-    // Update cursor to end of the while loop
     updateCursor(whileTree.span.end)
 
     new J.WhileLoop(
@@ -5088,7 +5078,6 @@ class ScalaTreeVisitor(
       }
     }
     
-    // Update cursor to end of the block
     updateCursor(block.span.end)
     
     val blockMarkers = if (!hasBraces) {
@@ -5809,7 +5798,6 @@ class ScalaTreeVisitor(
       classDeclMarkers = classDeclMarkers.add(DerivesClause(Tree.randomId(), derivesText))
     }
     if (endMarkerText == null) {
-      // an `end Foo` closing an indented body can sit beyond dotty's span
       classDeclMarkers = withEndMarker(classDeclMarkers, td.span, td.name.toString)
     }
 
@@ -5919,10 +5907,11 @@ class ScalaTreeVisitor(
           if (openBracket >= cursor) cursor = openBracket + 1
 
           // The target type goes through the type-position helper so function types
-          // (`A => B`), tuple, union and intersection types map to a `TypeTree`.
+          // (`A => B`), tuple, union and intersection types map to a `TypeTree`. The type
+          // argument container holds expressions, which every type legal here also is.
           val targetType = visitTypeTree(ta.args.head) match {
-            case tt: TypeTree => tt
-            case null => throw unmappedException(ta)
+            case tt: TypeTree with Expression => tt
+            case _ => throw unmappedException(ta)
           }
           val closeBracket = positionOfNext("]", cursor)
           val beforeClose = if (closeBracket > cursor) ScalaSpace.format(source, cursor, closeBracket) else Space.EMPTY
@@ -5930,7 +5919,7 @@ class ScalaTreeVisitor(
           updateCursor(ta.span.end)
 
           val typeArgs = new util.ArrayList[JRightPadded[Expression]]()
-          typeArgs.add(new JRightPadded(targetType.asInstanceOf[Expression], beforeClose, Markers.EMPTY))
+          typeArgs.add(new JRightPadded[Expression](targetType, beforeClose, Markers.EMPTY))
           val noArgs = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
             Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
 
@@ -8036,8 +8025,6 @@ class ScalaTreeVisitor(
       // Dotty wraps a literal type in a SingletonTypeTree
       new S.LiteralType(Tree.randomId(), prefix, Markers.EMPTY, qualifier, typeFor(stt.span))
     } else {
-      // After visiting qualifier, cursor is at the end of qualifier.
-      // The remaining source should be whitespace followed by ".type".
       val endPos = Math.max(0, stt.span.end - offsetAdjustment)
       val between = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
       val dotIdx = positionOfNextIn(between, ".", 0)
@@ -8122,8 +8109,7 @@ class ScalaTreeVisitor(
       case t: untpd.Tuple => Option(visitTypeTree(t)).map(_.asInstanceOf[J]).getOrElse(visitTree(ann.arg))
       case _ => visitTree(ann.arg)
     }
-    // Capture-checking syntax (`T^`, `T^{it}`) desugars to a synthetic `retains` annotation
-    // with no `@` in source, so it stays a suffix on the type it follows.
+    // Capture-checking syntax (`T^`, `T^{it}`) is a suffix on the type it follows.
     val captureText = consumeCaptureSet()
     if (captureText != null) {
       updateCursor(ann.span.end)
@@ -8153,8 +8139,6 @@ class ScalaTreeVisitor(
     if (isAnnotatedType) {
       val typeExpr: TypeTree = arg match {
         case tt: TypeTree => tt
-        // `(Context ?=> Symbol) @unchecked`: the parenthesized form is a type, and
-        // J.Parentheses is not a TypeTree
         case par: J.Parentheses[?] if par.getTree.isInstanceOf[TypeTree] =>
           val inner = par.withPrefix[J.Parentheses[TypeTree]](Space.EMPTY)
           new J.ParenthesizedTypeTree(Tree.randomId(), par.getPrefix, Markers.EMPTY,
@@ -8337,7 +8321,6 @@ class ScalaTreeVisitor(
     val remaining = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
     var extEndMarker: String = null
     val endSpace = if (isExtBraceless) {
-      // dotty's span covers a trailing `end extension`, which is not whitespace
       endMarkerAt(cursor, endPos) match {
         case Some((start, text)) =>
           extEndMarker = source.substring(cursor, start + text.length)
@@ -9318,7 +9301,7 @@ class ScalaTreeVisitor(
     } else null
   }
 
-  /** Attaches a consumed `using` keyword to the first argument, which every printer path emits. */
+  /** Attaches a consumed `using` keyword to the argument list. */
   private def withUsing(args: util.ArrayList[JRightPadded[Expression]], text: String): Unit = {
     if (text != null && !args.isEmpty) {
       val first = args.get(0)
@@ -9538,8 +9521,7 @@ class ScalaTreeVisitor(
   }
 
   /** Adds an {@link EndMarker} for an end marker sitting between the cursor and the end of
-   *  {@code span}, if any. Call before advancing the cursor past the span, which would
-   *  otherwise skip the marker.
+   *  {@code span}, if any.
    */
   private def withEndMarker(markers: Markers, span: Spans.Span, name: String = null): Markers = {
     // A `val`'s or `given`'s end marker sits beyond dotty's span for the definition, so when
