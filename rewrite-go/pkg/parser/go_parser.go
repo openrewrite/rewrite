@@ -194,13 +194,11 @@ type parseContext struct {
 	cursor   int // current byte offset into src, tracks consumed positions
 	typeInfo *types.Info
 	mapper   *typeMapper
-	// enclosingMethod owns the locals and parameters being mapped, the
-	// way a declaring type owns a field.
+	// enclosingMethod owns the locals and parameters being mapped.
 	enclosingMethod *java.JavaTypeMethod
 }
 
-// enterMethod makes m the owner of the variables mapped until the
-// returned function restores the previous one.
+// enterMethod scopes enclosingMethod to m until the returned func runs.
 func (ctx *parseContext) enterMethod(m *java.JavaTypeMethod) func() {
 	previous := ctx.enclosingMethod
 	ctx.enclosingMethod = m

@@ -39,7 +39,7 @@ type typeMapper struct {
 	// mappingOrigin holds the class for each generic whose mapping is
 	// still on the stack, keyed by its origin. See mapNamed.
 	mappingOrigin map[*types.Named]*java.JavaTypeClass
-	// fieldOwner leads from a struct field back to the type declaring it.
+	// fieldOwner leads from a struct field back to its declaring type.
 	fieldOwner map[*types.Var]java.JavaType
 }
 
@@ -365,9 +365,8 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
-// structMembers extracts fields from a struct as JavaTypeVariable. The
-// owner is recorded per field so an identifier referring to one from a
-// use site resolves to the same owning type.
+// structMembers extracts fields from a struct as JavaTypeVariable,
+// recording each field's owner for ownerType to find later.
 func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java.JavaTypeVariable {
 	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
