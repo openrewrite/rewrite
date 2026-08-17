@@ -778,7 +778,7 @@ func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
 	}
 
 	var markers java.Markers
-	if trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base()); len(elements) > 0 && trailingCommaOff >= 0 {
+	if trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(fl.Closing)); len(elements) > 0 && trailingCommaOff >= 0 {
 		commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 		ctx.skip(1) // ","
 		commaAfter := ctx.prefix(fl.Closing)
@@ -890,7 +890,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 		}
 
 		var markers java.Markers
-		if trailingCommaOff := ctx.findNextBefore(',', int(results.Closing)-ctx.file.Base()); len(elements) > 0 && trailingCommaOff >= 0 {
+		if trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(results.Closing)); len(elements) > 0 && trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(results.Closing)
@@ -1018,7 +1018,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 
 	var markers java.Markers
 	if len(elements) > 0 {
-		trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base())
+		trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(fl.Closing))
 		if trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
@@ -1069,6 +1069,15 @@ func takeSemicolon[T any](ctx *parseContext, rp *java.RightPadded[T], boundary i
 	rp.After = ctx.prefix(ctx.file.Pos(off))
 	ctx.skip(1) // ";"
 	rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
+}
+
+// boundaryAt is the offset of pos, or -1 when the position is absent so
+// that a scan bounded by it finds nothing rather than running to EOF.
+func (ctx *parseContext) boundaryAt(pos token.Pos) int {
+	if !pos.IsValid() {
+		return -1
+	}
+	return ctx.file.Offset(pos)
 }
 
 // nextTokenOffset returns the offset of the first byte at or after the
@@ -1742,7 +1751,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 	// Go's AST normalizes `for ; cond; {}` to Init=nil, Post=nil, same as `for cond {}`.
 	// We detect semicolons by looking at the source text between for keyword and body.
 	is3Clause := stmt.Init != nil || stmt.Post != nil
-	bodyStart := int(stmt.Body.Lbrace) - ctx.file.Base()
+	bodyStart := ctx.boundaryAt(stmt.Body.Lbrace)
 	if !is3Clause {
 		// `for ; cond; {}` has no Init/Post in the AST but is still
 		// syntactically 3-clause. Detect by scanning for `;` in the
@@ -2281,7 +2290,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	var markers java.Markers
 	if len(argElements) > 0 {
 		// Look for a comma between current position and closing paren
-		trailingCommaOff := ctx.findNextBefore(',', int(expr.Rparen)-ctx.file.Base())
+		trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(expr.Rparen))
 		if trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
@@ -2357,8 +2366,10 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.Ja
 		// A named func type is what the call goes through, the way an
 		// interface is for a method; an unnamed one names nothing.
 		var declaring *java.JavaTypeClass
-		if named, ok := obj.Type().(*types.Named); ok {
-			declaring = ctx.mapper.mapNamed(named)
+		if _, ok := obj.Type().(*types.Named); ok {
+			// Through mapType, which bounds the walk and contains a
+			// type the checker left unwalkable.
+			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
 		}
 		return ctx.mapper.mapSignature(sig, name, declaring)
 	}
@@ -2511,7 +2522,7 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	// Check for trailing comma before closing brace
 	var compMarkers java.Markers
 	if len(elements) > 0 {
-		trailingCommaOff := ctx.findNextBefore(',', int(expr.Rbrace)-ctx.file.Base())
+		trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(expr.Rbrace))
 		if trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
@@ -3241,9 +3252,14 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 	if len(raw) >= 2 && raw[0] == '`' {
 		raw = raw[1 : len(raw)-1]
 	} else {
-		if unquoted, err := strconv.Unquote(raw); err == nil {
-			raw = unquoted
+		unquoted, err := strconv.Unquote(raw)
+		if err != nil {
+			// go/parser rejects a literal Unquote cannot read, so this
+			// is unreachable; strip the delimiters so that if it ever is
+			// reached the printer does not write them twice.
+			unquoted = strings.Trim(raw, `"`)
 		}
+		raw = unquoted
 		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: `"`})
 	}
 
@@ -3598,14 +3614,20 @@ func (ctx *parseContext) findNext(ch byte) int {
 
 // findNextBefore returns the byte offset of the next occurrence of ch from the
 // current cursor, but only if it appears before the `before` byte offset; a
-// `before` of 0 means scan to end of src.
+// `before` of 0 means scan to end of src, and a negative one means the bound
+// is absent so nothing matches.
 //
 // The scan steps over Go rune literals ('...'), interpreted string literals
 // ("..."), raw string literals (`...`), and `//` / `/* */` comments. Every
 // character the parser looks for this way — a `,` between arguments, the `;`
 // in a `for` header, the `:` of a label — is syntax, and one written inside a
-// comment or a string is text that happens to look like it.
+// comment or a string is text that happens to look like it. A quote,
+// backtick or `/` is therefore never found: those open the regions the
+// scan steps over.
 func (ctx *parseContext) findNextBefore(ch byte, before int) int {
+	if before < 0 {
+		return -1
+	}
 	end := len(ctx.src)
 	if before > 0 && before < end {
 		end = before
