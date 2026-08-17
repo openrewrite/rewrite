@@ -37,7 +37,7 @@ import (
 // parityFloor is the number of standard library files the hand-rolled
 // visitors render exactly as gofmt does. Raise it whenever a change earns
 // more; it never goes down.
-const parityFloor = 4354
+const parityFloor = 4379
 
 // TestParityGap measures how far the hand-rolled visitors are from gofmt,
 // using gofmtSource as the oracle, and holds the result at parityFloor. The

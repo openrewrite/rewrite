@@ -52,8 +52,7 @@ func (v *TabsAndIndentsVisitor) Visit(t java.Tree, p any) java.Tree {
 }
 
 // VisitCompilationUnit indents the specs of a parenthesized import
-// declaration one level in, and the whitespace before its closing paren back
-// out to file level.
+// declaration.
 func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	if cu.Imports != nil {
 		grouped := java.HasMarker[golang.GroupedImport](cu.Imports.Markers)
@@ -101,8 +100,7 @@ func (v *TabsAndIndentsVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J
 	return &out
 }
 
-// VisitComposite indents the elements of a composite literal that spans
-// lines, and the whitespace before its closing brace back out.
+// VisitComposite indents the elements of a composite literal.
 func (v *TabsAndIndentsVisitor) VisitComposite(c *golang.Composite, p any) java.J {
 	out := *c
 	// The type expression sits at the literal's own level — the fields of an
@@ -125,7 +123,7 @@ func (v *TabsAndIndentsVisitor) reindentTrailingComma(m java.Markers) java.Marke
 	if comma == nil {
 		return m
 	}
-	after := v.reindentSpace(comma.After)
+	after := v.reindentClosing(comma.After)
 	if java.SpaceEqual(after, comma.After) {
 		return m
 	}
@@ -147,10 +145,7 @@ func (v *TabsAndIndentsVisitor) indentSpecs(c *java.Container[java.Statement], p
 	return &out
 }
 
-// indentElements moves each element of a delimited list one level in, and the
-// whitespace before the closing delimiter back out. An element's After holds a
-// newline only in that closing position, so re-indenting every After at the
-// outer depth leaves the ones between elements untouched.
+// indentElements indents the elements of a delimited list.
 func indentElements[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T]) []java.RightPadded[T] {
 	return eachElement(v, elements, nil, false)
 }
@@ -161,6 +156,10 @@ func indentSubtrees[T java.Tree](v *TabsAndIndentsVisitor, elements []java.Right
 	return eachElement(v, elements, p, true)
 }
 
+// eachElement moves each element of a delimited list one level in and the
+// closing delimiter back out. An element's After holds a line break only in
+// that closing position, so treating every After as a closing one leaves the
+// ones between elements untouched.
 func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T], p any, descend bool) []java.RightPadded[T] {
 	out := make([]java.RightPadded[T], len(elements))
 	for i, rp := range elements {
@@ -183,7 +182,7 @@ func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPad
 				rp.Element = next
 			}
 		}
-		rp.After = v.reindentSpace(rp.After)
+		rp.After = v.reindentClosing(rp.After)
 		out[i] = rp
 	}
 	return out
@@ -236,11 +235,9 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 	return block
 }
 
-// VisitCase aligns the case keyword with the enclosing switch (one
-// tab less than the switch body's depth) while keeping the case body
-// statements at body depth. Also explicitly visits Body so nested
-// blocks inside a case get their own indent fixes (the default
-// GoVisitor.VisitCase doesn't recurse into Body).
+// VisitCase indents a switch clause: the lead-in aligns the keyword with the
+// enclosing switch, and the body one level in. It visits Body itself, which
+// GoVisitor.VisitCase does not recurse into.
 func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	c = c.WithPrefix(v.reindentClauseLeadIn(c.Prefix))
 
@@ -260,8 +257,7 @@ func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	return &out
 }
 
-// VisitMethodInvocation indents arguments that wrap onto their own lines, and
-// the whitespace before the closing paren back out to the call's own level.
+// VisitMethodInvocation indents arguments that wrap onto their own lines.
 func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 	out := *mi
 	out.Arguments.Elements = indentSubtrees(v, mi.Arguments.Elements, p)
