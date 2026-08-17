@@ -236,7 +236,7 @@ func TestAddImport_AliasedFormDoesNotMatchRegular(t *testing.T) {
 }
 
 func TestRemoveImport_DeletesMatching(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings", Force: true})
 	before := `
 		package main
 
@@ -257,6 +257,142 @@ func TestRemoveImport_DeletesMatching(t *testing.T) {
 		func main() { fmt.Println(strings.ToUpper("hi")) }
 	`
 	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_KeepsStillReferenced(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				"strings"
+			)
+
+			func main() { fmt.Println(strings.ToUpper("hi")) }
+		`),
+	)
+}
+
+func TestRemoveImport_DeletesUnreferenced(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"strings"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_DeletesUnreferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			s "strings"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_KeepsReferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				s "strings"
+			)
+
+			func main() { fmt.Println(s.ToUpper("hi")) }
+		`),
+	)
+}
+
+func TestRemoveImport_KeepsBlankImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "github.com/x/y"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				_ "github.com/x/y"
+				"fmt"
+			)
+
+			func main() { fmt.Println("hi") }
+		`),
+	)
+}
+
+func TestRemoveImport_ForceDeletesBlankImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "github.com/x/y", Force: true})
+	before := `
+		package main
+
+		import (
+			_ "github.com/x/y"
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveImport_KeepsDotImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "github.com/x/y"})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				. "github.com/x/y"
+				"fmt"
+			)
+
+			func main() { fmt.Println("hi") }
+		`),
+	)
 }
 
 func TestRemoveImport_NoOpWhenAbsent(t *testing.T) {
@@ -294,6 +430,46 @@ func TestRemoveUnusedImports_DropsUnreferenced(t *testing.T) {
 		func main() { fmt.Println("hi") }
 	`
 	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_DropsUnreferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			s "strings"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsReferencedAliased(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				s "strings"
+			)
+
+			func main() { fmt.Println(s.ToUpper("hi")) }
+		`),
+	)
 }
 
 func TestRemoveUnusedImports_PreservesBlankImports(t *testing.T) {

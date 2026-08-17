@@ -177,6 +177,93 @@ type removeFmtVisitor struct{ visitor.GoVisitor }
 func (v *removeFmtVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
 	svc := recipe.Service[*recipes.ImportService](nil)
-	v.DoAfterVisit(svc.RemoveImportVisitor("fmt"))
+	v.DoAfterVisit(svc.RemoveImportVisitor("fmt", false))
 	return cu
+}
+
+func TestMaybeRemoveImport_DeduplicatesPendingVisitors(t *testing.T) {
+	v := visitor.Init(&maybeRemoveImportPendingVisitor{})
+	recipes.MaybeRemoveImport(v, "fmt")
+	recipes.MaybeRemoveImport(v, "fmt")
+
+	if got := len(v.PendingAfterVisits()); got != 1 {
+		t.Fatalf("expected one pending RemoveImport visitor, got %d", got)
+	}
+}
+
+type maybeRemoveImportPendingVisitor struct{ visitor.GoVisitor }
+
+func TestMaybeRemoveImport_KeepsStillReferencedImport(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&maybeRemoveStringsImportRecipe{unwrap: false})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+				"strings"
+			)
+
+			func main() { fmt.Println(strings.ToUpper("hi")) }
+		`),
+	)
+}
+
+func TestMaybeRemoveImport_RemovesImportOrphanedByTheSameEdit(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&maybeRemoveStringsImportRecipe{unwrap: true})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"strings"
+		)
+
+		func main() { fmt.Println(strings.ToUpper("hi")) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+		)
+
+		func main() { fmt.Println("hi") }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+// Unwraps `strings.ToUpper(x)` to `x` when unwrap is set; calls
+// MaybeRemoveImport("strings") either way.
+type maybeRemoveStringsImportRecipe struct {
+	recipe.Base
+	unwrap bool
+}
+
+func (r *maybeRemoveStringsImportRecipe) Name() string { return "test.MaybeRemoveStringsImport" }
+func (r *maybeRemoveStringsImportRecipe) DisplayName() string {
+	return "Remove strings import via MaybeRemoveImport"
+}
+func (r *maybeRemoveStringsImportRecipe) Description() string { return "Test recipe." }
+func (r *maybeRemoveStringsImportRecipe) Editor() recipe.TreeVisitor {
+	return visitor.Init(&maybeRemoveStringsVisitor{unwrap: r.unwrap})
+}
+
+type maybeRemoveStringsVisitor struct {
+	visitor.GoVisitor
+	unwrap bool
+}
+
+func (v *maybeRemoveStringsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
+	recipes.MaybeRemoveImport(v, "strings")
+	return cu
+}
+
+func (v *maybeRemoveStringsVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	mi = v.GoVisitor.VisitMethodInvocation(mi, p).(*java.MethodInvocation)
+	if !v.unwrap || mi.Name == nil || mi.Name.Name != "ToUpper" || len(mi.Arguments.Elements) != 1 {
+		return mi
+	}
+	return mi.Arguments.Elements[0].Element
 }
