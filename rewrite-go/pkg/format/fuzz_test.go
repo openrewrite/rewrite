@@ -41,7 +41,7 @@ var fuzzSeeds = []string{
 
 // FuzzFormat re-whitespaces valid Go source and holds the formatter to the
 // properties that survive any input layout: it emits parseable Go, it moves no
-// tokens, and a second run changes nothing. Mutating whitespace rather than
+// tokens, and a second run changes nothing wherever gofmt is itself stable. Mutating whitespace rather than
 // bytes keeps every generated input valid Go, so the budget goes on layouts
 // instead of on inputs the parser rejects.
 func FuzzFormat(f *testing.F) {
@@ -78,6 +78,18 @@ func FuzzFormat(f *testing.F) {
 		}
 		if before, after := codeTokens(mutated), codeTokens(formatted); before != after {
 			t.Fatalf("formatting moved tokens\n  before %s\n  after  %s", before, after)
+		}
+
+		// gofmt is itself not idempotent on every input: go/doc/comment reads an
+		// indented line as a code block only when a blank line precedes it, and
+		// the first pass removes the blank lines. Hold the formatter to
+		// idempotence exactly where gofmt has it.
+		once, err := gofmtSource("f.go", mutated)
+		if err != nil {
+			return
+		}
+		if twice, err := gofmtSource("f.go", once); err != nil || twice != once {
+			return
 		}
 
 		again, err := p.Parse("f.go", formatted)

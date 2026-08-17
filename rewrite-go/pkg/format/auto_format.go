@@ -21,27 +21,22 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// AutoFormatVisitor composes the per-responsibility format visitors
-// into a single end-to-end pipeline. The pipeline applies passes in a
-// fixed order — each later pass relies on the structure normalized by
-// the earlier ones:
+// AutoFormatVisitor composes the per-responsibility format visitors into a
+// single end-to-end pipeline, in the two phases org.openrewrite.java.format.
+// AutoFormatVisitor uses. Spacing is settled first, widest scope last:
 //
-//  1. RemoveTrailingWhitespaceVisitor  — strip trailing spaces/tabs
-//  2. BlankLinesVisitor                — collapse blank-line runs
-//  3. TabsAndIndentsVisitor            — re-indent post-newline whitespace
-//  4. SpacesVisitor                    — normalize intra-line spacing
-//  5. DocCommentVisitor                — canonicalize doc comment text
+//  1. DocCommentVisitor                — canonical doc comment text
+//  2. SpacesVisitor                    — intra-line spacing
+//  3. TabsAndIndentsVisitor            — indentation
 //
-// Pass-1 runs first because pass-3 (re-indent) only touches the post-
-// newline portion of a Whitespace; if pass-1 ran later, the trailing
-// space/tabs of an earlier line could survive. Pass-2 runs before pass-3
-// because collapsing blank lines doesn't touch indents — it just
-// removes whole `\n` characters — so pass-3 still has the right
-// post-newline section to rewrite. Pass-4 runs after pass-3 because
-// changes within a binary/assignment don't affect whether a line carries
-// a newline; spacing fixes can't disturb prior passes. Pass-5 runs after
-// pass-3 too, because a doc comment is one that sits at column one, which
-// is only true of the right comments once indentation has been restored.
+// then the passes that decide what the lines are, once their text is final:
+//
+//  4. BlankLinesVisitor                — collapse blank-line runs
+//  5. RemoveTrailingWhitespaceVisitor  — strip trailing space/tabs
+//
+// Phase two runs last because the earlier passes rewrite a line's text and can
+// add or drop whole lines, so a line structure normalized ahead of them would
+// not stay normalized.
 //
 // stopAfter is forwarded to every member visitor; pass nil to format
 // the entire visited subtree.
@@ -58,10 +53,10 @@ func (v *AutoFormatVisitor) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
 	}
-	v.DoAfterVisit(NewRemoveTrailingWhitespaceVisitor(v.stopAfter))
-	v.DoAfterVisit(NewBlankLinesVisitor(v.stopAfter))
-	v.DoAfterVisit(NewTabsAndIndentsVisitor(v.stopAfter))
-	v.DoAfterVisit(NewSpacesVisitor(v.stopAfter))
 	v.DoAfterVisit(NewDocCommentVisitor(v.stopAfter))
+	v.DoAfterVisit(NewSpacesVisitor(v.stopAfter))
+	v.DoAfterVisit(NewTabsAndIndentsVisitor(v.stopAfter))
+	v.DoAfterVisit(NewBlankLinesVisitor(v.stopAfter))
+	v.DoAfterVisit(NewRemoveTrailingWhitespaceVisitor(v.stopAfter))
 	return t
 }

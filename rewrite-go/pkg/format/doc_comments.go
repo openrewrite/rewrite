@@ -28,8 +28,11 @@ import (
 // DocCommentVisitor rewrites doc comments into the canonical form gofmt
 // produces, delegating the text to go/doc/comment — the parser and printer
 // gofmt itself uses, so lists, code blocks, headings and links all follow.
-// Only an unindented `//` run abutting the token it documents qualifies, which
-// is gofmt's rule; every other comment keeps its text.
+//
+// Only the package clause and top-level declarations carry doc comments, which
+// is what gofmt's "unindented run abutting the token" amounts to in a formatted
+// file. Taking the position from the tree rather than from the column keeps the
+// pass independent of the indentation any other pass has applied.
 type DocCommentVisitor struct {
 	visitor.GoVisitor
 	stopAfterTracker
@@ -52,29 +55,33 @@ func (v *DocCommentVisitor) Visit(t java.Tree, p any) java.Tree {
 	return out
 }
 
-// VisitCompilationUnit holds two positions out of the pass. Comments trailing
-// the last declaration document nothing, and gofmt leaves an import
-// declaration's doc comment as written — in a file that imports "C" it is the
-// cgo preamble, and its spacing is significant.
+// VisitCompilationUnit rewrites the doc comment of the package clause and of
+// each top-level declaration. An import declaration is left as written: in a
+// file that imports "C" its doc comment is the cgo preamble, whose spacing is
+// significant, and gofmt exempts it too.
 func (v *DocCommentVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
-	// The file's own prefix is the one place a doc comment can begin at column
-	// one without a line break ahead of it.
-	if start, ok := docCommentRun(cu.Prefix, true); ok {
-		if formatted, ok := canonicalDocComment(cu.Prefix.Comments[start:]); ok {
-			prefix := cu.Prefix
-			prefix.Comments = append(append([]java.Comment(nil), prefix.Comments[:start]...), formatted...)
-			cu = cu.WithPrefix(prefix)
+	out := *cu
+	// The file's own prefix is the one place a doc comment can begin the source
+	// with no line break ahead of it.
+	out.Prefix = canonicalDoc(cu.Prefix, true)
+
+	declarationDoc := func(s java.Space) java.Space { return canonicalDoc(s, false) }
+	statements := make([]java.RightPadded[java.Statement], len(cu.Statements))
+	for i, rp := range cu.Statements {
+		if rp.Element != nil {
+			if fixed, ok := transformPrefix(rp.Element, declarationDoc).(java.Statement); ok {
+				rp.Element = fixed
+			}
 		}
+		statements[i] = rp
 	}
-	out, ok := v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
-	if !ok {
-		return cu
-	}
-	return out.WithEOF(cu.EOF).WithImports(cu.Imports)
+	out.Statements = statements
+	return v.GoVisitor.VisitCompilationUnit(&out, p)
 }
 
-func (v *DocCommentVisitor) VisitSpace(s java.Space, p any) java.Space {
-	start, ok := docCommentRun(s, false)
+// canonicalDoc rewrites the doc comment run of s, if it has one.
+func canonicalDoc(s java.Space, atFileStart bool) java.Space {
+	start, ok := docCommentRun(s, atFileStart)
 	if !ok {
 		return s
 	}
@@ -88,37 +95,30 @@ func (v *DocCommentVisitor) VisitSpace(s java.Space, p any) java.Space {
 
 // docCommentRun reports the index at which the run documenting whatever
 // follows s begins. The run reaches the next token with nothing but a line
-// break between, and every line in it starts at column one.
+// break between, and begins a line — a comment trailing code documents
+// nothing, and dropping it would join two tokens. Earlier comments belong to
+// whatever preceded them.
 func docCommentRun(s java.Space, atFileStart bool) (int, bool) {
 	last := len(s.Comments) - 1
 	if last < 0 || s.Comments[last].Suffix != "\n" {
 		return 0, false
 	}
 	for start := last; ; start-- {
-		if !startsLine(s, start, atFileStart) {
-			return 0, false
-		}
 		// A run reaching the start of s, or preceded by anything other than a
 		// bare line break, is as far back as this doc comment goes.
-		if start == 0 || s.Comments[start-1].Suffix != "\n" {
+		if start == 0 {
+			if s.Whitespace == "" && !atFileStart {
+				return 0, false
+			}
+			if s.Whitespace != "" && !strings.HasSuffix(s.Whitespace, "\n") {
+				return 0, false
+			}
+			return 0, true
+		}
+		if s.Comments[start-1].Suffix != "\n" {
 			return start, true
 		}
 	}
-}
-
-// startsLine reports whether the i-th comment of s begins a line: the text
-// ahead of it ends in a line break, or there is no text ahead of it and s sits
-// at the start of the file. A comment trailing code on the same line documents
-// nothing, and dropping it would join two tokens.
-func startsLine(s java.Space, i int, atFileStart bool) bool {
-	preceding := s.Whitespace
-	if i > 0 {
-		preceding = s.Comments[i-1].Suffix
-	}
-	if preceding == "" {
-		return atFileStart && i == 0
-	}
-	return strings.HasSuffix(preceding, "\n")
 }
 
 // canonicalDocComment reformats one doc comment run, mirroring

@@ -92,16 +92,22 @@ func adjustSpace(s java.Space, f func(string) string) java.Space {
 	return s
 }
 
-// stripLeadingBlankLines collapses any "\n\n+" run at the start to a
-// single "\n", preserving any trailing indent.
+// stripLeadingBlankLines collapses the first run of newlines in ws to a single
+// one, preserving both the trailing indent and anything ahead of that run,
+// which is the previous line's trailing whitespace.
 func stripLeadingBlankLines(ws string) string {
-	if !strings.HasPrefix(ws, "\n\n") {
+	start := strings.IndexByte(ws, '\n')
+	if start < 0 {
 		return ws
 	}
-	for strings.HasPrefix(ws, "\n\n") {
-		ws = ws[1:]
+	end := start
+	for end < len(ws) && ws[end] == '\n' {
+		end++
 	}
-	return ws
+	if end-start < 2 {
+		return ws
+	}
+	return ws[:start] + "\n" + ws[end:]
 }
 
 // capInternalBlankLines walks ws and collapses any internal run of
