@@ -94,6 +94,17 @@ some other bug. Turn the result into an ordinary test in the topic file
 that covers that syntax — `rewriteRun` already asserts both byte-equal
 round-trip and a clean tree, so a minimal reproducer is a complete test.
 
+## Checking what the sweep never sees
+
+```sh
+GO_CORPUS=/tmp/go-corpus go test -tags parityaudit ./test/ -run TestFalseRejections -v
+```
+
+A file the sweep skips is one no build context selected, and a bug in
+constraint evaluation looks exactly like a file that was meant to be
+skipped — it just disappears from the denominator. This asks `go/build`
+whether it would have taken the file, and lists those it would.
+
 ## Measuring type attribution
 
 ```sh
