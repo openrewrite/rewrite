@@ -24,66 +24,25 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	rwtest "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-type invocationCollector struct {
-	visitor.GoVisitor
-	invocations        []*java.MethodInvocation
-	composites         []*golang.Composite
-	arrayAccesses      []*java.ArrayAccess
-	unaries            []*java.Unary
-	goUnaries          []*golang.Unary
-	parameterizedTypes []*java.ParameterizedType
-}
-
-func (v *invocationCollector) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
-	v.arrayAccesses = append(v.arrayAccesses, aa)
-	return v.GoVisitor.VisitArrayAccess(aa, p)
-}
-
-func (v *invocationCollector) VisitUnary(u *java.Unary, p any) java.J {
-	v.unaries = append(v.unaries, u)
-	return v.GoVisitor.VisitUnary(u, p)
-}
-
-func (v *invocationCollector) VisitGoUnary(u *golang.Unary, p any) java.J {
-	v.goUnaries = append(v.goUnaries, u)
-	return v.GoVisitor.VisitGoUnary(u, p)
-}
-
-func (v *invocationCollector) VisitParameterizedType(pt *java.ParameterizedType, p any) java.J {
-	v.parameterizedTypes = append(v.parameterizedTypes, pt)
-	return v.GoVisitor.VisitParameterizedType(pt, p)
-}
-
-func (v *invocationCollector) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
-	v.invocations = append(v.invocations, mi)
-	return v.GoVisitor.VisitMethodInvocation(mi, p)
-}
-
-func (v *invocationCollector) VisitComposite(c *golang.Composite, p any) java.J {
-	v.composites = append(v.composites, c)
-	return v.GoVisitor.VisitComposite(c, p)
-}
-
-func collectAttribution(t *testing.T, src string) *invocationCollector {
+func collectAttribution(t *testing.T, src string) *rwtest.TypedNodes {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("attribution.go", src)
 	require.NoError(t, err)
-	v := visitor.Init(&invocationCollector{})
-	v.Visit(cu, nil)
-	return v
+	return rwtest.CollectTypedNodes(cu)
 }
 
 // invocationNamed returns the single invocation of the given name, failing
 // when the source has none or more than one.
-func invocationNamed(t *testing.T, c *invocationCollector, name string) *java.MethodInvocation {
+func invocationNamed(t *testing.T, c *rwtest.TypedNodes, name string) *java.MethodInvocation {
 	t.Helper()
 	var found *java.MethodInvocation
-	for _, mi := range c.invocations {
+	for _, mi := range c.Invocations {
 		if mi.Name != nil && mi.Name.Name == name {
 			require.Nilf(t, found, "more than one call named %q", name)
 			found = mi
@@ -238,7 +197,7 @@ func h() {
 `)
 
 	var fqns []string
-	for _, comp := range c.composites {
+	for _, comp := range c.Composites {
 		fqns = append(fqns, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(comp)))
 	}
 	assert.Equal(t, []string{
@@ -260,8 +219,8 @@ func h() {
 }
 `)
 
-	require.Len(t, c.composites, 3)
-	inner := c.composites[2]
+	require.Len(t, c.Composites, 3)
+	inner := c.Composites[2]
 	assert.Nil(t, inner.TypeExpr, "the innermost composite has no type expression to read")
 	assert.Equal(t, "crypto/tls.Config", matcher.GetFullyQualifiedName(matcher.TypeOfExpression(inner)))
 }
@@ -284,7 +243,7 @@ func k(src []byte) {
 `)
 
 	var marked []string
-	for _, mi := range c.invocations {
+	for _, mi := range c.Invocations {
 		if java.FindMarker[golang.Conversion](mi.Markers) != nil {
 			marked = append(marked, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(mi)))
 		}
@@ -304,7 +263,7 @@ func k(dst, src []byte) {
 `)
 
 	var marked []string
-	for _, mi := range c.invocations {
+	for _, mi := range c.Invocations {
 		if java.FindMarker[golang.Builtin](mi.Markers) != nil {
 			marked = append(marked, mi.Name.Name)
 		}
@@ -442,7 +401,7 @@ func f(xs []int, m map[string]bool, arr [3]byte, s string) {
 `)
 
 	var types []string
-	for _, aa := range c.arrayAccesses {
+	for _, aa := range c.ArrayAccesses {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(aa)))
 	}
 	// The comma-ok form evaluates to V.
@@ -461,7 +420,7 @@ func f(n int, b bool) {
 `)
 
 	var types []string
-	for _, u := range c.unaries {
+	for _, u := range c.Unaries {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(u)))
 	}
 	assert.Equal(t, []string{"int", "boolean", "int", "int"}, types)
@@ -480,7 +439,7 @@ func f(p *int, ch chan string) {
 `)
 
 	var types []string
-	for _, u := range c.goUnaries {
+	for _, u := range c.GoUnaries {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(u)))
 	}
 	// Go pointers are transparent for refactoring, so `&T{}` is typed T.
@@ -502,7 +461,7 @@ func f(b Box[int], p Pair[string, int]) {
 `)
 
 	var types []string
-	for _, pt := range c.parameterizedTypes {
+	for _, pt := range c.ParameterizedTypes {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(pt)))
 	}
 	assert.Equal(t, []string{"main.Box", "main.Pair"}, types)

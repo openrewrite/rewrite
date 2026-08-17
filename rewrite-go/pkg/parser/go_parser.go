@@ -2129,10 +2129,7 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
 
-	// Type attribution for literal
-	if tv, ok := ctx.typeInfo.Types[lit]; ok {
-		l.Type = ctx.mapper.mapType(tv.Type)
-	}
+	l.Type = ctx.valueTypeOf(lit)
 
 	return l
 }
@@ -2218,10 +2215,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 		Right:    right,
 	}
 
-	// Type attribution for binary expression
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		b.Type = ctx.mapper.mapType(tv.Type)
-	}
+	b.Type = ctx.valueTypeOf(expr)
 
 	return b
 }
@@ -2617,9 +2611,7 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	}
 	// The literal's own type, which an elided inner literal (`[]T{{...}}`)
 	// has no type expression to state.
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		comp.Type = ctx.mapper.mapType(tv.Type)
-	}
+	comp.Type = ctx.valueTypeOf(expr)
 	return comp
 }
 
@@ -2775,9 +2767,7 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 		Dimension:   java.LeftPadded[java.Space]{Element: closePrefix},
 		ElementType: elt,
 	}
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		at.Type = ctx.mapper.mapType(tv.Type)
-	}
+	at.Type = ctx.valueTypeOf(expr)
 	return at
 }
 

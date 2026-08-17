@@ -264,7 +264,7 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 // Every name comes from the type system, so an unresolved receiver yields "":
 // a local variable named `os` cannot read back as the `os` package.
 func DeclaringTypeFQN(mi *java.MethodInvocation) string {
-	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
+	if IsResolved(mi) {
 		return mi.MethodType.DeclaringType.GetFullyQualifiedName()
 	}
 	if mi.Select != nil {

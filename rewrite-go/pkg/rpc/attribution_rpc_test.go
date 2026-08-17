@@ -24,9 +24,9 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	rwtest "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 func roundTripSource(t *testing.T, src string) java.Tree {
@@ -37,59 +37,17 @@ func roundTripSource(t *testing.T, src string) java.Tree {
 	return roundTripNode(t, cu, seed).(java.Tree)
 }
 
-type attributionCollector struct {
-	visitor.GoVisitor
-	invocations        []*java.MethodInvocation
-	composites         []*golang.Composite
-	arrayAccesses      []*java.ArrayAccess
-	unaries            []*java.Unary
-	goUnaries          []*golang.Unary
-	parameterizedTypes []*java.ParameterizedType
-}
-
-func (v *attributionCollector) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
-	v.arrayAccesses = append(v.arrayAccesses, aa)
-	return v.GoVisitor.VisitArrayAccess(aa, p)
-}
-
-func (v *attributionCollector) VisitUnary(u *java.Unary, p any) java.J {
-	v.unaries = append(v.unaries, u)
-	return v.GoVisitor.VisitUnary(u, p)
-}
-
-func (v *attributionCollector) VisitGoUnary(u *golang.Unary, p any) java.J {
-	v.goUnaries = append(v.goUnaries, u)
-	return v.GoVisitor.VisitGoUnary(u, p)
-}
-
-func (v *attributionCollector) VisitParameterizedType(pt *java.ParameterizedType, p any) java.J {
-	v.parameterizedTypes = append(v.parameterizedTypes, pt)
-	return v.GoVisitor.VisitParameterizedType(pt, p)
-}
-
-func (v *attributionCollector) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
-	v.invocations = append(v.invocations, mi)
-	return v.GoVisitor.VisitMethodInvocation(mi, p)
-}
-
-func (v *attributionCollector) VisitComposite(c *golang.Composite, p any) java.J {
-	v.composites = append(v.composites, c)
-	return v.GoVisitor.VisitComposite(c, p)
-}
-
-func collectRoundTripped(t *testing.T, src string) *attributionCollector {
+func collectRoundTripped(t *testing.T, src string) *rwtest.TypedNodes {
 	t.Helper()
-	c := visitor.Init(&attributionCollector{})
-	c.Visit(roundTripSource(t, src), nil)
-	return c
+	return rwtest.CollectTypedNodes(roundTripSource(t, src))
 }
 
 func TestCompositeTypeSurvivesRpcRoundTrip(t *testing.T) {
 	c := collectRoundTripped(t, "package main\n\nimport \"crypto/tls\"\n\nfunc f() {\n\t_ = []tls.Config{{InsecureSkipVerify: true}}\n}\n")
 
-	require.Len(t, c.composites, 2)
-	assert.Equal(t, "crypto/tls.Config[]", matcher.GetFullyQualifiedName(c.composites[0].Type))
-	assert.Equal(t, "crypto/tls.Config", matcher.GetFullyQualifiedName(c.composites[1].Type),
+	require.Len(t, c.Composites, 2)
+	assert.Equal(t, "crypto/tls.Config[]", matcher.GetFullyQualifiedName(c.Composites[0].Type))
+	assert.Equal(t, "crypto/tls.Config", matcher.GetFullyQualifiedName(c.Composites[1].Type),
 		"the elided inner literal has only its own type slot to carry the type")
 }
 
@@ -97,7 +55,7 @@ func TestConversionAndBuiltinMarkersSurviveRpcRoundTrip(t *testing.T) {
 	c := collectRoundTripped(t, "package main\n\nfunc f(b []byte) {\n\t_ = string(b)\n\t_ = len(b)\n}\n")
 
 	var conversions, builtins int
-	for _, mi := range c.invocations {
+	for _, mi := range c.Invocations {
 		if java.FindMarker[golang.Conversion](mi.Markers) != nil {
 			conversions++
 		}
@@ -112,16 +70,16 @@ func TestConversionAndBuiltinMarkersSurviveRpcRoundTrip(t *testing.T) {
 func TestResultTypesSurviveRpcRoundTrip(t *testing.T) {
 	c := collectRoundTripped(t, "package main\n\ntype Box[T any] struct{ v T }\n\nfunc f(xs []int, n int, p *int, b Box[string]) {\n\t_ = xs[0]\n\t_ = -n\n\t_ = *p\n}\n")
 
-	require.Len(t, c.unaries, 1)
-	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.unaries[0].Type))
-	require.Len(t, c.goUnaries, 1)
-	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.goUnaries[0].Type))
-	require.Len(t, c.parameterizedTypes, 1)
-	assert.Equal(t, "main.Box", matcher.GetFullyQualifiedName(c.parameterizedTypes[0].Type))
+	require.Len(t, c.Unaries, 1)
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.Unaries[0].Type))
+	require.Len(t, c.GoUnaries, 1)
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(c.GoUnaries[0].Type))
+	require.Len(t, c.ParameterizedTypes, 1)
+	assert.Equal(t, "main.Box", matcher.GetFullyQualifiedName(c.ParameterizedTypes[0].Type))
 
 	// The J.ArrayAccess codec every RPC peer shares carries indexed and
 	// dimension only, so the type an index resolves to is Go-side state.
 	// Widening it is a lockstep change across all peers.
-	require.Len(t, c.arrayAccesses, 1)
-	assert.Nil(t, c.arrayAccesses[0].Type)
+	require.Len(t, c.ArrayAccesses, 1)
+	assert.Nil(t, c.ArrayAccesses[0].Type)
 }
