@@ -56,6 +56,8 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.*;
+
 @Getter
 public class PythonRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<PythonRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
@@ -242,7 +244,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 } catch (Exception e) {
                     sourceFile = new ParseError(
                             Tree.randomId(),
-                            new Markers(Tree.randomId(), Collections.singletonList(
+                            new Markers(Tree.randomId(), singletonList(
                                     ParseExceptionResult.build(PythonParser.class, e, null))),
                             Paths.get(item.getSourcePath()),
                             null,
@@ -353,12 +355,12 @@ public class PythonRewriteRpc extends RewriteRpc {
                 path,
                 null,
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 deps,
-                Collections.emptyMap(),
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                Collections.emptyList(),
+                emptyMap(),
+                emptyMap(),
+                emptyList(),
+                emptyList(),
                 resolvedDeps,
                 PythonResolutionResult.PackageManager.Uv,
                 null
@@ -376,13 +378,13 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (Files.exists(pyprojectPath)) {
             Parser.Input pyprojectInput = Parser.Input.fromFile(pyprojectPath);
             Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
-                    Collections.singletonList(pyprojectInput), effectiveRelativeTo, ctx);
+                    singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
             Path uvLockPath = projectPath.resolve("uv.lock");
             if (Files.exists(uvLockPath)) {
                 Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
                 Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
-                        Collections.singletonList(uvLockInput), effectiveRelativeTo, ctx);
+                        singletonList(uvLockInput), effectiveRelativeTo, ctx);
                 result = Stream.concat(result, uvLockStream);
             }
             return result;
@@ -392,13 +394,13 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (Files.exists(pipfilePath)) {
             Parser.Input pipfileInput = Parser.Input.fromFile(pipfilePath);
             Stream<SourceFile> result = new PipfileParser().parseInputs(
-                    Collections.singletonList(pipfileInput), effectiveRelativeTo, ctx);
+                    singletonList(pipfileInput), effectiveRelativeTo, ctx);
 
             Path pipfileLockPath = projectPath.resolve("Pipfile.lock");
             if (Files.exists(pipfileLockPath)) {
                 Parser.Input pipfileLockInput = Parser.Input.fromFile(pipfileLockPath);
                 Stream<SourceFile> pipfileLockStream = new JsonParser().parseInputs(
-                        Collections.singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
+                        singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
                 result = Stream.concat(result, pipfileLockStream);
             }
             return result;
@@ -408,7 +410,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (Files.exists(setupCfgPath)) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
             return new SetupCfgParser(commandEnv).parseInputs(
-                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+                    singletonList(input), effectiveRelativeTo, ctx);
         }
 
         RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
@@ -435,7 +437,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<PythonRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         // Default to looking for a venv python, falling back to system python
         private Supplier<@Nullable Path> pythonPathSupplier = Builder::findDefaultPythonPath;

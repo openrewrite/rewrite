@@ -34,7 +34,9 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.Supplier;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {

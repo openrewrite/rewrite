@@ -29,10 +29,11 @@ import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+
+import static java.util.Collections.singletonMap;
 
 /**
  * Pin a transitive dependency version using the strategy appropriate for the file type
@@ -244,7 +245,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     return;
                 }
                 String normalizedName = PythonResolutionResult.normalizeName(packageName);
-                Map<String, String> pins = Collections.singletonMap(normalizedName, version);
+                Map<String, String> pins = singletonMap(normalizedName, version);
                 Function<PythonDependencyFile, PythonDependencyFile> editFn =
                         t -> t.withPinnedTransitiveDependencies(pins, null, null);
                 PyProjectHelper.EditAndRegenerateResult r =

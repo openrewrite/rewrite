@@ -28,10 +28,11 @@ import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+
+import static java.util.Collections.singletonMap;
 
 /**
  * Add a dependency to a Python project. Supports {@code pyproject.toml}
@@ -258,7 +259,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     return;
                 }
                 String ver = version != null ? version : "";
-                Map<String, String> additions = Collections.singletonMap(packageName, ver);
+                Map<String, String> additions = singletonMap(packageName, ver);
                 Function<PythonDependencyFile, PythonDependencyFile> editFn =
                         t -> t.withAddedDependencies(additions, scope, groupName);
                 PyProjectHelper.EditAndRegenerateResult r =

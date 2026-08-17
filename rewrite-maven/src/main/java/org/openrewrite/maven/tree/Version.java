@@ -18,7 +18,9 @@ package org.openrewrite.maven.tree;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Modified from <code>org.eclipse.aether.util.version.GenericVersion</code>.

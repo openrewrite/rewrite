@@ -30,10 +30,11 @@ import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+
+import static java.util.Collections.singletonMap;
 
 /**
  * Upgrade the version constraint for a dependency. Supports {@code pyproject.toml}
@@ -261,7 +262,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (ps.modifiedDepsFile != null) {
                     return;
                 }
-                Map<String, String> upgrades = Collections.singletonMap(
+                Map<String, String> upgrades = singletonMap(
                         PythonResolutionResult.normalizeName(packageName), newVersion);
                 Function<PythonDependencyFile, PythonDependencyFile> editFn =
                         t -> t.withUpgradedVersions(upgrades, scope, groupName);

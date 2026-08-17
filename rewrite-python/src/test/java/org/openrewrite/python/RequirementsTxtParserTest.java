@@ -31,11 +31,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -278,10 +278,10 @@ class RequirementsTxtParserTest {
                 requirements
         );
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         PlainText text = (PlainText) parsed.get(0);
@@ -319,10 +319,10 @@ class RequirementsTxtParserTest {
         RequirementsTxtParser parser = new RequirementsTxtParser();
         Parser.Input input = Parser.Input.fromString(Paths.get("requirements.txt"), requirements);
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 null,
                 new InMemoryExecutionContext(t -> {})
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         SourceFile sf = parsed.get(0);
