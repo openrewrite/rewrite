@@ -231,3 +231,311 @@ func main() {
 	require.NoError(t, err)
 	require.NotNil(t, cu, "expected non-nil compilation unit")
 }
+
+func TestTypeAttributionAssignment(t *testing.T) {
+	src := "package main\n\nfunc f() {\n\tx := 1\n\tx = 2\n\t_ = x\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var found int
+	forEachAssignment(cu, func(a *java.Assignment) {
+		found++
+		if a.Type == nil {
+			t.Errorf("assignment %d has no type", found)
+		} else if prim, ok := a.Type.(*java.JavaTypePrimitive); !ok || prim.Keyword != "int" {
+			t.Errorf("assignment %d type: got %v, want int", found, a.Type)
+		}
+	})
+	if found != 3 {
+		t.Fatalf("expected 3 assignments, found %d", found)
+	}
+}
+
+func TestTypeAttributionSliceType(t *testing.T) {
+	src := "package main\n\nvar xs []int\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var found int
+	forEachArrayType(cu, func(a *java.ArrayType) {
+		found++
+		if a.Type == nil {
+			t.Error("slice type has no type")
+		}
+	})
+	if found != 1 {
+		t.Fatalf("expected 1 array type, found %d", found)
+	}
+}
+
+type assignmentWalker struct {
+	visitor.GoVisitor
+	onAssignment        func(*java.Assignment)
+	onArrayType         func(*java.ArrayType)
+	onMethodDeclaration func(*java.MethodDeclaration)
+	onMethodInvocation  func(*java.MethodInvocation)
+	onIdentifier        func(*java.Identifier)
+}
+
+func (v *assignmentWalker) VisitAssignment(a *java.Assignment, p any) java.J {
+	if v.onAssignment != nil {
+		v.onAssignment(a)
+	}
+	return v.GoVisitor.VisitAssignment(a, p)
+}
+
+func (v *assignmentWalker) VisitArrayType(a *java.ArrayType, p any) java.J {
+	if v.onArrayType != nil {
+		v.onArrayType(a)
+	}
+	return v.GoVisitor.VisitArrayType(a, p)
+}
+
+func forEachAssignment(cu java.Tree, f func(*java.Assignment)) {
+	visitor.Init(&assignmentWalker{onAssignment: f}).Visit(cu, nil)
+}
+
+func forEachArrayType(cu java.Tree, f func(*java.ArrayType)) {
+	visitor.Init(&assignmentWalker{onArrayType: f}).Visit(cu, nil)
+}
+
+func TestTypeAttributionFuncLit(t *testing.T) {
+	src := "package main\n\nvar fn = func(a int) int { return a }\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var found int
+	forEachMethodDeclaration(cu, func(m *java.MethodDeclaration) {
+		found++
+		if m.MethodType == nil {
+			t.Fatal("function literal has no method type")
+		}
+		if got := len(m.MethodType.ParameterTypes); got != 1 {
+			t.Errorf("parameter types: got %d, want 1", got)
+		}
+		if prim, ok := m.MethodType.ReturnType.(*java.JavaTypePrimitive); !ok || prim.Keyword != "int" {
+			t.Errorf("return type: got %v, want int", m.MethodType.ReturnType)
+		}
+	})
+	if found != 1 {
+		t.Fatalf("expected 1 method declaration, found %d", found)
+	}
+}
+
+func (v *assignmentWalker) VisitMethodDeclaration(m *java.MethodDeclaration, p any) java.J {
+	if v.onMethodDeclaration != nil {
+		v.onMethodDeclaration(m)
+	}
+	return v.GoVisitor.VisitMethodDeclaration(m, p)
+}
+
+func forEachMethodDeclaration(cu java.Tree, f func(*java.MethodDeclaration)) {
+	visitor.Init(&assignmentWalker{onMethodDeclaration: f}).Visit(cu, nil)
+}
+
+func TestTypeAttributionCallThroughFuncValue(t *testing.T) {
+	src := "package main\n\ntype H func(a int) int\n\ntype S struct{ cb func(a int) int }\n\nfunc f(s S, h H) {\n\tfn := func(a int) int { return a }\n\t_ = fn(1)\n\t_ = s.cb(2)\n\t_ = h(3)\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	byName := map[string]*java.JavaTypeMethod{}
+	forEachMethodInvocation(cu, func(m *java.MethodInvocation) {
+		if m.Name != nil {
+			byName[m.Name.Name] = m.MethodType
+		}
+	})
+	for _, name := range []string{"fn", "cb", "h"} {
+		mt, ok := byName[name]
+		if !ok {
+			t.Fatalf("no call to %q found", name)
+		}
+		if mt == nil {
+			t.Errorf("call through %q has no method type", name)
+			continue
+		}
+		if got := len(mt.ParameterTypes); got != 1 {
+			t.Errorf("%q parameter types: got %d, want 1", name, got)
+		}
+	}
+}
+
+func (v *assignmentWalker) VisitMethodInvocation(m *java.MethodInvocation, p any) java.J {
+	if v.onMethodInvocation != nil {
+		v.onMethodInvocation(m)
+	}
+	return v.GoVisitor.VisitMethodInvocation(m, p)
+}
+
+func forEachMethodInvocation(cu java.Tree, f func(*java.MethodInvocation)) {
+	visitor.Init(&assignmentWalker{onMethodInvocation: f}).Visit(cu, nil)
+}
+
+func TestTypeAttributionFieldOwner(t *testing.T) {
+	src := "package main\n\ntype T struct{ N int }\n\nfunc f(t T) {\n\t_ = t.N\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var checked int
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.Name != "N" || i.FieldType == nil {
+			return
+		}
+		checked++
+		owner, ok := i.FieldType.Owner.(*java.JavaTypeClass)
+		if !ok {
+			t.Fatalf("field N owner: got %T, want *JavaTypeClass", i.FieldType.Owner)
+		}
+		if owner.FullyQualifiedName != "main.T" {
+			t.Errorf("field N owner: got %q, want main.T", owner.FullyQualifiedName)
+		}
+	})
+	if checked == 0 {
+		t.Fatal("no field type for N found")
+	}
+}
+
+func TestTypeAttributionInterfaceMethodDeclaringType(t *testing.T) {
+	src := "package main\n\ntype I interface{ M() int }\n\nvar i I\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var checked int
+	forEachIdentifier(cu, func(id *java.Identifier) {
+		cls, ok := id.Type.(*java.JavaTypeClass)
+		if !ok || cls.FullyQualifiedName != "main.I" || len(cls.Methods) == 0 {
+			return
+		}
+		checked++
+		m := cls.Methods[0]
+		if m.DeclaringType == nil {
+			t.Fatal("interface method M has no declaring type")
+		}
+		if got := m.DeclaringType.GetFullyQualifiedName(); got != "main.I" {
+			t.Errorf("declaring type: got %q, want main.I", got)
+		}
+	})
+	if checked == 0 {
+		t.Fatal("interface I not found")
+	}
+}
+
+func (v *assignmentWalker) VisitIdentifier(i *java.Identifier, p any) java.J {
+	if v.onIdentifier != nil {
+		v.onIdentifier(i)
+	}
+	return v.GoVisitor.VisitIdentifier(i, p)
+}
+
+func forEachIdentifier(cu java.Tree, f func(*java.Identifier)) {
+	visitor.Init(&assignmentWalker{onIdentifier: f}).Visit(cu, nil)
+}
+
+func TestTypeAttributionLocalOwner(t *testing.T) {
+	src := "package main\n\nfunc f(a int) {\n\tb := 1\n\t_ = a\n\t_ = b\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	seen := map[string]bool{}
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.FieldType == nil || (i.Name != "a" && i.Name != "b") {
+			return
+		}
+		seen[i.Name] = true
+		owner, ok := i.FieldType.Owner.(*java.JavaTypeMethod)
+		if !ok {
+			t.Errorf("%q owner: got %T, want *JavaTypeMethod", i.Name, i.FieldType.Owner)
+			return
+		}
+		if owner.Name != "f" {
+			t.Errorf("%q owner method: got %q, want f", i.Name, owner.Name)
+		}
+	})
+	for _, n := range []string{"a", "b"} {
+		if !seen[n] {
+			t.Errorf("no field type seen for %q", n)
+		}
+	}
+}
+
+func TestTypeAttributionNamedFuncTypeDeclaringType(t *testing.T) {
+	src := "package main\n\ntype optionFunc func(a int)\n\nfunc f(o optionFunc, g func(a int)) {\n\to(1)\n\tg(2)\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	byName := map[string]*java.JavaTypeMethod{}
+	forEachMethodInvocation(cu, func(m *java.MethodInvocation) {
+		if m.Name != nil {
+			byName[m.Name.Name] = m.MethodType
+		}
+	})
+	named := byName["o"]
+	if named == nil || named.DeclaringType == nil {
+		t.Fatalf("call through named func type has no declaring type: %v", named)
+	}
+	if got := named.DeclaringType.GetFullyQualifiedName(); got != "main.optionFunc" {
+		t.Errorf("declaring type: got %q, want main.optionFunc", got)
+	}
+	// An unnamed func type declares nothing.
+	if unnamed := byName["g"]; unnamed == nil || unnamed.DeclaringType != nil {
+		t.Errorf("call through unnamed func type: got declaring type %v, want none", unnamed.DeclaringType)
+	}
+}
+
+func TestTypeAttributionPackageLevelVarOwner(t *testing.T) {
+	src := "package main\n\nvar Global int\n\ntype S struct{ F int }\n\nfunc (s *S) M(a int) {\n\t_ = Global\n\t_ = s.F\n\t_ = a\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	owners := map[string][]string{}
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.FieldType == nil {
+			return
+		}
+		owners[i.Name] = append(owners[i.Name], describeOwner(i.FieldType.Owner))
+	})
+	for name, want := range map[string]string{
+		"Global": "class:main",   // package scope, not whoever reads it
+		"F":      "class:main.S", // the struct declaring it
+		"a":      "method:M",     // the function it lives in
+		"s":      "method:M",     // the receiver, at declaration and use alike
+	} {
+		got := owners[name]
+		if len(got) == 0 {
+			t.Errorf("%s: no field type seen", name)
+			continue
+		}
+		for _, g := range got {
+			if g != want {
+				t.Errorf("%s owner: got %q, want %q (all sightings: %v)", name, g, want, got)
+				break
+			}
+		}
+	}
+}
+
+func describeOwner(o java.JavaType) string {
+	switch v := o.(type) {
+	case nil:
+		return "none"
+	case *java.JavaTypeMethod:
+		if v == nil {
+			return "TYPED-NIL method"
+		}
+		return "method:" + v.Name
+	case *java.JavaTypeClass:
+		if v == nil {
+			return "TYPED-NIL class"
+		}
+		return "class:" + v.FullyQualifiedName
+	}
+	return "other"
+}
