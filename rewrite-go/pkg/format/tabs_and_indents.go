@@ -161,30 +161,28 @@ func indentSubtrees[T java.Tree](v *TabsAndIndentsVisitor, elements []java.Right
 // that closing position, so treating every After as a closing one leaves the
 // ones between elements untouched.
 func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T], p any, descend bool) []java.RightPadded[T] {
+	outer := v.depth
 	out := make([]java.RightPadded[T], len(elements))
 	for i, rp := range elements {
-		// A list contributes a level only where it breaks the line. An element
-		// written alongside the delimiter that opens the list stays on that
-		// line's level, and whatever nests inside it counts from there.
+		// A list contributes a level from the first element that breaks the
+		// line. Elements written alongside the delimiter that opens the list
+		// stay on that line's level, and once a later element has started a
+		// line of its own, its own siblings share the level it set.
 		if breaksLine(getPrefix(rp.Element)) {
-			v.depth++
+			v.depth = outer + 1
 			if fixed, ok := any(transformPrefix(rp.Element, v.reindentSpace)).(T); ok {
 				rp.Element = fixed
 			}
-			if descend {
-				if next, ok := any(v.Visit(rp.Element, p)).(T); ok {
-					rp.Element = next
-				}
-			}
-			v.depth--
-		} else if descend {
+		}
+		if descend {
 			if next, ok := any(v.Visit(rp.Element, p)).(T); ok {
 				rp.Element = next
 			}
 		}
-		rp.After = v.reindentClosing(rp.After)
+		rp.After = v.reindentClosingAt(rp.After, outer)
 		out[i] = rp
 	}
+	v.depth = outer
 	return out
 }
 
@@ -405,11 +403,21 @@ func reduceIndentDepth(depth int) int {
 // comments in it trail the body and so sit one level in, while the delimiter
 // itself returns to the outer depth.
 func (v *TabsAndIndentsVisitor) reindentClosing(s java.Space) java.Space {
+	return v.reindentClosingAt(s, v.depth)
+}
+
+// reindentClosingAt re-indents a closing delimiter that sits at the given
+// depth, whatever level the elements ahead of it reached.
+func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.Space {
 	if len(s.Comments) == 0 {
-		return v.reindentSpace(s)
+		saved := v.depth
+		v.depth = depth
+		out := v.reindentSpace(s)
+		v.depth = saved
+		return out
 	}
-	inner := strings.Repeat("\t", v.depth+1)
-	outer := strings.Repeat("\t", v.depth)
+	inner := strings.Repeat("\t", depth+1)
+	outer := strings.Repeat("\t", depth)
 
 	s.Whitespace = reindentTail(s.Whitespace, inner)
 	comments := append([]java.Comment(nil), s.Comments...)
