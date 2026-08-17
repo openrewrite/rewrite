@@ -16,7 +16,6 @@
 package org.openrewrite.python.service;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.python.tree.Py;
 
 import static org.assertj.core.api.Assertions.assertThat;

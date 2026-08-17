@@ -31,12 +31,13 @@ import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Identifies Android lifecycle method overrides on
@@ -114,9 +115,9 @@ public class AndroidLifecycleMethod implements Trait<Statement> {
         addComponent("android.app.Service", ComponentFamily.SERVICE, Arrays.asList(
                 "onCreate", "onStartCommand", "onBind", "onUnbind", "onDestroy"));
         addComponent("android.content.BroadcastReceiver", ComponentFamily.BROADCAST_RECEIVER,
-                Collections.singletonList("onReceive"));
+                singletonList("onReceive"));
         addComponent("androidx.work.Worker", ComponentFamily.WORKER,
-                Collections.singletonList("doWork"));
+                singletonList("doWork"));
         addComponent("androidx.work.ListenableWorker", ComponentFamily.WORKER,
                 Arrays.asList("startWork", "onStopped"));
     }

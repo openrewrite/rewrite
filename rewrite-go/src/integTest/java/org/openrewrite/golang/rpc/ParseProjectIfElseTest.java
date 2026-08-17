@@ -31,8 +31,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -88,19 +89,19 @@ class ParseProjectIfElseTest {
 
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
         List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         List<ParseError> parseErrors = sources.stream()
                 .filter(s -> s instanceof ParseError)
                 .map(s -> (ParseError) s)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(parseErrors)
                 .as("expected zero parse errors; got: %s",
                         parseErrors.stream()
                                 .map(pe -> pe.getSourcePath() + ": " + pe.getMarkers().findFirst(ParseExceptionResult.class)
                                         .map(ParseExceptionResult::getMessage).orElse("(no message)"))
-                                .collect(Collectors.joining("\n")))
+                                .collect(joining("\n")))
                 .isEmpty();
     }
 

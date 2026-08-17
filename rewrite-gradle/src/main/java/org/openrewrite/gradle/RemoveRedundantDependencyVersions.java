@@ -278,7 +278,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 @Override
                                 public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
                                     J.Return r = super.visitReturn(_return, ctx);
-                                    if (r.getExpression() == null) {
+                                    if (_return.getExpression() != null && r.getExpression() == null) {
                                         //noinspection DataFlowIssue
                                         return null;
                                     }

@@ -50,6 +50,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
@@ -307,8 +309,8 @@ class RewriteRpcTest implements RewriteTest {
     @Test
     void dataTableStoreConfigurationCrossesRpc(@TempDir Path tmp) {
         client.dataTableStore(new CsvDataTableStore(tmp,
-          java.util.Collections.singletonMap("repositoryOrigin", "github.com/acme/example"),
-          java.util.Collections.emptyMap()));
+          singletonMap("repositoryOrigin", "github.com/acme/example"),
+          emptyMap()));
 
         // A trivial remote visit triggers the lazy SetDataTableStore handshake.
         rewriteRun(

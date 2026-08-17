@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -60,9 +64,7 @@ func main() {
 	_ = f64
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Signed widths and floats map to distinct primitive keywords.
 	ExpectPrimitiveType(t, cu, "i", "int")
@@ -94,9 +96,7 @@ func main() {
 	_ = b
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectPrimitiveType(t, cu, "b", "int")
 }
 
@@ -112,9 +112,7 @@ func main() {
 	_ = c
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectType(t, cu, "c", "unsafe.Pointer")
 }
 
@@ -128,22 +126,14 @@ func main() {
 	_ = a
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	v := visitor.Init(&typeCollector{identTypes: make(map[string]java.JavaType)})
 	v.Visit(cu, nil)
 
 	typ, ok := v.identTypes["a"]
-	if !ok {
-		t.Fatal("no type attribution for a")
-	}
+	require.True(t, ok, "no type attribution for a")
 	cls, ok := typ.(*java.JavaTypeClass)
-	if !ok {
-		t.Fatalf("any: type is %T, want *JavaTypeClass (empty interface)", typ)
-	}
-	if cls.Kind != "Interface" {
-		t.Errorf("any: Kind = %q, want %q", cls.Kind, "Interface")
-	}
+	require.Truef(t, ok, "any: type is %T, want *JavaTypeClass (empty interface)", typ)
+	assert.Equalf(t, "Interface", cls.Kind, "any: Kind = %q, want %q", cls.Kind, "Interface")
 }

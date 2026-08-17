@@ -16,7 +16,10 @@
 
 package rpc
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/require"
+)
 
 // A changed ref-deduplicated slot is re-added under a fresh ref, never CHANGEd
 // (see Send for why).
@@ -33,18 +36,12 @@ func TestChangedRefSlotIsReAddedInsteadOfChanged(t *testing.T) {
 	// A repeat of the same transition dedups against the ref registered by the re-add
 	q.Send(AsRef(t2), AsRef(t1), nil)
 
-	if len(q.batch) != 3 {
-		t.Fatalf("batch length = %d, want 3", len(q.batch))
-	}
+	require.Len(t, q.batch, 3, "batch length")
 	for i, d := range q.batch {
 		if d.State != Add {
 			t.Fatalf("batch[%d].State = %v, want Add", i, d.State)
 		}
 	}
-	if *q.batch[0].Ref != 1 || *q.batch[1].Ref != 2 {
-		t.Fatalf("refs = %d, %d, want 1, 2", *q.batch[0].Ref, *q.batch[1].Ref)
-	}
-	if q.batch[2].Ref == nil || *q.batch[2].Ref != 2 || q.batch[2].Value != nil {
-		t.Fatalf("batch[2] = %+v, want ref-only ADD with ref 2", q.batch[2])
-	}
+	require.Falsef(t, *q.batch[0].Ref != 1 || *q.batch[1].Ref != 2, "refs = %d, %d, want 1, 2", *q.batch[0].Ref, *q.batch[1].Ref)
+	require.Falsef(t, q.batch[2].Ref == nil || *q.batch[2].Ref != 2 || q.batch[2].Value != nil, "batch[2] = %+v, want ref-only ADD with ref 2", q.batch[2])
 }

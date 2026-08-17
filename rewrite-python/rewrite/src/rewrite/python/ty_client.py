@@ -34,6 +34,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from .type_mapping import SessionTypeCache
+
 logger = logging.getLogger(__name__)
 
 
@@ -91,6 +93,9 @@ class TyTypesClient:
         # starts (a fresh client, or ``initialize`` with a different root) so no
         # state leaks across unrelated parses.
         self.session_types: Dict[int, Dict[str, Any]] = {}
+
+        # The JavaTypes those descriptors resolve to, sharing their lifetime.
+        self.java_types = SessionTypeCache()
 
         self._start_process()
 
@@ -294,6 +299,7 @@ class TyTypesClient:
             # A different project root means a brand-new ty session whose type
             # ids start over; drop the accumulated table so ids don't collide.
             self.session_types.clear()
+            self.java_types.clear()
             self._start_process()
 
         # Bounded so a wedged ty degrades to untyped instead of hanging; large

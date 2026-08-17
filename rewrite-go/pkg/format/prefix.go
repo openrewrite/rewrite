@@ -82,7 +82,7 @@ func transformPrefix(t java.Tree, f func(java.Space) java.Space) java.Tree {
 	}
 	cur := getPrefix(t)
 	next := f(cur)
-	if next.Whitespace == cur.Whitespace && len(next.Comments) == len(cur.Comments) {
+	if spaceContentEqual(cur, next) {
 		return t
 	}
 	return withPrefix(t, next)

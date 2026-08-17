@@ -33,8 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -149,6 +149,6 @@ class CSharpRecipeArtifactIsolationTest {
         return marketplace.getAllRecipes().stream()
           .filter(listing -> packageName.equals(listing.getBundle().getPackageName()))
           .map(RecipeListing::getName)
-          .collect(Collectors.toSet());
+          .collect(toSet());
     }
 }

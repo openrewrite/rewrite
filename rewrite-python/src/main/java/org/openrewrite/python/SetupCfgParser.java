@@ -27,11 +27,12 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -45,7 +46,7 @@ public class SetupCfgParser implements Parser {
     private final Map<String, String> subprocessEnvironment;
 
     public SetupCfgParser() {
-        this(Collections.emptyMap());
+        this(emptyMap());
     }
 
     public SetupCfgParser(Map<String, String> subprocessEnvironment) {
@@ -87,12 +88,12 @@ public class SetupCfgParser implements Parser {
                     text.getSourcePath().toString(),
                     null,
                     null,
-                    Collections.emptyList(),
+                    emptyList(),
                     deps,
-                    Collections.emptyMap(),
-                    Collections.emptyMap(),
-                    Collections.emptyList(),
-                    Collections.emptyList(),
+                    emptyMap(),
+                    emptyMap(),
+                    emptyList(),
+                    emptyList(),
                     resolvedDeps,
                     PackageManager.Uv,
                     null

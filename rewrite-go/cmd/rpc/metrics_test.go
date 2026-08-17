@@ -26,6 +26,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 // newTestServer wires a server pointed at a temp metrics CSV. Cleanup is
@@ -50,15 +52,11 @@ func newTestServer(t *testing.T) (*server, string) {
 func readMetricsCSV(t *testing.T, path string) (header []string, rows [][]string) {
 	t.Helper()
 	f, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open metrics csv: %v", err)
-	}
+	require.NoError(t, err, "open metrics csv")
 	defer f.Close()
 	r := csv.NewReader(f)
 	all, err := r.ReadAll()
-	if err != nil {
-		t.Fatalf("parse metrics csv: %v", err)
-	}
+	require.NoError(t, err, "parse metrics csv")
 	if len(all) == 0 {
 		t.Fatal("metrics csv is empty (no header)")
 	}
@@ -79,9 +77,7 @@ func TestMetricsCSVHeaderWritten(t *testing.T) {
 			t.Errorf("header[%d]: want %q, got %q", i, col, header[i])
 		}
 	}
-	if len(rows) != 0 {
-		t.Errorf("want no rows before any RPC, got %d", len(rows))
-	}
+	assert.Len(t, rows, 0, "want no rows before any RPC")
 }
 
 func TestMetricsCSVRowPerRequest(t *testing.T) {
@@ -133,9 +129,7 @@ func TestMetricsCSVCapturesErrors(t *testing.T) {
 	s.closeMetrics()
 
 	_, rows := readMetricsCSV(t, csvPath)
-	if len(rows) != 1 {
-		t.Fatalf("rows: want 1, got %d", len(rows))
-	}
+	require.Len(t, rows, 1, "rows")
 	if rows[0][1] != "BogusMethodThatDoesNotExist" {
 		t.Errorf("method: %q", rows[0][1])
 	}
@@ -174,17 +168,13 @@ func TestMetricsCSVConcurrentLoad(t *testing.T) {
 	s.closeMetrics()
 
 	_, rows := readMetricsCSV(t, csvPath)
-	if len(rows) != total {
-		t.Fatalf("rows: want %d, got %d", total, len(rows))
-	}
+	require.Len(t, rows, total, "rows")
 	// Every row must have 9 columns and a parseable timestamp+duration.
 	// If writes interleaved, csv.NewReader.ReadAll above would fail or
 	// produce malformed rows; we re-validate here in case ReadAll silently
 	// padded.
 	for i, row := range rows {
-		if len(row) != 9 {
-			t.Fatalf("row[%d] columns: want 9, got %d (%v)", i, len(row), row)
-		}
+		require.Lenf(t, row, 9, "row[%d] columns", i)
 		if row[1] != "GetLanguages" {
 			t.Errorf("row[%d].method: want GetLanguages, got %q", i, row[1])
 		}
@@ -206,7 +196,5 @@ func TestMetricsCSVDisabledWhenFlagEmpty(t *testing.T) {
 
 	// Should be a no-op; if writer-or-file leaks it would panic on close.
 	s.safeHandleRequest(&jsonRPCRequest{JSONRPC: "2.0", ID: json.RawMessage("1"), Method: "GetLanguages"})
-	if s.metricsWriter != nil || s.metricsFile != nil {
-		t.Errorf("metrics writer should be nil when flag empty (writer=%v file=%v)", s.metricsWriter, s.metricsFile)
-	}
+	assert.Falsef(t, s.metricsWriter != nil || s.metricsFile != nil, "metrics writer should be nil when flag empty (writer=%v file", s.metricsWriter)
 }
