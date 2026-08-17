@@ -138,48 +138,21 @@ func (m *typeMapper) doMapType(t types.Type) java.JavaType {
 	}
 }
 
-// mapBasic maps Go basic types to JavaTypePrimitive.
+// mapBasic keys a Go basic type on its own Go type name (as with map/chan).
+// Java's JavaType.Primitive is a fixed enum of 12 keywords, which cannot hold
+// int, int32 and untyped int apart, nor float64 from complex128. `byte` and
+// `rune` are Basic instances distinct from `uint8` and `int32`, so the name also
+// keeps the spelling the checker resolved.
 func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
-	// Handle aliases by name first (Byte=Uint8, Rune=Int32 share constant values)
-	switch b.Name() {
-	case "byte":
-		return &java.JavaTypePrimitive{Keyword: "byte"}
-	case "rune":
-		return &java.JavaTypePrimitive{Keyword: "char"}
-	}
-
 	switch b.Kind() {
-	case types.Bool, types.UntypedBool:
-		return &java.JavaTypePrimitive{Keyword: "boolean"}
-	case types.Int8:
-		return &java.JavaTypePrimitive{Keyword: "byte"}
-	case types.Int16:
-		return &java.JavaTypePrimitive{Keyword: "short"}
-	case types.Int64:
-		return &java.JavaTypePrimitive{Keyword: "long"}
-	case types.Int, types.Int32, types.UntypedInt:
-		return &java.JavaTypePrimitive{Keyword: "int"}
-	case types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64, types.Uintptr:
-		// Go's unsigned integer widths have no Java primitive equivalent, so they map to
-		// synthetic named types keyed by their Go type name (as with map/chan).
-		return &java.JavaTypeClass{FullyQualifiedName: b.Name(), Kind: "Class"}
-	case types.Float32:
-		return &java.JavaTypePrimitive{Keyword: "float"}
-	case types.Float64, types.UntypedFloat:
-		return &java.JavaTypePrimitive{Keyword: "double"}
-	case types.Complex64, types.Complex128, types.UntypedComplex:
-		return &java.JavaTypePrimitive{Keyword: "double"}
-	case types.String, types.UntypedString:
-		return &java.JavaTypePrimitive{Keyword: "String"}
-	case types.UntypedRune:
-		return &java.JavaTypePrimitive{Keyword: "char"}
-	case types.UntypedNil:
-		return &java.JavaTypePrimitive{Keyword: "void"}
+	case types.Invalid:
+		// A type the checker could not resolve names nothing to key on.
+		return java.UnknownType
 	case types.UnsafePointer:
-		// No Java primitive exists for it, so map it to a synthetic named type.
+		// The only basic type whose Go name ("Pointer") is not how source spells it.
 		return &java.JavaTypeClass{FullyQualifiedName: "unsafe.Pointer", Kind: "Class"}
 	default:
-		return java.UnknownType
+		return &java.JavaTypeClass{FullyQualifiedName: b.Name(), Kind: "Class"}
 	}
 }
 

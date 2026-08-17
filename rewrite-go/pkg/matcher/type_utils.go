@@ -107,54 +107,64 @@ func IsError(t java.JavaType) bool {
 	return IsOfClassType(t, "error")
 }
 
+// Classification is a lookup on the Go type name a basic type is attributed
+// under. An untyped constant is its own type (`const c = 1` is an untyped int,
+// not an int) and answers the same questions as its typed counterpart.
+var (
+	goIntegerTypes = map[string]bool{
+		"int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+		"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
+		"uintptr": true, "byte": true, "rune": true,
+		"untyped int": true, "untyped rune": true,
+	}
+	goFractionalTypes = map[string]bool{
+		"float32": true, "float64": true, "complex64": true, "complex128": true,
+		"untyped float": true, "untyped complex": true,
+	}
+)
+
 func IsString(t java.JavaType) bool {
-	if t == nil {
-		return false
+	switch GetFullyQualifiedName(t) {
+	case "string", "untyped string":
+		return true
 	}
-	if p, ok := t.(*java.JavaTypePrimitive); ok {
-		return p.Keyword == "String" || p.Keyword == "string"
-	}
-	return IsOfClassType(t, "string")
+	return false
 }
 
 func IsNumeric(t java.JavaType) bool {
-	if t == nil {
-		return false
-	}
-	if p, ok := t.(*java.JavaTypePrimitive); ok {
-		switch p.Keyword {
-		case "int", "long", "short", "byte", "float", "double", "char":
-			return true
-		}
-	}
-	// Go's unsigned integers have no Java primitive; they map to named types.
-	switch GetFullyQualifiedName(t) {
-	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
-		return true
-	}
-	return false
+	return IsInt(t) || goFractionalTypes[GetFullyQualifiedName(t)]
 }
 
 func IsInt(t java.JavaType) bool {
-	if p, ok := t.(*java.JavaTypePrimitive); ok {
-		switch p.Keyword {
-		case "int", "long", "short", "byte":
-			return true
-		}
-	}
-	// Go's unsigned integers have no Java primitive; they map to named types.
+	return goIntegerTypes[GetFullyQualifiedName(t)]
+}
+
+func IsBool(t java.JavaType) bool {
 	switch GetFullyQualifiedName(t) {
-	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
+	case "bool", "untyped bool":
 		return true
 	}
 	return false
 }
 
-func IsBool(t java.JavaType) bool {
-	if p, ok := t.(*java.JavaTypePrimitive); ok {
-		return p.Keyword == "boolean" || p.Keyword == "bool"
+// IsSameGoType reports whether two attributed types are the same Go type.
+// `byte` and `uint8` are one type spelled two ways, as are `rune` and `int32`;
+// attribution keeps each spelling, so identity compares canonical names.
+func IsSameGoType(a, b java.JavaType) bool {
+	if a == nil || b == nil {
+		return false
 	}
-	return IsOfClassType(t, "bool")
+	return canonicalGoType(java.TypeSignature(a)) == canonicalGoType(java.TypeSignature(b))
+}
+
+func canonicalGoType(signature string) string {
+	switch signature {
+	case "byte":
+		return "uint8"
+	case "rune":
+		return "int32"
+	}
+	return signature
 }
 
 // AsClass safely casts a JavaType to *JavaTypeClass, returning nil if not a

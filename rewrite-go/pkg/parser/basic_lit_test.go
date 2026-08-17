@@ -76,29 +76,28 @@ func TestBasicLitDecodedValue(t *testing.T) {
 	}
 }
 
-// firstLiteralOfType parses src and returns the first *java.Literal whose
-// attributed Type is the primitive `keyword` (e.g. "byte", "char").
-func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
+// firstLiteralOfType parses src and returns the first *java.Literal attributed
+// the Go type `typeName` (e.g. "byte", "rune").
+func firstLiteralOfType(t *testing.T, src, typeName string) *java.Literal {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("g.go", src)
 	require.NoError(t, err, "parse")
 	var found *java.Literal
 	visitor.Walk(cu, func(n java.Tree) bool {
 		if lit, ok := n.(*java.Literal); ok {
-			if prim, ok := lit.Type.(*java.JavaTypePrimitive); ok && prim.Keyword == keyword {
+			if fq, ok := lit.Type.(java.FullyQualified); ok && fq.GetFullyQualifiedName() == typeName {
 				found = lit
 				return false
 			}
 		}
 		return true
 	})
-	require.NotNilf(t, found, "no *java.Literal of primitive type %q found", keyword)
+	require.NotNilf(t, found, "no *java.Literal of type %q found", typeName)
 	return found
 }
 
-// A Go byte-typed character literal such as `'^'` must round-trip through the
-// JVM-side LST deserializer. That deserializer is type-directed: for a J.Literal
-// whose Type is the `byte` primitive it coerces the value with
+// A byte is an integer type, so a byte-typed character literal such as `'^'`
+// carries its numeric code point rather than the character text.
 func TestByteCharLiteralRoundTripsAsByte(t *testing.T) {
 	// given: `'^'` in a byte context, so go/types attributes it the `byte` type
 	src := "package main\n\nfunc main() {\n\tvar b byte = '^'\n\t_ = b\n}\n"
@@ -106,13 +105,11 @@ func TestByteCharLiteralRoundTripsAsByte(t *testing.T) {
 	// when
 	lit := firstLiteralOfType(t, src, "byte")
 
-	// then: the Value must be the numeric code point, so the JVM stores it
-	// without running Byte.valueOf on a character string.
+	// then
 	if s, ok := lit.Value.(string); ok {
 		if _, err := strconv.ParseInt(s, 10, 8); err != nil {
-			t.Fatalf("byte literal Value = %q (string): the JVM runs Byte.valueOf(%q), "+
-				"which throws NumberFormatException (%v). A byte literal's Value must be a "+
-				"numeric code point, not the raw character string.", s, s, err)
+			t.Fatalf("byte literal Value = %q (string), which does not parse as a code point (%v). "+
+				"A byte literal's Value must be a numeric code point, not the raw character string.", s, err)
 		}
 	}
 	if lit.Value != int64('^') {

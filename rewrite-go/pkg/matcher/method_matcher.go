@@ -58,7 +58,7 @@ func (m *typeArgMatcher) matches(t java.JavaType) bool {
 		// If type info is not available, match by raw name against common Go types.
 		return false
 	}
-	return m.pattern.MatchString(fqn)
+	return m.pattern.MatchString(canonicalGoType(fqn))
 }
 
 type wildcardArgMatcher struct{}
@@ -111,7 +111,7 @@ func NewMethodMatcher(pattern string) *MethodMatcher {
 				break
 			}
 			mm.argPatterns = append(mm.argPatterns, &typeArgMatcher{
-				pattern: globToRegexp(resolveGoType(part)),
+				pattern: globToRegexp(canonicalGoType(part)),
 				raw:     part,
 			})
 		}
@@ -264,40 +264,4 @@ func globToRegexp(pattern string) *regexp.Regexp {
 
 func isRegexpMeta(ch byte) bool {
 	return strings.ContainsRune(`\.+?{}[]()^$|`, rune(ch))
-}
-
-// Maps a Go type name from a matcher pattern to the type signature the type
-// mapper produces, so patterns like "int64" match the mapped primitive keyword
-// ("long") and "uint" matches the synthetic FQN.
-func resolveGoType(name string) string {
-	// The type mapper maps Go integer widths that Java can express to their
-	// primitive keyword and unsigned widths to a synthetic class FQN.
-	switch name {
-	case "string":
-		return "String" // JavaTypePrimitive keyword for Go strings
-	case "bool":
-		return "boolean"
-	case "int", "int32":
-		return "int"
-	case "int16":
-		return "short"
-	case "int8":
-		return "byte"
-	case "int64":
-		return "long"
-	case "uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
-		return name // unsigned widths have no Java primitive; keep the Go FQN
-	case "float32":
-		return "float"
-	case "float64":
-		return "double"
-	case "byte":
-		return "byte"
-	case "rune":
-		return "char"
-	case "error":
-		return "error"
-	default:
-		return name
-	}
 }
