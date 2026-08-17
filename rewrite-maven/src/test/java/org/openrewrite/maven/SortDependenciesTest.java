@@ -512,15 +512,15 @@ class SortDependenciesTest implements RewriteTest {
                       <groupId>io.opentelemetry</groupId>
                       <artifactId>opentelemetry-bom</artifactId>
                       <version>${opentelemetry.version}</version>
-                      <type><![CDATA[ pom ]]></type>
-                      <scope><![CDATA[ import ]]></scope>
+                      <type>pom</type>
+                      <scope>import</scope>
                     </dependency>
                     <dependency>
                       <groupId>${quarkus.platform.group-id}</groupId>
                       <artifactId>${quarkus.platform.artifact-id}</artifactId>
                       <version>${quarkus.platform.version}</version>
-                      <type><![CDATA[ pom ]]></type>
-                      <scope><![CDATA[ import ]]></scope>
+                      <type>pom</type>
+                      <scope>import</scope>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>

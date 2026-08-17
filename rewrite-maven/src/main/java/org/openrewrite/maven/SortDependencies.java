@@ -154,7 +154,7 @@ public class SortDependencies extends Recipe {
                 // A placeholder that the effective model can't resolve, such as one defined only in an
                 // inactive profile, might still be an import; leave those dependencies where they are.
                 return resolved == null || ResolvedPom.placeholderHelper.hasPlaceholders(resolved) ||
-                       expected.equals(resolved.trim());
+                       expected.equalsIgnoreCase(resolved);
             }
         };
     }
