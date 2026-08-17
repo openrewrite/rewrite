@@ -384,3 +384,22 @@ func TestBlankLinesAtBlockBraces(t *testing.T) {
 		}
 	}
 }
+
+func TestTabsAndIndents_CaseLeadInComments(t *testing.T) {
+	cases := map[string][2]string{
+		"a comment at the case keyword's level stays": {
+			"package p\n\nfunc f(a, b bool) {\n\tswitch {\n\tcase a:\n\t// c\n\tcase b:\n\t\treturn\n\t}\n}\n",
+			"package p\n\nfunc f(a, b bool) {\n\tswitch {\n\tcase a:\n\t// c\n\tcase b:\n\t\treturn\n\t}\n}\n"},
+		"a comment at the body's level stays there": {
+			"package p\n\nfunc f(a, b bool) {\n\tswitch {\n\tcase a:\n\t\t// c\n\tcase b:\n\t\treturn\n\t}\n}\n",
+			"package p\n\nfunc f(a, b bool) {\n\tswitch {\n\tcase a:\n\t\t// c\n\tcase b:\n\t\treturn\n\t}\n}\n"},
+		"a comment written anywhere else moves to the body": {
+			"package p\n\nfunc f(a, b bool) {\n\tswitch {\n\tcase a:\n// c\n\tcase b:\n\t\treturn\n\t}\n}\n",
+			"package p\n\nfunc f(a, b bool) {\n\tswitch {\n\tcase a:\n\t\t// c\n\tcase b:\n\t\treturn\n\t}\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewTabsAndIndentsVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}

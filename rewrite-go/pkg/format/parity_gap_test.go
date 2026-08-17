@@ -37,7 +37,7 @@ import (
 // parityFloor is the number of standard library files the hand-rolled
 // visitors render exactly as gofmt does. Raise it whenever a change earns
 // more; it never goes down.
-const parityFloor = 4048
+const parityFloor = 4222
 
 // TestParityGap measures how far the hand-rolled visitors are from gofmt,
 // using gofmtSource as the oracle, and holds the result at parityFloor. The
@@ -173,12 +173,12 @@ func classifyLine(g, w string) (string, string) {
 	case strings.TrimSpace(g) == "" || strings.TrimSpace(w) == "":
 		return "blank lines", detail
 	case commentLine.MatchString(w) || commentLine.MatchString(g):
-		if collapse(g) == collapse(w) && indentOf(g) != indentOf(w) {
+		if collapse(g) == collapse(w) && leadingIndent(g) != leadingIndent(w) {
 			return "comment indentation", detail
 		}
 		return "comment layout", detail
 	case collapse(g) == collapse(w):
-		if indentOf(g) != indentOf(w) {
+		if leadingIndent(g) != leadingIndent(w) {
 			return "indentation", detail
 		}
 		return "intra-line alignment", detail
@@ -204,4 +204,4 @@ func sameIgnoringIndent(got, want string) bool {
 
 func collapse(s string) string { return spaceRun.ReplaceAllString(strings.TrimSpace(s), " ") }
 
-func indentOf(s string) string { return s[:len(s)-len(strings.TrimLeft(s, " \t"))] }
+func leadingIndent(s string) string { return s[:len(s)-len(strings.TrimLeft(s, " \t"))] }

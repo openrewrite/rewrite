@@ -196,9 +196,12 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 	stmts := make([]java.RightPadded[java.Statement], len(block.Statements))
 	for i, rp := range block.Statements {
 		if rp.Element != nil {
-			fixed, _ := transformPrefix(rp.Element, v.reindentSpace).(java.Statement)
-			if fixed != nil {
-				rp.Element = fixed
+			// A clause aligns with the switch or select that encloses it and
+			// decides its own lead-in, so its prefix is left to it.
+			if !ownsItsLeadIn(rp.Element) {
+				if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Statement); ok {
+					rp.Element = fixed
+				}
 			}
 			if next, ok := v.Visit(rp.Element, p).(java.Statement); ok {
 				rp.Element = next
@@ -219,9 +222,7 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 // blocks inside a case get their own indent fixes (the default
 // GoVisitor.VisitCase doesn't recurse into Body).
 func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
-	v.depth--
-	c = c.WithPrefix(v.reindentSpace(c.Prefix))
-	v.depth++
+	c = c.WithPrefix(v.reindentClauseLeadIn(c.Prefix))
 
 	// Expressions that wrap sit one level in from the `case` keyword, which
 	// is the depth the body already runs at.
@@ -243,9 +244,16 @@ func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 // the whitespace before the closing paren back out to the call's own level.
 func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 	out := *mi
-	out.Arguments.Elements = indentElements(v, mi.Arguments.Elements)
+	out.Arguments.Elements = indentSubtrees(v, mi.Arguments.Elements, p)
 	out.Markers = v.reindentTrailingComma(mi.Markers)
-	return v.GoVisitor.VisitMethodInvocation(&out, p)
+	if mi.Select != nil {
+		selected := *mi.Select
+		if next, ok := v.Visit(selected.Element, p).(java.Expression); ok {
+			selected.Element = next
+			out.Select = &selected
+		}
+	}
+	return &out
 }
 
 // VisitBinary indents a right operand that continues on its own line. Both
@@ -276,9 +284,7 @@ func (v *TabsAndIndentsVisitor) VisitGoBinary(b *golang.Binary, p any) java.J {
 // clause: the `case` keyword sits with the enclosing `select`, its body one
 // level in.
 func (v *TabsAndIndentsVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
-	v.depth--
-	cc = cc.WithPrefix(v.reindentSpace(cc.Prefix))
-	v.depth++
+	cc = cc.WithPrefix(v.reindentClauseLeadIn(cc.Prefix))
 
 	out := *cc
 	out.Body = indentBody(v, cc.Body, p)
@@ -299,6 +305,68 @@ func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement
 		out[i] = rp
 	}
 	return out
+}
+
+// ownsItsLeadIn reports whether a statement re-indents the whitespace ahead of
+// itself rather than leaving that to the block holding it.
+func ownsItsLeadIn(t java.Tree) bool {
+	switch t.(type) {
+	case *java.Case, *golang.CommClause:
+		return true
+	}
+	return false
+}
+
+// reindentClauseLeadIn re-indents what runs up to a `case` or `default`
+// keyword, which aligns with the enclosing `switch` or `select` one level out
+// from the clause bodies. A comment ahead of the keyword belongs to the body
+// above it and is indented with that body, unless it was written at the
+// keyword's own level, where it reads as introducing the clause and stays.
+func (v *TabsAndIndentsVisitor) reindentClauseLeadIn(s java.Space) java.Space {
+	body := strings.Repeat("\t", v.depth)
+	keyword := strings.Repeat("\t", reduceIndentDepth(v.depth))
+
+	segments := make([]string, 0, len(s.Comments)+1)
+	segments = append(segments, s.Whitespace)
+	for _, c := range s.Comments {
+		segments = append(segments, c.Suffix)
+	}
+	for i, segment := range segments {
+		want := body
+		if i == len(segments)-1 {
+			want = keyword
+		} else if indentOf(segment) == keyword {
+			continue
+		}
+		segments[i] = reindentTail(segment, want)
+	}
+
+	out := s
+	out.Whitespace = segments[0]
+	if len(s.Comments) > 0 {
+		comments := append([]java.Comment(nil), s.Comments...)
+		for i := range comments {
+			comments[i].Suffix = segments[i+1]
+		}
+		out.Comments = comments
+	}
+	return out
+}
+
+// indentOf reports the whitespace after the last line break in ws, which is the
+// indent of whatever follows it.
+func indentOf(ws string) string {
+	if i := strings.LastIndex(ws, "\n"); i >= 0 {
+		return ws[i+1:]
+	}
+	return ws
+}
+
+func reduceIndentDepth(depth int) int {
+	if depth <= 1 {
+		return 0
+	}
+	return depth - 1
 }
 
 // reindentClosing re-indents the whitespace before a closing delimiter. Any
