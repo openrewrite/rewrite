@@ -39,6 +39,8 @@ type typeMapper struct {
 	// mappingOrigin holds the class for each generic whose mapping is
 	// still on the stack, keyed by its origin. See mapNamed.
 	mappingOrigin map[*types.Named]*java.JavaTypeClass
+	// fieldOwner leads from a struct field back to the type declaring it.
+	fieldOwner map[*types.Var]java.JavaType
 }
 
 // maxTypeDepth bounds how deep type attribution follows a type into its
@@ -51,6 +53,7 @@ func newTypeMapper() *typeMapper {
 		cache:         make(map[types.Type]java.JavaType),
 		namedCache:    make(map[*types.Named]*java.JavaTypeClass),
 		mappingOrigin: make(map[*types.Named]*java.JavaTypeClass),
+		fieldOwner:    make(map[*types.Var]java.JavaType),
 	}
 }
 
@@ -234,10 +237,10 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	switch u := underlying.(type) {
 	case *types.Struct:
 		cls.Kind = "Class"
-		cls.Members = m.structMembers(u)
+		cls.Members = m.structMembers(u, cls)
 	case *types.Interface:
 		cls.Kind = "Interface"
-		cls.Methods = m.interfaceMethods(u)
+		cls.Methods = m.interfaceMethods(u, cls)
 	default:
 		// Named type wrapping a basic type (e.g., type MyInt int)
 		cls.Kind = "Class"
@@ -314,7 +317,7 @@ func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *java.Java
 		FullyQualifiedName: fqn,
 		Kind:               "Interface",
 	}
-	cls.Methods = m.interfaceMethods(iface)
+	cls.Methods = m.interfaceMethods(iface, cls)
 	return cls
 }
 
@@ -324,7 +327,7 @@ func (m *typeMapper) mapStruct(s *types.Struct, fqn string) *java.JavaTypeClass 
 		FullyQualifiedName: fqn,
 		Kind:               "Class",
 	}
-	cls.Members = m.structMembers(s)
+	cls.Members = m.structMembers(s, cls)
 	return cls
 }
 
@@ -362,13 +365,17 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
-// structMembers extracts fields from a struct as JavaTypeVariable.
-func (m *typeMapper) structMembers(s *types.Struct) []*java.JavaTypeVariable {
+// structMembers extracts fields from a struct as JavaTypeVariable. The
+// owner is recorded per field so an identifier referring to one from a
+// use site resolves to the same owning type.
+func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java.JavaTypeVariable {
 	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
 		f := s.Field(i)
+		m.fieldOwner[f] = owner
 		members = append(members, &java.JavaTypeVariable{
 			Name:        f.Name(),
+			Owner:       owner,
 			Type:        m.mapType(f.Type()),
 			Annotations: nil,
 		})
@@ -377,12 +384,12 @@ func (m *typeMapper) structMembers(s *types.Struct) []*java.JavaTypeVariable {
 }
 
 // interfaceMethods extracts methods from an interface as JavaTypeMethod.
-func (m *typeMapper) interfaceMethods(iface *types.Interface) []*java.JavaTypeMethod {
+func (m *typeMapper) interfaceMethods(iface *types.Interface, owner *java.JavaTypeClass) []*java.JavaTypeMethod {
 	var methods []*java.JavaTypeMethod
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)
 		sig := method.Type().(*types.Signature)
-		mt := m.mapSignature(sig, method.Name(), nil)
+		mt := m.mapSignature(sig, method.Name(), owner)
 		methods = append(methods, mt)
 	}
 	return methods
@@ -444,16 +451,15 @@ func (m *typeMapper) mapObject(obj types.Object) java.JavaType {
 }
 
 // mapObjectToVariable maps a types.Object to a JavaTypeVariable (for field-like identifiers).
-func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariable {
+func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaType) *java.JavaTypeVariable {
 	if obj == nil {
 		return nil
 	}
 	switch o := obj.(type) {
 	case *types.Var:
-		ownerType := m.ownerType(o)
 		return &java.JavaTypeVariable{
 			Name:  o.Name(),
-			Owner: ownerType,
+			Owner: m.ownerType(o, enclosing),
 			Type:  m.mapType(o.Type()),
 		}
 	default:
@@ -461,13 +467,17 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariabl
 	}
 }
 
-func (m *typeMapper) ownerType(v *types.Var) java.JavaType {
+// ownerType is what a variable belongs to: the declaring type for a
+// field, the enclosing function for a local or parameter. go/types leads
+// from a struct to its fields but not back, so a field's owner comes
+// from the index built while mapping the struct.
+func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaType {
 	if !v.IsField() {
-		return nil
+		return enclosing
 	}
-	// For struct fields, the owner is the parent type.
-	// go/types doesn't directly expose the parent; we return nil.
-	// The owner will be inferred from context during tree construction.
+	if owner, ok := m.fieldOwner[v]; ok {
+		return owner
+	}
 	return nil
 }
 

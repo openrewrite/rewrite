@@ -194,6 +194,17 @@ type parseContext struct {
 	cursor   int // current byte offset into src, tracks consumed positions
 	typeInfo *types.Info
 	mapper   *typeMapper
+	// enclosingMethod owns the locals and parameters being mapped, the
+	// way a declaring type owns a field.
+	enclosingMethod *java.JavaTypeMethod
+}
+
+// enterMethod makes m the owner of the variables mapped until the
+// returned function restores the previous one.
+func (ctx *parseContext) enterMethod(m *java.JavaTypeMethod) func() {
+	previous := ctx.enclosingMethod
+	ctx.enclosingMethod = m
+	return func() { ctx.enclosingMethod = previous }
 }
 
 // prefix extracts the whitespace and comments between the current cursor
@@ -669,6 +680,14 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 		receiver = &recv
 	}
 
+	var methodType *java.JavaTypeMethod
+	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
+		if fn, ok := obj.(*types.Func); ok {
+			methodType = ctx.mapper.mapMethodObject(fn)
+		}
+	}
+	defer ctx.enterMethod(methodType)()
+
 	name := ctx.mapIdent(decl.Name)
 	typeParams := ctx.mapTypeParams(decl.Type.TypeParams)
 	params := ctx.mapFieldListAsParams(decl.Type.Params)
@@ -690,12 +709,7 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 		Body:               body,
 	}
 
-	// Type attribution for method declaration
-	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
-		if fn, ok := obj.(*types.Func); ok {
-			md.MethodType = ctx.mapper.mapMethodObject(fn)
-		}
-	}
+	md.MethodType = methodType
 
 	if receiver != nil {
 		// The prefix (whitespace before `func`, after any `//go:` directives)
@@ -2060,10 +2074,10 @@ func (ctx *parseContext) mapIdent(ident *ast.Ident) *java.Identifier {
 	// Type attribution: look up in Defs first, then Uses
 	if obj, ok := ctx.typeInfo.Defs[ident]; ok && obj != nil {
 		id.Type = ctx.mapper.mapObject(obj)
-		id.FieldType = ctx.mapper.mapObjectToVariable(obj)
+		id.FieldType = ctx.mapper.mapObjectToVariable(obj, ctx.enclosingMethod)
 	} else if obj, ok := ctx.typeInfo.Uses[ident]; ok && obj != nil {
 		id.Type = ctx.mapper.mapObject(obj)
-		id.FieldType = ctx.mapper.mapObjectToVariable(obj)
+		id.FieldType = ctx.mapper.mapObjectToVariable(obj, ctx.enclosingMethod)
 	}
 
 	return id
@@ -2884,6 +2898,17 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 // mapFuncLit maps a function literal (closure).
 func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Type.Func, len("func"))
+
+	// A literal has no name to look up, so its signature comes from the
+	// expression rather than from Defs.
+	var methodType *java.JavaTypeMethod
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		if sig, ok := tv.Type.(*types.Signature); ok {
+			methodType = ctx.mapper.mapSignature(sig, "", nil)
+		}
+	}
+	defer ctx.enterMethod(methodType)()
+
 	params := ctx.mapFieldListAsParams(expr.Type.Params)
 	returnType := ctx.mapReturnType(expr.Type.Results)
 	body := ctx.mapBlockStmt(expr.Body)
@@ -2891,16 +2916,10 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 	md := &java.MethodDeclaration{
 		ID:         uuid.New(),
 		Name:       &java.Identifier{ID: uuid.New(), Name: ""},
+		MethodType: methodType,
 		Parameters: params,
 		ReturnType: returnType,
 		Body:       body,
-	}
-	// A literal has no name to look up, so its signature comes from the
-	// expression rather than from Defs.
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		if sig, ok := tv.Type.(*types.Signature); ok {
-			md.MethodType = ctx.mapper.mapSignature(sig, "", nil)
-		}
 	}
 	// Wrap in StatementExpression so the MethodDeclaration (a Statement) can
 	// appear in expression contexts like return statements, assignments, and

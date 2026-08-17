@@ -54,6 +54,7 @@ func TestTypeAttribution(t *testing.T) {
 	var mu sync.Mutex
 	totals := map[string]*slotCount{}
 	emptySites := map[string]int{}
+	defectCounts := map[string]int{}
 
 	var wg sync.WaitGroup
 	work := make(chan string)
@@ -62,10 +63,13 @@ func TestTypeAttribution(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for path := range work {
-				counts, empty := attributionOf(root, path)
+				counts, empty, defects := attributionOf(root, path)
 				mu.Lock()
 				for k, n := range empty {
 					emptySites[k] += n
+				}
+				for k, n := range defects {
+					defectCounts[k] += n
 				}
 				for k, v := range counts {
 					c := totals[k]
@@ -105,6 +109,16 @@ func TestTypeAttribution(t *testing.T) {
 		c := totals[k]
 		fmt.Fprintf(&sb, "%-52s %10d %10d %10d %7.2f%%\n", k, c.resolved, c.unknown, c.nil_, c.pct())
 	}
+	defs := make([]string, 0, len(defectCounts))
+	for k := range defectCounts {
+		defs = append(defs, k)
+	}
+	sort.Slice(defs, func(i, j int) bool { return defectCounts[defs[i]] > defectCounts[defs[j]] })
+	fmt.Fprintf(&sb, "\nresolved types carrying nothing to match on\n")
+	for _, k := range defs {
+		fmt.Fprintf(&sb, "%10d  %s\n", defectCounts[k], k)
+	}
+
 	sites := make([]string, 0, len(emptySites))
 	for k := range emptySites {
 		sites = append(sites, k)
@@ -247,12 +261,12 @@ func parseGroup(root, path string) []*golang.CompilationUnit {
 	return out
 }
 
-func attributionOf(root, path string) (counts map[string]*slotCount, empty map[string]int) {
-	counts, empty = map[string]*slotCount{}, map[string]int{}
+func attributionOf(root, path string) (counts map[string]*slotCount, empty, defects map[string]int) {
+	counts, empty, defects = map[string]*slotCount{}, map[string]int{}, map[string]int{}
 	defer func() { recover() }()
 
 	for _, cu := range parseGroup(root, path) {
-		w := &typeWalker{counts: counts, empty: empty, seen: map[uintptr]bool{}}
+		w := &typeWalker{counts: counts, empty: empty, defects: defects, seen: map[uintptr]bool{}}
 		w.walk(reflect.ValueOf(cu), "", "", "<root>")
 	}
 	return
@@ -264,8 +278,62 @@ type typeWalker struct {
 	counts map[string]*slotCount
 	// empty is keyed by the field the node sits in as well as its own,
 	// because an identifier's role decides whether Go has a type for it.
-	empty map[string]int
-	seen  map[uintptr]bool
+	empty   map[string]int
+	defects map[string]int
+	seen    map[uintptr]bool
+}
+
+// defectsOf names the ways a mapped type can be present yet carry
+// nothing a recipe can match on. A slot counted as resolved is not
+// necessarily a slot that is useful.
+func defectsOf(t java.JavaType) []string {
+	switch v := t.(type) {
+	case *java.JavaTypeClass:
+		var d []string
+		if v.FullyQualifiedName == "" {
+			d = append(d, "class: no fully qualified name")
+		} else if !strings.Contains(v.FullyQualifiedName, ".") && !strings.Contains(v.FullyQualifiedName, "/") {
+			d = append(d, "class: unqualified name "+v.FullyQualifiedName)
+		}
+		if v.Kind == "" {
+			d = append(d, "class: no kind")
+		}
+		return d
+	case *java.JavaTypeMethod:
+		var d []string
+		if v.DeclaringType == nil {
+			d = append(d, "method: no declaring type")
+		}
+		if v.ReturnType == nil {
+			d = append(d, "method: no return type")
+		}
+		if len(v.ParameterNames) != len(v.ParameterTypes) {
+			d = append(d, "method: parameter names and types disagree")
+		}
+		return d
+	case *java.JavaTypeVariable:
+		var d []string
+		if v.Owner == nil {
+			d = append(d, "variable: no owner")
+		}
+		if v.Type == nil {
+			d = append(d, "variable: no type")
+		}
+		return d
+	case *java.JavaTypeArray:
+		if v.ElemType == nil {
+			return []string{"array: no element type"}
+		}
+	case *java.JavaTypeParameterized:
+		if v.Type == nil {
+			return []string{"parameterized: no raw type"}
+		}
+	case *java.JavaTypePrimitive:
+		if v.Keyword == "" {
+			return []string{"primitive: no keyword"}
+		}
+	}
+	return nil
 }
 
 func (w *typeWalker) count(slot, site string, v reflect.Value) {
@@ -283,6 +351,9 @@ func (w *typeWalker) count(slot, site string, v reflect.Value) {
 		w.empty[site+" [unknown]"]++
 	default:
 		c.resolved++
+		for _, d := range defectsOf(v.Interface().(java.JavaType)) {
+			w.defects[d]++
+		}
 	}
 }
 
