@@ -31,7 +31,10 @@ import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,7 +52,7 @@ class PythonDependencyFileTest implements RewriteTest {
           randomId(), "test-project", "1.0.0", null, null,
           ".", null, null,
           emptyList(), dependencies,
-          Collections.emptyMap(), Collections.emptyMap(),
+          emptyMap(), emptyMap(),
           emptyList(), emptyList(),
           resolved, null, null
         );

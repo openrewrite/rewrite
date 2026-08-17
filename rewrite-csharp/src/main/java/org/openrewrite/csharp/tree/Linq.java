@@ -23,7 +23,6 @@ import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.Statement;
 
 import java.lang.ref.WeakReference;
 import java.util.List;

@@ -26,7 +26,8 @@ import org.openrewrite.java.tree.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toSet;
 
 /**
  * Service for computing source code position metrics such as column alignment positions and tree element lengths.
@@ -206,7 +207,7 @@ public class SourcePositionService {
             @Override
             protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<TreeVisitor<?, ?>> p) {
                 if (container != null && !container.getPadding().getElements().isEmpty() && cursor.getValue() instanceof JContainer) {
-                    Set<UUID> elements = container.getElements().stream().map(Tree::getId).collect(Collectors.toSet());
+                    Set<UUID> elements = container.getElements().stream().map(Tree::getId).collect(toSet());
                     ((JContainer<? extends J>) cursor.getValue()).getElements().stream().map(Tree::getId).forEach(elements::remove);
                     if (elements.isEmpty()) {
                         //if no elements remain, we should continue our search with the input cursor to receive its changes.

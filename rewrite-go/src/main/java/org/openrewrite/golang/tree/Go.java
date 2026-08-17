@@ -34,9 +34,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 public interface Go extends J {
@@ -156,7 +156,7 @@ public interface Go extends J {
 
         @Override
         public List<J.Import> getImports() {
-            return imports == null ? java.util.Collections.emptyList() : imports.getElements();
+            return imports == null ? emptyList() : imports.getElements();
         }
 
         @Override
@@ -166,7 +166,7 @@ public interface Go extends J {
             }
             if (this.imports == null) {
                 return withImportsContainer(JContainer.build(Space.EMPTY,
-                        JRightPadded.withElements(java.util.Collections.emptyList(), imports), Markers.EMPTY));
+                        JRightPadded.withElements(emptyList(), imports), Markers.EMPTY));
             }
             return withImportsContainer(JContainer.build(this.imports.getBefore(),
                     JRightPadded.withElements(this.imports.getPadding().getElements(), imports),
@@ -203,7 +203,7 @@ public interface Go extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override

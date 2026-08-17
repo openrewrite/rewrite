@@ -19,8 +19,9 @@ import com.google.errorprone.annotations.MustBeClosed;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.stream.Stream;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A {@link DataTableStore} that silently drops all inserts and returns empty results.
@@ -43,6 +44,6 @@ final class NoOpDataTableStore implements DataTableStore {
 
     @Override
     public Collection<DataTable<?>> getDataTables() {
-        return Collections.emptyList();
+        return emptyList();
     }
 }
