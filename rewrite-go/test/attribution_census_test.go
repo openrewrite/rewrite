@@ -35,13 +35,13 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// TestTypeAttribution counts how many of a corpus's type slots came back
+// TestAttributionCensus counts how many of a corpus's type slots came back
 // resolved, per (node type, field): `java.Identifier.Type` and
 // `java.MethodInvocation.MethodType` are separate populations, because a
 // regression usually shows up in one of them rather than in the total.
 //
-//	GO_CORPUS=/tmp/go-corpus go test -tags parityaudit ./test/ -run TestTypeAttribution -timeout 60m
-func TestTypeAttribution(t *testing.T) {
+//	GO_CORPUS=/tmp/go-corpus go test -tags parityaudit ./test/ -run TestAttributionCensus -timeout 60m
+func TestAttributionCensus(t *testing.T) {
 	root := os.Getenv("GO_CORPUS")
 	if root == "" {
 		t.Skip("GO_CORPUS not set")

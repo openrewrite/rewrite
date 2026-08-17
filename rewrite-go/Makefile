@@ -42,7 +42,7 @@ fuzz:
 #   make types CORPUS=/tmp/go-corpus
 #   GO_TYPES_PACKAGE=1 make types CORPUS=/tmp/go-corpus   # whole packages
 types:
-	GO_CORPUS=$(CORPUS) go test -tags parityaudit ./test/ -run TestTypeAttribution -timeout 120m -v
+	GO_CORPUS=$(CORPUS) go test -tags parityaudit ./test/ -run TestAttributionCensus -timeout 120m -v
 
 # Shrink one failing corpus file to a minimal reproducer.
 #

@@ -259,6 +259,18 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 	return mt
 }
 
+func (r *GoReceiver) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ta
+	ta = &c
+	if result := q.Receive(ta.Left, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		ta.Left = result.(java.RightPadded[java.Expression])
+	}
+	ta.AssertedType = receiveValue(q, ta.AssertedType, func(e *java.ControlParentheses) any { return r.Visit(e, q) })
+	ta.Type = r.receiveType(ta.Type, q)
+	return ta
+}
+
 func (r *GoReceiver) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *es

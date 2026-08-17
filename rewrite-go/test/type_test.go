@@ -19,7 +19,11 @@ package test
 import (
 	"testing"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 func TestParseMapType(t *testing.T) {
@@ -94,6 +98,30 @@ func TestParseParenthesizedExpression(t *testing.T) {
 		`))
 }
 
+func TestParseTypeAssertionShape(t *testing.T) {
+	src := "package main\n\nfunc f(e any) {\n\tx := e /*c*/ .(error)\n\t_ = x\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var seen int
+	forEachTypeAssertion(cu, func(ta *golang.TypeAssertion) {
+		seen++
+		if ws := ta.Left.After.Whitespace; ws != " " {
+			t.Errorf("space before the dot: got %q, want %q", ws, " ")
+		}
+		if len(ta.Left.After.Comments) != 1 {
+			t.Errorf("comment before the dot: got %d, want 1", len(ta.Left.After.Comments))
+		}
+		if ta.Type == nil {
+			t.Error("type assertion has no type")
+		}
+	})
+	if seen != 1 {
+		t.Fatalf("expected 1 type assertion, found %d", seen)
+	}
+}
+
 func TestParseSpaceBeforeTypeAssertionDot(t *testing.T) {
 	src := "package main\n\nfunc f(e any) {\n\tx := e  .(error)\n\t_ = x\n}\n"
 	assertRoundtrip(t, src)
@@ -102,4 +130,18 @@ func TestParseSpaceBeforeTypeAssertionDot(t *testing.T) {
 func TestParseCommentBeforeTypeAssertionDot(t *testing.T) {
 	src := "package main\n\nfunc f(e any) {\n\tx := e /*c*/ .(error)\n\t_ = x\n}\n"
 	assertRoundtrip(t, src)
+}
+
+type typeAssertionWalker struct {
+	visitor.GoVisitor
+	f func(*golang.TypeAssertion)
+}
+
+func (v *typeAssertionWalker) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	v.f(ta)
+	return v.GoVisitor.VisitTypeAssertion(ta, p)
+}
+
+func forEachTypeAssertion(cu java.Tree, f func(*golang.TypeAssertion)) {
+	visitor.Init(&typeAssertionWalker{f: f}).Visit(cu, nil)
 }

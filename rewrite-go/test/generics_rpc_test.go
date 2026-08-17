@@ -171,3 +171,19 @@ func TestExpressionStatementSurvivesRpc(t *testing.T) {
 		}
 	}
 }
+
+func TestTypeAssertionSurvivesRpc(t *testing.T) {
+	for _, src := range []string{
+		"package main\n\nfunc f(e any) {\n\tx := e.(error)\n\t_ = x\n}\n",
+		"package main\n\nfunc f(e any) {\n\tx := e /*c*/ .(error)\n\t_ = x\n}\n",
+		"package main\n\nfunc f(e any) {\n\tswitch e.(type) {\n\tcase error:\n\t}\n}\n",
+	} {
+		cu, err := parser.NewGoParser().Parse("x.go", src)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if got := printer.Print(rpcRoundTrip(t, cu)); got != src {
+			t.Errorf("rpc round trip changed source\nexpected: %q\nactual:   %q", src, got)
+		}
+	}
+}

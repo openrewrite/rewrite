@@ -1111,6 +1111,96 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // TypeAssertion (x.(T))
+    // ---------------------------------------------------------------
+
+    /**
+     * Go's {@code x.(T)}. {@link J.TypeCast} models a prefix cast and so
+     * has nowhere to hold what stands between the expression and the dot,
+     * which the left element's padding carries here.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeAssertion implements Go, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> left;
+
+        public Expression getLeft() {
+            return left.getElement();
+        }
+
+        public Go.TypeAssertion withLeft(Expression left) {
+            return getPadding().withLeft(this.left.withElement(left));
+        }
+
+        @With
+        @Getter
+        J.ControlParentheses<Expression> assertedType;
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitTypeAssertion(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.TypeAssertion t;
+
+            public JRightPadded<Expression> getLeft() {
+                return t.left;
+            }
+
+            public Go.TypeAssertion withLeft(JRightPadded<Expression> left) {
+                return t.left == left ? t : new Go.TypeAssertion(t.padding, t.id, t.prefix, t.markers, left, t.assertedType, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // ExpressionStatement — wraps an Expression in statement position
     // ---------------------------------------------------------------
 

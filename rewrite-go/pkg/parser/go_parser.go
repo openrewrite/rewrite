@@ -2900,20 +2900,16 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 		Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
 	}
 
-	var markers java.Markers
-	if !dotPrefix.IsEmpty() {
-		markers = java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{golang.TypeAssertionDot{Ident: uuid.New(), Before: dotPrefix}},
-		}
+	ta := &golang.TypeAssertion{
+		ID:           uuid.New(),
+		Prefix:       prefix,
+		Left:         java.RightPadded[java.Expression]{Element: x, After: dotPrefix},
+		AssertedType: clazz,
 	}
-	return &java.TypeCast{
-		ID:      uuid.New(),
-		Prefix:  prefix,
-		Markers: markers,
-		Clazz:   clazz,
-		Expr:    x,
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		ta.Type = ctx.mapper.mapType(tv.Type)
 	}
+	return ta
 }
 
 // mapFuncLit maps a function literal (closure).

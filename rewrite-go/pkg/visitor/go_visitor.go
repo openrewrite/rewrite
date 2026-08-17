@@ -205,6 +205,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitArrayType(n, p)
 	case *java.Parentheses:
 		return v.self().VisitParentheses(n, p)
+	case *golang.TypeAssertion:
+		return v.self().VisitTypeAssertion(n, p)
 	case *java.TypeCast:
 		return v.self().VisitTypeCast(n, p)
 	case *java.ControlParentheses:
@@ -334,6 +336,7 @@ type VisitorI interface {
 	VisitArrayType(at *java.ArrayType, p any) java.J
 	VisitGoArrayType(at *golang.ArrayType, p any) java.J
 	VisitParentheses(paren *java.Parentheses, p any) java.J
+	VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J
 	VisitTypeCast(tc *java.TypeCast, p any) java.J
 	VisitControlParentheses(cp *java.ControlParentheses, p any) java.J
 	VisitArrayAccess(aa *java.ArrayAccess, p any) java.J
@@ -1347,6 +1350,27 @@ func (v *GoVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	c.Markers = markers
 	c.Expr = expr
 	c.Clazz = clazz
+	return &c
+}
+
+func (v *GoVisitor) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	prefix := v.self().VisitSpace(ta.Prefix, p)
+	markers := v.visitMarkers(ta.Markers, p)
+	left := visitExpression(v, ta.Left.Element, p)
+	leftAfter := v.self().VisitSpace(ta.Left.After, p)
+	clazz := ta.AssertedType
+	if clazz != nil {
+		clazz = visitAndCast[*java.ControlParentheses](v, clazz, p)
+	}
+	if java.SpaceEqual(prefix, ta.Prefix) && java.MarkersEqual(markers, ta.Markers) &&
+		left == ta.Left.Element && java.SpaceEqual(leftAfter, ta.Left.After) && clazz == ta.AssertedType {
+		return ta
+	}
+	c := *ta
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Left = java.RightPadded[java.Expression]{Element: left, After: leftAfter, Markers: ta.Left.Markers}
+	c.AssertedType = clazz
 	return &c
 }
 

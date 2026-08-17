@@ -1014,18 +1014,27 @@ func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J 
 	return paren
 }
 
+// VisitTypeCast renders J's prefix cast. Go's own `x.(T)` is a
+// TypeAssertion; a TypeCast reaches this printer only from a synthesized
+// or Java-side tree.
 func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)
-	// Go type assertion: expr.(Type)
-	p.Visit(tc.Expr, out)
-	if d := java.FindMarker[golang.TypeAssertionDot](tc.Markers); d != nil {
-		p.visitSpace(d.Before, out)
-	}
-	out.Append(".")
 	p.Visit(tc.Clazz, out)
+	p.Visit(tc.Expr, out)
 	p.afterSyntax(tc.Markers, out)
 	return tc
+}
+
+func (p *GoPrinter) VisitTypeAssertion(ta *golang.TypeAssertion, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ta.Prefix, ta.Markers, out)
+	p.Visit(ta.Left.Element, out)
+	p.visitSpace(ta.Left.After, out)
+	out.Append(".")
+	p.Visit(ta.AssertedType, out)
+	p.afterSyntax(ta.Markers, out)
+	return ta
 }
 
 func (p *GoPrinter) VisitControlParentheses(cp *java.ControlParentheses, param any) java.J {

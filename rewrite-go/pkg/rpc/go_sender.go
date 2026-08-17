@@ -250,6 +250,17 @@ func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 	return mt
 }
 
+func (s *GoSender) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(ta, func(v any) any { return v.(*golang.TypeAssertion).Left },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(ta, func(v any) any { return v.(*golang.TypeAssertion).AssertedType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ta, func(v any) any { return AsRef(v.(*golang.TypeAssertion).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
+	return ta
+}
+
 func (s *GoSender) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(es, func(v any) any { return v.(*golang.ExpressionStatement).Expression },

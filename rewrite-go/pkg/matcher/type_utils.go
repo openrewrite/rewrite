@@ -16,7 +16,10 @@
 
 package matcher
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+import (
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
 
 // GetFullyQualifiedName extracts the FQN from a JavaType.
 // Returns "" for nil, unknown, or types without a FQN.
@@ -207,6 +210,13 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return n.Type
 	case *java.FieldAccess:
 		return n.Type
+	case *golang.TypeAssertion:
+		if n.Type != nil {
+			return n.Type
+		}
+		if n.AssertedType != nil {
+			return TypeOfExpression(n.AssertedType.Tree.Element)
+		}
 	case *java.TypeCast:
 		if n.Clazz != nil {
 			return TypeOfExpression(n.Clazz.Tree.Element)

@@ -1010,6 +1010,39 @@ func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionState
 	return &c
 }
 
+// TypeAssertion is Go's `x.(T)`. J.TypeCast models a prefix cast and so
+// has nowhere to hold what stands between the expression and the dot.
+type TypeAssertion struct {
+	ID           uuid.UUID
+	Prefix       java.Space
+	Markers      java.Markers
+	Left         java.RightPadded[java.Expression] // After = space before `.`
+	AssertedType *java.ControlParentheses          // `(T)`
+	Type         java.JavaType                     // the result type (nullable)
+}
+
+func (*TypeAssertion) IsTree()       {}
+func (*TypeAssertion) IsJ()          {}
+func (*TypeAssertion) IsExpression() {}
+
+func (n *TypeAssertion) WithPrefix(prefix java.Space) *TypeAssertion {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeAssertion) WithMarkers(markers java.Markers) *TypeAssertion {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 type StatementExpression struct {
 	ID        uuid.UUID
 	Prefix    java.Space
@@ -1328,15 +1361,6 @@ type StructTag struct {
 }
 
 func (s StructTag) ID() uuid.UUID { return s.Ident }
-
-// TypeAssertionDot carries the spacing before the `.` of a type
-// assertion, which no node's prefix covers: `e /*c*/ .(error)`.
-type TypeAssertionDot struct {
-	Ident  uuid.UUID
-	Before java.Space
-}
-
-func (t TypeAssertionDot) ID() uuid.UUID { return t.Ident }
 
 // StructTagQuote records which string literal delimiter a struct tag was
 // written with. The tag itself is modelled as LeadingAnnotations, which
