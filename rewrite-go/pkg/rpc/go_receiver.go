@@ -80,8 +80,8 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	pe.Text = receiveScalar[string](q, pe.Text)
 	return pe
 }
@@ -93,23 +93,8 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
 	cu.CharsetBomMarked = receiveScalar[bool](q, cu.CharsetBomMarked)
-	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
-	q.Receive(nil, func(v any) any {
-		receiveScalar[string](q, "") // algorithm
-		q.Receive(nil, nil)          // value
-		return nil
-	})
-	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields
-	q.Receive(nil, func(v any) any {
-		q.Receive(nil, nil) // creationTime
-		q.Receive(nil, nil) // lastModifiedTime
-		q.Receive(nil, nil) // lastAccessTime
-		q.Receive(nil, nil) // isReadable
-		q.Receive(nil, nil) // isWritable
-		q.Receive(nil, nil) // isExecutable
-		q.Receive(nil, nil) // size
-		return nil
-	})
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	// packageDecl
 	var beforePkgDecl any
 	if cu.PackageDecl != nil {

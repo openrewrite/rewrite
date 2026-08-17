@@ -18,6 +18,7 @@ Python RPC Receiver that mirrors Java's PythonReceiver structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional, Type, TypeVar
@@ -991,6 +992,51 @@ def _register_marker_codecs():
         _receive_omit_parentheses,
         lambda: OmitParentheses(random_id()),
         _send_omit_parentheses
+    )
+
+
+def _register_file_attributes_codec():
+    """A source file's ``file_attributes`` is a codec field on the Java side, so it arrives as a
+    typed ADD followed by one message per sub-field. Consuming only the ADD leaves the rest to be
+    read as whatever field comes next.
+
+    The sub-fields are consumed and discarded rather than parsed. Java sends timestamps with
+    nanosecond precision and a zone id; ``datetime`` holds neither, so keeping the value would
+    degrade it and then hand the degraded form back on the return leg. Discarding leaves
+    ``file_attributes`` at None, which the sender reports as NO_CHANGE, so the peer keeps its own.
+    """
+    from rewrite.tree import FileAttributes
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    def _local_iso(value: Optional[datetime]) -> Optional[str]:
+        # Java's FileAttributes.fromPath stamps the system zone, so a naive datetime (what
+        # FileAttributes.from_path builds) has to acquire one or ZonedDateTime.parse rejects it.
+        if value is None:
+            return None
+        return (value if value.tzinfo else value.astimezone()).isoformat()
+
+    def _receive_file_attributes(_attrs: FileAttributes, q: RpcReceiveQueue) -> None:
+        for _field in ('creation_time', 'last_modified_time', 'last_access_time',
+                       'is_readable', 'is_writable', 'is_executable', 'size'):
+            q.receive(None)
+        return None
+
+    def _send_file_attributes(attrs: FileAttributes, q: RpcSendQueue) -> None:
+        q.get_and_send(attrs, lambda a: _local_iso(a.creation_time))
+        q.get_and_send(attrs, lambda a: _local_iso(a.last_modified_time))
+        q.get_and_send(attrs, lambda a: _local_iso(a.last_access_time))
+        q.get_and_send(attrs, lambda a: a.is_readable)
+        q.get_and_send(attrs, lambda a: a.is_writable)
+        q.get_and_send(attrs, lambda a: a.is_executable)
+        q.get_and_send(attrs, lambda a: a.size)
+
+    register_codec_with_both_names(
+        'org.openrewrite.FileAttributes',
+        FileAttributes,
+        _receive_file_attributes,
+        lambda: FileAttributes(None, None, None, False, False, False, 0),
+        _send_file_attributes
     )
 
 
@@ -2124,4 +2170,5 @@ _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
 _register_python_marker_codecs()  # Python-specific markers including PrintSyntax, ExecSyntax
 _register_python_resolution_result_codecs()  # PythonResolutionResult and nested types
+_register_file_attributes_codec()  # Consumes the source-file fileAttributes sub-fields
 _register_execution_context_codec()

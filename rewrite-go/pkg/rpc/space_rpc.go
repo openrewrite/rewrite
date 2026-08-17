@@ -127,6 +127,34 @@ func SendMarkersCodec(m java.Markers, q *SendQueue) {
 		func(v any) { sendMarkerCodecFields(v, q) })
 }
 
+// fileAttributesFields is the field order org.openrewrite.FileAttributes#rpcSend uses, and the
+// number of sub-field messages it emits. Both the marker path and the source-file field path
+// (see receiveFileAttributes) depend on it.
+var fileAttributesFields = []string{"creationTime", "lastModifiedTime", "lastAccessTime",
+	"isReadable", "isWritable", "isExecutable", "size"}
+
+// receiveFileAttributes consumes the sub-fields of a source file's fileAttributes and discards
+// them. No Go tree models file attributes, and because the send side reports NO_CHANGE for the
+// field, the peer keeps its own value rather than having it overwritten with an empty one.
+func receiveFileAttributes(q *ReceiveQueue) {
+	q.Receive(nil, func(any) any {
+		for range fileAttributesFields {
+			q.Receive(nil, nil)
+		}
+		return nil
+	})
+}
+
+// receiveChecksum consumes the two sub-fields org.openrewrite.Checksum#rpcSend emits, on the
+// same terms as receiveFileAttributes.
+func receiveChecksum(q *ReceiveQueue) {
+	q.Receive(nil, func(any) any {
+		q.Receive(nil, nil) // algorithm
+		q.Receive(nil, nil) // value
+		return nil
+	})
+}
+
 // hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
 // sub-field messages for a java.GenericMarker with the given Java FQN.
 // Markers not listed here have no RpcCodec on either side and must travel
@@ -241,7 +269,7 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 				return nil
 			}, nil)
 		case "org.openrewrite.FileAttributes":
-			for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+			for _, key := range fileAttributesFields {
 				k := key
 				q.GetAndSend(m, func(_ any) any {
 					if d != nil {
@@ -529,7 +557,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			case "org.openrewrite.FileAttributes":
 				m.Data = map[string]any{}
-				for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+				for _, key := range fileAttributesFields {
 					m.Data[key] = q.Receive(nil, nil)
 				}
 			case "org.openrewrite.marker.Markup$Error",
