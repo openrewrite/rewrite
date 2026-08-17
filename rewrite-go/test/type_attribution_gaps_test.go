@@ -230,14 +230,17 @@ func h() {
 func TestConversionIsMarked(t *testing.T) {
 	c := collectAttribution(t, `package main
 
+import "time"
+
 type MyInt int
 
 func declared(b []byte) []byte { return b }
 
-func k(src []byte) {
+func k(src []byte, n int64) {
 	_ = []byte("a")
 	_ = string(src)
 	_ = MyInt(3)
+	_ = time.Duration(n)
 	_ = declared(src)
 }
 `)
@@ -249,7 +252,8 @@ func k(src []byte) {
 		}
 	}
 	// Go's `string` maps to the JavaTypePrimitive whose keyword is "String".
-	assert.Equal(t, []string{"byte[]", "String", "main.MyInt"}, marked)
+	// A package-qualified conversion is the type it names, not its package.
+	assert.Equal(t, []string{"byte[]", "String", "main.MyInt", "time.Duration"}, marked)
 }
 
 func TestBuiltinIsMarked(t *testing.T) {
