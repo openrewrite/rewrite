@@ -290,18 +290,17 @@ func defectsOf(t java.JavaType) []string {
 	switch v := t.(type) {
 	case *java.JavaTypeClass:
 		var d []string
-		if v.FullyQualifiedName == "" {
-			d = append(d, "class: no fully qualified name")
-		} else if !strings.Contains(v.FullyQualifiedName, ".") && !strings.Contains(v.FullyQualifiedName, "/") {
-			d = append(d, "class: unqualified name "+v.FullyQualifiedName)
-		}
-		if v.Kind == "" {
+		// An anonymous struct or interface has no name to carry, and Go's
+		// builtins, unsigned widths, maps and channels take a synthetic
+		// one with no package to qualify it.
+		if v.FullyQualifiedName != "" && v.Kind == "" {
 			d = append(d, "class: no kind")
 		}
 		return d
 	case *java.JavaTypeMethod:
 		var d []string
-		if v.DeclaringType == nil {
+		// An unnamed signature — a func type, a closure — declares nothing.
+		if v.Name != "" && v.DeclaringType == nil {
 			d = append(d, "method: no declaring type")
 		}
 		if v.ReturnType == nil {

@@ -507,3 +507,28 @@ func TestTypeAttributionLocalOwner(t *testing.T) {
 		}
 	}
 }
+
+func TestTypeAttributionNamedFuncTypeDeclaringType(t *testing.T) {
+	src := "package main\n\ntype optionFunc func(a int)\n\nfunc f(o optionFunc, g func(a int)) {\n\to(1)\n\tg(2)\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	byName := map[string]*java.JavaTypeMethod{}
+	forEachMethodInvocation(cu, func(m *java.MethodInvocation) {
+		if m.Name != nil {
+			byName[m.Name.Name] = m.MethodType
+		}
+	})
+	named := byName["o"]
+	if named == nil || named.DeclaringType == nil {
+		t.Fatalf("call through named func type has no declaring type: %v", named)
+	}
+	if got := named.DeclaringType.GetFullyQualifiedName(); got != "main.optionFunc" {
+		t.Errorf("declaring type: got %q, want main.optionFunc", got)
+	}
+	// An unnamed func type declares nothing.
+	if unnamed := byName["g"]; unnamed == nil || unnamed.DeclaringType != nil {
+		t.Errorf("call through unnamed func type: got declaring type %v, want none", unnamed.DeclaringType)
+	}
+}

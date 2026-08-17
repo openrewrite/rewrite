@@ -2350,7 +2350,13 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.Ja
 		return ctx.mapper.mapMethodObject(fn)
 	}
 	if sig, ok := obj.Type().Underlying().(*types.Signature); ok {
-		return ctx.mapper.mapSignature(sig, name, nil)
+		// A named func type is what the call goes through, the way an
+		// interface is for a method; an unnamed one names nothing.
+		var declaring *java.JavaTypeClass
+		if named, ok := obj.Type().(*types.Named); ok {
+			declaring = ctx.mapper.mapNamed(named)
+		}
+		return ctx.mapper.mapSignature(sig, name, declaring)
 	}
 	return nil
 }
