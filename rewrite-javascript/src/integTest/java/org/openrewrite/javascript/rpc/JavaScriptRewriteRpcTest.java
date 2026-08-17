@@ -28,6 +28,7 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
@@ -280,6 +281,28 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             "Hello Jon!",
             spec -> spec.beforeRecipe(text ->
               assertThat(client().print(text)).isEqualTo("Hello Jon!"))
+          )
+        );
+    }
+
+    @Test
+    void javaSourceSetMarkerAcrossRpcBoundary() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text -> {
+                JavaType.FullyQualified a = JavaType.ShallowClass.build("com.example.A");
+                JavaType.FullyQualified b = JavaType.ShallowClass.build("com.example.B");
+                JavaSourceSet sourceSet = new JavaSourceSet(Tree.randomId(), "main",
+                  List.of(JavaType.ShallowClass.build("java.lang.String"), a, b),
+                  Map.of("com.example:example:1.0", List.of(a, b)));
+
+                // Resource files in a Java source set carry this marker, so it crosses to a peer
+                // that accepts PlainText/JSON/YAML even though that peer never sees a Java CU.
+                // Without a codec on both sides the queue desynchronizes here.
+                assertThat(client().print(text.withMarkers(text.getMarkers().add(sourceSet))))
+                  .isEqualTo("Hello Jon!");
+            })
           )
         );
     }
