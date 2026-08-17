@@ -2414,8 +2414,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                // A modifier is terminated by whitespace, by the `<` of a type parameter list, or by the `@` of a
-                // directly adjacent annotation; only in the last case does the terminated word include `c` itself.
+                // Modifiers end at whitespace, at a type parameter list's `<`, or at an adjacent annotation's `@`
                 boolean beforeAnnotation = !Character.isWhitespace(c) && c != '<' &&
                         i + 1 < source.length() && source.charAt(i + 1) == '@';
                 if (Character.isWhitespace(c) || c == '<' || beforeAnnotation) {
