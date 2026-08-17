@@ -287,3 +287,114 @@ func TestAutoFormat_FullPipelineEndToEnd(t *testing.T) {
 		t.Errorf("got %q, want %q", out, want)
 	}
 }
+
+func TestTabsAndIndents_IndentsImportBlock(t *testing.T) {
+	out := applyVisitor(t, "package p\n\nimport (\n\"fmt\"\n\"os\"\n)\n\nvar _ = fmt.Sprint(os.Args)\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\nvar _ = fmt.Sprint(os.Args)\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
+
+func TestTabsAndIndents_IndentsLeadingComment(t *testing.T) {
+	out := applyVisitor(t, "package p\n\nfunc f() {\n// leading\nx := 1\n_ = x\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc f() {\n\t// leading\n\tx := 1\n\t_ = x\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
+
+func TestTabsAndIndents_IndentsConsecutiveComments(t *testing.T) {
+	out := applyVisitor(t, "package p\n\nfunc f() {\n// one\n// two\nx := 1\n_ = x\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc f() {\n\t// one\n\t// two\n\tx := 1\n\t_ = x\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
+
+func TestTabsAndIndents_LeavesTrailingCommentOnItsLine(t *testing.T) {
+	out := applyVisitor(t, "package p\n\nfunc f() {\nx := 1 // trailing\n_ = x\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc f() {\n\tx := 1 // trailing\n\t_ = x\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
+
+func TestTabsAndIndents_IndentsGroupedDeclarations(t *testing.T) {
+	cases := map[string][2]string{
+		"var group": {
+			"package p\n\nvar (\na = 1\nb = 2\n)\n",
+			"package p\n\nvar (\n\ta = 1\n\tb = 2\n)\n"},
+		"const group": {
+			"package p\n\nconst (\nA = 1\nB = 2\n)\n",
+			"package p\n\nconst (\n\tA = 1\n\tB = 2\n)\n"},
+		"type group": {
+			"package p\n\ntype (\nA int\nB string\n)\n",
+			"package p\n\ntype (\n\tA int\n\tB string\n)\n"},
+		"struct body": {
+			"package p\n\ntype T struct {\nX int\nY int\n}\n",
+			"package p\n\ntype T struct {\n\tX int\n\tY int\n}\n"},
+		"interface body": {
+			"package p\n\ntype I interface {\nFoo() int\n}\n",
+			"package p\n\ntype I interface {\n\tFoo() int\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewTabsAndIndentsVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}
+
+func TestTabsAndIndents_IndentsCompositeLiteral(t *testing.T) {
+	out := applyVisitor(t, "package p\n\nvar m = map[string]bool{\n\"a\": true,\n\"b\": false,\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nvar m = map[string]bool{\n\t\"a\": true,\n\t\"b\": false,\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
+
+func TestTabsAndIndents_IndentsTrailingComments(t *testing.T) {
+	cases := map[string][2]string{
+		"comment before closing brace": {
+			"package p\n\nfunc f() {\nx := 1\n_ = x\n// trailing note\n}\n",
+			"package p\n\nfunc f() {\n\tx := 1\n\t_ = x\n\t// trailing note\n}\n"},
+		"comment as whole case body": {
+			"package p\n\nfunc g(i int) {\nswitch i {\ndefault:\n// note\n}\n}\n",
+			"package p\n\nfunc g(i int) {\n\tswitch i {\n\tdefault:\n\t\t// note\n\t}\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewTabsAndIndentsVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}
+
+func TestTabsAndIndents_AlignsSelectCaseWithSelect(t *testing.T) {
+	out := applyVisitor(t, "package p\n\nfunc h(c chan int) {\nselect {\ncase <-c:\nreturn\n}\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc h(c chan int) {\n\tselect {\n\tcase <-c:\n\t\treturn\n\t}\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
+
+func TestTabsAndIndents_IndentsWrappedLists(t *testing.T) {
+	cases := map[string][2]string{
+		"call arguments": {
+			"package p\n\nimport \"os/exec\"\n\nfunc f() {\ncmd := exec.Command(\"go\", \"tool\",\n\"-a\", \"b\",\n)\n_ = cmd\n}\n",
+			"package p\n\nimport \"os/exec\"\n\nfunc f() {\n\tcmd := exec.Command(\"go\", \"tool\",\n\t\t\"-a\", \"b\",\n\t)\n\t_ = cmd\n}\n"},
+		"case expressions": {
+			"package p\n\nfunc f(i int) {\nswitch i {\ncase 1, 2,\n3:\nreturn\n}\n}\n",
+			"package p\n\nfunc f(i int) {\n\tswitch i {\n\tcase 1, 2,\n\t\t3:\n\t\treturn\n\t}\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewTabsAndIndentsVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}

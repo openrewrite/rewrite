@@ -19,28 +19,17 @@ package format
 import (
 	"strings"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// TabsAndIndentsVisitor re-indents block-level whitespace to gofmt's
-// `\t × depth` convention.
+// TabsAndIndentsVisitor re-indents to gofmt's `\t × depth` convention.
 //
-// Strategy: rather than touching every Space in the tree (which would
-// rewrite continuation alignments inside multi-line argument lists),
-// the visitor drives indentation from VisitBlock explicitly:
-//
-//   - For each `Block.Statements[i].Element`, the statement's own
-//     Prefix carries the inter-statement whitespace; we rewrite its
-//     indent (the post-newline portion) to `\t × (depth+1)`.
-//   - `Block.End` (the whitespace before `}`) is re-indented to
-//     `\t × depth`.
-//   - VisitCase decrements depth around the case-clause Prefix so
-//     `case` keywords align with the enclosing `switch` (gofmt
-//     convention) while body statements remain at body depth.
-//
-// Whitespace that doesn't carry a newline, or whitespace inside an
-// expression context (continuations, alignments) is left untouched.
+// Indentation is driven from the constructs that introduce a level — blocks,
+// clause bodies, and delimited lists that wrap across lines — rather than from
+// every Space in the tree, which would also rewrite the continuation alignment
+// inside multi-line expressions.
 type TabsAndIndentsVisitor struct {
 	visitor.GoVisitor
 	stopAfterTracker
@@ -62,6 +51,114 @@ func (v *TabsAndIndentsVisitor) Visit(t java.Tree, p any) java.Tree {
 	return out
 }
 
+// VisitCompilationUnit indents the specs of a parenthesized import
+// declaration one level in, and the whitespace before its closing paren back
+// out to file level.
+func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	if cu.Imports != nil {
+		grouped := java.HasMarker[golang.GroupedImport](cu.Imports.Markers)
+		elements := make([]java.RightPadded[*java.Import], len(cu.Imports.Elements))
+		for i, rp := range cu.Imports.Elements {
+			if block := java.FindMarker[golang.ImportBlock](rp.Element.Markers); block != nil {
+				grouped = block.Grouped
+				block.Before = v.reindentSpace(block.Before)
+			}
+			if grouped {
+				v.depth++
+			}
+			rp.Element = rp.Element.WithPrefix(v.reindentSpace(rp.Element.Prefix))
+			if grouped {
+				v.depth--
+			}
+			rp.After = v.reindentSpace(rp.After)
+			elements[i] = rp
+		}
+		imports := *cu.Imports
+		imports.Elements = elements
+		cu = cu.WithImports(&imports)
+	}
+	return v.GoVisitor.VisitCompilationUnit(cu, p)
+}
+
+// VisitDeclarationBlock indents the specs of a `var (…)` or `const (…)` group.
+func (v *TabsAndIndentsVisitor) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	if db.Specs != nil {
+		c := *db
+		c.Specs = v.indentSpecs(db.Specs)
+		db = &c
+	}
+	return v.GoVisitor.VisitDeclarationBlock(db, p)
+}
+
+// VisitTypeDecl indents the specs of a `type (…)` group. An ungrouped
+// declaration has no Specs and is indented by its enclosing block.
+func (v *TabsAndIndentsVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
+	if td.Specs != nil {
+		c := *td
+		c.Specs = v.indentSpecs(td.Specs)
+		td = &c
+	}
+	return v.GoVisitor.VisitTypeDecl(td, p)
+}
+
+// VisitComposite indents the elements of a composite literal that spans
+// lines, and the whitespace before its closing brace back out.
+func (v *TabsAndIndentsVisitor) VisitComposite(c *golang.Composite, p any) java.J {
+	println("VISIT COMPOSITE depth=", v.depth, "elems=", len(c.Elements.Elements))
+	out := *c
+	out.Elements.Elements = indentElements(v, c.Elements.Elements)
+	out.Markers = v.reindentTrailingComma(c.Markers)
+	return v.GoVisitor.VisitComposite(&out, p)
+}
+
+// reindentTrailingComma re-indents the closing delimiter of a list that ends
+// in a comma, where the space between the two rides on the marker rather than
+// on any element.
+func (v *TabsAndIndentsVisitor) reindentTrailingComma(m java.Markers) java.Markers {
+	comma := java.FindMarker[golang.TrailingComma](m)
+	if comma == nil {
+		return m
+	}
+	after := v.reindentSpace(comma.After)
+	if java.SpaceEqual(after, comma.After) {
+		return m
+	}
+	updated := *comma
+	updated.After = after
+	entries := append([]java.Marker(nil), m.Entries...)
+	for i, e := range entries {
+		if _, isComma := e.(golang.TrailingComma); isComma {
+			entries[i] = updated
+		}
+	}
+	return java.Markers{ID: m.ID, Entries: entries}
+}
+
+// indentSpecs indents the body of a parenthesized declaration group.
+func (v *TabsAndIndentsVisitor) indentSpecs(c *java.Container[java.Statement]) *java.Container[java.Statement] {
+	out := *c
+	out.Elements = indentElements(v, c.Elements)
+	return &out
+}
+
+// indentElements moves each element of a delimited list one level in, and the
+// whitespace before the closing delimiter back out. An element's After holds a
+// newline only in that closing position, so re-indenting every After at the
+// outer depth leaves the ones between elements untouched.
+func indentElements[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T]) []java.RightPadded[T] {
+	out := make([]java.RightPadded[T], len(elements))
+	for i, rp := range elements {
+		v.depth++
+		if fixed, ok := any(transformPrefix(rp.Element, v.reindentSpace)).(T); ok {
+			rp.Element = fixed
+		}
+		v.depth--
+		rp.After = v.reindentSpace(rp.After)
+		out[i] = rp
+	}
+	return out
+}
+
 // VisitBlock dispatches the body at depth+1 and re-indents each
 // statement's Prefix and the closing-brace `End`.
 func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
@@ -79,10 +176,10 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 		}
 		stmts[i] = rp
 	}
-	block.Statements = stmts
 	v.depth--
 
-	block = block.WithEnd(v.reindentSpace(block.End))
+	block = block.WithStatements(stmts)
+	block = block.WithEnd(v.reindentClosing(block.End))
 	return block
 }
 
@@ -96,36 +193,117 @@ func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	c = c.WithPrefix(v.reindentSpace(c.Prefix))
 	v.depth++
 
-	body := make([]java.RightPadded[java.Statement], len(c.Body))
-	for i, rp := range c.Body {
+	// Expressions that wrap sit one level in from the `case` keyword, which
+	// is the depth the body already runs at.
+	exprs := make([]java.RightPadded[java.Expression], len(c.Expressions.Elements))
+	for i, rp := range c.Expressions.Elements {
+		if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Expression); ok {
+			rp.Element = fixed
+		}
+		exprs[i] = rp
+	}
+
+	out := *c
+	out.Expressions.Elements = exprs
+	out.Body = indentBody(v, c.Body, p)
+	return &out
+}
+
+// VisitMethodInvocation indents arguments that wrap onto their own lines, and
+// the whitespace before the closing paren back out to the call's own level.
+func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	out := *mi
+	out.Arguments.Elements = indentElements(v, mi.Arguments.Elements)
+	out.Markers = v.reindentTrailingComma(mi.Markers)
+	return v.GoVisitor.VisitMethodInvocation(&out, p)
+}
+
+// VisitCommClause aligns a select clause the way VisitCase aligns a switch
+// clause: the `case` keyword sits with the enclosing `select`, its body one
+// level in.
+func (v *TabsAndIndentsVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
+	v.depth--
+	cc = cc.WithPrefix(v.reindentSpace(cc.Prefix))
+	v.depth++
+
+	out := *cc
+	out.Body = indentBody(v, cc.Body, p)
+	return v.GoVisitor.VisitCommClause(&out, p)
+}
+
+func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement], p any) []java.RightPadded[java.Statement] {
+	out := make([]java.RightPadded[java.Statement], len(body))
+	for i, rp := range body {
 		if rp.Element != nil {
-			fixed, _ := transformPrefix(rp.Element, v.reindentSpace).(java.Statement)
-			if fixed != nil {
+			if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Statement); ok {
 				rp.Element = fixed
 			}
 			if next, ok := v.Visit(rp.Element, p).(java.Statement); ok {
 				rp.Element = next
 			}
 		}
-		body[i] = rp
+		out[i] = rp
 	}
-	c.Body = body
-	return c
+	return out
 }
 
-// reindentSpace rewrites the indent (post-last-newline portion) of s
-// to `\t × v.depth`. Whitespace without a newline is returned
-// unchanged. The pre-newline portion (which can hold blank lines) is
-// preserved — BlankLinesVisitor handles that.
-func (v *TabsAndIndentsVisitor) reindentSpace(s java.Space) java.Space {
-	if !strings.Contains(s.Whitespace, "\n") {
-		return s
+// reindentClosing re-indents the whitespace before a closing delimiter. Any
+// comments in it trail the body and so sit one level in, while the delimiter
+// itself returns to the outer depth.
+func (v *TabsAndIndentsVisitor) reindentClosing(s java.Space) java.Space {
+	if len(s.Comments) == 0 {
+		return v.reindentSpace(s)
 	}
-	last := strings.LastIndex(s.Whitespace, "\n")
-	want := strings.Repeat("\t", v.depth)
-	if s.Whitespace[last+1:] == want {
-		return s
+	inner := strings.Repeat("\t", v.depth+1)
+	outer := strings.Repeat("\t", v.depth)
+
+	s.Whitespace = reindentTail(s.Whitespace, inner)
+	comments := append([]java.Comment(nil), s.Comments...)
+	for i := range comments {
+		indent := inner
+		if i == len(comments)-1 {
+			indent = outer
+		}
+		comments[i].Suffix = reindentTail(comments[i].Suffix, indent)
 	}
-	s.Whitespace = s.Whitespace[:last+1] + want
+	s.Comments = comments
 	return s
+}
+
+// reindentSpace rewrites to `\t × v.depth` the indent of everything s
+// introduces: its comments, and the syntax that follows them. A Space prints
+// as Whitespace, then each comment followed by its Suffix, so every one of
+// those segments ends in the indent of whatever comes next.
+func (v *TabsAndIndentsVisitor) reindentSpace(s java.Space) java.Space {
+	want := strings.Repeat("\t", v.depth)
+	s.Whitespace = reindentTail(s.Whitespace, want)
+
+	var comments []java.Comment
+	for i, c := range s.Comments {
+		suffix := reindentTail(c.Suffix, want)
+		if suffix == c.Suffix {
+			continue
+		}
+		if comments == nil {
+			comments = append([]java.Comment(nil), s.Comments...)
+		}
+		comments[i].Suffix = suffix
+	}
+	if comments != nil {
+		s.Comments = comments
+	}
+	return s
+}
+
+// reindentTail rewrites the run of whitespace following the last newline in
+// ws, which is the indent of whatever comes next. Whitespace holding no
+// newline sits mid-line and is returned unchanged, which is what keeps a
+// trailing comment beside the code it follows. The portion before the last
+// newline can hold blank lines and is preserved — BlankLinesVisitor owns that.
+func reindentTail(ws, indent string) string {
+	last := strings.LastIndex(ws, "\n")
+	if last < 0 || ws[last+1:] == indent {
+		return ws
+	}
+	return ws[:last+1] + indent
 }
