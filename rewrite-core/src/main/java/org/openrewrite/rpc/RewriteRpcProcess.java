@@ -39,6 +39,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -73,6 +74,13 @@ public class RewriteRpcProcess extends Thread {
 
     @Setter
     private @Nullable Path stderrRedirect;
+
+    /**
+     * How long {@link #shutdown()} waits for the subprocess to exit after {@code SIGTERM}
+     * before escalating to {@code SIGKILL}.
+     */
+    @Setter
+    private Duration shutdownGracePeriod = Duration.ofSeconds(5);
 
     @Nullable
     private Thread shutdownHook;
@@ -248,17 +256,23 @@ public class RewriteRpcProcess extends Thread {
             }
             shutdownHook = null;
         }
+        // Held back rather than thrown here so the stderr drain join below still runs.
+        RuntimeException unexpectedExit = null;
         if (process != null && process.isAlive()) {
             process.destroy();
             try {
-                boolean exited = process.waitFor(5, TimeUnit.SECONDS);
-                if (!exited) {
+                if (process.waitFor(shutdownGracePeriod.toMillis(), TimeUnit.MILLISECONDS)) {
+                    int exitCode = process.exitValue();
+                    if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
+                        unexpectedExit = new RuntimeException(unexpectedExitMessage(exitCode));
+                    }
+                } else {
+                    // The grace period elapsed, so escalate. The exit code this produces
+                    // (137 on Unix) is this method's own SIGKILL rather than anything the
+                    // subprocess did, so it is deliberately not inspected — inspecting it
+                    // is what made a deliberate force-kill look like a crash.
                     process.destroyForcibly();
                     process.waitFor(2, TimeUnit.SECONDS);
-                }
-                int exitCode = process.exitValue();
-                if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
-                    throw new RuntimeException("Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -280,6 +294,23 @@ public class RewriteRpcProcess extends Thread {
             }
             stderrDrainThread = null;
         }
+        if (unexpectedExit != null) {
+            throw unexpectedExit;
+        }
+    }
+
+    private String unexpectedExitMessage(int exitCode) {
+        String message = "Rewrite RPC process exited with code " + exitCode +
+                " in response to shutdown";
+        if (exitCode == 137) {
+            // Reachable only when the subprocess died within the grace period, i.e. before
+            // shutdown() would have escalated, so this SIGKILL came from somewhere else.
+            message += " (SIGKILL from outside Rewrite, e.g. the OOM killer)";
+        }
+        if (stderrRedirect != null) {
+            message += "\nSee stderr log: " + stderrRedirect;
+        }
+        return message;
     }
 
     /**

@@ -16,13 +16,17 @@
 package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
@@ -167,6 +172,112 @@ class RewriteRpcProcessTest {
     }
 
     /**
+     * A subprocess that outlasts the grace period is force-killed by {@code shutdown()} itself,
+     * which on Unix yields exit code 137. That is this method's own SIGKILL, not a crash, so
+     * {@code shutdown()} must not report it — doing so failed commands whose work had already
+     * completed, intermittently, whenever the machine was loaded enough to slow the subprocess'
+     * SIGTERM handling past the grace period.
+     */
+    @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "destroy() maps to TerminateProcess, which no child can delay")
+    void shutdownDoesNotReportItsOwnForceKillAsFailure() throws Exception {
+        Path ready = Files.createTempFile("rpc-force-kill-ready", ".marker");
+        RewriteRpcProcess process = forkedProcess(SigtermIgnoringEntryPoint.class, ready);
+        // Shorter than the default 5s so the test doesn't have to wait it out.
+        process.setShutdownGracePeriod(Duration.ofMillis(500));
+        Process underlying = null;
+        try {
+            process.start();
+            underlying = underlyingProcess(process);
+            awaitReady(ready);
+
+            assertThatCode(process::shutdown)
+                    .as("a subprocess force-killed by shutdown() is not a failure of the command")
+                    .doesNotThrowAnyException();
+
+            assertThat(underlying.isAlive()).as("subprocess should have been killed").isFalse();
+            assertThat(underlying.exitValue())
+                    .as("the subprocess must actually have needed the force-kill, or this test proves nothing")
+                    .isEqualTo(137);
+        } finally {
+            if (underlying != null) {
+                underlying.destroyForcibly();
+            }
+            Files.deleteIfExists(ready);
+        }
+    }
+
+    /**
+     * The complement of {@link #shutdownDoesNotReportItsOwnForceKillAsFailure()}: an exit code
+     * that the subprocess produced on its own — rather than one {@code shutdown()} inflicted —
+     * is still surfaced. Also covers that the stderr drain thread is joined before the throw
+     * escapes, since the parent-side log handle must be released on that path too.
+     */
+    @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "destroy() maps to TerminateProcess, so the child never runs its hook")
+    void shutdownStillReportsAnExitCodeTheSubprocessChose() throws Exception {
+        Path ready = Files.createTempFile("rpc-unexpected-exit-ready", ".marker");
+        Path stderrLog = Files.createTempFile("rpc-unexpected-exit", ".log");
+        RewriteRpcProcess process = forkedProcess(UnexpectedExitEntryPoint.class, ready);
+        process.setStderrRedirect(stderrLog);
+        Process underlying = null;
+        try {
+            process.start();
+            underlying = underlyingProcess(process);
+            awaitReady(ready);
+            Thread drainThread = field(process, "stderrDrainThread", Thread.class);
+
+            assertThatThrownBy(process::shutdown)
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("exited with code " + UnexpectedExitEntryPoint.EXIT_CODE)
+                    .hasMessageContaining(stderrLog.toString());
+
+            assertThat(drainThread.isAlive())
+                    .as("the stderr drain must be joined before shutdown() throws, or the log handle leaks")
+                    .isFalse();
+        } finally {
+            if (underlying != null) {
+                underlying.destroyForcibly();
+            }
+            Files.deleteIfExists(ready);
+            Files.deleteIfExists(stderrLog);
+        }
+    }
+
+    private static RewriteRpcProcess forkedProcess(Class<?> entryPoint, Path readyMarker) {
+        return new RewriteRpcProcess(
+                System.getProperty("java.home") + "/bin/java",
+                "-cp", System.getProperty("java.class.path"),
+                entryPoint.getName(), readyMarker.toString());
+    }
+
+    private static Process underlyingProcess(RewriteRpcProcess process) throws Exception {
+        return field(process, "process", Process.class);
+    }
+
+    private static <T> T field(RewriteRpcProcess process, String name, Class<T> type) throws Exception {
+        Field f = RewriteRpcProcess.class.getDeclaredField(name);
+        f.setAccessible(true);
+        return type.cast(f.get(process));
+    }
+
+    /**
+     * Blocks until the forked JVM has written its readiness marker. Without this the test can
+     * SIGTERM the child before it installs its shutdown hook, which silently turns both tests
+     * into assertions about an ordinary JVM exit.
+     */
+    private static void awaitReady(Path marker) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (Files.size(marker) == 0) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("forked JVM never signalled readiness at " + marker);
+            }
+            //noinspection BusyWait
+            Thread.sleep(50);
+        }
+    }
+
+    /**
      * Runs in the forked JVM. Spawns a long-running child via {@link RewriteRpcProcess},
      * prints its PID, and returns from {@code main} so the JVM exits without an explicit
      * {@code shutdown()} call.
@@ -200,5 +311,41 @@ class RewriteRpcProcessTest {
                 System.err.flush();
             }
         }
+    }
+
+    /**
+     * Forked entry point whose shutdown hook blocks, so the JVM cannot finish exiting on
+     * SIGTERM and {@code shutdown()} has to escalate to SIGKILL.
+     */
+    public static class SigtermIgnoringEntryPoint {
+        public static void main(String[] args) throws Exception {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(60));
+                } catch (InterruptedException ignored) {
+                }
+            }));
+            signalReady(args[0]);
+            Thread.sleep(TimeUnit.SECONDS.toMillis(60));
+        }
+    }
+
+    /**
+     * Forked entry point that exits on SIGTERM with a code the parent has no reason to expect,
+     * standing in for a subprocess that dies of its own accord as it is being shut down.
+     */
+    public static class UnexpectedExitEntryPoint {
+        static final int EXIT_CODE = 3;
+
+        public static void main(String[] args) throws Exception {
+            // halt() rather than System.exit(), which deadlocks when called from a shutdown hook.
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> Runtime.getRuntime().halt(EXIT_CODE)));
+            signalReady(args[0]);
+            Thread.sleep(TimeUnit.SECONDS.toMillis(60));
+        }
+    }
+
+    private static void signalReady(String marker) throws IOException {
+        Files.write(Paths.get(marker), "ready".getBytes());
     }
 }
