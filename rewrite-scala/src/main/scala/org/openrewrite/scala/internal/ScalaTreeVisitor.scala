@@ -913,6 +913,7 @@ class ScalaTreeVisitor(
     } else {
       // Normal parenthesized arguments: Seq(1, 2)
       val parenPos = positionOfNext("(")
+      val parenIsNext = parenPos >= 0 && source.substring(cursor, parenPos).forall(_.isWhitespace)
       if (parenPos >= 0) {
         if (parenPos > cursor) {
           argContainerPrefix = ScalaSpace.format(source, cursor, parenPos)
@@ -920,6 +921,16 @@ class ScalaTreeVisitor(
         cursor = parenPos + 1
       }
       usingText2 = consumeUsingKeyword()
+
+      // The parentheses of an empty list can still hold whitespace or a comment, as in
+      // `f(\n)`, which a J.Empty carries so the container prints it back.
+      if (app.args.isEmpty && parenIsNext) {
+        val closePos = positionOfNext(")", cursor)
+        if (closePos > cursor) {
+          args.add(JRightPadded.build(new J.Empty(Tree.randomId(),
+            ScalaSpace.format(source, cursor, closePos), Markers.EMPTY).asInstanceOf[Expression]))
+        }
+      }
 
       for ((arg, i) <- app.args.zipWithIndex) {
         val visited = visitTree(arg)
@@ -1285,6 +1296,22 @@ class ScalaTreeVisitor(
           cursor = parenPos + 1
         }
         usingText3 = consumeUsingKeyword()
+      } else {
+        // See the empty-list handling above; a call with no parentheses at all leaves the
+        // cursor where it is.
+        val open = indexOfNextNonWhitespace(cursor)
+        val appEnd = Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment))
+        if (open < appEnd && source.charAt(open) == '(') {
+          val closePos = positionOfNext(")", open + 1)
+          if (closePos > open && closePos <= appEnd) {
+            if (open > cursor) argContainerPrefix = ScalaSpace.format(source, cursor, open)
+            if (closePos > open + 1) {
+              args.add(JRightPadded.build(new J.Empty(Tree.randomId(),
+                ScalaSpace.format(source, open + 1, closePos), Markers.EMPTY).asInstanceOf[Expression]))
+            }
+            cursor = closePos + 1
+          }
+        }
       }
 
       for (i <- app.args.indices) {

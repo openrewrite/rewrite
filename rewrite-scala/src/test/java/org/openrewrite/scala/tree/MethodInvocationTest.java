@@ -588,4 +588,22 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void emptyArgumentListWithInteriorSpace() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(): Int = 1
+              val a = f(
+              )
+              val b = f(/* none */)
+              val c = "x".trim(
+              )
+            }
+            """
+          )
+        );
+    }
+
 }
