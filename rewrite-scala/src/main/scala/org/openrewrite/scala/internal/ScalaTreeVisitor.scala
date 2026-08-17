@@ -5320,9 +5320,12 @@ class ScalaTreeVisitor(
     // A primary constructor may carry an access modifier: `class X private (i: Int)`,
     // `class X private[pkg] (i: Int)`. Returns the source offset just past it.
     val afterCtorModifier: Int = {
+      // Bounded by the class's own span: past it the keyword belongs to the next declaration.
+      val classEnd = Math.min(source.length, Math.max(0, td.span.end - offsetAdjustment))
       var i = cursor
-      while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      val keyword = if (source.startsWith("private", i)) "private"
+      while (i < classEnd && source.charAt(i).isWhitespace) i += 1
+      val keyword = if (i >= classEnd) ""
+      else if (source.startsWith("private", i)) "private"
       else if (source.startsWith("protected", i)) "protected"
       else ""
       if (keyword.isEmpty) {
