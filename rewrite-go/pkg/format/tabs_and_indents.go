@@ -104,7 +104,6 @@ func (v *TabsAndIndentsVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J
 // VisitComposite indents the elements of a composite literal that spans
 // lines, and the whitespace before its closing brace back out.
 func (v *TabsAndIndentsVisitor) VisitComposite(c *golang.Composite, p any) java.J {
-	println("VISIT COMPOSITE depth=", v.depth, "elems=", len(c.Elements.Elements))
 	out := *c
 	out.Elements.Elements = indentElements(v, c.Elements.Elements)
 	out.Markers = v.reindentTrailingComma(c.Markers)
@@ -216,6 +215,30 @@ func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation,
 	out.Arguments.Elements = indentElements(v, mi.Arguments.Elements)
 	out.Markers = v.reindentTrailingComma(mi.Markers)
 	return v.GoVisitor.VisitMethodInvocation(&out, p)
+}
+
+// VisitBinary indents a right operand that continues on its own line. Both
+// operands sit at the same level however deeply the expression nests, so the
+// depth is taken from the enclosing statement rather than from the operand.
+func (v *TabsAndIndentsVisitor) VisitBinary(b *java.Binary, p any) java.J {
+	out := *b
+	v.depth++
+	if right, ok := transformPrefix(b.Right, v.reindentSpace).(java.Expression); ok {
+		out.Right = right
+	}
+	v.depth--
+	return v.GoVisitor.VisitBinary(&out, p)
+}
+
+// VisitGoBinary applies VisitBinary's rule to Go's own binary expressions.
+func (v *TabsAndIndentsVisitor) VisitGoBinary(b *golang.Binary, p any) java.J {
+	out := *b
+	v.depth++
+	if right, ok := transformPrefix(b.Right, v.reindentSpace).(java.Expression); ok {
+		out.Right = right
+	}
+	v.depth--
+	return v.GoVisitor.VisitGoBinary(&out, p)
 }
 
 // VisitCommClause aligns a select clause the way VisitCase aligns a switch

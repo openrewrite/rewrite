@@ -30,15 +30,18 @@ import (
 //  2. BlankLinesVisitor                — collapse blank-line runs
 //  3. TabsAndIndentsVisitor            — re-indent post-newline whitespace
 //  4. SpacesVisitor                    — normalize intra-line spacing
+//  5. DocCommentVisitor                — canonicalize doc comment text
 //
 // Pass-1 runs first because pass-3 (re-indent) only touches the post-
 // newline portion of a Whitespace; if pass-1 ran later, the trailing
 // space/tabs of an earlier line could survive. Pass-2 runs before pass-3
 // because collapsing blank lines doesn't touch indents — it just
 // removes whole `\n` characters — so pass-3 still has the right
-// post-newline section to rewrite. Pass-4 runs last because changes
-// within a binary/assignment don't affect whether a line carries a
-// newline; spacing fixes can't disturb prior passes.
+// post-newline section to rewrite. Pass-4 runs after pass-3 because
+// changes within a binary/assignment don't affect whether a line carries
+// a newline; spacing fixes can't disturb prior passes. Pass-5 runs after
+// pass-3 too, because a doc comment is one that sits at column one, which
+// is only true of the right comments once indentation has been restored.
 //
 // stopAfter is forwarded to every member visitor; pass nil to format
 // the entire visited subtree.
@@ -59,5 +62,6 @@ func (v *AutoFormatVisitor) Visit(t java.Tree, p any) java.Tree {
 	v.DoAfterVisit(NewBlankLinesVisitor(v.stopAfter))
 	v.DoAfterVisit(NewTabsAndIndentsVisitor(v.stopAfter))
 	v.DoAfterVisit(NewSpacesVisitor(v.stopAfter))
+	v.DoAfterVisit(NewDocCommentVisitor(v.stopAfter))
 	return t
 }

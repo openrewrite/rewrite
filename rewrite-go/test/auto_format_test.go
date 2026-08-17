@@ -374,3 +374,19 @@ func TestTabsAndIndents_IndentsWrappedLists(t *testing.T) {
 		}
 	}
 }
+
+func TestTabsAndIndents_IndentsWrappedBinary(t *testing.T) {
+	cases := map[string][2]string{
+		"in if condition": {
+			"package p\n\nfunc f(a, b, c bool) bool {\nif a &&\nb &&\nc {\nreturn true\n}\nreturn false\n}\n",
+			"package p\n\nfunc f(a, b, c bool) bool {\n\tif a &&\n\t\tb &&\n\t\tc {\n\t\treturn true\n\t}\n\treturn false\n}\n"},
+		"in assignment": {
+			"package p\n\nfunc f(a, b bool) bool {\nx := a ||\nb\nreturn x\n}\n",
+			"package p\n\nfunc f(a, b bool) bool {\n\tx := a ||\n\t\tb\n\treturn x\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewTabsAndIndentsVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}

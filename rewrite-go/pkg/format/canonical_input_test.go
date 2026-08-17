@@ -1,0 +1,110 @@
+//go:build gofmtaudit
+
+package format
+
+import (
+	"go/build"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+)
+
+// TestCanonicalInputUnchanged runs the formatter over gofmt-clean sources,
+// where the layout is already canonical and every pass must leave it alone.
+// Anything rewritten here is a disagreement with gofmt, as distinct from the
+// parity gap, which also counts layout the formatter does not reach yet.
+func TestCanonicalInputUnchanged(t *testing.T) {
+	t.Run("doc comments", func(t *testing.T) { canonicalInputUnchanged(t, false) })
+	t.Run("full pipeline", func(t *testing.T) { canonicalInputUnchanged(t, true) })
+}
+
+func canonicalInputUnchanged(t *testing.T, wholePipeline bool) {
+	var contexts []build.Context
+	for _, pair := range [][2]string{
+		{"darwin", "arm64"}, {"linux", "amd64"}, {"windows", "amd64"},
+		{"js", "wasm"}, {"plan9", "386"}, {"linux", "riscv64"}, {"aix", "ppc64"},
+	} {
+		c := build.Default
+		c.GOOS, c.GOARCH = pair[0], pair[1]
+		c.CgoEnabled = true
+		contexts = append(contexts, c)
+	}
+
+	root := filepath.Join(runtime.GOROOT(), "src")
+	var files []string
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() && strings.HasSuffix(path, ".go") && !strings.Contains(path, "/testdata/") {
+			files = append(files, path)
+		}
+		return nil
+	})
+
+	var checked, changed int
+	var examples []string
+	for _, f := range files {
+		content, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		src := string(content)
+		var ctx *build.Context
+		for i := range contexts {
+			if parser.MatchBuildContext(contexts[i], filepath.Base(f), src) {
+				ctx = &contexts[i]
+				break
+			}
+		}
+		if ctx == nil {
+			continue
+		}
+		// Only gofmt-clean files carry the invariant.
+		if formatted, err := gofmtSource(filepath.Base(f), src); err != nil || formatted != src {
+			continue
+		}
+		p := parser.NewGoParserWithBuildContext(*ctx)
+		p.ParseOnly = true
+		cu, err := p.Parse(filepath.Base(f), src)
+		if err != nil || printer.Print(cu) != src {
+			continue
+		}
+		checked++
+
+		var got string
+		if wholePipeline {
+			v := NewAutoFormatVisitor(nil)
+			out := v.Visit(cu, nil)
+			got = printer.Print(visitor.DrainAfterVisits(v, out.(java.Tree), nil))
+		} else {
+			v := NewDocCommentVisitor(nil)
+			got = printer.Print(v.Visit(cu, nil).(java.Tree))
+		}
+		if got == src {
+			continue
+		}
+		changed++
+		if len(examples) < 6 {
+			for i, line := range strings.Split(got, "\n") {
+				want := strings.Split(src, "\n")
+				if i < len(want) && line != want[i] {
+					examples = append(examples, filepath.Base(f)+
+						"\n         want |"+want[i]+"|\n         got  |"+line+"|")
+					break
+				}
+			}
+		}
+	}
+	t.Logf("gofmtCleanFilesChecked=%d changed=%d", checked, changed)
+	for _, e := range examples {
+		t.Logf("  %s", e)
+	}
+	if changed != 0 {
+		t.Errorf("rewrote %d already-canonical files", changed)
+	}
+}
