@@ -105,9 +105,16 @@ func (v *TabsAndIndentsVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J
 // lines, and the whitespace before its closing brace back out.
 func (v *TabsAndIndentsVisitor) VisitComposite(c *golang.Composite, p any) java.J {
 	out := *c
-	out.Elements.Elements = indentElements(v, c.Elements.Elements)
+	// The type expression sits at the literal's own level — the fields of an
+	// inline struct type line up with the elements, not one level further in.
+	if c.TypeExpr != nil {
+		if typeExpr, ok := v.Visit(c.TypeExpr, p).(java.Expression); ok {
+			out.TypeExpr = typeExpr
+		}
+	}
+	out.Elements.Elements = indentSubtrees(v, c.Elements.Elements, p)
 	out.Markers = v.reindentTrailingComma(c.Markers)
-	return v.GoVisitor.VisitComposite(&out, p)
+	return &out
 }
 
 // reindentTrailingComma re-indents the closing delimiter of a list that ends
@@ -145,13 +152,37 @@ func (v *TabsAndIndentsVisitor) indentSpecs(c *java.Container[java.Statement]) *
 // newline only in that closing position, so re-indenting every After at the
 // outer depth leaves the ones between elements untouched.
 func indentElements[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T]) []java.RightPadded[T] {
+	return eachElement(v, elements, nil, false)
+}
+
+// indentSubtrees indents a delimited list and descends into each element at the
+// element's own level, so a list nested inside one lands a level further in.
+func indentSubtrees[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T], p any) []java.RightPadded[T] {
+	return eachElement(v, elements, p, true)
+}
+
+func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPadded[T], p any, descend bool) []java.RightPadded[T] {
 	out := make([]java.RightPadded[T], len(elements))
 	for i, rp := range elements {
-		v.depth++
-		if fixed, ok := any(transformPrefix(rp.Element, v.reindentSpace)).(T); ok {
-			rp.Element = fixed
+		// A list contributes a level only where it breaks the line. An element
+		// written alongside the delimiter that opens the list stays on that
+		// line's level, and whatever nests inside it counts from there.
+		if breaksLine(getPrefix(rp.Element)) {
+			v.depth++
+			if fixed, ok := any(transformPrefix(rp.Element, v.reindentSpace)).(T); ok {
+				rp.Element = fixed
+			}
+			if descend {
+				if next, ok := any(v.Visit(rp.Element, p)).(T); ok {
+					rp.Element = next
+				}
+			}
+			v.depth--
+		} else if descend {
+			if next, ok := any(v.Visit(rp.Element, p)).(T); ok {
+				rp.Element = next
+			}
 		}
-		v.depth--
 		rp.After = v.reindentSpace(rp.After)
 		out[i] = rp
 	}
@@ -316,6 +347,21 @@ func (v *TabsAndIndentsVisitor) reindentSpace(s java.Space) java.Space {
 		s.Comments = comments
 	}
 	return s
+}
+
+// breaksLine reports whether s puts what follows it on a new line. The break
+// can sit in the whitespace or in the suffix of a comment s carries, as it does
+// when the previous line ends in a trailing comment.
+func breaksLine(s java.Space) bool {
+	if strings.Contains(s.Whitespace, "\n") {
+		return true
+	}
+	for _, c := range s.Comments {
+		if strings.Contains(c.Suffix, "\n") {
+			return true
+		}
+	}
+	return false
 }
 
 // reindentTail rewrites the run of whitespace following the last newline in
