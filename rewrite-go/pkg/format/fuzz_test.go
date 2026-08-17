@@ -109,7 +109,9 @@ func runAutoFormat(cu java.Tree) string {
 }
 
 // codeTokens renders the token stream excluding comment text, which doc
-// formatting is allowed to rewrite.
+// formatting is allowed to rewrite, and excluding semicolons, which Go inserts
+// from line breaks and formatting therefore decides. That a program stays
+// well-formed is checked by parsing it.
 func codeTokens(src string) string {
 	fset := gotoken.NewFileSet()
 	file := fset.AddFile("f.go", fset.Base(), len(src))
@@ -121,8 +123,11 @@ func codeTokens(src string) string {
 		if tok == gotoken.EOF {
 			return out.String()
 		}
+		if tok == gotoken.SEMICOLON {
+			continue
+		}
 		out.WriteString(tok.String())
-		if lit != "" && tok != gotoken.SEMICOLON {
+		if lit != "" {
 			out.WriteString("(" + lit + ")")
 		}
 		out.WriteByte(' ')
@@ -160,6 +165,13 @@ func reWhitespace(src string, rnd *rand.Rand) (string, bool) {
 			width = len(tok.String())
 		}
 		if offset+width > len(src) {
+			return "", false
+		}
+		// The scanner drops carriage returns from a raw string literal, so its
+		// text can be shorter than the source it came from. Mutating around a
+		// token whose text does not match the source would move the token
+		// boundaries, so leave those sources alone.
+		if lit != "" && src[offset:offset+width] != lit {
 			return "", false
 		}
 

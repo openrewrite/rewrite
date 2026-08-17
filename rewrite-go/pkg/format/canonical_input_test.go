@@ -26,11 +26,12 @@ import (
 const canonicalDamageCeiling = 2981
 
 func TestCanonicalInputUnchanged(t *testing.T) {
-	t.Run("doc comments", func(t *testing.T) { canonicalInputUnchanged(t, false) })
-	t.Run("full pipeline", func(t *testing.T) { canonicalInputUnchanged(t, true) })
+	t.Run("doc comments", func(t *testing.T) { canonicalInputUnchanged(t, "doc") })
+	t.Run("minimum spacing", func(t *testing.T) { canonicalInputUnchanged(t, "mvs") })
+	t.Run("full pipeline", func(t *testing.T) { canonicalInputUnchanged(t, "all") })
 }
 
-func canonicalInputUnchanged(t *testing.T, wholePipeline bool) {
+func canonicalInputUnchanged(t *testing.T, pass string) {
 	var contexts []build.Context
 	for _, pair := range [][2]string{
 		{"darwin", "arm64"}, {"linux", "amd64"}, {"windows", "amd64"},
@@ -82,13 +83,15 @@ func canonicalInputUnchanged(t *testing.T, wholePipeline bool) {
 		checked++
 
 		var got string
-		if wholePipeline {
+		switch pass {
+		case "all":
 			v := NewAutoFormatVisitor(nil)
 			out := v.Visit(cu, nil)
 			got = printer.Print(visitor.DrainAfterVisits(v, out.(java.Tree), nil))
-		} else {
-			v := NewDocCommentVisitor(nil)
-			got = printer.Print(v.Visit(cu, nil).(java.Tree))
+		case "mvs":
+			got = printer.Print(NewMinimumViableSpacingVisitor(nil).Visit(cu, nil))
+		default:
+			got = printer.Print(NewDocCommentVisitor(nil).Visit(cu, nil))
 		}
 		if got == src {
 			continue
@@ -110,7 +113,7 @@ func canonicalInputUnchanged(t *testing.T, wholePipeline bool) {
 		t.Logf("  %s", e)
 	}
 	ceiling := 0
-	if wholePipeline {
+	if pass == "all" {
 		ceiling = canonicalDamageCeiling
 	}
 	if changed > ceiling {
