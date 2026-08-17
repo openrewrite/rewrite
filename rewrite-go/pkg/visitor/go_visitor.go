@@ -497,11 +497,22 @@ func (v *GoVisitor) VisitLiteral(lit *java.Literal, p any) java.J {
 }
 
 func (v *GoVisitor) VisitBinary(bin *java.Binary, p any) java.J {
-	bin = bin.WithPrefix(v.self().VisitSpace(bin.Prefix, p))
-	bin = bin.WithMarkers(v.visitMarkers(bin.Markers, p))
-	bin = bin.WithLeft(visitExpression(v, bin.Left, p))
-	bin = bin.WithRight(visitExpression(v, bin.Right, p))
-	return bin
+	prefix := v.self().VisitSpace(bin.Prefix, p)
+	markers := v.visitMarkers(bin.Markers, p)
+	left := visitExpression(v, bin.Left, p)
+	opBefore := v.self().VisitSpace(bin.Operator.Before, p)
+	right := visitExpression(v, bin.Right, p)
+	if java.SpaceEqual(prefix, bin.Prefix) && java.MarkersEqual(markers, bin.Markers) &&
+		left == bin.Left && java.SpaceEqual(opBefore, bin.Operator.Before) && right == bin.Right {
+		return bin
+	}
+	c := *bin
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Left = left
+	c.Operator.Before = opBefore
+	c.Right = right
+	return &c
 }
 
 func (v *GoVisitor) VisitBlock(block *java.Block, p any) java.J {
@@ -801,10 +812,17 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 	if typeExpr != nil {
 		typeExpr = visitExpression(v, typeExpr, p)
 	}
+	varargs := vd.Varargs
+	if varargs != nil {
+		visited := v.self().VisitSpace(*varargs, p)
+		if !java.SpaceEqual(visited, *varargs) {
+			varargs = &visited
+		}
+	}
 	variables := visitRightPaddedList(v, vd.Variables, p)
 	if java.SpaceEqual(prefix, vd.Prefix) && java.MarkersEqual(markers, vd.Markers) &&
 		java.SameSlice(anns, vd.LeadingAnnotations) && typeExpr == vd.TypeExpr &&
-		java.SameSlice(variables, vd.Variables) {
+		varargs == vd.Varargs && java.SameSlice(variables, vd.Variables) {
 		return vd
 	}
 	c := *vd
@@ -812,6 +830,7 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 	c.Markers = markers
 	c.LeadingAnnotations = anns
 	c.TypeExpr = typeExpr
+	c.Varargs = varargs
 	c.Variables = variables
 	return &c
 }
@@ -898,34 +917,67 @@ func (v *GoVisitor) VisitImport(imp *java.Import, p any) java.J {
 }
 
 func (v *GoVisitor) VisitUnary(unary *java.Unary, p any) java.J {
-	unary = unary.WithPrefix(v.self().VisitSpace(unary.Prefix, p))
-	unary = unary.WithMarkers(v.visitMarkers(unary.Markers, p))
-	unary = unary.WithOperand(visitExpression(v, unary.Operand, p))
-	return unary
+	prefix := v.self().VisitSpace(unary.Prefix, p)
+	markers := v.visitMarkers(unary.Markers, p)
+	opBefore := v.self().VisitSpace(unary.Operator.Before, p)
+	operand := visitExpression(v, unary.Operand, p)
+	if java.SpaceEqual(prefix, unary.Prefix) && java.MarkersEqual(markers, unary.Markers) &&
+		java.SpaceEqual(opBefore, unary.Operator.Before) && operand == unary.Operand {
+		return unary
+	}
+	c := *unary
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Operator.Before = opBefore
+	c.Operand = operand
+	return &c
 }
 
 func (v *GoVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any) java.J {
 	prefix := v.self().VisitSpace(ao.Prefix, p)
 	markers := v.visitMarkers(ao.Markers, p)
 	variable := visitExpression(v, ao.Variable, p)
+	opBefore := v.self().VisitSpace(ao.Operator.Before, p)
 	assignment := visitExpression(v, ao.Assignment, p)
 	if java.SpaceEqual(prefix, ao.Prefix) && java.MarkersEqual(markers, ao.Markers) &&
-		variable == ao.Variable && assignment == ao.Assignment {
+		variable == ao.Variable && java.SpaceEqual(opBefore, ao.Operator.Before) &&
+		assignment == ao.Assignment {
 		return ao
 	}
 	c := *ao
 	c.Prefix = prefix
 	c.Markers = markers
 	c.Variable = variable
+	c.Operator.Before = opBefore
 	c.Assignment = assignment
 	return &c
 }
 
 func (v *GoVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
-	sw = sw.WithPrefix(v.self().VisitSpace(sw.Prefix, p))
-	sw = sw.WithMarkers(v.visitMarkers(sw.Markers, p))
-	sw = sw.WithBody(visitAndCast[*java.Block](v, sw.Body, p))
-	return sw
+	prefix := v.self().VisitSpace(sw.Prefix, p)
+	markers := v.visitMarkers(sw.Markers, p)
+	tag := sw.Tag
+	if tag != nil {
+		elem := visitExpression(v, tag.Element, p)
+		after := v.self().VisitSpace(tag.After, p)
+		if elem != tag.Element || !java.SpaceEqual(after, tag.After) {
+			c := *tag
+			c.Element = elem
+			c.After = after
+			tag = &c
+		}
+	}
+	body := visitAndCast[*java.Block](v, sw.Body, p)
+	if java.SpaceEqual(prefix, sw.Prefix) && java.MarkersEqual(markers, sw.Markers) &&
+		tag == sw.Tag && body == sw.Body {
+		return sw
+	}
+	c := *sw
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Tag = tag
+	c.Body = body
+	return &c
 }
 
 func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
@@ -952,6 +1004,10 @@ func (v *GoVisitor) VisitForLoop(forLoop *java.ForLoop, p any) java.J {
 	prefix := v.self().VisitSpace(forLoop.Prefix, p)
 	markers := v.visitMarkers(forLoop.Markers, p)
 	ctrl := visitAndCast[*java.ForControl](v, &forLoop.Control, p)
+	if ctrl == nil {
+		// Control is a value field, so a pruned control has no deleted form.
+		ctrl = &forLoop.Control
+	}
 	body := visitAndCast[*java.Block](v, forLoop.Body, p)
 	if java.SpaceEqual(prefix, forLoop.Prefix) && java.MarkersEqual(markers, forLoop.Markers) &&
 		ctrl == &forLoop.Control && body == forLoop.Body {
@@ -1015,10 +1071,23 @@ func (v *GoVisitor) VisitForControl(control *java.ForControl, p any) java.J {
 }
 
 func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
-	forEach = forEach.WithPrefix(v.self().VisitSpace(forEach.Prefix, p))
-	forEach = forEach.WithMarkers(v.visitMarkers(forEach.Markers, p))
-	forEach = forEach.WithBody(visitAndCast[*java.Block](v, forEach.Body, p))
-	return forEach
+	prefix := v.self().VisitSpace(forEach.Prefix, p)
+	markers := v.visitMarkers(forEach.Markers, p)
+	ctrl := visitAndCast[*java.ForEachControl](v, &forEach.Control, p)
+	if ctrl == nil {
+		ctrl = &forEach.Control
+	}
+	body := visitAndCast[*java.Block](v, forEach.Body, p)
+	if java.SpaceEqual(prefix, forEach.Prefix) && java.MarkersEqual(markers, forEach.Markers) &&
+		ctrl == &forEach.Control && body == forEach.Body {
+		return forEach
+	}
+	c := *forEach
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Control = *ctrl
+	c.Body = body
+	return &c
 }
 
 func (v *GoVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
@@ -1240,8 +1309,15 @@ func (v *GoVisitor) VisitFallthrough(f *golang.Fallthrough, p any) java.J {
 }
 
 func (v *GoVisitor) VisitEmpty(empty *java.Empty, p any) java.J {
-	empty = empty.WithPrefix(v.self().VisitSpace(empty.Prefix, p))
-	return empty
+	prefix := v.self().VisitSpace(empty.Prefix, p)
+	markers := v.visitMarkers(empty.Markers, p)
+	if java.SpaceEqual(prefix, empty.Prefix) && java.MarkersEqual(markers, empty.Markers) {
+		return empty
+	}
+	c := *empty
+	c.Prefix = prefix
+	c.Markers = markers
+	return &c
 }
 
 func (v *GoVisitor) VisitAnnotation(ann *java.Annotation, p any) java.J {
