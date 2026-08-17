@@ -1010,8 +1010,8 @@ class ScalaTreeVisitor(
       val between = source.substring(from, to)
       val commaIdx = positionOfNextIn(between, ",", 0)
       if (commaIdx < 0) (ScalaSpace.format(source, from, to), Markers.EMPTY)
-      else (Space.format(between.substring(commaIdx + 1)),
-        Markers.EMPTY.add(TrailingComma.create(Space.format(between.substring(0, commaIdx)))))
+      else (ScalaSpace.format(source, from + commaIdx + 1, to),
+        Markers.EMPTY.add(TrailingComma.create(ScalaSpace.format(source, from, from + commaIdx))))
     }
   }
 

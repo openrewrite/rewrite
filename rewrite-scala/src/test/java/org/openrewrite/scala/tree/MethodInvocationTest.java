@@ -606,4 +606,21 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedBlockCommentBeforeTrailingComma() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(a: Int, b: Int): Int = a
+              val x = f(
+                1,
+                2 /* x /* y */ z */,
+              )
+            }
+            """
+          )
+        );
+    }
+
 }
