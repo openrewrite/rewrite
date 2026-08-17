@@ -381,3 +381,22 @@ func TestBinarySpacing(t *testing.T) {
 		}
 	}
 }
+
+func TestBinarySpacingInSlices(t *testing.T) {
+	cases := map[string][2]string{
+		"single index stays tight": {
+			"package p\n\nfunc f(a []int, n int) {\n\ta = a[:n - 1]\n\t_ = a\n}\n",
+			"package p\n\nfunc f(a []int, n int) {\n\ta = a[:n-1]\n\t_ = a\n}\n"},
+		"two indices with a binary set the colon off": {
+			"package p\n\nfunc f(a []int, i, j int) {\n\t_ = a[i:j + 1]\n}\n",
+			"package p\n\nfunc f(a []int, i, j int) {\n\t_ = a[i : j+1]\n}\n"},
+		"two plain indices stay tight": {
+			"package p\n\nfunc f(a []int, i, j int) {\n\t_ = a[i : j]\n}\n",
+			"package p\n\nfunc f(a []int, i, j int) {\n\t_ = a[i:j]\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewBinarySpacingVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}

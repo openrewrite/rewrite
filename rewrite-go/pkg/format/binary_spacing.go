@@ -53,7 +53,10 @@ func (v *BinarySpacingVisitor) Visit(t java.Tree, p any) java.Tree {
 	// Every statement starts its expressions at the outermost depth, so a
 	// statement reached from inside an expression — a function literal's body —
 	// starts over rather than inheriting the depth around it.
-	if _, isStatement := t.(java.Statement); isStatement {
+	_, isStatement := t.(java.Statement)
+	// A call is both a statement and an expression; only something that is
+	// purely a statement begins a fresh expression.
+	if _, isExpression := t.(java.Expression); isStatement && !isExpression {
 		outer := v.depth
 		v.depth = 1
 		defer func() { v.depth = outer }()
@@ -111,6 +114,55 @@ func (v *BinarySpacingVisitor) VisitArrayAccess(access *java.ArrayAccess, p any)
 	}
 	v.depth = depth
 	return &out
+}
+
+// VisitSlice descends into the indices of a slice expression, and spaces the
+// colons: gofmt sets them off with blanks when an outermost slice has more than
+// one index and at least one of them is a binary expression, so `a[i : j+1]`
+// reads apart while `a[:n-1]` stays tight.
+func (v *BinarySpacingVisitor) VisitSlice(sl *golang.Slice, p any) java.J {
+	depth := v.depth
+	out := *sl
+	out.Indexed = v.operand(sl.Indexed, 1)
+
+	indices := []java.Expression{sl.Low.Element, sl.High.Element, sl.Max}
+	present, binaries := 0, 0
+	for _, index := range indices {
+		if isPresentIndex(index) {
+			present++
+			if operandsOf(index).prec > 0 {
+				binaries++
+			}
+		}
+	}
+	blanks := depth <= 1 && present > 1 && binaries > 0
+
+	out.Low.Element = v.operand(sl.Low.Element, depth+1)
+	out.High.Element = v.operand(sl.High.Element, depth+1)
+	out.Max = v.operand(sl.Max, depth+1)
+
+	// A colon takes a blank on the side where an index is written, and none
+	// where one is omitted.
+	out.Low.After = spaceOrNothing(out.Low.After, blanks && isPresentIndex(out.Low.Element))
+	if isPresentIndex(out.High.Element) {
+		out.High.Element = withPrefix(out.High.Element, spaceOrNothing(getPrefix(out.High.Element), blanks))
+		out.High.After = spaceOrNothing(out.High.After, blanks && out.Max != nil)
+	}
+	if isPresentIndex(out.Max) {
+		out.Max = withPrefix(out.Max, spaceOrNothing(getPrefix(out.Max), blanks))
+	}
+	v.depth = depth
+	return &out
+}
+
+// isPresentIndex reports whether a slice index is written, since an omitted one
+// is modeled as an empty expression rather than as nothing.
+func isPresentIndex(e java.Expression) bool {
+	if e == nil {
+		return false
+	}
+	_, empty := e.(*java.Empty)
+	return !empty
 }
 
 // VisitComposite prints its elements at the outermost depth however deeply the
