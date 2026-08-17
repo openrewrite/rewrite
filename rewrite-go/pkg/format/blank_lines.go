@@ -31,7 +31,9 @@ import (
 //     uniformly inside blocks AND between top-level decls).
 //   - A declaration list — the fields of a struct, the methods of an
 //     interface — sits flush against its braces, while a statement
-//     block keeps a blank line written against either of its own.
+//     block keeps a blank line written against either of its own. A
+//     comment against a brace keeps the blank line separating it either
+//     way, since the separation reads as the comment's own.
 //
 // The flush rule operates on the first statement's own Prefix, since the
 // parser attaches inter-statement whitespace to the outermost element.
@@ -68,9 +70,12 @@ func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 	if !v.isDeclarationList() {
 		return out
 	}
-	out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
+	if len(out.End.Comments) == 0 {
+		out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
+	}
 
-	if len(out.Statements) > 0 && out.Statements[0].Element != nil {
+	if len(out.Statements) > 0 && out.Statements[0].Element != nil &&
+		len(getPrefix(out.Statements[0].Element).Comments) == 0 {
 		first := out.Statements[0]
 		if updated, ok := transformPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
 			first.Element = updated

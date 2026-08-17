@@ -424,3 +424,32 @@ func TestBinarySpacing_SiblingArgumentsKeepTheirDepth(t *testing.T) {
 		t.Errorf("want %q\ngot  %q", want, out)
 	}
 }
+
+func TestBlankLinesAroundCommentsInDeclarationLists(t *testing.T) {
+	cases := map[string][2]string{
+		"a bare field sits flush": {
+			"package p\n\ntype A struct {\n\n\tX int\n\n}\n",
+			"package p\n\ntype A struct {\n\tX int\n}\n"},
+		"a leading comment keeps its separation": {
+			"package p\n\ntype B struct {\n\n\t// doc\n\tX int\n}\n",
+			"package p\n\ntype B struct {\n\n\t// doc\n\tX int\n}\n"},
+		"a trailing comment keeps its separation": {
+			"package p\n\ntype C struct {\n\tX int\n\n\t// trailing\n}\n",
+			"package p\n\ntype C struct {\n\tX int\n\n\t// trailing\n}\n"},
+	}
+	for name, io := range cases {
+		if out := applyVisitor(t, io[0], format.NewBlankLinesVisitor(nil)); out != io[1] {
+			t.Errorf("%s:\n  want %q\n  got  %q", name, io[1], out)
+		}
+	}
+}
+
+func TestTabsAndIndents_LabelBeforeAClosingBrace(t *testing.T) {
+	out := applyVisitor(t,
+		"package p\n\nfunc f(xs []int) {\n\tfor _, x := range xs {\n\t\t_ = x\n\tA:\n\t}\n\treturn\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc f(xs []int) {\n\tfor _, x := range xs {\n\t\t_ = x\n\tA:\n\t}\n\treturn\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}

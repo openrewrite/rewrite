@@ -118,6 +118,20 @@ func (v *BinarySpacingVisitor) VisitArrayAccess(access *java.ArrayAccess, p any)
 	return &out
 }
 
+// VisitGoUnary starts a dereferenced operand at the outermost depth. gofmt
+// prints the operand of `*x` as an expression in its own right, while every
+// other unary operator carries the depth around it into its operand.
+func (v *BinarySpacingVisitor) VisitGoUnary(u *golang.Unary, p any) java.J {
+	if u.Operator.Element != golang.Indirection {
+		return v.GoVisitor.VisitGoUnary(u, p)
+	}
+	depth := v.depth
+	out := *u
+	out.Expression = v.operand(u.Expression, 1)
+	v.depth = depth
+	return &out
+}
+
 // VisitSlice descends into the indices of a slice expression, and spaces the
 // colons: gofmt sets them off with blanks when an outermost slice has more than
 // one index and at least one of them is a binary expression, so `a[i : j+1]`
