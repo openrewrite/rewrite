@@ -273,6 +273,17 @@ type binaryOperands struct {
 	left, right java.Expression
 }
 
+// BinaryOperands reports how tightly e binds, on go/token.Token.Precedence's
+// scale, along with its operands. ok is false for anything that is not a binary
+// expression. Callers outside layout need this to decide grouping.
+func BinaryOperands(e java.Expression) (prec int, left, right java.Expression, ok bool) {
+	ops := operandsOf(e)
+	if ops.prec == 0 {
+		return 0, nil, nil, false
+	}
+	return ops.prec, ops.left, ops.right, true
+}
+
 func operandsOf(e java.Expression) binaryOperands {
 	switch b := e.(type) {
 	case *java.Binary:

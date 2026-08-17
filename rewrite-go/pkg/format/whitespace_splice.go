@@ -33,14 +33,15 @@ var (
 // SpliceWhitespace returns original with every Space replaced by its
 // counterpart in formatted, a tree parsed from a re-laid-out rendering of
 // original. Node ids, type attribution and everything else come from original,
-// which is rebuilt only along the paths that changed. When target is non-nil,
-// only Spaces inside that subtree are replaced.
+// which is rebuilt only along the paths that changed. Only Spaces inside the
+// given target subtrees are replaced; with no targets, the whole tree is.
 //
 // A node the two trees shape differently keeps its original whitespace while
 // its siblings are spliced; the second return value reports whether every node
 // was reached, distinguishing a complete splice from a partial one.
-func SpliceWhitespace(original, formatted java.Tree, target java.Tree) (java.Tree, bool) {
-	s := &splicer{target: target, active: target == nil}
+func SpliceWhitespace(original, formatted java.Tree, targets ...java.Tree) (java.Tree, bool) {
+	s := &splicer{targets: presentTargets(targets)}
+	s.active = len(s.targets) == 0
 	out, changed := s.value(reflect.ValueOf(original), reflect.ValueOf(formatted))
 	if !changed {
 		return original, !s.diverged
@@ -48,10 +49,31 @@ func SpliceWhitespace(original, formatted java.Tree, target java.Tree) (java.Tre
 	return out.Interface().(java.Tree), !s.diverged
 }
 
+// presentTargets drops the nils callers pass for "no target in particular", so
+// that a list of only those reads as an unbounded splice.
+func presentTargets(targets []java.Tree) []java.Tree {
+	var present []java.Tree
+	for _, t := range targets {
+		if t != nil {
+			present = append(present, t)
+		}
+	}
+	return present
+}
+
 type splicer struct {
-	target   java.Tree
+	targets  []java.Tree
 	active   bool
 	diverged bool
+}
+
+func (s *splicer) isTarget(t any) bool {
+	for _, target := range s.targets {
+		if t == target {
+			return true
+		}
+	}
+	return false
 }
 
 // value walks orig and fmtd in lockstep, returning the reconciled value and
@@ -110,7 +132,7 @@ func (s *splicer) value(orig, fmtd reflect.Value) (reflect.Value, bool) {
 			return orig, false
 		}
 		outer := s.active
-		if !outer && d.isTree && orig.Interface() == s.target {
+		if !outer && d.isTree && s.isTarget(orig.Interface()) {
 			s.active = true
 		}
 		elem, changed := s.value(orig.Elem(), fmtd.Elem())
