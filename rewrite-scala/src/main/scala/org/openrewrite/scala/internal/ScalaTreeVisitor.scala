@@ -55,7 +55,6 @@ import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.CommaContinuation
 import org.openrewrite.scala.marker.FunctionApplication
-import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
 import org.openrewrite.scala.marker.ContextFunctionArrow

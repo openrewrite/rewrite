@@ -47,7 +47,6 @@ import org.openrewrite.scala.marker.DoKeyword;
 import org.openrewrite.scala.marker.ThenKeyword;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
-import org.openrewrite.scala.marker.TypeAscription;
 import org.openrewrite.scala.marker.PartialFunctionLiteral;
 import org.openrewrite.scala.marker.ContextFunctionArrow;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
