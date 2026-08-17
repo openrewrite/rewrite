@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable, TypeVar
 from uuid import UUID
 
+from rewrite.rpc.reference import ReferenceMap
+
 
 class RpcObjectState(str, Enum):
     NO_CHANGE = "NO_CHANGE"
@@ -30,10 +32,11 @@ T = TypeVar('T')
 class RpcSendQueue:
     """Queue for generating RpcObjectData array from Python LST using visitor pattern."""
 
-    def __init__(self, source_file_type: Optional[str] = None):
+    def __init__(self, source_file_type: Optional[str] = None,
+                 refs: Optional[ReferenceMap] = None):
         self.q: List[Dict[str, Any]] = []
-        self.refs: Dict[int, tuple] = {}  # id(obj) -> (obj, ref_number) — verified with `is`
-        self.next_ref: int = 0
+        # A caller-supplied map spans the peer connection; the default spans this queue.
+        self.refs: ReferenceMap = refs if refs is not None else ReferenceMap()
         self.source_file_type = source_file_type
         self._before: Any = None
 
@@ -220,21 +223,19 @@ class RpcSendQueue:
             self.put({'state': RpcObjectState.DELETE})
             return
 
-        obj_id = id(obj)
-        entry = self.refs.get(obj_id)
-        if entry is not None and entry[0] is obj:
+        ref = self.refs.get(obj)
+        if ref is not None:
             # Already sent — emit ref number only, no onChange
-            self.put({'state': RpcObjectState.ADD, 'ref': entry[1]})
+            self.put({'state': RpcObjectState.ADD, 'ref': ref})
             return
 
         # First time — assign ref number and serialize fully
-        self.next_ref += 1
-        self.refs[obj_id] = (obj, self.next_ref)
+        ref = self.refs.create(obj)
 
         value_type = self._get_value_type(obj)
         codec = self._get_rpc_codec(obj)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
-        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': self.next_ref})
+        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': ref})
         self._do_change(obj, None, on_change, codec)
 
     def _do_change(self, after: Any, before: Any,
