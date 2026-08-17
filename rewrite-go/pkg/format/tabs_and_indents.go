@@ -164,10 +164,9 @@ func eachElement[T java.Tree](v *TabsAndIndentsVisitor, elements []java.RightPad
 	outer := v.depth
 	out := make([]java.RightPadded[T], len(elements))
 	for i, rp := range elements {
-		// A list contributes a level from the first element that breaks the
-		// line. Elements written alongside the delimiter that opens the list
-		// stay on that line's level, and once a later element has started a
-		// line of its own, its own siblings share the level it set.
+		// Elements written alongside the delimiter that opens the list stay on
+		// that line's level; from the first element to start a line of its own,
+		// the rest share the level it set.
 		if breaksLine(getPrefix(rp.Element)) {
 			v.depth = outer + 1
 			if fixed, ok := any(transformPrefix(rp.Element, v.reindentSpace)).(T); ok {
@@ -194,8 +193,12 @@ func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
 
 	copied := *out
 	statement := l.Statement
-	if fixed, ok := transformPrefix(statement, v.reindentSpace).(java.Statement); ok {
-		statement = fixed
+	// An empty labelled statement prints nothing, so the whitespace ahead of it
+	// closes the block rather than opening a line of its own.
+	if _, empty := statement.(*java.Empty); !empty {
+		if fixed, ok := transformPrefix(statement, v.reindentSpace).(java.Statement); ok {
+			statement = fixed
+		}
 	}
 	if next, ok := v.Visit(statement, p).(java.Statement); ok {
 		statement = next

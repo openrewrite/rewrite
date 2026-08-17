@@ -40,7 +40,7 @@ import (
 // canonicalDamageCeiling is the number of gofmt-clean standard library files
 // the whole pipeline still rewrites, all of it layout the formatter renders
 // differently from gofmt. Lower it as passes converge; it never goes up.
-const canonicalDamageCeiling = 9
+const canonicalDamageCeiling = 3
 
 func TestCanonicalInputUnchanged(t *testing.T) {
 	t.Run("doc comments", func(t *testing.T) { canonicalInputUnchanged(t, "doc") })

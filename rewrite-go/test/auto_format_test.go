@@ -443,3 +443,13 @@ func TestBlankLinesAroundCommentsInDeclarationLists(t *testing.T) {
 		}
 	}
 }
+
+func TestTabsAndIndents_LabelBeforeAClosingBrace(t *testing.T) {
+	out := applyVisitor(t,
+		"package p\n\nfunc f(xs []int) {\n\tfor _, x := range xs {\n\t\t_ = x\n\tA:\n\t}\n\treturn\n}\n",
+		format.NewTabsAndIndentsVisitor(nil))
+	want := "package p\n\nfunc f(xs []int) {\n\tfor _, x := range xs {\n\t\t_ = x\n\tA:\n\t}\n\treturn\n}\n"
+	if out != want {
+		t.Errorf("want %q\ngot  %q", want, out)
+	}
+}
