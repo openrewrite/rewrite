@@ -37,12 +37,12 @@ const (
 
 // Gofmt lays out cu the way gofmt would, by printing it, running the result
 // through go/printer, and splicing that layout back in with SpliceWhitespace.
-// Only the given target subtrees are re-laid-out, so a recipe's diff stays
-// limited to what the recipe touched; with no targets, the whole file is.
+// When target is non-nil only that subtree is re-laid-out, so a recipe's diff
+// stays limited to what the recipe touched.
 //
 // cu comes back unchanged when it is already formatted or when the printed
 // source doesn't parse.
-func Gofmt(cu *golang.CompilationUnit, targets ...java.Tree) (*golang.CompilationUnit, error) {
+func Gofmt(cu *golang.CompilationUnit, target java.Tree) (*golang.CompilationUnit, error) {
 	src := printer.Print(cu)
 	formattedSrc, err := gofmtSource(cu.SourcePath, src)
 	if err != nil {
@@ -62,7 +62,7 @@ func Gofmt(cu *golang.CompilationUnit, targets ...java.Tree) (*golang.Compilatio
 		if err != nil {
 			return best, err
 		}
-		spliced, complete := SpliceWhitespace(cu, formatted, targets...)
+		spliced, complete := SpliceWhitespace(cu, formatted, target)
 		best = spliced.(*golang.CompilationUnit)
 		if complete {
 			break
@@ -74,36 +74,17 @@ func Gofmt(cu *golang.CompilationUnit, targets ...java.Tree) (*golang.Compilatio
 // GofmtVisitor applies Gofmt to every compilation unit it visits.
 type GofmtVisitor struct {
 	visitor.GoVisitor
-	targets   []java.Tree
-	wholeFile bool
+	target java.Tree
 }
 
 // NewGofmtVisitor returns a visitor bounded to the given target subtree. Pass
 // nil to lay out the whole file.
 func NewGofmtVisitor(target java.Tree) *GofmtVisitor {
-	v := &GofmtVisitor{targets: presentTargets([]java.Tree{target})}
-	v.wholeFile = len(v.targets) == 0
-	return visitor.Init(v)
-}
-
-// NewTargetedGofmtVisitor returns a visitor that lays out only the subtrees
-// passed to Add, and leaves a file alone when nothing was added. Targets can
-// accumulate up until the visit.
-func NewTargetedGofmtVisitor() *GofmtVisitor {
-	return visitor.Init(&GofmtVisitor{})
-}
-
-func (v *GofmtVisitor) Add(target java.Tree) {
-	if target != nil {
-		v.targets = append(v.targets, target)
-	}
+	return visitor.Init(&GofmtVisitor{target: target})
 }
 
 func (v *GofmtVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
-	if !v.wholeFile && len(v.targets) == 0 {
-		return cu
-	}
-	out, err := Gofmt(cu, v.targets...)
+	out, err := Gofmt(cu, v.target)
 	if err != nil {
 		return cu
 	}
