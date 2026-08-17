@@ -16,7 +16,9 @@
 package org.openrewrite.kotlin.tree;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashMap;
@@ -258,6 +260,21 @@ public final class KotlinTypeUtils {
      */
     public static boolean isKotlinUnit(@Nullable JavaType type) {
         return type == JavaType.Primitive.Void || TypeUtils.isOfClassType(type, "kotlin.Unit");
+    }
+
+    /**
+     * True when {@code typeTree} is an explicit, non-nullable {@code Unit}.
+     * <p>
+     * Nullability isn't modeled on {@link JavaType} — a nullable {@code Unit} and a
+     * non-nullable {@code Unit} used somewhere it can't be JVM-primitive-optimized
+     * (e.g. as a generic type argument) both resolve to the same interned
+     * {@code JavaType.Class} for {@code kotlin.Unit}, so {@link #isKotlinUnit(JavaType)}
+     * alone can't tell them apart. That distinction only exists on the LST, via whether
+     * the type reference is wrapped in {@link J.NullableType} — so this overload checks
+     * the tree shape first and only then delegates to the {@link JavaType} check.
+     */
+    public static boolean isKotlinUnit(@Nullable TypeTree typeTree) {
+        return typeTree != null && !(typeTree instanceof J.NullableType) && isKotlinUnit(typeTree.getType());
     }
 
     /**

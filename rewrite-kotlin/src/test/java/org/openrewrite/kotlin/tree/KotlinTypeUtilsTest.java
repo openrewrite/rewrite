@@ -15,13 +15,41 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.KotlinParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class KotlinTypeUtilsTest {
+
+    /**
+     * Parses {@code source} (expected to declare exactly one top-level function) and
+     * returns that function's return type expression, or {@code null} if it has none.
+     */
+    private static @Nullable TypeTree parseReturnTypeExpression(String source) {
+        K.CompilationUnit cu = (K.CompilationUnit) KotlinParser.builder().build()
+          .parse(source)
+          .findFirst()
+          .orElseThrow();
+        TypeTree[] found = new TypeTree[1];
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        new KotlinIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                found[0] = method.getReturnTypeExpression();
+                return method;
+            }
+        }.visit(cu, ctx);
+        return found[0];
+    }
 
     @Test
     void jvmFqnFromKotlinFqn() {
@@ -88,6 +116,38 @@ class KotlinTypeUtilsTest {
 
         // Unit returned from a function maps to JVM void.
         assertThat(KotlinTypeUtils.isKotlinUnit(JavaType.Primitive.Void)).isTrue();
+    }
+
+    /**
+     * The {@link TypeTree} overload of {@code isKotlinUnit} exists specifically to
+     * distinguish an explicit, non-nullable {@code Unit} from {@code Unit?} — a
+     * distinction the {@link JavaType}-only overload can't make, since both resolve
+     * to the same {@code kotlin.Unit} class type once boxed.
+     */
+    @Test
+    void isKotlinUnitTypeTreeMatchesExplicitNonNullableUnit() {
+        assertThat(KotlinTypeUtils.isKotlinUnit(parseReturnTypeExpression("fun foo(): Unit {}"))).isTrue();
+    }
+
+    @Test
+    void isKotlinUnitTypeTreeRejectsNullableUnit() {
+        assertThat(KotlinTypeUtils.isKotlinUnit(parseReturnTypeExpression("fun foo(): Unit? { return null }"))).isFalse();
+    }
+
+    @Test
+    void isKotlinUnitTypeTreeRejectsOtherReturnTypes() {
+        assertThat(KotlinTypeUtils.isKotlinUnit(parseReturnTypeExpression("fun foo(): Int { return 1 }"))).isFalse();
+    }
+
+    @Test
+    void isKotlinUnitTypeTreeRejectsImplicitReturnType() {
+        // No explicit return type at all -> returnTypeExpression is null.
+        assertThat(KotlinTypeUtils.isKotlinUnit(parseReturnTypeExpression("fun foo() {}"))).isFalse();
+    }
+
+    @Test
+    void isKotlinUnitTypeTreeOnNullIsFalse() {
+        assertThat(KotlinTypeUtils.isKotlinUnit((TypeTree) null)).isFalse();
     }
 
     @Test
