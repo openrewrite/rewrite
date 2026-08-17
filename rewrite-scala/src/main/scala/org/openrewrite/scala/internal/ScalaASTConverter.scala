@@ -212,7 +212,7 @@ class ScalaASTConverter {
       Tree.randomId(),
       Space.EMPTY,
       Markers.EMPTY,
-      packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
+      packageExpr.withPrefix(spaceBeforePackageName(pkgDef, visitor)),
       Collections.emptyList()
     )
     visitor.updateCursor(pkgDef.pid.span.end)
@@ -236,7 +236,7 @@ class ScalaASTConverter {
       Tree.randomId(),
       Space.EMPTY,
       Markers.EMPTY,
-      packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
+      packageExpr.withPrefix(spaceBeforePackageName(pkgDef, visitor)),
       Collections.emptyList()
     )
 
@@ -326,7 +326,7 @@ class ScalaASTConverter {
       Tree.randomId(),
       prefix,
       markers,
-      packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
+      packageExpr.withPrefix(spaceBeforePackageName(pkgDef, visitor)),
       Collections.emptyList()
     )
   }
@@ -350,6 +350,19 @@ class ScalaASTConverter {
    * marker, which the printer renders back with backticks. Falls back to
    * [[extractPackageName]] when the span is unusable.
    */
+  /** The run between the `package` keyword and the package name, which need not be one space. */
+  private def spaceBeforePackageName(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): Space = {
+    if (pkgDef.pid.span.exists) {
+      val srcText = visitor.getSourceText
+      val nameStart = pkgDef.pid.span.start - visitor.getOffsetAdjustment
+      val keyword = if (nameStart <= srcText.length) srcText.lastIndexOf("package", nameStart) else -1
+      if (keyword >= 0 && keyword + "package".length <= nameStart) {
+        return ScalaSpace.format(srcText.substring(keyword + "package".length, nameStart))
+      }
+    }
+    Space.build(" ", Collections.emptyList())
+  }
+
   private def packageNameFromSource(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): String = {
     if (pkgDef.pid.span.exists) {
       val srcText = visitor.getSourceText

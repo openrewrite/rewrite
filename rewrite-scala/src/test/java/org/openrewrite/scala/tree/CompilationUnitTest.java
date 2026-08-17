@@ -104,6 +104,19 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void packageKeywordFollowedByMoreThanOneSpace() {
+        rewriteRun(
+          scala(
+            """
+            package  com.example
+
+            val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
     void packageWithBacktickedSegment() {
         rewriteRun(
           scala(
