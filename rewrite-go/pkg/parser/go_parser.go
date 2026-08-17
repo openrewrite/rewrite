@@ -2538,6 +2538,10 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	}
 	lbracePrefix := ctx.prefix(expr.Lbrace)
 	ctx.skip(1) // "{"
+	if expr.Type == nil {
+		// Nothing precedes `{`, so that whitespace is the composite's own.
+		prefix, lbracePrefix = lbracePrefix, java.EmptySpace
+	}
 
 	var elements []java.RightPadded[java.Expression]
 	for i, elt := range expr.Elts {
