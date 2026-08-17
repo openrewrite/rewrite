@@ -44,6 +44,13 @@ type GoParser struct {
 	// GOOS/GOARCH). Recipe authors that need cross-platform analysis can
 	// set this explicitly via NewGoParserWithBuildContext.
 	BuildContext build.Context
+
+	// ParseOnly produces trees without type attribution, for callers that read
+	// only layout off the result. Some expressions map to a different shape
+	// without types — `Map[int]` becomes an index expression rather than a
+	// generic instantiation — so a caller that compares shapes must tolerate
+	// that. Mirrors JavaScriptParser.parseOnly() in rewrite-javascript.
+	ParseOnly bool
 }
 
 func NewGoParser() *GoParser {
@@ -132,20 +139,22 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		// Used to distinguish generic instantiation from ordinary indexing.
 		Instances: make(map[*ast.Ident]types.Instance),
 	}
-	conf := types.Config{
-		Importer: gp.Importer,
-		// Don't fail on type errors — we want partial type info even when
-		// some imports can't be resolved.
-		Error: func(error) {},
-	}
+	if !gp.ParseOnly {
+		conf := types.Config{
+			Importer: gp.Importer,
+			// Don't fail on type errors — we want partial type info even when
+			// some imports can't be resolved.
+			Error: func(error) {},
+		}
 
-	// Use the first file's package name as the type-checker hint;
-	// types.Config.Check validates that all files agree.
-	pkgName := "main"
-	if asts[0].Name != nil {
-		pkgName = asts[0].Name.Name
+		// Use the first file's package name as the type-checker hint;
+		// types.Config.Check validates that all files agree.
+		pkgName := "main"
+		if asts[0].Name != nil {
+			pkgName = asts[0].Name.Name
+		}
+		checkTypes(&conf, pkgName, fset, asts, typeInfo)
 	}
-	checkTypes(&conf, pkgName, fset, asts, typeInfo)
 
 	mapper := newTypeMapper()
 	cus := make([]*golang.CompilationUnit, 0, len(files))
