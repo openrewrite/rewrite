@@ -24,29 +24,34 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// Matches by import path: any form (regular, aliased, dot, or blank)
-// that imports PackagePath is removed. If the imports container becomes
-// empty as a result, it is nil-ed out so the printer doesn't emit an
-// empty `import ()` block.
+// Matches by import path, whichever form (regular, aliased, dot, or
+// blank) the import takes. If the imports container becomes empty as a
+// result, it is nil-ed out so the printer doesn't emit an empty
+// `import ()` block.
 //
-// Removing an actively-referenced import will of course break the file;
-// this recipe trusts the caller to know that. For unused-import cleanup,
-// use RemoveUnusedImports.
+// Force mirrors the Java recipe's flag of the same name. Left false, the
+// import survives while the file still references it, and blank (`_`) and
+// dot (`.`) imports survive outright under the rule RemoveUnusedImports
+// documents. Set it to remove every matching form regardless.
 type RemoveImport struct {
 	recipe.Base
 	PackagePath string
+	Force       bool
 }
 
 func (r *RemoveImport) Name() string        { return "org.openrewrite.golang.RemoveImport" }
 func (r *RemoveImport) DisplayName() string { return "Remove import" }
 func (r *RemoveImport) Description() string {
-	return "Remove an `import` statement from a Go compilation unit. Matches by import path; any form (regular, aliased, dot, blank) is removed."
+	return "Remove an `import` statement from a Go compilation unit. Matches by import path, in any form (regular, aliased, dot, blank). Unless `force` is set, an import that the file still references is kept, as are blank (`_`) and dot (`.`) imports."
 }
 
 func (r *RemoveImport) Options() []recipe.OptionDescriptor {
 	return []recipe.OptionDescriptor{
 		recipe.Option("packagePath", "Package path", "The import path to remove.").
 			WithExample("fmt").WithValue(r.PackagePath),
+		recipe.Option("force", "Force",
+			"When true, remove the import even if the file still references the package, and remove blank (`_`) and dot (`.`) imports.").
+			AsOptional().WithValue(r.Force),
 	}
 }
 
@@ -64,10 +69,24 @@ func (v *removeImportVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p
 	if v.cfg.PackagePath == "" || cu.Imports == nil {
 		return cu
 	}
+	var refs, quals map[string]bool
+	if !v.cfg.Force {
+		refs, quals = internal.ReferencedImports(cu)
+	}
 	for _, rp := range cu.Imports.Elements {
-		if internal.ImportPath(rp.Element) == v.cfg.PackagePath {
-			cu = internal.RemoveFromBlock(cu, rp.Element)
+		imp := rp.Element
+		if internal.ImportPath(imp) != v.cfg.PackagePath {
+			continue
 		}
+		if !v.cfg.Force {
+			if alias := internal.AliasName(imp); alias == "_" || alias == "." {
+				continue
+			}
+			if internal.IsReferenced(imp, refs, quals) {
+				continue
+			}
+		}
+		cu = internal.RemoveFromBlock(cu, imp)
 	}
 	return cu
 }
