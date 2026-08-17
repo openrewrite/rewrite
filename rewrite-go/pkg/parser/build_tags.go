@@ -30,6 +30,7 @@ import (
 //
 // The constraint evaluator recognizes:
 //   - GOOS/GOARCH name tags (matches when ctx.GOOS == tag etc.)
+//   - the compiler name in buildCtx.Compiler ("gc" or "gccgo")
 //   - "cgo" if buildCtx.CgoEnabled is true
 //   - language version tags (e.g. "go1.21") if at or below the configured
 //     release; falls back to true to avoid spurious exclusions
@@ -133,6 +134,8 @@ func matchTag(buildCtx build.Context, tag string) bool {
 	case buildCtx.GOOS:
 		return true
 	case buildCtx.GOARCH:
+		return true
+	case buildCtx.Compiler:
 		return true
 	case "cgo":
 		return buildCtx.CgoEnabled
