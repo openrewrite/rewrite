@@ -59,21 +59,30 @@ func Wrap(e java.Expression) java.Expression {
 // Needed reports whether e would regroup the expression around it if it were
 // dropped in at site unparenthesized.
 func Needed(e java.Expression, site *visitor.Cursor) bool {
-	prec, _, _, isBinary := format.BinaryOperands(e)
-	if !isBinary || site == nil || site.Parent() == nil {
+	if site == nil || site.Parent() == nil {
 		return false
+	}
+	if bracesReadAsABlock(e, site) {
+		return true
 	}
 	replaced := site.Value()
 	switch parent := site.Parent().Value().(type) {
 	case *java.Unary, *golang.Unary:
-		return true
-	// A primary expression is what these apply to, so an operator inside one
-	// has to be grouped away from it.
-	case *java.FieldAccess, *java.ArrayAccess, *golang.TypeAssertion:
-		return true
+		// Two operators in a row run together into one token.
+		return needsDelimiting(e)
+	// These apply to a primary expression, so anything else under one has to be
+	// grouped away from it.
+	case *java.FieldAccess, *java.ArrayAccess, *golang.TypeAssertion, *golang.Slice:
+		return needsDelimiting(e)
+	// The callee slot holds the type a conversion names, which is subject to
+	// the same rule.
 	case *java.MethodInvocation:
-		return parent.Select != nil && any(parent.Select.Element) == any(replaced)
+		return parent.Select != nil && any(parent.Select.Element) == any(replaced) && needsDelimiting(e)
 	default:
+		prec, _, _, isBinary := format.BinaryOperands(e)
+		if !isBinary {
+			return false
+		}
 		enclosing, isExpr := site.Parent().Value().(java.Expression)
 		if !isExpr {
 			return false
@@ -92,6 +101,62 @@ func Needed(e java.Expression, site *visitor.Cursor) bool {
 		}
 		return false
 	}
+}
+
+// needsDelimiting reports whether e is a form Go's grammar does not admit where
+// a primary expression belongs: anything built from operators, and the pointer,
+// channel and func type spellings, which a conversion names in that position.
+// Slice, array and map types open with a bracket and read unambiguously.
+func needsDelimiting(e java.Expression) bool {
+	switch e.(type) {
+	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary, *java.TypeCast:
+		return true
+	case *golang.Channel, *golang.FuncType:
+		return true
+	}
+	return false
+}
+
+// bracesReadAsABlock reports whether e is a composite literal written with a
+// bare type name, sitting between a control-clause keyword and its block. Go's
+// parser takes the literal's opening brace for the block's, so the literal has
+// to be delimited.
+func bracesReadAsABlock(e java.Expression, site *visitor.Cursor) bool {
+	composite, ok := e.(*golang.Composite)
+	if !ok || !isBareTypeName(composite.TypeExpr) {
+		return false
+	}
+	child := java.Tree(site.Value())
+	for c := site.Parent(); c != nil; c = c.Parent() {
+		switch parent := c.Value().(type) {
+		case *java.If, *java.Switch, *java.ForLoop, *java.ForEachLoop, *golang.StatementWithInit:
+			return true
+		// Anything already delimited settles where the brace belongs.
+		case *java.Parentheses, *golang.Composite:
+			return false
+		case *java.MethodInvocation:
+			if parent.Select == nil || any(parent.Select.Element) != any(child) {
+				return false
+			}
+		case *java.ArrayAccess:
+			if any(parent.Indexed) != any(child) {
+				return false
+			}
+		}
+		child = c.Value()
+	}
+	return false
+}
+
+// isBareTypeName reports whether a composite literal's type is spelled as a
+// name, which is the spelling that collides with a block. One written from a
+// slice, map or array type opens with a bracket instead.
+func isBareTypeName(typeExpr java.Expression) bool {
+	switch typeExpr.(type) {
+	case *java.Identifier, *java.FieldAccess:
+		return true
+	}
+	return false
 }
 
 // Visitor parenthesizes every expression in the tree it visits that would
