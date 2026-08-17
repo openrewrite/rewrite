@@ -532,3 +532,54 @@ func TestTypeAttributionNamedFuncTypeDeclaringType(t *testing.T) {
 		t.Errorf("call through unnamed func type: got declaring type %v, want none", unnamed.DeclaringType)
 	}
 }
+
+func TestTypeAttributionPackageLevelVarOwner(t *testing.T) {
+	src := "package main\n\nvar Global int\n\ntype S struct{ F int }\n\nfunc (s *S) M(a int) {\n\t_ = Global\n\t_ = s.F\n\t_ = a\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	owners := map[string][]string{}
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.FieldType == nil {
+			return
+		}
+		owners[i.Name] = append(owners[i.Name], describeOwner(i.FieldType.Owner))
+	})
+	for name, want := range map[string]string{
+		"Global": "class:main",   // package scope, not whoever reads it
+		"F":      "class:main.S", // the struct declaring it
+		"a":      "method:M",     // the function it lives in
+		"s":      "method:M",     // the receiver, at declaration and use alike
+	} {
+		got := owners[name]
+		if len(got) == 0 {
+			t.Errorf("%s: no field type seen", name)
+			continue
+		}
+		for _, g := range got {
+			if g != want {
+				t.Errorf("%s owner: got %q, want %q (all sightings: %v)", name, g, want, got)
+				break
+			}
+		}
+	}
+}
+
+func describeOwner(o java.JavaType) string {
+	switch v := o.(type) {
+	case nil:
+		return "none"
+	case *java.JavaTypeMethod:
+		if v == nil {
+			return "TYPED-NIL method"
+		}
+		return "method:" + v.Name
+	case *java.JavaTypeClass:
+		if v == nil {
+			return "TYPED-NIL class"
+		}
+		return "class:" + v.FullyQualifiedName
+	}
+	return "other"
+}

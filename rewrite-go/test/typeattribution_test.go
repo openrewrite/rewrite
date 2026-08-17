@@ -312,7 +312,9 @@ func defectsOf(t java.JavaType) []string {
 		return d
 	case *java.JavaTypeVariable:
 		var d []string
-		if v.Owner == nil {
+		// A nil pointer boxed in the interface reads as present and
+		// panics on use, so it counts as absent here.
+		if isNilType(v.Owner) {
 			d = append(d, "variable: no owner")
 		}
 		if v.Type == nil {
@@ -335,6 +337,16 @@ func defectsOf(t java.JavaType) []string {
 	return nil
 }
 
+// isNilType reports a JavaType that is absent, whether the interface
+// itself is nil or it boxes a nil pointer.
+func isNilType(t java.JavaType) bool {
+	if t == nil {
+		return true
+	}
+	rv := reflect.ValueOf(t)
+	return rv.Kind() == reflect.Ptr && rv.IsNil()
+}
+
 func (w *typeWalker) count(slot, site string, v reflect.Value) {
 	c := w.counts[slot]
 	if c == nil {
@@ -342,7 +354,7 @@ func (w *typeWalker) count(slot, site string, v reflect.Value) {
 		w.counts[slot] = c
 	}
 	switch {
-	case v.IsNil():
+	case v.IsNil(), v.Kind() == reflect.Interface && isNilType(v.Interface().(java.JavaType)):
 		c.nil_++
 		w.empty[site+" [nil]"]++
 	case v.Interface() == java.UnknownType:

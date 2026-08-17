@@ -194,14 +194,20 @@ type parseContext struct {
 	cursor   int // current byte offset into src, tracks consumed positions
 	typeInfo *types.Info
 	mapper   *typeMapper
-	// enclosingMethod owns the locals and parameters being mapped.
-	enclosingMethod *java.JavaTypeMethod
+	// enclosingMethod owns the locals and parameters being mapped. It is
+	// an interface so that an absent one is a nil interface rather than a
+	// nil pointer boxed in one, which would read as present.
+	enclosingMethod java.JavaType
 }
 
 // enterMethod scopes enclosingMethod to m until the returned func runs.
 func (ctx *parseContext) enterMethod(m *java.JavaTypeMethod) func() {
 	previous := ctx.enclosingMethod
-	ctx.enclosingMethod = m
+	if m == nil {
+		ctx.enclosingMethod = nil
+	} else {
+		ctx.enclosingMethod = m
+	}
 	return func() { ctx.enclosingMethod = previous }
 }
 
@@ -672,12 +678,6 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("func"))
 	leadingAnns, prefix := extractDirectives(prefix)
 
-	var receiver *java.Container[java.Statement]
-	if decl.Recv != nil && len(decl.Recv.List) > 0 {
-		recv := ctx.mapFieldListAsParams(decl.Recv)
-		receiver = &recv
-	}
-
 	var methodType *java.JavaTypeMethod
 	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
 		if fn, ok := obj.(*types.Func); ok {
@@ -685,6 +685,12 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 		}
 	}
 	defer ctx.enterMethod(methodType)()
+
+	var receiver *java.Container[java.Statement]
+	if decl.Recv != nil && len(decl.Recv.List) > 0 {
+		recv := ctx.mapFieldListAsParams(decl.Recv)
+		receiver = &recv
+	}
 
 	name := ctx.mapIdent(decl.Name)
 	typeParams := ctx.mapTypeParams(decl.Type.TypeParams)
