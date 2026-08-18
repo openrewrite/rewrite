@@ -44,6 +44,13 @@ type GoParser struct {
 	// GOOS/GOARCH). Recipe authors that need cross-platform analysis can
 	// set this explicitly via NewGoParserWithBuildContext.
 	BuildContext build.Context
+
+	// ParseOnly produces trees without type attribution, for callers that read
+	// only layout off the result. Some expressions map to a different shape
+	// without types — `Map[int]` becomes an index expression rather than a
+	// generic instantiation — so a caller that compares shapes must tolerate
+	// that. Mirrors JavaScriptParser.parseOnly() in rewrite-javascript.
+	ParseOnly bool
 }
 
 func NewGoParser() *GoParser {
@@ -132,20 +139,22 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		// Used to distinguish generic instantiation from ordinary indexing.
 		Instances: make(map[*ast.Ident]types.Instance),
 	}
-	conf := types.Config{
-		Importer: gp.Importer,
-		// Don't fail on type errors — we want partial type info even when
-		// some imports can't be resolved.
-		Error: func(error) {},
-	}
+	if !gp.ParseOnly {
+		conf := types.Config{
+			Importer: gp.Importer,
+			// Don't fail on type errors — we want partial type info even when
+			// some imports can't be resolved.
+			Error: func(error) {},
+		}
 
-	// Use the first file's package name as the type-checker hint;
-	// types.Config.Check validates that all files agree.
-	pkgName := "main"
-	if asts[0].Name != nil {
-		pkgName = asts[0].Name.Name
+		// Use the first file's package name as the type-checker hint;
+		// types.Config.Check validates that all files agree.
+		pkgName := "main"
+		if asts[0].Name != nil {
+			pkgName = asts[0].Name.Name
+		}
+		checkTypes(&conf, pkgName, fset, asts, typeInfo)
 	}
-	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
 
 	mapper := newTypeMapper()
 	cus := make([]*golang.CompilationUnit, 0, len(files))
@@ -162,6 +171,15 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		cus = append(cus, ctx.mapFile(asts[i], f.Path))
 	}
 	return cus, nil
+}
+
+// checkTypes populates typeInfo as far as the type checker gets. Some
+// malformed-but-parseable inputs — a type cycle routed through an alias,
+// for one — make go/types panic rather than report an error, and the LST
+// does not depend on type information being complete.
+func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) {
+	defer func() { recover() }()
+	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
 }
 
 // PackageNameOf returns the package clause name of a Go source file, or ""
@@ -185,6 +203,21 @@ type parseContext struct {
 	cursor   int // current byte offset into src, tracks consumed positions
 	typeInfo *types.Info
 	mapper   *typeMapper
+	// enclosingMethod owns the locals and parameters being mapped. It is
+	// an interface so that an absent one is a nil interface rather than a
+	// nil pointer boxed in one, which would read as present.
+	enclosingMethod java.JavaType
+}
+
+// enterMethod scopes enclosingMethod to m until the returned func runs.
+func (ctx *parseContext) enterMethod(m *java.JavaTypeMethod) func() {
+	previous := ctx.enclosingMethod
+	if m == nil {
+		ctx.enclosingMethod = nil
+	} else {
+		ctx.enclosingMethod = m
+	}
+	return func() { ctx.enclosingMethod = previous }
 }
 
 // prefix extracts the whitespace and comments between the current cursor
@@ -225,7 +258,14 @@ func (ctx *parseContext) prefixAndSkip(pos token.Pos, length int) java.Space {
 }
 
 // mapFile maps an ast.File to a CompilationUnit.
+const utf8BOM = "\ufeff"
+
 func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.CompilationUnit {
+	bomMarked := strings.HasPrefix(string(ctx.src), utf8BOM)
+	if bomMarked {
+		ctx.skip(len(utf8BOM))
+	}
+
 	// "package" keyword
 	prefix := ctx.prefixAndSkip(file.Package, len("package"))
 
@@ -237,14 +277,21 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 
 	// Top-level declarations (functions, types, vars, consts - excluding imports)
 	var stmts []java.RightPadded[java.Statement]
-	for _, decl := range file.Decls {
+	for i, decl := range file.Decls {
 		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
 			continue
 		}
 		stmt := ctx.mapDecl(decl)
-		if stmt != nil {
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: stmt})
+		if stmt == nil {
+			continue
 		}
+		rp := java.RightPadded[java.Statement]{Element: stmt}
+		boundary := len(ctx.src)
+		if i+1 < len(file.Decls) {
+			boundary = ctx.file.Offset(file.Decls[i+1].Pos())
+		}
+		takeSemicolon(ctx, &rp, boundary)
+		stmts = append(stmts, rp)
 	}
 	eof := java.EmptySpace
 	if ctx.cursor < len(ctx.src) {
@@ -252,13 +299,14 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 	}
 
 	return &golang.CompilationUnit{
-		ID:          uuid.New(),
-		Prefix:      prefix,
-		SourcePath:  sourcePath,
-		PackageDecl: &paddedPkgName,
-		Imports:     imports,
-		Statements:  stmts,
-		EOF:         eof,
+		ID:               uuid.New(),
+		Prefix:           prefix,
+		SourcePath:       sourcePath,
+		CharsetBomMarked: bomMarked,
+		PackageDecl:      &paddedPkgName,
+		Imports:          imports,
+		Statements:       stmts,
+		EOF:              eof,
 	}
 }
 
@@ -296,23 +344,16 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		}
 	}
 
-	for _, spec := range first.Specs {
+	for i, spec := range first.Specs {
 		is := spec.(*ast.ImportSpec)
-		imp := ctx.mapImportSpec(is)
-		elements = append(elements, java.RightPadded[*java.Import]{Element: imp})
+		rp := java.RightPadded[*java.Import]{Element: ctx.mapImportSpec(is)}
+		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, first, i))
+		elements = append(elements, rp)
 	}
 
 	if first.Lparen.IsValid() {
-		closeParen := ctx.prefix(first.Rparen)
+		elements = closeImportGroup(elements, ctx.prefix(first.Rparen))
 		ctx.skip(1) // skip ")"
-		if len(elements) > 0 {
-			elements[len(elements)-1].After = closeParen
-		} else if len(closeParen.Comments) > 0 {
-			elements = append(elements, java.RightPadded[*java.Import]{
-				Element: &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}},
-				After:   closeParen,
-			})
-		}
 	}
 
 	// Subsequent import blocks: attach ImportBlock marker to first import of each
@@ -337,18 +378,15 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		if grouped {
 			closeParen := ctx.prefix(importDecl.Rparen)
 			ctx.skip(1) // skip ")"
-			if len(importDecl.Specs) > 0 {
-				elements[len(elements)-1].After = closeParen
-			} else if len(closeParen.Comments) > 0 {
+			if len(importDecl.Specs) == 0 {
 				imp := &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}}
 				imp.Markers = java.Markers{
 					ID:      uuid.New(),
 					Entries: []java.Marker{importBlockMarker},
 				}
-				elements = append(elements, java.RightPadded[*java.Import]{
-					Element: imp,
-					After:   closeParen,
-				})
+				elements = append(elements, java.RightPadded[*java.Import]{Element: imp, After: closeParen})
+			} else {
+				elements = closeImportGroup(elements, closeParen)
 			}
 		}
 		prevGrouped = grouped
@@ -370,8 +408,39 @@ func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]java
 				Entries: []java.Marker{marker},
 			}
 		}
-		*elements = append(*elements, java.RightPadded[*java.Import]{Element: imp})
+		rp := java.RightPadded[*java.Import]{Element: imp}
+		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, decl, j))
+		*elements = append(*elements, rp)
 	}
+}
+
+// importSpecBoundary is where spec i of an import declaration ends: the
+// next spec, or the `)` of a grouped block. An ungrouped `import "x";`
+// has neither, and relies on takeSemicolon's line cap.
+func importSpecBoundary(ctx *parseContext, decl *ast.GenDecl, i int) int {
+	if i+1 < len(decl.Specs) {
+		return ctx.file.Offset(decl.Specs[i+1].Pos())
+	}
+	if decl.Rparen.IsValid() {
+		return ctx.file.Offset(decl.Rparen)
+	}
+	return 0
+}
+
+// closeImportGroup parks the space before a grouped import's `)`, the
+// way closeSpecGroup does for a declaration group.
+func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java.Space) []java.RightPadded[*java.Import] {
+	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
+		elements[n-1].After = closeParen
+		return elements
+	}
+	if len(elements) == 0 && len(closeParen.Comments) == 0 && closeParen.Whitespace == "" {
+		return elements
+	}
+	return append(elements, java.RightPadded[*java.Import]{
+		Element: &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}},
+		After:   closeParen,
+	})
 }
 
 // mapImportSpec maps a single import spec.
@@ -434,25 +503,18 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) java.Statement {
 	ctx.skip(1) // "("
 
 	var elements []java.RightPadded[java.Statement]
-	for _, s := range decl.Specs {
+	for i, s := range decl.Specs {
 		spec := s.(*ast.ValueSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		vd := ctx.mapValueSpec(spec, innerPrefix, keyword)
 		vd.Markers.Entries = append(vd.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
-		elements = append(elements, java.RightPadded[java.Statement]{Element: vd})
+		elements = append(elements, ctx.terminateSpec(vd, decl, i))
 	}
 
 	rparenPrefix := ctx.prefix(decl.Rparen)
 	ctx.skip(1) // ")"
 
-	if len(elements) > 0 {
-		elements[len(elements)-1].After = rparenPrefix
-	} else if len(rparenPrefix.Comments) > 0 {
-		elements = append(elements, java.RightPadded[java.Statement]{
-			Element: &java.Empty{ID: uuid.New()},
-			After:   rparenPrefix,
-		})
-	}
+	elements = closeSpecGroup(elements, rparenPrefix)
 
 	kind := golang.DeclVar
 	if keyword == "const" {
@@ -570,25 +632,18 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) java.Statement {
 	ctx.skip(1) // "("
 
 	var elements []java.RightPadded[java.Statement]
-	for _, s := range decl.Specs {
+	for i, s := range decl.Specs {
 		spec := s.(*ast.TypeSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		td := ctx.mapTypeSpec(spec, innerPrefix)
 		td.Markers.Entries = append(td.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
-		elements = append(elements, java.RightPadded[java.Statement]{Element: td})
+		elements = append(elements, ctx.terminateSpec(td, decl, i))
 	}
 
 	rparenPrefix := ctx.prefix(decl.Rparen)
 	ctx.skip(1) // ")"
 
-	if len(elements) > 0 {
-		elements[len(elements)-1].After = rparenPrefix
-	} else if len(rparenPrefix.Comments) > 0 {
-		elements = append(elements, java.RightPadded[java.Statement]{
-			Element: &java.Empty{ID: uuid.New()},
-			After:   rparenPrefix,
-		})
-	}
+	elements = closeSpecGroup(elements, rparenPrefix)
 
 	specs := &java.Container[java.Statement]{Before: lparenPrefix, Elements: elements}
 	return &golang.TypeDecl{
@@ -632,6 +687,14 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("func"))
 	leadingAnns, prefix := extractDirectives(prefix)
 
+	var methodType *java.JavaTypeMethod
+	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
+		if fn, ok := obj.(*types.Func); ok {
+			methodType = ctx.mapper.mapMethodObject(fn)
+		}
+	}
+	defer ctx.enterMethod(methodType)()
+
 	var receiver *java.Container[java.Statement]
 	if decl.Recv != nil && len(decl.Recv.List) > 0 {
 		recv := ctx.mapFieldListAsParams(decl.Recv)
@@ -659,12 +722,7 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 		Body:               body,
 	}
 
-	// Type attribution for method declaration
-	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
-		if fn, ok := obj.(*types.Func); ok {
-			md.MethodType = ctx.mapper.mapMethodObject(fn)
-		}
-	}
+	md.MethodType = methodType
 
 	if receiver != nil {
 		// The prefix (whitespace before `func`, after any `//go:` directives)
@@ -728,15 +786,32 @@ func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
 		elements = append(elements, java.RightPadded[java.J]{Element: tp, After: after})
 	}
 
-	closePrefix := ctx.prefix(fl.Closing)
-	ctx.skip(1) // "]"
-	if len(elements) > 0 {
-		elements[len(elements)-1].After = closePrefix
+	var markers java.Markers
+	if trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(fl.Closing)); len(elements) > 0 && trailingCommaOff >= 0 {
+		commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
+		ctx.skip(1) // ","
+		commaAfter := ctx.prefix(fl.Closing)
+		ctx.skip(1) // "]"
+		markers = java.Markers{
+			ID: uuid.New(),
+			Entries: []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}},
+		}
+	} else {
+		closePrefix := ctx.prefix(fl.Closing)
+		ctx.skip(1) // "]"
+		if len(elements) > 0 {
+			elements[len(elements)-1].After = closePrefix
+		}
 	}
 
 	return &java.TypeParameters{
 		ID:             uuid.New(),
 		Prefix:         before,
+		Markers:        markers,
 		TypeParameters: elements,
 	}
 }
@@ -823,16 +898,31 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 			}
 		}
 
-		closePrefix := ctx.prefix(results.Closing)
-		ctx.skip(1) // ")"
-
-		if len(elements) > 0 {
-			elements[len(elements)-1].After = closePrefix
+		var markers java.Markers
+		if trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(results.Closing)); len(elements) > 0 && trailingCommaOff >= 0 {
+			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
+			ctx.skip(1) // ","
+			commaAfter := ctx.prefix(results.Closing)
+			ctx.skip(1) // ")"
+			markers = java.Markers{
+				ID: uuid.New(),
+				Entries: []java.Marker{golang.TrailingComma{
+					Ident:  uuid.New(),
+					Before: commaBefore,
+					After:  commaAfter,
+				}},
+			}
+		} else {
+			closePrefix := ctx.prefix(results.Closing)
+			ctx.skip(1) // ")"
+			if len(elements) > 0 {
+				elements[len(elements)-1].After = closePrefix
+			}
 		}
 
 		return &golang.TypeList{
 			ID:    uuid.New(),
-			Types: java.Container[java.Statement]{Before: before, Elements: elements},
+			Types: java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers},
 		}
 	}
 
@@ -937,7 +1027,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 
 	var markers java.Markers
 	if len(elements) > 0 {
-		trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base())
+		trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(fl.Closing))
 		if trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
@@ -970,15 +1060,126 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 	return java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers}
 }
 
+// takeSemicolon claims an explicit `;` written between the element just
+// mapped and `boundary`, where the next one starts. Go's tokenizer
+// inserts semicolons at end of line and reports neither the inserted nor
+// the written one in the AST, so a `;` in the source is recoverable only
+// from the source text.
+func takeSemicolon[T any](ctx *parseContext, rp *java.RightPadded[T], boundary int) {
+	// Only the very next token can be this element's terminator. One
+	// further off belongs to something else — the statement enclosing
+	// the list, or an expression still to be mapped. `boundary`, where
+	// the caller knows one, is where the next element starts: a `;` at
+	// or past it is that element's.
+	off := ctx.nextTokenOffset()
+	if off < 0 || ctx.src[off] != ';' || (boundary > 0 && off >= boundary) {
+		return
+	}
+	rp.After = ctx.prefix(ctx.file.Pos(off))
+	ctx.skip(1) // ";"
+	rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
+}
+
+// literalSource is the source text of the string literal at pos,
+// delimiters included, found by scanning to the closing one: an
+// interpreted string ends at an unescaped quote, a raw string at the
+// next backtick.
+func (ctx *parseContext) literalSource(pos token.Pos) string {
+	start := ctx.file.Offset(pos)
+	if start >= len(ctx.src) {
+		return ""
+	}
+	quote := ctx.src[start]
+	i := start + 1
+	for i < len(ctx.src) {
+		c := ctx.src[i]
+		if quote == '"' && c == '\\' {
+			i += 2
+			continue
+		}
+		i++
+		if c == quote {
+			break
+		}
+	}
+	return string(ctx.src[start:i])
+}
+
+// boundaryAt is the offset of pos, or -1 when the position is absent so
+// that a scan bounded by it finds nothing rather than running to EOF.
+func (ctx *parseContext) boundaryAt(pos token.Pos) int {
+	if !pos.IsValid() {
+		return -1
+	}
+	return ctx.file.Offset(pos)
+}
+
+// nextTokenOffset returns the offset of the first byte at or after the
+// cursor that is neither whitespace nor part of a comment, or -1.
+func (ctx *parseContext) nextTokenOffset() int {
+	i := ctx.cursor
+	for i < len(ctx.src) {
+		switch c := ctx.src[i]; {
+		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
+			i++
+		case c == '/' && i+1 < len(ctx.src) && ctx.src[i+1] == '/':
+			for i < len(ctx.src) && ctx.src[i] != '\n' {
+				i++
+			}
+		case c == '/' && i+1 < len(ctx.src) && ctx.src[i+1] == '*':
+			i += 2
+			for i+1 < len(ctx.src) && !(ctx.src[i] == '*' && ctx.src[i+1] == '/') {
+				i++
+			}
+			i += 2
+		default:
+			return i
+		}
+	}
+	return -1
+}
+
+// closeSpecGroup parks the space before a declaration group's `)`. The
+// last element's After normally holds it, but when that element claimed
+// a trailing `;` its After is already spoken for, so the space rides an
+// Empty — the same slot an otherwise empty group's comments use.
+func closeSpecGroup(elements []java.RightPadded[java.Statement], rparenPrefix java.Space) []java.RightPadded[java.Statement] {
+	if n := len(elements); n > 0 && java.FindMarker[golang.Semicolon](elements[n-1].Markers) == nil {
+		elements[n-1].After = rparenPrefix
+		return elements
+	}
+	if len(elements) == 0 && len(rparenPrefix.Comments) == 0 && rparenPrefix.Whitespace == "" {
+		return elements
+	}
+	return append(elements, java.RightPadded[java.Statement]{
+		Element: &java.Empty{ID: uuid.New()},
+		After:   rparenPrefix,
+	})
+}
+
+// terminateSpec wraps spec i of a parenthesized declaration group.
+func (ctx *parseContext) terminateSpec(stmt java.Statement, decl *ast.GenDecl, i int) java.RightPadded[java.Statement] {
+	rp := java.RightPadded[java.Statement]{Element: stmt}
+	boundary := ctx.file.Offset(decl.Rparen)
+	if i+1 < len(decl.Specs) {
+		boundary = ctx.file.Offset(decl.Specs[i+1].Pos())
+	}
+	takeSemicolon(ctx, &rp, boundary)
+	return rp
+}
+
+// terminate wraps entry i of a struct or interface field list.
+func (ctx *parseContext) terminate(stmt java.Statement, fl *ast.FieldList, i int) java.RightPadded[java.Statement] {
+	rp := java.RightPadded[java.Statement]{Element: stmt}
+	boundary := ctx.file.Offset(fl.Closing)
+	if i+1 < len(fl.List) {
+		boundary = ctx.file.Offset(fl.List[i+1].Pos())
+	}
+	takeSemicolon(ctx, &rp, boundary)
+	return rp
+}
+
 // mapBlockStmt maps a block statement.
-//
-// Multi-statements-per-line (`_ = 1; _ = 2`) carry a literal `;` that
-// Go's tokenizer recognizes but doesn't surface as part of either
-// statement's AST. To round-trip the source, we look for an inline `;`
-// between this statement and the next, capture the leading whitespace
-// as RightPadded.After, mark the entry with a Semicolon marker, and
-// advance the cursor past the `;`. The Block printer emits `;` when
-// the marker is present.
 func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *java.Block {
 	prefix := ctx.prefix(block.Lbrace)
 	ctx.skip(1) // "{"
@@ -991,34 +1192,11 @@ func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *java.Block {
 		}
 		rp := java.RightPadded[java.Statement]{Element: mapped}
 
-		// Detect inline `;` separator. Go inserts implicit semicolons
-		// at end-of-line, so a literal `;` between two statements only
-		// appears when they share a source line (or when a `;` appears
-		// before the closing `}` on the last statement's line). We
-		// avoid scanning comments/strings for stray `;` bytes by
-		// gating on line numbers from the tokenizer.
-		stmtEndLine := ctx.file.Position(stmt.End()).Line
-		var nextStartLine int
+		boundary := ctx.file.Offset(block.Rbrace)
 		if i+1 < len(block.List) {
-			nextStartLine = ctx.file.Position(block.List[i+1].Pos()).Line
-		} else {
-			nextStartLine = ctx.file.Position(block.Rbrace).Line
+			boundary = ctx.file.Offset(block.List[i+1].Pos())
 		}
-		if stmtEndLine == nextStartLine {
-			// Same line — look for the explicit `;`.
-			boundary := 0
-			if i+1 < len(block.List) {
-				boundary = ctx.file.Offset(block.List[i+1].Pos())
-			} else {
-				boundary = ctx.file.Offset(block.Rbrace)
-			}
-			semiOffset := ctx.findNextBefore(';', boundary)
-			if semiOffset >= 0 {
-				rp.After = ctx.prefix(ctx.file.Pos(semiOffset))
-				ctx.skip(1) // consume ";"
-				rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
-			}
-		}
+		takeSemicolon(ctx, &rp, boundary)
 
 		stmts = append(stmts, rp)
 	}
@@ -1218,9 +1396,22 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 		ID:       uuid.New(),
 		Prefix:   prefix,
 		Markers:  markers,
+		Type:     ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 		Variable: lhs,
 		Value:    java.LeftPadded[java.Expression]{Before: opPrefix, Element: rhs},
 	}
+}
+
+// assignedType is the type of what an assignment writes, taken from the
+// value where the target carries none — the blank identifier is the one
+// that does not.
+func (ctx *parseContext) assignedType(lhs, rhs ast.Expr) java.JavaType {
+	for _, e := range []ast.Expr{lhs, rhs} {
+		if tv, ok := ctx.typeInfo.Types[e]; ok && tv.Type != nil {
+			return ctx.mapper.mapType(tv.Type)
+		}
+	}
+	return nil
 }
 
 func mapAssignmentOp(tok token.Token) (java.AssignmentOperator, bool) {
@@ -1271,7 +1462,10 @@ func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) java.Statement {
 	if s, ok := expr.(java.Statement); ok {
 		return s
 	}
-	return nil
+	// `(h())` and a bare selector are expressions the J model has no
+	// statement node for; the wrapper puts them in statement position.
+	prefix, expr := hoistLeftPrefix(expr)
+	return &golang.ExpressionStatement{ID: uuid.New(), Prefix: prefix, Expression: expr}
 }
 
 // mapIfStmt maps an if statement. A plain `if cond { }` maps to java.If
@@ -1280,18 +1474,7 @@ func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) java.Statement {
 func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("if"))
 
-	var init *java.RightPadded[java.Statement]
-	if stmt.Init != nil {
-		initStmt := ctx.mapStmt(stmt.Init)
-		semicolonOffset := ctx.findNext(';')
-		var after java.Space
-		if semicolonOffset >= 0 {
-			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
-			ctx.skip(1) // ";"
-		}
-		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
-		init = &rp
-	}
+	init := ctx.mapInitClause(stmt.Init, stmt.Cond.Pos())
 
 	cond := ctx.mapExpr(stmt.Cond)
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1342,6 +1525,27 @@ func controlParentheses(inner java.Expression) *java.ControlParentheses {
 // wrapWithInit wraps an inner if/switch in a golang.StatementWithInit when an
 // init clause is present, moving the keyword prefix onto the wrapper and
 // leaving the inner statement prefix-less. With no init it returns inner as-is.
+// mapInitClause maps the `<stmt>;` that may precede an `if` or `switch`
+// header. Either half may be absent: `switch ; {` has no statement, and
+// a line break can separate clause from condition in place of a written
+// `;`. A java.Empty stands in for the one, a Semicolon marker records
+// the other.
+func (ctx *parseContext) mapInitClause(init ast.Stmt, headerEnd token.Pos) *java.RightPadded[java.Statement] {
+	var element java.Statement
+	if init != nil {
+		element = ctx.mapStmt(init)
+	}
+	rp := java.RightPadded[java.Statement]{Element: element}
+	takeSemicolon(ctx, &rp, ctx.file.Offset(headerEnd))
+	if rp.Element == nil {
+		if java.FindMarker[golang.Semicolon](rp.Markers) == nil {
+			return nil
+		}
+		rp.Element = &java.Empty{ID: uuid.New()}
+	}
+	return &rp
+}
+
 func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inner java.Statement) java.Statement {
 	if init == nil {
 		return inner
@@ -1359,18 +1563,7 @@ func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inn
 func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
-	var init *java.RightPadded[java.Statement]
-	if stmt.Init != nil {
-		initStmt := ctx.mapStmt(stmt.Init)
-		semicolonOffset := ctx.findNext(';')
-		var after java.Space
-		if semicolonOffset >= 0 {
-			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
-			ctx.skip(1) // ";"
-		}
-		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
-		init = &rp
-	}
+	init := ctx.mapInitClause(stmt.Init, stmt.Body.Lbrace)
 
 	var tag *java.RightPadded[java.Expression]
 	if stmt.Tag != nil {
@@ -1440,11 +1633,18 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 
 	// Body statements
 	var body []java.RightPadded[java.Statement]
-	for _, stmt := range clause.Body {
+	for i, stmt := range clause.Body {
 		mapped := ctx.mapStmt(stmt)
-		if mapped != nil {
-			body = append(body, java.RightPadded[java.Statement]{Element: mapped})
+		if mapped == nil {
+			continue
 		}
+		rp := java.RightPadded[java.Statement]{Element: mapped}
+		boundary := 0
+		if i+1 < len(clause.Body) {
+			boundary = ctx.file.Offset(clause.Body[i+1].Pos())
+		}
+		takeSemicolon(ctx, &rp, boundary)
+		body = append(body, rp)
 	}
 
 	return &java.Case{
@@ -1494,11 +1694,18 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClaus
 	}
 
 	var body []java.RightPadded[java.Statement]
-	for _, stmt := range clause.Body {
+	for i, stmt := range clause.Body {
 		mapped := ctx.mapStmt(stmt)
-		if mapped != nil {
-			body = append(body, java.RightPadded[java.Statement]{Element: mapped})
+		if mapped == nil {
+			continue
 		}
+		rp := java.RightPadded[java.Statement]{Element: mapped}
+		boundary := 0
+		if i+1 < len(clause.Body) {
+			boundary = ctx.file.Offset(clause.Body[i+1].Pos())
+		}
+		takeSemicolon(ctx, &rp, boundary)
+		body = append(body, rp)
 	}
 
 	return &golang.CommClause{
@@ -1516,18 +1723,7 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClaus
 func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
-	var init *java.RightPadded[java.Statement]
-	if stmt.Init != nil {
-		initStmt := ctx.mapStmt(stmt.Init)
-		semicolonOffset := ctx.findNext(';')
-		var after java.Space
-		if semicolonOffset >= 0 {
-			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
-			ctx.skip(1)
-		}
-		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
-		init = &rp
-	}
+	init := ctx.mapInitClause(stmt.Init, stmt.Assign.Pos())
 
 	// The assign is `x.(type)` (ExprStmt) or `v := x.(type)` (AssignStmt)
 	var tag *java.RightPadded[java.Expression]
@@ -1569,10 +1765,14 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 // mapEmptyStmt maps an empty statement (bare semicolons).
 func (ctx *parseContext) mapEmptyStmt(stmt *ast.EmptyStmt) *java.Empty {
 	prefix := ctx.prefix(stmt.Pos())
+	empty := &java.Empty{ID: uuid.New(), Prefix: prefix}
+	// An empty statement is a `;` on its own; the implicit kind stands
+	// for the one the tokenizer inserts at a line break and has no text.
 	if !stmt.Implicit {
-		ctx.skip(1) // explicit ";"
+		ctx.skip(1) // ";"
+		empty.Markers = java.AddMarker(empty.Markers, golang.NewSemicolon())
 	}
-	return &java.Empty{ID: uuid.New(), Prefix: prefix}
+	return empty
 }
 
 // mapForStmt maps a for statement (classic 3-clause, condition-only, or infinite).
@@ -1585,13 +1785,13 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 	// Go's AST normalizes `for ; cond; {}` to Init=nil, Post=nil, same as `for cond {}`.
 	// We detect semicolons by looking at the source text between for keyword and body.
 	is3Clause := stmt.Init != nil || stmt.Post != nil
-	bodyStart := int(stmt.Body.Lbrace) - ctx.file.Base()
+	bodyStart := ctx.boundaryAt(stmt.Body.Lbrace)
 	if !is3Clause {
 		// `for ; cond; {}` has no Init/Post in the AST but is still
 		// syntactically 3-clause. Detect by scanning for `;` in the
 		// header — but skip rune/string literals so a `';'` inside the
 		// condition (e.g. `for tok != ';'`) isn't mistaken for one.
-		if ctx.findNextPositionOf(';', bodyStart) >= 0 {
+		if ctx.findNextBefore(';', bodyStart) >= 0 {
 			is3Clause = true
 		}
 	}
@@ -1603,7 +1803,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			// The whitespace after "for" is read onto the init clause; hoist it
 			// onto the control so it stays attached to the outermost element.
 			control.Prefix, init = hoistLeftPrefix(init)
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			var after java.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1613,7 +1813,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			control.Init = &initRP
 		} else {
 			// No init but semicolons present: `for ; cond; post {}`
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			var after java.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1625,7 +1825,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 
 		if stmt.Cond != nil {
 			cond := ctx.mapExpr(stmt.Cond)
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			after := java.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1634,7 +1834,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			condRP := java.RightPadded[java.Expression]{Element: cond, After: after}
 			control.Condition = &condRP
 		} else {
-			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
+			semicolonOffset := ctx.findNextBefore(';', bodyStart)
 			after := java.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1784,6 +1984,7 @@ func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *java.Unary {
 		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Before: opPrefix, Element: op},
 		Operand:  operand,
+		Type:     ctx.valueTypeOf(stmt.X),
 	}
 }
 
@@ -1921,10 +2122,10 @@ func (ctx *parseContext) mapIdent(ident *ast.Ident) *java.Identifier {
 	// Type attribution: look up in Defs first, then Uses
 	if obj, ok := ctx.typeInfo.Defs[ident]; ok && obj != nil {
 		id.Type = ctx.mapper.mapObject(obj)
-		id.FieldType = ctx.mapper.mapObjectToVariable(obj)
+		id.FieldType = ctx.mapper.mapObjectToVariable(obj, ctx.enclosingMethod)
 	} else if obj, ok := ctx.typeInfo.Uses[ident]; ok && obj != nil {
 		id.Type = ctx.mapper.mapObject(obj)
-		id.FieldType = ctx.mapper.mapObjectToVariable(obj)
+		id.FieldType = ctx.mapper.mapObjectToVariable(obj, ctx.enclosingMethod)
 	}
 
 	return id
@@ -1937,10 +2138,7 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
 
-	// Type attribution for literal
-	if tv, ok := ctx.typeInfo.Types[lit]; ok {
-		l.Type = ctx.mapper.mapType(tv.Type)
-	}
+	l.Type = ctx.valueTypeOf(lit)
 
 	return l
 }
@@ -2026,10 +2224,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 		Right:    right,
 	}
 
-	// Type attribution for binary expression
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		b.Type = ctx.mapper.mapType(tv.Type)
-	}
+	b.Type = ctx.valueTypeOf(expr)
 
 	return b
 }
@@ -2124,7 +2319,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	var markers java.Markers
 	if len(argElements) > 0 {
 		// Look for a comma between current position and closing paren
-		trailingCommaOff := ctx.findNextBefore(',', int(expr.Rparen)-ctx.file.Base())
+		trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(expr.Rparen))
 		if trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
@@ -2146,7 +2341,8 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	} else {
 		closePrefix := ctx.prefix(expr.Rparen)
 		ctx.skip(1) // ")"
-		if len(closePrefix.Comments) > 0 {
+		// No element means no After to park the closing space in.
+		if !closePrefix.IsEmpty() {
 			argElements = append(argElements, java.RightPadded[java.Expression]{
 				Element: &java.Empty{ID: uuid.New()},
 				After:   closePrefix,
@@ -2169,21 +2365,66 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	if selExpr, ok := calleeAst.(*ast.SelectorExpr); ok {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
+			if mi.MethodType == nil {
+				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name, selection.Recv())
+			}
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
 			// Qualified identifier (pkg.Func) — not a selection, but Sel is in Uses
-			if fn, ok := obj.(*types.Func); ok {
-				mi.MethodType = ctx.mapper.mapMethodObject(fn)
-			}
+			mi.MethodType = ctx.calleeSignature(obj, selExpr.Sel.Name, nil)
 		}
 	} else if ident, ok := calleeAst.(*ast.Ident); ok {
 		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
-			if fn, ok := obj.(*types.Func); ok {
-				mi.MethodType = ctx.mapper.mapMethodObject(fn)
-			}
+			mi.MethodType = ctx.calleeSignature(obj, ident.Name, nil)
 		}
 	}
 
+	if marker := ctx.callKindMarker(expr.Fun); marker != nil {
+		mi.Markers = java.AddMarker(mi.Markers, marker)
+	}
+
 	return mi
+}
+
+// callKindMarker reports whether a call's callee denotes a type (making the
+// call a conversion) or one of Go's predeclared functions.
+func (ctx *parseContext) callKindMarker(callee ast.Expr) java.Marker {
+	if tv, ok := ctx.typeInfo.Types[callee]; ok && tv.IsType() {
+		return golang.NewConversion()
+	}
+	if ident, ok := callee.(*ast.Ident); ok {
+		if _, ok := ctx.typeInfo.Uses[ident].(*types.Builtin); ok {
+			return golang.NewBuiltin()
+		}
+	}
+	return nil
+}
+
+// calleeSignature is the signature a call goes through, whether the
+// callee is a declared function or a value of func type — a parameter, a
+// local, a struct field. recv is the type the callee was selected from,
+// nil for a bare identifier. A builtin has no signature to give.
+func (ctx *parseContext) calleeSignature(obj types.Object, name string, recv types.Type) *java.JavaTypeMethod {
+	if obj == nil {
+		return nil
+	}
+	if fn, ok := obj.(*types.Func); ok {
+		return ctx.mapper.mapMethodObject(fn)
+	}
+	if sig, ok := obj.Type().Underlying().(*types.Signature); ok {
+		// A named func type is what the call goes through, the way an
+		// interface is for a method. An unnamed one names nothing, so a
+		// func-typed field falls back to the type that declares it.
+		var declaring *java.JavaTypeClass
+		// mapType is the depth-bounded, panic-guarded entry; the
+		// mapNamed underneath it is not.
+		if _, ok := obj.Type().(*types.Named); ok {
+			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
+		} else if recv != nil {
+			declaring, _ = ctx.mapper.mapType(recv).(*java.JavaTypeClass)
+		}
+		return ctx.mapper.mapSignature(sig, name, declaring)
+	}
+	return nil
 }
 
 // isGenericInstantiation reports whether x — the operand of an *ast.IndexExpr
@@ -2263,6 +2504,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	case token.AND:
 		return &golang.Unary{
@@ -2270,6 +2512,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.AddressOf},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	case token.ARROW:
 		return &golang.Unary{
@@ -2277,6 +2520,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Receive},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -2299,6 +2543,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Element: op},
 		Operand:  operand,
+		Type:     ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2314,6 +2559,10 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	}
 	lbracePrefix := ctx.prefix(expr.Lbrace)
 	ctx.skip(1) // "{"
+	if expr.Type == nil {
+		// Nothing precedes `{`, so that whitespace is the composite's own.
+		prefix, lbracePrefix = lbracePrefix, java.EmptySpace
+	}
 
 	var elements []java.RightPadded[java.Expression]
 	for i, elt := range expr.Elts {
@@ -2332,7 +2581,7 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	// Check for trailing comma before closing brace
 	var compMarkers java.Markers
 	if len(elements) > 0 {
-		trailingCommaOff := ctx.findNextBefore(',', int(expr.Rbrace)-ctx.file.Base())
+		trailingCommaOff := ctx.findNextBefore(',', ctx.boundaryAt(expr.Rbrace))
 		if trailingCommaOff >= 0 {
 			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
 			ctx.skip(1) // ","
@@ -2354,7 +2603,7 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 	} else {
 		closePrefix := ctx.prefix(expr.Rbrace)
 		ctx.skip(1) // "}"
-		if len(closePrefix.Comments) > 0 {
+		if !closePrefix.IsEmpty() {
 			elements = append(elements, java.RightPadded[java.Expression]{
 				Element: &java.Empty{ID: uuid.New()},
 				After:   closePrefix,
@@ -2362,13 +2611,17 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 		}
 	}
 
-	return &golang.Composite{
+	comp := &golang.Composite{
 		ID:       uuid.New(),
 		Prefix:   prefix,
 		Markers:  compMarkers,
 		TypeExpr: typeExpr,
 		Elements: java.Container[java.Expression]{Before: lbracePrefix, Elements: elements},
 	}
+	// The literal's own type, which an elided inner literal (`[]T{{...}}`)
+	// has no type expression to state.
+	comp.Type = ctx.valueTypeOf(expr)
+	return comp
 }
 
 // mapParenExpr maps a parenthesized expression.
@@ -2398,6 +2651,7 @@ func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) java.Expression {
 		Prefix:     prefix,
 		Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
 		Expression: operand,
+		Type:       ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2516,12 +2770,14 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 		}
 	}
 
-	return &java.ArrayType{
+	at := &java.ArrayType{
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		Dimension:   java.LeftPadded[java.Space]{Element: closePrefix},
 		ElementType: elt,
 	}
+	at.Type = ctx.valueTypeOf(expr)
+	return at
 }
 
 // mapParameterizedType maps a single-type-arg generic instantiation in a type position,
@@ -2534,6 +2790,7 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expressi
 		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsSingle(expr),
+		Type:           ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2543,13 +2800,36 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expressi
 func (ctx *parseContext) mapTypeArgsSingle(expr *ast.IndexExpr) *java.Container[java.Expression] {
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
-	typeArg := ctx.mapTypeExpr(expr.Index)
-	rbrackPrefix := ctx.prefix(expr.Rbrack)
-	ctx.skip(1) // "]"
+	elements := []java.RightPadded[java.Expression]{{Element: ctx.mapTypeExpr(expr.Index)}}
+	markers := ctx.closeTypeArgs(elements, expr.Rbrack)
 	return &java.Container[java.Expression]{
 		Before:   lbrackPrefix,
-		Elements: []java.RightPadded[java.Expression]{{Element: typeArg, After: rbrackPrefix}},
+		Elements: elements,
+		Markers:  markers,
 	}
+}
+
+// closeTypeArgs consumes a type argument list's `]`, claiming a trailing
+// comma into a marker so it does not end up in the whitespace before the
+// bracket.
+func (ctx *parseContext) closeTypeArgs(elements []java.RightPadded[java.Expression], rbrack token.Pos) java.Markers {
+	if commaOff := ctx.findNextBefore(',', ctx.file.Offset(rbrack)); commaOff >= 0 {
+		before := ctx.prefix(ctx.file.Pos(commaOff))
+		ctx.skip(1) // ","
+		after := ctx.prefix(rbrack)
+		ctx.skip(1) // "]"
+		return java.Markers{
+			ID: uuid.New(),
+			Entries: []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: before,
+				After:  after,
+			}},
+		}
+	}
+	elements[len(elements)-1].After = ctx.prefix(rbrack)
+	ctx.skip(1) // "]"
+	return java.Markers{}
 }
 
 // mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,
@@ -2562,6 +2842,7 @@ func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java
 		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsMulti(expr),
+		Type:           ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2582,16 +2863,15 @@ func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Contain
 				after = ctx.prefix(ctx.file.Pos(commaOffset))
 				ctx.skip(1) // ","
 			}
-		} else {
-			after = ctx.prefix(expr.Rbrack)
 		}
 		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
-	ctx.skip(1) // "]"
+	markers := ctx.closeTypeArgs(elements, expr.Rbrack)
 
 	return &java.Container[java.Expression]{
 		Before:   lbrackPrefix,
 		Elements: elements,
+		Markers:  markers,
 	}
 }
 
@@ -2614,7 +2894,22 @@ func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 			Prefix: lbrackPrefix,
 			Index:  java.RightPadded[java.Expression]{Element: index, After: rbrackPrefix},
 		},
+		Type: ctx.valueTypeOf(expr),
 	}
+}
+
+// valueTypeOf is the type an expression evaluates to. A comma-ok map index is
+// typed `(V, ok)`, of which only V is the expression's value.
+func (ctx *parseContext) valueTypeOf(expr ast.Expr) java.JavaType {
+	tv, ok := ctx.typeInfo.Types[expr]
+	if !ok {
+		return nil
+	}
+	t := tv.Type
+	if tuple, ok := t.(*types.Tuple); ok && tuple.Len() > 0 {
+		t = tuple.At(0).Type()
+	}
+	return ctx.mapper.mapType(t)
 }
 
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).
@@ -2684,18 +2979,32 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 		Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
 	}
 
-	_ = dotPrefix // space between Expr and the dot; gofmt never emits it
-	return &java.TypeCast{
-		ID:     uuid.New(),
-		Prefix: prefix,
-		Clazz:  clazz,
-		Expr:   x,
+	ta := &golang.TypeAssertion{
+		ID:           uuid.New(),
+		Prefix:       prefix,
+		Left:         java.RightPadded[java.Expression]{Element: x, After: dotPrefix},
+		AssertedType: clazz,
 	}
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		ta.Type = ctx.mapper.mapType(tv.Type)
+	}
+	return ta
 }
 
 // mapFuncLit maps a function literal (closure).
 func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Type.Func, len("func"))
+
+	// A literal has no name to look up, so its signature comes from the
+	// expression rather than from Defs.
+	var methodType *java.JavaTypeMethod
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		if sig, ok := tv.Type.(*types.Signature); ok {
+			methodType = ctx.mapper.mapSignature(sig, "", nil)
+		}
+	}
+	defer ctx.enterMethod(methodType)()
+
 	params := ctx.mapFieldListAsParams(expr.Type.Params)
 	returnType := ctx.mapReturnType(expr.Type.Results)
 	body := ctx.mapBlockStmt(expr.Body)
@@ -2703,6 +3012,7 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 	md := &java.MethodDeclaration{
 		ID:         uuid.New(),
 		Name:       &java.Identifier{ID: uuid.New(), Name: ""},
+		MethodType: methodType,
 		Parameters: params,
 		ReturnType: returnType,
 		Body:       body,
@@ -2924,7 +3234,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 	ctx.skip(1) // "{"
 
 	var stmts []java.RightPadded[java.Statement]
-	for _, field := range fl.List {
+	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded type (e.g., `io.Reader` in struct)
 			typeExpr := ctx.mapTypeExpr(field.Type)
@@ -2941,7 +3251,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 			if field.Tag != nil {
 				ctx.mapStructTag(vd, field.Tag)
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
+			stmts = append(stmts, ctx.terminate(vd, fl, i))
 		} else {
 			// Named field(s): `X int` or `X, Y int`
 			var vars []java.RightPadded[*java.VariableDeclarator]
@@ -2975,7 +3285,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 			if field.Tag != nil {
 				ctx.mapStructTag(vd, field.Tag)
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
+			stmts = append(stmts, ctx.terminate(vd, fl, i))
 		}
 	}
 
@@ -3004,36 +3314,60 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 //     gofmt'd input is exact.
 func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.BasicLit) {
 	outerPrefix := ctx.prefix(tag.Pos())
-	ctx.skip(len(tag.Value))
+	// A raw string's carriage returns are absent from tag.Value, and
+	// BasicLit.End() derives from that value in some Go releases, so the
+	// literal's extent is found by scanning for its closing delimiter.
+	src := ctx.literalSource(tag.Pos())
+	ctx.skip(len(src))
 
-	// tag.Value includes the wrapping backticks (or quotes).
-	raw := tag.Value
-	if len(raw) >= 2 {
-		first, last := raw[0], raw[len(raw)-1]
-		if (first == '`' && last == '`') || (first == '"' && last == '"') {
-			raw = raw[1 : len(raw)-1]
+	// A raw string carries its content verbatim; an interpreted one needs
+	// its escapes resolved so `"json:\"a\""` yields the same pairs as
+	// the raw spelling.
+	raw := src
+	if len(raw) >= 2 && raw[0] == '`' {
+		raw = raw[1 : len(raw)-1]
+	} else {
+		unquoted, err := strconv.Unquote(raw)
+		if err != nil {
+			// Unreachable: go/parser rejects a literal Unquote cannot
+			// read. Stripping keeps the printer from writing the
+			// delimiters twice if it ever is reached.
+			unquoted = strings.Trim(raw, `"`)
 		}
+		raw = unquoted
+		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: `"`})
 	}
 
-	pairs := parseStructTagPairs(raw)
-	if len(pairs) == 0 {
+	// Anything the scan could not read as a pair is source all the same;
+	// only whitespace has a slot on the last value, so a tag with other
+	// leftovers is kept whole instead of decomposed.
+	pairs, rest := parseStructTagPairs(raw)
+	if len(pairs) == 0 || strings.TrimSpace(rest) != "" {
+		// The text is still source even when no pair reads out of it.
+		vd.LeadingAnnotations = []*java.Annotation{{
+			ID:             uuid.New(),
+			Prefix:         outerPrefix,
+			AnnotationType: &java.Identifier{ID: uuid.New(), Name: raw},
+		}}
 		return
 	}
 
 	annotations := make([]*java.Annotation, len(pairs))
 	for i, p := range pairs {
-		var annPrefix java.Space
+		// The first pair's Prefix is the space outside the delimiter, so
+		// its own padding — which is inside — rides the key instead.
+		annPrefix := java.Space{Whitespace: p.PrefixWS}
+		var keyPrefix java.Space
 		if i == 0 {
-			annPrefix = outerPrefix
-		} else {
-			annPrefix = java.Space{Whitespace: p.PrefixWS}
+			annPrefix, keyPrefix = outerPrefix, java.Space{Whitespace: p.PrefixWS}
 		}
 		annotations[i] = &java.Annotation{
 			ID:     uuid.New(),
 			Prefix: annPrefix,
 			AnnotationType: &java.Identifier{
-				ID:   uuid.New(),
-				Name: p.Key,
+				ID:     uuid.New(),
+				Prefix: keyPrefix,
+				Name:   p.Key,
 			},
 			Arguments: &java.Container[java.Expression]{
 				Elements: []java.RightPadded[java.Expression]{
@@ -3046,6 +3380,8 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 			},
 		}
 	}
+	last := annotations[len(annotations)-1].Arguments.Elements
+	last[len(last)-1].After = java.Space{Whitespace: rest}
 	vd.LeadingAnnotations = annotations
 }
 
@@ -3069,11 +3405,11 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 		if c.Kind != java.LineComment {
 			break
 		}
-		name, args, ok := parseDirective(c.Text)
+		name, sep, args, ok := parseDirective(c.Text)
 		if !ok {
 			break
 		}
-		anns = append(anns, buildDirectiveAnnotation(name, args, java.Space{Whitespace: pendingPrefixWS}))
+		anns = append(anns, buildDirectiveAnnotation(name, sep, args, java.Space{Whitespace: pendingPrefixWS}))
 		pendingPrefixWS = c.Suffix
 		i++
 	}
@@ -3088,41 +3424,42 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 }
 
 // parseDirective tries to parse a `//PREFIX:NAME [ARGS]` line into
-// (name, args, ok). The full directive name returned is `PREFIX:NAME`
-// — preserved exactly as authors write it (`go:noinline`,
-// `lint:ignore`). `args` is the trimmed text after the first space (or
-// "" when absent).
+// (name, sep, args, ok). The full directive name returned is
+// `PREFIX:NAME` — preserved exactly as authors write it
+// (`go:noinline`, `lint:ignore`). `sep` is the whitespace between name
+// and args, which authors do not always write as one space.
 //
 // Recognized prefixes: `go`, `lint`. (Other vendor-specific prefixes
 // like `nolint` aren't of the form `PREFIX:NAME` and are left as
 // regular comments.)
-func parseDirective(text string) (name, args string, ok bool) {
+func parseDirective(text string) (name, sep, args string, ok bool) {
 	if !strings.HasPrefix(text, "//") {
-		return "", "", false
+		return "", "", "", false
 	}
 	inner := text[2:]
 	colonIdx := strings.Index(inner, ":")
 	if colonIdx <= 0 {
-		return "", "", false
+		return "", "", "", false
 	}
 	prefix := inner[:colonIdx]
 	if !isDirectivePrefix(prefix) {
-		return "", "", false
+		return "", "", "", false
 	}
 	rest := inner[colonIdx+1:]
 	spaceIdx := strings.IndexAny(rest, " \t")
 	if spaceIdx < 0 {
 		if rest == "" {
-			return "", "", false
+			return "", "", "", false
 		}
-		return prefix + ":" + rest, "", true
+		return prefix + ":" + rest, "", "", true
 	}
 	dirName := rest[:spaceIdx]
 	if dirName == "" {
-		return "", "", false
+		return "", "", "", false
 	}
 	dirArgs := strings.TrimLeft(rest[spaceIdx:], " \t")
-	return prefix + ":" + dirName, dirArgs, true
+	sep = rest[spaceIdx : len(rest)-len(dirArgs)]
+	return prefix + ":" + dirName, sep, dirArgs, true
 }
 
 func isDirectivePrefix(p string) bool {
@@ -3133,7 +3470,7 @@ func isDirectivePrefix(p string) bool {
 	return false
 }
 
-func buildDirectiveAnnotation(name, args string, prefix java.Space) *java.Annotation {
+func buildDirectiveAnnotation(name, sep, args string, prefix java.Space) *java.Annotation {
 	ann := &java.Annotation{
 		ID:     uuid.New(),
 		Prefix: prefix,
@@ -3142,16 +3479,18 @@ func buildDirectiveAnnotation(name, args string, prefix java.Space) *java.Annota
 			Name: name,
 		},
 	}
-	if args != "" {
-		ann.Arguments = &java.Container[java.Expression]{
-			Before: java.Space{Whitespace: " "},
-			Elements: []java.RightPadded[java.Expression]{
+	// The separator is source even where it runs to the end of the line
+	// with no argument behind it.
+	if sep != "" || args != "" {
+		ann.Arguments = &java.Container[java.Expression]{Before: java.Space{Whitespace: sep}}
+		if args != "" {
+			ann.Arguments.Elements = []java.RightPadded[java.Expression]{
 				{Element: &java.Literal{
 					ID:     uuid.New(),
 					Source: args,
 					Value:  args,
 				}},
-			},
+			}
 		}
 	}
 	return ann
@@ -3175,7 +3514,7 @@ type structTagPair struct {
 // Returns whatever pairs it parsed up to the first malformed section;
 // gofmt'd input is always well-formed but defensive scanning matches
 // stdlib behavior.
-func parseStructTagPairs(tag string) []structTagPair {
+func parseStructTagPairs(tag string) ([]structTagPair, string) {
 	var pairs []structTagPair
 	i := 0
 	for i < len(tag) {
@@ -3186,7 +3525,7 @@ func parseStructTagPairs(tag string) []structTagPair {
 		}
 		prefixWS := tag[prefStart:i]
 		if i == len(tag) {
-			break
+			return pairs, prefixWS
 		}
 		// Read key.
 		keyStart := i
@@ -3194,7 +3533,7 @@ func parseStructTagPairs(tag string) []structTagPair {
 			i++
 		}
 		if i == keyStart || i+1 >= len(tag) || tag[i] != ':' || tag[i+1] != '"' {
-			break
+			return pairs, tag[prefStart:]
 		}
 		key := tag[keyStart:i]
 		i++ // skip `:`
@@ -3208,13 +3547,13 @@ func parseStructTagPairs(tag string) []structTagPair {
 			i++
 		}
 		if i >= len(tag) {
-			break
+			return pairs, tag[prefStart:]
 		}
 		i++ // skip closing `"`
 		quotedValue := tag[valueStart:i]
 		unquoted, err := strconv.Unquote(quotedValue)
 		if err != nil {
-			break
+			return pairs, tag[prefStart:]
 		}
 		pairs = append(pairs, structTagPair{
 			PrefixWS:      prefixWS,
@@ -3223,7 +3562,7 @@ func parseStructTagPairs(tag string) []structTagPair {
 			UnquotedValue: unquoted,
 		})
 	}
-	return pairs
+	return pairs, ""
 }
 
 // mapFieldListAsInterfaceBody maps an interface's method list to a Block.
@@ -3233,7 +3572,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	ctx.skip(1) // "{"
 
 	var stmts []java.RightPadded[java.Statement]
-	for _, field := range fl.List {
+	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded interface type (e.g., `io.Reader`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
@@ -3246,7 +3585,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
 				},
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
+			stmts = append(stmts, ctx.terminate(vd, fl, i))
 		} else {
 			// Method signature: `Name(params) returnType`
 			name := ctx.mapIdent(field.Names[0])
@@ -3266,7 +3605,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 				ReturnType: returnType,
 				// Body is nil — interface method has no body
 			}
-			stmts = append(stmts, java.RightPadded[java.Statement]{Element: md})
+			stmts = append(stmts, ctx.terminate(md, fl, i))
 		}
 	}
 
@@ -3345,31 +3684,25 @@ func mapBinaryOp(op token.Token) java.BinaryOperator {
 }
 
 func (ctx *parseContext) findNext(ch byte) int {
-	for i := ctx.cursor; i < len(ctx.src); i++ {
-		if ctx.src[i] == ch {
-			return i
-		}
-	}
-	return -1
+	return ctx.findNextBefore(ch, 0)
 }
 
 // findNextBefore returns the byte offset of the next occurrence of ch from the
-// current cursor, but only if it appears before the `before` byte offset.
+// current cursor, but only if it appears before the `before` byte offset; a
+// `before` of 0 means scan to end of src, and a negative one means the bound
+// is absent so nothing matches.
+//
+// The scan steps over Go rune literals ('...'), interpreted string literals
+// ("..."), raw string literals (`...`), and `//` / `/* */` comments. Every
+// character the parser looks for this way — a `,` between arguments, the `;`
+// in a `for` header, the `:` of a label — is syntax, and one written inside a
+// comment or a string is text that happens to look like it. A quote,
+// backtick or `/` is therefore never found: those open the regions the
+// scan steps over.
 func (ctx *parseContext) findNextBefore(ch byte, before int) int {
-	for i := ctx.cursor; i < len(ctx.src) && i < before; i++ {
-		if ctx.src[i] == ch {
-			return i
-		}
+	if before < 0 {
+		return -1
 	}
-	return -1
-}
-
-// findNextPositionOf is like findNextBefore but skips over Go rune
-// literals ('...'), interpreted string literals ("..."), raw string literals
-// (`...`), and `//` / `/* */` comments while scanning. A `before` of 0 means
-// scan to end of src. Used for syntactic markers like `;` in a `for` header
-// that can otherwise hide inside a `';'` rune literal or a `/* ; */` comment.
-func (ctx *parseContext) findNextPositionOf(ch byte, before int) int {
 	end := len(ctx.src)
 	if before > 0 && before < end {
 		end = before

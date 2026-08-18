@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -41,9 +43,7 @@ func main() {
 	_ = strconv.Itoa(i)
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	calls := map[string]*java.MethodInvocation{}
 	visitor.Walk(cu, func(n java.Tree) bool {
@@ -71,9 +71,7 @@ func main() {
 
 	for _, tc := range cases {
 		mi, ok := calls[tc.call]
-		if !ok {
-			t.Fatalf("no invocation of %q found in parsed tree", tc.call)
-		}
+		require.Truef(t, ok, "no invocation of %q found in parsed tree", tc.call)
 		if got := matcher.NewMethodMatcher(tc.pattern).Matches(mi); got != tc.want {
 			t.Errorf("NewMethodMatcher(%q).Matches(%s call) = %v, want %v", tc.pattern, tc.call, got, tc.want)
 		}

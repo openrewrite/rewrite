@@ -106,8 +106,12 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// New object or forward declaration
 		if msg.ValueType == nil {
 			before = msg.Value
+		} else if obj, known := newObjIfKnown(*msg.ValueType); known {
+			before = obj
+		} else if scalar, ok := inlineScalar(msg.Value); ok {
+			before = scalar
 		} else {
-			before = newObj(*msg.ValueType)
+			panic(missingCodec(*msg.ValueType))
 		}
 		if ref != nil {
 			// Store before deserialization to handle cycles
@@ -122,7 +126,13 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// before=nil drop every sub-field message of a CHANGE-typed object,
 		// silently desyncing the wire.
 		if isNilValue(before) && msg.ValueType != nil {
-			before = newObj(*msg.ValueType)
+			if obj, known := newObjIfKnown(*msg.ValueType); known {
+				before = obj
+			} else if scalar, ok := inlineScalar(msg.Value); ok {
+				before = scalar
+			} else {
+				panic(missingCodec(*msg.ValueType))
+			}
 		}
 		before = hydrateGenericMarker(before, msg.Value)
 		// The remote inlines a value only when it has no codec for the type, so a typed ADD with
@@ -159,6 +169,18 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 	default:
 		panic(fmt.Sprintf("unsupported state: %v", msg.State))
 	}
+}
+
+// inlineScalar reports whether a type this side does not model arrived as a
+// value it can carry verbatim. A scalar — a big integer, a timestamp —
+// round-trips unchanged; a structured payload would lose its type on the way
+// back, and no value at all means the remote has a codec this side lacks.
+func inlineScalar(v any) (any, bool) {
+	switch v.(type) {
+	case nil, map[string]any, []any:
+		return nil, false
+	}
+	return v, true
 }
 
 func missingCodec(valueType string) string {
@@ -356,16 +378,16 @@ func RegisterFactory(javaClassName string, factory func() any) {
 	factories[javaClassName] = factory
 }
 
-// newObj creates a new empty instance by Java class name.
-// Unknown marker types are treated as GenericMarker to avoid panics
-// from markers added in newer versions of rewrite-core.
-func newObj(javaClassName string) any {
+// newObjIfKnown creates a new empty instance by Java class name, reporting
+// whether the name is one this side models. Unknown marker types are treated as
+// GenericMarker so markers added in newer versions of rewrite-core still arrive.
+func newObjIfKnown(javaClassName string) (any, bool) {
 	if factory, ok := factories[javaClassName]; ok {
-		return factory()
+		return factory(), true
 	}
 	// Unknown marker types — create a GenericMarker with JavaType preserved.
 	if strings.Contains(javaClassName, "marker") || strings.Contains(javaClassName, "Marker") {
-		return java.GenericMarker{JavaType: javaClassName}
+		return java.GenericMarker{JavaType: javaClassName}, true
 	}
-	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
+	return nil, false
 }

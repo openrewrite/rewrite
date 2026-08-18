@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import cast, Optional
 
 from rewrite import Tree, P, Cursor, list_find
-from rewrite.java import Statement, Block, Semicolon
+from rewrite.java import Statement, Block, Semicolon, Unary
 from rewrite.python import PythonVisitor, ExpressionStatement
 from rewrite.visitor import T
 
@@ -29,6 +29,12 @@ class MinimumViableSpacingVisitor(PythonVisitor):
                     tree = tree.replace(prefix=new_prefix)
 
         return tree
+
+    def visit_unary(self, unary: Unary, p: P) -> Optional[T]:
+        u = cast(Unary, super().visit_unary(unary, p))
+        if u.operator == Unary.Type.Not and not u.expression.prefix.comments and not u.expression.prefix.whitespace:
+            u = u.replace(_expression=u.expression.replace(_prefix=u.expression.prefix.replace(whitespace=' ')))
+        return cast(Optional[T], u)
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
         return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))

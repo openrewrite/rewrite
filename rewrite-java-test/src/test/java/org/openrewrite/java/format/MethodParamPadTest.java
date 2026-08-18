@@ -346,6 +346,32 @@ class MethodParamPadTest implements RewriteTest {
     }
 
     @Test
+    void staticGenericMethodWithoutSpaceBeforeTypeParameters() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Map;
+
+              class A<K, V> {
+                  public static<K, V> A<K, V> of(Map.Entry<K, V> entry) {
+                      return new A<>();
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class A<K, V> {
+                  public static <K, V> A<K, V> of(Map.Entry<K, V> entry) {
+                      return new A<>();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void recordWithCompactConstructor() {
         rewriteRun(
           version(java(

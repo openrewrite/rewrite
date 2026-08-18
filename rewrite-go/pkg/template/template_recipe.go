@@ -267,7 +267,8 @@ func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 		if match == nil {
 			continue
 		}
-		replaced := v.after.Apply(nil, match)
+		// See RewriteVisitor.Visit on why the cursor names t rather than j.
+		replaced := v.after.Apply(visitor.NewCursor(v.Cursor(), t), match)
 		if replaced != nil {
 			if len(v.sourceImports) > 0 {
 				for _, imp := range v.sourceImports {
@@ -275,7 +276,7 @@ func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 				}
 				v.DoAfterVisit(recipe.Service[*recipegolang.ImportService](nil).RemoveUnusedImportsVisitor())
 			}
-			return setLeadingPrefix(replaced, getLeadingPrefix(j))
+			return replaced
 		}
 	}
 	return result

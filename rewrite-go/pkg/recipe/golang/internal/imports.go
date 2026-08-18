@@ -176,29 +176,26 @@ func IsLocal(importPath, modulePath string) bool {
 	return importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/")
 }
 
-// ReferencedPackages walks cu and returns the set of import paths that
-// are referenced by some identifier in the file body. Used by
-// RemoveUnusedImports to drop imports whose alias is never read.
-//
-// Detection is driven by the Type attribution that the parser threads
-// onto each Identifier:
-//   - For an `Identifier` whose `Type` is a `JavaTypeClass` and whose
-//     `FullyQualifiedName` carries an import path (path-shaped FQN),
-//     that path is added to the set.
-//   - For a `MethodInvocation`, the `MethodType.DeclaringType.FullyQualifiedName`
-//     is used.
-//
-// Aliases and dot imports are handled uniformly — the package's import
-// path is what we track, regardless of how the user named it.
+// ReferencedImports walks the body of cu once and returns the two signals
+// that decide whether an import is used: refs, the import paths carried by
+// the parser's Type attribution, and quals, the identifiers used lexically
+// as package qualifiers — the attribution-free signal goimports relies on.
+// Aliases and dot imports land in refs under the package's import path.
+func ReferencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
+	return referencedImports(cu)
+}
+
+// ReferencedPackages returns just the import-path set of ReferencedImports.
 func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
 	refs, _ := referencedImports(cu)
 	return refs
 }
 
-// ReferencedQualifiers returns the identifiers used lexically as package qualifiers (left of the dot), the attribution-free signal goimports relies on.
-func ReferencedQualifiers(cu *golang.CompilationUnit) map[string]bool {
-	_, quals := referencedImports(cu)
-	return quals
+// IsReferenced reports whether imp is used by the file whose refs/quals
+// sets are passed in. Both sets come from one ReferencedImports walk per
+// file.
+func IsReferenced(imp *java.Import, refs, quals map[string]bool) bool {
+	return refs[ImportPath(imp)] || quals[PackageName(imp)]
 }
 
 func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
@@ -216,6 +213,13 @@ type referencedPackagesVisitor struct {
 	visitor.GoVisitor
 	refs  map[string]bool
 	quals map[string]bool
+}
+
+// The alias in `import s "strings"` carries the imported package as its
+// type, so the walk stops at the import declarations and counts only uses
+// in the body.
+func (v *referencedPackagesVisitor) VisitImport(imp *java.Import, p any) java.J {
+	return imp
 }
 
 func (v *referencedPackagesVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {

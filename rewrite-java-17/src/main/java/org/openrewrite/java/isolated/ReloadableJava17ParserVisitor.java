@@ -2343,7 +2343,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         boolean inMultilineComment = false;
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
-        boolean noSpace = false;
 
         int keywordStartIdx = -1;
         for (int i = cursor; i < source.length(); i++) {
@@ -2377,10 +2376,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
-                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                // Modifiers end at whitespace, at a type parameter list's `<`, or at an adjacent annotation's `@`
+                boolean beforeAnnotation = !Character.isWhitespace(c) && c != '<' &&
+                        i + 1 < source.length() && source.charAt(i + 1) == '@';
+                if (Character.isWhitespace(c) || c == '<' || beforeAnnotation) {
                     if (keywordStartIdx != -1) {
-                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, noSpace ? i + 1 : i));
+                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, beforeAnnotation ? i + 1 : i));
                         keywordStartIdx = -1;
 
                         if (matching == null) {

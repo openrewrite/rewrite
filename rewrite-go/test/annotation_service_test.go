@@ -21,6 +21,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -36,45 +40,31 @@ import (
 
 func TestAnnotationService_Registered(t *testing.T) {
 	svc := recipe.Service[*recipes.AnnotationService](nil)
-	if svc == nil {
-		t.Fatal("expected AnnotationService to be registered")
-	}
+	require.NotNil(t, svc, "expected AnnotationService to be registered")
 }
 
 func TestAnnotationService_IsAnnotatedWith_StructTag(t *testing.T) {
 	src := "package main\n\ntype User struct {\n\tName string `json:\"name\"`\n}\n"
 	field := parseStructAndFindField(t, src, "Name")
 	svc := &recipes.AnnotationService{}
-	if !svc.IsAnnotatedWith(field, "json") {
-		t.Errorf("expected struct field with json tag to match \"json\"")
-	}
-	if svc.IsAnnotatedWith(field, "validate") {
-		t.Errorf("did not expect match for absent tag \"validate\"")
-	}
+	assert.True(t, svc.IsAnnotatedWith(field, "json"), "expected struct field with json tag to match \"json\"")
+	assert.False(t, svc.IsAnnotatedWith(field, "validate"), "did not expect match for absent tag \"validate\"")
 }
 
 func TestAnnotationService_IsAnnotatedWith_Directive(t *testing.T) {
 	src := "package main\n\n//go:noinline\nfunc slow() {}\n"
 	md := parseAndFindMethod(t, src, "slow")
 	svc := &recipes.AnnotationService{}
-	if !svc.IsAnnotatedWith(md, "go:noinline") {
-		t.Errorf("expected method with go:noinline to match")
-	}
+	assert.True(t, svc.IsAnnotatedWith(md, "go:noinline"), "expected method with go:noinline to match")
 }
 
 func TestAnnotationService_IsAnnotatedWith_WildcardPrefix(t *testing.T) {
 	src := "package main\n\n//go:noinline\n//go:nosplit\nfunc slow() {}\n"
 	md := parseAndFindMethod(t, src, "slow")
 	svc := &recipes.AnnotationService{}
-	if !svc.IsAnnotatedWith(md, "go:*") {
-		t.Errorf("expected method with go: directives to match \"go:*\"")
-	}
-	if !svc.IsAnnotatedWith(md, "*") {
-		t.Errorf("expected universal match \"*\" to succeed")
-	}
-	if svc.IsAnnotatedWith(md, "lint:*") {
-		t.Errorf("did not expect match for \"lint:*\" on go-only directives")
-	}
+	assert.True(t, svc.IsAnnotatedWith(md, "go:*"), "expected method with go: directives to match \"go:*\"")
+	assert.True(t, svc.IsAnnotatedWith(md, "*"), "expected universal match \"*\" to succeed")
+	assert.False(t, svc.IsAnnotatedWith(md, "lint:*"), "did not expect match for \"lint:*\" on go-only directives")
 }
 
 func TestAnnotationService_FindAnnotations(t *testing.T) {
@@ -83,9 +73,7 @@ func TestAnnotationService_FindAnnotations(t *testing.T) {
 	svc := &recipes.AnnotationService{}
 
 	jsonAnns := svc.FindAnnotations(field, "json")
-	if len(jsonAnns) != 1 {
-		t.Fatalf("expected 1 json annotation, got %d", len(jsonAnns))
-	}
+	require.Len(t, jsonAnns, 1, "expected 1 json annotation")
 	if v, _ := jsonAnns[0].Arguments.Elements[0].Element.(*java.Literal).Value.(string); v != "email" {
 		t.Errorf("json value: got %q, want \"email\"", v)
 	}
@@ -98,20 +86,14 @@ func TestAnnotationService_AllAnnotations_ViaCursor(t *testing.T) {
 
 	c := buildCursor(md)
 	anns := svc.AllAnnotations(c)
-	if len(anns) != 1 {
-		t.Fatalf("AllAnnotations: got %d, want 1", len(anns))
-	}
-	if anns[0].AnnotationType.(*java.Identifier).Name != "go:noinline" {
-		t.Errorf("annotation: got %+v", anns[0].AnnotationType)
-	}
+	require.Len(t, anns, 1, "AllAnnotations")
+	assert.Equalf(t, "go:noinline", anns[0].AnnotationType.(*java.Identifier).Name, "annotation: got %+v", anns[0].AnnotationType)
 }
 
 func TestAnnotationService_AddAnnotationVisitor_OnFunc(t *testing.T) {
 	src := "package main\n\nfunc slow() { _ = 1 }\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 
 	svc := &recipes.AnnotationService{}
 	ann := &java.Annotation{
@@ -136,9 +118,7 @@ func TestAnnotationService_RemoveAnnotationVisitor(t *testing.T) {
 	// Start with two go: directives, remove one specifically.
 	src := "package main\n\n//go:noinline\n//go:nosplit\nfunc slow() {}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 
 	svc := &recipes.AnnotationService{}
 	v := svc.RemoveAnnotationVisitor("go:nosplit")
@@ -155,12 +135,8 @@ func TestAnnotationService_Matches_ViaCursor(t *testing.T) {
 	md := parseAndFindMethod(t, src, "slow")
 	c := buildCursor(md)
 	svc := &recipes.AnnotationService{}
-	if !svc.Matches(c, recipes.NewAnnotationMatcher("go:noinline")) {
-		t.Error("expected matcher \"go:noinline\" to match")
-	}
-	if svc.Matches(c, recipes.NewAnnotationMatcher("go:nosplit")) {
-		t.Error("did not expect matcher \"go:nosplit\" to match")
-	}
+	assert.True(t, svc.Matches(c, recipes.NewAnnotationMatcher("go:noinline")), "expected matcher \"go:noinline\" to match")
+	assert.False(t, svc.Matches(c, recipes.NewAnnotationMatcher("go:nosplit")), "did not expect matcher \"go:nosplit\" to match")
 }
 
 // buildCursor wraps a node in a single-element cursor for testing
