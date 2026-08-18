@@ -21,6 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
+	"strconv"
+	"strings"
 )
 
 type State int
@@ -71,9 +74,24 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias{
 		State:     d.State.String(),
 		ValueType: d.ValueType,
-		Value:     d.Value,
+		Value:     wireNumber(d.Value),
 		Ref:       d.Ref,
 	})
+}
+
+// A value that carries no valueType is bound on the JVM side by its JSON shape,
+// and Go writes a float64 without a fraction or an exponent for every magnitude
+// between 1e-6 and 1e21 -- a shape the receiver reads as an integer.
+func wireNumber(v any) any {
+	f, ok := v.(float64)
+	if !ok {
+		return v
+	}
+	s := strconv.FormatFloat(f, 'g', -1, 64)
+	if !strings.ContainsAny(s, ".eE") {
+		s += ".0"
+	}
+	return json.Number(s)
 }
 
 type wireObjectData struct {
@@ -85,6 +103,7 @@ type wireObjectData struct {
 
 func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	open, err := dec.Token()
 	if err != nil {
 		if err == io.EOF {
@@ -107,30 +126,49 @@ func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error)
 		}
 		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
 		if w.Value != nil {
-			d.Value = internValue(w.Value, intern)
+			d.Value = decodeValue(w.Value, intern)
 		}
 		batch = append(batch, d)
 	}
 	return batch, nil
 }
 
-func internValue(v any, tbl map[string]string) any {
+func decodeValue(v any, tbl map[string]string) any {
 	switch x := v.(type) {
 	case string:
 		return internString(x, tbl)
+	case json.Number:
+		return decodeNumber(x)
 	case []any:
 		for i := range x {
-			x[i] = internValue(x[i], tbl)
+			x[i] = decodeValue(x[i], tbl)
 		}
 		return x
 	case map[string]any:
 		for k, val := range x {
-			x[k] = internValue(val, tbl)
+			x[k] = decodeValue(val, tbl)
 		}
 		return x
 	default:
 		return v
 	}
+}
+
+// The remote's numbers arrive as text (see UseNumber above) and take the Go type
+// their JSON shape implies, so a value keeps both its kind and its full precision
+// across a round trip.
+func decodeNumber(n json.Number) any {
+	s := n.String()
+	if !strings.ContainsAny(s, ".eE") {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i
+		}
+		if i, ok := new(big.Int).SetString(s, 10); ok {
+			return i
+		}
+	}
+	f, _ := n.Float64()
+	return f
 }
 
 func internString(s string, tbl map[string]string) string {

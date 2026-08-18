@@ -238,15 +238,30 @@ func convertTo[T any](v any) T {
 	if t, ok := v.(T); ok {
 		return t
 	}
-	// Handle float64 -> int64 conversion (common with JSON)
+	// A number arrives in the Go type its JSON shape implies (see decodeNumber),
+	// which need not be the one the field it fills holds.
 	var zero T
 	switch any(zero).(type) {
 	case int64:
 		switch n := v.(type) {
-		case float64:
-			return any(int64(n)).(T)
 		case int:
 			return any(int64(n)).(T)
+		case float64:
+			return any(int64(n)).(T)
+		}
+	case int:
+		switch n := v.(type) {
+		case int64:
+			return any(int(n)).(T)
+		case float64:
+			return any(int(n)).(T)
+		}
+	case float64:
+		switch n := v.(type) {
+		case int:
+			return any(float64(n)).(T)
+		case int64:
+			return any(float64(n)).(T)
 		}
 	case string:
 		if s, ok := v.(string); ok {
