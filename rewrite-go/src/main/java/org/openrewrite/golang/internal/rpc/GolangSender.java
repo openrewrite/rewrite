@@ -94,6 +94,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitComposite(Go.Composite composite, RpcSendQueue q) {
         q.getAndSend(composite, Go.Composite::getTypeExpr, el -> visit(el, q));
         q.getAndSend(composite, c -> c.getPadding().getElements(), el -> visitContainer(el, q));
+        q.getAndSend(composite, c -> Reference.asRef(c.getType()), type -> visitType(getValueNonNull(type), q));
         return composite;
     }
 
@@ -266,6 +267,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitGoUnary(Go.Unary unary, RpcSendQueue q) {
         q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
         q.getAndSend(unary, Go.Unary::getExpression, el -> visit(el, q));
+        q.getAndSend(unary, u -> Reference.asRef(u.getType()), type -> visitType(getValueNonNull(type), q));
         return unary;
     }
 

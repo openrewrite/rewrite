@@ -197,7 +197,7 @@ func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
 	mi := &java.MethodInvocation{
 		Select: &java.RightPadded[java.Expression]{
-			Element: &java.Identifier{Name: "fmt"},
+			Element: &java.Identifier{Name: "fmt", Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"}},
 		},
 		Name: &java.Identifier{Name: "Println"},
 	}
@@ -227,16 +227,26 @@ func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
 }
 
 func TestMethodMatcherWildcardType(t *testing.T) {
-	mm := NewMethodMatcher("* Sub(..)")
+	// "*" stops at a dot, so a package-qualified FQN needs "*..*".
+	mm := NewMethodMatcher("*..* Sub(..)")
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "t", Type: &java.JavaTypeClass{FullyQualifiedName: "time.Time"}},
+		},
+		Name: &java.Identifier{Name: "Sub"},
+	}
+	assert.True(t, mm.Matches(mi), "expected match for wildcard declaring type")
+}
+
+func TestMethodMatcherNoMatchUntypedReceiver(t *testing.T) {
+	mm := NewMethodMatcher("*..* Sub(..)")
 	mi := &java.MethodInvocation{
 		Select: &java.RightPadded[java.Expression]{
 			Element: &java.Identifier{Name: "t"},
 		},
 		Name: &java.Identifier{Name: "Sub"},
 	}
-	// With just an identifier "t" as select, DeclaringTypeFQN returns "t"
-	// which matches "*" pattern
-	assert.True(t, mm.Matches(mi), "expected match for wildcard declaring type")
+	assert.False(t, mm.Matches(mi), "an untyped receiver has no declaring type, not even for a wildcard")
 }
 
 func TestMethodMatcherWithTypeInfo(t *testing.T) {
@@ -369,29 +379,30 @@ func TestTypeOfExpressionDerivesThroughWrappers(t *testing.T) {
 	}
 }
 
-func TestMethodMatcherUnattributedDeclaringType(t *testing.T) {
-	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &java.MethodInvocation{
+// A declaring type of Unknown carries no name, so the call reads as unresolved
+// and its receiver's own type supplies the name.
+func unknownDeclaringTypeInvocation() *java.MethodInvocation {
+	return &java.MethodInvocation{
 		Select: &java.RightPadded[java.Expression]{
-			Element: &java.Identifier{Name: "fmt"},
-		},
-		Name: &java.Identifier{Name: "Println"},
-		MethodType: &java.JavaTypeMethod{
-			Name:          "Println",
-			DeclaringType: java.UnknownType,
-		},
-	}
-	assert.True(t, mm.Matches(mi),
-		"an unnamed declaring type falls through to the select identifier")
-}
-
-func TestDeclaringTypeFQNUnattributedDeclaringType(t *testing.T) {
-	mi := &java.MethodInvocation{
-		Select: &java.RightPadded[java.Expression]{
-			Element: &java.Identifier{Name: "fmt"},
+			Element: &java.Identifier{
+				Name: "fmt",
+				Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"},
+			},
 		},
 		Name:       &java.Identifier{Name: "Println"},
 		MethodType: &java.JavaTypeMethod{Name: "Println", DeclaringType: java.UnknownType},
 	}
-	assert.Equal(t, "fmt", DeclaringTypeFQN(mi))
+}
+
+func TestMethodMatcherUnattributedDeclaringType(t *testing.T) {
+	mm := NewMethodMatcher("fmt Println(..)")
+	assert.True(t, mm.Matches(unknownDeclaringTypeInvocation()))
+}
+
+func TestDeclaringTypeFQNUnattributedDeclaringType(t *testing.T) {
+	assert.Equal(t, "fmt", DeclaringTypeFQN(unknownDeclaringTypeInvocation()))
+}
+
+func TestIsResolvedUnattributedDeclaringType(t *testing.T) {
+	assert.False(t, IsResolved(unknownDeclaringTypeInvocation()))
 }

@@ -193,13 +193,17 @@ func (*JavaTypeUnknown) isJavaType() {}
 // keeps its place in a supertype's interfaces or a type's annotations.
 func (*JavaTypeUnknown) GetFullyQualifiedName() string { return "<unknown>" }
 
-// FQNOf is the name to match a type by, empty when there is none: "<unknown>" is
-// a placeholder no pattern should match and no fallback should be skipped for.
+// IsUnknown reports whether attribution produced no type. Unknown names itself
+// so it can travel as a FullyQualified, but "<unknown>" is a placeholder: nothing
+// resolves against it and no pattern should match it.
+func IsUnknown(t JavaType) bool {
+	_, unknown := t.(*JavaTypeUnknown)
+	return unknown
+}
+
+// FQNOf is the name to match a type by, empty when there is none.
 func FQNOf(fq FullyQualified) string {
-	if fq == nil {
-		return ""
-	}
-	if _, unknown := fq.(*JavaTypeUnknown); unknown {
+	if fq == nil || IsUnknown(fq) {
 		return ""
 	}
 	return fq.GetFullyQualifiedName()

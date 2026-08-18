@@ -33,7 +33,8 @@ import (
 type TabsAndIndentsVisitor struct {
 	visitor.GoVisitor
 	stopAfterTracker
-	depth int
+	depth  int
+	seeded bool
 }
 
 func NewTabsAndIndentsVisitor(stopAfter java.Tree) *TabsAndIndentsVisitor {
@@ -46,9 +47,87 @@ func (v *TabsAndIndentsVisitor) Visit(t java.Tree, p any) java.Tree {
 	if v.shouldHalt() {
 		return t
 	}
+	// The level a subtree sits at is set by the ancestors above it, which a
+	// visit starting below the file only knows through a seeded cursor.
+	if !v.seeded {
+		v.seeded = true
+		v.depth = depthAt(v.Cursor(), t)
+	}
 	out := v.GoVisitor.Visit(t, p)
 	v.noteVisited(t)
 	return out
+}
+
+// depthAt returns the level a node sits at, given the cursor of its parent.
+func depthAt(parent *visitor.Cursor, node java.Tree) int {
+	if parent == nil {
+		return 0
+	}
+	var chain []java.Tree
+	for c := parent; c != nil; c = c.Parent() {
+		chain = append(chain, c.Value())
+	}
+	depth := 0
+	for i := len(chain) - 1; i > 0; i-- {
+		depth += indentDelta(chain[i], chain[i-1])
+	}
+	return depth + indentDelta(chain[0], node)
+}
+
+// indentDelta reports how many levels child sits in from parent, mirroring what
+// the traversal below accumulates in v.depth on its way down. The two stay in
+// step by test: TestSubtreeIndentMatchesWholeFile checks every node of a corpus.
+func indentDelta(parent, child java.Tree) int {
+	switch p := parent.(type) {
+	case *java.Block:
+		return 1
+	case *java.Binary:
+		return operandDelta(p.Right, child)
+	case *golang.Binary:
+		return operandDelta(p.Right, child)
+	case *golang.DeclarationBlock:
+		return specsDelta(p.Specs, child)
+	case *golang.TypeDecl:
+		return specsDelta(p.Specs, child)
+	case *golang.Composite:
+		return listDelta(p.Elements.Elements, child)
+	case *java.MethodInvocation:
+		return listDelta(p.Arguments.Elements, child)
+	}
+	return 0
+}
+
+// operandDelta mirrors visitOperand: only a right operand continuing on its own
+// line moves in a level.
+func operandDelta(right java.Expression, child java.Tree) int {
+	if right != nil && java.Tree(right) == child && breaksLine(getPrefix(child)) {
+		return 1
+	}
+	return 0
+}
+
+func specsDelta(specs *java.Container[java.Statement], child java.Tree) int {
+	if specs == nil {
+		return 0
+	}
+	return listDelta(specs.Elements, child)
+}
+
+// listDelta mirrors eachElement: the first element to start a line of its own
+// moves the list in a level, and the elements after it stay there. A child that
+// is not in the list at all sits outside it, as a composite literal's type
+// expression and a method invocation's select do.
+func listDelta[T java.Tree](elements []java.RightPadded[T], child java.Tree) int {
+	delta := 0
+	for _, rp := range elements {
+		if breaksLine(getPrefix(rp.Element)) {
+			delta = 1
+		}
+		if any(rp.Element) == any(child) {
+			return delta
+		}
+	}
+	return 0
 }
 
 // VisitCompilationUnit indents the specs of a parenthesized import
