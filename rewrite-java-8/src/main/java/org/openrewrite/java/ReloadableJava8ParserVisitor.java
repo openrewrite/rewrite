@@ -2204,8 +2204,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
-                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                // Modifiers end at whitespace, at a type parameter list's `<`, or at an adjacent annotation's `@`
+                if (Character.isWhitespace(c) || c == '<' || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
                     if (noSpace) {
                         word.getAndUpdate(w -> w + c);
                         noSpace = false;
