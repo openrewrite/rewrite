@@ -61,6 +61,24 @@ def test_statement_with_semicolon():
     )
 
 
+def test_not_leaves_existing_spacing_untouched():
+    rewrite_run(
+        # language=python
+        python("assert not  x"),
+        spec=RecipeSpec()
+        .with_recipe(from_visitor(MinimumViableSpacingVisitor()))
+    )
+
+
+def test_arithmetic_unary_stays_tight():
+    rewrite_run(
+        # language=python
+        python("assert -x"),
+        spec=RecipeSpec()
+        .with_recipe(from_visitor(MinimumViableSpacingVisitor()))
+    )
+
+
 class DuplicateMethod(PythonVisitor):
     def visit_block(self, block: Block, p: P) -> J:
         if block.statements and isinstance(block.statements[0], MethodInvocation):
