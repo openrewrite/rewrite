@@ -24,6 +24,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"math"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -2139,6 +2140,17 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
 
 	l.Type = ctx.valueTypeOf(lit)
+
+	// A Go int constant is 64-bit, but Java's int is 32-bit. When the value
+	// overflows Integer, fall back to long so the JVM LST deserializer does not
+	// reconstruct it via Integer.valueOf, which throws and drops the file.
+	if lit.Kind == token.INT {
+		if prim, ok := l.Type.(*java.JavaTypePrimitive); ok && prim.Keyword == "int" {
+			if v, ok := l.Value.(int64); ok && v > math.MaxInt32 {
+				l.Type = &java.JavaTypePrimitive{Keyword: "long"}
+			}
+		}
+	}
 
 	return l
 }

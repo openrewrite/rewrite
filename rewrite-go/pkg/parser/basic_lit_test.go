@@ -76,6 +76,23 @@ func TestBasicLitDecodedValue(t *testing.T) {
 	}
 }
 
+// A Go int constant whose value exceeds Integer.MAX_VALUE must fall back to the
+// `long` primitive, since the JVM LST deserializer reconstructs an `int`-keyword
+// literal via Integer.valueOf, which throws on an out-of-range value.
+func TestIntLiteralExceedingInt32FallsBackToLong(t *testing.T) {
+	// given: an untyped int constant larger than Integer.MAX_VALUE (2147483647)
+	src := "package main\n\nfunc main() {\n\tv := 5243700879\n\t_ = v\n}\n"
+
+	// when
+	lit := litRHS(t, src)
+
+	// then
+	prim, ok := lit.Type.(*java.JavaTypePrimitive)
+	require.Truef(t, ok, "expected *java.JavaTypePrimitive, got %T", lit.Type)
+	assert.Equal(t, "long", prim.Keyword, "keyword")
+	assert.Equal(t, int64(5243700879), lit.Value, "value")
+}
+
 // firstLiteralOfType parses src and returns the first *java.Literal whose
 // attributed Type is the primitive `keyword` (e.g. "byte", "char").
 func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
