@@ -39,7 +39,7 @@ func GetFullyQualifiedName(t java.JavaType) string {
 	case *java.JavaTypeArray:
 		return GetFullyQualifiedName(v.ElemType) + "[]"
 	case java.FullyQualified:
-		return v.GetFullyQualifiedName()
+		return java.FQNOf(v)
 	}
 	return ""
 }
@@ -280,5 +280,6 @@ func DeclaringTypeFQN(mi *java.MethodInvocation) string {
 // a known type. A false here and a non-empty DeclaringTypeFQN can coexist: an
 // import whose symbols failed to load still names its package.
 func IsResolved(mi *java.MethodInvocation) bool {
-	return mi.MethodType != nil && mi.MethodType.DeclaringType != nil
+	return mi.MethodType != nil && mi.MethodType.DeclaringType != nil &&
+		!java.IsUnknown(mi.MethodType.DeclaringType)
 }

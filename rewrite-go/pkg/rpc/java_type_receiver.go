@@ -237,10 +237,7 @@ func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []java.FullyQ
 	}
 	result := make([]java.FullyQualified, len(afterAny))
 	for i, v := range afterAny {
-		if fq, ok := v.(java.FullyQualified); ok {
-			result[i] = fq
-		}
-		// Unknown / non-fully-qualified types are skipped (nil in the list)
+		result[i] = v.(java.FullyQualified)
 	}
 	return result
 }

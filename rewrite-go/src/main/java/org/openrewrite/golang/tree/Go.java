@@ -1778,9 +1778,10 @@ public interface Go extends J {
         @Getter
         List<J.Annotation> leadingAnnotations;
 
+        /** Absent on the outer node of a grouped {@code type ( … )}, whose names live on its specs. */
         @With
         @Getter
-        J.Identifier name;
+        J.@Nullable Identifier name;
 
         @With
         @Getter
