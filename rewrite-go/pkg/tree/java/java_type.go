@@ -189,6 +189,22 @@ type JavaTypeUnknown struct{}
 
 func (*JavaTypeUnknown) isJavaType() {}
 
+// GetFullyQualifiedName makes Unknown a FullyQualified, as it is in Java, so it
+// keeps its place in a supertype's interfaces or a type's annotations.
+func (*JavaTypeUnknown) GetFullyQualifiedName() string { return "<unknown>" }
+
+// FQNOf is the name to match a type by, empty when there is none: "<unknown>" is
+// a placeholder no pattern should match and no fallback should be skipped for.
+func FQNOf(fq FullyQualified) string {
+	if fq == nil {
+		return ""
+	}
+	if _, unknown := fq.(*JavaTypeUnknown); unknown {
+		return ""
+	}
+	return fq.GetFullyQualifiedName()
+}
+
 var UnknownType = &JavaTypeUnknown{}
 
 // TypeSignature computes a string signature for a JavaType, used for list identity

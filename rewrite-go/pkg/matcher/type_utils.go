@@ -39,7 +39,7 @@ func GetFullyQualifiedName(t java.JavaType) string {
 	case *java.JavaTypeArray:
 		return GetFullyQualifiedName(v.ElemType) + "[]"
 	case java.FullyQualified:
-		return v.GetFullyQualifiedName()
+		return java.FQNOf(v)
 	}
 	return ""
 }
@@ -243,8 +243,10 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 // For `fmt.Println(...)`, this returns "fmt" (the package path).
 // For `t.Sub(...)`, this returns the type of the receiver.
 func DeclaringTypeFQN(mi *java.MethodInvocation) string {
-	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
-		return mi.MethodType.DeclaringType.GetFullyQualifiedName()
+	if mi.MethodType != nil {
+		if fqn := java.FQNOf(mi.MethodType.DeclaringType); fqn != "" {
+			return fqn
+		}
 	}
 	// Fallback: infer from Select expression
 	if mi.Select != nil {

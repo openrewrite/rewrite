@@ -368,3 +368,30 @@ func TestTypeOfExpressionDerivesThroughWrappers(t *testing.T) {
 		t.Errorf("TypeCast: got %v, want derived Clazz type %v", castType, strType)
 	}
 }
+
+func TestMethodMatcherUnattributedDeclaringType(t *testing.T) {
+	mm := NewMethodMatcher("fmt Println(..)")
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
+		},
+		Name: &java.Identifier{Name: "Println"},
+		MethodType: &java.JavaTypeMethod{
+			Name:          "Println",
+			DeclaringType: java.UnknownType,
+		},
+	}
+	assert.True(t, mm.Matches(mi),
+		"an unnamed declaring type falls through to the select identifier")
+}
+
+func TestDeclaringTypeFQNUnattributedDeclaringType(t *testing.T) {
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
+		},
+		Name:       &java.Identifier{Name: "Println"},
+		MethodType: &java.JavaTypeMethod{Name: "Println", DeclaringType: java.UnknownType},
+	}
+	assert.Equal(t, "fmt", DeclaringTypeFQN(mi))
+}
