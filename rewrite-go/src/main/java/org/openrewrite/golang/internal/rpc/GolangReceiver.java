@@ -134,6 +134,21 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitTypeAssertion(Go.TypeAssertion ta, RpcReceiveQueue q) {
+        //noinspection unchecked
+        return ta
+                .getPadding().withLeft(q.receive(ta.getPadding().getLeft(), el -> visitRightPadded(el, q)))
+                .withAssertedType(q.receive(ta.getAssertedType(), el -> (J.ControlParentheses<Expression>) visitNonNull(el, q)))
+                .withType(q.receive(ta.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitExpressionStatement(Go.ExpressionStatement es, RpcReceiveQueue q) {
+        return es
+                .withExpression(q.receive(es.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
     public J visitStatementExpression(Go.StatementExpression se, RpcReceiveQueue q) {
         return se
                 .withStatement(q.receive(se.getStatement(), el -> (Statement) visitNonNull(el, q)));

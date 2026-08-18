@@ -31,10 +31,11 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+
+import static java.util.Collections.singleton;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -104,7 +105,7 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         addIfPresent(result, "peerDependencies", marker.getPeerDependencies());
         addIfPresent(result, "optionalDependencies", marker.getOptionalDependencies());
         addIfPresent(result, "bundledDependencies", marker.getBundledDependencies());
-        if (scope != null) result.retainAll(Collections.singleton(scope));
+        if (scope != null) result.retainAll(singleton(scope));
         return result.isEmpty() ? null : result;
     }
 

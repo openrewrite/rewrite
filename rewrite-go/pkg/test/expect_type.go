@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -34,16 +38,10 @@ func ExpectType(t *testing.T, root java.Tree, name string, expectedFQN string) {
 	t.Helper()
 	c := visitor.Init(&identifierTypeCollector{name: name})
 	c.Visit(root, nil)
-	if !c.found {
-		t.Fatalf("ExpectType(%q): no identifier with that name in tree", name)
-	}
-	if c.typ == nil {
-		t.Fatalf("ExpectType(%q): identifier has nil Type", name)
-	}
+	require.Truef(t, c.found, "ExpectType(%q): no identifier with that name in tree", name)
+	require.NotNilf(t, c.typ, "ExpectType(%q): identifier has nil Type", name)
 	fq, ok := c.typ.(java.FullyQualified)
-	if !ok {
-		t.Fatalf("ExpectType(%q): identifier Type is %T, want FullyQualified", name, c.typ)
-	}
+	require.Truef(t, ok, "ExpectType(%q): identifier Type is %T, want FullyQualified", name, c.typ)
 	if got := fq.GetFullyQualifiedName(); got != expectedFQN {
 		t.Errorf("ExpectType(%q): FQN = %q, want %q", name, got, expectedFQN)
 	}
@@ -56,19 +54,11 @@ func ExpectPrimitiveType(t *testing.T, root java.Tree, name string, expectedKeyw
 	t.Helper()
 	c := visitor.Init(&identifierTypeCollector{name: name})
 	c.Visit(root, nil)
-	if !c.found {
-		t.Fatalf("ExpectPrimitiveType(%q): no identifier with that name in tree", name)
-	}
-	if c.typ == nil {
-		t.Fatalf("ExpectPrimitiveType(%q): identifier has nil Type", name)
-	}
+	require.Truef(t, c.found, "ExpectPrimitiveType(%q): no identifier with that name in tree", name)
+	require.NotNilf(t, c.typ, "ExpectPrimitiveType(%q): identifier has nil Type", name)
 	prim, ok := c.typ.(*java.JavaTypePrimitive)
-	if !ok {
-		t.Fatalf("ExpectPrimitiveType(%q): identifier Type is %T, want *JavaTypePrimitive", name, c.typ)
-	}
-	if prim.Keyword != expectedKeyword {
-		t.Errorf("ExpectPrimitiveType(%q): keyword = %q, want %q", name, prim.Keyword, expectedKeyword)
-	}
+	require.Truef(t, ok, "ExpectPrimitiveType(%q): identifier Type is %T, want *JavaTypePrimitive", name, c.typ)
+	assert.Equalf(t, prim.Keyword, expectedKeyword, "ExpectPrimitiveType(%q): keyword", name)
 }
 
 // ExpectMethodType walks the tree rooted at root and asserts that the
@@ -84,15 +74,9 @@ func ExpectMethodType(t *testing.T, root java.Tree, name string, expectedDeclari
 	t.Helper()
 	c := visitor.Init(&methodTypeCollector{name: name})
 	c.Visit(root, nil)
-	if !c.found {
-		t.Fatalf("ExpectMethodType(%q): no method with that name in tree", name)
-	}
-	if c.methodType == nil {
-		t.Fatalf("ExpectMethodType(%q): method has nil MethodType", name)
-	}
-	if c.methodType.DeclaringType == nil {
-		t.Fatalf("ExpectMethodType(%q): method has nil DeclaringType", name)
-	}
+	require.Truef(t, c.found, "ExpectMethodType(%q): no method with that name in tree", name)
+	require.NotNilf(t, c.methodType, "ExpectMethodType(%q): method has nil MethodType", name)
+	require.NotNilf(t, c.methodType.DeclaringType, "ExpectMethodType(%q): method has nil DeclaringType", name)
 	if got := c.methodType.DeclaringType.GetFullyQualifiedName(); got != expectedDeclaringFQN {
 		t.Errorf("ExpectMethodType(%q): declaring FQN = %q, want %q", name, got, expectedDeclaringFQN)
 	}

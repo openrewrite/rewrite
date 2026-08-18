@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.AbstractRecipe;
 import org.openrewrite.Recipe;
 
 import java.net.URL;

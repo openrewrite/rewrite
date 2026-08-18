@@ -27,8 +27,6 @@ import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Objects;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 

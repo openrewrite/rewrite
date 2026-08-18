@@ -28,6 +28,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -2266,6 +2267,72 @@ type parseProjectResponseItem struct {
 // Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
 const maxParseableSizeBytes = 1 << 20
 
+// filterGitIgnored removes paths that git would ignore under projectPath, so
+// build output and other gitignored sources are not parsed into the LST. Paths
+// are evaluated relative to projectPath via a single `git check-ignore --stdin`
+// call, which is index-aware: a tracked (e.g. force-added) file under an ignored
+// directory is never reported ignored and is kept. Fails open — if git is
+// unavailable, projectPath is not a work tree, or the invocation errors, every
+// path is returned unchanged.
+func filterGitIgnored(projectPath string, paths []string) []string {
+	if len(paths) == 0 {
+		return paths
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		return paths
+	}
+
+	// NUL-delimited I/O (-z) so paths containing a newline can't corrupt the
+	// protocol, matching the C# peer (GitCli.CheckIgnored).
+	var in bytes.Buffer
+	rels := make([]string, len(paths))
+	for i, p := range paths {
+		rel, err := filepath.Rel(projectPath, p)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			continue // outside the work tree: not subject to its ignore rules
+		}
+		rel = filepath.ToSlash(rel)
+		rels[i] = rel
+		in.WriteString(rel)
+		in.WriteByte(0)
+	}
+	if in.Len() == 0 {
+		return paths
+	}
+
+	cmd := exec.Command("git", "check-ignore", "--stdin", "-z")
+	cmd.Dir = projectPath
+	cmd.Stdin = &in
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		// Exit code 1 means "nothing ignored" (empty output), which is not an
+		// error for us. Anything else (128 = not a repo, git missing, ...) fails open.
+		if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 1 {
+			return paths
+		}
+	}
+
+	ignored := make(map[string]struct{})
+	for _, line := range strings.Split(out.String(), "\x00") {
+		if line != "" {
+			ignored[line] = struct{}{}
+		}
+	}
+	if len(ignored) == 0 {
+		return paths
+	}
+
+	kept := make([]string, 0, len(paths))
+	for i, p := range paths {
+		if _, skip := ignored[rels[i]]; skip {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	return kept
+}
+
 func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	var req parseProjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -2317,6 +2384,14 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	if err != nil {
 		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Walk error: %v", err)}
 	}
+
+	// Go has no build-output directory convention, so name-based pruning can't
+	// find generated sources (they land wherever the build tooling chose). Let
+	// .gitignore decide instead: drop anything git would ignore. Index-aware, so
+	// a force-added file under an ignored directory survives.
+	disc.goFiles = filterGitIgnored(req.ProjectPath, disc.goFiles)
+	disc.oversizeFiles = filterGitIgnored(req.ProjectPath, disc.oversizeFiles)
+	disc.goMods = filterGitIgnored(req.ProjectPath, disc.goMods)
 
 	// Parse every go.mod once; index by directory so we can find the
 	// closest ancestor for each .go file. Failing to parse a go.mod is

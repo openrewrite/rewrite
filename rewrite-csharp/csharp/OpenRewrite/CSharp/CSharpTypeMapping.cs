@@ -160,6 +160,7 @@ internal class CSharpTypeMapping
             ILocalSymbol l => MapVariable(l, l.Name, null, MapType(l.Type)),
             IParameterSymbol p => MapVariable(p, p.Name, null, MapType(p.Type)),
             IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
+            IEventSymbol evt => MapVariable(evt, evt.Name, MapType(evt.ContainingType), MapType(evt.Type)),
             _ => null
         };
     }
@@ -238,12 +239,93 @@ internal class CSharpTypeMapping
             ? symbol.Interfaces.Select(i => (JavaType.FullyQualified)MapType(i)!).ToList()
             : null;
 
-        // For now, skip members and methods to avoid excessive traversal
-        // These can be populated lazily or in a future enhancement
         cls.UnsafeSet(flags, kind, fqn, typeParameters, supertype, owningClass,
             null, interfaces, null, null);
 
+        _memberQueue.Enqueue((symbol, cls));
+        DrainMemberQueue();
+
         return cls;
+    }
+
+    /// <summary>
+    /// Types whose <see cref="JavaType.Class.Members"/>/<see cref="JavaType.Class.Methods"/>
+    /// still need filling in. Populating a type's members maps the member signature types, which
+    /// in turn queues those types; draining iteratively keeps the recursion depth bounded by the
+    /// supertype/interface/type-argument graph rather than by the member graph.
+    /// </summary>
+    private readonly Queue<(INamedTypeSymbol Symbol, JavaType.Class Class)> _memberQueue = new();
+
+    private bool _draining;
+
+    private void DrainMemberQueue()
+    {
+        if (_draining) return;
+        _draining = true;
+        try
+        {
+            while (_memberQueue.Count > 0)
+            {
+                var (symbol, cls) = _memberQueue.Dequeue();
+                PopulateMembers(symbol, cls);
+            }
+        }
+        finally
+        {
+            _draining = false;
+        }
+    }
+
+    /// <summary>
+    /// Maps the members a type <em>declares</em> (inherited members stay reachable through
+    /// <see cref="JavaType.Class.Supertype"/>/<see cref="JavaType.Class.Interfaces"/>, matching
+    /// the Java type mapping). Compiler-generated members (auto-property backing fields, property
+    /// and event accessors, static initializers, and anything with a mangled name) are skipped.
+    /// </summary>
+    private void PopulateMembers(INamedTypeSymbol symbol, JavaType.Class cls)
+    {
+        cls.Annotations = ListAnnotations(symbol);
+
+        List<JavaType.Variable>? members = null;
+        List<JavaType.Method>? methods = null;
+
+        foreach (var member in symbol.GetMembers())
+        {
+            if (IsCompilerGenerated(member)) continue;
+
+            switch (member)
+            {
+                case IFieldSymbol field:
+                    (members ??= []).Add(MapVariable(field, field.Name, cls, MapType(field.Type)));
+                    break;
+                case IPropertySymbol property:
+                    (members ??= []).Add(MapVariable(property, property.Name, cls, MapType(property.Type)));
+                    break;
+                case IEventSymbol evt:
+                    (members ??= []).Add(MapVariable(evt, evt.Name, cls, MapType(evt.Type)));
+                    break;
+                case IMethodSymbol method:
+                    (methods ??= []).Add(MapMethod(method));
+                    break;
+            }
+        }
+
+        cls.Members = members;
+        cls.Methods = methods;
+    }
+
+    private static bool IsCompilerGenerated(ISymbol member)
+    {
+        if (member.Name.Length == 0 || member.Name[0] == '<') return true;
+
+        return member switch
+        {
+            IFieldSymbol field => field.AssociatedSymbol != null,
+            IMethodSymbol method => method.AssociatedSymbol != null ||
+                                    method.MethodKind == MethodKind.StaticConstructor,
+            INamedTypeSymbol => true,
+            _ => false
+        };
     }
 
     private JavaType MapArrayType(IArrayTypeSymbol symbol)
@@ -312,6 +394,8 @@ internal class CSharpTypeMapping
                 : null
         );
 
+        method.Annotations = ListAnnotations(symbol);
+
         return method;
     }
 
@@ -325,8 +409,17 @@ internal class CSharpTypeMapping
             FlagsBitMap = MapFlags(symbol)
         };
         _typeCache[symbol] = variable;
+        variable.Annotations = ListAnnotations(symbol);
         return variable;
     }
+
+    /// <summary>
+    /// Maps the attributes applied to a symbol onto <c>Annotations</c>. The type and member
+    /// mappings passed in are this mapper's, so an attribute's type resolves to the same instance
+    /// every other reference to it does.
+    /// </summary>
+    private IList<JavaType.FullyQualified>? ListAnnotations(ISymbol symbol) =>
+        AttributeMapping.ListAnnotations(symbol, MapType, MapVariable, MapMethod);
 
     internal static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
     {

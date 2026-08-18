@@ -34,24 +34,53 @@ type typeMapper struct {
 	// ownPkg, when set (exported-types enumeration only), limits full class bodies
 	// to the enumerated modules; foreign named types become FQN-only ShallowClass refs.
 	ownPkg func(pkgPath string) bool
+	// depth counts nested mapType frames. See maxTypeDepth.
+	depth int
+	// mappingOrigin holds the class for each generic whose mapping is
+	// still on the stack, keyed by its origin. See mapNamed.
+	mappingOrigin map[*types.Named]*java.JavaTypeClass
+	// fieldOwner leads from a struct field back to its declaring type.
+	fieldOwner map[*types.Var]java.JavaType
 }
+
+// maxTypeDepth bounds how deep type attribution follows a type into its
+// components, so a shape the caches cannot collapse still terminates.
+// Real Go nests types nowhere near this deep.
+const maxTypeDepth = 64
 
 func newTypeMapper() *typeMapper {
 	return &typeMapper{
-		cache:      make(map[types.Type]java.JavaType),
-		namedCache: make(map[*types.Named]*java.JavaTypeClass),
+		cache:         make(map[types.Type]java.JavaType),
+		namedCache:    make(map[*types.Named]*java.JavaTypeClass),
+		mappingOrigin: make(map[*types.Named]*java.JavaTypeClass),
+		fieldOwner:    make(map[*types.Var]java.JavaType),
 	}
 }
 
-func (m *typeMapper) mapType(t types.Type) java.JavaType {
+func (m *typeMapper) mapType(t types.Type) (result java.JavaType) {
 	if t == nil {
 		return nil
 	}
 	if cached, ok := m.cache[t]; ok {
 		return cached
 	}
+	if m.depth >= maxTypeDepth {
+		return java.UnknownType
+	}
+	m.depth++
+	defer func() { m.depth-- }()
 
-	result := m.doMapType(t)
+	// A type checker that gave up part-way leaves types whose internals
+	// trip its own assertions when walked (Named.Underlying on an
+	// unresolved cycle, say). Attribution is best-effort, so an
+	// unwalkable type degrades to Unknown and its neighbours survive.
+	defer func() {
+		if r := recover(); r != nil {
+			result = java.UnknownType
+		}
+	}()
+
+	result = m.doMapType(t)
 	if result != nil {
 		m.cache[t] = result
 	}
@@ -175,6 +204,17 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 		return cached
 	}
 
+	// `func (R[P]) m(R[R[P]])` names a fresh *types.Named at every
+	// nesting, so pointer identity never repeats and the caches never
+	// hit. An instantiation reached while its own generic is still being
+	// mapped resolves to that one instead.
+	origin := named.Origin()
+	if origin != nil && origin != named {
+		if cls, ok := m.mappingOrigin[origin]; ok {
+			return cls
+		}
+	}
+
 	obj := named.Obj()
 	fqn := fullyQualifiedName(obj)
 
@@ -184,6 +224,12 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	}
 	// Cache early to break cycles
 	m.namedCache[named] = cls
+	if origin != nil {
+		if _, ok := m.mappingOrigin[origin]; !ok {
+			m.mappingOrigin[origin] = cls
+			defer delete(m.mappingOrigin, origin)
+		}
+	}
 	m.cache[named] = cls
 
 	// Map the underlying type to determine kind and populate members/methods
@@ -191,10 +237,10 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	switch u := underlying.(type) {
 	case *types.Struct:
 		cls.Kind = "Class"
-		cls.Members = m.structMembers(u)
+		cls.Members = m.structMembers(u, cls)
 	case *types.Interface:
 		cls.Kind = "Interface"
-		cls.Methods = m.interfaceMethods(u)
+		cls.Methods = m.interfaceMethods(u, cls)
 	default:
 		// Named type wrapping a basic type (e.g., type MyInt int)
 		cls.Kind = "Class"
@@ -271,7 +317,7 @@ func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *java.Java
 		FullyQualifiedName: fqn,
 		Kind:               "Interface",
 	}
-	cls.Methods = m.interfaceMethods(iface)
+	cls.Methods = m.interfaceMethods(iface, cls)
 	return cls
 }
 
@@ -281,7 +327,7 @@ func (m *typeMapper) mapStruct(s *types.Struct, fqn string) *java.JavaTypeClass 
 		FullyQualifiedName: fqn,
 		Kind:               "Class",
 	}
-	cls.Members = m.structMembers(s)
+	cls.Members = m.structMembers(s, cls)
 	return cls
 }
 
@@ -319,13 +365,16 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
-// structMembers extracts fields from a struct as JavaTypeVariable.
-func (m *typeMapper) structMembers(s *types.Struct) []*java.JavaTypeVariable {
+// structMembers extracts fields from a struct as JavaTypeVariable,
+// recording each field's owner for ownerType to find later.
+func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java.JavaTypeVariable {
 	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
 		f := s.Field(i)
+		m.fieldOwner[f] = owner
 		members = append(members, &java.JavaTypeVariable{
 			Name:        f.Name(),
+			Owner:       owner,
 			Type:        m.mapType(f.Type()),
 			Annotations: nil,
 		})
@@ -334,12 +383,12 @@ func (m *typeMapper) structMembers(s *types.Struct) []*java.JavaTypeVariable {
 }
 
 // interfaceMethods extracts methods from an interface as JavaTypeMethod.
-func (m *typeMapper) interfaceMethods(iface *types.Interface) []*java.JavaTypeMethod {
+func (m *typeMapper) interfaceMethods(iface *types.Interface, owner *java.JavaTypeClass) []*java.JavaTypeMethod {
 	var methods []*java.JavaTypeMethod
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)
 		sig := method.Type().(*types.Signature)
-		mt := m.mapSignature(sig, method.Name(), nil)
+		mt := m.mapSignature(sig, method.Name(), owner)
 		methods = append(methods, mt)
 	}
 	return methods
@@ -401,16 +450,15 @@ func (m *typeMapper) mapObject(obj types.Object) java.JavaType {
 }
 
 // mapObjectToVariable maps a types.Object to a JavaTypeVariable (for field-like identifiers).
-func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariable {
+func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaType) *java.JavaTypeVariable {
 	if obj == nil {
 		return nil
 	}
 	switch o := obj.(type) {
 	case *types.Var:
-		ownerType := m.ownerType(o)
 		return &java.JavaTypeVariable{
 			Name:  o.Name(),
-			Owner: ownerType,
+			Owner: m.ownerType(o, enclosing),
 			Type:  m.mapType(o.Type()),
 		}
 	default:
@@ -418,14 +466,22 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariabl
 	}
 }
 
-func (m *typeMapper) ownerType(v *types.Var) java.JavaType {
-	if !v.IsField() {
+// ownerType is what a variable belongs to: the declaring type for a
+// field, the package for one declared at package scope wherever it is
+// read from, the enclosing function for a local or parameter. go/types
+// leads from a struct to its fields but not back, so a field's owner
+// comes from the index built while mapping the struct.
+func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaType {
+	if v.IsField() {
+		if owner, ok := m.fieldOwner[v]; ok {
+			return owner
+		}
 		return nil
 	}
-	// For struct fields, the owner is the parent type.
-	// go/types doesn't directly expose the parent; we return nil.
-	// The owner will be inferred from context during tree construction.
-	return nil
+	if pkg := v.Pkg(); pkg != nil && v.Parent() == pkg.Scope() {
+		return &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: pkg.Path()}
+	}
+	return enclosing
 }
 
 // mapMethodObject maps a types.Func to a JavaTypeMethod.

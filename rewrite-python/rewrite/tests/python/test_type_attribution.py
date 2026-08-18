@@ -1003,6 +1003,135 @@ class TestVariableTypes:
             _cleanup_mapping(mapping, tmpdir, client)
 
 
+class TestTupleElements:
+    """Tests for per-position tuple element types."""
+
+    @staticmethod
+    def _tuple_descriptor(elements, class_name='tuple', module_name='builtins',
+                          type_args=None):
+        return {
+            'kind': 'instance',
+            'className': class_name,
+            'moduleName': module_name,
+            'typeArgs': type_args if type_args is not None else [],
+            'tupleElements': elements,
+        }
+
+    def test_fixed_elements_become_type_parameters(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'str'}
+        # typeArgs holds the collapsed union; the elements must win over it.
+        mapping._type_registry[400] = self._tuple_descriptor(
+            [{'typeId': 1, 'kind': 'fixed'}, {'typeId': 2, 'kind': 'fixed'}],
+            type_args=[3])
+        mapping._type_registry[3] = {'kind': 'union', 'members': [1, 2]}
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.fully_qualified_name == 'tuple'
+        assert result._type_parameters == [JavaType.Primitive.Int,
+                                           JavaType.Primitive.String]
+
+    def test_homogeneous_element_becomes_single_type_parameter(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[400] = self._tuple_descriptor(
+            [{'typeId': 1, 'kind': 'homogeneous'}], type_args=[1])
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result._type_parameters == [JavaType.Primitive.Int]
+
+    def test_type_var_tuple_element_resolves(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[2] = {'kind': 'typeVar', 'name': 'Ts',
+                                     'typevarKind': 'TypeVarTuple'}
+        mapping._type_registry[400] = self._tuple_descriptor(
+            [{'typeId': 1, 'kind': 'fixed'}, {'typeId': 2, 'kind': 'typeVarTuple'}])
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result._type_parameters[0] == JavaType.Primitive.Int
+        assert isinstance(result._type_parameters[1], JavaType.GenericTypeVariable)
+
+    def test_empty_tuple_is_not_parameterized(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = self._tuple_descriptor([])
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'tuple'
+
+    def test_tuple_subclass_is_not_parameterized_by_its_elements(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'str'}
+        mapping._type_registry[400] = self._tuple_descriptor(
+            [{'typeId': 1, 'kind': 'fixed'}, {'typeId': 2, 'kind': 'fixed'}],
+            class_name='MyTup', module_name='mymod')
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'mymod.MyTup'
+
+    def test_unrecognised_tuple_elements_shape_falls_back_to_type_args(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[400] = self._tuple_descriptor(
+            {'elements': []}, type_args=[1])
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result._type_parameters == [JavaType.Primitive.Int]
+
+    def test_falls_back_to_type_args_without_tuple_elements(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[400] = {
+            'kind': 'instance', 'className': 'tuple', 'moduleName': 'builtins',
+            'typeArgs': [1],
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result._type_parameters == [JavaType.Primitive.Int]
+
+
+@requires_ty_types_cli
+class TestTupleElementsWithTyTypes:
+    """End-to-end tuple element attribution using live ty-types."""
+
+    def test_fixed_length_tuple_keeps_element_order(self):
+        source = '''
+            def pair() -> tuple[int, str]: ...
+            pair()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.type(tree.body[1].value)
+            assert isinstance(result, JavaType.Parameterized)
+            assert result.fully_qualified_name == 'tuple'
+            assert result._type_parameters == [JavaType.Primitive.Int,
+                                               JavaType.Primitive.String]
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_homogeneous_tuple_has_one_element(self):
+        source = '''
+            def homo() -> tuple[int, ...]: ...
+            homo()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.type(tree.body[1].value)
+            assert isinstance(result, JavaType.Parameterized)
+            assert result._type_parameters == [JavaType.Primitive.Int]
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 @requires_ty_types_cli
 class TestParameterizedTypes:
     """Tests for Parameterized type creation (e.g., list[str])."""
@@ -1881,6 +2010,33 @@ class TestKnownInstanceDescriptor:
         result = mapping._resolve_type(400)
         assert isinstance(result, JavaType.Unknown)
 
+    def test_known_instance_range_is_a_builtin(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': 'range',
+            'knownInstanceKind': 'Range',
+            'isNonEmpty': True,
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'range'
+
+    @pytest.mark.parametrize('known_instance_kind',
+                             ['FunctoolsPartial', 'FunctoolsPartialCall'])
+    def test_known_instance_functools_partial(self, known_instance_kind):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': 'partial',
+            'knownInstanceKind': known_instance_kind,
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'functools.partial'
+
 
 class TestTypeAliasDescriptor:
     """Tests for the enriched typeAlias kind."""
@@ -2051,6 +2207,37 @@ class TestNewDescriptorsWithTyTypes:
             assert result._name == 'add'
             assert result._declaring_type is not None
             assert result._declaring_type._fully_qualified_name.endswith('Calculator')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_range_call_resolves_to_builtin_range(self):
+        source = '''
+            r = range(3)
+            r
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.type(tree.body[1].value)
+            assert isinstance(result, JavaType.FullyQualified)
+            assert result._fully_qualified_name == 'range'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_functools_partial_resolves_to_partial(self):
+        source = '''
+            import functools
+
+            def f(a: int, b: str) -> bool:
+                return True
+
+            p = functools.partial(f, 1)
+            p
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.type(tree.body[3].value)
+            assert isinstance(result, JavaType.FullyQualified)
+            assert result._fully_qualified_name == 'functools.partial'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

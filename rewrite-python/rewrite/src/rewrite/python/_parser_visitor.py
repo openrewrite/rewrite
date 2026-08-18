@@ -1,4 +1,5 @@
 import ast
+import contextlib
 import dataclasses
 import sys
 import token
@@ -94,6 +95,7 @@ class ParserVisitor(ast.NodeVisitor):
             tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
         self._token_idx = 1  # Skip ENCODING token
+        self._type_context_depth = 0
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -1059,7 +1061,8 @@ class ParserVisitor(ast.NodeVisitor):
         expr_type, field_type = self._type_mapping.attribute_type_info(node, receiver_type)
 
         if isinstance(name_ident, j.Identifier):
-            name_ident = dataclasses.replace(name_ident, _type=expr_type, _field_type=field_type)
+            name_ident = dataclasses.replace(name_ident, _type=expr_type,
+                                             _field_type=self.__binding_field_type(field_type))
 
         return j.FieldAccess(
             random_id(),
@@ -2222,11 +2225,14 @@ class ParserVisitor(ast.NodeVisitor):
         if node.returns is None:
             return_type = None
         else:
+            arrow = self.__source_before('->')
+            with self.__type_context():
+                returns = self.__convert(node.returns)
             return_type = py.TypeHint(
                 random_id(),
-                self.__source_before('->'),
+                arrow,
                 Markers.EMPTY,
-                self.__convert(node.returns),
+                returns,
                 self._type_mapping.type(node.returns)
             )
         body = self.__convert_block(node.body)
@@ -2601,6 +2607,20 @@ class ParserVisitor(ast.NodeVisitor):
         # Parsing complete - all tokens should be consumed
         return cu
 
+    @contextlib.contextmanager
+    def __type_context(self):
+        self._type_context_depth += 1
+        try:
+            yield
+        finally:
+            self._type_context_depth -= 1
+
+    def __binding_field_type(self, field_type):
+        """``field_type`` describes the variable an identifier resolves to, and a
+        type position names a type rather than binding one. ty's descriptors cannot
+        draw this line: the annotation ``int`` and a variable holding an int share one."""
+        return None if self._type_context_depth else field_type
+
     def visit_Name(self, node):
         space, actual_name = self.__consume_identifier(node.id)
         expr_type, field_type = self._type_mapping.name_type_info(node)
@@ -2611,7 +2631,7 @@ class ParserVisitor(ast.NodeVisitor):
             _EMPTY_LIST,
             actual_name,
             expr_type,
-            field_type
+            self.__binding_field_type(field_type)
         )
 
     def visit_NamedExpr(self, node):
@@ -2849,7 +2869,8 @@ class ParserVisitor(ast.NodeVisitor):
 
     def __convert_type(self, node) -> Optional[TypeTree]:
         prefix = self.__whitespace()
-        converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
+        with self.__type_context():
+            converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
         if isinstance(converted_type, TypeTree):
             return converted_type.replace(prefix=prefix)  # TypeTree base class doesn't have replace
         else:

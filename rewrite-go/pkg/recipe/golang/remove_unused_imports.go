@@ -34,7 +34,7 @@ import (
 // their init() side-effects, not for any user-visible reference.
 //
 // Recipe authors who want to drop blank imports should use RemoveImport
-// targeting the specific path.
+// with Force set, targeting the specific path.
 type RemoveUnusedImports struct {
 	recipe.Base
 }
@@ -58,7 +58,7 @@ func (v *removeUnusedImportsVisitor) VisitCompilationUnit(cu *golang.Compilation
 	if cu.Imports == nil || len(cu.Imports.Elements) == 0 {
 		return cu
 	}
-	refs := internal.ReferencedPackages(cu)
+	refs, quals := internal.ReferencedImports(cu)
 	for _, rp := range cu.Imports.Elements {
 		imp := rp.Element
 		if imp == nil {
@@ -73,9 +73,10 @@ func (v *removeUnusedImportsVisitor) VisitCompilationUnit(cu *golang.Compilation
 		if internal.AliasName(imp) == "." {
 			continue
 		}
-		if !refs[internal.ImportPath(imp)] {
-			cu = internal.RemoveFromBlock(cu, imp)
+		if internal.IsReferenced(imp, refs, quals) {
+			continue
 		}
+		cu = internal.RemoveFromBlock(cu, imp)
 	}
 	return cu
 }

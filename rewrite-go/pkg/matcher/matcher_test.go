@@ -19,6 +19,10 @@ package matcher
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -47,12 +51,8 @@ func TestGetFullyQualifiedName(t *testing.T) {
 
 func TestIsOfClassType(t *testing.T) {
 	cls := &java.JavaTypeClass{FullyQualifiedName: "time.Time"}
-	if !IsOfClassType(cls, "time.Time") {
-		t.Error("expected true for exact match")
-	}
-	if IsOfClassType(cls, "time.Duration") {
-		t.Error("expected false for different type")
-	}
+	assert.True(t, IsOfClassType(cls, "time.Time"), "expected true for exact match")
+	assert.False(t, IsOfClassType(cls, "time.Duration"), "expected false for different type")
 }
 
 func TestIsAssignableTo(t *testing.T) {
@@ -62,34 +62,20 @@ func TestIsAssignableTo(t *testing.T) {
 		Interfaces:         []java.FullyQualified{stringer},
 	}
 
-	if !IsAssignableTo(myType, "main.MyType") {
-		t.Error("type should be assignable to itself")
-	}
-	if !IsAssignableTo(myType, "fmt.Stringer") {
-		t.Error("type should be assignable to its interface")
-	}
-	if IsAssignableTo(myType, "io.Reader") {
-		t.Error("type should not be assignable to unrelated interface")
-	}
+	assert.True(t, IsAssignableTo(myType, "main.MyType"), "type should be assignable to itself")
+	assert.True(t, IsAssignableTo(myType, "fmt.Stringer"), "type should be assignable to its interface")
+	assert.False(t, IsAssignableTo(myType, "io.Reader"), "type should not be assignable to unrelated interface")
 }
 
 func TestIsError(t *testing.T) {
 	errType := &java.JavaTypeClass{FullyQualifiedName: "error"}
-	if !IsError(errType) {
-		t.Error("expected true for error type")
-	}
-	if IsError(&java.JavaTypeClass{FullyQualifiedName: "string"}) {
-		t.Error("expected false for non-error type")
-	}
+	assert.True(t, IsError(errType), "expected true for error type")
+	assert.False(t, IsError(&java.JavaTypeClass{FullyQualifiedName: "string"}), "expected false for non-error type")
 }
 
 func TestIsString(t *testing.T) {
-	if !IsString(&java.JavaTypePrimitive{Keyword: "String"}) {
-		t.Error("expected true for String primitive")
-	}
-	if IsString(&java.JavaTypePrimitive{Keyword: "int"}) {
-		t.Error("expected false for int")
-	}
+	assert.True(t, IsString(&java.JavaTypePrimitive{Keyword: "String"}), "expected true for String primitive")
+	assert.False(t, IsString(&java.JavaTypePrimitive{Keyword: "int"}), "expected false for int")
 }
 
 func TestIsInt(t *testing.T) {
@@ -107,9 +93,7 @@ func TestIsInt(t *testing.T) {
 		&java.JavaTypeClass{FullyQualifiedName: "uintptr"},
 	}
 	for _, typ := range intLike {
-		if !IsInt(typ) {
-			t.Errorf("IsInt(%q) = false, want true", GetFullyQualifiedName(typ))
-		}
+		assert.Truef(t, IsInt(typ), "IsInt(%q) = false, want true", GetFullyQualifiedName(typ))
 	}
 	notInt := []java.JavaType{
 		&java.JavaTypePrimitive{Keyword: "double"},
@@ -118,9 +102,7 @@ func TestIsInt(t *testing.T) {
 		nil,
 	}
 	for _, typ := range notInt {
-		if IsInt(typ) {
-			t.Errorf("IsInt(%q) = true, want false", GetFullyQualifiedName(typ))
-		}
+		assert.Falsef(t, IsInt(typ), "IsInt(%q) = true, want false", GetFullyQualifiedName(typ))
 	}
 }
 
@@ -143,16 +125,10 @@ func TestIsNumeric(t *testing.T) {
 		&java.JavaTypeClass{FullyQualifiedName: "uintptr"},
 	}
 	for _, typ := range numeric {
-		if !IsNumeric(typ) {
-			t.Errorf("IsNumeric(%q) = false, want true", GetFullyQualifiedName(typ))
-		}
+		assert.Truef(t, IsNumeric(typ), "IsNumeric(%q) = false, want true", GetFullyQualifiedName(typ))
 	}
-	if IsNumeric(&java.JavaTypePrimitive{Keyword: "String"}) {
-		t.Error("IsNumeric(String) = true, want false")
-	}
-	if IsNumeric(nil) {
-		t.Error("IsNumeric(nil) = true, want false")
-	}
+	assert.False(t, IsNumeric(&java.JavaTypePrimitive{Keyword: "String"}), "IsNumeric(String) = true, want false")
+	assert.False(t, IsNumeric(nil), "IsNumeric(nil) = true, want false")
 }
 
 // Pattern type names must resolve to the same signature the type mapper
@@ -180,9 +156,7 @@ func TestAsClass(t *testing.T) {
 	if AsClass(param) != cls {
 		t.Error("AsClass should unwrap parameterized types")
 	}
-	if AsClass(&java.JavaTypePrimitive{Keyword: "int"}) != nil {
-		t.Error("AsClass should return nil for non-class types")
-	}
+	assert.Nil(t, AsClass(&java.JavaTypePrimitive{Keyword: "int"}), "AsClass should return nil for non-class types")
 }
 
 func TestGlobToRegexp(t *testing.T) {
@@ -208,23 +182,15 @@ func TestGlobToRegexp(t *testing.T) {
 	for _, tt := range tests {
 		re := globToRegexp(tt.pattern)
 		got := re.MatchString(tt.input)
-		if got != tt.want {
-			t.Errorf("globToRegexp(%q).MatchString(%q) = %v, want %v", tt.pattern, tt.input, got, tt.want)
-		}
+		assert.Equalf(t, tt.want, got, "globToRegexp(%q).MatchString", tt.pattern)
 	}
 }
 
 func TestMethodMatcherParsing(t *testing.T) {
 	mm := NewMethodMatcher("fmt Sprintf(string, ..)")
-	if mm.declaringTypePattern == nil {
-		t.Fatal("expected declaringTypePattern")
-	}
-	if mm.methodNamePattern == nil {
-		t.Fatal("expected methodNamePattern")
-	}
-	if !mm.matchesAnyArgs {
-		t.Error("expected matchesAnyArgs for .. pattern")
-	}
+	require.NotNil(t, mm.declaringTypePattern, "expected declaringTypePattern")
+	require.NotNil(t, mm.methodNamePattern, "expected methodNamePattern")
+	assert.True(t, mm.matchesAnyArgs, "expected matchesAnyArgs for .. pattern")
 }
 
 func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
@@ -235,9 +201,7 @@ func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
 		},
 		Name: &java.Identifier{Name: "Println"},
 	}
-	if !mm.Matches(mi) {
-		t.Error("expected match for fmt.Println with any args")
-	}
+	assert.True(t, mm.Matches(mi), "expected match for fmt.Println with any args")
 }
 
 func TestMethodMatcherNoMatchWrongName(t *testing.T) {
@@ -248,9 +212,7 @@ func TestMethodMatcherNoMatchWrongName(t *testing.T) {
 		},
 		Name: &java.Identifier{Name: "Sprintf"},
 	}
-	if mm.Matches(mi) {
-		t.Error("expected no match for wrong method name")
-	}
+	assert.False(t, mm.Matches(mi), "expected no match for wrong method name")
 }
 
 func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
@@ -261,9 +223,7 @@ func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
 		},
 		Name: &java.Identifier{Name: "Println"},
 	}
-	if mm.Matches(mi) {
-		t.Error("expected no match for wrong package")
-	}
+	assert.False(t, mm.Matches(mi), "expected no match for wrong package")
 }
 
 func TestMethodMatcherWildcardType(t *testing.T) {
@@ -276,9 +236,7 @@ func TestMethodMatcherWildcardType(t *testing.T) {
 	}
 	// With just an identifier "t" as select, DeclaringTypeFQN returns "t"
 	// which matches "*" pattern
-	if !mm.Matches(mi) {
-		t.Error("expected match for wildcard declaring type")
-	}
+	assert.True(t, mm.Matches(mi), "expected match for wildcard declaring type")
 }
 
 func TestMethodMatcherWithTypeInfo(t *testing.T) {
@@ -294,9 +252,7 @@ func TestMethodMatcherWithTypeInfo(t *testing.T) {
 			Name:          "Sprintf",
 		},
 	}
-	if !mm.Matches(mi) {
-		t.Error("expected match with type info")
-	}
+	assert.True(t, mm.Matches(mi), "expected match with type info")
 }
 
 func TestMethodMatcherMatchesMethod(t *testing.T) {
@@ -305,9 +261,7 @@ func TestMethodMatcherMatchesMethod(t *testing.T) {
 		DeclaringType: &java.JavaTypeClass{FullyQualifiedName: "time.Time"},
 		Name:          "Sub",
 	}
-	if !mm.MatchesMethod(mt) {
-		t.Error("expected match for time.Time Sub(..)")
-	}
+	assert.True(t, mm.MatchesMethod(mt), "expected match for time.Time Sub(..)")
 }
 
 func TestMethodMatcherOnParsedCode(t *testing.T) {
@@ -321,9 +275,7 @@ func main() {
 	fmt.Sprintf("%d", 42)
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	printlnMatcher := NewMethodMatcher("fmt Println(..)")
 	sprintfMatcher := NewMethodMatcher("fmt Sprintf(..)")
@@ -341,12 +293,8 @@ func main() {
 	})
 	v.Visit(cu, nil)
 
-	if printlnCount != 1 {
-		t.Errorf("expected 1 Println match, got %d", printlnCount)
-	}
-	if sprintfCount != 1 {
-		t.Errorf("expected 1 Sprintf match, got %d", sprintfCount)
-	}
+	assert.Equal(t, 1, printlnCount, "expected 1 Println match")
+	assert.Equal(t, 1, sprintfCount, "expected 1 Sprintf match")
 }
 
 func TestMethodMatcherNoMatchOnParsedCode(t *testing.T) {
@@ -359,9 +307,7 @@ func main() {
 	log.Println("hello")
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	fmtPrintln := NewMethodMatcher("fmt Println(..)")
 
@@ -372,9 +318,7 @@ func main() {
 	})
 	v.Visit(cu, nil)
 
-	if count != 0 {
-		t.Errorf("expected 0 matches for fmt.Println in log code, got %d", count)
-	}
+	assert.Equal(t, 0, count, "expected 0 matches for fmt.Println in log code")
 }
 
 // Test helper visitor that counts method matcher hits.

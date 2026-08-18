@@ -127,6 +127,34 @@ func SendMarkersCodec(m java.Markers, q *SendQueue) {
 		func(v any) { sendMarkerCodecFields(v, q) })
 }
 
+// fileAttributesFields is the field order org.openrewrite.FileAttributes#rpcSend uses, and the
+// number of sub-field messages it emits. Both the marker path and the source-file field path
+// (see receiveFileAttributes) depend on it.
+var fileAttributesFields = []string{"creationTime", "lastModifiedTime", "lastAccessTime",
+	"isReadable", "isWritable", "isExecutable", "size"}
+
+// receiveFileAttributes consumes the sub-fields of a source file's fileAttributes and discards
+// them. No Go tree models file attributes, and because the send side reports NO_CHANGE for the
+// field, the peer keeps its own value rather than having it overwritten with an empty one.
+func receiveFileAttributes(q *ReceiveQueue) {
+	q.Receive(nil, func(any) any {
+		for range fileAttributesFields {
+			q.Receive(nil, nil)
+		}
+		return nil
+	})
+}
+
+// receiveChecksum consumes the two sub-fields org.openrewrite.Checksum#rpcSend emits, on the
+// same terms as receiveFileAttributes.
+func receiveChecksum(q *ReceiveQueue) {
+	q.Receive(nil, func(any) any {
+		q.Receive(nil, nil) // algorithm
+		q.Receive(nil, nil) // value
+		return nil
+	})
+}
+
 // hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
 // sub-field messages for a java.GenericMarker with the given Java FQN.
 // Markers not listed here have no RpcCodec on either side and must travel
@@ -165,6 +193,8 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Description }, nil)
+	case java.RecipesThatMadeChanges:
+		sendRecipesThatMadeChanges(m, q)
 	case golang.GroupedImport:
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
@@ -190,6 +220,8 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.SelectStmt).Ident.String() }, nil)
 	case golang.TypeSwitchGuard:
 		q.GetAndSend(m, func(x any) any { return x.(golang.TypeSwitchGuard).Ident.String() }, nil)
+	case golang.ImplicitForClauses:
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImplicitForClauses).Ident.String() }, nil)
 	case golang.StructTag:
 		// StructTag.rpcSend sends: id (UUID string), tag valueSource (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Ident.String() }, nil)
@@ -199,6 +231,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before.Whitespace }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After.Whitespace }, nil)
+	case golang.StructTagQuote:
+		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
+		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Quote }, nil)
 	case golang.Semicolon:
 		// Semicolon.rpcSend sends: id (UUID string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.Semicolon).Ident.String() }, nil)
@@ -229,7 +265,7 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 				return nil
 			}, nil)
 		case "org.openrewrite.FileAttributes":
-			for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+			for _, key := range fileAttributesFields {
 				k := key
 				q.GetAndSend(m, func(_ any) any {
 					if d != nil {
@@ -339,6 +375,8 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				m.Description = desc.(string)
 			}
 			return m
+		case java.RecipesThatMadeChanges:
+			return receiveRecipesThatMadeChanges(m, q)
 		case golang.GroupedImport:
 			// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -421,6 +459,14 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			return m
+		case golang.ImplicitForClauses:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			return m
 		case golang.StructTag:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -445,6 +491,15 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 					Source: valueSource,
 				}
 			}
+			return m
+		case golang.StructTagQuote:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Quote = receiveScalar[string](q, m.Quote)
 			return m
 		case golang.TrailingComma:
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -489,7 +544,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			case "org.openrewrite.FileAttributes":
 				m.Data = map[string]any{}
-				for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+				for _, key := range fileAttributesFields {
 					m.Data[key] = q.Receive(nil, nil)
 				}
 			case "org.openrewrite.marker.Markup$Error",

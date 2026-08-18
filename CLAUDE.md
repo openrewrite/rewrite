@@ -132,7 +132,7 @@ These modules use their own package managers (`uv`/`pip` for Python, `npm` for N
 ### Language Parsers
 - **`rewrite-java`**: Main Java language support with comprehensive AST model
 - **`rewrite-java-8/11/17/21/25`**: Java version-specific features and compatibility
-- **`rewrite-groovy/kotlin/javascript/csharp`**: Other languages extending the `J` model from `rewrite-java`
+- **`rewrite-groovy/kotlin/javascript/csharp/ruby/scala`**: Other languages extending the `J` model from `rewrite-java`
 - **`rewrite-docker`**: Dockerfile parsing and manipulation
 
 ### Format Parsers

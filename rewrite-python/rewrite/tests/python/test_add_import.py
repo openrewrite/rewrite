@@ -14,12 +14,16 @@
 
 """Tests for AddImport / maybe_add_import."""
 
+import pytest
+
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
-from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
+from rewrite.python.add_import import AddImportOptions, maybe_add_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
+
+from ._java_import_arm import java_add_import
 
 
 def _assert_ids_accessible(source_file):
@@ -32,15 +36,29 @@ def _assert_ids_accessible(source_file):
     IdWalker().visit(source_file, InMemoryExecutionContext())
 
 
-def _add_import_visitor(module, name=None, alias=None):
-    """Build a visitor that registers a single maybe_add_import (always added)."""
+@pytest.fixture(params=[
+    pytest.param('native'),
+    pytest.param('java', marks=pytest.mark.requires_java_rpc),
+])
+def arm(request):
+    """Run each case against the Python visitor in-process and against the Java visitor over RPC."""
+    if request.param == 'java':
+        request.getfixturevalue('java_rpc')
+    return request.param
+
+
+def _add_import_visitor(arm, module, name=None, alias=None, only_if_referenced=False):
+    """Build a visitor that registers a single add-import request."""
+    if arm == 'java':
+        return java_add_import(module, name, alias, only_if_referenced)
+
     class _V(PythonVisitor[ExecutionContext]):
         def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
             maybe_add_import(self, AddImportOptions(
                 module=module,
                 name=name,
                 alias=alias,
-                only_if_referenced=False,
+                only_if_referenced=only_if_referenced,
             ))
             return super().visit_compilation_unit(cu, p)
 
@@ -50,18 +68,9 @@ def _add_import_visitor(module, name=None, alias=None):
 class TestMaybeAddImport:
     """Tests for maybe_add_import scheduling via _after_visit."""
 
-    def test_add_from_import(self):
+    def test_add_from_import(self, arm):
         """Add 'from os.path import join' to a file that uses join."""
-        class AddJoinVisitor(PythonVisitor[ExecutionContext]):
-            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
-                maybe_add_import(self, AddImportOptions(
-                    module='os.path',
-                    name='join',
-                    only_if_referenced=False
-                ))
-                return super().visit_compilation_unit(cu, p)
-
-        spec = RecipeSpec(recipe=from_visitor(AddJoinVisitor()))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'join')))
         spec.rewrite_run(
             python(
                 """
@@ -74,17 +83,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_add_direct_import(self):
+    def test_add_direct_import(self, arm):
         """Add 'import os' to a file."""
-        class AddOsVisitor(PythonVisitor[ExecutionContext]):
-            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
-                maybe_add_import(self, AddImportOptions(
-                    module='os',
-                    only_if_referenced=False
-                ))
-                return super().visit_compilation_unit(cu, p)
-
-        spec = RecipeSpec(recipe=from_visitor(AddOsVisitor()))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os')))
         spec.rewrite_run(
             python(
                 """
@@ -97,17 +98,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_no_duplicate_import(self):
+    def test_no_duplicate_import(self, arm):
         """Don't add an import that already exists."""
-        class AddOsVisitor(PythonVisitor[ExecutionContext]):
-            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
-                maybe_add_import(self, AddImportOptions(
-                    module='os',
-                    only_if_referenced=False
-                ))
-                return super().visit_compilation_unit(cu, p)
-
-        spec = RecipeSpec(recipe=from_visitor(AddOsVisitor()))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os')))
         spec.rewrite_run(
             python(
                 """
@@ -117,10 +110,10 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_builtin_name_is_not_imported(self):
+    def test_builtin_name_is_not_imported(self, arm):
         """A bare builtin name (e.g. from ChangeType retargeting to `list`) is not a module;
         adding an import for it is a no-op."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('list')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'list')))
         spec.rewrite_run(
             python(
                 """
@@ -129,18 +122,10 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_only_if_referenced(self):
+    def test_only_if_referenced(self, arm):
         """Don't add import when the name is not referenced and only_if_referenced=True."""
-        class AddJoinVisitor(PythonVisitor[ExecutionContext]):
-            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
-                maybe_add_import(self, AddImportOptions(
-                    module='os.path',
-                    name='join',
-                    only_if_referenced=True
-                ))
-                return super().visit_compilation_unit(cu, p)
-
-        spec = RecipeSpec(recipe=from_visitor(AddJoinVisitor()))
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', 'join', only_if_referenced=True)))
         spec.rewrite_run(
             python(
                 """
@@ -149,17 +134,10 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_only_if_referenced_ignores_identifiers_in_imports(self):
+    def test_only_if_referenced_ignores_identifiers_in_imports(self, arm):
         """``pathlib`` occurs only as the module of the existing aliased import."""
-        class AddPathlibVisitor(PythonVisitor[ExecutionContext]):
-            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
-                maybe_add_import(self, AddImportOptions(
-                    module='pathlib',
-                    only_if_referenced=True
-                ))
-                return super().visit_compilation_unit(cu, p)
-
-        spec = RecipeSpec(recipe=from_visitor(AddPathlibVisitor()))
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'pathlib', only_if_referenced=True)))
         spec.rewrite_run(
             python(
                 """
@@ -170,13 +148,45 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_into_existing_from_import(self):
+    def test_only_if_referenced_adds_when_referenced(self, arm):
+        """The name is used, so the import is added."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', 'join', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                x = join('a', 'b')
+                """,
+                """
+                from os.path import join
+                x = join('a', 'b')
+                """,
+            )
+        )
+
+    def test_only_if_referenced_finds_a_reference_in_a_comprehension(self, arm):
+        """The only reference is inside a comprehension, a Python-specific node."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', 'join', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                paths = [join(p) for p in ps]
+                """,
+                """
+                from os.path import join
+                paths = [join(p) for p in ps]
+                """,
+            )
+        )
+
+    def test_merge_into_existing_from_import(self, arm):
         """Merge a new name into an existing 'from X import ...' statement.
 
         The new member is inserted in case-insensitive alphabetical position
         ('exists' < 'join'), not appended.
         """
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('os.path', 'exists')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'exists')))
         spec.rewrite_run(
             python(
                 """
@@ -190,11 +200,11 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_into_existing_import_keeps_ids_accessible(self):
+    def test_merge_into_existing_import_keeps_ids_accessible(self, arm):
         """Merging into an existing from-import rebuilds the MultiImport from the
         public `.id` property; the rebuilt node's id must remain accessible
         (regression for the 8.84.8 int-id migration)."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('os.path', 'exists')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'exists')))
         spec.rewrite_run(
             python(
                 """
@@ -209,9 +219,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_inserts_member_in_sorted_position(self):
+    def test_merge_inserts_member_in_sorted_position(self, arm):
         """Insert before an existing member when it sorts earlier (the reported bug)."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'ClassVar')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'typing', 'ClassVar')))
         spec.rewrite_run(
             python(
                 """
@@ -225,9 +235,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_inserts_member_in_middle(self):
+    def test_merge_inserts_member_in_middle(self, arm):
         """Insert a member between two existing, already-sorted members."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'ClassVar')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'typing', 'ClassVar')))
         spec.rewrite_run(
             python(
                 """
@@ -241,9 +251,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_appends_when_alphabetically_last(self):
+    def test_merge_appends_when_alphabetically_last(self, arm):
         """Append a member when it sorts after all existing members."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'Final')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'typing', 'Final')))
         spec.rewrite_run(
             python(
                 """
@@ -257,9 +267,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_is_case_insensitive(self):
+    def test_merge_is_case_insensitive(self, arm):
         """Ordering is case-insensitive: 'cast' sorts before 'Optional'."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'cast')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'typing', 'cast')))
         spec.rewrite_run(
             python(
                 """
@@ -273,10 +283,10 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_into_unsorted_list_still_inserts_sorted(self):
+    def test_merge_into_unsorted_list_still_inserts_sorted(self, arm):
         """When existing members are unsorted, the new member is still placed at
         its first sorted position; existing members are not reordered."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('os.path', 'exists')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'exists')))
         spec.rewrite_run(
             python(
                 """
@@ -290,9 +300,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_merge_aliased_member_sorted_by_alias(self):
+    def test_merge_aliased_member_sorted_by_alias(self, arm):
         """An aliased member is sorted by its alias (the bound name)."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'Final', alias='abc')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'typing', 'Final', alias='abc')))
         spec.rewrite_run(
             python(
                 """
@@ -306,10 +316,10 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_new_from_import_added_after_existing_imports(self):
+    def test_new_from_import_added_after_existing_imports(self, arm):
         """A brand-new 'from' import is placed after existing imports; import
         statements are not reordered among themselves."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('mmm', 'w')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'mmm', 'w')))
         spec.rewrite_run(
             python(
                 """
@@ -326,10 +336,10 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_skips_builtins_import(self):
+    def test_skips_builtins_import(self, arm):
         """Names from the 'builtins' module are always available, so no import
         is added (e.g. 'from builtins import list' is redundant)."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('builtins', 'list')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'builtins', 'list')))
         spec.rewrite_run(
             python(
                 """
@@ -338,9 +348,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_skips_builtins_direct_import(self):
+    def test_skips_builtins_direct_import(self, arm):
         """A direct 'import builtins' is likewise not added."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('builtins')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'builtins')))
         spec.rewrite_run(
             python(
                 """
@@ -349,9 +359,9 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_adds_aliased_builtins_import(self):
+    def test_adds_aliased_builtins_import(self, arm):
         """An explicit alias makes a builtins import meaningful, so it is added."""
-        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('builtins', 'list', '_list')))
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'builtins', 'list', '_list')))
         spec.rewrite_run(
             python(
                 """
@@ -365,31 +375,13 @@ class TestMaybeAddImport:
         )
 
 
-class TestAddImportVisitor:
-    """Tests for AddImport constructed directly (bypassing maybe_add_import),
-    as the RPC server does for Java-initiated ``maybeAddImport`` calls."""
-
-    def test_skips_builtins_import(self):
-        """e.g. Java's ChangeType retargeting a type to ``builtins.list`` must
-        not add ``from builtins import list``."""
-        spec = RecipeSpec(recipe=from_visitor(AddImport(AddImportOptions(
-            module='builtins', name='list', only_if_referenced=False))))
-        spec.rewrite_run(
-            python(
-                """
-                x: list = []
-                """,
-            )
-        )
-
-
 class TestCanonicalAddImportDedup:
     """An existing import already satisfies a requested (module, name) when
     its canonical FQN matches (``os.path.join`` is canonically
     ``posixpath.join``), not just when its written path does."""
 
-    def test_canonical_request_matches_written_from_import(self):
-        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'join'))).rewrite_run(
+    def test_canonical_request_matches_written_from_import(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'posixpath', 'join'))).rewrite_run(
             python(
                 """
                 from os.path import join
@@ -398,8 +390,8 @@ class TestCanonicalAddImportDedup:
             )
         )
 
-    def test_canonical_request_matches_written_class_import(self):
-        RecipeSpec(recipe=from_visitor(_add_import_visitor('typing', 'Iterable'))).rewrite_run(
+    def test_canonical_request_matches_written_class_import(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'typing', 'Iterable'))).rewrite_run(
             python(
                 """
                 from collections.abc import Iterable
@@ -408,9 +400,9 @@ class TestCanonicalAddImportDedup:
             )
         )
 
-    def test_canonical_match_requires_same_bound_name(self):
+    def test_canonical_match_requires_same_bound_name(self, arm):
         """An aliased binding does not satisfy a request for the plain name."""
-        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'join'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'posixpath', 'join'))).rewrite_run(
             python(
                 """
                 from os.path import join as j
@@ -424,10 +416,10 @@ class TestCanonicalAddImportDedup:
             )
         )
 
-    def test_canonical_mismatch_still_adds(self):
+    def test_canonical_mismatch_still_adds(self, arm):
         """os.path.exists is canonically genericpath.exists, so a posixpath
         request is a different symbol and gets its own import."""
-        RecipeSpec(recipe=from_visitor(_add_import_visitor('posixpath', 'exists'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'posixpath', 'exists'))).rewrite_run(
             python(
                 """
                 from os.path import exists

@@ -36,7 +36,7 @@ import threading
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Set
+from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
 
 try:
@@ -45,6 +45,7 @@ except ImportError:  # not available on Windows
     resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
+from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
 # overflow the default recursion limit (1000) during RPC serialization.
@@ -67,9 +68,13 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
-# Per-source-file remote_refs high-water, captured before a file is first visited so
-# handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
+# Refs sent to Java, so a type sent for one source file is cited rather than resent
+# by the next (mirrors RewriteRpc.localRefs).
+local_refs = ReferenceMap()
+# Per-source-file ref high-water on each side, captured before a file is first visited
+# so handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
 _ref_checkpoints: Dict[str, int] = {}
+_local_ref_checkpoints: Dict[str, int] = {}
 
 # Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
 _metrics_file = None
@@ -80,9 +85,10 @@ _metrics_lock = threading.Lock()
 _request_id_counter = 0
 _request_id_lock = threading.Lock()
 
-# Pending requests waiting for responses
-_pending_requests: Dict[int, Any] = {}
-_pending_lock = threading.Lock()
+# Ids of the calls currently on the stack, and responses that arrived for one of them
+# while another was waiting; anything no listed call claims is dropped rather than kept.
+_awaiting_ids: Set[Any] = set()
+_pending_responses: Dict[Any, dict] = {}
 
 # Flag for trace mode
 _trace_rpc = False
@@ -144,21 +150,44 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     # Send the request to Java via stdout
     write_message(request)
 
-    # Read the response from Java with timeout
-    response = read_message_with_timeout(timeout_seconds)
+    _awaiting_ids.add(request_id)
+    try:
+        while True:
+            response = _pending_responses.pop(request_id, None)
+            if response is None:
+                try:
+                    response = read_message_with_timeout(timeout_seconds)
+                except TimeoutError as e:
+                    raise RuntimeError(f"No response received for {method} request ({e})")
+                if response is None:
+                    raise RuntimeError(f"Host closed the stream while awaiting a response to {method}")
 
-    if response is None:
-        raise RuntimeError(f"No response received for {method} request (timeout after {timeout_seconds}s)")
+            # Java can call us while we are calling Java; serve it and keep waiting, as
+            # the JS peer's connection does for a request arriving mid-call.
+            if response.get('method') is not None:
+                _serve(response)
+                continue
 
-    if _trace_rpc:
-        logger.debug(f"Received response from Java: {json.dumps(response)}")
+            response_id = response.get('id')
+            if response_id != request_id:
+                if response_id in _awaiting_ids:
+                    _pending_responses[response_id] = response
+                else:
+                    logger.warning(f"Discarding response for request {response_id}; "
+                                   f"no call is awaiting it")
+                continue
 
-    # Check for errors
-    if 'error' in response:
-        error = response['error']
-        raise RuntimeError(f"RPC error from Java: {error.get('message', 'Unknown error')}")
+            if _trace_rpc:
+                logger.debug(f"Received response from Java: {json.dumps(response)}")
 
-    return response.get('result')
+            if 'error' in response:
+                error = response['error']
+                raise RuntimeError(f"RPC error from Java: {error.get('message', 'Unknown error')}")
+
+            return response.get('result')
+    finally:
+        _awaiting_ids.discard(request_id)
+        _pending_responses.pop(request_id, None)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -560,17 +589,36 @@ def handle_parse(params: dict) -> List[str]:
     return results
 
 
-# Never-source dirs (caches, venvs, VCS, dependency trees, build output); caller exclusions extend, not replace.
+# These nest anywhere in a project.
 DEFAULT_PARSE_EXCLUSIONS = [
     '__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne',
-    'node_modules', '.pytest_cache', '.mypy_cache', 'build', 'dist', 'target',
+    'node_modules', '.pytest_cache', '.mypy_cache',
 ]
+
+# Build output, which only ever sits at the project root; deeper down these are
+# ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
+ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+
+
+def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
+    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
+    import fnmatch
+
+    def excluded(name: str, patterns: List[str]) -> bool:
+        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
+
+    for root, dirs, files in os.walk(project_path):
+        at_root = root == project_path
+        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
+        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+
+        for file in files:
+            if file.endswith('.py'):
+                yield os.path.join(root, file)
 
 
 def handle_parse_project(params: dict) -> List[dict]:
     """Handle a ParseProject RPC request."""
-    import fnmatch
-
     project_path = params.get('projectPath', '.')
     exclusions = DEFAULT_PARSE_EXCLUSIONS + [
         excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
@@ -603,26 +651,21 @@ def handle_parse_project(params: dict) -> List[dict]:
         pass
 
     try:
-        for root, dirs, files in os.walk(project_path):
-            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
-
-            for file in files:
-                if file.endswith('.py'):
-                    path = os.path.join(root, file)
-                    try:
-                        oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
-                    except OSError:
-                        oversize = False  # let the normal path surface the read error
-                    if oversize:
-                        results.append(_create_quark(path, relative_to))
-                        continue
-                    try:
-                        result = parse_python_file(path, relative_to, ty_client,
-                                                   language_level=language_level,
-                                                   project_language_level=project_language_level)
-                        results.append(result)
-                    except Exception as e:
-                        logger.error(f"Error parsing {path}: {e}")
+        for path in _walk_python_files(project_path, exclusions):
+            try:
+                oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
+            except OSError:
+                oversize = False  # let the normal path surface the read error
+            if oversize:
+                results.append(_create_quark(path, relative_to))
+                continue
+            try:
+                result = parse_python_file(path, relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error parsing {path}: {e}")
     finally:
         if ty_client is not None:
             ty_client.shutdown()
@@ -970,8 +1013,15 @@ def handle_get_object(params: dict) -> List[dict]:
         # Get the "before" state - what we previously sent to Java
         before = remote_objects.get(obj_id)
 
-        q = RpcSendQueue(source_file_type)
-        result = q.generate(obj, before)
+        saved_refs = local_refs.snapshot()
+        q = RpcSendQueue(source_file_type, local_refs)
+        try:
+            result = q.generate(obj, before)
+        except BaseException:
+            # Java receives nothing of this exchange, so refs assigned during it name
+            # objects it never got; citing them later would fail on its side.
+            local_refs.rollback_to(saved_refs)
+            raise
 
         # Update remote_objects to track that Java now has this version
         remote_objects[obj_id] = obj
@@ -1073,6 +1123,8 @@ def handle_reset(params: dict) -> bool:
     _recipe_accumulators.clear()
     _recipe_phases.clear()
     _ref_checkpoints.clear()
+    _local_ref_checkpoints.clear()
+    local_refs.clear()
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -1082,6 +1134,9 @@ def handle_evict(params: dict) -> bool:
     """Handle an Evict RPC notification - drop one source file's tree and roll back the
     refs it introduced, bounding memory to roughly one source file at a time. Recipe,
     accumulator, and execution-context state (keyed separately) is left intact.
+
+    Both directions roll back together, matching RewriteRpc.evict: Java drops this file's
+    refs from both of its maps, so any kept here would name ids it no longer holds.
     """
     obj_id = params.get('id')
     if obj_id is None:
@@ -1092,6 +1147,9 @@ def handle_evict(params: dict) -> bool:
     if checkpoint is not None:
         for ref_id in [k for k in remote_refs if k > checkpoint]:
             del remote_refs[ref_id]
+    local_checkpoint = _local_ref_checkpoints.pop(obj_id, None)
+    if local_checkpoint is not None:
+        local_refs.rollback_to(local_checkpoint)
     return True
 
 
@@ -2024,8 +2082,10 @@ def handle_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot the remote_refs high-water for this file before fetching its tree (first visit wins).
+    # Snapshot both directions' ref high-water for this file before fetching its tree
+    # (first visit wins).
     _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -2082,8 +2142,9 @@ def handle_batch_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot the remote_refs high-water for this file before fetching its tree.
+    # Snapshot both directions' ref high-water for this file before fetching its tree.
     _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2304,8 +2365,7 @@ def handle_generate(params: dict) -> dict:
 # pair, so one child's ref numbering never has to mean anything to another child. Relaying a
 # child's stream directly to a sibling is unsafe.
 _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
-_hub_send_refs: Dict[str, Dict] = {}        # bundle -> send ref map      (facade -> child)
-_hub_send_next: Dict[str, int] = {}         # bundle -> next send ref number
+_hub_send_refs: Dict[str, ReferenceMap] = {}  # bundle -> send ref map      (facade -> child)
 _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
 
@@ -2335,14 +2395,11 @@ def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) 
     if tree is None:
         return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
 
-    q = RpcSendQueue(source_file_type)
-    q.refs = _hub_send_refs.setdefault(bundle, {})
-    q.next_ref = _hub_send_next.get(bundle, 0)
+    refs = _hub_send_refs.setdefault(bundle, ReferenceMap())
     # Remember where this child's ref numbering stood before this file, so Evict can roll it back
     # in lockstep with the child's own rollback (see _hub_release).
-    _hub_send_checkpoint.setdefault((bundle, obj_id), q.next_ref)
-    data = q.generate(tree, _hub_served.get((bundle, obj_id)))
-    _hub_send_next[bundle] = q.next_ref
+    _hub_send_checkpoint.setdefault((bundle, obj_id), refs.snapshot())
+    data = RpcSendQueue(source_file_type, refs).generate(tree, _hub_served.get((bundle, obj_id)))
     _hub_served[(bundle, obj_id)] = tree
     return data
 
@@ -2379,13 +2436,10 @@ def _hub_release(obj_id: str) -> None:
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
-        bundle = key[0]
         checkpoint = _hub_send_checkpoint.pop(key)
-        refs = _hub_send_refs.get(bundle)
+        refs = _hub_send_refs.get(key[0])
         if refs is not None:
-            for ref_key in [k for k, (_, num) in refs.items() if num > checkpoint]:
-                del refs[ref_key]
-        _hub_send_next[bundle] = checkpoint
+            refs.rollback_to(checkpoint)
 
 
 def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
@@ -2530,6 +2584,10 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+class _ProtocolError(Exception):
+    """The stream can no longer be framed, so no later message can be trusted."""
+
+
 class _StdinBuffer:
     """Buffered reader for raw stdin file descriptor.
 
@@ -2542,6 +2600,7 @@ class _StdinBuffer:
     def __init__(self):
         self._fd: Optional[int] = None
         self._buf = bytearray()
+        self.at_eof = False
 
     def _get_fd(self) -> int:
         fd = self._fd
@@ -2607,6 +2666,7 @@ class _StdinBuffer:
         else:
             chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
         if not chunk:
+            self.at_eof = True
             return False
         self._buf += chunk
         return True
@@ -2615,75 +2675,70 @@ class _StdinBuffer:
 _stdin_buffer = _StdinBuffer()
 
 
-def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
-    """Read a JSON-RPC message from stdin with timeout.
+def _read_body(header_line: bytes) -> Optional[dict]:
+    """Read the remainder of a message whose header line has been consumed.
 
-    Args:
-        timeout_seconds: Maximum time to wait for complete message
+    No deadline applies past the header. A message the reader walks away from
+    half-read leaves its body to be parsed as the next message's header, which
+    desynchronizes every read that follows.
 
     Returns:
-        Parsed JSON message, or None on timeout/error
+        Parsed JSON message
+
+    Raises:
+        _ProtocolError: If the frame cannot be parsed or ends early
     """
-    deadline = time.time() + timeout_seconds
+    header_str = header_line.decode('utf-8', 'replace').strip()
+    if not header_str.startswith('Content-Length:'):
+        raise _ProtocolError(f"invalid header: {header_str}")
 
     try:
-        # Read Content-Length header
-        header_line = _stdin_buffer.read_line(deadline)
-        if not header_line:
-            logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
-            return None
-
-        header_str = header_line.decode('utf-8').strip()
-        if not header_str.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_str}")
-            return None
-
         content_length = int(header_str.split(':')[1].strip())
+    except ValueError:
+        raise _ProtocolError(f"invalid content length: {header_str}")
 
-        # Read empty line (separator)
-        separator = _stdin_buffer.read_line(deadline)
-        if separator is None:
-            logger.warning(f"Timeout waiting for header separator")
-            return None
+    # The separator line. A stream ending mid-frame has truncated a message rather
+    # than closed between two, so it is a fault and not the host hanging up.
+    if _stdin_buffer.read_line() is None:
+        raise _ProtocolError("stream ended before the message body")
 
-        # Read content
-        content_bytes = _stdin_buffer.read_bytes(content_length, deadline)
-        if content_bytes is None:
-            logger.warning(f"Timeout waiting for message content")
-            return None
+    content_bytes = _stdin_buffer.read_bytes(content_length)
+    if content_bytes is None:
+        raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
+    try:
         return json.loads(content_bytes.decode('utf-8'))
-    except Exception as e:
-        logger.error(f"Error reading message with timeout: {e}")
-        return None
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise _ProtocolError(f"invalid message body: {e}")
+
+
+def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
+    """Read a JSON-RPC message from stdin, bounding the wait for it to *start*.
+
+    Args:
+        timeout_seconds: Maximum time to wait for a message to begin arriving
+
+    Returns:
+        Parsed JSON message, or None if the host closed the stream
+
+    Raises:
+        TimeoutError: If no message begins arriving within the deadline
+        _ProtocolError: If the frame cannot be parsed or ends early
+    """
+    header_line = _stdin_buffer.read_line(time.time() + timeout_seconds)
+    if header_line is None:
+        if _stdin_buffer.at_eof:
+            return None
+        raise TimeoutError(f"no RPC message arrived within {timeout_seconds}s")
+    return _read_body(header_line)
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
-    try:
-        # Read Content-Length header
-        header_line = _stdin_buffer.read_line()
-        if not header_line:
-            return None
-
-        header_str = header_line.decode('utf-8').strip()
-        if not header_str.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_str}")
-            return None
-
-        content_length = int(header_str.split(':')[1].strip())
-
-        # Read empty line (separator)
-        _stdin_buffer.read_line()
-
-        # Read content
-        content_bytes = _stdin_buffer.read_bytes(content_length)
-        if not content_bytes:
-            return None
-        return json.loads(content_bytes.decode('utf-8'))
-    except Exception as e:
-        logger.error(f"Error reading message: {e}")
+    """Read a JSON-RPC message from stdin (blocking, no timeout). None on EOF."""
+    header_line = _stdin_buffer.read_line()
+    if not header_line:
         return None
+    return _read_body(header_line)
 
 
 def write_message(response: dict):
@@ -2696,6 +2751,72 @@ def write_message(response: dict):
     content_bytes = json.dumps(response).encode('utf-8')
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
     os.write(sys.stdout.fileno(), header + content_bytes)
+
+
+def _error_response(request_id: Any, e: Exception) -> dict:
+    """Must be called while handling ``e``, so the traceback reaches the host."""
+    return {
+        'jsonrpc': '2.0',
+        'id': request_id,
+        'error': {
+            'code': -32603,
+            'message': str(e),
+            'data': traceback.format_exc()
+        }
+    }
+
+
+def _write_response(response: dict) -> None:
+    """Send a response, substituting an error when the result cannot be encoded.
+
+    Encoding sits outside the guard around the handler, and a value JSON cannot
+    represent is that one request's failure rather than the server's.
+    """
+    try:
+        if _trace_rpc:
+            logger.debug(f"Sending: {json.dumps(response)}")
+        write_message(response)
+    except (TypeError, ValueError) as e:
+        request_id = response.get('id')
+        logger.exception(f"Error encoding response for request {request_id}: {e}")
+        write_message(_error_response(request_id, e))
+
+
+def _serve(message: dict) -> None:
+    """Handle one inbound request and reply to it."""
+    request_id = message.get('id')
+    method = message.get('method')
+    params = message.get('params', {})
+
+    if method is None:
+        logger.error("Missing 'method' in request")
+        return
+
+    if _trace_rpc:
+        logger.debug(f"Received: {json.dumps(message)}")
+
+    metric_start = time.monotonic()
+    metric_error = ''
+    try:
+        response = {
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'result': handle_request(method, params)
+        }
+    except _ProtocolError:
+        # A nested call can raise this. Answering it as a request-level error would
+        # leave main() reading on, so let it through and end the process.
+        raise
+    except Exception as e:
+        logger.exception(f"Error handling request: {e}")
+        metric_error = str(e)
+        response = _error_response(request_id, e)
+    _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
+
+    # Notifications (no id, e.g. Evict) get no reply — a null-id response would
+    # fail every in-flight request on the Java reader.
+    if request_id is not None:
+        _write_response(response)
 
 
 def _init_pyroscope() -> None:
@@ -2763,8 +2884,8 @@ def _rss_bytes():
 
 
 def _record_metric(method: str, duration_ms: float, error: str) -> None:
-    """Append one row of timing + cache residency. refs counts remote_refs only: Python's send-side
-    refs live on a per-call RpcSendQueue, the only cross-call ref cache handle_evict rolls back."""
+    """Append one row of timing + cache residency. refs counts both connection-scoped ref
+    tables, the ones handle_evict rolls back: what Java sent us and what we sent Java."""
     if _metrics_writer is None:
         return
     used, peak = _rss_bytes()
@@ -2774,7 +2895,8 @@ def _record_metric(method: str, duration_ms: float, error: str) -> None:
         try:
             _metrics_writer.writerow([
                 datetime.now(timezone.utc).isoformat(), method, f"{duration_ms:.0f}", error,
-                used, peak, len(local_objects), len(remote_objects), len(remote_refs)])
+                used, peak, len(local_objects), len(remote_objects),
+                len(remote_refs) + len(local_refs)])
             _metrics_file.flush()
         except OSError as e:
             logger.warning(f"metrics-csv: write failed: {e}")
@@ -2790,6 +2912,11 @@ def _close_metrics() -> None:
             except OSError:
                 pass
         _metrics_file = _metrics_writer = None
+
+
+# Exit status for a fault, distinguishing it from the 0 of a host-closed stream.
+# Matches the JS server's `process.on('uncaughtException') -> process.exit(8)`.
+FATAL_EXIT_CODE = 8
 
 
 def main():
@@ -2836,64 +2963,27 @@ def main():
 
     logger.info("Python RPC server starting...")
 
-    while True:
-        try:
+    exit_code = 0
+    try:
+        while True:
             message = read_message()
             if message is None:
                 break
-
-            if args.trace_rpc_messages:
-                logger.debug(f"Received: {json.dumps(message)}")
-
-            request_id = message.get('id')
-            method = message.get('method')
-            params = message.get('params', {})
-
-            if method is None:
-                logger.error("Missing 'method' in request")
-                continue
-
-            metric_start = time.monotonic()
-            metric_error = ''
-            try:
-                result = handle_request(method, params)
-                response = {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'result': result
-                }
-            except Exception as e:
-                logger.exception(f"Error handling request: {e}")
-                # Include full stack trace in error response for debugging
-                tb_str = traceback.format_exc()
-                metric_error = str(e)
-                response = {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'error': {
-                        'code': -32603,
-                        'message': str(e),
-                        'data': tb_str
-                    }
-                }
-            _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
-
-            if args.trace_rpc_messages:
-                logger.debug(f"Sending: {json.dumps(response)}")
-
-            # Notifications (no id, e.g. Evict) get no reply — a null-id response would
-            # fail every in-flight request on the Java reader.
-            if request_id is not None:
-                write_message(response)
-
-        except Exception as e:
-            logger.exception(f"Fatal error: {e}")
-            break
+            _serve(message)
+    except _ProtocolError as e:
+        logger.error(f"Protocol error, cannot continue: {e}")
+        exit_code = FATAL_EXIT_CODE
+    except Exception as e:
+        logger.exception(f"Fatal error: {e}")
+        exit_code = FATAL_EXIT_CODE
 
     # No ty-types cleanup needed here — clients are scoped per parse batch
 
     _close_metrics()
     logger.info("Python RPC server shutting down...")
+
+    if exit_code:
+        sys.exit(exit_code)
 
 
 if __name__ == '__main__':

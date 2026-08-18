@@ -602,6 +602,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append("=");
             }
             if (omitBodyBraces && body.getStatements().size() == 1) {
+                visitSpace(body.getPrefix(), Space.Location.BLOCK_PREFIX, p);
                 visit(body.getStatements().get(0), p);
             } else {
                 visit(body, p);
@@ -759,14 +760,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
         if (scu.getPackageDeclaration() != null) {
             visit(scu.getPackageDeclaration(), p);
-            boolean packageEndsWithSemicolon = scu.getPackageDeclaration().getMarkers().findFirst(PackageSemicolon.class).isPresent();
-            if (!packageEndsWithSemicolon && !scu.getStatements().isEmpty()) {
-                Statement firstStatement = scu.getStatements().get(0);
-                String firstStatementPrefix = firstStatement.getPrefix().getWhitespace();
-                if (!firstStatementPrefix.startsWith("\n") && !firstStatementPrefix.startsWith(";")) {
-                    p.append("\n");
-                }
-            }
         }
 
         for (int i = 0; i < scu.getStatements().size(); i++) {

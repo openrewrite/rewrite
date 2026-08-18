@@ -80,8 +80,8 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	pe.Text = receiveScalar[string](q, pe.Text)
 	return pe
 }
@@ -92,24 +92,9 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	cu = &c
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
-	q.Receive(nil, nil) // charsetBomMarked
-	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
-	q.Receive(nil, func(v any) any {
-		receiveScalar[string](q, "") // algorithm
-		q.Receive(nil, nil)          // value
-		return nil
-	})
-	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields
-	q.Receive(nil, func(v any) any {
-		q.Receive(nil, nil) // creationTime
-		q.Receive(nil, nil) // lastModifiedTime
-		q.Receive(nil, nil) // lastAccessTime
-		q.Receive(nil, nil) // isReadable
-		q.Receive(nil, nil) // isWritable
-		q.Receive(nil, nil) // isExecutable
-		q.Receive(nil, nil) // size
-		return nil
-	})
+	cu.CharsetBomMarked = receiveScalar[bool](q, cu.CharsetBomMarked)
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	// packageDecl
 	var beforePkgDecl any
 	if cu.PackageDecl != nil {
@@ -272,6 +257,26 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 	}
 	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
 	return mt
+}
+
+func (r *GoReceiver) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ta
+	ta = &c
+	if result := q.Receive(ta.Left, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		ta.Left = result.(java.RightPadded[java.Expression])
+	}
+	ta.AssertedType = receiveValue(q, ta.AssertedType, func(e *java.ControlParentheses) any { return r.Visit(e, q) })
+	ta.Type = r.receiveType(ta.Type, q)
+	return ta
+}
+
+func (r *GoReceiver) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *es
+	es = &c
+	es.Expression = receiveValue(q, es.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	return es
 }
 
 func (r *GoReceiver) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {

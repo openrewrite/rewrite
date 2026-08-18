@@ -1321,8 +1321,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print name
-        VisitSpace(classDecl.Name.Prefix, p);
-        p.Append(classDecl.Name.SimpleName);
+        Visit(classDecl.Name, p);
 
         // Print type parameters (generics) — only print <attrs variance name, ...>
         if (classDecl.TypeParameters != null)

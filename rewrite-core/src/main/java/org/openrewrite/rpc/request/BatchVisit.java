@@ -34,6 +34,8 @@ import org.openrewrite.table.SourcesFileResults;
 import java.util.*;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
+
 @Value
 public class BatchVisit implements RpcRequest {
     String sourceFileType;
@@ -82,7 +84,7 @@ public class BatchVisit implements RpcRequest {
                 // Diff SearchResult IDs against the running set
                 List<String> searchResultIds;
                 if (deleted) {
-                    searchResultIds = Collections.emptyList();
+                    searchResultIds = emptyList();
                 } else {
                     Set<String> afterIds = collectSearchResultIds(after);
                     afterIds.removeAll(knownIds);

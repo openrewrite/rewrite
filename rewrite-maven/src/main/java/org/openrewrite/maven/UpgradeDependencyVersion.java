@@ -107,7 +107,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        return validated;
+        return validated.and(RetainVersions.validate("retainVersions", retainVersions));
     }
 
     String displayName = "Upgrade Maven dependency version";

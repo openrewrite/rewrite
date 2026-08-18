@@ -39,17 +39,19 @@ public class PipRecipeBundleResolver implements RecipeBundleResolver {
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         Path pkgPath = Paths.get(bundle.getPackageName());
         InstallRecipesResponse response;
+        RecipeBundle resolved = bundle;
         if (Files.exists(pkgPath)) {
-            // Key the bundle on the absolute, normalized path so it matches the origin the server records for it.
             Path absolute = pkgPath.toAbsolutePath().normalize();
-            bundle.setPackageName(absolute.toString());
+            // Key the bundle on the absolute, normalized path so it matches the origin the server records for it.
+            resolved = new RecipeBundle(bundle.getPackageEcosystem(), absolute.toString(),
+                    bundle.getRequestedVersion(), bundle.getVersion(), bundle.getTeam());
             response = rpc.installRecipes(absolute.toFile());
         } else {
-            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getEffectiveVersion());
         }
         if (response.getVersion() != null) {
-            bundle.setVersion(response.getVersion());
+            resolved = resolved.withVersion(response.getVersion());
         }
-        return new PipRecipeBundleReader(bundle, rpc);
+        return new PipRecipeBundleReader(resolved, rpc);
     }
 }

@@ -101,6 +101,8 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *java.Parentheses:
 		return n.WithPrefix(prefix)
+	case *golang.TypeAssertion:
+		return n.WithPrefix(prefix)
 	case *java.TypeCast:
 		return n.WithPrefix(prefix)
 	case *java.ControlParentheses:

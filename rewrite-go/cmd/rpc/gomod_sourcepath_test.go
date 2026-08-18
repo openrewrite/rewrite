@@ -21,6 +21,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -42,9 +46,7 @@ func TestParseProjectRelativizesGoModSourcePath(t *testing.T) {
 		ProjectPath: projectDir,
 		RelativeTo:  &relativeTo,
 	})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -59,22 +61,14 @@ func TestParseProjectRelativizesGoModSourcePath(t *testing.T) {
 			break
 		}
 	}
-	if gm == nil {
-		t.Fatal("expected a GoMod object to be produced")
-	}
-	if gm.SourcePath != "go.mod" {
-		t.Fatalf("expected GoMod SourcePath relativized to %q, got %q", "go.mod", gm.SourcePath)
-	}
+	require.NotNil(t, gm, "expected a GoMod object to be produced")
+	require.Equalf(t, "go.mod", gm.SourcePath, "expected GoMod SourcePath relativized to %q", "go.mod")
 }
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755), "mkdir")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644), "write")
 }
 
 // TestParseProjectRelativizesGoResolutionResultPath pins down that the GoResolutionResult
@@ -97,9 +91,7 @@ func TestParseProjectRelativizesGoResolutionResultPath(t *testing.T) {
 		ProjectPath: projectDir,
 		RelativeTo:  &relativeTo,
 	})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -122,9 +114,7 @@ func TestParseProjectRelativizesGoResolutionResultPath(t *testing.T) {
 			}
 		}
 	}
-	if onGoMod != 2 || onGoSum != 1 {
-		t.Fatalf("expected markers on 2 go.mod and 1 go.sum, got %d and %d", onGoMod, onGoSum)
-	}
+	require.Falsef(t, onGoMod != 2 || onGoSum != 1, "expected markers on 2 go.mod and 1 go.sum, got %d and", onGoMod)
 }
 
 func resolutionResults(entries []java.Marker) []golang.GoResolutionResult {
@@ -139,7 +129,5 @@ func resolutionResults(entries []java.Marker) []golang.GoResolutionResult {
 
 func assertMarkerPath(t *testing.T, got, want, attachedTo string) {
 	t.Helper()
-	if got != want {
-		t.Errorf("marker on %q has Path %q, want %q", attachedTo, got, want)
-	}
+	assert.Equalf(t, want, got, "marker on %q has Path", attachedTo)
 }

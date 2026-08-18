@@ -27,6 +27,7 @@ from __future__ import annotations
 import ast
 import os
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -101,6 +102,14 @@ _PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
 
+# knownInstance descriptors carry no moduleName, and most of the singletons ty
+# reports live in `typing`. These `knownInstanceKind`s are the ones that don't.
+_KNOWN_INSTANCE_FQNS: Dict[str, str] = {
+    'Range': 'range',
+    'FunctoolsPartial': 'functools.partial',
+    'FunctoolsPartialCall': 'functools.partial',
+}
+
 
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
     """The names ``__all__`` declares via top-level literal list/tuple assignments
@@ -127,6 +136,25 @@ def _is_public(name: str, all_names: Optional[Set[str]]) -> bool:
     """Whether ``name`` is part of the module's public surface: membership in
     ``__all__`` when declared, else the non-underscore convention."""
     return name in all_names if all_names is not None else not name.startswith('_')
+
+
+@dataclass
+class SessionTypeCache:
+    """The JavaType instances every file of one ty session shares.
+
+    ty type ids are stable for a session's lifetime and its descriptor table is
+    cumulative across files (see ``TyTypesClient.session_types``), so an id denotes
+    the same type in every file of the parse and needs only one JavaType.
+    """
+
+    by_type_id: Dict[int, JavaType] = field(default_factory=dict)
+    declaring_by_type_id: Dict[int, JavaType.FullyQualified] = field(default_factory=dict)
+    by_fqn: Dict[str, JavaType] = field(default_factory=dict)
+
+    def clear(self) -> None:
+        self.by_type_id.clear()
+        self.declaring_by_type_id.clear()
+        self.by_fqn.clear()
 
 
 class PythonTypeMapping:
@@ -162,7 +190,6 @@ class PythonTypeMapping:
         self._source = source
         self._file_path = file_path
         self._temp_file: Optional[Path] = None
-        self._type_cache: Dict[str, JavaType] = {}  # FQN -> JavaType (per-instance)
 
         # Use pre-computed values when available (e.g. supplied by ParserVisitor),
         # otherwise compute them here.
@@ -181,8 +208,13 @@ class PythonTypeMapping:
         self._node_index_by_start: Dict[int, List[Tuple[int, int, str]]] = {}  # start -> [(end, type_id, node_kind)]
         self._type_registry: Dict[int, Dict[str, Any]] = {}  # type_id -> TypeDescriptor
         self._call_signature_index: Dict[Tuple[int, int], Dict[str, Any]] = {}  # (start, end) -> callSignature
-        self._type_id_cache: Dict[int, JavaType] = {}  # type_id -> resolved JavaType
-        self._declaring_type_id_cache: Dict[int, JavaType.FullyQualified] = {}  # type_id -> resolved declaring type
+        session_java_types = getattr(ty_client, 'java_types', None) or SessionTypeCache()
+        self._type_cache: Dict[str, JavaType] = session_java_types.by_fqn
+        self._type_id_cache: Dict[int, JavaType] = session_java_types.by_type_id
+        self._declaring_type_id_cache: Dict[int, JavaType.FullyQualified] = \
+            session_java_types.declaring_by_type_id
+        # Cycle detection tracks one file's in-progress resolutions, so unlike the
+        # resolved types above it belongs to this instance rather than the session.
         self._resolving_type_ids: set = set()  # type_ids currently being resolved (cycle detection)
         self._resolving_declaring_type_ids: set = set()
         self._cycle_placeholders: Dict[int, JavaType.Class] = {}  # placeholders created on cycle detection
@@ -438,6 +470,8 @@ class PythonTypeMapping:
             if class_name in _PYTHON_PRIMITIVES:
                 return _PYTHON_PRIMITIVES[class_name]
 
+            module_name = descriptor.get('moduleName')
+
             # Resolve base class: prefer classId (enriched with supertypes/methods)
             class_id = descriptor.get('classId')
             if class_id is None:
@@ -449,25 +483,33 @@ class PythonTypeMapping:
                 if not isinstance(base_class, JavaType.Class):
                     base_class = self._create_class_type(class_name)
             else:
-                module_name = descriptor.get('moduleName')
                 if module_name and module_name != 'builtins':
                     base_class = self._create_class_type(f"{module_name}.{class_name}")
                 else:
                     base_class = self._create_class_type(class_name)
 
-            # If typeArgs present, wrap in Parameterized
-            type_args = descriptor.get('typeArgs')
-            if type_args:
-                resolved_args = []
-                for arg_id in type_args:
-                    arg_type = self._resolve_type(arg_id)
-                    if arg_type is not None:
-                        resolved_args.append(arg_type)
-                if resolved_args:
-                    param = JavaType.Parameterized()
-                    param._type = base_class
-                    param._type_parameters = resolved_args
-                    return param
+            # `tuple` has a single generic parameter, so typeArgs conflates
+            # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
+            # elements from `tuple` without being generic, so only `tuple` takes them.
+            tuple_elements = (descriptor.get('tupleElements')
+                              if class_name == 'tuple' and module_name == 'builtins'
+                              else None)
+            if isinstance(tuple_elements, list):
+                arg_ids = [element.get('typeId') for element in tuple_elements
+                           if isinstance(element, dict)]
+            else:
+                arg_ids = descriptor.get('typeArgs') or []
+
+            resolved_args = []
+            for arg_id in arg_ids:
+                arg_type = self._resolve_type(arg_id) if arg_id is not None else None
+                if arg_type is not None:
+                    resolved_args.append(arg_type)
+            if resolved_args:
+                param = JavaType.Parameterized()
+                param._type = base_class
+                param._type_parameters = resolved_args
+                return param
 
             return base_class
 
@@ -625,9 +667,8 @@ class PythonTypeMapping:
             # Map a TypedDict to a nominal class type by name and populate its
             # members from the descriptor's `fields`. Each field carries its own
             # `name` and `typeId` (the same shape as a classLiteral member), so
-            # we reuse the variable-building path. The class is keyed by simple
-            # name via `_create_class_type`, so two TypedDicts that share a name
-            # collapse — acceptable until ty emits a qualified name here.
+            # we reuse the variable-building path. Two TypedDicts sharing a name
+            # within a file collapse (see _typed_dict_key).
             #
             # We still drop the PEP 728 `closed` / `extraItems` openness fields
             # and the per-field `required` / `readOnly` flags; and linking a
@@ -637,7 +678,8 @@ class PythonTypeMapping:
             name = descriptor.get('name', '')
             if not name:
                 return _UNKNOWN
-            class_type = self._create_class_type(name, shallow=False)
+            class_type = self._create_class_type(
+                name, shallow=False, cache_key=self._typed_dict_key(name))
             fields = descriptor.get('fields', [])
             if fields and getattr(class_type, '_members', None) is None:
                 variables = []
@@ -713,10 +755,13 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind == 'knownInstance':
-            class_name = descriptor.get('className', '')
-            if class_name:
-                return self._create_class_type(f"typing.{class_name}")
-            return _UNKNOWN
+            fqn = _KNOWN_INSTANCE_FQNS.get(descriptor.get('knownInstanceKind', ''))
+            if fqn is None:
+                class_name = descriptor.get('className', '')
+                if not class_name:
+                    return _UNKNOWN
+                fqn = f"typing.{class_name}"
+            return self._create_class_type(fqn)
 
         elif kind == 'typeAlias':
             # Resolve through to the underlying value type when available
@@ -1316,7 +1361,7 @@ class PythonTypeMapping:
         elif kind == 'typedDict':
             name = descriptor.get('name', '')
             if name:
-                return self._create_class_type(name)
+                return self._create_class_type(name, cache_key=self._typed_dict_key(name))
             return None
 
         elif kind == 'subclassOf':
@@ -1548,11 +1593,19 @@ class PythonTypeMapping:
         param._type_parameters = [base]
         return param
 
-    def _create_class_type(self, fqn: str, shallow: bool = True) -> JavaType.Class:
+    def _typed_dict_key(self, name: str) -> str:
+        """The cache key for a TypedDict named ``name``. ty names a TypedDict
+        without qualifying it, so the key is scoped to this file to keep the same
+        name in two modules apart in the session-wide cache."""
+        return f"{self._file_path}#{name}"
+
+    def _create_class_type(self, fqn: str, shallow: bool = True,
+                           cache_key: Optional[str] = None) -> JavaType.Class:
         """Create a class type from a fully qualified name. Stubs minted here are
         body-less references (ShallowClass); pass shallow=False when filling a body."""
-        if fqn in self._type_cache:
-            cached = self._type_cache[fqn]
+        key = fqn if cache_key is None else cache_key
+        if key in self._type_cache:
+            cached = self._type_cache[key]
             if isinstance(cached, JavaType.Class):
                 if not shallow and type(cached) is JavaType.ShallowClass:
                     # Promote in place so earlier references see the full class.
@@ -1564,7 +1617,7 @@ class PythonTypeMapping:
         class_type._fully_qualified_name = fqn
         class_type._kind = JavaType.FullyQualified.Kind.Class
 
-        self._type_cache[fqn] = class_type
+        self._type_cache[key] = class_type
         return class_type
 
     def _get_node_text(self, node: ast.expr) -> str:

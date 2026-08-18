@@ -68,6 +68,22 @@ func ImportPath(imp *java.Import) string {
 	return strings.Trim(raw, `"`+"`")
 }
 
+// PackageName returns the qualifier used to reference the import: its alias, else the last path segment ("" for blank/dot imports).
+func PackageName(imp *java.Import) string {
+	switch alias := AliasName(imp); alias {
+	case "":
+		path := ImportPath(imp)
+		if i := strings.LastIndex(path, "/"); i >= 0 {
+			return path[i+1:]
+		}
+		return path
+	case "_", ".":
+		return ""
+	default:
+		return alias
+	}
+}
+
 // AliasName returns the alias used by an Import: a custom identifier for
 // `import alias "path"`, "_" for blank imports, "." for dot imports, or
 // "" when the import uses the default (last segment of the path).
@@ -160,33 +176,50 @@ func IsLocal(importPath, modulePath string) bool {
 	return importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/")
 }
 
-// ReferencedPackages walks cu and returns the set of import paths that
-// are referenced by some identifier in the file body. Used by
-// RemoveUnusedImports to drop imports whose alias is never read.
-//
-// Detection is driven by the Type attribution that the parser threads
-// onto each Identifier:
-//   - For an `Identifier` whose `Type` is a `JavaTypeClass` and whose
-//     `FullyQualifiedName` carries an import path (path-shaped FQN),
-//     that path is added to the set.
-//   - For a `MethodInvocation`, the `MethodType.DeclaringType.FullyQualifiedName`
-//     is used.
-//
-// Aliases and dot imports are handled uniformly — the package's import
-// path is what we track, regardless of how the user named it.
+// ReferencedImports walks the body of cu once and returns the two signals
+// that decide whether an import is used: refs, the import paths carried by
+// the parser's Type attribution, and quals, the identifiers used lexically
+// as package qualifiers — the attribution-free signal goimports relies on.
+// Aliases and dot imports land in refs under the package's import path.
+func ReferencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
+	return referencedImports(cu)
+}
+
+// ReferencedPackages returns just the import-path set of ReferencedImports.
 func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
-	refs := map[string]bool{}
-	if cu == nil {
-		return refs
-	}
-	v := visitor.Init(&referencedPackagesVisitor{refs: refs})
-	v.Visit(cu, nil)
+	refs, _ := referencedImports(cu)
 	return refs
+}
+
+// IsReferenced reports whether imp is used by the file whose refs/quals
+// sets are passed in. Both sets come from one ReferencedImports walk per
+// file.
+func IsReferenced(imp *java.Import, refs, quals map[string]bool) bool {
+	return refs[ImportPath(imp)] || quals[PackageName(imp)]
+}
+
+func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
+	refs = map[string]bool{}
+	quals = map[string]bool{}
+	if cu == nil {
+		return refs, quals
+	}
+	v := visitor.Init(&referencedPackagesVisitor{refs: refs, quals: quals})
+	v.Visit(cu, nil)
+	return refs, quals
 }
 
 type referencedPackagesVisitor struct {
 	visitor.GoVisitor
-	refs map[string]bool
+	refs  map[string]bool
+	quals map[string]bool
+}
+
+// The alias in `import s "strings"` carries the imported package as its
+// type, so the walk stops at the import declarations and counts only uses
+// in the body.
+func (v *referencedPackagesVisitor) VisitImport(imp *java.Import, p any) java.J {
+	return imp
 }
 
 func (v *referencedPackagesVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
@@ -206,7 +239,19 @@ func (v *referencedPackagesVisitor) VisitMethodInvocation(mi *java.MethodInvocat
 			v.refs[path] = true
 		}
 	}
+	if mi.Select != nil {
+		if id, ok := mi.Select.Element.(*java.Identifier); ok {
+			v.quals[id.Name] = true
+		}
+	}
 	return v.GoVisitor.VisitMethodInvocation(mi, p)
+}
+
+func (v *referencedPackagesVisitor) VisitFieldAccess(fa *java.FieldAccess, p any) java.J {
+	if id, ok := fa.Target.(*java.Identifier); ok {
+		v.quals[id.Name] = true
+	}
+	return v.GoVisitor.VisitFieldAccess(fa, p)
 }
 
 // pkgPathOf returns the package import path implied by an FQN. The
