@@ -41,8 +41,12 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
+import org.jetbrains.kotlin.cli.FrontendConfigurationKeysKt;
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar.ExtensionStorage;
+import org.jetbrains.kotlin.compiler.plugin.ExtensionRegistrationUtilsKt;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.diagnostics.KtRegisteredDiagnosticFactoriesStorage;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
@@ -83,12 +87,15 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.jetbrains.kotlin.cli.FrontendConfigurationKeysKt.*;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
+import static org.jetbrains.kotlin.compiler.plugin.ExtensionRegistrationUtilsKt.registerInProject;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
@@ -136,7 +143,7 @@ public class KotlinParser implements Parser {
                             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
                             String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                                       .orElse(Long.toString(System.nanoTime())) + ".kt";
+                                    .orElse(Long.toString(System.nanoTime())) + ".kt";
 
                             Path path = Paths.get(pkg + className);
                             return new Input(
@@ -447,6 +454,10 @@ public class KotlinParser implements Parser {
                 compilerConfiguration,
                 EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
+        ExtensionStorage extensionsStorage = requireNonNull(getExtensionsStorage(compilerConfiguration), "extensions storage was not set in compilerConfiguration()");
+
+        registerInProject(extensionsStorage, environment.getProject(), ignored -> null);
+
         List<KtFile> ktFiles = new ArrayList<>(sources.size());
         List<KotlinSource> kotlinSources = new ArrayList<>(sources.size());
 
@@ -568,7 +579,9 @@ public class KotlinParser implements Parser {
         KOTLIN_1_9,
         KOTLIN_2_0,
         KOTLIN_2_1,
-        KOTLIN_2_2
+        KOTLIN_2_2,
+        KOTLIN_2_3,
+        KOTLIN_2_4
     }
 
     private CompilerConfiguration compilerConfiguration() {
@@ -596,7 +609,19 @@ public class KotlinParser implements Parser {
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
+        addExtensionStorage(compilerConfiguration);
+
         return compilerConfiguration;
+    }
+
+    private static void addExtensionStorage(CompilerConfiguration compilerConfiguration) {
+        ExtensionStorage extensionStorage = new ExtensionStorage();
+        List<CompilerPluginRegistrar> registrars = compilerConfiguration.getList(CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS());
+        for (CompilerPluginRegistrar registrar : registrars) {
+            registrar.registerExtensions(extensionStorage, compilerConfiguration);
+        }
+        setExtensionsStorage(compilerConfiguration, extensionStorage);
+        setDiagnosticFactoriesStorage(compilerConfiguration, new KtRegisteredDiagnosticFactoriesStorage());
     }
 
     private LanguageVersion getLanguageVersion(KotlinLanguageLevel languageLevel) {
@@ -627,6 +652,10 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return LanguageVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return LanguageVersion.KOTLIN_2_3;
+            case KOTLIN_2_4:
+                return LanguageVersion.KOTLIN_2_4;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -660,6 +689,10 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return ApiVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return ApiVersion.KOTLIN_2_3;
+            case KOTLIN_2_4:
+                return ApiVersion.KOTLIN_2_4;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
