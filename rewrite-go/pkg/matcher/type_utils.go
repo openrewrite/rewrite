@@ -223,6 +223,10 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		}
 	case *java.ArrayAccess:
 		return n.Type
+	case *java.ArrayType:
+		return n.Type
+	case *java.ParameterizedType:
+		return n.Type
 	case *java.Parentheses:
 		return TypeOfExpression(n.Tree.Element)
 	case *java.ControlParentheses:
@@ -231,6 +235,23 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType
 		}
+		// A conversion has no callee to carry a signature; its value is of
+		// the type being converted to. Name holds that type, down to the
+		// `Duration` of `time.Duration(x)` — Select is only the package.
+		// A conversion to an unnamed type (`[]byte(s)`) has no Name, and
+		// parks its type expression in Select instead.
+		if java.FindMarker[golang.Conversion](n.Markers) != nil {
+			if n.Name != nil && n.Name.Type != nil {
+				return n.Name.Type
+			}
+			if n.Select != nil {
+				return TypeOfExpression(n.Select.Element)
+			}
+		}
+	case *golang.Composite:
+		return n.Type
+	case *golang.Unary:
+		return n.Type
 	case *java.Assignment:
 		return n.Type
 	case *java.AssignmentOperation:
@@ -242,19 +263,22 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 // DeclaringTypeFQN extracts the declaring type's FQN from a MethodInvocation.
 // For `fmt.Println(...)`, this returns "fmt" (the package path).
 // For `t.Sub(...)`, this returns the type of the receiver.
+//
+// Every name comes from the type system, so an unresolved receiver yields "":
+// a local variable named `os` cannot read back as the `os` package.
 func DeclaringTypeFQN(mi *java.MethodInvocation) string {
-	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
+	if IsResolved(mi) {
 		return mi.MethodType.DeclaringType.GetFullyQualifiedName()
 	}
-	// Fallback: infer from Select expression
 	if mi.Select != nil {
-		if ident, ok := mi.Select.Element.(*java.Identifier); ok {
-			// Package-qualified call: fmt.Println -> "fmt"
-			return ident.Name
-		}
-		// Method call on a typed receiver: try to get the type
-		t := TypeOfExpression(mi.Select.Element)
-		return GetFullyQualifiedName(t)
+		return GetFullyQualifiedName(TypeOfExpression(mi.Select.Element))
 	}
 	return ""
+}
+
+// IsResolved reports whether the type checker resolved the call to a method of
+// a known type. A false here and a non-empty DeclaringTypeFQN can coexist: an
+// import whose symbols failed to load still names its package.
+func IsResolved(mi *java.MethodInvocation) bool {
+	return mi.MethodType != nil && mi.MethodType.DeclaringType != nil
 }

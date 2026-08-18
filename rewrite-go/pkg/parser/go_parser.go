@@ -1984,6 +1984,7 @@ func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *java.Unary {
 		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Before: opPrefix, Element: op},
 		Operand:  operand,
+		Type:     ctx.valueTypeOf(stmt.X),
 	}
 }
 
@@ -2137,10 +2138,7 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
 
-	// Type attribution for literal
-	if tv, ok := ctx.typeInfo.Types[lit]; ok {
-		l.Type = ctx.mapper.mapType(tv.Type)
-	}
+	l.Type = ctx.valueTypeOf(lit)
 
 	return l
 }
@@ -2226,10 +2224,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 		Right:    right,
 	}
 
-	// Type attribution for binary expression
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		b.Type = ctx.mapper.mapType(tv.Type)
-	}
+	b.Type = ctx.valueTypeOf(expr)
 
 	return b
 }
@@ -2371,25 +2366,44 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
 			if mi.MethodType == nil {
-				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name)
+				mi.MethodType = ctx.calleeSignature(selection.Obj(), selExpr.Sel.Name, selection.Recv())
 			}
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
 			// Qualified identifier (pkg.Func) — not a selection, but Sel is in Uses
-			mi.MethodType = ctx.calleeSignature(obj, selExpr.Sel.Name)
+			mi.MethodType = ctx.calleeSignature(obj, selExpr.Sel.Name, nil)
 		}
 	} else if ident, ok := calleeAst.(*ast.Ident); ok {
 		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
-			mi.MethodType = ctx.calleeSignature(obj, ident.Name)
+			mi.MethodType = ctx.calleeSignature(obj, ident.Name, nil)
 		}
+	}
+
+	if marker := ctx.callKindMarker(expr.Fun); marker != nil {
+		mi.Markers = java.AddMarker(mi.Markers, marker)
 	}
 
 	return mi
 }
 
+// callKindMarker reports whether a call's callee denotes a type (making the
+// call a conversion) or one of Go's predeclared functions.
+func (ctx *parseContext) callKindMarker(callee ast.Expr) java.Marker {
+	if tv, ok := ctx.typeInfo.Types[callee]; ok && tv.IsType() {
+		return golang.NewConversion()
+	}
+	if ident, ok := callee.(*ast.Ident); ok {
+		if _, ok := ctx.typeInfo.Uses[ident].(*types.Builtin); ok {
+			return golang.NewBuiltin()
+		}
+	}
+	return nil
+}
+
 // calleeSignature is the signature a call goes through, whether the
 // callee is a declared function or a value of func type — a parameter, a
-// local, a struct field. A builtin has no signature to give.
-func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.JavaTypeMethod {
+// local, a struct field. recv is the type the callee was selected from,
+// nil for a bare identifier. A builtin has no signature to give.
+func (ctx *parseContext) calleeSignature(obj types.Object, name string, recv types.Type) *java.JavaTypeMethod {
 	if obj == nil {
 		return nil
 	}
@@ -2398,12 +2412,15 @@ func (ctx *parseContext) calleeSignature(obj types.Object, name string) *java.Ja
 	}
 	if sig, ok := obj.Type().Underlying().(*types.Signature); ok {
 		// A named func type is what the call goes through, the way an
-		// interface is for a method; an unnamed one names nothing.
+		// interface is for a method. An unnamed one names nothing, so a
+		// func-typed field falls back to the type that declares it.
 		var declaring *java.JavaTypeClass
+		// mapType is the depth-bounded, panic-guarded entry; the
+		// mapNamed underneath it is not.
 		if _, ok := obj.Type().(*types.Named); ok {
-			// mapType is the depth-bounded, panic-guarded entry; the
-			// mapNamed underneath it is not.
 			declaring, _ = ctx.mapper.mapType(obj.Type()).(*java.JavaTypeClass)
+		} else if recv != nil {
+			declaring, _ = ctx.mapper.mapType(recv).(*java.JavaTypeClass)
 		}
 		return ctx.mapper.mapSignature(sig, name, declaring)
 	}
@@ -2487,6 +2504,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	case token.AND:
 		return &golang.Unary{
@@ -2494,6 +2512,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.AddressOf},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	case token.ARROW:
 		return &golang.Unary{
@@ -2501,6 +2520,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 			Prefix:     prefix,
 			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Receive},
 			Expression: operand,
+			Type:       ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -2523,6 +2543,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Element: op},
 		Operand:  operand,
+		Type:     ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2590,13 +2611,17 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 		}
 	}
 
-	return &golang.Composite{
+	comp := &golang.Composite{
 		ID:       uuid.New(),
 		Prefix:   prefix,
 		Markers:  compMarkers,
 		TypeExpr: typeExpr,
 		Elements: java.Container[java.Expression]{Before: lbracePrefix, Elements: elements},
 	}
+	// The literal's own type, which an elided inner literal (`[]T{{...}}`)
+	// has no type expression to state.
+	comp.Type = ctx.valueTypeOf(expr)
+	return comp
 }
 
 // mapParenExpr maps a parenthesized expression.
@@ -2626,6 +2651,7 @@ func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) java.Expression {
 		Prefix:     prefix,
 		Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
 		Expression: operand,
+		Type:       ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2750,9 +2776,7 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 		Dimension:   java.LeftPadded[java.Space]{Element: closePrefix},
 		ElementType: elt,
 	}
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		at.Type = ctx.mapper.mapType(tv.Type)
-	}
+	at.Type = ctx.valueTypeOf(expr)
 	return at
 }
 
@@ -2766,6 +2790,7 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expressi
 		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsSingle(expr),
+		Type:           ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2817,6 +2842,7 @@ func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java
 		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsMulti(expr),
+		Type:           ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2868,7 +2894,22 @@ func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 			Prefix: lbrackPrefix,
 			Index:  java.RightPadded[java.Expression]{Element: index, After: rbrackPrefix},
 		},
+		Type: ctx.valueTypeOf(expr),
 	}
+}
+
+// valueTypeOf is the type an expression evaluates to. A comma-ok map index is
+// typed `(V, ok)`, of which only V is the expression's value.
+func (ctx *parseContext) valueTypeOf(expr ast.Expr) java.JavaType {
+	tv, ok := ctx.typeInfo.Types[expr]
+	if !ok {
+		return nil
+	}
+	t := tv.Type
+	if tuple, ok := t.(*types.Tuple); ok && tuple.Len() > 0 {
+		t = tuple.At(0).Type()
+	}
+	return ctx.mapper.mapType(t)
 }
 
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).

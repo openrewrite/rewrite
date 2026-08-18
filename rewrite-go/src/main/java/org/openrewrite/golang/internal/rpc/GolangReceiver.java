@@ -97,7 +97,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     public J visitComposite(Go.Composite composite, RpcReceiveQueue q) {
         return composite
                 .withTypeExpr(q.receive(composite.getTypeExpr(), el -> (Expression) visitNonNull(el, q)))
-                .getPadding().withElements(q.receive(composite.getPadding().getElements(), el -> visitContainer(el, q)));
+                .getPadding().withElements(q.receive(composite.getPadding().getElements(), el -> visitContainer(el, q)))
+                .withType(q.receive(composite.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -270,7 +271,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     public J visitGoUnary(Go.Unary unary, RpcReceiveQueue q) {
         return unary
                 .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.Unary.Type.class))))
-                .withExpression(q.receive(unary.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+                .withExpression(q.receive(unary.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(unary.getType(), type -> visitType(type, q)));
     }
 
     @Override

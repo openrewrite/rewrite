@@ -197,7 +197,7 @@ func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
 	mi := &java.MethodInvocation{
 		Select: &java.RightPadded[java.Expression]{
-			Element: &java.Identifier{Name: "fmt"},
+			Element: &java.Identifier{Name: "fmt", Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"}},
 		},
 		Name: &java.Identifier{Name: "Println"},
 	}
@@ -227,16 +227,26 @@ func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
 }
 
 func TestMethodMatcherWildcardType(t *testing.T) {
-	mm := NewMethodMatcher("* Sub(..)")
+	// "*" stops at a dot, so a package-qualified FQN needs "*..*".
+	mm := NewMethodMatcher("*..* Sub(..)")
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "t", Type: &java.JavaTypeClass{FullyQualifiedName: "time.Time"}},
+		},
+		Name: &java.Identifier{Name: "Sub"},
+	}
+	assert.True(t, mm.Matches(mi), "expected match for wildcard declaring type")
+}
+
+func TestMethodMatcherNoMatchUntypedReceiver(t *testing.T) {
+	mm := NewMethodMatcher("*..* Sub(..)")
 	mi := &java.MethodInvocation{
 		Select: &java.RightPadded[java.Expression]{
 			Element: &java.Identifier{Name: "t"},
 		},
 		Name: &java.Identifier{Name: "Sub"},
 	}
-	// With just an identifier "t" as select, DeclaringTypeFQN returns "t"
-	// which matches "*" pattern
-	assert.True(t, mm.Matches(mi), "expected match for wildcard declaring type")
+	assert.False(t, mm.Matches(mi), "an untyped receiver has no declaring type, not even for a wildcard")
 }
 
 func TestMethodMatcherWithTypeInfo(t *testing.T) {

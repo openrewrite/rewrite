@@ -248,6 +248,7 @@ type Composite struct {
 	Markers  java.Markers
 	TypeExpr java.Expression                 // nil for untyped composite literals
 	Elements java.Container[java.Expression] // Before = space between TypeExpr and `{`, empty when untyped; last After = space before `}`
+	Type     java.JavaType
 }
 
 func (*Composite) IsTree()       {}
@@ -1150,6 +1151,7 @@ type Unary struct {
 	Markers    java.Markers
 	Operator   java.LeftPadded[UnaryOperator] // Before = space before the operator token
 	Expression java.Expression
+	Type       java.JavaType
 }
 
 func (*Unary) IsTree()       {}
