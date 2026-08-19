@@ -215,6 +215,11 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
             //Wrapping can introduce blocks
             return super.visit((J.Block) o, o);
         }
+        if (o instanceof G.ExpressionStatement && !(tree instanceof G.ExpressionStatement)) {
+            // G.ExpressionStatement#acceptGroovy unwraps the visited tree to its inner expression but forwards
+            // the wrapper as context, so unwrap the context too to keep both trees aligned
+            o = ((G.ExpressionStatement) o).getExpression();
+        }
         return super.visit(tree, o);
     }
 
@@ -1277,10 +1282,11 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
-        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
-        if (parens == newParens) {
+        if (parens == ctx || !(ctx instanceof J.Parentheses)) {
             return parens;
         }
+        //noinspection unchecked
+        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         J.Parentheses<T> pa = parens;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PARENTHESES_PREFIX, newParens.getPrefix()));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParens.getMarkers()));

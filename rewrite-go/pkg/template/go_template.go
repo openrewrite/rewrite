@@ -17,6 +17,7 @@
 package template
 
 import (
+	"io/fs"
 	"sync"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -30,6 +31,7 @@ type GoTemplate struct {
 	captures map[string]*Capture
 	imports  []string
 	kind     ScaffoldKind
+	importerCache
 
 	once     sync.Once
 	cached   java.J
@@ -50,7 +52,7 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
 	// and we need a fresh tree to substitute into).
 	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind)
+	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
 	if err != nil {
 		return nil
 	}
@@ -67,16 +69,17 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 // getTree lazily parses the template and caches the result.
 func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
-		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind)
+		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
 	})
 	return t.cached, t.parseErr
 }
 
 type TemplateBuilder struct {
-	code     string
-	captures []*Capture
-	imports  []string
-	kind     ScaffoldKind
+	code       string
+	captures   []*Capture
+	imports    []string
+	kind       ScaffoldKind
+	exportData []fs.FS
 }
 
 func ExpressionTemplate(code string) *TemplateBuilder {
@@ -102,12 +105,22 @@ func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	return b
 }
 
+// ExportData attributes the template against compiler export data the recipe
+// module carries, reaching packages the running toolchain cannot load. Sets
+// accumulate, as Imports does, so a module can draw on several generated
+// packages; see exportdata.Importer for what none of them covers.
+func (b *TemplateBuilder) ExportData(sets ...fs.FS) *TemplateBuilder {
+	b.exportData = append(b.exportData, sets...)
+	return b
+}
+
 func (b *TemplateBuilder) Build() *GoTemplate {
 	return &GoTemplate{
-		code:     b.code,
-		captures: captureMap(b.captures),
-		imports:  b.imports,
-		kind:     b.kind,
+		code:          b.code,
+		captures:      captureMap(b.captures),
+		imports:       b.imports,
+		kind:          b.kind,
+		importerCache: importerCache{exportData: b.exportData},
 	}
 }
 

@@ -224,11 +224,32 @@ func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
 	return refs
 }
 
-// IsReferenced reports whether imp is used by the file whose refs/quals
-// sets are passed in. Both sets come from one ReferencedImports walk per
-// file.
-func IsReferenced(imp *java.Import, refs, quals map[string]bool) bool {
-	return refs[ImportPath(imp)] || quals[PackageName(imp)]
+// ResolvedQualifiers names the qualifiers attribution has already accounted
+// for: those bound by an import refs names. Two imports can bind one
+// qualifier, which is how a major-version move reads mid-rewrite.
+func ResolvedQualifiers(imports []*java.Import, refs map[string]bool) map[string]bool {
+	resolved := map[string]bool{}
+	for _, imp := range imports {
+		if refs[ImportPath(imp)] {
+			if name := PackageName(imp); name != "" {
+				resolved[name] = true
+			}
+		}
+	}
+	return resolved
+}
+
+// IsReferenced reports whether imp is used by the file whose refs/quals sets
+// are passed in. quals stands in for references attribution could not resolve,
+// so it rescues an import refs does not name — but not once some other import
+// has claimed that qualifier through refs, which makes refs's silence about
+// this one an answer rather than a gap.
+func IsReferenced(imp *java.Import, refs, quals, resolvedQuals map[string]bool) bool {
+	if refs[ImportPath(imp)] {
+		return true
+	}
+	name := PackageName(imp)
+	return quals[name] && !resolvedQuals[name]
 }
 
 func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
@@ -405,10 +426,11 @@ func promoteToGrouped(imps *java.Container[*java.Import]) {
 // container. If the container becomes empty as a result, it's nil-ed out
 // so the printer doesn't emit an empty `import ()` block.
 //
-// Whitespace handling: the removed entry's trailing space (the
-// `RightPadded.After` field, which contains the newline before the next
-// element or the closing `)`) is donated to the new last element so the
-// block keeps its closing-paren-on-its-own-line shape.
+// Whitespace handling: the removed entry's trailing space (`RightPadded.After`,
+// the newline before the next element or the closing `)`) is donated to the new
+// last element so the block keeps its closing-paren-on-its-own-line shape. A
+// group separator on the new first element is dropped, since nothing precedes
+// it to separate from.
 func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.CompilationUnit {
 	if cu == nil || cu.Imports == nil || imp == nil {
 		return cu
@@ -417,9 +439,13 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	imps := *c.Imports
 	removedLastAfter := java.Space{}
 	removedWasLast := false
+	removedWasFirst := false
 	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
 	for i, rp := range imps.Elements {
 		if rp.Element != nil && rp.Element.ID == imp.ID {
+			if i == 0 {
+				removedWasFirst = true
+			}
 			if i == len(imps.Elements)-1 {
 				removedLastAfter = rp.After
 				removedWasLast = true
@@ -433,6 +459,9 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 		// last element so the block keeps its tidy shape.
 		out[len(out)-1].After = removedLastAfter
 	}
+	if removedWasFirst && len(out) > 0 {
+		out[0].Element = withoutLeadingBlankLines(out[0].Element)
+	}
 	imps.Elements = out
 	if len(out) == 0 {
 		c.Imports = nil
@@ -442,14 +471,60 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	return &c
 }
 
+// withGroupSeparator prefixes imp with the blank line gofmt puts in front of
+// the import that opens a group.
+func withGroupSeparator(imp *java.Import, indent java.Space) *java.Import {
+	return withPrefixWhitespace(imp, "\n"+indent.Whitespace)
+}
+
+// withoutLeadingBlankLines is the inverse: imp keeps its indent but opens no
+// group.
+func withoutLeadingBlankLines(imp *java.Import) *java.Import {
+	if imp == nil {
+		return imp
+	}
+	return withPrefixWhitespace(imp, canonicalIndentOf(imp.Prefix.Whitespace))
+}
+
+func withPrefixWhitespace(imp *java.Import, ws string) *java.Import {
+	if imp == nil || imp.Prefix.Whitespace == ws {
+		return imp
+	}
+	cloned := *imp
+	cloned.Prefix = java.Space{Comments: imp.Prefix.Comments, Whitespace: ws}
+	return &cloned
+}
+
+func canonicalIndentOf(ws string) string {
+	for strings.HasPrefix(ws, "\n\n") {
+		ws = ws[1:]
+	}
+	return ws
+}
+
+// canonicalIndent is the per-line indent inside an `import (...)` block,
+// read off the first sibling that carries one (typically "\n\t").
+func canonicalIndent(elements []java.RightPadded[*java.Import]) java.Space {
+	for _, rp := range elements {
+		if rp.Element == nil {
+			continue
+		}
+		if canonical := canonicalIndentOf(rp.Element.Prefix.Whitespace); strings.HasPrefix(canonical, "\n") {
+			return java.Space{Whitespace: canonical}
+		}
+	}
+	return java.Space{Whitespace: "\n\t"}
+}
+
 // insertGrouped places imp at the end of its own group while preserving
 // the relative order of pre-existing imports. New groups appear in
 // stdlib / third-party / local order.
 //
-// Whitespace handling: the new import inherits a sibling's Prefix (the
-// `\n\t` indent inside an `import (...)` block) so the printer renders
-// it on its own line. When inserting into an empty block (no siblings),
-// a sensible default is used.
+// Whitespace handling: the new import takes the block's per-line indent, plus
+// a group separator when the import it follows belongs to another group.
+// Inserting ahead of every existing import moves that separator onto the
+// import displaced from the head, which now opens the second group. With no
+// siblings to read an indent from, the caller's prefix stands.
 func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, modulePath string) []java.RightPadded[*java.Import] {
 	target := GroupOf(ImportPath(imp), modulePath)
 	insertAt := len(elements)
@@ -460,25 +535,25 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 			break
 		}
 	}
-	if imp.Prefix.Whitespace == "" && len(elements) > 0 {
-		// Borrow the surrounding indent. If we're inserting in front,
-		// take the first sibling's prefix; otherwise the previous
-		// sibling's. Both reliably end with `\n\t` in a grouped block.
-		var donor *java.Import
-		if insertAt < len(elements) {
-			donor = elements[insertAt].Element
-		} else {
-			donor = elements[len(elements)-1].Element
-		}
-		if donor != nil {
-			imp.Prefix = donor.Prefix
-		}
-	}
 	wrapped := java.RightPadded[*java.Import]{Element: imp}
 	out := make([]java.RightPadded[*java.Import], 0, len(elements)+1)
 	out = append(out, elements[:insertAt]...)
 	out = append(out, wrapped)
 	out = append(out, elements[insertAt:]...)
+
+	if len(elements) > 0 {
+		indent := canonicalIndent(elements)
+		if imp.Prefix.Whitespace == "" {
+			if insertAt > 0 && GroupOf(ImportPath(elements[insertAt-1].Element), modulePath) != target {
+				out[insertAt].Element = withGroupSeparator(imp, indent)
+			} else {
+				out[insertAt].Element = withPrefixWhitespace(imp, indent.Whitespace)
+			}
+		}
+		if insertAt == 0 {
+			out[1].Element = withGroupSeparator(out[1].Element, indent)
+		}
+	}
 
 	// Re-balance trailing whitespace: in a grouped block the last
 	// element's After holds the space before `)`. When we appended at
@@ -524,9 +599,8 @@ func NewImport(path string, alias *string) *java.Import {
 // inserted between non-empty groups. Mirrors `goimports -w` output.
 //
 // Whitespace handling:
-//   - Element `Prefix` carries the per-line indent (typically `\n\t`).
-//     The first element of each non-leading non-empty group gets a leading
-//     `\n` prepended to its indent so the group separator is a blank line.
+//   - Element `Prefix` carries the per-line indent (typically `\n\t`), with a
+//     group separator on the first element of each non-leading group.
 //   - `RightPadded.After` is anchored to a position (between-elements vs.
 //     before-`)`) rather than to its element. When the order changes the
 //     anchor changes too — the element that was last is no longer last.
@@ -540,26 +614,7 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	betweenAfter := elements[0].After
 	closingAfter := elements[len(elements)-1].After
 
-	// Re-derive the per-line indent prefix from the first non-blank-line
-	// element so the blank-line separator below can prepend a single \n
-	// to it. The smallest existing prefix that ends in \n + indent wins.
-	indentPrefix := java.Space{Whitespace: "\n\t"}
-	for _, rp := range elements {
-		if rp.Element == nil {
-			continue
-		}
-		ws := rp.Element.Prefix.Whitespace
-		// Strip a leading blank-line newline so we get the canonical
-		// "\n\t" indent rather than "\n\n\t".
-		canonical := ws
-		for strings.HasPrefix(canonical, "\n\n") {
-			canonical = canonical[1:]
-		}
-		if strings.HasPrefix(canonical, "\n") {
-			indentPrefix = java.Space{Whitespace: canonical}
-			break
-		}
-	}
+	indentPrefix := canonicalIndent(elements)
 
 	type bucket struct {
 		group ImportGroup
@@ -582,7 +637,6 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	}
 
 	out := make([]java.RightPadded[*java.Import], 0, len(elements))
-	groupSeparatorPrefix := java.Space{Whitespace: "\n" + indentPrefix.Whitespace}
 	for _, b := range buckets {
 		if len(b.items) == 0 {
 			continue
@@ -591,14 +645,11 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 			if item.Element == nil {
 				continue
 			}
-			cloned := *item.Element
-			switch {
-			case j == 0 && len(out) > 0:
-				cloned.Prefix = groupSeparatorPrefix
-			default:
-				cloned.Prefix = indentPrefix
+			if j == 0 && len(out) > 0 {
+				item.Element = withGroupSeparator(item.Element, indentPrefix)
+			} else {
+				item.Element = withPrefixWhitespace(item.Element, indentPrefix.Whitespace)
 			}
-			item.Element = &cloned
 			b.items[j] = item
 		}
 		out = append(out, b.items...)
