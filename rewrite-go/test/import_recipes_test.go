@@ -594,3 +594,24 @@ func TestOrderImports_AlphabeticalWithinGroupAndBlankLineBetween(t *testing.T) {
 	`
 	spec.RewriteRun(t, Golang(before, after))
 }
+
+func TestRemoveUnusedImports_KeepsVersionedPathImportUsedByQualifier(t *testing.T) {
+	// Attribution cannot resolve these paths, so the lexical qualifier is
+	// the only signal keeping the imports.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"github.com/x/y/v2"
+				"gopkg.in/yaml.v3"
+			)
+
+			func f(b []byte, out any) error {
+				y.Hello()
+				return yaml.Unmarshal(b, out)
+			}
+		`),
+	)
+}
