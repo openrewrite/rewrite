@@ -594,3 +594,56 @@ func TestOrderImports_AlphabeticalWithinGroupAndBlankLineBetween(t *testing.T) {
 	`
 	spec.RewriteRun(t, Golang(before, after))
 }
+
+func TestRemoveUnusedImports_DropsFirstOfGroupedBlock(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"io/ioutil"
+
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	after := `
+		package main
+
+		import (
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsGroupSeparatorWhenDroppingMiddle(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"io/ioutil"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}

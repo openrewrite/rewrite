@@ -426,10 +426,11 @@ func promoteToGrouped(imps *java.Container[*java.Import]) {
 // container. If the container becomes empty as a result, it's nil-ed out
 // so the printer doesn't emit an empty `import ()` block.
 //
-// Whitespace handling: the removed entry's trailing space (the
-// `RightPadded.After` field, which contains the newline before the next
-// element or the closing `)`) is donated to the new last element so the
-// block keeps its closing-paren-on-its-own-line shape.
+// Whitespace handling: the removed entry's trailing space (`RightPadded.After`,
+// the newline before the next element or the closing `)`) is donated to the new
+// last element so the block keeps its closing-paren-on-its-own-line shape. A
+// group separator on the new first element is dropped, since nothing precedes
+// it to separate from.
 func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.CompilationUnit {
 	if cu == nil || cu.Imports == nil || imp == nil {
 		return cu
@@ -438,9 +439,13 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	imps := *c.Imports
 	removedLastAfter := java.Space{}
 	removedWasLast := false
+	removedWasFirst := false
 	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
 	for i, rp := range imps.Elements {
 		if rp.Element != nil && rp.Element.ID == imp.ID {
+			if i == 0 {
+				removedWasFirst = true
+			}
 			if i == len(imps.Elements)-1 {
 				removedLastAfter = rp.After
 				removedWasLast = true
@@ -454,6 +459,9 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 		// last element so the block keeps its tidy shape.
 		out[len(out)-1].After = removedLastAfter
 	}
+	if removedWasFirst && len(out) > 0 {
+		out[0].Element = withoutLeadingBlankLines(out[0].Element)
+	}
 	imps.Elements = out
 	if len(out) == 0 {
 		c.Imports = nil
@@ -461,6 +469,31 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 		c.Imports = &imps
 	}
 	return &c
+}
+
+// withoutLeadingBlankLines drops the blank line gofmt puts in front of the
+// import that opens a group, leaving the indent.
+func withoutLeadingBlankLines(imp *java.Import) *java.Import {
+	if imp == nil {
+		return imp
+	}
+	return withPrefixWhitespace(imp, canonicalIndentOf(imp.Prefix.Whitespace))
+}
+
+func withPrefixWhitespace(imp *java.Import, ws string) *java.Import {
+	if imp == nil || imp.Prefix.Whitespace == ws {
+		return imp
+	}
+	cloned := *imp
+	cloned.Prefix = java.Space{Comments: imp.Prefix.Comments, Whitespace: ws}
+	return &cloned
+}
+
+func canonicalIndentOf(ws string) string {
+	for strings.HasPrefix(ws, "\n\n") {
+		ws = ws[1:]
+	}
+	return ws
 }
 
 // insertGrouped places imp at the end of its own group while preserving
