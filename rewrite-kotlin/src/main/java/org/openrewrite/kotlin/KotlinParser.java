@@ -456,7 +456,7 @@ public class KotlinParser implements Parser {
 
         ExtensionStorage extensionsStorage = requireNonNull(getExtensionsStorage(compilerConfiguration), "extensions storage was not set in compilerConfiguration()");
 
-        registerInProject(extensionsStorage, environment.getProject(), ignored -> null);
+        registerInProject(extensionsStorage, environment.getProject(), ext -> "Failed to register " + ext);
 
         List<KtFile> ktFiles = new ArrayList<>(sources.size());
         List<KotlinSource> kotlinSources = new ArrayList<>(sources.size());
