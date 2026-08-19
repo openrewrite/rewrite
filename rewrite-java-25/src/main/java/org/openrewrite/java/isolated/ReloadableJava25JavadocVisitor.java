@@ -58,6 +58,11 @@ import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
+    /**
+     * javac's {@code LayoutCharacters.EOI}, the sentinel it appends to its scanner buffers.
+     */
+    private static final char EOI = 0x1A;
+
     private final Attr attr;
 
     private final Symbol.@Nullable TypeSymbol symbol;
@@ -1062,6 +1067,13 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
+
+        // `DCRawText#getContent()` can return the content of a markdown (`///`) doc comment with javac's
+        // end-of-input sentinel appended, e.g. when the content ends in a backslash. The sentinel is not
+        // present in `source`, so leaving it in place both corrupts the text and desynchronizes the cursor.
+        if (!node.isEmpty() && node.charAt(node.length() - 1) == EOI) {
+            node = node.substring(0, node.length() - 1);
+        }
 
         if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) && !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
