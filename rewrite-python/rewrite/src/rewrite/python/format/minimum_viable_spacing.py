@@ -4,7 +4,7 @@ from typing import cast, Optional
 
 from rewrite import Tree, P, Cursor, PrintOutputCapture, list_find
 from rewrite.java import Assert, Binary, Expression, Return, Statement, Block, Semicolon, Ternary, Unary
-from rewrite.python import PythonVisitor, ExpressionStatement
+from rewrite.python import Binary as PyBinary, PythonVisitor, ExpressionStatement
 from rewrite.visitor import T
 
 
@@ -37,6 +37,12 @@ class MinimumViableSpacingVisitor(PythonVisitor):
     def visit_binary(self, binary: Binary, p: P) -> Optional[T]:
         b = cast(Binary, super().visit_binary(binary, p))
         if b.operator in (Binary.Type.And, Binary.Type.Or):
+            b = b.replace(right=self._separate_from_keyword(b.right))
+        return cast(Optional[T], b)
+
+    def visit_python_binary(self, binary: PyBinary, p: P) -> Optional[T]:
+        b = cast(PyBinary, super().visit_python_binary(binary, p))
+        if b.operator in (PyBinary.Type.In, PyBinary.Type.Is, PyBinary.Type.IsNot, PyBinary.Type.NotIn):
             b = b.replace(right=self._separate_from_keyword(b.right))
         return cast(Optional[T], b)
 

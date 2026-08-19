@@ -1,7 +1,7 @@
 from rewrite import Markers, random_id
-from rewrite.java import (Assert, Binary, Block, Expression, P, J, JLeftPadded, MethodInvocation, Return, Space,
-                          JRightPadded, Ternary, Unary)
-from rewrite.python import MinimumViableSpacingVisitor, PythonVisitor
+from rewrite.java import (Assert, Binary, Block, Expression, Identifier, P, J, JLeftPadded, MethodInvocation,
+                          Return, Space, JRightPadded, Ternary, Unary)
+from rewrite.python import Binary as PyBinary, MinimumViableSpacingVisitor, PythonVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
 
@@ -122,6 +122,24 @@ class NegateTernaryFalsePart(PythonVisitor):
         if isinstance(t.false_part, Unary):
             return t
         return t.padding.replace(false_part=t.padding.false_part.replace(element=negated(t.false_part)))
+
+
+class RenameBinaryRight(PythonVisitor):
+    """Replaces the right operand with a freshly built identifier, as a recipe would."""
+
+    def visit_python_binary(self, binary: PyBinary, p: P) -> J:
+        b = super().visit_python_binary(binary, p)
+        replacement = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], 'z', None, None)
+        return b.replace(right=replacement)
+
+
+def test_space_before_generated_operand_after_in():
+    rewrite_run(
+        # language=python
+        python("assert x in y", "assert x in z"),
+        spec=RecipeSpec()
+        .with_recipes(from_visitor(RenameBinaryRight()), from_visitor(MinimumViableSpacingVisitor()))
+    )
 
 
 def test_not_operand_starting_with_delimiter_stays_tight():
