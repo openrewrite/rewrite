@@ -91,6 +91,22 @@ class RecipeCompilerPluginRegistrarTest {
     }
 
     @Test
+    fun `a message collector that is itself version skewed throws rather than losing the message`() {
+        val skewed = object : MessageCollector by CapturingMessageCollector() {
+            override fun report(
+                severity: CompilerMessageSeverity,
+                message: String,
+                location: CompilerMessageSourceLocation?,
+            ): Unit = throw NoSuchMethodError("org.jetbrains.kotlin.cli.common.messages.MessageCollector.report")
+        }
+
+        assertThatIllegalStateException()
+            .isThrownBy { registerRecipeExtensions(configurationWith(skewed)) { throw ClassCastException("boom") } }
+            .withMessageContaining("kotlin(\"jvm\")")
+            .withCauseInstanceOf(ClassCastException::class.java)
+    }
+
+    @Test
     fun `the reported error fails compilation rather than crashing the compiler`() {
         val result = RecipePluginCompileFixture.compile("val answer = 42", "Empty.kt", FailingRegistrar())
 
@@ -107,7 +123,7 @@ class RecipeCompilerPluginRegistrarTest {
         fun registrationFailures(): List<Throwable> = listOf(
             ClassCastException(
                 "class org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter\$Companion cannot be cast to " +
-                        "class org.jetbrains.kotlin.extensions.ExtensionPointDescriptor"
+                        "class org.jetbrains.kotlin.extensions.ProjectExtensionDescriptor"
             ),
             NoSuchMethodError("org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter.registerExtension"),
             AbstractMethodError("org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension.generate"),

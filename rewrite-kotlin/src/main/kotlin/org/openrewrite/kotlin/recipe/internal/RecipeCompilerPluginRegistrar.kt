@@ -80,11 +80,19 @@ internal fun registerRecipeExtensions(configuration: CompilerConfiguration, regi
 
 private fun reportKotlinVersionMismatch(configuration: CompilerConfiguration, cause: Throwable) {
     val message = kotlinVersionMismatchMessage(cause)
-    // MessageCollector.NONE would discard the diagnostic, leaving the plugin silently unregistered.
-    val messageCollector = configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-        ?.takeIf { it !== MessageCollector.NONE }
-        ?: throw IllegalStateException(message, cause)
-    messageCollector.report(CompilerMessageSeverity.ERROR, message)
+    try {
+        // MessageCollector.NONE would discard the diagnostic, leaving the plugin silently unregistered.
+        val messageCollector = configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+            ?.takeIf { it !== MessageCollector.NONE }
+        if (messageCollector != null) {
+            messageCollector.report(CompilerMessageSeverity.ERROR, message)
+            return
+        }
+    } catch (ignored: LinkageError) {
+        // Reporting runs through the same compiler API surface whose skew we are diagnosing; if it
+        // is skewed too, fall through rather than replacing the actionable message with its failure.
+    }
+    throw IllegalStateException(message, cause)
 }
 
 // KotlinCompilerVersion reports the compiler that is running, never the one we compiled
