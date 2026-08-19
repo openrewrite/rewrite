@@ -849,6 +849,8 @@ class PythonTypeMapping:
             return JavaType.Primitive.Int
         elif isinstance(node.value, float):
             return JavaType.Primitive.Double
+        elif isinstance(node.value, complex):
+            return self._create_class_type('complex')
         elif node.value is None:
             return JavaType.Primitive.None_
         return None
