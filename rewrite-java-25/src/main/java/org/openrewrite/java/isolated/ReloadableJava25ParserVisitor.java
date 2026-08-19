@@ -2432,7 +2432,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
@@ -2555,7 +2555,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;

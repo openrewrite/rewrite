@@ -52,6 +52,52 @@ class CommentTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineOpenerInsideSingleLineCommentBeforeMethodModifier() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated  //*not a block comment
+                  public String value() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineOpenerInsideSingleLineCommentBeforeMultipleModifiers() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated  //*not a block comment
+                  public static String value() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineOpenerLaterInSingleLineCommentBeforeFieldModifier() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated  //see /*.java
+                  public int value = 1;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4995")
     @Test
     void trailingComment() {
