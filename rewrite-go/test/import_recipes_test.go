@@ -647,3 +647,111 @@ func TestRemoveUnusedImports_KeepsGroupSeparatorWhenDroppingMiddle(t *testing.T)
 	`
 	spec.RewriteRun(t, Golang(before, after))
 }
+
+func TestAddImport_OpensNewLeadingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
+	before := `
+		package main
+
+		import (
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		func main() { y.Hello() }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_JoinsExistingLeadingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "os"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(y.Hello()) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_JoinsExistingTrailingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "example.com/plainpkg"})
+	before := `
+		package main
+
+		import (
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() { os.Exit(0); y.Hello() }
+	`
+	after := `
+		package main
+
+		import (
+			"os"
+
+			"github.com/x/y"
+			"example.com/plainpkg"
+		)
+
+		func main() { os.Exit(0); y.Hello() }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_OpensNewTrailingGroup(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "github.com/x/y"})
+	before := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+		)
+
+		func main() { fmt.Println(os.Args) }
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() { fmt.Println(os.Args) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
