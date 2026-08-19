@@ -155,11 +155,12 @@ func reWhitespace(src string, rnd *rand.Rand) (string, bool) {
 		if offset < prevEnd || offset > len(src) {
 			return "", false
 		}
+		// go/scanner reports a semicolon inserted for a line break as "\n": it
+		// occupies no source text, and the gap that follows carries the break.
+		implicit := tok == gotoken.SEMICOLON && lit == "\n"
 		width := len(lit)
 		switch {
-		case tok == gotoken.SEMICOLON && lit == "\n":
-			// Inserted for a line break rather than written, so it occupies no
-			// source text and the gap that follows carries the break.
+		case implicit:
 			width = 0
 		case lit == "":
 			width = len(tok.String())
@@ -171,7 +172,7 @@ func reWhitespace(src string, rnd *rand.Rand) (string, bool) {
 		// text can be shorter than the source it came from. Mutating around a
 		// token whose text does not match the source would move the token
 		// boundaries, so leave those sources alone.
-		if lit != "" && src[offset:offset+width] != lit {
+		if lit != "" && !implicit && src[offset:offset+width] != lit {
 			return "", false
 		}
 
