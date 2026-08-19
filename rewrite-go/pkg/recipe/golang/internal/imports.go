@@ -68,20 +68,53 @@ func ImportPath(imp *java.Import) string {
 	return strings.Trim(raw, `"`+"`")
 }
 
-// PackageName returns the qualifier used to reference the import: its alias, else the last path segment ("" for blank/dot imports).
+// PackageName returns the qualifier used to reference the import: its alias,
+// else the name derived from the path ("" for blank/dot imports).
 func PackageName(imp *java.Import) string {
 	switch alias := AliasName(imp); alias {
 	case "":
-		path := ImportPath(imp)
-		if i := strings.LastIndex(path, "/"); i >= 0 {
-			return path[i+1:]
-		}
-		return path
+		return packageNameForPath(ImportPath(imp))
 	case "_", ".":
 		return ""
 	default:
 		return alias
 	}
+}
+
+// packageNameForPath derives the qualifier an import path binds. Under
+// semantic import versioning the version lives in the path rather than the
+// package name — a trailing `/vN` element, or the `.vN` suffix gopkg.in spells
+// it with — so the name comes from the segment before it. A module may declare
+// a package name matching neither; this is the better guess, not a guarantee.
+func packageNameForPath(path string) string {
+	last := path
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		last = path[i+1:]
+		if isVersionElement(last) {
+			rest := path[:i]
+			last = rest
+			if j := strings.LastIndex(rest, "/"); j >= 0 {
+				last = rest[j+1:]
+			}
+		}
+	}
+	if i := strings.LastIndex(last, "."); i > 0 && isVersionElement(last[i+1:]) {
+		last = last[:i]
+	}
+	return last
+}
+
+// isVersionElement reports whether a path element is a major-version marker.
+func isVersionElement(s string) bool {
+	if len(s) < 2 || s[0] != 'v' {
+		return false
+	}
+	for _, r := range s[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // AliasName returns the alias used by an Import: a custom identifier for
