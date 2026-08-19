@@ -420,10 +420,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     }
 
     /**
-     * Whether a node is a token that actually appeared in the source, as opposed to absent or
-     * synthesized by ANTLR error recovery. Recovery may insert a token that was never written
-     * (which the printer would then emit as though it had been) or leave the rule's children
-     * out entirely, so neither is safe to build an LST from.
+     * Whether a node is a token that appeared in the source, rather than one ANTLR error recovery
+     * synthesized (marked as an {@link ErrorNode}) or left out altogether.
      */
     private boolean isSourceToken(@Nullable TerminalNode node) {
         return node != null && !(node instanceof ErrorNode);
@@ -439,11 +437,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     }
 
     /**
-     * Reject an attribute that ANTLR only produced by recovering from malformed markup. Accepting one
-     * yields an {@link Xml.Attribute} that is not in the source: a key or value invented outright, or a
-     * value silently truncated at the point the markup went wrong. Such a tree can still reprint
-     * byte-for-byte, because the dropped source survives in a neighbouring prefix, so
-     * {@code requirePrintEqualsInput} does not catch it and any recipe editing the tag corrupts the file.
+     * Reject an attribute ANTLR only produced by recovering from malformed markup, which describes
+     * something other than the source. Such a tree can still reprint byte-for-byte, since the dropped
+     * source survives in a neighbouring prefix, so {@code requirePrintEqualsInput} does not catch it.
      */
     private void requireWellFormedAttribute(boolean wellFormed, ParserRuleContext ctx) {
         if (!wellFormed) {
