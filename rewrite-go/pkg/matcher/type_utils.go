@@ -235,19 +235,6 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType
 		}
-		// A conversion has no callee to carry a signature; its value is of
-		// the type being converted to. Name holds that type, down to the
-		// `Duration` of `time.Duration(x)` — Select is only the package.
-		// A conversion to an unnamed type (`[]byte(s)`) has no Name, and
-		// parks its type expression in Select instead.
-		if java.FindMarker[golang.Conversion](n.Markers) != nil {
-			if n.Name != nil && n.Name.Type != nil {
-				return n.Name.Type
-			}
-			if n.Select != nil {
-				return TypeOfExpression(n.Select.Element)
-			}
-		}
 	case *golang.Composite:
 		return n.Type
 	case *golang.Unary:

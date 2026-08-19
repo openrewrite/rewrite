@@ -1109,9 +1109,9 @@ public interface Go extends J {
     // ---------------------------------------------------------------
 
     /**
-     * Go's postfix {@code x.(T)}, where {@link J.TypeCast} is a prefix
-     * cast. The left expression is right-padded, so its padding holds what
-     * stands before the dot — a space, or a comment.
+     * Go's postfix {@code x.(T)}, which reads an interface's dynamic type where
+     * {@link J.TypeCast} converts. The left expression is right-padded, so its
+     * padding holds what stands before the dot — a space, or a comment.
      */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

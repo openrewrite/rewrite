@@ -51,19 +51,18 @@ func TestCompositeTypeSurvivesRpcRoundTrip(t *testing.T) {
 		"the elided inner literal has only its own type slot to carry the type")
 }
 
-func TestConversionAndBuiltinMarkersSurviveRpcRoundTrip(t *testing.T) {
+func TestConversionAndBuiltinSurviveRpcRoundTrip(t *testing.T) {
 	c := collectRoundTripped(t, "package main\n\nfunc f(b []byte) {\n\t_ = string(b)\n\t_ = len(b)\n}\n")
 
-	var conversions, builtins int
+	require.Len(t, c.Conversions, 1, "conversion lost on round-trip")
+	assert.Equal(t, "String", matcher.GetFullyQualifiedName(matcher.TypeOfExpression(c.Conversions[0])))
+
+	var builtins int
 	for _, mi := range c.Invocations {
-		if java.FindMarker[golang.Conversion](mi.Markers) != nil {
-			conversions++
-		}
 		if java.FindMarker[golang.Builtin](mi.Markers) != nil {
 			builtins++
 		}
 	}
-	assert.Equal(t, 1, conversions, "Conversion marker lost on round-trip")
 	assert.Equal(t, 1, builtins, "Builtin marker lost on round-trip")
 }
 

@@ -1412,11 +1412,11 @@ func (v *GoVisitor) VisitParentheses(paren *java.Parentheses, p any) java.J {
 func (v *GoVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	prefix := v.self().VisitSpace(tc.Prefix, p)
 	markers := v.visitMarkers(tc.Markers, p)
-	expr := visitExpression(v, tc.Expr, p)
 	clazz := tc.Clazz
 	if clazz != nil {
 		clazz = visitAndCast[*java.ControlParentheses](v, clazz, p)
 	}
+	expr := visitExpression(v, tc.Expr, p)
 	if java.SpaceEqual(prefix, tc.Prefix) && java.MarkersEqual(markers, tc.Markers) &&
 		expr == tc.Expr && clazz == tc.Clazz {
 		return tc

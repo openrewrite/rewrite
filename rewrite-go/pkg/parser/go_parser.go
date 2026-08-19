@@ -2231,6 +2231,10 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 
 // mapCallExpr maps a function/method call.
 func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
+	if ctx.isConversion(expr) {
+		return ctx.mapConversion(expr)
+	}
+
 	// `Map[int](42)` / `Pair[K, V](...)`: the callee is a generic function (or
 	// type) instantiated with explicit type arguments. Go reuses *ast.IndexExpr
 	// for both this and ordinary indexing (`funcs[0]()`), so disambiguate via the
@@ -2378,25 +2382,70 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		}
 	}
 
-	if marker := ctx.callKindMarker(expr.Fun); marker != nil {
+	if marker := ctx.builtinMarker(expr.Fun); marker != nil {
 		mi.Markers = java.AddMarker(mi.Markers, marker)
 	}
 
 	return mi
 }
 
-// callKindMarker reports whether a call's callee denotes a type (making the
-// call a conversion) or one of Go's predeclared functions.
-func (ctx *parseContext) callKindMarker(callee ast.Expr) java.Marker {
-	if tv, ok := ctx.typeInfo.Types[callee]; ok && tv.IsType() {
-		return golang.NewConversion()
-	}
+func (ctx *parseContext) builtinMarker(callee ast.Expr) java.Marker {
 	if ident, ok := callee.(*ast.Ident); ok {
 		if _, ok := ctx.typeInfo.Uses[ident].(*types.Builtin); ok {
 			return golang.NewBuiltin()
 		}
 	}
 	return nil
+}
+
+// isConversion reports whether a call is Go's `T(x)`, which converts one value
+// to a type and is spelled exactly like a call to a function named T. Only a
+// single operand with no `...` converts, so a callee naming a type in any other
+// shape leaves a call.
+func (ctx *parseContext) isConversion(expr *ast.CallExpr) bool {
+	tv, ok := ctx.typeInfo.Types[expr.Fun]
+	return ok && tv.IsType() && len(expr.Args) == 1 && !expr.Ellipsis.IsValid()
+}
+
+// mapConversion maps `T(x)` onto the slots java.TypeCast describes.
+func (ctx *parseContext) mapConversion(expr *ast.CallExpr) java.Expression {
+	prefix, typeExpr := hoistLeftPrefix(ctx.mapTypeExpr(expr.Fun))
+
+	lparenPrefix := ctx.prefix(expr.Lparen)
+	ctx.skip(1) // "("
+
+	operand := ctx.mapExpr(expr.Args[0])
+
+	var markers java.Markers
+	var rparenPrefix java.Space
+	if commaOffset := ctx.findNextBefore(',', ctx.boundaryAt(expr.Rparen)); commaOffset >= 0 {
+		commaBefore := ctx.prefix(ctx.file.Pos(commaOffset))
+		ctx.skip(1) // ","
+		commaAfter := ctx.prefix(expr.Rparen)
+		markers = java.Markers{
+			ID: uuid.New(),
+			Entries: []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}},
+		}
+	} else {
+		rparenPrefix = ctx.prefix(expr.Rparen)
+	}
+	ctx.skip(1) // ")"
+
+	return &java.TypeCast{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Markers: markers,
+		Clazz: &java.ControlParentheses{
+			ID:     uuid.New(),
+			Prefix: lparenPrefix,
+			Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
+		},
+		Expr: operand,
+	}
 }
 
 // calleeSignature is the signature a call goes through, whether the
