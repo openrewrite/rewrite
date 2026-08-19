@@ -17,6 +17,7 @@ package org.openrewrite.xml.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
@@ -381,6 +382,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         }
                     }
 
+                    requireWellFormedAttribute(isBlank(beforeTagDelimiterPrefix), c);
+
                     return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
@@ -390,21 +393,67 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
+            requireWellFormedAttribute(isBlank(prefix), c);
+
+            requireWellFormedAttribute(isSourceToken(c.Name()), c);
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
+            requireWellFormedAttribute(isSourceToken(c.EQUALS()), c);
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
+            requireWellFormedAttribute(isBlank(beforeEquals), c);
 
-            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> new Xml.Attribute.Value(
-                            randomId(),
-                            p,
-                            Markers.EMPTY,
-                            v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
-                            v.getText().substring(1, c.STRING().getText().length() - 1)
-                    )
+            requireWellFormedAttribute(isSourceToken(c.STRING()), c);
+            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> {
+                        requireWellFormedAttribute(isBlank(p), c);
+                        return new Xml.Attribute.Value(
+                                randomId(),
+                                p,
+                                Markers.EMPTY,
+                                v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
+                                v.getText().substring(1, c.STRING().getText().length() - 1)
+                        );
+                    }
             );
 
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
+    }
+
+    /**
+     * Whether a node is a token that actually appeared in the source, as opposed to absent or
+     * synthesized by ANTLR error recovery. Recovery may insert a token that was never written
+     * (which the printer would then emit as though it had been) or leave the rule's children
+     * out entirely, so neither is safe to build an LST from.
+     */
+    private boolean isSourceToken(@Nullable TerminalNode node) {
+        return node != null && !(node instanceof ErrorNode);
+    }
+
+    private boolean isBlank(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (!Character.isWhitespace(text.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Reject an attribute that ANTLR only produced by recovering from malformed markup. Accepting one
+     * yields an {@link Xml.Attribute} that is not in the source: a key or value invented outright, or a
+     * value silently truncated at the point the markup went wrong. Such a tree can still reprint
+     * byte-for-byte, because the dropped source survives in a neighbouring prefix, so
+     * {@code requirePrintEqualsInput} does not catch it and any recipe editing the tag corrupts the file.
+     */
+    private void requireWellFormedAttribute(boolean wellFormed, ParserRuleContext ctx) {
+        if (!wellFormed) {
+            Token start = ctx.getStart();
+            throw new IllegalStateException(String.format(
+                    "Malformed attribute in %s at line %d, column %d. This is most often caused by a literal '\"' " +
+                    "inside a double-quoted attribute value, which XML 1.0 section 2.3 does not permit; write it as " +
+                    "&quot; or delimit the value with single quotes.",
+                    path, start.getLine(), start.getCharPositionInLine() + 1));
+        }
     }
 
     @Override

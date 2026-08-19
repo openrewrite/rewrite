@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser.Input;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RecipeSpec;
@@ -412,6 +413,67 @@ class XmlParserTest implements RewriteTest {
           .findFirst().orElseThrow();
         assertThat(parsed).isInstanceOf(ParseError.class);
         assertThat(parsed.printAll()).isEqualTo("<root>\n<br>\n</root>");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      // ANTLR inserts a missing '=', which the printer then emits: `abc` becomes `abc=`
+      "<t k=\"\" abc \"v\"/>",
+      // ANTLR drops the rule's children, leaving the attribute without an '=' or a value
+      "<t k=\"\" a b \"v\"/>",
+      // ANTLR resyncs past the `1`, silently truncating the attribute value; this still reprints
+      // byte-for-byte, so only the checks in XmlParserVisitor catch it
+      "<t k=\"\" x = 1 \"v\"/>",
+      // no attribute is recovered at all; the stray tokens are swallowed before the tag delimiter
+      "<t k=\"\" 10.0.0.1 \"v\"/>",
+    })
+    void malformedAttributeIsNotSilentlyAccepted(@Language("xml") String source) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), source)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+    }
+
+    @Test
+    void attributeValueWithUnescapedQuotes() {
+        // An embedded expression whose string literals are not escaped leaves the attribute value
+        // unrepresentable, so the document has to be rejected rather than parsed into a tree whose
+        // `value` attribute silently stops at the first quote.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), """
+            <policies>
+                <inbound>
+                    <set-variable name="allowedIps" value="@{
+                        string ips = "";
+                        ips += "10.0.0.1,";
+                        return ips;
+                    }" />
+                </inbound>
+            </policies>
+            """)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Malformed attribute");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<set-variable value='@{ string ips = \"\"; ips += \"10.0.0.1,\"; return ips; }'/>",
+      "<set-variable value=\"@{ string ips = &quot;10.0.0.1&quot;; return ips; }\"/>",
+    })
+    void wellFormedEmbeddedExpressionsKeepTheirFullValue(@Language("xml") String source) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), source)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(Xml.Document.class);
+        assertThat(((Xml.Document) parsed).getRoot().getAttributes().get(0).getValueAsString())
+          .contains("10.0.0.1")
+          .endsWith("}");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
