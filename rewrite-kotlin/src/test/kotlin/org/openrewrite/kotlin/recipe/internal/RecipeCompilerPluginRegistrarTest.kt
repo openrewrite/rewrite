@@ -17,7 +17,6 @@
 package org.openrewrite.kotlin.recipe.internal
 
 import com.tschuchort.compiletesting.KotlinCompilation
-import com.tschuchort.compiletesting.SourceFile
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalStateException
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
@@ -30,6 +29,7 @@ import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
+import org.openrewrite.kotlin.recipe.RecipePluginCompileFixture
 
 /**
  * Registration fails with a raw `ClassCastException` when a consumer's `kotlin("jvm")`
@@ -48,7 +48,7 @@ class RecipeCompilerPluginRegistrarTest {
         assertThat(messageCollector.messages).singleElement().satisfies({ (severity, message) ->
             assertThat(severity).isEqualTo(CompilerMessageSeverity.ERROR)
             assertThat(message)
-                .contains("Kotlin ${KotlinCompilerVersion.getVersion()}")
+                .contains("Kotlin ${KotlinCompilerVersion.getVersion() ?: "unknown"}")
                 .contains("built against Kotlin")
                 .contains("kotlin(\"jvm\")")
                 .contains(failure::class.java.name)
@@ -81,13 +81,18 @@ class RecipeCompilerPluginRegistrarTest {
     }
 
     @Test
+    fun `a discarding message collector throws rather than silently unregistering`() {
+        assertThatIllegalStateException()
+            .isThrownBy {
+                registerRecipeExtensions(configurationWith(MessageCollector.NONE)) { throw ClassCastException("boom") }
+            }
+            .withMessageContaining("kotlin(\"jvm\")")
+            .withCauseInstanceOf(ClassCastException::class.java)
+    }
+
+    @Test
     fun `the reported error fails compilation rather than crashing the compiler`() {
-        val result = KotlinCompilation().apply {
-            sources = listOf(SourceFile.kotlin("Empty.kt", "val answer = 42"))
-            compilerPluginRegistrars = listOf(FailingRegistrar())
-            inheritClassPath = true
-            messageOutputStream = System.out
-        }.compile()
+        val result = RecipePluginCompileFixture.compile("val answer = 42", "Empty.kt", FailingRegistrar())
 
         assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.COMPILATION_ERROR)
         assertThat(result.messages).contains("kotlin(\"jvm\")")

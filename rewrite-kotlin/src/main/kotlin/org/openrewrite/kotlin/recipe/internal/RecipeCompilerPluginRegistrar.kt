@@ -80,24 +80,28 @@ internal fun registerRecipeExtensions(configuration: CompilerConfiguration, regi
 
 private fun reportKotlinVersionMismatch(configuration: CompilerConfiguration, cause: Throwable) {
     val message = kotlinVersionMismatchMessage(cause)
+    // MessageCollector.NONE would discard the diagnostic, leaving the plugin silently unregistered.
     val messageCollector = configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+        ?.takeIf { it !== MessageCollector.NONE }
         ?: throw IllegalStateException(message, cause)
     messageCollector.report(CompilerMessageSeverity.ERROR, message)
 }
 
-internal fun kotlinVersionMismatchMessage(cause: Throwable): String =
-    "The rewrite-kotlin recipe DSL compiler plugin could not register its extensions with the Kotlin " +
+internal fun kotlinVersionMismatchMessage(cause: Throwable): String {
+    val alignment = BUILT_AGAINST_KOTLIN_VERSION?.let {
+        "rewrite-kotlin was built against Kotlin $it; align your kotlin(\"jvm\") version with $it, or use a " +
+                "rewrite-kotlin release built against the Kotlin version you are compiling with."
+    } ?: "Align your kotlin(\"jvm\") version with the Kotlin version rewrite-kotlin was built against, or use " +
+            "a rewrite-kotlin release built against the Kotlin version you are compiling with."
+    return "The rewrite-kotlin recipe DSL compiler plugin could not register its extensions with the Kotlin " +
             "compiler running this build (Kotlin ${KotlinCompilerVersion.getVersion() ?: "unknown"}). " +
-            "rewrite-kotlin was built against Kotlin $BUILT_AGAINST_KOTLIN_VERSION; align your " +
-            "kotlin(\"jvm\") version with $BUILT_AGAINST_KOTLIN_VERSION, or use a rewrite-kotlin release " +
-            "built against the Kotlin version you are compiling with. " +
-            "Underlying failure: ${cause::class.java.name}: ${cause.message}"
+            alignment + " Underlying failure: ${cause::class.java.name}: ${cause.message}"
+}
 
 // KotlinCompilerVersion reports the compiler that is running, never the one we compiled
 // against, so rewrite-kotlin's build emits its own version into this resource.
-private val BUILT_AGAINST_KOTLIN_VERSION: String by lazy {
+private val BUILT_AGAINST_KOTLIN_VERSION: String? by lazy {
     RecipeCompilerPluginRegistrar::class.java.getResourceAsStream("/META-INF/rewrite-kotlin-compiler.version")
         ?.use { it.readBytes().toString(Charsets.UTF_8).trim() }
         ?.takeIf { it.isNotEmpty() }
-        ?: "unknown"
 }
