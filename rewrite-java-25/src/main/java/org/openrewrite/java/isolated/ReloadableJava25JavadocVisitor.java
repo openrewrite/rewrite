@@ -58,9 +58,7 @@ import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
-    /**
-     * javac's {@code LayoutCharacters.EOI}, the sentinel it appends to its scanner buffers.
-     */
+    /// javac's {@code LayoutCharacters.EOI}, the sentinel it appends to its scanner buffers.
     private static final char EOI = 0x1A;
 
     private final Attr attr;
