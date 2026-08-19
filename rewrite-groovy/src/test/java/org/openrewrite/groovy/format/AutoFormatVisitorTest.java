@@ -89,4 +89,22 @@ class AutoFormatVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parenthesizedClosureReturnValue() {
+        rewriteRun(
+          groovy(
+            """
+              if (convertTemplate == null)
+                  convertTemplate = inTypemap.find({ key, value -> (key instanceof Pattern && key.matcher(apiType).matches()) })?.value
+              """,
+            """
+              if (convertTemplate == null)
+                  convertTemplate = inTypemap.find {key, value ->
+                      (key instanceof Pattern && key.matcher(apiType).matches())
+                  }?.value
+              """
+          )
+        );
+    }
 }
