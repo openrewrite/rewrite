@@ -315,24 +315,25 @@ func (v *referencedPackagesVisitor) VisitFieldAccess(fa *java.FieldAccess, p any
 //     `y.Hello()` after `import "github.com/x/y"`).
 //   - "<importPath>.<TypeName>"    — for named types in that package.
 //
-// Both shapes share an import-path prefix (the leading segment up to the
-// last `.`); we return that prefix so RemoveUnusedImports can match
-// against the literal import path.
+// Both shapes share an import-path prefix; we return that prefix so
+// RemoveUnusedImports can match against the literal import path.
 func pkgPathOf(fqn string) string {
 	if fqn == "" {
 		return ""
 	}
-	// FQNs that are already an import path (no trailing `.TypeName`)
-	// contain a `/` and no `.` after the last `/`. Detect that shape and
-	// return the FQN as-is.
 	if strings.Contains(fqn, "/") {
+		// A `.` in the last path element separates `pkg` from `TypeName`,
+		// except for a gopkg.in-style `.vN`, which is part of the path.
 		lastSlash := strings.LastIndex(fqn, "/")
-		tail := fqn[lastSlash+1:]
-		if !strings.Contains(tail, ".") {
-			return fqn
+		elements := strings.Split(fqn[lastSlash+1:], ".")
+		end := lastSlash + 1 + len(elements[0])
+		for _, element := range elements[1:] {
+			if !isVersionElement(element) {
+				break
+			}
+			end += 1 + len(element)
 		}
-		// `.../pkg.TypeName` shape — strip the trailing `.TypeName`.
-		return fqn[:lastSlash+1+strings.Index(tail, ".")]
+		return fqn[:end]
 	}
 	// Stdlib paths (e.g. "fmt") and "fmt.Println"-style FQNs.
 	if dot := strings.Index(fqn, "."); dot >= 0 {

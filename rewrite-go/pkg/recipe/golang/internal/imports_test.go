@@ -44,6 +44,23 @@ func TestPackageNameForPath(t *testing.T) {
 	}
 }
 
+func TestPkgPathOf(t *testing.T) {
+	for fqn, want := range map[string]string{
+		"gopkg.in/yaml.v3":         "gopkg.in/yaml.v3",
+		"gopkg.in/check.v1":        "gopkg.in/check.v1",
+		"gopkg.in/yaml.v3.Node":    "gopkg.in/yaml.v3",
+		"example.com/pkg.TypeName": "example.com/pkg",
+		"example.com/pkg.V2":       "example.com/pkg",
+		"github.com/x/y/v2":        "github.com/x/y/v2",
+		"encoding/json/v2":         "encoding/json/v2",
+		"fmt.Println":              "fmt",
+		"fmt":                      "fmt",
+		"":                         "",
+	} {
+		assert.Equal(t, want, pkgPathOf(fqn), "fqn %q", fqn)
+	}
+}
+
 func TestResolvedQualifiers(t *testing.T) {
 	blank := "_"
 	imports := []*java.Import{
