@@ -98,6 +98,36 @@ class CommentTest implements RewriteTest {
         );
     }
 
+    @Test
+    void slashImmediatelyAfterMultilineOpenerBeforeModifier() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated /*/ not the end of the comment */ public String value() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleLineOpenerInsideMultilineCommentBeforeModifiers() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated /* // */ public static String value() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4995")
     @Test
     void trailingComment() {
