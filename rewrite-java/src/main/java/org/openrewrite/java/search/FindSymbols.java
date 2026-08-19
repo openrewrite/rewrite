@@ -25,7 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.stream.Collectors;
+import static java.util.stream.Collectors.joining;
 
 /**
  * Lists all symbols (classes, interfaces, enums, records, methods, constructors, fields)
@@ -143,7 +143,7 @@ public class FindSymbols extends Recipe {
                     String params = methodType.getParameterTypes().stream()
                             .map(TypeUtils::asFullyQualified)
                             .map(fq -> fq != null ? fq.getClassName() : "?")
-                            .collect(Collectors.joining(", "));
+                            .collect(joining(", "));
                     JavaType returnJavaType = methodType.getReturnType();
                     JavaType.FullyQualified returnFq = TypeUtils.asFullyQualified(returnJavaType);
                     String returnType = returnFq != null

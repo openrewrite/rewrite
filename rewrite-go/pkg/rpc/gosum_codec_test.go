@@ -18,6 +18,8 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -39,9 +41,7 @@ func TestGoSumRPCRoundTrip(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// given: a parsed GoSum LST
 			before, err := parser.ParseGoSumFile("go.sum", content)
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
+			require.NoError(t, err, "parse error")
 
 			// when: round-tripped through the RPC sender/receiver
 			seed := &golang.GoSum{Ident: before.Ident}
@@ -49,9 +49,7 @@ func TestGoSumRPCRoundTrip(t *testing.T) {
 
 			// then: the received tree prints identically to the original
 			gs, ok := got.(*golang.GoSum)
-			if !ok {
-				t.Fatalf("expected *golang.GoSum, got %T", got)
-			}
+			require.Truef(t, ok, "expected *golang.GoSum, got %T", got)
 			if printed := printer.PrintGoSum(gs); printed != content {
 				t.Fatalf("RPC round-trip not lossless\n--- want ---\n%q\n--- got ---\n%q", content, printed)
 			}
@@ -63,13 +61,9 @@ func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	content := "github.com/x/y v1.2.3 h1:aaaa=\n" +
 		"github.com/x/y v1.2.3/go.mod h1:bbbb=\n"
 	before, err := parser.ParseGoSumFile("go.sum", content)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 	mrr, err := parser.ParseGoMod("go.mod", "module example.com/foo\n\nrequire github.com/x/y v1.2.3\n")
-	if err != nil {
-		t.Fatalf("marker parse error: %v", err)
-	}
+	require.NoError(t, err, "marker parse error")
 	before.Markers.Entries = append(before.Markers.Entries, *mrr)
 
 	seed := &golang.GoSum{Ident: before.Ident}
@@ -81,10 +75,6 @@ func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 			found = &r
 		}
 	}
-	if found == nil {
-		t.Fatalf("GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries)
-	}
-	if found.ModulePath != "example.com/foo" || len(found.Requires) != 1 {
-		t.Fatalf("marker fields not preserved: %#v", found)
-	}
+	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries)
+	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
 }

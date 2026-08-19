@@ -21,6 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class MethodDeclarationTest implements RewriteTest {
@@ -64,6 +65,44 @@ class MethodDeclarationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8531")
+    @Test
+    void typeParametersDirectlyAfterModifier() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  public static<P, R> R foo(P p) {
+                      return null;
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertModifiers(cu, J.Modifier.Type.Public, J.Modifier.Type.Static))
+          )
+        );
+    }
+
+    @Test
+    void annotationDirectlyAfterModifier() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  public@Deprecated static <P> P foo(P p) {
+                      return p;
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertModifiers(cu, J.Modifier.Type.Public, J.Modifier.Type.Static))
+          )
+        );
+    }
+
+    private static void assertModifiers(J.CompilationUnit cu, J.Modifier.Type... expected) {
+        J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+        assertThat(method.getModifiers()).map(J.Modifier::getType).containsExactly(expected);
     }
 
     @Test

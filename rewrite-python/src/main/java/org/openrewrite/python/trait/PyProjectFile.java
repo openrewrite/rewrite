@@ -23,6 +23,7 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
 
+import static java.util.Collections.singletonMap;
 import static org.openrewrite.internal.ListUtils.concat;
 
 @Value
@@ -236,10 +237,10 @@ public class PyProjectFile implements PythonDependencyFile {
                     current.marker, entry.getKey(), scope, null);
             if (existing == null) {
                 current = current.withAddedDependencies(
-                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+                        singletonMap(entry.getKey(), entry.getValue()), scope, null);
             } else {
                 current = current.withUpgradedVersions(
-                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+                        singletonMap(entry.getKey(), entry.getValue()), scope, null);
             }
         }
         return current;

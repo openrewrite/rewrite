@@ -56,7 +56,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -69,6 +68,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.Collections.emptyList;
 
 /**
  * RPC client that communicates with a Go process for parsing and printing Go source code.
@@ -359,7 +360,7 @@ public class GoRewriteRpc extends RewriteRpc {
 
     public static class Builder implements Supplier<GoRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         private Supplier<@Nullable Path> goBinaryPathSupplier = () -> null;
         private Duration timeout = Duration.ofSeconds(60);

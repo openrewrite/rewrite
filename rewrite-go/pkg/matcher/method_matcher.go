@@ -177,10 +177,7 @@ func (m *MethodMatcher) MatchesMethod(mt *java.JavaTypeMethod) bool {
 
 	// Match declaring type
 	if m.declaringTypePattern != nil {
-		declFQN := ""
-		if mt.DeclaringType != nil {
-			declFQN = mt.DeclaringType.GetFullyQualifiedName()
-		}
+		declFQN := java.FQNOf(mt.DeclaringType)
 		if !m.declaringTypePattern.MatchString(declFQN) {
 			return false
 		}

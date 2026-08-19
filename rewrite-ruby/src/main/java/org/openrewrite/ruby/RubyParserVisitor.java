@@ -39,8 +39,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -287,7 +286,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         int cursorBefore = cursor;
         Deque<PendingHeredoc> heredocsBefore = new ArrayDeque<>(pendingHeredocs);
         Map<UUID, Rb.Heredoc> finalizedBefore = finalizedHeredocs.isEmpty() ?
-                Collections.emptyMap() : new HashMap<>(finalizedHeredocs);
+                emptyMap() : new HashMap<>(finalizedHeredocs);
         U converted = conditional.apply(t, whitespace());
         if (converted != null) {
             return Optional.of(converted);
@@ -1362,11 +1361,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     private List<Nodes.Node> multiTargets(Nodes.Node[] lefts, Nodes.@Nullable Node rest,
                                           Nodes.Node[] rights) {
         List<Nodes.Node> targets = new ArrayList<>(lefts.length + rights.length + 1);
-        Collections.addAll(targets, lefts);
+        addAll(targets, lefts);
         if (rest != null && !(rest instanceof Nodes.ImplicitRestNode)) {
             targets.add(rest);
         }
-        Collections.addAll(targets, rights);
+        addAll(targets, rights);
         return targets;
     }
 
@@ -1751,7 +1750,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                                                  Nodes.@Nullable Node block) {
         List<Nodes.Node> args = new ArrayList<>();
         if (arguments != null) {
-            Collections.addAll(args, arguments.arguments);
+            addAll(args, arguments.arguments);
         }
         if (block instanceof Nodes.BlockArgumentNode) {
             args.add(block);
@@ -1853,7 +1852,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             if (block.parameters != null) {
                 collectParameters(block.parameters, params);
             }
-            Collections.addAll(params, block.locals);
+            addAll(params, block.locals);
         } else if (parameters instanceof Nodes.ParametersNode) {
             collectParameters((Nodes.ParametersNode) parameters, params);
         } else {
@@ -2664,13 +2663,13 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     private void collectParameters(Nodes.ParametersNode parameters, List<Nodes.Node> into) {
         List<Nodes.Node> collected = new ArrayList<>();
-        Collections.addAll(collected, parameters.requireds);
-        Collections.addAll(collected, parameters.optionals);
+        addAll(collected, parameters.requireds);
+        addAll(collected, parameters.optionals);
         if (parameters.rest != null) {
             collected.add(parameters.rest);
         }
-        Collections.addAll(collected, parameters.posts);
-        Collections.addAll(collected, parameters.keywords);
+        addAll(collected, parameters.posts);
+        addAll(collected, parameters.keywords);
         if (parameters.keyword_rest != null) {
             collected.add(parameters.keyword_rest);
         }
@@ -3027,11 +3026,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitArrayPatternNode(Nodes.ArrayPatternNode node) {
         List<Nodes.Node> elements = new ArrayList<>();
-        Collections.addAll(elements, node.requireds);
+        addAll(elements, node.requireds);
         if (node.rest != null) {
             elements.add(node.rest);
         }
-        Collections.addAll(elements, node.posts);
+        addAll(elements, node.posts);
         return patternWithConstant(node, node.constant, elements.toArray(new Nodes.Node[0]), "[");
     }
 
@@ -3041,7 +3040,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         if (node.left != null) {
             elements.add(node.left);
         }
-        Collections.addAll(elements, node.requireds);
+        addAll(elements, node.requireds);
         if (node.right != null) {
             elements.add(node.right);
         }

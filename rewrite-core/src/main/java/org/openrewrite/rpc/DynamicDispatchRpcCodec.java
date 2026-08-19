@@ -18,7 +18,6 @@ package org.openrewrite.rpc;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -27,6 +26,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.newSetFromMap;
 
 public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
     private static final Map<String, List<DynamicDispatchRpcCodec<?>>> CODEC_BY_TYPE = new ConcurrentHashMap<>();
@@ -38,7 +38,7 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
      * classloader that didn't have them visible at class-init time.
      */
     private static final Set<ClassLoader> SCANNED_CLASSLOADERS =
-            Collections.newSetFromMap(new WeakHashMap<>());
+            newSetFromMap(new WeakHashMap<>());
 
     static {
         // Scan with this class's defining classloader so codecs co-located with rewrite-core
