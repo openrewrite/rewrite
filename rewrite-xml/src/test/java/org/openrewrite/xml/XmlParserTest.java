@@ -417,14 +417,9 @@ class XmlParserTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      // ANTLR inserts a missing '=', which the printer then emits: `abc` becomes `abc=`
       "<t k=\"\" abc \"v\"/>",
-      // ANTLR drops the rule's children, leaving the attribute without an '=' or a value
       "<t k=\"\" a b \"v\"/>",
-      // ANTLR resyncs past the `1`, silently truncating the attribute value; this still reprints
-      // byte-for-byte, so only the checks in XmlParserVisitor catch it
       "<t k=\"\" x = 1 \"v\"/>",
-      // no attribute is recovered at all; the stray tokens are swallowed before the tag delimiter
       "<t k=\"\" 10.0.0.1 \"v\"/>",
     })
     void malformedAttributeIsNotSilentlyAccepted(@Language("xml") String source) {
@@ -438,9 +433,6 @@ class XmlParserTest implements RewriteTest {
 
     @Test
     void attributeValueWithUnescapedQuotes() {
-        // An embedded expression whose string literals are not escaped leaves the attribute value
-        // unrepresentable, so the document has to be rejected rather than parsed into a tree whose
-        // `value` attribute silently stops at the first quote.
         SourceFile parsed = XmlParser.builder().build()
           .parse(new InMemoryExecutionContext(t -> {
           }), """
