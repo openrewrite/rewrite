@@ -421,6 +421,8 @@ class XmlParserTest implements RewriteTest {
       "<t k=\"\" a b \"v\"/>",
       "<t k=\"\" x = 1 \"v\"/>",
       "<t k=\"\" 10.0.0.1 \"v\"/>",
+      "<t k=\"\" \"orphan\"/>",
+      "<?xml version=\"1.0\" \"orphan\"?><t/>",
     })
     void malformedAttributeIsNotSilentlyAccepted(@Language("xml") String source) {
         SourceFile parsed = XmlParser.builder().build()
@@ -429,6 +431,8 @@ class XmlParserTest implements RewriteTest {
           .findFirst().orElseThrow();
         assertThat(parsed).isInstanceOf(ParseError.class);
         assertThat(parsed.printAll()).isEqualTo(source);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Malformed attribute");
     }
 
     @Test

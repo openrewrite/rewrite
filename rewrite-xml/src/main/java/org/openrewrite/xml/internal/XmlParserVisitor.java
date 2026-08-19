@@ -22,6 +22,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
@@ -200,13 +201,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
                             .collect(toList());
+                    String beforeTagDelimiterPrefix = prefix(ctx.getStop());
+                    requireWellFormedAttribute(StringUtils.isBlank(beforeTagDelimiterPrefix), c);
+
                     return new Xml.XmlDecl(
                             randomId(),
                             prefix,
                             Markers.EMPTY,
                             name,
                             attributes,
-                            prefix(ctx.getStop())
+                            beforeTagDelimiterPrefix
                     );
                 }
         );
@@ -250,6 +254,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             String beforeType = prefix(ctx.Name());
             String type = convert(ctx.Name(), (n, p) -> n.getText());
             List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
+            String beforeDirectiveClose = prefix(ctx.DIRECTIVE_CLOSE());
+            requireWellFormedAttribute(StringUtils.isBlank(beforeDirectiveClose), c);
 
             return new Xml.JspDirective(
                     randomId(),
@@ -258,7 +264,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     beforeType,
                     type,
                     attributes,
-                    prefix(ctx.DIRECTIVE_CLOSE())
+                    beforeDirectiveClose
             );
         });
     }
@@ -382,7 +388,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         }
                     }
 
-                    requireWellFormedAttribute(isBlank(beforeTagDelimiterPrefix), c);
+                    requireWellFormedAttribute(StringUtils.isBlank(beforeTagDelimiterPrefix), c);
 
                     return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
@@ -393,7 +399,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            requireWellFormedAttribute(isBlank(prefix) && isSourceToken(c.Name()) &&
+            requireWellFormedAttribute(StringUtils.isBlank(prefix) && isSourceToken(c.Name()) &&
                                        isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()), c);
 
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
@@ -409,7 +415,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     )
             );
 
-            requireWellFormedAttribute(isBlank(beforeEquals) && isBlank(value.getPrefix()), c);
+            requireWellFormedAttribute(StringUtils.isBlank(beforeEquals) && StringUtils.isBlank(value.getPrefix()), c);
 
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
@@ -423,15 +429,6 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return node != null && !(node instanceof ErrorNode);
     }
 
-    private boolean isBlank(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            if (!Character.isWhitespace(text.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /**
      * Reject an attribute ANTLR only produced by recovering from malformed markup, which describes
      * something other than the source. Such a tree can still reprint byte-for-byte, since the dropped
@@ -441,9 +438,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         if (!wellFormed) {
             Token start = ctx.getStart();
             throw new IllegalStateException(String.format(
-                    "Malformed attribute in %s at line %d, column %d. This is most often caused by a literal '\"' " +
-                    "inside a double-quoted attribute value, which XML 1.0 section 2.3 does not permit; write it as " +
-                    "&quot; or delimit the value with single quotes.",
+                    "Malformed attribute in %s at line %d, column %d. The markup here is not a well-formed " +
+                    "name=\"value\" attribute; common causes are a literal '\"' inside a double-quoted value, which " +
+                    "XML 1.0 section 2.3 does not permit (write it as &quot; or delimit the value with single " +
+                    "quotes), an unquoted value, or an HTML-style attribute written without a value.",
                     path, start.getLine(), start.getCharPositionInLine() + 1));
         }
     }
