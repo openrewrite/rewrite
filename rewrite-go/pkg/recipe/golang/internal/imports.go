@@ -119,7 +119,7 @@ func isVersionElement(s string) bool {
 
 // AliasName returns the alias used by an Import: a custom identifier for
 // `import alias "path"`, "_" for blank imports, "." for dot imports, or
-// "" when the import uses the default (last segment of the path).
+// "" when the import uses the name the path itself implies.
 func AliasName(imp *java.Import) string {
 	if imp == nil || imp.Alias == nil {
 		return ""
