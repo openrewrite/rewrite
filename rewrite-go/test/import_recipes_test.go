@@ -17,12 +17,14 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -771,6 +773,67 @@ func TestRemoveUnusedImports_KeepsVersionedPathImportUsedByQualifier(t *testing.
 
 			func f(b []byte, out any) error {
 				y.Hello()
+				return yaml.Unmarshal(b, out)
+			}
+		`),
+	)
+}
+
+func TestRemoveUnusedImports_DropsImportSupersededOnSharedQualifier(t *testing.T) {
+	// The rewrite binds `rand` twice mid-tree, which is what makes the
+	// superseded import contend for the new one's qualifier. Driving the
+	// recipe from compilable source is what puts it in that state — a
+	// hand-written post-rewrite file is invalid Go and binds `rand`
+	// arbitrarily.
+	n := template.Expr("n")
+	r := template.NewRecipe(
+		template.RecipeName("test.RandIntnToIntN"),
+		template.WithDisplayName("Use math/rand/v2"),
+		template.WithBefore(fmt.Sprintf(`rand.Intn(%s)`, n), template.Imports("math/rand")),
+		template.WithAfter(fmt.Sprintf(`rand.IntN(%s)`, n), template.Imports("math/rand/v2"), template.SourceImports("math/rand/v2")),
+		template.WithCaptures(n),
+	)
+
+	spec := NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import "math/rand"
+
+			func pick() int {
+				return rand.Intn(10)
+			}
+		`, `
+			package main
+
+			import (
+				"math/rand/v2"
+			)
+
+			func pick() int {
+				return rand.IntN(10)
+			}
+		`),
+	)
+}
+
+func TestRemoveUnusedImports_KeepsEveryImportWhenNothingIsAttributed(t *testing.T) {
+	// Attribution names none of these paths, so refs is empty, no qualifier
+	// is resolved, and the lexical fallback keeps every import.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"github.com/x/y/v2"
+				"gopkg.in/check.v1"
+				"gopkg.in/yaml.v3"
+			)
+
+			func f(b []byte, out any) error {
+				check.Assert(y.Hello())
 				return yaml.Unmarshal(b, out)
 			}
 		`),
