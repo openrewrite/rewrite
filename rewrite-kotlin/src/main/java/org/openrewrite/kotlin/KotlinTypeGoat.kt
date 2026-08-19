@@ -74,6 +74,7 @@ abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     abstract fun <U> inheritedKotlinTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
     abstract fun <U> genericIntersection(n: U): U where U : TypeA, U : PT<U>, U : C
     abstract fun genericT(n: T): T // remove after signatures are common.
+    @Suppress("EXPOSED_TYPE_PARAMETER_BOUND")
     abstract fun <U> recursiveIntersection(n: U) where U : Extension<U>, U : Intersection<U>
     abstract fun javaType(n: Object)
     abstract fun TypeA.receiver(n: C)
