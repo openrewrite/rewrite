@@ -1162,7 +1162,7 @@ public class YamlParser implements org.openrewrite.Parser {
             char c = input.charAt(i);
 
             if (!inDirective) {
-                if (c == '%') {
+                if (c == '%' && (i == 0 || input.charAt(i - 1) == '\n' || input.charAt(i - 1) == '\r')) {
                     inDirective = true;
                     i++;
                 } else {
@@ -1247,6 +1247,12 @@ public class YamlParser implements org.openrewrite.Parser {
                     inDirective = false;
                 } else {
                     value.append(c);
+                    i++;
+                }
+            } else if (c == '#') {
+                // A comment line may precede directives, so treat it as prefix rather than as content
+                while (i < source.length() && source.charAt(i) != '\n' && source.charAt(i) != '\r') {
+                    prefix.append(source.charAt(i));
                     i++;
                 }
             } else if (c == '-' && i + 2 < source.length() &&
