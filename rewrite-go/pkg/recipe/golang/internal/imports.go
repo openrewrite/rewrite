@@ -224,11 +224,34 @@ func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
 	return refs
 }
 
-// IsReferenced reports whether imp is used by the file whose refs/quals
-// sets are passed in. Both sets come from one ReferencedImports walk per
-// file.
-func IsReferenced(imp *java.Import, refs, quals map[string]bool) bool {
-	return refs[ImportPath(imp)] || quals[PackageName(imp)]
+// ResolvedQualifiers names the qualifiers attribution has already accounted
+// for: those bound by an import refs names. Valid Go cannot bind one
+// qualifier twice, so a non-empty result means either a tree mid-rewrite —
+// how a major-version move reads — or input that arrived invalid, where the
+// qualifier binds arbitrarily and no answer is better than another.
+func ResolvedQualifiers(imports []*java.Import, refs map[string]bool) map[string]bool {
+	resolved := map[string]bool{}
+	for _, imp := range imports {
+		if refs[ImportPath(imp)] {
+			if name := PackageName(imp); name != "" {
+				resolved[name] = true
+			}
+		}
+	}
+	return resolved
+}
+
+// IsReferenced reports whether imp is used by the file whose refs/quals sets
+// are passed in. quals stands in for references attribution could not resolve,
+// so it rescues an import refs does not name — but not once some other import
+// has claimed that qualifier through refs, which makes refs's silence about
+// this one an answer rather than a gap.
+func IsReferenced(imp *java.Import, refs, quals, resolvedQuals map[string]bool) bool {
+	if refs[ImportPath(imp)] {
+		return true
+	}
+	name := PackageName(imp)
+	return quals[name] && !resolvedQuals[name]
 }
 
 func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
