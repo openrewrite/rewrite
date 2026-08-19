@@ -45,6 +45,16 @@ public abstract class XMLParserBase extends Parser {
         super(input);
     }
 
+    /**
+     * Gates the {@code element} rule so that strict XML keeps the plain two-alternative shape it had before void
+     * element support was added. The shape of the rule, not just which alternative matches, determines the
+     * resynchronization sets ANTLR's error recovery uses, so sharing one shape between the two modes would let
+     * HTML support alter how malformed XML recovers.
+     */
+    public boolean isHtmlMode() {
+        return htmlMode;
+    }
+
     public boolean isVoidElement(@Nullable String name) {
         return htmlMode && name != null && VOID_ELEMENTS.contains(name.toLowerCase());
     }

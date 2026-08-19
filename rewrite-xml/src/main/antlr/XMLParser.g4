@@ -81,8 +81,16 @@ content
     :   (element | reference | processinginstruction | CDATA | COMMENT |
          jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
 
+// Strict XML and HTML-like sources get separate alternatives rather than one shared, left-factored shape.
+// The shape of this rule determines the resynchronization sets ANTLR's error recovery uses, so folding the
+// two together would let HTML void element support change how malformed *XML* recovers -- e.g. an attribute
+// whose value contains an unescaped quote could recover with a synthesized '=' that the printer then emits
+// into the source. Keeping the strict-XML alternatives exactly as they were before void element support
+// existed is what makes "HTML support does not affect XML parsing" true of recovery and not just of matching.
 element
-    :   OPEN name=Name attribute*
+    :   {!isHtmlMode()}? OPEN name=Name attribute* CLOSE content* OPEN '/' Name CLOSE
+    |   {!isHtmlMode()}? OPEN name=Name attribute* '/>'
+    |   {isHtmlMode()}?  OPEN name=Name attribute*
         (   '/>'
         |   CLOSE
             (   {isVoidElement($name.text)}? voidClose // HTML void element, e.g. <br> with no closing tag

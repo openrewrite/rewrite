@@ -328,6 +328,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Override
     public Xml.Tag visitElement(XMLParser.ElementContext ctx) {
+        if (ctx != null && ctx.Name(0) == null) {
+            throw malformed(ctx.getStart(), "an element is missing its name");
+        }
         return convert(ctx, (c, prefix) -> {
                     String name = convert(ctx.Name(0), (n, p) -> n.getText());
 
@@ -389,6 +392,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
+        requireWellFormed(ctx);
         return convert(ctx, (c, prefix) -> {
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
@@ -405,6 +409,33 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
+    }
+
+    /**
+     * An attribute is only reachable here with a part missing, or with a part ANTLR invented, when error recovery
+     * built it out of tokens that were never an attribute in the source. Reading such a context yields a tree that no
+     * longer represents the source: a synthesized {@code =} is indistinguishable from a real one once built, and the
+     * printer then emits it back into the attribute value.
+     */
+    private void requireWellFormed(XMLParser.@Nullable AttributeContext ctx) {
+        if (ctx != null && (ctx.Name() == null || ctx.STRING() == null || isSynthesized(ctx.EQUALS()))) {
+            throw malformed(ctx.getStart(), "an attribute value contains an unescaped '\"' or '<'");
+        }
+    }
+
+    private static boolean isSynthesized(@Nullable TerminalNode node) {
+        return node == null || node.getSymbol().getTokenIndex() < 0;
+    }
+
+    /**
+     * Rejects input that is not well-formed XML, so the caller falls back to a
+     * {@link org.openrewrite.tree.ParseError} that preserves the original text rather than building an LST out of
+     * whatever ANTLR error recovery happened to leave behind.
+     */
+    private IllegalStateException malformed(Token start, String detail) {
+        return new IllegalStateException(String.format(
+                "%s is not well-formed XML: %s at line %d:%d.",
+                path, detail, start.getLine(), start.getCharPositionInLine()));
     }
 
     @Override

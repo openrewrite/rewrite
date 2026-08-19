@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser.Input;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RecipeSpec;
@@ -956,5 +957,66 @@ class XmlParserTest implements RewriteTest {
           .findFirst().orElseThrow();
         assertThat(parsed).isInstanceOf(ParseError.class);
         assertThat(parsed.printAll()).isEqualTo("<a>McFarland & Company</a>");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/7906")
+    @Test
+    void attributeValueWithUnescapedQuoteIsNotGivenAnExtraEquals() {
+        // The lexer ends a STRING at the first embedded quote, so the rest of the value re-lexes as more
+        // attributes. Error recovery must not synthesize an '=' for them, because the printer cannot tell a
+        // synthesized '=' from a real one and writes it back into the value.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<a v=\"@{ \"A\" }\"/>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<a v=\"@{ \"A\" }\"/>");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/7906")
+    @Test
+    void policyExpressionAttributeValueIsNeverRewritten() {
+        // Multi-line embedded expressions (e.g. Azure API Management policies) routinely carry unescaped
+        // quotes. Such a document is not well-formed XML, so a ParseError is correct -- but the text must
+        // come back byte for byte, never with an '=' inserted into a value.
+        @Language("xml")
+        String policy = """
+          <policies>
+              <inbound>
+                  <set-variable name="allowList" value="@{
+                      string list = "";
+                      list += "AAA,";
+                      return list;
+                  }" />
+              </inbound>
+          </policies>
+          """;
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), policy)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo(policy);
+        // "AAA," previously came back as "AAA=" from an '=' that error recovery invented.
+        assertThat(parseFailure(parsed)).doesNotContain("AAA=");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/7906")
+    @Test
+    void nestedAttributeValueWithUnescapedQuoteAndAngleBracketDoesNotThrow() {
+        // Same input one level of nesting deeper, which previously reached visitAttribute with a null EQUALS
+        // token and threw a NullPointerException instead of falling back to a ParseError.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<a><b v=\"@{ \"\" x < 5 \"F\" }\"/></a>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<a><b v=\"@{ \"\" x < 5 \"F\" }\"/></a>");
+        assertThat(parseFailure(parsed)).doesNotContain("NullPointerException");
+    }
+
+    private static String parseFailure(SourceFile parsed) {
+        return parsed.getMarkers().findFirst(ParseExceptionResult.class)
+          .orElseThrow().getMessage();
     }
 }
