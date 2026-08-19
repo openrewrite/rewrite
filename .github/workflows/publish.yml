@@ -28,8 +28,8 @@ jobs:
       artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
-      cgp_artifacts_maven_username: ${{ secrets.CGP_ARTIFACTS_MAVEN_USERNAME }}
-      cgp_artifacts_maven_token: ${{ secrets.CGP_ARTIFACTS_MAVEN_TOKEN }}
+      CODEGENOME_USERNAME: ${{ secrets.CODEGENOME_USERNAME }}
+      CODEGENOME_TOKEN: ${{ secrets.CODEGENOME_TOKEN }}
       # Maven dual-publish (Gradle's s3:// transport) and npm/PyPI/NuGet publishing respectively:
       # two separate mechanisms, either of which can be switched off on its own.
       cgp_aws_access_key_id: ${{ secrets.CGP_AWS_ACCESS_KEY_ID }}

@@ -235,13 +235,25 @@ func withLeadingSpace(t java.Tree) java.Tree {
 
 // fusesWith reports whether the first token of after would join the last token
 // of before, which happens when the characters either side of the join can both
-// appear inside one identifier or number.
+// appear inside one identifier or number, or together spell one operator.
 func fusesWith(before, after string) bool {
 	before = strings.TrimRight(before, " \t\n")
 	if before == "" || after == "" {
 		return false
 	}
-	return tokenChar(before[len(before)-1]) && tokenChar(after[0])
+	return tokenChar(before[len(before)-1]) && tokenChar(after[0]) ||
+		spellsOperator(before, after[0])
+}
+
+// spellsOperator reports whether writing a straight after before lexes as one
+// operator rather than two, keeping `+ +x` from reading as `++x`. before is the
+// whole operator, so a `<-` followed by `-` stays two tokens.
+func spellsOperator(before string, a byte) bool {
+	switch before + string(a) {
+	case "++", "--", "&&", "&^":
+		return true
+	}
+	return false
 }
 
 func tokenChar(b byte) bool {
