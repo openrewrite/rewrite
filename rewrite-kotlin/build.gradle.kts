@@ -149,3 +149,28 @@ val generateLanguageScopes by tasks.registering(GenerateLanguageScopesTask::clas
 sourceSets.named("main") {
     java.srcDir(generateLanguageScopes)
 }
+
+// === Built-against Kotlin version resource ===
+//
+// `KotlinCompilerVersion` reports whichever compiler is executing — in a consumer's
+// build, theirs rather than ours. `RecipeCompilerPluginRegistrar` reads this resource to
+// name the `kotlin("jvm")` version to align with when extension registration fails.
+
+val compilerVersionResourceDir = layout.buildDirectory.dir("generated/resources/compilerVersion")
+
+val writeCompilerVersionResource by tasks.registering {
+    val outputDir = compilerVersionResourceDir
+    val version = kotlinVersion
+    inputs.property("kotlinVersion", version)
+    outputs.dir(outputDir)
+    doLast {
+        outputDir.get().file("META-INF/rewrite-kotlin-compiler.version").asFile.apply {
+            parentFile.mkdirs()
+            writeText(version)
+        }
+    }
+}
+
+sourceSets.named("main") {
+    resources.srcDir(writeCompilerVersionResource)
+}

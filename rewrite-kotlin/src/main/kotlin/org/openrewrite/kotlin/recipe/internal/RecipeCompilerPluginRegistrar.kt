@@ -16,9 +16,13 @@
 package org.openrewrite.kotlin.recipe.internal
 
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 
 // Kotlin compiler plugin entry point for the recipe authoring DSL declared in
@@ -53,7 +57,47 @@ public class RecipeCompilerPluginRegistrar : CompilerPluginRegistrar() {
     override val supportsK2: Boolean = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-        FirExtensionRegistrarAdapter.registerExtension(RecipeFirExtensionRegistrar())
-        IrGenerationExtension.registerExtension(RecipeIrGenerationExtension())
+        registerRecipeExtensions(configuration) {
+            FirExtensionRegistrarAdapter.registerExtension(RecipeFirExtensionRegistrar())
+            IrGenerationExtension.registerExtension(RecipeIrGenerationExtension())
+        }
     }
+}
+
+// A compiler whose version differs from the one we were built against fails registration
+// with a raw ClassCastException that Gradle surfaces only as "Internal compiler error".
+// See https://github.com/openrewrite/rewrite/issues/8270.
+internal fun registerRecipeExtensions(configuration: CompilerConfiguration, register: () -> Unit) {
+    try {
+        register()
+    } catch (e: LinkageError) {
+        // Also catches AbstractMethodError.
+        reportKotlinVersionMismatch(configuration, e)
+    } catch (e: ClassCastException) {
+        reportKotlinVersionMismatch(configuration, e)
+    }
+}
+
+private fun reportKotlinVersionMismatch(configuration: CompilerConfiguration, cause: Throwable) {
+    val message = kotlinVersionMismatchMessage(cause)
+    val messageCollector = configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+        ?: throw IllegalStateException(message, cause)
+    messageCollector.report(CompilerMessageSeverity.ERROR, message)
+}
+
+internal fun kotlinVersionMismatchMessage(cause: Throwable): String =
+    "The rewrite-kotlin recipe DSL compiler plugin could not register its extensions with the Kotlin " +
+            "compiler running this build (Kotlin ${KotlinCompilerVersion.getVersion() ?: "unknown"}). " +
+            "rewrite-kotlin was built against Kotlin $BUILT_AGAINST_KOTLIN_VERSION; align your " +
+            "kotlin(\"jvm\") version with $BUILT_AGAINST_KOTLIN_VERSION, or use a rewrite-kotlin release " +
+            "built against the Kotlin version you are compiling with. " +
+            "Underlying failure: ${cause::class.java.name}: ${cause.message}"
+
+// KotlinCompilerVersion reports the compiler that is running, never the one we compiled
+// against, so rewrite-kotlin's build emits its own version into this resource.
+private val BUILT_AGAINST_KOTLIN_VERSION: String by lazy {
+    RecipeCompilerPluginRegistrar::class.java.getResourceAsStream("/META-INF/rewrite-kotlin-compiler.version")
+        ?.use { it.readBytes().toString(Charsets.UTF_8).trim() }
+        ?.takeIf { it.isNotEmpty() }
+        ?: "unknown"
 }
