@@ -393,27 +393,23 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            requireWellFormedAttribute(isBlank(prefix), c);
+            requireWellFormedAttribute(isBlank(prefix) && isSourceToken(c.Name()) &&
+                                       isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()), c);
 
-            requireWellFormedAttribute(isSourceToken(c.Name()), c);
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
-            requireWellFormedAttribute(isSourceToken(c.EQUALS()), c);
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
-            requireWellFormedAttribute(isBlank(beforeEquals), c);
 
-            requireWellFormedAttribute(isSourceToken(c.STRING()), c);
-            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> {
-                        requireWellFormedAttribute(isBlank(p), c);
-                        return new Xml.Attribute.Value(
-                                randomId(),
-                                p,
-                                Markers.EMPTY,
-                                v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
-                                v.getText().substring(1, c.STRING().getText().length() - 1)
-                        );
-                    }
+            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> new Xml.Attribute.Value(
+                            randomId(),
+                            p,
+                            Markers.EMPTY,
+                            v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
+                            v.getText().substring(1, c.STRING().getText().length() - 1)
+                    )
             );
+
+            requireWellFormedAttribute(isBlank(beforeEquals) && isBlank(value.getPrefix()), c);
 
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
