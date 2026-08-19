@@ -150,11 +150,8 @@ sourceSets.named("main") {
     java.srcDir(generateLanguageScopes)
 }
 
-// === Built-against Kotlin version constant ===
-//
-// `KotlinCompilerVersion` reports whichever compiler is executing — in a consumer's
-// build, theirs rather than ours. `RecipeCompilerPluginRegistrar` uses this constant to
-// name the `kotlin("jvm")` version to align with when extension registration fails.
+// `KotlinCompilerVersion` reports the compiler that is executing, so `RecipeCompilerPluginRegistrar`
+// needs this constant to name the `kotlin("jvm")` version to align with on a registration failure.
 
 val generatedCompilerVersionDir = layout.buildDirectory.dir("generated/source/compilerVersion/main/kotlin")
 
