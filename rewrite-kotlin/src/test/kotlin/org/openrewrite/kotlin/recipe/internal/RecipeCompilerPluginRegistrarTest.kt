@@ -56,11 +56,11 @@ class RecipeCompilerPluginRegistrarTest {
     }
 
     @Test
-    fun `the version rewrite-kotlin was built against comes from its own resource`() {
+    fun `the version rewrite-kotlin was built against is generated from the build`() {
         val message = kotlinVersionMismatchMessage(ClassCastException("boom"))
 
-        assertThat(message).doesNotContain("built against Kotlin unknown")
         assertThat(message).containsPattern("built against Kotlin \\d+\\.\\d+\\.\\d+")
+        assertThat(message).contains("align your kotlin(\"jvm\") version with $BUILT_AGAINST_KOTLIN_VERSION")
     }
 
     @Test
