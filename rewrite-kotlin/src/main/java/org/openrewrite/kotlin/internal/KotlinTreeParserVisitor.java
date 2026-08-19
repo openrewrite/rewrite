@@ -1415,11 +1415,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (parameter.getExtendsBound() != null) {
-            bounds = JContainer.build(suffix(parameter.getNameIdentifier()),
+            bounds = JContainer.build(Space.EMPTY,
                     singletonList(padRight((TypeTree) parameter.getExtendsBound().accept(this, data),
                             Space.EMPTY)),
                     Markers.EMPTY);
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), Space.EMPTY));
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(parameter.getNameIdentifier())));
         }
 
         return new J.TypeParameter(

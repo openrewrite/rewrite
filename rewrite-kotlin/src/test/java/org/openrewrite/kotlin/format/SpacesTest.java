@@ -1309,6 +1309,51 @@ class SpacesTest implements RewriteTest {
                 );
             }
 
+            @Issue("https://github.com/openrewrite/rewrite/issues/6613")
+            @Test
+            void typeParameterBoundDefaults() {
+                rewriteRun(
+                  kotlin(
+                    """
+                      class Test<T   :   Number>
+
+                      fun <T   :   Number> method(t   :   T) {
+                      }
+                      """,
+                    """
+                      class Test<T : Number>
+
+                      fun <T : Number> method(t: T) {
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Issue("https://github.com/openrewrite/rewrite/issues/6613")
+            @Test
+            void typeParameterBoundWithoutSpaceAroundColon() {
+                rewriteRun(
+                  spaces(style -> style.withOther(style.getOther()
+                    .withBeforeColonInNewTypeDefinition(false)
+                    .withAfterColonInNewTypeDefinition(false))),
+                  kotlin(
+                    """
+                      class Test<T   :   Number>
+
+                      fun <T   :   Number> method(t: T) {
+                      }
+                      """,
+                    """
+                      class Test<T:Number>
+
+                      fun <T:Number> method(t: T) {
+                      }
+                      """
+                  )
+                );
+            }
+
             @Test
             void otherBeforeColonAfterDeclarationNameFalseMethodDeclaration() {
                 rewriteRun(
