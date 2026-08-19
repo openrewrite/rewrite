@@ -2434,8 +2434,20 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// the go.sum-only result (never fail the parse).
 		moduleDir := filepath.Dir(modPath)
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
-			s.logger.Printf("ParseProject: module resolution failed for %s (deriving build list from go.mod): %v", moduleDir, rerr)
-			mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.ResolvedDependencies)
+			s.logger.Printf("ParseProject: module resolution failed for %s, falling back to vendor/go.mod: %v", moduleDir, rerr)
+			// vendor/modules.txt is authoritative for a vendored build and is the only
+			// offline source of the package->module map, so it outranks go.mod.
+			if vendored, verr := os.ReadFile(filepath.Join(moduleDir, "vendor", "modules.txt")); verr == nil {
+				vendorMods, vendorPkgs := goparser.ParseVendorModules(string(vendored))
+				mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, vendorMods)
+				mrr.PackageModules = vendorPkgs
+				mrr.ResolutionSource = golang.ResolutionVendor
+			} else {
+				mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.ResolvedDependencies)
+			}
+			// Each build-list member's own go.mod is already in the module cache when
+			// the repo has been built here, and its requires are that module's edges.
+			mrr.ResolvedDependencies = goparser.AttachCachedEdges(goparser.GoModCacheDir(), mrr.ResolvedDependencies)
 		} else {
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
 			mrr.PackageModules = pkgs

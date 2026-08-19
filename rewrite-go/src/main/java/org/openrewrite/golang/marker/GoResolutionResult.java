@@ -135,6 +135,11 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
          */
         GO_MOD,
         /**
+         * Build list and package-to-module map from {@code vendor/modules.txt}, which is
+         * authoritative for a vendored build. No graph edges.
+         */
+        VENDOR,
+        /**
          * No build list — {@link #resolvedDependencies} holds go.sum hash rows only.
          */
         GO_SUM_ONLY
@@ -145,15 +150,24 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      * actually build, rather than a hash inventory.
      */
     public boolean hasBuildList() {
-        return resolutionSource == ResolutionSource.TOOLCHAIN || resolutionSource == ResolutionSource.GO_MOD;
+        return resolutionSource == ResolutionSource.TOOLCHAIN ||
+               resolutionSource == ResolutionSource.VENDOR ||
+               resolutionSource == ResolutionSource.GO_MOD;
     }
 
     /**
-     * Whether {@link ResolvedDependency#deps} is populated, i.e. whether transitive
-     * questions can be answered.
+     * Whether any build-list member carries {@link ResolvedDependency#deps}, i.e. whether
+     * transitive questions can be answered. Edges are an enrichment over whatever build
+     * list was derived, so this is a property of the data rather than of
+     * {@link #resolutionSource}.
      */
     public boolean hasGraph() {
-        return resolutionSource == ResolutionSource.TOOLCHAIN;
+        for (ResolvedDependency d : resolvedDependencies) {
+            if (d.getDeps() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public @Nullable Require findRequire(String module) {

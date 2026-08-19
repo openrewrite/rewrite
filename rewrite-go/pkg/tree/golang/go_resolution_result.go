@@ -54,6 +54,9 @@ const (
 	// ResolutionGoMod: build list from the main module's require block under
 	// Go 1.17+ pruning. No graph edges, no package->module map.
 	ResolutionGoMod GoResolutionSource = "GO_MOD"
+	// ResolutionVendor: build list and package->module map from vendor/modules.txt,
+	// which is authoritative for a vendored build. No graph edges.
+	ResolutionVendor GoResolutionSource = "VENDOR"
 	// ResolutionGoSumOnly: no build list — ResolvedDependencies holds go.sum
 	// hash rows only.
 	ResolutionGoSumOnly GoResolutionSource = "GO_SUM_ONLY"
@@ -62,13 +65,25 @@ const (
 // HasBuildList reports whether ResolvedDependencies' selected rows are the
 // modules that actually build, rather than a go.sum hash inventory.
 func (m GoResolutionResult) HasBuildList() bool {
-	return m.ResolutionSource == ResolutionToolchain || m.ResolutionSource == ResolutionGoMod
+	switch m.ResolutionSource {
+	case ResolutionToolchain, ResolutionVendor, ResolutionGoMod:
+		return true
+	default:
+		return false
+	}
 }
 
-// HasGraph reports whether GoResolvedDependency.Deps is populated, i.e. whether
-// transitive questions can be answered.
+// HasGraph reports whether any build-list member carries Deps, i.e. whether
+// transitive questions can be answered. Edges are an enrichment over whatever
+// build list was derived, so this is a property of the data rather than of
+// ResolutionSource.
 func (m GoResolutionResult) HasGraph() bool {
-	return m.ResolutionSource == ResolutionToolchain
+	for _, d := range m.ResolvedDependencies {
+		if d.Deps != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
