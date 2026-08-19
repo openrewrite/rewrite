@@ -99,7 +99,7 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 			{
 				ModulePath: "github.com/google/uuid", Version: "v1.6.0",
 				ModuleHash: "h1:abc=", GoModHash: "h1:def=",
-				Main: true, ModuleGoVersion: "1.22",
+				Main: true, ModuleGoVersion: "1.22", Selected: true,
 				Deps: []golang.GoModuleRef{
 					{ModulePath: "golang.org/x/mod", Version: "v0.35.0"},
 				},
@@ -114,6 +114,7 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 			{ImportPath: "fmt", Standard: true},
 			{ImportPath: "github.com/google/uuid", ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
 		},
+		ResolutionSource: golang.ResolutionToolchain,
 	}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
@@ -137,6 +138,8 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 		Replaces:   []golang.GoReplace{},
 		Excludes:   []golang.GoExclude{},
 		Retracts:   []golang.GoRetract{},
+
+		ResolutionSource: golang.ResolutionGoSumOnly,
 	}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 

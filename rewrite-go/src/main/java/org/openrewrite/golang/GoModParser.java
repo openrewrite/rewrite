@@ -23,6 +23,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.golang.marker.GoResolutionResult;
 import org.openrewrite.golang.marker.GoResolutionResult.Exclude;
 import org.openrewrite.golang.marker.GoResolutionResult.Replace;
+import org.openrewrite.golang.marker.GoResolutionResult.ResolutionSource;
 import org.openrewrite.golang.marker.GoResolutionResult.ResolvedDependency;
 import org.openrewrite.golang.marker.GoResolutionResult.Retract;
 import org.openrewrite.golang.marker.GoResolutionResult.Require;
@@ -32,7 +33,11 @@ import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -111,16 +116,15 @@ public class GoModParser implements Parser {
         // The Go server attaches the GoResolutionResult marker during parsing.
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
         return rpc.parse(sources, relativeTo, this, GoMod.class.getName(), ctx)
-                .map(GoModParser::withSumHashes);
+                .map(sf -> withSumHashes(sf, relativeTo));
     }
 
     /**
      * Enrich the {@link GoResolutionResult} marker with hashes from a sibling
-     * {@code go.sum}, if one is readable on disk next to the go.mod. The Go-side
-     * parser only sees go.mod content (sources travel as strings over RPC), so
-     * go.sum resolution stays here.
+     * {@code go.sum}. The Go-side parser only sees go.mod content (sources travel
+     * as strings over RPC), so go.sum resolution stays here.
      */
-    private static SourceFile withSumHashes(SourceFile sf) {
+    private static SourceFile withSumHashes(SourceFile sf, @Nullable Path relativeTo) {
         if (!(sf instanceof GoMod)) {
             return sf;
         }
@@ -128,14 +132,44 @@ public class GoModParser implements Parser {
         return gm.getMarkers().findFirst(GoResolutionResult.class)
                 .filter(marker -> marker.getModulePath() != null && !marker.getModulePath().isEmpty())
                 .map(marker -> {
-                    List<ResolvedDependency> resolved = parseSumSibling(gm.getSourcePath());
-                    if (resolved.isEmpty()) {
+                    List<ResolvedDependency> fromSum = parseSumSibling(gm.getSourcePath(), relativeTo);
+                    if (fromSum.isEmpty()) {
                         return sf;
                     }
-                    return (SourceFile) gm.withMarkers(
-                            gm.getMarkers().setByType(marker.withResolvedDependencies(resolved)));
+                    return (SourceFile) gm.withMarkers(gm.getMarkers().setByType(marker.withResolvedDependencies(
+                            mergeSumHashes(marker.getResolvedDependencies(), fromSum))));
                 })
                 .orElse(sf);
+    }
+
+    /**
+     * Overlay go.sum hashes onto the build list, joined on {@code module@version}.
+     * Sum rows outside the build list are preserved, unselected. Mirrors the Go-side
+     * {@code MergeResolvedDependencies}.
+     */
+    static List<ResolvedDependency> mergeSumHashes(@Nullable List<ResolvedDependency> buildList,
+                                                   List<ResolvedDependency> fromSum) {
+        if (buildList == null || buildList.isEmpty()) {
+            return fromSum;
+        }
+        Map<String, ResolvedDependency> sumByKey = new LinkedHashMap<>();
+        for (ResolvedDependency d : fromSum) {
+            sumByKey.put(d.getModulePath() + "@" + d.getVersion(), d);
+        }
+        List<ResolvedDependency> out = new ArrayList<>(buildList.size() + fromSum.size());
+        Set<String> seen = new HashSet<>();
+        for (ResolvedDependency d : buildList) {
+            String key = d.getModulePath() + "@" + d.getVersion();
+            ResolvedDependency sum = sumByKey.get(key);
+            out.add(sum == null ? d : d.withModuleHash(sum.getModuleHash()).withGoModHash(sum.getGoModHash()));
+            seen.add(key);
+        }
+        for (ResolvedDependency d : fromSum) {
+            if (!seen.contains(d.getModulePath() + "@" + d.getVersion())) {
+                out.add(d.withSelected(false));
+            }
+        }
+        return out;
     }
 
     @Override
@@ -221,7 +255,7 @@ public class GoModParser implements Parser {
             return null;
         }
 
-        List<ResolvedDependency> resolved = parseSumSibling(doc.getSourcePath());
+        List<ResolvedDependency> resolved = parseSumSibling(doc.getSourcePath(), null);
 
         return new GoResolutionResult(
                 Tree.randomId(),
@@ -234,7 +268,8 @@ public class GoModParser implements Parser {
                 excludes,
                 retracts,
                 resolved,
-                new ArrayList<>()
+                new ArrayList<>(),
+                ResolutionSource.GO_SUM_ONLY
         );
     }
 
@@ -270,8 +305,16 @@ public class GoModParser implements Parser {
         }
     }
 
-    private static List<ResolvedDependency> parseSumSibling(Path goModPath) {
-        Path sumPath = goModPath.resolveSibling("go.sum");
+    /**
+     * A source path is a repo-relative identifier, so {@code relativeTo} is what turns
+     * it back into a filesystem location; without one there is nothing to read.
+     */
+    static List<ResolvedDependency> parseSumSibling(Path goModPath, @Nullable Path relativeTo) {
+        Path onDisk = relativeTo == null ? goModPath : relativeTo.resolve(goModPath);
+        if (!onDisk.isAbsolute()) {
+            return new ArrayList<>();
+        }
+        Path sumPath = onDisk.resolveSibling("go.sum");
         java.io.File sumFile = sumPath.toFile();
         if (!sumFile.isFile()) {
             return new ArrayList<>();
@@ -328,7 +371,7 @@ public class GoModParser implements Parser {
         for (java.util.Map.Entry<String, String[]> e : byKey.entrySet()) {
             String[] parts = e.getKey().split("@", 2);
             resolved.add(new ResolvedDependency(parts[0], parts[1], e.getValue()[0], e.getValue()[1],
-                    false, false, null, null, null, null));
+                    false, false, null, null, null, false, null));
         }
         return resolved;
     }

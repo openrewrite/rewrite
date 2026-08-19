@@ -39,6 +39,36 @@ type GoResolutionResult struct {
 	// coordinate, so this mapping requires toolchain resolution. Empty unless
 	// the parse-time resolution gate is on.
 	PackageModules []GoPackageModule
+	// ResolutionSource records how ResolvedDependencies was derived. Prefer
+	// HasBuildList/HasGraph over comparing constants.
+	ResolutionSource GoResolutionSource
+}
+
+// GoResolutionSource is how a GoResolutionResult's build list was derived.
+type GoResolutionSource string
+
+const (
+	// ResolutionToolchain: build list, graph edges and the package->module map,
+	// from `go list -m`, `go mod graph` and `go list -deps`.
+	ResolutionToolchain GoResolutionSource = "TOOLCHAIN"
+	// ResolutionGoMod: build list from the main module's require block under
+	// Go 1.17+ pruning. No graph edges, no package->module map.
+	ResolutionGoMod GoResolutionSource = "GO_MOD"
+	// ResolutionGoSumOnly: no build list — ResolvedDependencies holds go.sum
+	// hash rows only.
+	ResolutionGoSumOnly GoResolutionSource = "GO_SUM_ONLY"
+)
+
+// HasBuildList reports whether ResolvedDependencies' selected rows are the
+// modules that actually build, rather than a go.sum hash inventory.
+func (m GoResolutionResult) HasBuildList() bool {
+	return m.ResolutionSource == ResolutionToolchain || m.ResolutionSource == ResolutionGoMod
+}
+
+// HasGraph reports whether GoResolvedDependency.Deps is populated, i.e. whether
+// transitive questions can be answered.
+func (m GoResolutionResult) HasGraph() bool {
+	return m.ResolutionSource == ResolutionToolchain
 }
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
@@ -112,6 +142,10 @@ type GoResolvedDependency struct {
 	ReplacePath     string // toolchain-applied replace target, empty if none
 	ReplaceVersion  string
 	ModuleGoVersion string // this module's own `go` directive, from `go list -m`
+	// Selected marks a member of the resolved build list. go.sum also records
+	// versions MVS rejected; those are carried for their hashes with Selected
+	// false and are not part of the build.
+	Selected bool
 	// Deps are the direct module dependencies of this node (from `go mod graph`),
 	// referenced by module@version. Resolve against ResolvedDependencies. Nil when
 	// the graph is unavailable. Edges (not nested nodes) keep this cycle-safe and
@@ -153,5 +187,6 @@ func NewGoResolutionResult(modulePath, goVersion, toolchain, path string) GoReso
 		Retracts:             []GoRetract{},
 		ResolvedDependencies: []GoResolvedDependency{},
 		PackageModules:       []GoPackageModule{},
+		ResolutionSource:     ResolutionGoSumOnly,
 	}
 }

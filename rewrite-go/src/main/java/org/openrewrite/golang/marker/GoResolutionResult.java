@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
  * Metadata parsed from a Go module's go.mod (and optionally go.sum) file.
@@ -113,6 +114,48 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      */
     List<PackageModule> packageModules;
 
+    /**
+     * How {@link #resolvedDependencies} was derived. Prefer {@link #hasBuildList()} /
+     * {@link #hasGraph()} over comparing constants.
+     */
+    ResolutionSource resolutionSource;
+
+    /**
+     * How a module's build list was derived.
+     */
+    public enum ResolutionSource {
+        /**
+         * Build list, graph edges and the package-to-module map, from {@code go list -m},
+         * {@code go mod graph} and {@code go list -deps}.
+         */
+        TOOLCHAIN,
+        /**
+         * Build list from the main module's {@code require} block under Go 1.17+ graph
+         * pruning. No graph edges, no package-to-module map.
+         */
+        GO_MOD,
+        /**
+         * No build list — {@link #resolvedDependencies} holds go.sum hash rows only.
+         */
+        GO_SUM_ONLY
+    }
+
+    /**
+     * Whether the selected rows of {@link #resolvedDependencies} are the modules that
+     * actually build, rather than a hash inventory.
+     */
+    public boolean hasBuildList() {
+        return resolutionSource == ResolutionSource.TOOLCHAIN || resolutionSource == ResolutionSource.GO_MOD;
+    }
+
+    /**
+     * Whether {@link ResolvedDependency#deps} is populated, i.e. whether transitive
+     * questions can be answered.
+     */
+    public boolean hasGraph() {
+        return resolutionSource == ResolutionSource.TOOLCHAIN;
+    }
+
     public @Nullable Require findRequire(String module) {
         for (Require r : requires) {
             if (r.getModulePath().equals(module)) {
@@ -165,6 +208,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         q.getAndSendListAsRef(after, r -> r.getPackageModules() != null ? r.getPackageModules() : emptyList(),
                 PackageModule::getImportPath,
                 pm -> pm.rpcSend(pm, q));
+        q.getAndSend(after, GoResolutionResult::getResolutionSource);
     }
 
     @Override
@@ -180,7 +224,8 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withExcludes(q.receiveList(before.excludes, r -> r.rpcReceive(r, q)))
                 .withRetracts(q.receiveList(before.retracts, r -> r.rpcReceive(r, q)))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
-                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)));
+                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)))
+                .withResolutionSource(q.receiveAndGet(before.resolutionSource, toEnum(ResolutionSource.class)));
     }
 
     /**
@@ -336,6 +381,13 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         @Nullable String moduleGoVersion;
 
         /**
+         * Marks a member of the resolved build list. go.sum also records versions MVS
+         * rejected; those are carried for their hashes with {@code selected} false and
+         * are not part of the build.
+         */
+        boolean selected;
+
+        /**
          * Direct module dependencies of this node (from {@code go mod graph}), by {@code module@version}
          * edge reference. Resolve against {@link #resolvedDependencies}. Null when the graph is
          * unavailable. Edges (not nested nodes) keep this cycle-safe; Go's MVS gives one selected
@@ -354,6 +406,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
             q.getAndSend(after, ResolvedDependency::getReplacePath);
             q.getAndSend(after, ResolvedDependency::getReplaceVersion);
             q.getAndSend(after, ResolvedDependency::getModuleGoVersion);
+            q.getAndSend(after, ResolvedDependency::isSelected);
             q.getAndSendListAsRef(after, r -> r.getDeps() != null ? r.getDeps() : emptyList(),
                     ref -> ref.getModulePath() + "@" + ref.getVersion(),
                     ref -> ref.rpcSend(ref, q));
@@ -371,6 +424,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                     .withReplacePath(q.receive(before.replacePath))
                     .withReplaceVersion(q.receive(before.replaceVersion))
                     .withModuleGoVersion(q.receive(before.moduleGoVersion))
+                    .withSelected(q.receive(before.selected))
                     .withDeps(q.receiveList(before.deps, ref -> ref.rpcReceive(ref, q)));
         }
     }
