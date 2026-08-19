@@ -1736,17 +1736,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     spaceAfterShebang = null;
                 }
             } catch (Exception e) {
-                statement = new J.Unknown(
-                        randomId(),
-                        deepPrefix(declaration),
-                        Markers.EMPTY,
-                        new J.Unknown.Source(
-                                randomId(),
-                                Space.EMPTY,
-                                Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.builder().build(), e)
-                                        .withTreeType(declaration.getClass().getName()))),
-                                file.getText().substring(PsiUtilsKt.getStartOffsetSkippingComments(declaration),
-                                        declaration.getTextRange().getEndOffset())));
+                statement = unknown(declaration, e);
             }
 
             statements.add(maybeTrailingSemicolon(statement, declaration));
@@ -1997,8 +1987,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitBlockExpression(KtBlockExpression expression, ExecutionContext data) {
         List<JRightPadded<Statement>> statements = new ArrayList<>();
         for (KtExpression stmt : expression.getStatements()) {
-            J exp = stmt.accept(this, data);
-            Statement statement = convertToStatement(exp).withPrefix(endFixPrefixAndInfix(stmt));
+            Statement statement;
+            try {
+                statement = convertToStatement(stmt.accept(this, data)).withPrefix(endFixPrefixAndInfix(stmt));
+            } catch (Exception e) {
+                statement = unknown(stmt, e);
+            }
             JRightPadded<Statement> build = maybeTrailingSemicolon(statement, stmt);
             statements.add(build);
         }
@@ -2378,7 +2372,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (d instanceof KtEnumEntry) {
                 continue;
             }
-            Statement statement = convertToStatement(d.accept(this, data));
+            Statement statement;
+            try {
+                statement = convertToStatement(d.accept(this, data));
+            } catch (Exception e) {
+                statement = unknown(d, e);
+            }
             list.add(maybeTrailingSemicolon(statement, d));
         }
 
@@ -3858,6 +3857,20 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             id = id.withPrefix(merge(prefix, id.getPrefix()));
         }
         return id;
+    }
+
+    private J.Unknown unknown(KtElement element, Exception e) {
+        return new J.Unknown(
+                randomId(),
+                deepPrefix(element),
+                Markers.EMPTY,
+                new J.Unknown.Source(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.builder().build(), e)
+                                .withTreeType(element.getClass().getName()))),
+                        element.getContainingFile().getText().substring(PsiUtilsKt.getStartOffsetSkippingComments(element),
+                                element.getTextRange().getEndOffset())));
     }
 
     private @Nullable FirElement owner(PsiElement element) {

@@ -16,9 +16,16 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("RemoveRedundantQualifierName")
@@ -93,6 +100,30 @@ class LambdaTest implements RewriteTest {
                   val lambda : suspend ( ) -> Int = suspend { 1 }
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = KotlinParser.KotlinLanguageLevel.class, names = "KOTLIN_2_\\d+", mode = EnumSource.Mode.MATCH_ALL)
+    void suspendLambdaAtEveryLanguageLevel(KotlinParser.KotlinLanguageLevel languageLevel) {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().languageLevel(languageLevel)),
+          kotlin(
+            """
+              fun method ( ) {
+                  val lambda : suspend ( ) -> Int = suspend { 1 }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration method = (J.MethodDeclaration) cu.getStatements().getFirst();
+                J.VariableDeclarations lambda = (J.VariableDeclarations) requireNonNull(method.getBody()).getStatements().getFirst();
+                Expression initializer = lambda.getVariables().getFirst().getInitializer();
+                assertThat(initializer).isInstanceOfSatisfying(J.MethodInvocation.class, m -> {
+                    assertThat(m.getSimpleName()).isEqualTo("suspend");
+                    assertThat(m.getMethodType()).isNotNull();
+                });
+            })
           )
         );
     }

@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.KtRealPsiSourceElement
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.fir.FirElement
@@ -32,12 +33,14 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
@@ -147,6 +150,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return typeMapping.type(typeMap[parent], owner)
         }
         val fir = primary(psiElement)
+        if (fir is FirVariable && psiElement is KtSimpleNameExpression &&
+            fir.name.asString() != psiElement.getReferencedName()) {
+            // `primary` walked up to an enclosing declaration, whose type describes a different name
+            return null
+        }
         if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
             if (fir.symbol is FirRegularClassSymbol) {
                 val classId = (fir.symbol as FirRegularClassSymbol).classId
@@ -259,11 +267,25 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     }
 
                     else -> {
-                        null
+                        if (psi is KtCallExpression) resolvedAwayCallType(psi) else null
                     }
                 }
             }
         }
+    }
+
+    @OptIn(SymbolInternals::class)
+    private fun resolvedAwayCallType(psi: KtCallExpression): JavaType.Method? {
+        // Since Kotlin 2.3 `suspend { }` resolves to a suspending lambda, leaving no FIR for the call itself
+        val name = (psi.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()
+        if (elementMap.containsKey(psi) || name != "suspend" ||
+            psi.valueArgumentList != null || psi.lambdaArguments.size != 1) {
+            return null
+        }
+        val symbol = typeMapping.firSession.symbolProvider
+            .getTopLevelFunctionSymbols(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, Name.identifier(name))
+            .firstOrNull() ?: return null
+        return typeMapping.methodDeclarationType(symbol.fir, null)
     }
 
     fun primitiveType(psi: PsiElement): JavaType.Primitive {
@@ -399,7 +421,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> null
                 }
             }
-            else -> throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            else -> {
+                // `primary` walked up to an enclosing element, so the compiler resolved this call away
+                if (fir.source?.psi !== psi) null
+                else throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            }
         }
     }
 
