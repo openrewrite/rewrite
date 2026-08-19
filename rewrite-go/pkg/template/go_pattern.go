@@ -17,7 +17,6 @@
 package template
 
 import (
-	"io/fs"
 	"reflect"
 	"sync"
 
@@ -33,7 +32,6 @@ type GoPattern struct {
 	captures map[string]*Capture
 	imports  []string
 	kind     ScaffoldKind
-	importerCache
 
 	once     sync.Once
 	cached   java.J
@@ -73,17 +71,16 @@ func (p *GoPattern) Matches(candidate java.J, cursor *visitor.Cursor) bool {
 // getTree lazily parses the pattern and caches the result.
 func (p *GoPattern) getTree() (java.J, error) {
 	p.once.Do(func() {
-		p.cached, p.parseErr = parseScaffold(p.code, p.captures, p.imports, p.kind, p.shared())
+		p.cached, p.parseErr = parseScaffold(p.code, p.captures, p.imports, p.kind)
 	})
 	return p.cached, p.parseErr
 }
 
 type PatternBuilder struct {
-	code       string
-	captures   []*Capture
-	imports    []string
-	kind       ScaffoldKind
-	exportData []fs.FS
+	code     string
+	captures []*Capture
+	imports  []string
+	kind     ScaffoldKind
 }
 
 func Expression(code string) *PatternBuilder {
@@ -108,19 +105,11 @@ func (b *PatternBuilder) Imports(pkgs ...string) *PatternBuilder {
 	return b
 }
 
-// ExportData attributes the pattern against export data the recipe module
-// carries. See TemplateBuilder.ExportData.
-func (b *PatternBuilder) ExportData(sets ...fs.FS) *PatternBuilder {
-	b.exportData = append(b.exportData, sets...)
-	return b
-}
-
 func (b *PatternBuilder) Build() *GoPattern {
 	return &GoPattern{
-		code:          b.code,
-		captures:      captureMap(b.captures),
-		imports:       b.imports,
-		kind:          b.kind,
-		importerCache: importerCache{exportData: b.exportData},
+		code:     b.code,
+		captures: captureMap(b.captures),
+		imports:  b.imports,
+		kind:     b.kind,
 	}
 }

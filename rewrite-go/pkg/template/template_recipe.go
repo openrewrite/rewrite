@@ -17,7 +17,6 @@
 package template
 
 import (
-	"io/fs"
 	"strings"
 	"time"
 
@@ -35,7 +34,6 @@ type beforeSpec struct {
 	code          string
 	imports       []string
 	sourceImports []SourceImportSpec
-	exportData    []fs.FS
 	kind          *ScaffoldKind // nil = auto-detect
 }
 
@@ -47,18 +45,17 @@ type SourceImportSpec struct {
 }
 
 type templateRecipeConfig struct {
-	name            string
-	displayName     string
-	description     string
-	tags            []string
-	befores         []beforeSpec
-	afterCode       string
-	afterImports    []string
-	sourceImports   []SourceImportSpec
-	afterExportData []fs.FS
-	afterKind       *ScaffoldKind
-	captures        []*Capture
-	kind            *ScaffoldKind // global override
+	name          string
+	displayName   string
+	description   string
+	tags          []string
+	befores       []beforeSpec
+	afterCode     string
+	afterImports  []string
+	sourceImports []SourceImportSpec
+	afterKind     *ScaffoldKind
+	captures      []*Capture
+	kind          *ScaffoldKind // global override
 }
 
 func RecipeName(name string) RecipeOption {
@@ -98,7 +95,6 @@ func WithAfter(code string, opts ...BeforeOption) RecipeOption {
 		}
 		c.afterImports = spec.imports
 		c.sourceImports = spec.sourceImports
-		c.afterExportData = spec.exportData
 		c.afterKind = spec.kind
 	}
 }
@@ -130,20 +126,8 @@ func Imports(pkgs ...string) BeforeOption {
 	return func(s *beforeSpec) { s.imports = append(s.imports, pkgs...) }
 }
 
-// ExportData attributes a template against compiler export data the recipe
-// module carries. On WithAfter it decides the types the emitted code carries,
-// which is what tells a superseded import from a live one; on WithBefore it
-// bears only on the shape a generic instantiation takes, so it belongs there
-// only when the source is parsed the same way.
-// See doc/recipe-authoring.md: Shipped export data.
-func ExportData(sets ...fs.FS) BeforeOption {
-	return func(s *beforeSpec) { s.exportData = append(s.exportData, sets...) }
-}
-
 // SourceImports declares regular imports to add to the source file when an
-// after template is applied. It is only meaningful on WithAfter, and cannot
-// swap a package under a qualifier the file still uses for another path — see
-// doc/recipe-authoring.md: Shipped export data.
+// after template is applied. It is only meaningful on WithAfter.
 func SourceImports(pkgs ...string) BeforeOption {
 	return func(s *beforeSpec) {
 		for _, pkg := range pkgs {
@@ -185,11 +169,11 @@ func buildRecipe(cfg *templateRecipeConfig) recipe.Recipe {
 	var befores []*GoPattern
 	for _, bs := range cfg.befores {
 		kind := resolveKind(bs.kind, cfg.kind, bs.code)
-		befores = append(befores, buildPattern(bs.code, caps, bs.imports, kind, bs.exportData))
+		befores = append(befores, buildPattern(bs.code, caps, bs.imports, kind))
 	}
 
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
-	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind, cfg.afterExportData)
+	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind)
 
 	v := newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 
@@ -212,25 +196,25 @@ func resolveKind(specific *ScaffoldKind, global *ScaffoldKind, code string) Scaf
 	return detectScaffoldKind(code)
 }
 
-func buildPattern(code string, caps []*Capture, imports []string, kind ScaffoldKind, exportData []fs.FS) *GoPattern {
+func buildPattern(code string, caps []*Capture, imports []string, kind ScaffoldKind) *GoPattern {
 	switch kind {
 	case ScaffoldStatement:
-		return StatementPattern(code).Captures(caps...).Imports(imports...).ExportData(exportData...).Build()
+		return StatementPattern(code).Captures(caps...).Imports(imports...).Build()
 	case ScaffoldTopLevel:
-		return TopLevel(code).Captures(caps...).Imports(imports...).ExportData(exportData...).Build()
+		return TopLevel(code).Captures(caps...).Imports(imports...).Build()
 	default:
-		return Expression(code).Captures(caps...).Imports(imports...).ExportData(exportData...).Build()
+		return Expression(code).Captures(caps...).Imports(imports...).Build()
 	}
 }
 
-func buildTemplate(code string, caps []*Capture, imports []string, kind ScaffoldKind, exportData []fs.FS) *GoTemplate {
+func buildTemplate(code string, caps []*Capture, imports []string, kind ScaffoldKind) *GoTemplate {
 	switch kind {
 	case ScaffoldStatement:
-		return StatementTemplate(code).Captures(caps...).Imports(imports...).ExportData(exportData...).Build()
+		return StatementTemplate(code).Captures(caps...).Imports(imports...).Build()
 	case ScaffoldTopLevel:
-		return TopLevelTemplate(code).Captures(caps...).Imports(imports...).ExportData(exportData...).Build()
+		return TopLevelTemplate(code).Captures(caps...).Imports(imports...).Build()
 	default:
-		return ExpressionTemplate(code).Captures(caps...).Imports(imports...).ExportData(exportData...).Build()
+		return ExpressionTemplate(code).Captures(caps...).Imports(imports...).Build()
 	}
 }
 
@@ -355,11 +339,11 @@ func (tr *TemplateRecipe) InitTemplate(opts ...RecipeOption) {
 	var befores []*GoPattern
 	for _, bs := range cfg.befores {
 		kind := resolveKind(bs.kind, cfg.kind, bs.code)
-		befores = append(befores, buildPattern(bs.code, caps, bs.imports, kind, bs.exportData))
+		befores = append(befores, buildPattern(bs.code, caps, bs.imports, kind))
 	}
 
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
-	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind, cfg.afterExportData)
+	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind)
 
 	tr.editor = newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 }

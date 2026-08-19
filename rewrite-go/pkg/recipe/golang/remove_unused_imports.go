@@ -59,7 +59,6 @@ func (v *removeUnusedImportsVisitor) VisitCompilationUnit(cu *golang.Compilation
 		return cu
 	}
 	refs, quals := internal.ReferencedImports(cu)
-	resolved := internal.ResolvedQualifiers(importsOf(cu), refs)
 	for _, rp := range cu.Imports.Elements {
 		imp := rp.Element
 		if imp == nil {
@@ -74,23 +73,10 @@ func (v *removeUnusedImportsVisitor) VisitCompilationUnit(cu *golang.Compilation
 		if internal.AliasName(imp) == "." {
 			continue
 		}
-		if internal.IsReferenced(imp, refs, quals, resolved) {
+		if internal.IsReferenced(imp, refs, quals) {
 			continue
 		}
 		cu = internal.RemoveFromBlock(cu, imp)
 	}
 	return cu
-}
-
-func importsOf(cu *golang.CompilationUnit) []*java.Import {
-	if cu == nil || cu.Imports == nil {
-		return nil
-	}
-	imps := make([]*java.Import, 0, len(cu.Imports.Elements))
-	for _, rp := range cu.Imports.Elements {
-		if rp.Element != nil {
-			imps = append(imps, rp.Element)
-		}
-	}
-	return imps
 }
