@@ -32,7 +32,7 @@ const pruningMinGoVersion = "v1.17"
 // require block plus go.sum's hash rows, without the Go toolchain. Pruning is
 // what makes it sound (see pruningMinGoVersion); before that the require block
 // holds only the direct roots and the go.sum rows are returned as-is.
-func DeriveBuildList(goVersion string, requires []golang.GoRequire, fromSum []golang.GoResolvedDependency) ([]golang.GoResolvedDependency, golang.GoResolutionSource) {
+func DeriveBuildList(goVersion string, requires []golang.GoRequire, replaces []golang.GoReplace, fromSum []golang.GoResolvedDependency) ([]golang.GoResolvedDependency, golang.GoResolutionSource) {
 	if !supportsPruning(goVersion) {
 		out := make([]golang.GoResolvedDependency, 0, len(fromSum))
 		for _, d := range fromSum {
@@ -44,13 +44,33 @@ func DeriveBuildList(goVersion string, requires []golang.GoRequire, fromSum []go
 
 	buildList := make([]golang.GoResolvedDependency, 0, len(requires))
 	for _, r := range requires {
-		buildList = append(buildList, golang.GoResolvedDependency{
+		mod := golang.GoResolvedDependency{
 			ModulePath: r.ModulePath,
 			Version:    r.Version,
 			Indirect:   r.Indirect,
-		})
+		}
+		applyReplace(&mod, replaces)
+		buildList = append(buildList, mod)
 	}
 	return MergeResolvedDependencies(fromSum, buildList), golang.ResolutionGoMod
+}
+
+// applyReplace records the `replace` target for mod, matching how `go list -m`
+// reports one. A replace with no old version binds every version of the path;
+// with one it binds only that version. go.sum records the replacement's hashes
+// under the replacement's own coordinate, so a replaced module has none here.
+func applyReplace(mod *golang.GoResolvedDependency, replaces []golang.GoReplace) {
+	for _, r := range replaces {
+		if r.OldPath != mod.ModulePath {
+			continue
+		}
+		if r.OldVersion != "" && r.OldVersion != mod.Version {
+			continue
+		}
+		mod.ReplacePath = r.NewPath
+		mod.ReplaceVersion = r.NewVersion
+		return
+	}
 }
 
 // supportsPruning reports whether a `go` directive is at or past

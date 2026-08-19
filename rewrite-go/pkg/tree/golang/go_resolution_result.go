@@ -52,10 +52,10 @@ const (
 	// from `go list -m`, `go mod graph` and `go list -deps`.
 	ResolutionToolchain GoResolutionSource = "TOOLCHAIN"
 	// ResolutionGoMod: build list from the main module's require block under
-	// Go 1.17+ pruning. No graph edges, no package->module map.
+	// Go 1.17+ pruning. No package->module map.
 	ResolutionGoMod GoResolutionSource = "GO_MOD"
 	// ResolutionVendor: build list and package->module map from vendor/modules.txt,
-	// which is authoritative for a vendored build. No graph edges.
+	// which is authoritative for a vendored build.
 	ResolutionVendor GoResolutionSource = "VENDOR"
 	// ResolutionGoSumOnly: no build list — ResolvedDependencies holds go.sum
 	// hash rows only.

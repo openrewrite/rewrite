@@ -19,6 +19,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -126,4 +127,27 @@ require golang.org/x/tools v0.43.0
 
 	require.Len(t, attached[0].Deps, 1)
 	assert.Equal(t, "golang.org/x/tools", attached[0].Deps[0].ModulePath)
+}
+
+func TestAttachCachedEdgesEscapesUppercaseVersions(t *testing.T) {
+	cache := t.TempDir()
+	escaped, err := module.EscapeVersion("v1.0.0-RC1")
+	require.NoError(t, err)
+	assert.Contains(t, escaped, "!r!c1", "the cache escapes the version, not just the path")
+	dir := filepath.Join(cache, "cache", "download", "example.com/a", "@v")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, escaped+".mod"),
+		[]byte("module example.com/a\nrequire example.com/b v1.2.0\n"), 0o644))
+
+	attached := AttachCachedEdges(cache, buildListOf("example.com/a", "v1.0.0-RC1"))
+
+	require.Len(t, attached[0].Deps, 1)
+	assert.Equal(t, "example.com/b", attached[0].Deps[0].ModulePath)
+}
+
+func TestGoModCacheDirUsesFirstGopathEntry(t *testing.T) {
+	t.Setenv("GOMODCACHE", "")
+	t.Setenv("GOPATH", strings.Join([]string{"/first", "/second"}, string(os.PathListSeparator)))
+
+	assert.Equal(t, filepath.Join("/first", "pkg", "mod"), GoModCacheDir())
 }

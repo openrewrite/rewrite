@@ -17,6 +17,8 @@ package org.openrewrite.golang;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.golang.marker.GoResolutionResult;
+import org.openrewrite.golang.marker.GoResolutionResult.ResolutionSource;
 import org.openrewrite.golang.marker.GoResolutionResult.ResolvedDependency;
 
 import java.io.IOException;
@@ -24,6 +26,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import org.openrewrite.Tree;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -70,6 +74,16 @@ class GoModParserSumHashesTest {
     }
 
     @Test
+    void relativeProjectRootResolvesAgainstTheWorkingDirectory(@TempDir Path root) throws IOException {
+        Files.write(root.resolve("go.sum"), GO_SUM.getBytes(StandardCharsets.UTF_8));
+        Path relativeRoot = Paths.get("").toAbsolutePath().relativize(root);
+
+        assertThat(GoModParser.parseSumSibling(Paths.get("go.mod"), relativeRoot))
+                .as("supplying a root, even a relative one, states where the repo is")
+                .hasSize(2);
+    }
+
+    @Test
     void mergeJoinsHashesOntoBuildListAndKeepsItSelected() {
         List<ResolvedDependency> buildList = singletonList(selected("github.com/google/uuid", "v1.6.0"));
 
@@ -94,6 +108,26 @@ class GoModParserSumHashesTest {
             assertThat(d.getModulePath()).isEqualTo("golang.org/x/mod");
             assertThat(d.getVersion()).isEqualTo("v0.27.0");
         });
+    }
+
+    @Test
+    void hasGraphToleratesAbsentResolvedDependencies() {
+        GoResolutionResult marker = new GoResolutionResult(Tree.randomId(), "example.com/foo", null, null,
+                "go.mod", emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList(),
+                ResolutionSource.GO_MOD);
+
+        assertThat(marker.hasGraph()).isFalse();
+    }
+
+    @Test
+    void hasGraphIsDrivenByEdgesNotProvenance() {
+        ResolvedDependency withEdges = new ResolvedDependency("a", "v1", null, null, false, false, null, null, null,
+                true, singletonList(new GoResolutionResult.ModuleRef("b", "v2")));
+        GoResolutionResult marker = new GoResolutionResult(Tree.randomId(), "example.com/foo", null, null,
+                "go.mod", emptyList(), emptyList(), emptyList(), emptyList(), singletonList(withEdges), emptyList(),
+                ResolutionSource.GO_MOD);
+
+        assertThat(marker.hasGraph()).as("a go.mod build list enriched from the module cache has edges").isTrue();
     }
 
     @Test

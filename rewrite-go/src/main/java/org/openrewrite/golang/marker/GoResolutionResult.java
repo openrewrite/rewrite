@@ -131,12 +131,12 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         TOOLCHAIN,
         /**
          * Build list from the main module's {@code require} block under Go 1.17+ graph
-         * pruning. No graph edges, no package-to-module map.
+         * pruning. No package-to-module map.
          */
         GO_MOD,
         /**
          * Build list and package-to-module map from {@code vendor/modules.txt}, which is
-         * authoritative for a vendored build. No graph edges.
+         * authoritative for a vendored build.
          */
         VENDOR,
         /**
@@ -149,6 +149,14 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      * Whether the selected rows of {@link #resolvedDependencies} are the modules that
      * actually build, rather than a hash inventory.
      */
+    /**
+     * A marker that leaves {@link #resolutionSource} unset describes no build list.
+     */
+    private static ResolutionSource sourceOrDefault(@Nullable Object received) {
+        String name = (String) received;
+        return name == null || name.isEmpty() ? ResolutionSource.GO_SUM_ONLY : ResolutionSource.valueOf(name);
+    }
+
     public boolean hasBuildList() {
         return resolutionSource == ResolutionSource.TOOLCHAIN ||
                resolutionSource == ResolutionSource.VENDOR ||
@@ -162,6 +170,9 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      * {@link #resolutionSource}.
      */
     public boolean hasGraph() {
+        if (resolvedDependencies == null) {
+            return false;
+        }
         for (ResolvedDependency d : resolvedDependencies) {
             if (d.getDeps() != null) {
                 return true;
@@ -239,7 +250,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withRetracts(q.receiveList(before.retracts, r -> r.rpcReceive(r, q)))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
                 .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)))
-                .withResolutionSource(q.receiveAndGet(before.resolutionSource, toEnum(ResolutionSource.class)));
+                .withResolutionSource(q.receiveAndGet(before.resolutionSource, GoResolutionResult::sourceOrDefault));
     }
 
     /**

@@ -35,7 +35,7 @@ func TestDeriveBuildListFromPrunedRequires(t *testing.T) {
 		{ModulePath: "golang.org/x/mod", Version: "v0.35.0", Indirect: true},
 	}
 
-	list, source := DeriveBuildList("1.25.0", requires, nil)
+	list, source := DeriveBuildList("1.25.0", requires, nil, nil)
 
 	assert.Equal(t, golang.ResolutionGoMod, source)
 	require.Len(t, list, 2)
@@ -51,7 +51,7 @@ func TestDeriveBuildListPrePruningFallsBackToGoSumOnly(t *testing.T) {
 	requires := []golang.GoRequire{{ModulePath: "github.com/google/uuid", Version: "v1.6.0"}}
 	sum := []golang.GoResolvedDependency{sumRow("github.com/google/uuid", "v1.6.0", "h1:aaa")}
 
-	list, source := DeriveBuildList("1.16", requires, sum)
+	list, source := DeriveBuildList("1.16", requires, nil, sum)
 
 	assert.Equal(t, golang.ResolutionGoSumOnly, source)
 	require.Len(t, list, 1)
@@ -61,7 +61,7 @@ func TestDeriveBuildListPrePruningFallsBackToGoSumOnly(t *testing.T) {
 func TestDeriveBuildListMissingGoDirectiveFallsBackToGoSumOnly(t *testing.T) {
 	requires := []golang.GoRequire{{ModulePath: "github.com/google/uuid", Version: "v1.6.0"}}
 
-	_, source := DeriveBuildList("", requires, nil)
+	_, source := DeriveBuildList("", requires, nil, nil)
 
 	assert.Equal(t, golang.ResolutionGoSumOnly, source)
 }
@@ -72,7 +72,7 @@ func TestDeriveBuildListJoinsGoSumHashes(t *testing.T) {
 		{ModulePath: "github.com/google/uuid", Version: "v1.6.0", ModuleHash: "h1:zip", GoModHash: "h1:mod"},
 	}
 
-	list, _ := DeriveBuildList("1.21", requires, sum)
+	list, _ := DeriveBuildList("1.21", requires, nil, sum)
 
 	require.Len(t, list, 1)
 	assert.Equal(t, "h1:zip", list[0].ModuleHash)
@@ -87,7 +87,7 @@ func TestDeriveBuildListMarksRejectedGoSumVersionsUnselected(t *testing.T) {
 		sumRow("golang.org/x/mod", "v0.27.0", "h1:old"),
 	}
 
-	list, source := DeriveBuildList("1.21", requires, sum)
+	list, source := DeriveBuildList("1.21", requires, nil, sum)
 
 	assert.Equal(t, golang.ResolutionGoMod, source)
 	require.Len(t, list, 2)
@@ -101,7 +101,7 @@ func TestDeriveBuildListMarksRejectedGoSumVersionsUnselected(t *testing.T) {
 }
 
 func TestDeriveBuildListEmptyRequires(t *testing.T) {
-	list, source := DeriveBuildList("1.21", nil, nil)
+	list, source := DeriveBuildList("1.21", nil, nil, nil)
 
 	assert.Equal(t, golang.ResolutionGoMod, source)
 	assert.NotNil(t, list, "callers assign this straight onto the marker; nil serializes as a null list")
@@ -123,4 +123,39 @@ func TestSupportsPruning(t *testing.T) {
 	} {
 		assert.Equalf(t, tc.want, supportsPruning(tc.goVersion), "go %q", tc.goVersion)
 	}
+}
+
+func TestDeriveBuildListAppliesVersionedReplace(t *testing.T) {
+	requires := []golang.GoRequire{{ModulePath: "golang.org/x/net", Version: "v1.2.3"}}
+	replaces := []golang.GoReplace{
+		{OldPath: "golang.org/x/net", OldVersion: "v1.2.3", NewPath: "example.com/fork", NewVersion: "v2.0.0"},
+	}
+
+	list, _ := DeriveBuildList("1.21", requires, replaces, nil)
+
+	require.Len(t, list, 1)
+	assert.Equal(t, "example.com/fork", list[0].ReplacePath)
+	assert.Equal(t, "v2.0.0", list[0].ReplaceVersion)
+}
+
+func TestDeriveBuildListAppliesWildcardReplace(t *testing.T) {
+	requires := []golang.GoRequire{{ModulePath: "golang.org/x/net", Version: "v1.2.3"}}
+	replaces := []golang.GoReplace{{OldPath: "golang.org/x/net", NewPath: "./forks/net"}}
+
+	list, _ := DeriveBuildList("1.21", requires, replaces, nil)
+
+	require.Len(t, list, 1)
+	assert.Equal(t, "./forks/net", list[0].ReplacePath)
+	assert.Empty(t, list[0].ReplaceVersion, "a local path replacement carries no version")
+}
+
+func TestDeriveBuildListIgnoresReplaceForOtherVersion(t *testing.T) {
+	requires := []golang.GoRequire{{ModulePath: "golang.org/x/net", Version: "v1.2.3"}}
+	replaces := []golang.GoReplace{
+		{OldPath: "golang.org/x/net", OldVersion: "v0.9.0", NewPath: "example.com/fork", NewVersion: "v2.0.0"},
+	}
+
+	list, _ := DeriveBuildList("1.21", requires, replaces, nil)
+
+	assert.Empty(t, list[0].ReplacePath, "a versioned replace binds only that version")
 }

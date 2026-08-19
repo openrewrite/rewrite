@@ -19,6 +19,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
@@ -56,12 +57,16 @@ func AttachCachedEdges(cacheDir string, buildList []golang.GoResolvedDependency)
 // rather than failing the parse.
 func cachedModuleEdges(cacheDir, modulePath, version string) ([]golang.GoModuleRef, bool) {
 	// The cache lowercases each uppercase letter behind a `!` so its layout
-	// survives case-insensitive filesystems.
-	escaped, err := module.EscapePath(modulePath)
+	// survives case-insensitive filesystems. Versions carry the same encoding.
+	escapedPath, err := module.EscapePath(modulePath)
 	if err != nil {
 		return nil, false
 	}
-	path := filepath.Join(cacheDir, "cache", "download", escaped, "@v", version+".mod")
+	escapedVersion, err := module.EscapeVersion(version)
+	if err != nil {
+		return nil, false
+	}
+	path := filepath.Join(cacheDir, "cache", "download", escapedPath, "@v", escapedVersion+".mod")
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, false
@@ -82,7 +87,9 @@ func GoModCacheDir() string {
 		return dir
 	}
 	if gopath := os.Getenv("GOPATH"); gopath != "" {
-		return filepath.Join(gopath, "pkg", "mod")
+		// GOPATH is a list; the module cache lives under its first entry.
+		first, _, _ := strings.Cut(gopath, string(os.PathListSeparator))
+		return filepath.Join(first, "pkg", "mod")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

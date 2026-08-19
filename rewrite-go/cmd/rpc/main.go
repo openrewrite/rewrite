@@ -728,7 +728,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
 			// No go.sum on this path (sources arrive as strings), so the require
 			// block is the only build list available.
-			mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, nil)
+			mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.Replaces, nil)
 			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
 		}
 		goModByIdx[r.idx] = gm
@@ -2443,7 +2443,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 				mrr.PackageModules = vendorPkgs
 				mrr.ResolutionSource = golang.ResolutionVendor
 			} else {
-				mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.ResolvedDependencies)
+				mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.Replaces, mrr.ResolvedDependencies)
 			}
 			// Each build-list member's own go.mod is already in the module cache when
 			// the repo has been built here, and its requires are that module's edges.

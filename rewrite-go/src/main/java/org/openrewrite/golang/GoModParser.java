@@ -307,10 +307,11 @@ public class GoModParser implements Parser {
 
     /**
      * A source path is a repo-relative identifier, so {@code relativeTo} is what turns
-     * it back into a filesystem location; without one there is nothing to read.
+     * it back into a filesystem location; without one there is nothing to read. A relative
+     * root is itself relative to the working directory.
      */
     static List<ResolvedDependency> parseSumSibling(Path goModPath, @Nullable Path relativeTo) {
-        Path onDisk = relativeTo == null ? goModPath : relativeTo.resolve(goModPath);
+        Path onDisk = relativeTo == null ? goModPath : relativeTo.resolve(goModPath).toAbsolutePath();
         if (!onDisk.isAbsolute()) {
             return new ArrayList<>();
         }
@@ -330,7 +331,7 @@ public class GoModParser implements Parser {
 
     /**
      * Parse go.sum content (string) into the same shape as
-     * {@link #parseSumSibling(Path)}. Mirrors the Go-side
+     * {@link #parseSumSibling(Path, Path)}. Mirrors the Go-side
      * {@code parser.ParseGoSum} for cross-language parity.
      * <p>
      * Malformed lines are logged and skipped — go.sum is best-effort
