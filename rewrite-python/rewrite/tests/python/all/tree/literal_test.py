@@ -148,12 +148,12 @@ def test_double_quoted_string():
 
 def test_complex_number_lowercase():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 1j"))
+    RecipeSpec().rewrite_run(python("assert 1j", after_recipe=check_first_literal_is_complex()))
 
 
 def test_complex_number_uppercase():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 1J"))
+    RecipeSpec().rewrite_run(python("assert 1J", after_recipe=check_first_literal_is_complex()))
 
 
 def test_complex_number_uppercase_in_subscript():
@@ -277,5 +277,13 @@ def find_first(tree: Tree, clazz: Type[T]) -> T:
 def check_first_literal_type(expected_type):
     def after_recipe(cu):
         assert find_first(cu, Literal).type == expected_type
+    return after_recipe
+
+
+def check_first_literal_is_complex():
+    def after_recipe(cu):
+        literal_type = find_first(cu, Literal).type
+        assert isinstance(literal_type, JavaType.Class)
+        assert literal_type.fully_qualified_name == 'complex'
     return after_recipe
 
