@@ -243,9 +243,8 @@ func ResolvedQualifiers(imports []*java.Import, refs map[string]bool) map[string
 
 // IsReferenced reports whether imp is used by the file whose refs/quals sets
 // are passed in. quals stands in for references attribution could not resolve,
-// so it rescues an import refs does not name — but not once some other import
-// has claimed that qualifier through refs, which makes refs's silence about
-// this one an answer rather than a gap.
+// so it rescues an import refs does not name — unless resolvedQuals holds the
+// qualifier, which makes refs's silence about this one an answer, not a gap.
 func IsReferenced(imp *java.Import, refs, quals, resolvedQuals map[string]bool) bool {
 	if refs[ImportPath(imp)] {
 		return true

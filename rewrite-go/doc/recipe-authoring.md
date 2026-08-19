@@ -249,15 +249,24 @@ contribute to its API travel inside the one blob that names them.
 Nothing about a blob is pinned to the machine that made it. The
 GOOS/GOARCH and toolchain version recorded in it are not checked on
 read; only the binary export format is, and it changes rarely. A blob a
-toolchain can no longer read leaves the template exactly where shipping
-none would — attribution is lost, nothing else is — which is silent by
-design but easy to catch:
+toolchain can no longer read leaves the template where shipping none
+would: it still applies, carrying no types.
+
+That is harmless on its own and is not harmless with `SourceImports`.
+Dropping a superseded import needs attribution naming the path that
+replaced it, so an unattributed after-template emits both and the file
+stops compiling — the same output an un-rewritten reference produces,
+below. Since losing attribution is silent, a module that ships blobs
+should assert on its own:
 
 ```go
 func TestExportDataIsReadable(t *testing.T) {
-    require.NoError(t, exportdata.Verify(exportdata.FS, exportdata.Paths...))
+    require.NoError(t, exportdata.Verify(jsonv2exportdata.FS, jsonv2exportdata.Paths...))
 }
 ```
+
+`exportdata` there is `pkg/exportdata`; the generated package needs an
+import name of its own, which is why the examples alias it.
 
 Regenerate when that test fails, or when the shipped package's API
 moves and the templates should follow.

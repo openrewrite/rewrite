@@ -133,8 +133,7 @@ func Imports(pkgs ...string) BeforeOption {
 // ExportData attributes a template against compiler export data the recipe
 // module carries. On WithAfter it decides the types the emitted code carries,
 // which is what tells a superseded import from a live one; on WithBefore it
-// bears only on the shape a generic instantiation takes, so it belongs there
-// only when the source is parsed the same way.
+// bears only on the shape a generic instantiation takes.
 // See doc/recipe-authoring.md: Shipped export data.
 func ExportData(sets ...fs.FS) BeforeOption {
 	return func(s *beforeSpec) { s.exportData = append(s.exportData, sets...) }
@@ -180,6 +179,18 @@ func NewRecipe(opts ...RecipeOption) recipe.Recipe {
 }
 
 func buildRecipe(cfg *templateRecipeConfig) recipe.Recipe {
+	v := buildVisitor(cfg)
+
+	return &builtTemplateRecipe{
+		name:        cfg.name,
+		displayName: cfg.displayName,
+		description: cfg.description,
+		tags:        cfg.tags,
+		editor:      v,
+	}
+}
+
+func buildVisitor(cfg *templateRecipeConfig) *templateRecipeVisitor {
 	caps := cfg.captures
 
 	var befores []*GoPattern
@@ -191,15 +202,7 @@ func buildRecipe(cfg *templateRecipeConfig) recipe.Recipe {
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
 	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind, cfg.afterExportData)
 
-	v := newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
-
-	return &builtTemplateRecipe{
-		name:        cfg.name,
-		displayName: cfg.displayName,
-		description: cfg.description,
-		tags:        cfg.tags,
-		editor:      v,
-	}
+	return newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 }
 
 func resolveKind(specific *ScaffoldKind, global *ScaffoldKind, code string) ScaffoldKind {
@@ -350,18 +353,7 @@ func (tr *TemplateRecipe) InitTemplate(opts ...RecipeOption) {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	caps := cfg.captures
-
-	var befores []*GoPattern
-	for _, bs := range cfg.befores {
-		kind := resolveKind(bs.kind, cfg.kind, bs.code)
-		befores = append(befores, buildPattern(bs.code, caps, bs.imports, kind, bs.exportData))
-	}
-
-	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
-	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind, cfg.afterExportData)
-
-	tr.editor = newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
+	tr.editor = buildVisitor(cfg)
 }
 
 func (tr *TemplateRecipe) Editor() recipe.TreeVisitor {

@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -105,6 +106,17 @@ func ShippedModule(t *testing.T) string {
 // Importer reads it, or raw as `go build` left it.
 func ShippedArchive(t *testing.T, packed bool, importPath string) []byte {
 	t.Helper()
+	// The fixture's export data is the same for every caller under one toolchain.
+	key := importPath
+	if packed {
+		key += " packed"
+	}
+	shippedMu.Lock()
+	defer shippedMu.Unlock()
+	if blob, ok := shippedCache[key]; ok {
+		return blob
+	}
+
 	cmd := exec.Command("go", "list", "-export", "-f", "{{.Export}}", importPath)
 	cmd.Dir = ShippedModule(t)
 	var stderr bytes.Buffer
@@ -114,10 +126,16 @@ func ShippedArchive(t *testing.T, packed bool, importPath string) []byte {
 
 	archive, err := os.ReadFile(strings.TrimSpace(string(out)))
 	require.NoError(t, err)
-	if !packed {
-		return archive
+	blob := archive
+	if packed {
+		blob, err = exportdata.Pack(archive)
+		require.NoError(t, err)
 	}
-	blob, err := exportdata.Pack(archive)
-	require.NoError(t, err)
+	shippedCache[key] = blob
 	return blob
 }
+
+var (
+	shippedMu    sync.Mutex
+	shippedCache = map[string][]byte{}
+)

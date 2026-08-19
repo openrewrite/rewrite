@@ -21,6 +21,7 @@ package exportdata
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/importer"
 	"go/token"
@@ -42,17 +43,46 @@ func BlobName(importPath string) string {
 // Importer resolves an import path from the first of sets that carries it, and
 // otherwise from the toolchain's own search. Shipped blobs win, which is what
 // lets a module carry a package the toolchain resolves differently or not at
-// all; a blob that is absent or unreadable leaves the path to the next set and
-// finally to the toolchain, so export data a newer toolchain rejects costs
-// attribution and nothing more.
+// all. A blob that is absent or unreadable leaves the path to the toolchain;
+// see doc/recipe-authoring.md: Shipped export data for what that costs.
 func Importer(sets ...fs.FS) types.Importer {
-	imp := make([]types.Importer, 0, len(sets)+1)
-	for _, fsys := range sets {
-		if fsys != nil {
-			imp = append(imp, shippedOnly(fsys))
-		}
+	imp := make([]types.Importer, 0, 2)
+	// One importer over all the sets, so a package two of them both reference
+	// resolves to a single type.
+	if union := union(sets); union != nil {
+		imp = append(imp, shippedOnly(union))
 	}
 	return &chain{imp: append(imp, importer.Default())}
+}
+
+// union reads from the first set carrying a name, or nil if there are none.
+func union(sets []fs.FS) fs.FS {
+	present := make(unionFS, 0, len(sets))
+	for _, fsys := range sets {
+		if fsys != nil {
+			present = append(present, fsys)
+		}
+	}
+	if len(present) == 0 {
+		return nil
+	}
+	return present
+}
+
+type unionFS []fs.FS
+
+func (u unionFS) Open(name string) (fs.File, error) {
+	var err error
+	for _, fsys := range u {
+		f, e := fsys.Open(name)
+		if e == nil {
+			return f, nil
+		}
+		if err == nil {
+			err = e
+		}
+	}
+	return nil, err
 }
 
 // Verify reports the first path fsys does not cover with a readable blob. It
@@ -92,20 +122,22 @@ type chain struct {
 func (c *chain) Import(path string) (*types.Package, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var err error
+	var errs []error
 	for _, imp := range c.imp {
-		pkg, e := imp.Import(path)
-		if e == nil && pkg != nil {
+		pkg, err := imp.Import(path)
+		if err == nil && pkg != nil {
 			return pkg, nil
 		}
-		if e != nil {
-			err = e
+		if err != nil {
+			// Every link's reason is kept: a blob that failed to decode names
+			// the packaging fault behind a lost attribution.
+			errs = append(errs, err)
 		}
 	}
-	if err == nil {
-		err = fmt.Errorf("no importer resolved %q", path)
+	if len(errs) == 0 {
+		return nil, fmt.Errorf("no importer resolved %q", path)
 	}
-	return nil, err
+	return nil, errors.Join(errs...)
 }
 
 // Pack reduces a gc archive to the export data an importer reads, leaving the

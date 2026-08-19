@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -133,6 +134,9 @@ func TestGenerateReportsAPathTheModuleCannotBuild(t *testing.T) {
 // way the real one does while downloading a module.
 func goWrapper(t *testing.T) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script wrapper on PATH")
+	}
 	real, err := exec.LookPath("go")
 	require.NoError(t, err)
 	dir := t.TempDir()
@@ -159,4 +163,22 @@ func TestGenerateDropsBlobsNoLongerAskedFor(t *testing.T) {
 	require.NoError(t, generate(mod, out, []string{test.ShippedPath}, ""))
 	assert.NoFileExists(t, filepath.Join(out, blobDir, exportdata.BlobName(test.ShippedPathB)))
 	require.FileExists(t, filepath.Join(out, blobDir, exportdata.BlobName(test.ShippedPath)))
+}
+
+func TestGenerateKeepsTheOldBlobsWhenAPathFails(t *testing.T) {
+	mod := test.ShippedModule(t)
+	out := filepath.Join(t.TempDir(), "exportdata")
+	require.NoError(t, generate(mod, out, []string{test.ShippedPath}, ""))
+
+	err := generate(mod, out, []string{test.ShippedPath, "example.com/shipped/absent"}, "")
+	require.Error(t, err)
+	require.NoError(t, exportdata.Verify(os.DirFS(filepath.Join(out, blobDir)), test.ShippedPath))
+}
+
+func TestGenerateRejectsPatternsAndRelativePaths(t *testing.T) {
+	for _, path := range []string{"./...", "...", "../sibling", ".", ""} {
+		err := generate(test.ShippedModule(t), filepath.Join(t.TempDir(), "exportdata"),
+			[]string{path}, "")
+		assert.Error(t, err, "path %q", path)
+	}
 }

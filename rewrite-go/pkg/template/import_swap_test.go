@@ -66,6 +66,67 @@ func applyRecipe(t *testing.T, r recipe.Recipe, fsys fs.FS, src string) string {
 	return printer.Print(tree)
 }
 
+// swapRecipe rewrites mathx.Clamp's bound, moving the call to the v2 path.
+// With no sets the after-template is left unattributed.
+func swapRecipe(t *testing.T, sets ...fs.FS) recipe.Recipe {
+	t.Helper()
+	v := template.Expr("v")
+	after := []template.BeforeOption{
+		template.Imports(test.ShippedPathV2),
+		template.SourceImports(test.ShippedPathV2),
+	}
+	if len(sets) > 0 {
+		after = append(after, template.ExportData(sets...))
+	}
+	return template.NewRecipe(
+		template.RecipeName("test.SwapMathxToV2"),
+		template.WithCaptures(v),
+		template.WithBefore(fmt.Sprintf(`mathx.Clamp(%s, 0, 10)`, v), template.Imports(test.ShippedPath)),
+		template.WithAfter(fmt.Sprintf(`mathx.Clamp(%s, 0, 100)`, v), after...),
+	)
+}
+
+const oneCallSource = `
+package main
+
+import "example.com/shipped/mathx"
+
+func f(x int) int {
+	return mathx.Clamp(x, 0, 10)
+}
+`
+
+func TestSwapWithoutAttributionLeavesBothImports(t *testing.T) {
+	stale := fstest.MapFS{exportdata.BlobName(test.ShippedPathV2): {Data: []byte("stale")}}
+	for name, r := range map[string]recipe.Recipe{
+		"no export data": swapRecipe(t),
+		"stale blob":     swapRecipe(t, stale),
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := applyRecipe(t, r, bothShipped(t), oneCallSource)
+			assert.Contains(t, out, test.ShippedPathV2)
+			// Dropping the old import needs attribution naming the path that
+			// replaced it, so both stay bound to mathx and this will not compile.
+			assert.Contains(t, out, `"example.com/shipped/mathx"`)
+		})
+	}
+}
+
+func TestSwapLeavesBothImportsWhenACallIsNotRewritten(t *testing.T) {
+	src := `
+package main
+
+import "example.com/shipped/mathx"
+
+func f(x int) int {
+	return mathx.Clamp(x, 0, 10) + mathx.Clamp(x, 0, 99)
+}
+`
+	out := applyRecipe(t, swapRecipe(t, bothShipped(t)), bothShipped(t), src)
+	assert.Contains(t, out, test.ShippedPathV2)
+	assert.Contains(t, out, `"example.com/shipped/mathx"`)
+}
+
 func TestSupersededImportIsRemovedWhenOnlyThePathMoves(t *testing.T) {
 	fsys := bothShipped(t)
 	v := template.Expr("v")
