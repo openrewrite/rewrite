@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 func TestPackageNameForPath(t *testing.T) {
@@ -40,4 +42,18 @@ func TestPackageNameForPath(t *testing.T) {
 	} {
 		assert.Equal(t, want, packageNameForPath(path), "path %q", path)
 	}
+}
+
+func TestResolvedQualifiers(t *testing.T) {
+	blank := "_"
+	imports := []*java.Import{
+		NewImport("math/rand", nil),
+		NewImport("math/rand/v2", nil),
+		NewImport("fmt", nil),
+		NewImport("net/http/pprof", &blank),
+	}
+
+	assert.Equal(t, map[string]bool{"rand": true},
+		ResolvedQualifiers(imports, map[string]bool{"math/rand/v2": true, "net/http/pprof": true}))
+	assert.Empty(t, ResolvedQualifiers(imports, map[string]bool{}))
 }
