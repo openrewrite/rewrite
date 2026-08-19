@@ -3867,7 +3867,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 new J.Unknown.Source(
                         randomId(),
                         Space.EMPTY,
-                        Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.builder().build(), e)
+                        Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.class, e, null)
                                 .withTreeType(element.getClass().getName()))),
                         element.getContainingFile().getText().substring(PsiUtilsKt.getStartOffsetSkippingComments(element),
                                 element.getTextRange().getEndOffset())));
