@@ -421,19 +421,14 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         });
     }
 
-    /**
-     * Whether a node is a token that appeared in the source, rather than one ANTLR error recovery
-     * synthesized (marked as an {@link ErrorNode}) or left out altogether.
-     */
+    /// Whether a node is a token from the source, rather than one ANTLR error recovery
+    /// synthesized (an [ErrorNode]) or left out altogether.
     private boolean isSourceToken(@Nullable TerminalNode node) {
         return node != null && !(node instanceof ErrorNode);
     }
 
-    /**
-     * Reject an attribute ANTLR only produced by recovering from malformed markup, which describes
-     * something other than the source. Such a tree can still reprint byte-for-byte, since the dropped
-     * source survives in a neighbouring prefix, so {@code requirePrintEqualsInput} does not catch it.
-     */
+    /// Reject an attribute ANTLR only produced by recovering from malformed markup. Such a tree can still
+    /// reprint byte-for-byte — the dropped source survives in a prefix — so `requirePrintEqualsInput` misses it.
     private void requireWellFormedAttribute(boolean wellFormed, ParserRuleContext ctx) {
         if (!wellFormed) {
             Token start = ctx.getStart();
