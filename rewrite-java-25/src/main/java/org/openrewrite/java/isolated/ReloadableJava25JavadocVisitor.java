@@ -1066,9 +1066,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        // `DCRawText#getContent()` can return the content of a markdown (`///`) doc comment with javac's
-        // end-of-input sentinel appended, e.g. when the content ends in a backslash. The sentinel is not
-        // present in `source`, so leaving it in place both corrupts the text and desynchronizes the cursor.
+        // javac can append its end-of-input sentinel to `DCRawText#getContent()` for `///` doc comments,
+        // e.g. when the content ends in a backslash. It is absent from `source`, so it also skews the cursor.
         if (!node.isEmpty() && node.charAt(node.length() - 1) == EOI) {
             node = node.substring(0, node.length() - 1);
         }
