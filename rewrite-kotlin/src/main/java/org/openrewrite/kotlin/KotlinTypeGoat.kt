@@ -85,7 +85,8 @@ interface C {
 
 interface PT<T>
 
-interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
+@Suppress("EXPOSED_TYPE_PARAMETER_BOUND")
+internal interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
     val intersectionType: T
 }
 
