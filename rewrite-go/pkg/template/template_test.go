@@ -62,7 +62,7 @@ func TestScaffoldWithCaptures(t *testing.T) {
 }
 
 func TestParseScaffoldExpression(t *testing.T) {
-	node, err := parseScaffold("1 + 2", nil, nil, ScaffoldExpression)
+	node, err := parseScaffold("1 + 2", nil, nil, ScaffoldExpression, nil)
 	require.NoError(t, err, "parseScaffold error")
 	require.NotNil(t, node, "expected non-nil node")
 	bin, ok := node.(*java.Binary)
