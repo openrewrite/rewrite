@@ -822,9 +822,9 @@ func (p *GoPrinter) VisitUnary(unary *java.Unary, param any) java.J {
 	if unary.Operator.Element == java.PostIncrement || unary.Operator.Element == java.PostDecrement || unary.Operator.Element == java.SpreadPostfix {
 		p.Visit(unary.Operand, out)
 		p.visitSpace(unary.Operator.Before, out)
-		out.Append(unaryOperatorString(unary.Operator.Element))
+		out.Append(UnaryOperatorString(unary.Operator.Element))
 	} else {
-		out.Append(unaryOperatorString(unary.Operator.Element))
+		out.Append(UnaryOperatorString(unary.Operator.Element))
 		p.Visit(unary.Operand, out)
 	}
 	p.afterSyntax(unary.Markers, out)
@@ -1501,7 +1501,8 @@ func assignmentOperatorString(op java.AssignmentOperator) string {
 	}
 }
 
-func unaryOperatorString(op java.UnaryOperator) string {
+// UnaryOperatorString returns the source text of a unary operator.
+func UnaryOperatorString(op java.UnaryOperator) string {
 	switch op {
 	case java.Negate:
 		return "-"
