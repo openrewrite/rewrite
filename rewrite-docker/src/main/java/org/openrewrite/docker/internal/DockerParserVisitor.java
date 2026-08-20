@@ -232,10 +232,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             Token token = terminal.getSymbol();
             String tokenText = token.getText();
 
-            if (token.getType() == DockerLexer.COMMENT) {
-                // COMMENT tokens are ignored - they will be part of next element's prefix
-                break; // Stop processing tokens once we hit a comment
-            } else if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
+            if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                 Space elementPrefix = prefix(token);
                 skip(token);
                 String value = tokenText.substring(1, tokenText.length() - 1);
