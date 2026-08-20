@@ -160,7 +160,6 @@ class EnvTest implements RewriteTest {
 
     private static Docker.Argument envValue(Docker.File doc) {
         var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
-        assertThat(env.getPairs()).hasSize(1);
-        return env.getPairs().getFirst().getValue();
+        return assertThat(env.getPairs()).singleElement().actual().getValue();
     }
 }

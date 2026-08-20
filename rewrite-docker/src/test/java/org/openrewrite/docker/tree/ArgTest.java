@@ -249,8 +249,6 @@ class ArgTest implements RewriteTest {
 
     private static Docker.Argument argValue(Docker.File doc) {
         Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
-        Docker.Argument value = arg.getValue();
-        assertThat(value).isNotNull();
-        return value;
+        return assertThat(arg.getValue()).isNotNull().actual();
     }
 }

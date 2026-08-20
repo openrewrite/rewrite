@@ -245,7 +245,6 @@ class LabelTest implements RewriteTest {
 
     private static Docker.Label.LabelPair onlyPair(Docker.File doc) {
         var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
-        assertThat(label.getPairs()).hasSize(1);
-        return label.getPairs().getFirst();
+        return assertThat(label.getPairs()).singleElement().actual();
     }
 }
