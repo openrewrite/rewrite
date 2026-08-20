@@ -405,14 +405,37 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	return &c
 }
 
+// groupIndent reports the per-line indent shared by the elements of an
+// `import (...)` block, taken from the first element that carries one and
+// stripped of any leading blank-line newlines.
+func groupIndent(elements []java.RightPadded[*java.Import]) java.Space {
+	for _, rp := range elements {
+		if rp.Element == nil {
+			continue
+		}
+		canonical := rp.Element.Prefix.Whitespace
+		for strings.HasPrefix(canonical, "\n\n") {
+			canonical = canonical[1:]
+		}
+		if strings.HasPrefix(canonical, "\n") {
+			return java.Space{Whitespace: canonical}
+		}
+	}
+	return java.Space{Whitespace: "\n\t"}
+}
+
+// groupSeparator is the prefix of an element that opens a gofmt group
+// after another: the indent preceded by a blank line.
+func groupSeparator(indent java.Space) java.Space {
+	return java.Space{Whitespace: "\n" + indent.Whitespace}
+}
+
 // insertGrouped places imp at the end of its own group while preserving
 // the relative order of pre-existing imports. New groups appear in
 // stdlib / third-party / local order.
 //
-// Whitespace handling: the new import inherits a sibling's Prefix (the
-// `\n\t` indent inside an `import (...)` block) so the printer renders
-// it on its own line. When inserting into an empty block (no siblings),
-// a sensible default is used.
+// Whitespace handling: imp's Prefix is the group separator when it opens a
+// group after another, else the plain indent.
 func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, modulePath string) []java.RightPadded[*java.Import] {
 	target := GroupOf(ImportPath(imp), modulePath)
 	insertAt := len(elements)
@@ -423,18 +446,12 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 			break
 		}
 	}
+	indent := groupIndent(elements)
 	if imp.Prefix.Whitespace == "" && len(elements) > 0 {
-		// Borrow the surrounding indent. If we're inserting in front,
-		// take the first sibling's prefix; otherwise the previous
-		// sibling's. Both reliably end with `\n\t` in a grouped block.
-		var donor *java.Import
-		if insertAt < len(elements) {
-			donor = elements[insertAt].Element
+		if insertAt > 0 && GroupOf(ImportPath(elements[insertAt-1].Element), modulePath) != target {
+			imp.Prefix = groupSeparator(indent)
 		} else {
-			donor = elements[len(elements)-1].Element
-		}
-		if donor != nil {
-			imp.Prefix = donor.Prefix
+			imp.Prefix = indent
 		}
 	}
 	wrapped := java.RightPadded[*java.Import]{Element: imp}
@@ -442,6 +459,15 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 	out = append(out, elements[:insertAt]...)
 	out = append(out, wrapped)
 	out = append(out, elements[insertAt:]...)
+
+	if insertAt < len(elements) && out[insertAt+1].Element != nil {
+		// imp was spliced in front of a strictly later group, so the
+		// element it displaced opens that group and takes the separator.
+		// Only the whitespace moves; the Prefix may carry comments.
+		displaced := *out[insertAt+1].Element
+		displaced.Prefix.Whitespace = groupSeparator(indent).Whitespace
+		out[insertAt+1].Element = &displaced
+	}
 
 	// Re-balance trailing whitespace: in a grouped block the last
 	// element's After holds the space before `)`. When we appended at
@@ -503,26 +529,7 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	betweenAfter := elements[0].After
 	closingAfter := elements[len(elements)-1].After
 
-	// Re-derive the per-line indent prefix from the first non-blank-line
-	// element so the blank-line separator below can prepend a single \n
-	// to it. The smallest existing prefix that ends in \n + indent wins.
-	indentPrefix := java.Space{Whitespace: "\n\t"}
-	for _, rp := range elements {
-		if rp.Element == nil {
-			continue
-		}
-		ws := rp.Element.Prefix.Whitespace
-		// Strip a leading blank-line newline so we get the canonical
-		// "\n\t" indent rather than "\n\n\t".
-		canonical := ws
-		for strings.HasPrefix(canonical, "\n\n") {
-			canonical = canonical[1:]
-		}
-		if strings.HasPrefix(canonical, "\n") {
-			indentPrefix = java.Space{Whitespace: canonical}
-			break
-		}
-	}
+	indentPrefix := groupIndent(elements)
 
 	type bucket struct {
 		group ImportGroup
@@ -545,7 +552,7 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 	}
 
 	out := make([]java.RightPadded[*java.Import], 0, len(elements))
-	groupSeparatorPrefix := java.Space{Whitespace: "\n" + indentPrefix.Whitespace}
+	groupSeparatorPrefix := groupSeparator(indentPrefix)
 	for _, b := range buckets {
 		if len(b.items) == 0 {
 			continue

@@ -418,3 +418,226 @@ func TestOrderImports_AlphabeticalWithinGroupAndBlankLineBetween(t *testing.T) {
 	`
 	spec.RewriteRun(t, Golang(before, after))
 }
+
+func TestAddImport_GroupSeparatorWhitespace(t *testing.T) {
+	tests := []struct {
+		name   string
+		module string
+		add    string
+		before string
+		after  string
+	}{
+		{
+			name: "joins the stdlib group when a third-party group follows",
+			add:  "strings",
+			before: `
+				package main
+
+				import (
+					"fmt"
+
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+					"strings"
+
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name: "opens a new leading group in front of an existing one",
+			add:  "fmt",
+			before: `
+				package main
+
+				import (
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name: "opens a new trailing group after an existing one",
+			add:  "github.com/x/y",
+			before: `
+				package main
+
+				import (
+					"fmt"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name:   "opens a new middle group between stdlib and local",
+			module: "example.com/app",
+			add:    "github.com/x/y",
+			before: `
+				package main
+
+				import (
+					"fmt"
+
+					"example.com/app/pkg"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+
+					"github.com/x/y"
+
+					"example.com/app/pkg"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name: "carries the displaced import's comment into the second group",
+			add:  "fmt",
+			before: `
+				package main
+
+				import (
+					// networking
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+
+					// networking
+					"github.com/x/y"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name:   "separates a new middle group from an unseparated following group",
+			module: "example.com/app",
+			add:    "github.com/x/y",
+			before: `
+				package main
+
+				import (
+					"fmt"
+					"example.com/app/pkg"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+
+					"github.com/x/y"
+
+					"example.com/app/pkg"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name: "appends to the only group",
+			add:  "strings",
+			before: `
+				package main
+
+				import (
+					"fmt"
+				)
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import (
+					"fmt"
+					"strings"
+				)
+
+				func main() {}
+			`,
+		},
+		{
+			name: "creates the block when the file has no imports",
+			add:  "fmt",
+			before: `
+				package main
+
+				func main() {}
+			`,
+			after: `
+				package main
+
+				import "fmt"
+
+				func main() {}
+			`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: tt.add})
+			if tt.module == "" {
+				spec.RewriteRun(t, Golang(tt.before, tt.after))
+				return
+			}
+			spec.RewriteRun(t,
+				GoProject("app",
+					GoMod("module "+tt.module+"\n\ngo 1.22\n"),
+					Golang(tt.before, tt.after),
+				),
+			)
+		})
+	}
+}
