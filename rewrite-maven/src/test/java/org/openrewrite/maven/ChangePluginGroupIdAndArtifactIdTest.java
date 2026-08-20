@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
@@ -525,6 +526,170 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void resolveVersionRangeAgainstNewPluginCoordinates() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "org.openrewrite.maven",
+            "rewrite-maven-plugin-old",
+            null,
+            "rewrite-maven-plugin",
+            "4.2.x"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin-old</artifactId>
+                              <version>4.2.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.2.3</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void resolveVersionRangeIntoVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "org.openrewrite.maven",
+            "rewrite-maven-plugin-old",
+            null,
+            "rewrite-maven-plugin",
+            "4.2.x"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <rewrite.version>4.2.2</rewrite.version>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin-old</artifactId>
+                              <version>${rewrite.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <rewrite.version>4.2.3</rewrite.version>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>${rewrite.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveVersionAloneWhenRangeMatchesNothing() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "org.openrewrite.maven",
+            "rewrite-maven-plugin-old",
+            null,
+            "rewrite-maven-plugin",
+            "0.0.x"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin-old</artifactId>
+                              <version>4.2.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.2.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidVersionSelectorFailsValidation() {
+        assertThat(new ChangePluginGroupIdAndArtifactId(
+          "io.quarkus",
+          "quarkus-bootstrap-maven-plugin",
+          null,
+          "quarkus-extension-maven-plugin",
+          "latest.bogus"
+        ).validate().isValid()).isFalse();
     }
 
     @Test
