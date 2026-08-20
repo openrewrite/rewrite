@@ -24,7 +24,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.marker.Builtin;
-import org.openrewrite.golang.marker.Conversion;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -45,7 +44,8 @@ import static org.openrewrite.golang.Assertions.go;
 
 /**
  * The type attribution a Go recipe qualifies calls by has to survive the trip to Java: a composite literal's own
- * type and the markers that separate a conversion or a builtin from a call that simply failed to resolve.
+ * type, the conversion Go spells with call syntax, and the marker that separates a builtin from a call that
+ * simply failed to resolve.
  */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class GoTypeAttributionIntegTest implements RewriteTest {
@@ -113,8 +113,9 @@ class GoTypeAttributionIntegTest implements RewriteTest {
     }
 
     @Test
-    void conversionAndBuiltinMarkersSurvive() {
+    void conversionAndBuiltinSurvive() {
         List<String> conversions = new ArrayList<>();
+        List<JavaType> conversionTypes = new ArrayList<>();
         List<String> builtins = new ArrayList<>();
         rewriteRun(
                 go(
@@ -129,15 +130,22 @@ class GoTypeAttributionIntegTest implements RewriteTest {
                         spec -> spec.afterRecipe(cu -> {
                             new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
+                                public J.TypeCast visitTypeCast(J.TypeCast cast, ExecutionContext ctx) {
+                                    conversions.add(cast.printTrimmed(getCursor()));
+                                    conversionTypes.add(cast.getType());
+                                    return super.visitTypeCast(cast, ctx);
+                                }
+
+                                @Override
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation mi, ExecutionContext ctx) {
-                                    mi.getMarkers().findFirst(Conversion.class)
-                                            .ifPresent(m -> conversions.add(mi.printTrimmed(getCursor())));
                                     mi.getMarkers().findFirst(Builtin.class)
                                             .ifPresent(m -> builtins.add(mi.getSimpleName()));
                                     return super.visitMethodInvocation(mi, ctx);
                                 }
                             }.visit(cu, new InMemoryExecutionContext());
+                            // Printing goes back over RPC, so the Go layout has to come out of the Java-side tree.
                             assertThat(conversions).containsExactly("string(b)");
+                            assertThat(conversionTypes).containsExactly(JavaType.Primitive.String);
                             assertThat(builtins).containsExactly("len");
                         })
                 )

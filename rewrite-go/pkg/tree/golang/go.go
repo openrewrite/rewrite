@@ -1011,9 +1011,9 @@ func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionState
 	return &c
 }
 
-// TypeAssertion is Go's postfix `x.(T)`, where J.TypeCast is a prefix
-// cast. The left expression is right-padded, so its padding holds what
-// stands before the dot — a space, or a comment.
+// TypeAssertion is Go's postfix `x.(T)`, which reads an interface's dynamic
+// type where J.TypeCast converts. The left expression is right-padded, so its
+// padding holds what stands before the dot — a space, or a comment.
 type TypeAssertion struct {
 	ID           uuid.UUID
 	Prefix       java.Space

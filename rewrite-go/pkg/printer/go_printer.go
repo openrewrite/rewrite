@@ -1014,13 +1014,24 @@ func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J 
 	return paren
 }
 
-// VisitTypeCast renders J's prefix cast, which reaches this printer from
-// a synthesized or Java-side tree; Go's own `x.(T)` is a TypeAssertion.
+// VisitTypeCast renders Go's conversion `T(x)`.
 func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)
-	p.Visit(tc.Clazz, out)
+	if tc.Clazz != nil {
+		p.Visit(tc.Clazz.Tree.Element, out)
+		p.visitSpace(tc.Clazz.Prefix, out)
+	}
+	out.Append("(")
 	p.Visit(tc.Expr, out)
+	if trailing := java.FindMarker[golang.TrailingComma](tc.Markers); trailing != nil {
+		p.visitSpace(trailing.Before, out)
+		out.Append(",")
+		p.visitSpace(trailing.After, out)
+	} else if tc.Clazz != nil {
+		p.visitSpace(tc.Clazz.Tree.After, out)
+	}
+	out.Append(")")
 	p.afterSyntax(tc.Markers, out)
 	return tc
 }
