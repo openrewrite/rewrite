@@ -90,4 +90,26 @@ class CommentOnlyFileTest implements RewriteTest {
           }))
         );
     }
+
+    static Stream<Arguments> packageDeclarationsFollowedByComments() {
+        return Stream.of(
+          arguments("foo/Foo.scala", "package foo\n// trailing comment\n", 1),
+          arguments("foo/Foo.scala", "package foo\n\n/* trailing comment */\n", 1),
+          arguments("foo/bar/Foo.scala", "package foo.bar\n// first\n// second\n", 2),
+          arguments("foo/Foo.scala", "package foo\n// no trailing newline", 1),
+          arguments("foo/Foo.scala", "package foo\n\n", 0)
+        );
+    }
+
+    @MethodSource("packageDeclarationsFollowedByComments")
+    @ParameterizedTest
+    void packageDeclarationFollowedByComments(String path, @Language("scala") String source, int eofComments) {
+        rewriteRun(
+          scala(source, spec -> spec.path(path).noTrim().afterRecipe(cu -> {
+              assertThat(cu.getPackageDeclaration()).isNotNull();
+              assertThat(cu.getStatements()).isEmpty();
+              assertThat(cu.getEof().getComments()).hasSize(eofComments);
+          }))
+        );
+    }
 }
