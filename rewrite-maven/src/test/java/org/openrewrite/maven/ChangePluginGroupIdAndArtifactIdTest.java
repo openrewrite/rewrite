@@ -578,6 +578,53 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void resolveVersionRangeForImplicitApachePluginGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "org.apache.maven.*",
+            "maven-jar-plugin",
+            null,
+            "maven-jar-plugin",
+            "3.2.x"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-jar-plugin</artifactId>
+                              <version>3.2.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-jar-plugin</artifactId>
+                              <version>3.2.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void resolveVersionRangeIntoVersionProperty() {
         rewriteRun(
           spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(

@@ -31,11 +31,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static java.util.Collections.max;
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePluginGroupIdAndArtifactId extends Recipe {
@@ -108,7 +103,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                     try {
                         resolvedVersion = resolveVersion(t, ctx);
                     } catch (MavenDownloadingException e) {
-                        return e.warn(tag);
+                        return e.warn(t);
                     }
                     if (newGroupId != null) {
                         t = changeChildTagValue(t, "groupId", newGroupId, ctx);
@@ -133,21 +128,25 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 }
 
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
-                String groupId = resolvedPom.getValue(newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(oldGroupId));
-                String artifactId = resolvedPom.getValue(newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(oldArtifactId));
+                // A plugin tag without a `groupId` is implicitly `org.apache.maven.plugins`; `oldGroupId` may be a glob.
+                String groupId = resolvedPom.getValue(newGroupId != null ? newGroupId :
+                        tag.getChildValue("groupId").orElse("org.apache.maven.plugins"));
+                String artifactId = resolvedPom.getValue(newArtifactId != null ? newArtifactId :
+                        tag.getChildValue("artifactId").orElse(oldArtifactId));
                 if (groupId == null || artifactId == null) {
                     return null;
                 }
 
                 String currentVersion = tag.getChildValue("version").map(resolvedPom::getValue).orElse(null);
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadPluginMetadata(groupId, artifactId, ctx));
-                List<String> availableVersions = new ArrayList<>();
+                String selected = null;
                 for (String v : mavenMetadata.getVersioning().getVersions()) {
-                    if (versionComparator.isValid(currentVersion, v)) {
-                        availableVersions.add(v);
+                    if (versionComparator.isValid(currentVersion, v) &&
+                            (selected == null || versionComparator.compare(currentVersion, v, selected) > 0)) {
+                        selected = v;
                     }
                 }
-                return availableVersions.isEmpty() ? null : max(availableVersions, versionComparator);
+                return selected;
             }
         };
     }
