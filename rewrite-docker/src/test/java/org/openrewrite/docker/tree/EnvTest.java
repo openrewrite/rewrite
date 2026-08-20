@@ -97,4 +97,70 @@ class EnvTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void quotedValueInEqualsForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV NODE_VERSION="18.0.0"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = envValue(doc);
+                Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("18.0.0");
+                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(value.getText()).isEqualTo("18.0.0");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedValueInSpaceForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV NODE_VERSION "18.0.0"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = envValue(doc);
+                Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("18.0.0");
+                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(value.getText()).isEqualTo("18.0.0");
+            })
+          )
+        );
+    }
+
+    @Test
+    void environmentVariableValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV NODE_VERSION=${BASE}-suffix
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = envValue(doc);
+                assertThat(value.getContents()).hasSize(2);
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("BASE");
+                assertThat(var.isBraced()).isTrue();
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("${BASE}-suffix");
+            })
+          )
+        );
+    }
+
+    private static Docker.Argument envValue(Docker.File doc) {
+        var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+        assertThat(env.getPairs()).hasSize(1);
+        return env.getPairs().getFirst().getValue();
+    }
 }

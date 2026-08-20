@@ -87,4 +87,170 @@ class ArgTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doubleQuotedValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG VERSION="1.0.0"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("1.0.0");
+                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(value.getText()).isEqualTo("1.0.0");
+            })
+          )
+        );
+    }
+
+    @Test
+    void singleQuotedValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG VERSION='1.0.0'
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("1.0.0");
+                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
+                assertThat(value.getText()).isEqualTo("1.0.0");
+            })
+          )
+        );
+    }
+
+    @Test
+    void unquotedValueHasNoQuoteStyle() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG VERSION=1.0.0
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(((Docker.Literal) value.getContents().getFirst()).getQuoteStyle()).isNull();
+                assertThat(value.getQuoteStyle()).isNull();
+                assertThat(value.getText()).isEqualTo("1.0.0");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedValueWithSpaces() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG DESCRIPTION="some value"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(argValue(doc).getText()).isEqualTo("some value"))
+          )
+        );
+    }
+
+    @Test
+    void emptyQuotedValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG EMPTY=""
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getText()).isEmpty();
+                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+            })
+          )
+        );
+    }
+
+    @Test
+    void environmentVariableValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG VERSION=$BASE
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("BASE");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("$BASE");
+            })
+          )
+        );
+    }
+
+    @Test
+    void bracedEnvironmentVariableWithSuffix() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG VERSION=${BASE}-suffix
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(2);
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("BASE");
+                assertThat(var.isBraced()).isTrue();
+                assertThat(((Docker.Literal) value.getContents().getLast()).getText()).isEqualTo("-suffix");
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("${BASE}-suffix");
+            })
+          )
+        );
+    }
+
+    @Test
+    void partiallyQuotedValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG VERSION=a"b"c
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(3);
+                assertThat(value.getText()).isEqualTo("abc");
+            })
+          )
+        );
+    }
+
+    @Test
+    void hashInValueIsNotAComment() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG URL=http://example.com/x#fragment
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(argValue(doc).getText()).isEqualTo("http://example.com/x#fragment"))
+          )
+        );
+    }
+
+    private static Docker.Argument argValue(Docker.File doc) {
+        Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+        Docker.Argument value = arg.getValue();
+        assertThat(value).isNotNull();
+        return value;
+    }
 }

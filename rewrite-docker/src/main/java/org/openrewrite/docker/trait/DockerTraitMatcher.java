@@ -58,18 +58,7 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      */
     @Contract(value = "null -> null", pure = true)
     protected @Nullable String extractText(Docker.@Nullable Argument arg) {
-        if (arg == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                sb.append(((Docker.Literal) content).getText());
-            } else if (content instanceof Docker.EnvironmentVariable) {
-                return null;
-            }
-        }
-        return sb.toString();
+        return arg == null ? null : arg.getText();
     }
 
     /**
@@ -81,23 +70,7 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      */
     @Contract(value = "null -> null; !null -> !null", pure = true)
     protected @Nullable String extractTextWithVariables(Docker.@Nullable Argument arg) {
-        if (arg == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                sb.append(((Docker.Literal) content).getText());
-            } else if (content instanceof Docker.EnvironmentVariable) {
-                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
-                if (env.isBraced()) {
-                    sb.append("${").append(env.getName()).append("}");
-                } else {
-                    sb.append("$").append(env.getName());
-                }
-            }
-        }
-        return sb.toString();
+        return arg == null ? null : arg.getTextWithVariables();
     }
 
     /**
@@ -108,15 +81,7 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      */
     @Contract(value = "null -> false", pure = true)
     protected boolean hasEnvironmentVariables(Docker.@Nullable Argument arg) {
-        if (arg == null) {
-            return false;
-        }
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.EnvironmentVariable) {
-                return true;
-            }
-        }
-        return false;
+        return arg != null && arg.hasEnvironmentVariables();
     }
 
     /**
@@ -144,14 +109,6 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      * @return The quote style, or null if unquoted
      */
     protected Docker.Literal.@Nullable QuoteStyle getQuoteStyle(Docker.Argument arg) {
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                Docker.Literal.QuoteStyle style = ((Docker.Literal) content).getQuoteStyle();
-                if (style != null) {
-                    return style;
-                }
-            }
-        }
-        return null;
+        return arg.getQuoteStyle();
     }
 }

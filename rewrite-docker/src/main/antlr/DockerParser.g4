@@ -258,7 +258,19 @@ labelKey
     ;
 
 labelValue
-    : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
+    : labelValueElement+
+    ;
+
+labelValueElement
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | COMMAND_SUBST
+    | BACKTICK_SUBST
+    | SPECIAL_VAR
+    | DOLLAR
+    // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
     ;
 
 // Value in old-style LABEL (rest of line after key)

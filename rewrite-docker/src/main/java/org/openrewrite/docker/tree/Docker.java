@@ -975,6 +975,86 @@ public interface Docker extends Tree {
 
         List<ArgumentContent> contents;
 
+        /**
+         * The text of this argument, with any surrounding quotes removed. An argument may be built from
+         * several contents (e.g. {@code a"b"c} or {@code "John Doe" <jd@example.com>}), which are
+         * concatenated here along with any whitespace separating them.
+         *
+         * @return The text, or {@code null} if the argument references an environment variable and so
+         * cannot be resolved statically. Use {@link #getTextWithVariables()} to get the text with those
+         * references left intact.
+         */
+        public @Nullable String getText() {
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < contents.size(); i++) {
+                ArgumentContent content = contents.get(i);
+                if (content instanceof EnvironmentVariable) {
+                    return null;
+                }
+                if (content instanceof Literal) {
+                    appendSeparator(text, content, i);
+                    text.append(((Literal) content).getText());
+                }
+            }
+            return text.toString();
+        }
+
+        /**
+         * The text of this argument with quotes removed, but with environment variable references
+         * rendered in their original {@code $VAR} or <code>${VAR}</code> form.
+         */
+        public String getTextWithVariables() {
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < contents.size(); i++) {
+                ArgumentContent content = contents.get(i);
+                if (content instanceof Literal) {
+                    appendSeparator(text, content, i);
+                    text.append(((Literal) content).getText());
+                } else if (content instanceof EnvironmentVariable) {
+                    appendSeparator(text, content, i);
+                    EnvironmentVariable env = (EnvironmentVariable) content;
+                    text.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
+                }
+            }
+            return text.toString();
+        }
+
+        private void appendSeparator(StringBuilder text, ArgumentContent content, int index) {
+            if (index > 0) {
+                text.append(content.getPrefix().getWhitespace());
+            }
+        }
+
+        /**
+         * The quote style of this argument, taken from the first quoted literal it contains.
+         *
+         * @return The quote style, or {@code null} if no content is quoted.
+         */
+        public Literal.@Nullable QuoteStyle getQuoteStyle() {
+            for (ArgumentContent content : contents) {
+                if (content instanceof Literal) {
+                    Literal.QuoteStyle style = ((Literal) content).getQuoteStyle();
+                    if (style != null) {
+                        return style;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Whether this argument references any environment variable, meaning its value cannot be
+         * resolved statically.
+         */
+        public boolean hasEnvironmentVariables() {
+            for (ArgumentContent content : contents) {
+                if (content instanceof EnvironmentVariable) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArgument(this, p);
