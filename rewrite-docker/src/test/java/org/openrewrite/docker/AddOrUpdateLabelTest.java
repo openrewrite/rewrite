@@ -214,4 +214,55 @@ class AddOrUpdateLabelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void updateLabelWhoseValueIsAnEnvironmentVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("foo", "newvalue", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL foo=$BAR
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL foo=newvalue
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateBracedEnvironmentVariableLabel() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("foo", "newvalue", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL foo=${BAR}
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL foo=newvalue
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateEnvironmentVariableLabelKeepsSiblingPairs() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("b", "new", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL a=1 b=$X c=3
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL a=1 b=new c=3
+              """
+          )
+        );
+    }
 }
