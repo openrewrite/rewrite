@@ -568,7 +568,8 @@ public class KotlinParser implements Parser {
         KOTLIN_1_9,
         KOTLIN_2_0,
         KOTLIN_2_1,
-        KOTLIN_2_2
+        KOTLIN_2_2,
+        KOTLIN_2_3
     }
 
     private CompilerConfiguration compilerConfiguration() {
@@ -627,6 +628,8 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return LanguageVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return LanguageVersion.KOTLIN_2_3;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -660,6 +663,8 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return ApiVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return ApiVersion.KOTLIN_2_3;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
