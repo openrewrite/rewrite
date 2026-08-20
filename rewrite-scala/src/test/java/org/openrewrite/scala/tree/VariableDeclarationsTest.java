@@ -227,4 +227,88 @@ class VariableDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void endMarkerOnVal() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              val x =
+                1
+              end x
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnGiven() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              given x: Int = 1
+              end x
+            """
+          )
+        );
+    }
+
+    @Test
+    void inlineVal() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              inline val X = 8
+              private inline val Y = 9
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void inlineGiven() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              inline given x: Int = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void accessModifierAfterAnotherModifier() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              override implicit protected val a: String = "a"
+              implicit protected val b: String = "b"
+              lazy private val c: String = "c"
+              override private[this] val d: String = "d"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void finalVar() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              private final var isBlocked: Boolean = false
+            }
+            """
+          )
+        );
+    }
+
 }

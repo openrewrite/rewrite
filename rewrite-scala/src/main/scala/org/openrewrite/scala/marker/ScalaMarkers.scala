@@ -88,6 +88,15 @@ case class Curried(id: UUID) extends Marker {
  * Carries the source text between the last annotation/modifier and the
  * `val`/`var`/`given` keyword for Scala variable declarations.
  */
+/**
+ * Marks a `J.VariableDeclarations` written with `var`. A `val` is implicitly final, but an
+ * explicit `final` says nothing about which keyword the source used, and `final var` is legal.
+ */
+case class VarKeyword(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
 case class ValVarKeyword(id: UUID, beforeKeyword: String) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
@@ -134,6 +143,145 @@ case class OmitName(id: UUID) extends Marker {
  * printer can re-emit them after the first `)`. Includes the surrounding parens.
  */
 case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * A Scala 3 `derives` clause, as in `case class C(i: Int) derives CanEqual`. Holds the
+ * verbatim source from `derives` up to the body delimiter, which the printer emits
+ * between the parent list and the body.
+ */
+case class DerivesClause(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * A Scala 3 capture set written as a suffix on a type: the `^` of `IterableOnce[A]^` or
+ * the `^{it}` of `C^{it}`. Dotty desugars it to a synthetic `retains` annotation that has
+ * no `@` in source, so the suffix is kept verbatim and printed after the type.
+ */
+case class CaptureSet(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `using` keyword opening a call-site argument list, as in `f(using ctx)`. Carried by
+ * the first argument, which every printer path emits, and holds the source from the `(`
+ * through the keyword.
+ */
+case class UsingArguments(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * A function type written with the capture-checking pure arrow, `A -> B`, rather than `=>`.
+ */
+case class PureFunctionArrow(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Bounds written on a higher-kinded type parameter: the `: Monad` of `[F[_]: Monad]` or the
+ * `<: Iterable[a]` of `[It[a] <: Iterable[a]]`. Dotty records bounds on the parameter's rhs
+ * only for a plain parameter, so for a higher-kinded one the rhs is the kind itself and the
+ * source is kept verbatim, to be printed after the name.
+ */
+case class TypeParameterBounds(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * A self-type clause opening a template body, as in `trait T { self => ... }` or
+ * `trait T:\n  this: U =>`. Holds the verbatim source from the body delimiter through
+ * the `=>`. Dotty keeps the clause out of the body, so there is no statement to map it to.
+ */
+case class SelfType(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * A Scala 3 end marker closing a definition, e.g. the `end X` of `class X: ... end X`.
+ * Holds the verbatim source from the end of the element's own content through the
+ * marker, so it covers the newline and indent ahead of it — a method body is an
+ * expression with no trailing space of its own. Dotty checks end markers and then
+ * discards them, so there is no tree to map them to.
+ */
+case class EndMarker(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `+` or `-` variance marker on a kind parameter of a higher-kinded type
+ * parameter, as in the `F[-_, +_]` of `def f[F[-_, +_]]`. The variance is source
+ * syntax the wildcard itself does not carry.
+ */
+case class KindParameterVariance(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The access modifier on a class's primary constructor, e.g. the `private` in
+ * `class X private (i: Int)`. Holds the verbatim source text including the space
+ * ahead of it, which the printer emits between the class name and the `(`.
+ */
+case class ConstructorModifier(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `case` of a for-comprehension generator that filters by pattern,
+ * `for case (k, v) <- pairs do ...`.
+ */
+case class CasePattern(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `then` of a Scala 3 `if (cond) then ...`, which is optional after a parenthesized
+ * condition. Holds the verbatim source from the closing `)` through the keyword.
+ */
+case class ThenKeyword(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `inline` of a Scala 3 `inline if`, which modifies an expression rather than a
+ * declaration and so has no modifier list to sit in. Holds the verbatim source from the
+ * keyword up to the expression's own keyword.
+ */
+case class InlineKeyword(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The `do` of a Scala 3 `while (cond) do ...` or `for (...) do ...`, which is optional
+ * after a parenthesized head. Holds the verbatim source from the closing `)` through
+ * the keyword.
+ */
+case class DoKeyword(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The keyword introducing one parent in a class declaration's parent list. Scala 3
+ * accepts either `with` or `,` and the two may be mixed (`extends A, B with C`), so
+ * each parent after the first carries the separator that introduces it.
+ */
+case class ParentSeparator(id: UUID, text: String) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }

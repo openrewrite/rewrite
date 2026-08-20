@@ -365,4 +365,17 @@ class AnnotationTest implements RewriteTest {
             )
         );
     }
+    @Test
+    void backtickedAnnotationName() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              @`inline` def f(): Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }

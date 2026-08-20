@@ -73,16 +73,16 @@ public class ScalaParserVisitor {
         CompilationUnitResult result = converter.convertToCompilationUnit(parseResult, source, typeFactory);
 
         J.Package packageDecl = result.getPackageDecl();
-        List<Statement> statements = result.getStatements();
+        List<JRightPadded<Statement>> statements = result.getStatements();
 
 
         // Filter out any Unknown statements that contain the entire source with package
         if (packageDecl != null) {
             final String packageName = packageDecl.getPackageName();
             statements = statements.stream()
-                .filter(stmt -> {
-                    if (stmt instanceof J.Unknown) {
-                        String text = ((J.Unknown) stmt).getSource().getText().trim();
+                .filter(rp -> {
+                    if (rp.getElement() instanceof J.Unknown) {
+                        String text = ((J.Unknown) rp.getElement()).getSource().getText().trim();
                         // Skip if this Unknown contains the same package declaration
                         boolean shouldFilter = text.startsWith("package " + packageName);
                         return !shouldFilter;
@@ -117,12 +117,14 @@ public class ScalaParserVisitor {
                 unknownSource
             );
 
-            statements.add(unknown);
+            statements.add(JRightPadded.build(unknown));
         }
 
         // Get remaining source for EOF
         String remainingSource = converter.getRemainingSource(parseResult, source, result.getLastCursorPosition());
-        Space eof = remainingSource.isEmpty() ? EMPTY : Space.build(remainingSource, Collections.emptyList());
+        // Trailing source can hold comments, which belong in Space.comments rather than
+        // its whitespace
+        Space eof = remainingSource.isEmpty() ? EMPTY : ScalaSpace.format(remainingSource);
 
         // Build S.CompilationUnit
         return new S.CompilationUnit(
@@ -135,7 +137,7 @@ public class ScalaParserVisitor {
             charsetBomMarked,              // boolean charsetBomMarked
             null,                          // Checksum checksum
             packageDecl == null ? null : JRightPadded.build(packageDecl),
-            JRightPadded.withElements(Collections.emptyList(), statements),
+            statements,
             eof                            // Space eof
         );
     }

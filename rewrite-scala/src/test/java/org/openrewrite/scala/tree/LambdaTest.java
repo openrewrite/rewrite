@@ -388,4 +388,18 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+    @Test
+    void parameterTypeContainsAnArrow() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              val f = (cb: Int => Unit) => 1
+              val g = (acc: Boolean, cb: Int => Unit) => acc
+            }
+            """
+          )
+        );
+    }
+
 }

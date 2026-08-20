@@ -455,6 +455,14 @@ class ClassDeclarationTest implements RewriteTest {
                 """
             )
         );
+        // parseModifierKeywords — modifier keyword in block comment between modifiers
+        rewriteRun(
+            scala(
+                """
+                private /*final*/ case class SomePrintedTree(phase: String)
+                """
+            )
+        );
     }
 
     @Test
@@ -618,4 +626,273 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void commaSeparatedParents() {
+        rewriteRun(
+            scala(
+                """
+                trait A
+                trait B
+                class C extends A, B
+                """
+            )
+        );
+    }
+
+    @Test
+    void privateConstructor() {
+        rewriteRun(
+            scala(
+                """
+                final class X private ()
+                """
+            )
+        );
+    }
+
+    @Test
+    void qualifiedPrivateConstructor() {
+        rewriteRun(
+            scala(
+                """
+                class X private[scala] (val x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void usingWithAnnotatedParameter() {
+        rewriteRun(
+            scala(
+                """
+                class X(using @deprecated ctx: String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMarker() {
+        rewriteRun(
+            scala(
+                """
+                class X:
+                  def f(): Int = 1
+                end X
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMarkerAfterBracedBody() {
+        rewriteRun(
+            scala(
+                """
+                class X {
+                  def f(): Int = 1
+                }
+                end X
+                """
+            )
+        );
+    }
+
+    @Test
+    void endMarkerOnTrait() {
+        rewriteRun(
+            scala(
+                """
+                trait T:
+                  def f(): Int
+                end T
+                """
+            )
+        );
+    }
+
+    @Test
+    void nestedEndMarkers() {
+        rewriteRun(
+            scala(
+                """
+                class X:
+                  def f(): Int =
+                    1
+                  end f
+                end X
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeAlias() {
+        rewriteRun(
+            scala(
+                """
+                trait T { self =>
+                  def f(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeAnnotation() {
+        rewriteRun(
+            scala(
+                """
+                trait U
+                trait T { this: U =>
+                  def f(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeInIndentedBody() {
+        rewriteRun(
+            scala(
+                """
+                trait U
+                trait T:
+                  this: U =>
+                  def f(): Int = 1
+                """
+            )
+        );
+    }
+
+    @Test
+    void selfTypeOnObject() {
+        rewriteRun(
+            scala(
+                """
+                object O { self =>
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void derivesClause() {
+        rewriteRun(
+            scala(
+                """
+                case class C(i: Int) derives CanEqual {
+                  def f(): Int = i
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void derivesMultipleWithIndentedBody() {
+        rewriteRun(
+            scala(
+                """
+                case class C(i: Int) derives CanEqual, Show:
+                  def f(): Int = i
+                """
+            )
+        );
+    }
+
+    @Test
+    void parentIsParenthesizedFunctionType() {
+        rewriteRun(
+            scala(
+                """
+                trait T
+                class C extends T with (Int => Unit) {
+                  def apply(i: Int): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parentIsParenthesizedByNameFunctionType() {
+        rewriteRun(
+            scala(
+                """
+                trait T
+                class C extends T with (() => Unit) {
+                  def apply(): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void constructorModifierWithoutParameterList() {
+        rewriteRun(
+            scala(
+                """
+                final abstract class Byte private extends AnyVal {
+                  def toByte: Byte
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void scala3Modifiers() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  transparent inline def f(): Int = 1
+                  private inline def g(): Int = 2
+                  infix def and(o: Int): Int = o
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void nestedHigherKindedTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                trait Q[F[_[_], _]] {
+                  def f(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void accessModifierOfFollowingClassIsNotClaimed() {
+        rewriteRun(
+            scala(
+                """
+                class Foo
+
+                private class Bar
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration bar = (J.ClassDeclaration) cu.getStatements().get(1);
+                    assertThat(bar.getSimpleName()).isEqualTo("Bar");
+                    assertThat(bar.getModifiers()).singleElement()
+                      .extracting(J.Modifier::getType).isEqualTo(J.Modifier.Type.Private);
+                })
+            )
+        );
+    }
+
 }

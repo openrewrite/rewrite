@@ -514,4 +514,113 @@ class MethodInvocationTest implements RewriteTest {
             );
         }
     }
+    @Test
+    void usingArgument() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(using s: String): Int = 1
+              val r = f(using "a")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void usingArgumentInCurriedCall() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Int)(using s: String): Int = x
+              val r = f(1)(using "a")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void usingArgumentOnSelect() {
+        rewriteRun(
+          scala(
+            """
+            class C { def g(using s: String): Int = 1 }
+            object O {
+              val c = new C
+              val r = c.g(using "a")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void usingArgumentsMultiple() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(using a: Int, b: Int): Int = a
+              val r = f(using 1, 2)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInArguments() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(a: Int, b: Int): Int = a
+              val r = f(
+                1,
+                2,
+              )
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyArgumentListWithInteriorSpace() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(): Int = 1
+              val a = f(
+              )
+              val b = f(/* none */)
+              val c = "x".trim(
+              )
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void nestedBlockCommentBeforeTrailingComma() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(a: Int, b: Int): Int = a
+              val x = f(
+                1,
+                2 /* x /* y */ z */,
+              )
+            }
+            """
+          )
+        );
+    }
+
 }

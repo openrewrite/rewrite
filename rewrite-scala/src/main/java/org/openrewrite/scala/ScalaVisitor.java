@@ -246,6 +246,14 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
+    public J visitLiteralType(S.LiteralType literalType, P p) {
+        S.LiteralType l = literalType;
+        l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        l = l.withLiteral(visitAndCast(l.getLiteral(), p));
+        return l;
+    }
+
     public J visitSingletonType(S.SingletonType singletonType, P p) {
         S.SingletonType s = singletonType;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

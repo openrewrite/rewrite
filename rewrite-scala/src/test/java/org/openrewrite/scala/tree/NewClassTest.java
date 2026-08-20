@@ -364,4 +364,89 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void soleParentIsParenthesizedFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              val f = new (Int => Unit) {
+                def apply(i: Int): Unit = ()
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void mixinIsParenthesizedFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            class B
+            object O {
+              val h = new B with (Int => Unit) {
+                def apply(i: Int): Unit = ()
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void constructorWithThreeArgumentLists() {
+        rewriteRun(
+          scala(
+            """
+            class M[A](s: String)(f: Int => Int)(g: Int => Int)
+            object O {
+              val m = new M[Int]("x")(identity)(identity)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void anonymousClassWithEmptyArgumentList() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              val a = new Object() {
+                override def toString: String = "a"
+              }
+              val b = new Object {
+                override def toString: String = "b"
+              }
+              val c = new Object():
+                override def toString: String = "c"
+              val d = new Object {
+                def f(i: Int): Int = i
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaInConstructorArguments() {
+        rewriteRun(
+          scala(
+            """
+            class C(a: Int, b: Int)
+            object O {
+              val c = new C(
+                1,
+                2,
+              )
+            }
+            """
+          )
+        );
+    }
+
 }

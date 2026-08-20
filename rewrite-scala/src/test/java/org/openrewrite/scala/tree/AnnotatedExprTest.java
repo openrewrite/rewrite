@@ -54,4 +54,108 @@ class AnnotatedExprTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void captureSetSuffixOnType() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            trait T {
+              def f(xs: IterableOnce[Int]^): Int = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void captureSetSuffixInReturnType() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            trait T {
+              def f(): Iterator[Int]^ = Iterator.empty
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void captureSetWithExplicitSet() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            trait T {
+              def f(): List[Int]^{this} = Nil
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedAnnotatedType() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(g: (Int => Long) @unchecked): Int = 1
+              def h(g: (Int ?=> Long) @unchecked): Int = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void tupleAnnotatedTypeArgument() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Any): Int = x match {
+                case it: Iterable[(Int, Long) @unchecked] => 1
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void captureSetSuffixInsideEnclosingType() {
+        rewriteRun(
+          scala(
+            """
+            import language.experimental.captureChecking
+            class C {
+              var it: Iterator[Int]^{this} | Null = null
+              def go(f: Iterable[Int]^{this} => Int): Int = 1
+              def trySplit(): Iterator[Int]^{this} | Null = null
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void spaceBetweenAtAndAnnotationName() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Any): Int = x match {
+                case tree: String @ unchecked => 1
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
 }

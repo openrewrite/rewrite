@@ -535,4 +535,35 @@ class TryTest implements RewriteTest {
             """
         ));
     }
+    @Test
+    void endMarkerOnTry() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              def f(): Int =
+                try
+                  1
+                catch
+                  case _: Exception => 0
+                end try
+            """
+          )
+        );
+    }
+
+    @Test
+    void catchWithPartialFunctionExpression() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(part0: String, badPart: PartialFunction[Throwable, String]): String =
+                try part0 catch badPart
+            }
+            """
+          )
+        );
+    }
+
 }

@@ -148,4 +148,63 @@ class ObjectDeclarationTest implements RewriteTest {
             )
         );
     }
+    @Test
+    void privateCompanionObject() {
+        rewriteRun(
+          scala(
+            """
+            package p
+
+            private[p] final class B
+
+            private object B {
+              val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnIndentedObject() {
+        rewriteRun(
+          scala(
+            """
+            object Conversion:
+              extension [T](x: T)
+                def underlying: T = x
+            end Conversion
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnNestedObject() {
+        rewriteRun(
+          scala(
+            """
+            object Outer:
+              object experimental:
+                val x = 1
+              end experimental
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerAfterBracedBody() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f: Int = 1
+            }
+            end O
+            """
+          )
+        );
+    }
+
 }

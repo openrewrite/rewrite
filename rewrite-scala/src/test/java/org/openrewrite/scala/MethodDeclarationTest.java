@@ -373,6 +373,22 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedMethodWithEmptyFirstParameterList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f()(c: Int): Int = c
+                  def g()(using c: Int): Unit = {
+                    ()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void multilineParameterListWithClosingParenOnOwnLine() {
         rewriteRun(
             scala(
@@ -810,6 +826,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedAuxiliaryConstructor() {
+        rewriteRun(
+          scala(
+            """
+              class A(a: Int) {
+                def this()(implicit o: Ordering[Int]) = this(0)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void auxiliaryConstructorWithBlockBody() {
         rewriteRun(
           scala(
@@ -1103,4 +1132,162 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void varianceOnHigherKindedTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            trait X[To, From] {
+              def substituteBoth[F[-_, +_]](ftf: F[To, From]): F[From, To]
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnMethod() {
+        rewriteRun(
+          scala(
+            """
+            object Test:
+              def foo(): Int =
+                1
+              end foo
+            """
+          )
+        );
+    }
+    @Test
+    void implicitParameterWithAnnotation() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo[B](implicit @implicitNotFound("m") ev: Ordering[B]): Unit = ()
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnExtension() {
+        rewriteRun(
+          scala(
+            """
+            extension (x: Int)
+              def double: Int = x * 2
+            end extension
+            """
+          )
+        );
+    }
+
+    @Test
+    void endMarkerOnExtensionWithSeveralMethods() {
+        rewriteRun(
+          scala(
+            """
+            extension (x: Int)
+              def a: Int = x
+              def b: Int = x
+            end extension
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedImplicitParameterWithAnnotation() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def map[B](f: Int => B)(implicit @implicitNotFound("m") ev: Ordering[B]): Int = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void contextBoundOnHigherKindedTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            trait Monad[F[_]]
+            trait Par[F[_]]
+            object Test {
+              def f[F[_]: Monad, A](x: A): A = x
+              def g[F[_]: Monad: Par](x: Int): Int = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void upperBoundOnHigherKindedTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def f[It[a] <: Iterable[a], A](x: A): A = x
+              def g[It1[a] <: Iterable[a], El2, It2[a] <: Iterable[a]](x: El2): El2 = x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void inlineParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              inline def f(inline op: Boolean): Boolean = op
+              inline def g(a: Int, inline op: Boolean, b: Int): Boolean = op
+              inline def h(inline op: => Int): Int = op
+              inline def i[A](using inline z: List[A]): List[A] = z
+              inline def j(
+                inline op: Boolean
+              ): Boolean = op
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void noSpaceBeforeBodyEquals() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def desc(sym: Int)= {
+                1
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void inlineExtensionParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              extension (inline x: String)
+                inline def foo: Int = 1
+            }
+            """
+          )
+        );
+    }
+
 }
