@@ -180,11 +180,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return ImageReferences.split(contents, prefix);
     }
 
-    /**
-     * Parses a flat sequence of text elements (a {@code text}, {@code envTextEquals}, or single-token rule)
-     * into argument contents, stripping quotes into {@link Docker.Literal.QuoteStyle} and splitting
-     * {@code $VAR} references out into {@link Docker.EnvironmentVariable}.
-     */
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
 
@@ -275,7 +270,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         braced
                 ));
             } else {
-                // Plain text for other tokens
                 Space elementPrefix = prefix(token);
                 skip(token);
                 contents.add(new Docker.Literal(
@@ -291,10 +285,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return contents;
     }
 
-    /**
-     * Text elements are either a single-token rule context (e.g. {@code textElement}) or, for rules
-     * that reference a token directly (e.g. {@code signal}), the terminal node itself.
-     */
     private @Nullable TerminalNode elementTerminal(ParseTree child) {
         if (child instanceof TerminalNode) {
             return (TerminalNode) child;
@@ -306,10 +296,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return null;
     }
 
-    /**
-     * Builds an argument from a flat text-element rule, preserving quote style and environment
-     * variable references in the model rather than as raw source text.
-     */
     private Docker.Argument parseArgument(@Nullable ParserRuleContext elementsCtx) {
         if (elementsCtx == null) {
             return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, emptyList());

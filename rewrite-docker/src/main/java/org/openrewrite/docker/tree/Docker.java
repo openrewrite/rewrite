@@ -976,13 +976,8 @@ public interface Docker extends Tree {
         List<ArgumentContent> contents;
 
         /**
-         * The text of this argument, with any surrounding quotes removed. An argument may be built from
-         * several contents (e.g. {@code a"b"c} or {@code "John Doe" <jd@example.com>}), which are
-         * concatenated here along with any whitespace separating them.
-         *
-         * @return The text, or {@code null} if the argument references an environment variable and so
-         * cannot be resolved statically. Use {@link #getTextWithVariables()} to get the text with those
-         * references left intact.
+         * @return The unquoted text of every content joined by its separating whitespace, or {@code null}
+         * if an environment variable reference makes it impossible to resolve statically.
          */
         public @Nullable String getText() {
             StringBuilder text = new StringBuilder();
@@ -1000,8 +995,8 @@ public interface Docker extends Tree {
         }
 
         /**
-         * The text of this argument with quotes removed, but with environment variable references
-         * rendered in their original {@code $VAR} or <code>${VAR}</code> form.
+         * @return As {@link #getText()}, but rendering environment variable references in their original
+         * {@code $VAR} or <code>${VAR}</code> form rather than giving up.
          */
         public String getTextWithVariables() {
             StringBuilder text = new StringBuilder();
@@ -1026,9 +1021,7 @@ public interface Docker extends Tree {
         }
 
         /**
-         * The quote style of this argument, taken from the first quoted literal it contains.
-         *
-         * @return The quote style, or {@code null} if no content is quoted.
+         * @return The quote style of the first quoted literal, or {@code null} if none is quoted.
          */
         public Literal.@Nullable QuoteStyle getQuoteStyle() {
             for (ArgumentContent content : contents) {
@@ -1042,10 +1035,6 @@ public interface Docker extends Tree {
             return null;
         }
 
-        /**
-         * Whether this argument references any environment variable, meaning its value cannot be
-         * resolved statically.
-         */
         public boolean hasEnvironmentVariables() {
             for (ArgumentContent content : contents) {
                 if (content instanceof EnvironmentVariable) {
