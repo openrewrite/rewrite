@@ -146,6 +146,9 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		} else if !isNilValue(before) && getValueType(before) != nil {
 			if t, ok := before.(java.Tree); ok {
 				after = defaultReceiver.Visit(t, q)
+			} else if msg.Value != nil {
+				// A codec-less value-typed scalar (e.g. an operator enum)
+				after = msg.Value
 			} else if codecExpected {
 				panic(missingCodec(*msg.ValueType))
 			} else {

@@ -62,7 +62,7 @@ dependencies {
 
     // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
     // (mockwebserver 4.x would otherwise pin them to 1.9.10 transitively).
-    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.3.20"))
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.10"))
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
