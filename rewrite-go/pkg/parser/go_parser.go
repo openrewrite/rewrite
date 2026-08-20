@@ -2141,6 +2141,20 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 	l.Type = ctx.valueTypeOf(lit)
 
+	// An untyped constant compared against a value of a named type (e.g.
+	// `type Code int`; `2052 <= i` where `i Code`) is converted to that named
+	// type, so go/types reports the literal's type as the named type. A
+	// J.Literal on the Java side can only carry a JavaType.Primitive, so a named
+	// type is dropped to null there. Map the literal through the named type's
+	// underlying basic to preserve the primitive (e.g. int).
+	if tv, ok := ctx.typeInfo.Types[lit]; ok {
+		if named, ok := tv.Type.(*types.Named); ok {
+			if basic, ok := named.Underlying().(*types.Basic); ok {
+				l.Type = ctx.mapper.mapType(basic)
+			}
+		}
+	}
+
 	// A Go int constant is 64-bit, but Java's int is 32-bit. When the value
 	// overflows Integer, fall back to long so the JVM LST deserializer does not
 	// reconstruct it via Integer.valueOf, which throws and drops the file.
