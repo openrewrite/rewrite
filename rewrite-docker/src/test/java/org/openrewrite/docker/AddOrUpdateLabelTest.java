@@ -265,4 +265,47 @@ class AddOrUpdateLabelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noChangeWhenOldFormatMultiWordValueAlreadyMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("author", "John Doe", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL author John Doe
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateOldFormatValueKeepsSeparatingSpace() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("author", "Jane Roe", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL author John Doe
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL author "Jane Roe"
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeWhenMultiContentValueAlreadyMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("desc", "a b c", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL desc="a b" c
+              """
+          )
+        );
+    }
 }
