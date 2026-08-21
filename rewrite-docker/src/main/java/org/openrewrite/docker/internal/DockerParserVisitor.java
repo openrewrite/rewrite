@@ -180,12 +180,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return ImageReferences.split(contents, prefix);
     }
 
-    /**
-     * A value is a single literal holding its source text, so that a value spanning whitespace stays
-     * whole. Quote style is recorded only when the entire value is one quoted token; anywhere else the
-     * quotes are part of the text. Environment variable references are always split out, since their
-     * value cannot be resolved from the source.
-     */
+    /// A value is a single literal holding its source text, so that a value spanning whitespace stays
+    /// whole. Quote style is recorded only when the entire value is one quoted token; anywhere else the
+    /// quotes are part of the text. Environment variable references are always split out, since their
+    /// value cannot be resolved from the source.
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         if (textCtx == null) {
@@ -230,11 +228,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return contents;
     }
 
-    /**
-     * Splits environment variable references out of a value's text. Token boundaries are no guide here:
-     * the lexer emits `--name=value` as a single token, so a reference can sit inside one. What counts
-     * as a reference mirrors the lexer's ENV_VAR and SPECIAL_VAR rules, so that `$$` and `$1` stay text.
-     */
+    /// Splits environment variable references out of a value's text. Token boundaries are no guide here:
+    /// the lexer emits `--name=value` as a single token, so a reference can sit inside one. What counts
+    /// as a reference mirrors the lexer's `ENV_VAR` and `SPECIAL_VAR` rules, so `$$` and `$1` stay text.
     private List<Docker.ArgumentContent> splitVariables(String text, Space prefix) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -1215,10 +1211,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      * Parse a flag value text into its component parts.
      * Recognizes environment variables ($VAR, ${VAR}), and splits on = signs.
      */
-    /**
-     * Splits the value of a command's flag into its quoted literals, environment variable references and
-     * the {@code =} separating a key from a value, as in {@code --mount=type=bind}.
-     */
+    /// Splits the value of a command's flag into its quoted literals, environment variable references
+    /// and the `=` separating a key from a value, as in `--mount=type=bind`.
     private List<Docker.ArgumentContent> parseFlagValue(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();

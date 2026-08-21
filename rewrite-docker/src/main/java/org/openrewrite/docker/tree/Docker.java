@@ -975,10 +975,8 @@ public interface Docker extends Tree {
 
         List<ArgumentContent> contents;
 
-        /**
-         * @return The text of every content, or {@code null} if an environment variable reference makes it
-         * impossible to resolve statically.
-         */
+        /// @return The text of every content, or `null` if an environment variable reference makes it
+        /// impossible to resolve statically.
         public @Nullable String getText() {
             StringBuilder text = new StringBuilder();
             for (ArgumentContent content : contents) {
@@ -992,10 +990,8 @@ public interface Docker extends Tree {
             return text.toString();
         }
 
-        /**
-         * @return As {@link #getText()}, but rendering environment variable references in their original
-         * {@code $VAR} or <code>${VAR}</code> form rather than giving up.
-         */
+        /// @return As [#getText()], but rendering environment variable references in their original
+        /// `$VAR` or `${VAR}` form rather than giving up.
         public String getTextWithVariables() {
             StringBuilder text = new StringBuilder();
             for (ArgumentContent content : contents) {
@@ -1009,9 +1005,7 @@ public interface Docker extends Tree {
             return text.toString();
         }
 
-        /**
-         * @return The quote style of the first quoted literal, or {@code null} if none is quoted.
-         */
+        /// @return The quote style of the first quoted literal, or `null` if none is quoted.
         public Literal.@Nullable QuoteStyle getQuoteStyle() {
             for (ArgumentContent content : contents) {
                 if (content instanceof Literal) {
