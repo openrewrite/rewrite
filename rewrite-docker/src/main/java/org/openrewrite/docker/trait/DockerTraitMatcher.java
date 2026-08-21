@@ -76,4 +76,19 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
     static boolean partMatches(Docker.Argument part, String pattern) {
         return matchesBidirectional(extractTextForMatching(part), pattern, part.hasEnvironmentVariables());
     }
+
+    /// As [#partMatches], but for an image name, where a pattern also matches a name that spells
+    /// the same image differently: `ubuntu` matches `docker.io/library/ubuntu`, and the other way
+    /// round. Both are compared canonically, which fills in the registry and namespace a name
+    /// leaves out rather than dropping the ones a pattern writes; familiarizing them instead would
+    /// widen `docker.io/*` to `*`, matching every image on every registry.
+    static boolean imageNameMatches(Docker.Argument imageName, String pattern) {
+        if (partMatches(imageName, pattern)) {
+            return true;
+        }
+        String text = extractTextForMatching(imageName);
+        ImageName name = ImageName.parse(text);
+        ImageName patternName = ImageName.parse(pattern);
+        return matchesBidirectional(name.getCanonical(), patternName.getCanonical(), imageName.hasEnvironmentVariables());
+    }
 }

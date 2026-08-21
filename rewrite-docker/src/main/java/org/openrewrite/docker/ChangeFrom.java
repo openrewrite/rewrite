@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -167,7 +168,7 @@ public class ChangeFrom extends Recipe {
             String currentPlatform = image.getPlatform();
 
             // Resolve $N backrefs against captures from the paired old-field glob
-            String resolvedNewImageName = resolve(newImageName, currentImageName, oldImageName);
+            String resolvedNewImageName = resolveImageName(newImageName, currentImageName, oldImageName);
             String resolvedNewTag = resolve(newTag, currentTag, oldTag);
             String resolvedNewDigest = resolve(newDigest, currentDigest, oldDigest);
             String resolvedNewPlatform = resolve(newPlatform, currentPlatform, oldPlatform);
@@ -264,6 +265,22 @@ public class ChangeFrom extends Recipe {
             return null;
         }
         List<String> captures = extractCaptures(originalText, oldPattern);
+        return applyBackrefs(template, originalText == null ? "" : originalText, captures);
+    }
+
+    /// As [#resolve], for the image name, where the pattern may have matched a spelling other than
+    /// the one written, as `ubuntu*` matches `docker.io/library/ubuntu`. Capturing from the
+    /// spelling they were matched in keeps `$N` standing for what it selected.
+    private static @Nullable String resolveImageName(@Nullable String template, @Nullable String originalText, String oldPattern) {
+        if (template == null) {
+            return null;
+        }
+        List<String> captures = extractCaptures(originalText, oldPattern);
+        if (captures.isEmpty() && originalText != null && oldPattern.indexOf('*') >= 0) {
+            captures = extractCaptures(
+                    ImageName.parse(originalText).getCanonical(),
+                    ImageName.parse(oldPattern).getCanonical());
+        }
         return applyBackrefs(template, originalText == null ? "" : originalText, captures);
     }
 

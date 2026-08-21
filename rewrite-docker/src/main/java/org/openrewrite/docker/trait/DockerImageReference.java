@@ -74,6 +74,29 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return imageName == null ? Optional.empty() : Optional.of(imageName.getTextWithVariables());
     }
 
+    /// As [#getImageName()], but decomposed into the registry the image is pulled from and the path
+    /// within that registry, which also gives the other spellings of the same image.
+    default Optional<ImageName> getImage() {
+        return getImageName().map(ImageName::parse);
+    }
+
+    /// The registry as written, or empty where the name does not write one; for the registry an
+    /// image is pulled from either way, see [ImageName#getResolvedRegistry()].
+    default Optional<String> getRegistry() {
+        return getImage().map(ImageName::getRegistry);
+    }
+
+    /// The shortest name that resolves to the same image, so `docker.io/library/ubuntu` reads as
+    /// `ubuntu`.
+    default Optional<String> getFamiliarImageName() {
+        return getImage().map(ImageName::getFamiliar);
+    }
+
+    /// The fully qualified name, so `ubuntu` reads as `docker.io/library/ubuntu`.
+    default Optional<String> getCanonicalImageName() {
+        return getImage().map(ImageName::getCanonical);
+    }
+
     /**
      * Returns the tag, or empty if no tag is specified.
      */
@@ -127,12 +150,11 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return Optional.empty();
     }
 
-    /**
-     * Checks if the image name matches the given glob pattern.
-     */
+    /// Checks if the image name matches the given glob pattern, in whichever spelling the pattern
+    /// was written: `ubuntu` matches `docker.io/library/ubuntu` and the other way round.
     default boolean imageNameMatches(String pattern) {
         Docker.Argument imageName = getImageNameArgument();
-        return imageName != null && partMatches(imageName, pattern);
+        return imageName != null && DockerTraitMatcher.imageNameMatches(imageName, pattern);
     }
 
     /**

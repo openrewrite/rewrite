@@ -17,24 +17,17 @@ package org.openrewrite.docker;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.docker.tree.Space;
-import org.openrewrite.marker.Markers;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static java.lang.String.format;
-import static java.lang.String.join;
-import static java.util.Collections.singletonList;
 
 /**
  * Normalizes Docker Hub image names to their canonical short form.
@@ -45,24 +38,12 @@ import static java.util.Collections.singletonList;
  *   <li>{@code docker.io/myuser/myimage} → {@code myuser/myimage}</li>
  *   <li>{@code index.docker.io/library/ubuntu} → {@code ubuntu}</li>
  *   <li>{@code registry.hub.docker.com/library/ubuntu} → {@code ubuntu}</li>
+ *   <li>{@code library/ubuntu} → {@code ubuntu}</li>
  * </ul>
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class NormalizeDockerHubImageName extends Recipe {
-
-    private static final List<String> DOCKER_HUB_HOSTS = Arrays.asList(
-            "docker.io",
-            "index.docker.io",
-            "registry.hub.docker.com",
-            "registry-1.docker.io");
-
-    /**
-     * Pattern to match Docker Hub image references.
-     * Groups: 1=host, 2=library/ (optional), 3=image name
-     */
-    private static final Pattern DOCKER_HUB_PATTERN = Pattern.compile(
-            format("^(%s)/(library/)?(.+)$", join("|", DOCKER_HUB_HOSTS).replace(".", "\\.")));
 
     String displayName = "Normalize Docker Hub image names";
     String description = "Normalizes Docker Hub image names to their canonical short form by removing " +
@@ -73,20 +54,53 @@ public class NormalizeDockerHubImageName extends Recipe {
         return new DockerFrom.Matcher()
                 .excludeScratch()
                 .asVisitor(image -> {
-                    Optional<String> imageName = image.getImageName();
-                    if (!imageName.isPresent()) {
-                        return image.getTree();
+                    Docker.From from = image.getTree();
+                    Optional<ImageName> parsed = image.getImage();
+                    if (!parsed.isPresent()) {
+                        return from;
                     }
 
-                    Matcher matcher = DOCKER_HUB_PATTERN.matcher(imageName.get());
-                    if (!matcher.matches()) {
-                        return image.getTree();
+                    ImageName imageName = parsed.get();
+                    int redundant = imageName.toString().length() - imageName.getFamiliar().length();
+                    if (redundant <= 0) {
+                        return from;
                     }
 
-                    Docker.From f = image.getTree();
-                    return f.withImageName(f.getImageName().withContents(singletonList(new Docker.Literal(
-                            Tree.randomId(), Space.EMPTY, Markers.EMPTY, matcher.group(3), image.getQuoteStyle()))));
+                    List<Docker.ArgumentContent> contents = dropLeading(from.getImageName().getContents(), redundant);
+                    return contents == null ? from : from.withImageName(from.getImageName().withContents(contents));
                 });
     }
 
+    /// Leaves the contents that follow the dropped characters as they are, so that a variable
+    /// reference survives the change. Null where the prefix to drop ends part-way through one,
+    /// which cannot be split.
+    private static @Nullable List<Docker.ArgumentContent> dropLeading(List<Docker.ArgumentContent> contents, int characters) {
+        List<Docker.ArgumentContent> remaining = new ArrayList<>(contents.size());
+        int toDrop = characters;
+        for (Docker.ArgumentContent content : contents) {
+            if (toDrop == 0) {
+                remaining.add(content);
+                continue;
+            }
+            int length = renderedLength(content);
+            if (toDrop >= length) {
+                toDrop -= length;
+            } else if (content instanceof Docker.Literal) {
+                Docker.Literal literal = (Docker.Literal) content;
+                remaining.add(literal.withText(literal.getText().substring(toDrop)));
+                toDrop = 0;
+            } else {
+                return null;
+            }
+        }
+        return toDrop == 0 ? remaining : null;
+    }
+
+    private static int renderedLength(Docker.ArgumentContent content) {
+        if (content instanceof Docker.Literal) {
+            return ((Docker.Literal) content).getText().length();
+        }
+        Docker.EnvironmentVariable variable = (Docker.EnvironmentVariable) content;
+        return variable.getName().length() + (variable.isBraced() ? 3 : 1);
+    }
 }

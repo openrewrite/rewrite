@@ -55,6 +55,29 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     }
 
     @Test
+    void detectFullyQualifiedOfficialImage() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(EolDockerImages.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
+              Dockerfile,,docker.io/library/debian,buster,2022-09-10,"trixie (13)"
+              """
+          ),
+          docker(
+            """
+              FROM docker.io/library/debian:buster
+              RUN apt-get update
+              """,
+            """
+              ~~(EOL: docker.io/library/debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM docker.io/library/debian:buster
+              RUN apt-get update
+              """
+          )
+        );
+    }
+
+    @Test
     void detectDebianBusterSlim() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(EolDockerImages.class.getName(),
