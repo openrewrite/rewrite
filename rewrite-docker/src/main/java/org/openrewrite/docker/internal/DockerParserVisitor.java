@@ -1283,6 +1283,20 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 // Not a valid env var, treat $ as literal
                 current.append(c);
                 i++;
+            } else if (c == '"' || c == '\'') {
+                int close = findClosingQuote(text, i);
+                if (close < 0) {
+                    current.append(c);
+                    i++;
+                    continue;
+                }
+                if (current.length() > 0) {
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
+                    current.setLength(0);
+                }
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
+                        c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
+                i = close + 1;
             } else if (c == '=') {
                 // Flush any accumulated text
                 if (current.length() > 0) {
@@ -1304,6 +1318,19 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
+    }
+
+    private static int findClosingQuote(String text, int openIndex) {
+        char quote = text.charAt(openIndex);
+        for (int i = openIndex + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote == '"' && c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private boolean isVarChar(char c, boolean isFirst) {
