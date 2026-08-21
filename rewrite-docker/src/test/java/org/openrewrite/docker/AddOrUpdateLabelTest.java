@@ -297,9 +297,9 @@ class AddOrUpdateLabelTest implements RewriteTest {
     }
 
     @Test
-    void noChangeWhenMultiContentValueAlreadyMatches() {
+    void noChangeWhenMultiTokenValueAlreadyMatches() {
         rewriteRun(
-          spec -> spec.recipe(new AddOrUpdateLabel("desc", "a b c", true, null)),
+          spec -> spec.recipe(new AddOrUpdateLabel("desc", "\"a b\" c", true, null)),
           docker(
             """
               FROM ubuntu:22.04

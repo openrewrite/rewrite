@@ -225,7 +225,7 @@ class LabelTest implements RewriteTest {
     }
 
     @Test
-    void oldFormatValueKeepsSpacesAroundQuotedWords() {
+    void oldFormatValueIsOneLiteralHoldingSourceText() {
         rewriteRun(
           docker(
             """
@@ -235,9 +235,9 @@ class LabelTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Label.LabelPair pair = onlyPair(doc);
                 assertThat(pair.isHasEquals()).isFalse();
-                assertThat(pair.getValue().getContents()).hasSize(3);
-                assertThat(pair.getValue().getText()).isEqualTo("John Doe of ACME");
-                assertThat(pair.getValue().getTextWithVariables()).isEqualTo("John Doe of ACME");
+                assertThat(pair.getValue().getContents()).hasSize(1);
+                assertThat(pair.getValue().getQuoteStyle()).isNull();
+                assertThat(pair.getValue().getText()).isEqualTo("\"John Doe\" of ACME");
             })
           )
         );
