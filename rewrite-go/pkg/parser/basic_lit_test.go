@@ -17,6 +17,7 @@
 package parser_test
 
 import (
+	"math/big"
 	"strconv"
 	"testing"
 
@@ -36,6 +37,11 @@ func litRHS(t *testing.T, src string) *java.Literal {
 	lit, ok := rhs.(*java.Literal)
 	require.Truef(t, ok, "expected *java.Literal, got %T", rhs)
 	return lit
+}
+
+func bigInt(s string) *big.Int {
+	i, _ := new(big.Int).SetString(s, 10)
+	return i
 }
 
 // A literal's Value must carry the decoded semantic value (no quotes, escapes
@@ -58,7 +64,12 @@ func TestBasicLitDecodedValue(t *testing.T) {
 		{"int", `42`, int64(42), `42`},
 		{"hex int", `0x7f`, int64(127), `0x7f`},
 		{"underscored int", `1_000`, int64(1000), `1_000`},
+		{"int wider than int64", `300000000000000000000`, bigInt("300000000000000000000"), `300000000000000000000`},
+		{"hex int wider than int64", `0xffffffffffffffffff`, bigInt("4722366482869645213695"), `0xffffffffffffffffff`},
 		{"float", `3.14`, 3.14, `3.14`},
+		{"float with exponent", `3e20`, 3e20, `3e20`},
+		{"float without fraction", `3.0`, 3.0, `3.0`},
+		{"hex float", `0x1p-2`, 0.25, `0x1p-2`},
 	}
 
 	for _, tc := range cases {
@@ -68,9 +79,8 @@ func TestBasicLitDecodedValue(t *testing.T) {
 			lit := litRHS(t, src)
 
 			// then
-			if lit.Value != tc.wantValue {
-				t.Errorf("Value = %#v (%T), want %#v (%T)", lit.Value, lit.Value, tc.wantValue, tc.wantValue)
-			}
+			assert.Equalf(t, tc.wantValue, lit.Value, "Value = %#v (%T), want %#v (%T)",
+				lit.Value, lit.Value, tc.wantValue, tc.wantValue)
 			assert.Equal(t, lit.Source, tc.wantSource, "Source")
 		})
 	}

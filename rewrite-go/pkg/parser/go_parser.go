@@ -25,6 +25,7 @@ import (
 	"go/token"
 	"go/types"
 	"math"
+	"math/big"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -2190,6 +2191,11 @@ func decodeBasicLitValue(lit *ast.BasicLit) any {
 		}
 	case token.INT:
 		if i, err := strconv.ParseInt(lit.Value, 0, 64); err == nil {
+			return i
+		}
+		// A Go integer constant has arbitrary precision, so one too wide for an
+		// int64 is kept as a big.Int, which the JVM side receives as a BigInteger.
+		if i, ok := new(big.Int).SetString(lit.Value, 0); ok {
 			return i
 		}
 	case token.FLOAT:
