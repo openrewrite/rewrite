@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  *
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -267,4 +267,14 @@ func (v *lastIdentFinder) VisitIdentifier(ident *java.Identifier, p any) java.J 
 		*v.found = ident
 	}
 	return v.GoVisitor.VisitIdentifier(ident, p)
+}
+
+func TestInstantiateTreatsATypedNilBindingAsUnbound(t *testing.T) {
+	cap := Expr("v")
+	tmpl := ExpressionTemplate(fmt.Sprintf(`fmt.Sprintf("%%s", %s)`, cap)).
+		Captures(cap).Imports("fmt").Build()
+
+	m := NewMatchResult().Bind(cap, (*java.Literal)(nil))
+
+	assert.Nil(t, tmpl.Instantiate(m))
 }

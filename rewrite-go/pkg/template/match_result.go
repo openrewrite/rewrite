@@ -16,7 +16,11 @@
 
 package template
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+import (
+	"reflect"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
 
 type MatchResult struct {
 	bindings map[string]any // single: java.J, variadic: []java.J
@@ -54,10 +58,18 @@ func (m *MatchResult) Get(name string) java.J {
 	if !ok {
 		return nil
 	}
-	if j, ok := v.(java.J); ok {
+	if j, ok := v.(java.J); ok && !isNilTree(j) {
 		return j
 	}
 	return nil
+}
+
+// isNilTree reports a J holding no node. A caller that binds the nil result of
+// a helper returning a concrete type leaves an interface that is itself
+// non-nil, which every consumer would otherwise dereference.
+func isNilTree(j java.J) bool {
+	v := reflect.ValueOf(j)
+	return v.Kind() == reflect.Ptr && v.IsNil()
 }
 
 func (m *MatchResult) GetList(name string) []java.J {

@@ -18,6 +18,7 @@ package template
 
 import (
 	"fmt"
+	"go/types"
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
@@ -108,10 +109,13 @@ func buildScaffold(code string, captures map[string]*Capture, imports []string, 
 
 // parseScaffold parses the scaffold source and extracts the target node,
 // skipping the package declaration, imports, and preamble variables.
-func parseScaffold(code string, captures map[string]*Capture, imports []string, kind ScaffoldKind) (java.J, error) {
+func parseScaffold(code string, captures map[string]*Capture, imports []string, kind ScaffoldKind, imp types.Importer) (java.J, error) {
 	source, preambleCount := buildScaffold(code, captures, imports, kind)
 
 	p := parser.NewGoParser()
+	if imp != nil {
+		p.Importer = imp
+	}
 	cu, err := p.Parse("__template__.go", source)
 	if err != nil {
 		return nil, fmt.Errorf("template parse error: %w\nsource:\n%s", err, source)
