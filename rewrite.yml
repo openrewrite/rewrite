@@ -54,8 +54,8 @@ recipeList:
   - org.openrewrite.staticanalysis.InlineVariable
   - org.openrewrite.staticanalysis.LambdaBlockToExpression
   - org.openrewrite.staticanalysis.MissingOverrideAnnotation
-  - org.openrewrite.staticanalysis.OperatorWrap:
-      wrapOption: EOL
+#  - org.openrewrite.staticanalysis.OperatorWrap:  # wraps operators to end-of-line, against this repository's existing style of leading ? : && operators
+#      wrapOption: EOL
   - org.openrewrite.staticanalysis.RemoveCallsToObjectFinalize
   - org.openrewrite.staticanalysis.RemoveCallsToSystemGc
   - org.openrewrite.staticanalysis.RemoveHashCodeCallsFromArrayInstances
