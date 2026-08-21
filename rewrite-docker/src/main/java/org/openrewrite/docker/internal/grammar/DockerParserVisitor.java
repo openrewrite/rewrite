@@ -212,12 +212,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitShellFormText(DockerParser.ShellFormTextContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#shellFormTextElement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#heredoc}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -229,12 +223,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitHeredocPreamble(DockerParser.HeredocPreambleContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#preambleElement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitPreambleElement(DockerParser.PreambleElementContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#heredocBody}.
 	 * @param ctx the parse tree
@@ -308,23 +296,11 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitLabelValue(DockerParser.LabelValueContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#labelValueElement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitLabelValueElement(DockerParser.LabelValueElementContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#labelOldValue}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitLabelOldValue(DockerParser.LabelOldValueContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#labelOldValueElement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#portList}.
 	 * @param ctx the parse tree
@@ -367,18 +343,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitEnvValueSpace(DockerParser.EnvValueSpaceContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#envTextEquals}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitEnvTextEquals(DockerParser.EnvTextEqualsContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#envTextElementEquals}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#sourceList}.
 	 * @param ctx the parse tree
@@ -451,6 +415,12 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitText(DockerParser.TextContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#valueElement}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitValueElement(DockerParser.ValueElementContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#textElement}.
 	 * @param ctx the parse tree

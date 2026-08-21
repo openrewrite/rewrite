@@ -158,24 +158,7 @@ shellForm
 // Note: Instruction keywords (RUN, ADD, COPY, AS, CMD, etc.) become UNQUOTED_TEXT here
 // because they are only recognized as keyword tokens in specific contexts.
 shellFormText
-    : shellFormTextElement+
-    ;
-
-shellFormTextElement
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST      // Allow $(command) in shell commands
-    | BACKTICK_SUBST     // Allow `command` in shell commands
-    | SPECIAL_VAR        // Allow $!, $$, $?, etc. in shell commands
-    | DOLLAR             // Allow lone $ in shell commands (e.g., $'hello' ANSI-C quoting)
-    | EQUALS
-    | FLAG               // Allow --option or --option=value in shell commands
-    | DASH_DASH
-    | LBRACKET   // Allow [ in shell commands (e.g., if [ -f file ])
-    | RBRACKET   // Allow ] in shell commands
-    | COMMA      // Allow , in shell commands
+    : textElement+
     ;
 
 // Unified heredoc structure supporting both single and multiple heredocs
@@ -188,26 +171,9 @@ heredoc
 // Shell command preamble containing heredoc marker(s) and optional shell commands
 // For single heredoc: just "<<EOF" or "<<EOF /dest" (for COPY/ADD)
 // For multi heredoc: "<<EOF1 cat >file1 && <<EOF2 cat >file2"
+// Elements are shell command text and, for COPY/ADD, the destination path.
 heredocPreamble
-    : HEREDOC_START preambleElement* ( HEREDOC_START preambleElement* )*
-    ;
-
-// Elements that can appear in the heredoc preamble (shell command text, destination paths)
-preambleElement
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
-    | DOLLAR
-    | EQUALS
-    | FLAG
-    | DASH_DASH
-    | LBRACKET
-    | RBRACKET
-    | COMMA
+    : HEREDOC_START textElement* ( HEREDOC_START textElement* )*
     ;
 
 // A single heredoc body (content + closing marker)
@@ -258,42 +224,13 @@ labelKey
     ;
 
 labelValue
-    : labelValueElement+
-    ;
-
-labelValueElement
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
-    | DOLLAR
-    // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
+    : valueElement+
     ;
 
 // Value in old-style LABEL (rest of line after key)
 // Instruction keywords are UNQUOTED_TEXT here (not at line start)
 labelOldValue
-    : labelOldValueElement+
-    ;
-
-labelOldValueElement
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
-    | DOLLAR
-    | EQUALS
-    | FLAG
-    | DASH_DASH
-    | LBRACKET
-    | RBRACKET
-    | COMMA
+    : textElement+
     ;
 
 portList
@@ -323,27 +260,11 @@ envKey
     ;
 
 envValueEquals
-    : envTextEquals
+    : valueElement+
     ;
 
 envValueSpace
-    : text
-    ;
-
-envTextEquals
-    : envTextElementEquals+
-    ;
-
-envTextElementEquals
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
-    | DOLLAR
-    // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
+    : textElement+
     ;
 
 // For COPY/ADD: each sourcePath is a separate source
@@ -415,7 +336,21 @@ text
     : textElement+
     ;
 
-// Generic text element - used for paths, image names, arg values, etc.
+// An element of a value that ends at the next `=`, so that `KEY=value` pairs can repeat on one
+// instruction. Shared by LABEL k=v and ENV K=V.
+valueElement
+    : UNQUOTED_TEXT
+    | DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    | ENV_VAR
+    | COMMAND_SUBST   // Allow $(command) in values
+    | BACKTICK_SUBST  // Allow `command` in values
+    | SPECIAL_VAR     // Allow $!, $$, $?, etc. in values
+    | DOLLAR          // Allow lone $ in values (e.g., $'hello' ANSI-C quoting)
+    // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
+    ;
+
+// Generic text element - used for paths, image names, arg values, shell form and heredoc preambles.
 // Instruction keywords and contextual keywords (AS, CMD, NONE) become UNQUOTED_TEXT
 // when not in their specific contexts.
 textElement
