@@ -523,4 +523,23 @@ class GoRpcPrintRoundTripIntegTest {
                 }
                 """);
     }
+
+    @Test
+    void selectSurvivesReset() {
+        // Go.Select and its Go.CommClause clauses (receive, send, and default)
+        // must fully deserialize from the wire, not survive only via the cache.
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(c chan int, d chan int) {
+                \tselect {
+                \tcase v := <-c:
+                \t\t_ = v
+                \tcase d <- 1:
+                \tdefault:
+                \t}
+                }
+                """);
+    }
 }

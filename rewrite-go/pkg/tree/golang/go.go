@@ -978,6 +978,39 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 	return &c
 }
 
+// Select is Go's `select { ... }` statement. It looks like a `switch` but is a
+// distinct construct with no Java equivalent, so it is not mapped to java.Switch:
+// its clauses are golang.CommClause, which are not java.Case, and a JavaVisitor
+// walking java.Switch.getCases() must never encounter them.
+type Select struct {
+	ID      uuid.UUID
+	Prefix  java.Space
+	Markers java.Markers
+	Body    *java.Block // contains CommClause clauses
+}
+
+func (*Select) IsTree()      {}
+func (*Select) IsJ()         {}
+func (*Select) IsStatement() {}
+
+func (n *Select) WithPrefix(prefix java.Space) *Select {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Select) WithMarkers(markers java.Markers) *Select {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
 // ExpressionStatement wraps an Expression standing in statement
@@ -1325,13 +1358,6 @@ func (n *Variadic) WithMarkers(markers java.Markers) *Variadic {
 	c.Markers = markers
 	return &c
 }
-
-// SelectStmt is a marker on Switch indicating it's a `select` statement instead of `switch`.
-type SelectStmt struct {
-	Ident uuid.UUID
-}
-
-func (s SelectStmt) ID() uuid.UUID { return s.Ident }
 
 // TypeSwitchGuard is a marker on Switch indicating it's a type switch with
 // a type assertion guard like `switch x.(type)` or `switch v := x.(type)`.

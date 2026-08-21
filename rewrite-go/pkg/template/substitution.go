@@ -171,6 +171,8 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *golang.CommClause:
 		return n.WithPrefix(prefix)
+	case *golang.Select:
+		return n.WithPrefix(prefix)
 	case *golang.IndexList:
 		return n.WithPrefix(prefix)
 	case *golang.CompilationUnit:

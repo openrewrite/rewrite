@@ -182,6 +182,12 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitSelect(Go.Select select, RpcReceiveQueue q) {
+        return select
+                .withBody(q.receive(select.getBody(), el -> (J.Block) visitNonNull(el, q)));
+    }
+
+    @Override
     public J visitInterfaceType(Go.InterfaceType interfaceType, RpcReceiveQueue q) {
         return interfaceType
                 .withBody(q.receive(interfaceType.getBody(), el -> (J.Block) visitNonNull(el, q)));
