@@ -700,44 +700,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             JsonArrayParseResult result = visitJsonArrayForVolume(ctx.jsonArray());
             values = result.arguments;
             closingBracketPrefix = result.closingBracketPrefix;
-        } else if (ctx.pathList() != null) {
-            // Parse path list (space-separated paths)
-            for (DockerParser.VolumePathContext pathCtx : ctx.pathList().volumePath()) {
-                Space pathPrefix = prefix(pathCtx.getStart());
-                Token token;
-                String text;
-
-                if (pathCtx.UNQUOTED_TEXT() != null) {
-                    token = pathCtx.UNQUOTED_TEXT().getSymbol();
-                    text = token.getText();
-                    skip(token);
-                    List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
-                    values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
-                } else if (pathCtx.DOUBLE_QUOTED_STRING() != null) {
-                    token = pathCtx.DOUBLE_QUOTED_STRING().getSymbol();
-                    text = token.getText();
-                    skip(token);
-                    List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY,
-                            text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.DOUBLE));
-                    values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
-                } else if (pathCtx.SINGLE_QUOTED_STRING() != null) {
-                    token = pathCtx.SINGLE_QUOTED_STRING().getSymbol();
-                    text = token.getText();
-                    skip(token);
-                    List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY,
-                            text.substring(1, text.length() - 1), Docker.Literal.QuoteStyle.SINGLE));
-                    values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
-                } else if (pathCtx.ENV_VAR() != null) {
-                    token = pathCtx.ENV_VAR().getSymbol();
-                    text = token.getText();
-                    skip(token);
-                    List<Docker.ArgumentContent> contents = new ArrayList<>();
-                    contents.add(createEnvVar(text));
-                    values.add(new Docker.Argument(randomId(), pathPrefix, Markers.EMPTY, contents));
-                }
+        } else {
+            for (DockerParser.PathArgumentContext pathCtx : ctx.pathArgument()) {
+                values.add(parseArgument(pathCtx));
             }
         }
 
@@ -1430,15 +1395,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         if (currentLine.length() > 0) {
             contentLines.add(currentLine.toString());
         }
-    }
-
-    /**
-     * Parse an ENV_VAR token text (e.g., "${VAR}" or "$VAR") into an EnvironmentVariable content
-     */
-    private Docker.EnvironmentVariable createEnvVar(String text) {
-        boolean braced = text.startsWith("${");
-        String varName = braced ? text.substring(2, text.length() - 1) : text.substring(1);
-        return new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, braced);
     }
 
     // Helper methods for cursor management

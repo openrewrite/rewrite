@@ -102,7 +102,7 @@ entrypointInstruction
     ;
 
 volumeInstruction
-    : VOLUME ( jsonArray | pathList )
+    : VOLUME ( jsonArray | pathArgument+ )
     ;
 
 userInstruction
@@ -294,7 +294,8 @@ copyPaths
     ;
 
 // A path ends at the next whitespace, so it is a run of elements that follow one another with nothing
-// between them, unlike `text` and `value`, which span whitespace and so take every element left.
+// between them, unlike `text` and `value`, which span whitespace and so take every element left. Shared
+// by the paths of a COPY/ADD and those of a VOLUME.
 pathArgument
     : quoted
     | pathElement ( {adjacent()}? pathElement )*
@@ -302,20 +303,6 @@ pathArgument
 
 path
     : text
-    ;
-
-pathList
-    : volumePath+
-    ;
-
-volumePath
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR  // Allow environment variables (e.g., VOLUME ${DATA_DIR})
-    | COMMAND_SUBST   // Allow $(command)
-    | BACKTICK_SUBST  // Allow `command`
-    | SPECIAL_VAR     // Allow $!, $$, etc.
     ;
 
 userSpec
@@ -372,8 +359,8 @@ valueElement
     // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
     ;
 
-// A single COPY/ADD path: one source, or the destination. Whitespace separates paths, so `=` and `,`
-// are ordinary characters here rather than the separators they are in a value list.
+// An element of a path. Whitespace separates paths, so `=` and `,` are ordinary characters here rather
+// than the separators they are in a value list.
 pathElement
     : valueElement
     | EQUALS
