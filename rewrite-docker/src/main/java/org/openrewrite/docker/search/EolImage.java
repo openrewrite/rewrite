@@ -85,7 +85,6 @@ public class EolImage {
     }
 
     private static boolean matchesImageName(String actual, String pattern) {
-        // An entry names an official image, which "docker.io/library/debian" and "library/debian" also name
         return ImageName.parse(actual).getFamiliar().equals(pattern);
     }
 

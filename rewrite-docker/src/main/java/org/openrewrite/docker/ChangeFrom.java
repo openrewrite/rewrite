@@ -268,24 +268,18 @@ public class ChangeFrom extends Recipe {
         return applyBackrefs(template, originalText == null ? "" : originalText, captures);
     }
 
-    /**
-     * As {@link #resolve}, for the image name, where the pattern may have matched another spelling
-     * of the name than the one written: {@code ubuntu*} matches {@code docker.io/library/ubuntu}.
-     * The captures then come from the spelling that matched, so that {@code $N} still stands for
-     * what it selected.
-     */
+    /// As [#resolve], for the image name, where the pattern may have matched a spelling other than
+    /// the one written, as `ubuntu*` matches `docker.io/library/ubuntu`. Capturing from the
+    /// spelling they were matched in keeps `$N` standing for what it selected.
     private static @Nullable String resolveImageName(@Nullable String template, @Nullable String originalText, String oldPattern) {
         if (template == null) {
             return null;
         }
         List<String> captures = extractCaptures(originalText, oldPattern);
         if (captures.isEmpty() && originalText != null && oldPattern.indexOf('*') >= 0) {
-            ImageName name = ImageName.parse(originalText);
-            ImageName pattern = ImageName.parse(oldPattern);
-            captures = extractCaptures(name.getFamiliar(), pattern.getFamiliar());
-            if (captures.isEmpty()) {
-                captures = extractCaptures(name.getCanonical(), pattern.getCanonical());
-            }
+            captures = extractCaptures(
+                    ImageName.parse(originalText).getCanonical(),
+                    ImageName.parse(oldPattern).getCanonical());
         }
         return applyBackrefs(template, originalText == null ? "" : originalText, captures);
     }

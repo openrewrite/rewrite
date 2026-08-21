@@ -408,6 +408,29 @@ class DockerFromTest implements RewriteTest {
         }
 
         @Test
+        void aDockerHubPatternDoesNotMatchAnotherRegistry() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("docker.io/library/*").asVisitor((image, ctx) ->
+                  SearchResult.found(image.getTree())
+                )
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  FROM gcr.io/distroless/java:17
+                  FROM mcr.microsoft.com/dotnet/sdk:8.0
+                  """,
+                """
+                  ~~>FROM ubuntu:20.04
+                  FROM gcr.io/distroless/java:17
+                  FROM mcr.microsoft.com/dotnet/sdk:8.0
+                  """
+              )
+            );
+        }
+
+        @Test
         void matchesPlatform() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->

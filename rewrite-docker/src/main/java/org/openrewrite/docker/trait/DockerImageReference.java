@@ -74,37 +74,25 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return imageName == null ? Optional.empty() : Optional.of(imageName.getTextWithVariables());
     }
 
-    /**
-     * Returns the image name decomposed into the registry it is pulled from and the path within
-     * that registry, or empty where the reference does not resolve to an external image. Where
-     * {@link #getImageName()} gives the name as written, this gives the parts it is made of and the
-     * other spellings of the same image; see {@link ImageName}.
-     */
+    /// As [#getImageName()], but decomposed into the registry the image is pulled from and the path
+    /// within that registry, which also gives the other spellings of the same image.
     default Optional<ImageName> getImage() {
         return getImageName().map(ImageName::parse);
     }
 
-    /**
-     * Returns the registry as written, or empty where the image name does not name one, in which
-     * case the image is pulled from Docker Hub. For the registry an image is pulled from whether or
-     * not it is written, take {@link ImageName#getResolvedRegistry()} of {@link #getImage()}.
-     */
+    /// The registry as written, or empty where the name does not write one; for the registry an
+    /// image is pulled from either way, see [ImageName#getResolvedRegistry()].
     default Optional<String> getRegistry() {
         return getImage().map(ImageName::getRegistry);
     }
 
-    /**
-     * Returns the shortest image name that resolves to the same image, so that
-     * {@code docker.io/library/ubuntu} reads as {@code ubuntu}.
-     */
+    /// The shortest name that resolves to the same image, so `docker.io/library/ubuntu` reads as
+    /// `ubuntu`.
     default Optional<String> getFamiliarImageName() {
         return getImage().map(ImageName::getFamiliar);
     }
 
-    /**
-     * Returns the fully qualified image name, so that {@code ubuntu} reads as
-     * {@code docker.io/library/ubuntu}.
-     */
+    /// The fully qualified name, so `ubuntu` reads as `docker.io/library/ubuntu`.
     default Optional<String> getCanonicalImageName() {
         return getImage().map(ImageName::getCanonical);
     }
@@ -162,10 +150,8 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return Optional.empty();
     }
 
-    /**
-     * Checks if the image name matches the given glob pattern, in whichever spelling the pattern
-     * was written: {@code ubuntu} matches {@code docker.io/library/ubuntu} and the other way round.
-     */
+    /// Checks if the image name matches the given glob pattern, in whichever spelling the pattern
+    /// was written: `ubuntu` matches `docker.io/library/ubuntu` and the other way round.
     default boolean imageNameMatches(String pattern) {
         Docker.Argument imageName = getImageNameArgument();
         return imageName != null && DockerTraitMatcher.imageNameMatches(imageName, pattern);

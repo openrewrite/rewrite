@@ -77,25 +77,18 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
         return matchesBidirectional(extractTextForMatching(part), pattern, part.hasEnvironmentVariables());
     }
 
-    /**
-     * As {@link #partMatches}, but for an image name, where a pattern also matches a name that
-     * spells the same image differently: {@code ubuntu} matches {@code docker.io/library/ubuntu},
-     * and the other way round. The pattern is normalized alongside the name, so a glob keeps
-     * matching whichever spelling it was written for.
-     *
-     * @param imageName The image name to match
-     * @param pattern   The glob pattern to match against
-     * @return true if the name matches the pattern in any spelling
-     */
+    /// As [#partMatches], but for an image name, where a pattern also matches a name that spells
+    /// the same image differently: `ubuntu` matches `docker.io/library/ubuntu`, and the other way
+    /// round. Both are compared canonically, which fills in the registry and namespace a name
+    /// leaves out rather than dropping the ones a pattern writes; familiarizing them instead would
+    /// widen `docker.io/*` to `*`, matching every image on every registry.
     static boolean imageNameMatches(Docker.Argument imageName, String pattern) {
         if (partMatches(imageName, pattern)) {
             return true;
         }
         String text = extractTextForMatching(imageName);
-        boolean hasEnvVars = imageName.hasEnvironmentVariables();
         ImageName name = ImageName.parse(text);
         ImageName patternName = ImageName.parse(pattern);
-        return matchesBidirectional(name.getCanonical(), patternName.getCanonical(), hasEnvVars) ||
-                matchesBidirectional(name.getFamiliar(), patternName.getFamiliar(), hasEnvVars);
+        return matchesBidirectional(name.getCanonical(), patternName.getCanonical(), imageName.hasEnvironmentVariables());
     }
 }

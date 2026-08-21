@@ -22,34 +22,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * The name part of an image reference, decomposed into the registry it is pulled from and the path
- * within that registry. This is the {@code name} of {@code name:tag@digest}, so a tag and a digest
- * are not part of it.
- * <p>
- * Whether the first path component is a registry cannot be decided from the syntax alone:
- * {@code mcr.microsoft.com/windows/servercore} names a registry, while {@code redhat/ubi9-minimal}
- * names an organisation on Docker Hub. Docker resolves this by treating the component as a registry
- * only when it contains a {@code .} or a {@code :}, is exactly {@code localhost}, or carries an
- * uppercase character, which a path component may not. This class applies that same rule.
- * <p>
- * A name therefore has two other spellings besides the one it was written with:
- * {@link #getFamiliar() familiar}, the shortest form that still resolves to the same image, and
- * {@link #getCanonical() canonical}, the fully qualified form. {@code ubuntu},
- * {@code library/ubuntu} and {@code docker.io/library/ubuntu} share both, which is how a recipe can
- * match one of them having been configured with another.
- */
+/// The name part of an image reference, the `name` of `name:tag@digest`, decomposed into the
+/// registry it is pulled from and the path within that registry. `ubuntu`, `library/ubuntu` and
+/// `docker.io/library/ubuntu` share a [#getFamiliar()] and a [#getCanonical()] spelling, which is
+/// how a recipe can match one of them having been configured with another.
 @Value
 public class ImageName {
 
-    /**
-     * The registry an image without one is pulled from.
-     */
     public static final String DOCKER_HUB = "docker.io";
 
-    /**
-     * The namespace an official Docker Hub image lives in.
-     */
     public static final String OFFICIAL_NAMESPACE = "library";
 
     private static final List<String> DOCKER_HUB_ALIASES = Arrays.asList(
@@ -58,30 +39,17 @@ public class ImageName {
             "registry.hub.docker.com",
             "registry-1.docker.io");
 
-    /**
-     * The registry as written, or {@code null} where the name does not name one.
-     */
     @Nullable
     String registry;
 
-    /**
-     * Every path component but the last, as in {@code library} of {@code library/ubuntu} or
-     * {@code dotnet/framework} of {@code dotnet/framework/sdk}, or {@code null} where the path is a
-     * single component.
-     */
+    /// Every path component but the last, as in `dotnet/framework` of `dotnet/framework/sdk`.
     @Nullable
     String namespace;
 
-    /**
-     * The last path component, as in {@code ubuntu} of {@code library/ubuntu}.
-     */
     String repository;
 
-    /**
-     * Decomposes an image name such as {@code docker.io/library/ubuntu}. Environment variable
-     * references are left in the component that holds them, so {@code ${REGISTRY}/app} has a
-     * registry of {@code ${REGISTRY}}.
-     */
+    /// A variable reference is left in the component that holds it, so `${REGISTRY}/app` has a
+    /// registry of `${REGISTRY}`.
     public static ImageName parse(String name) {
         String registry = null;
         String path = name;
@@ -97,11 +65,10 @@ public class ImageName {
                 path.substring(lastSlash + 1));
     }
 
-    /**
-     * Whether a path component names a registry rather than being part of the path, by the rule
-     * Docker itself applies: it does when it carries a {@code .} or a {@code :}, is exactly
-     * {@code localhost}, or is not all lowercase, which a path component is required to be.
-     */
+    /// Registry-ness cannot be told from the syntax: `mcr.microsoft.com/windows/servercore` names a
+    /// registry, while `redhat/ubi9-minimal` names an organisation on Docker Hub. This is the rule
+    /// Docker itself settles that by; the last clause holds because a path component may not carry
+    /// an uppercase character.
     static boolean isRegistry(String component) {
         return component.indexOf('.') >= 0 ||
                 component.indexOf(':') >= 0 ||
@@ -109,34 +76,21 @@ public class ImageName {
                 !component.equals(component.toLowerCase(Locale.ROOT));
     }
 
-    /**
-     * The path within the registry, as in {@code library/ubuntu} of
-     * {@code docker.io/library/ubuntu}.
-     */
     public String getPath() {
         return namespace == null ? repository : namespace + '/' + repository;
     }
 
-    /**
-     * The registry the image is pulled from, which is Docker Hub for a name that does not write one.
-     */
     public String getResolvedRegistry() {
         return registry == null ? DOCKER_HUB : registry;
     }
 
-    /**
-     * Whether the image is pulled from Docker Hub, whether or not the name says so.
-     */
     public boolean isDockerHub() {
         return registry == null || DOCKER_HUB_ALIASES.contains(registry.toLowerCase(Locale.ROOT));
     }
 
-    /**
-     * The shortest spelling that resolves to the same image, dropping a Docker Hub registry and the
-     * {@code library} namespace of an official image: {@code docker.io/library/ubuntu} is
-     * {@code ubuntu}, and {@code docker.io/myuser/myimage} is {@code myuser/myimage}. A name on any
-     * other registry is already its own shortest spelling.
-     */
+    /// The shortest spelling that resolves to the same image: `docker.io/library/ubuntu` is
+    /// `ubuntu`, `docker.io/myuser/myimage` is `myuser/myimage`, and a name on any other registry
+    /// is already its own shortest.
     public String getFamiliar() {
         if (!isDockerHub()) {
             return toString();
@@ -144,10 +98,8 @@ public class ImageName {
         return OFFICIAL_NAMESPACE.equals(namespace) ? repository : getPath();
     }
 
-    /**
-     * The fully qualified spelling, naming the registry and the namespace even where the name
-     * itself leaves them out: {@code ubuntu} is {@code docker.io/library/ubuntu}.
-     */
+    /// The spelling that names the registry and namespace even where the name leaves them out:
+    /// `ubuntu` is `docker.io/library/ubuntu`.
     public String getCanonical() {
         if (isDockerHub()) {
             return DOCKER_HUB + '/' + (namespace == null ? OFFICIAL_NAMESPACE : namespace) + '/' + repository;
@@ -155,9 +107,7 @@ public class ImageName {
         return registry + '/' + getPath();
     }
 
-    /**
-     * The name as it was written.
-     */
+    /// The name as it was written.
     @Override
     public String toString() {
         return registry == null ? getPath() : registry + '/' + getPath();

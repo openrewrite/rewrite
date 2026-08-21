@@ -71,11 +71,9 @@ public class NormalizeDockerHubImageName extends Recipe {
                 });
     }
 
-    /**
-     * Drops the leading {@code characters} of an image name, leaving the contents that follow them
-     * as they are so that a variable reference survives the change. Null where the prefix to drop
-     * ends part-way through a variable reference, which cannot be split.
-     */
+    /// Leaves the contents that follow the dropped characters as they are, so that a variable
+    /// reference survives the change. Null where the prefix to drop ends part-way through one,
+    /// which cannot be split.
     private static @Nullable List<Docker.ArgumentContent> dropLeading(List<Docker.ArgumentContent> contents, int characters) {
         List<Docker.ArgumentContent> remaining = new ArrayList<>(contents.size());
         int toDrop = characters;
