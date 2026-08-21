@@ -842,3 +842,99 @@ func TestRemoveUnusedImports_KeepsEveryImportWhenNothingIsAttributed(t *testing.
 		`),
 	)
 }
+
+func TestRemoveUnusedImports_DropsUnreferencedRepoPrefixedPath(t *testing.T) {
+	// `go-yaml` binds `yaml`, which nothing here uses.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	before := `
+		package main
+
+		import (
+			"github.com/goccy/go-yaml"
+			"github.com/x/y"
+		)
+
+		func f() {
+			y.Hello()
+		}
+	`
+	after := `
+		package main
+
+		import (
+			"github.com/x/y"
+		)
+
+		func f() {
+			y.Hello()
+		}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestRemoveUnusedImports_KeepsImportUnderRepoPrefixedPath(t *testing.T) {
+	// `github.com/pelletier/go-toml/v2` declares `package toml`.
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"github.com/pelletier/go-toml/v2"
+			)
+
+			func Encode(v map[string]any) ([]byte, error) {
+				return toml.Marshal(v)
+			}
+		`),
+	)
+}
+
+type wrapThenRemoveUnused struct {
+	recipe.Base
+}
+
+func (r *wrapThenRemoveUnused) Name() string {
+	return "org.openrewrite.golang.test.WrapThenRemoveUnused"
+}
+func (r *wrapThenRemoveUnused) DisplayName() string { return "Wrap then remove unused" }
+func (r *wrapThenRemoveUnused) Description() string {
+	return "Wraps errors with context, then removes unused imports."
+}
+func (r *wrapThenRemoveUnused) RecipeList() []recipe.Recipe {
+	return []recipe.Recipe{&recipes.WrapErrorWithContext{}, &recipes.RemoveUnusedImports{}}
+}
+
+func TestRemoveUnusedImports_KeepsImportAddedByEarlierRecipe(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&wrapThenRemoveUnused{})
+	before := `
+		package main
+
+		import (
+			"errors"
+		)
+
+		func doWork() error {
+			if err := errors.New("boom"); err != nil {
+				return err
+			}
+			return nil
+		}
+	`
+	after := `
+		package main
+
+		import (
+			"errors"
+			"fmt"
+		)
+
+		func doWork() error {
+			if err := errors.New("boom"); err != nil {
+				return fmt.Errorf("doWork: %w", err)
+			}
+			return nil
+		}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}

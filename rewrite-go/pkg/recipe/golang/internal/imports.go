@@ -23,6 +23,7 @@ package internal
 import (
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 
@@ -101,7 +102,40 @@ func packageNameForPath(path string) string {
 	if i := strings.LastIndex(last, "."); i > 0 && isVersionElement(last[i+1:]) {
 		last = last[:i]
 	}
-	return last
+	return trimRepoAffix(last)
+}
+
+// trimRepoAffix drops the `go` a repository name carries to say what language
+// it holds — `go-toml` hosting `package toml`. A hyphen or a dot cannot appear
+// in a Go identifier, so an element spelling one is a repository name and never
+// the package name it declares.
+func trimRepoAffix(element string) string {
+	for _, affix := range []string{"go-", "go."} {
+		if len(element) > len(affix) && strings.HasPrefix(element, affix) {
+			return element[len(affix):]
+		}
+	}
+	for _, affix := range []string{"-go", ".go"} {
+		if len(element) > len(affix) && strings.HasSuffix(element, affix) {
+			return element[:len(element)-len(affix)]
+		}
+	}
+	return element
+}
+
+// isIdentifier reports whether s can be a Go identifier, and so whether it can
+// be the name a package declares.
+func isIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if r == '_' || unicode.IsLetter(r) || (i > 0 && unicode.IsDigit(r)) {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // isVersionElement reports whether a path element is a major-version marker.
@@ -209,48 +243,73 @@ func IsLocal(importPath, modulePath string) bool {
 	return importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/")
 }
 
-// ReferencedImports walks the body of cu once and returns the two signals
-// that decide whether an import is used: refs, the import paths carried by
-// the parser's Type attribution, and quals, the identifiers used lexically
-// as package qualifiers — the attribution-free signal goimports relies on.
-// Aliases and dot imports land in refs under the package's import path.
-func ReferencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
-	return referencedImports(cu)
+// ImportUses answers, for each import of a file, whether the file still uses
+// it. Build one per compilation unit with UsesOf and ask it about as many
+// imports as needed; the file is walked once.
+type ImportUses struct {
+	// refs holds the import paths the parser's Type attribution names.
+	refs map[string]bool
+	// quals holds the identifiers used lexically as package qualifiers — the
+	// attribution-free signal goimports relies on.
+	quals map[string]bool
+	// resolvedQuals holds the qualifiers an import refs names already binds.
+	// Valid Go cannot bind one qualifier twice, so a non-empty entry means
+	// either a tree mid-rewrite — how a major-version move reads — or input
+	// that arrived invalid, where the qualifier binds arbitrarily and no
+	// answer is better than another.
+	resolvedQuals map[string]bool
 }
 
-// ReferencedPackages returns just the import-path set of ReferencedImports.
+// UsesOf walks cu once and gathers the signals its imports are judged by.
+func UsesOf(cu *golang.CompilationUnit) ImportUses {
+	refs, quals := referencedImports(cu)
+	u := ImportUses{refs: refs, quals: quals, resolvedQuals: map[string]bool{}}
+	for _, imp := range ImportsOf(cu) {
+		if name := PackageName(imp); name != "" && refs[ImportPath(imp)] {
+			u.resolvedQuals[name] = true
+		}
+	}
+	return u
+}
+
+// Referenced reports whether the file still uses imp.
+func (u ImportUses) Referenced(imp *java.Import) bool {
+	if u.refs[ImportPath(imp)] {
+		return true
+	}
+	// Blank and dot imports bind no qualifier; whether they survive is a
+	// policy their callers hold.
+	name := PackageName(imp)
+	if name == "" {
+		return false
+	}
+	if u.quals[name] && !u.resolvedQuals[name] {
+		return true
+	}
+	// A name no package can declare matches no qualifier, so reading its
+	// absence as disuse would condemn the import on the one signal left.
+	return !isIdentifier(name)
+}
+
+// ImportsOf returns the imports cu declares, in source order.
+func ImportsOf(cu *golang.CompilationUnit) []*java.Import {
+	if cu == nil || cu.Imports == nil {
+		return nil
+	}
+	imps := make([]*java.Import, 0, len(cu.Imports.Elements))
+	for _, rp := range cu.Imports.Elements {
+		if rp.Element != nil {
+			imps = append(imps, rp.Element)
+		}
+	}
+	return imps
+}
+
+// ReferencedPackages returns the import paths the parser's Type attribution
+// names in the body of cu.
 func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
 	refs, _ := referencedImports(cu)
 	return refs
-}
-
-// ResolvedQualifiers names the qualifiers attribution has already accounted
-// for: those bound by an import refs names. Valid Go cannot bind one
-// qualifier twice, so a non-empty result means either a tree mid-rewrite —
-// how a major-version move reads — or input that arrived invalid, where the
-// qualifier binds arbitrarily and no answer is better than another.
-func ResolvedQualifiers(imports []*java.Import, refs map[string]bool) map[string]bool {
-	resolved := map[string]bool{}
-	for _, imp := range imports {
-		if refs[ImportPath(imp)] {
-			if name := PackageName(imp); name != "" {
-				resolved[name] = true
-			}
-		}
-	}
-	return resolved
-}
-
-// IsReferenced reports whether imp is used by the file whose refs/quals sets
-// are passed in. quals stands in for references attribution could not resolve,
-// so it rescues an import refs does not name — unless resolvedQuals holds the
-// qualifier, which makes refs's silence about this one an answer, not a gap.
-func IsReferenced(imp *java.Import, refs, quals, resolvedQuals map[string]bool) bool {
-	if refs[ImportPath(imp)] {
-		return true
-	}
-	name := PackageName(imp)
-	return quals[name] && !resolvedQuals[name]
 }
 
 func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
