@@ -242,7 +242,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return first instanceof DockerParser.QuotedContext ? ((DockerParser.QuotedContext) first).getStart() : null;
     }
 
-
     private String sourceText(int startIndex, int stopIndex) {
         return source.substring(source.offsetByCodePoints(0, startIndex),
                 source.offsetByCodePoints(0, stopIndex + 1));

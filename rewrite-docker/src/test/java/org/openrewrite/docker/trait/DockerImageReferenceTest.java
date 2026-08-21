@@ -118,4 +118,24 @@ class DockerImageReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void modelsAVariableReferenceARecipeWrites() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerImageReference.Matcher().imageName("nginx").asVisitor((ref, ctx) ->
+              "$VERSION".equals(ref.getTag().orElse(null)) ? ref.getTree() : ref.withTag("$VERSION"))
+          )),
+          docker(
+            """
+              FROM nginx:1.20
+              COPY --from=nginx:1.25 /web /app
+              """,
+            """
+              FROM nginx:$VERSION
+              COPY --from=nginx:$VERSION /web /app
+              """
+          )
+        );
+    }
 }

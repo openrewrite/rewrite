@@ -23,7 +23,6 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -44,7 +43,7 @@ public final class ImageReferences {
      * text separates the tag rather than being kept as part of a quoted name.
      */
     public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
-        return split(singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)), prefix);
+        return split(ArgumentContents.of(reference, null), prefix);
     }
 
     /**

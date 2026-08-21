@@ -297,6 +297,22 @@ class AddOrUpdateLabelTest implements RewriteTest {
     }
 
     @Test
+    void modelsAVariableReferenceInAValue() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("version", "$APP_VERSION", null, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL version=$APP_VERSION
+              """
+          )
+        );
+    }
+
+    @Test
     void noChangeWhenMultiTokenValueAlreadyMatches() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateLabel("desc", "\"a b\" c", true, null)),

@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.trait.DockerFrom;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
@@ -172,6 +173,22 @@ public class ChangeFrom extends Recipe {
             String resolvedNewDigest = resolve(newDigest, currentDigest, oldDigest);
             String resolvedNewPlatform = resolve(newPlatform, currentPlatform, oldPlatform);
 
+            Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
+
+            // A new name carrying a tag or digest belongs in the fields the parser would put them in, so
+            // that reading the result back finds the same tree. A quoted reference is one literal holding
+            // all three together, and splitting it would quote each part on its own, so it stays whole.
+            if (resolvedNewImageName != null && quoteStyle == null) {
+                Docker.@Nullable Argument[] parts = ImageReferences.split(resolvedNewImageName, Space.EMPTY);
+                resolvedNewImageName = parts[0].getTextWithVariables();
+                if (resolvedNewTag == null && parts[1] != null) {
+                    resolvedNewTag = parts[1].getTextWithVariables();
+                }
+                if (resolvedNewDigest == null && parts[2] != null) {
+                    resolvedNewDigest = parts[2].getTextWithVariables();
+                }
+            }
+
             boolean imageNameChanged = resolvedNewImageName != null && !currentImageName.equals(resolvedNewImageName);
             boolean tagChanged = resolvedNewTag != null && !resolvedNewTag.equals(currentTag == null ? "" : currentTag);
             boolean digestChanged = resolvedNewDigest != null && !resolvedNewDigest.equals(currentDigest == null ? "" : currentDigest);
@@ -194,11 +211,6 @@ public class ChangeFrom extends Recipe {
                 }
             }
 
-            Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
-
-            // A quoted reference is one literal holding image, tag and digest together, and splitting it
-            // would quote each part on its own. Everything else keeps image, tag and digest in the fields
-            // the parser would put them in, so that reading the result back finds the same tree.
             boolean wasSingleQuotedReference = quoteStyle != null && f.getImageName().getContents().size() == 1 &&
                     f.getTag() == null && f.getDigest() == null;
 

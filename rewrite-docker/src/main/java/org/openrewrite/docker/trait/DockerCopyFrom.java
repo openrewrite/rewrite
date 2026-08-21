@@ -23,20 +23,16 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.VisitFunction2;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
-import static java.util.Collections.singletonList;
-import static org.openrewrite.Tree.randomId;
 
 /**
  * A trait representing the image reference carried by the {@code --from} flag of a
@@ -193,8 +189,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return getTree();
         }
-        Docker.Argument newValue = arg.withContents(singletonList(
-          new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)));
+        Docker.Argument newValue = arg.withContents(ArgumentContents.of(reference, null));
         List<Docker.Flag> newFlags = ListUtils.map(flags(), f ->
           "from".equals(f.getName()) ? f.withValue(newValue) : f);
         Docker.Instruction instruction = getTree();
