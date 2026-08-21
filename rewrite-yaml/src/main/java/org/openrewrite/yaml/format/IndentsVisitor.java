@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.yaml.MultilineScalarChanged;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
@@ -231,16 +230,6 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
         }
         return size;
-    }
-
-    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
-    private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
-        try {
-            return supplier.get();
-        } catch (NoSuchMethodError | NoSuchFieldError e) {
-            // Handle newly introduced method calls on style that are not part of lst yet
-            return defaultValue;
-        }
     }
 
     private String firstIndent(Yaml yaml) {

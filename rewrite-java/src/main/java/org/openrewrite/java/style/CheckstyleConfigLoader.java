@@ -21,7 +21,6 @@ import com.puppycrawl.tools.checkstyle.api.Configuration;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.internal.ToBeRemoved;
 import org.xml.sax.InputSource;
 
 import java.io.ByteArrayInputStream;
@@ -1084,16 +1083,6 @@ public class CheckstyleConfigLoader {
                             .withNameCountToUseStarImport(null);
                 })
                 .collect(toSet());
-    }
-
-    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
-    private static boolean shouldKnowInflowStyle() {
-        try {
-            ImportLayoutStyle.Builder.class.getMethod("importAllOthersInflow");
-            return true;
-        } catch (NoSuchMethodError | NoSuchMethodException e) {
-            return false;
-        }
     }
 
     private static void addGroupBlocks(ImportLayoutStyle.Builder builder, String groups, boolean separated, boolean isStatic) {

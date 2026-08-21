@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TypeReferencePrefix;
@@ -2220,15 +2219,6 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, newErroneous.getPrefix()));
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return (S) style.applyDefaults();
-        }
-        return null;
     }
 
     private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
