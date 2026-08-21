@@ -583,6 +583,26 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitUserSpec(DockerParser.UserSpecContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link DockerParser#user}.
+	 * @param ctx the parse tree
+	 */
+	void enterUser(DockerParser.UserContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#user}.
+	 * @param ctx the parse tree
+	 */
+	void exitUser(DockerParser.UserContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#group}.
+	 * @param ctx the parse tree
+	 */
+	void enterGroup(DockerParser.GroupContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#group}.
+	 * @param ctx the parse tree
+	 */
+	void exitGroup(DockerParser.GroupContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link DockerParser#argName}.
 	 * @param ctx the parse tree
 	 */

@@ -46,7 +46,7 @@ ADD        : 'ADD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStar
 COPY       : 'COPY'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 ENTRYPOINT : 'ENTRYPOINT' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 VOLUME     : 'VOLUME'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-USER       : 'USER'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+USER       : 'USER'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(USER_SPEC); atLineStart = false; };
 WORKDIR    : 'WORKDIR'    { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 ARG        : 'ARG'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 // ONBUILD is special: it keeps atLineStart true so the following instruction is recognized
@@ -209,6 +209,31 @@ IR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQU
 
 fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$];
 fragment IR_PORT_COLON : ':' ( IR_TEXT_CHAR | ':' )* '/';
+
+// ----------------------------------------------------------------------------------------------
+// USER_SPEC mode - the user:group of a USER instruction
+// Entered from the USER keyword and left at the end of the line. As IMAGE_REF, minus the '@' and the
+// AS exit: only here is ':' its own token, so the parser can split the specification while a colon
+// inside a quoted string or a variable reference stays part of the name that holds it.
+// ----------------------------------------------------------------------------------------------
+mode USER_SPEC;
+
+US_WS                : WS_CHAR+     -> type(WS), channel(HIDDEN);
+US_LINE_CONTINUATION : LINE_CONT    -> type(LINE_CONTINUATION), channel(HIDDEN);
+US_COMMENT           : '#' ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
+US_NEWLINE           : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> type(NEWLINE), channel(HIDDEN), popMode;
+
+US_COLON : ':' -> type(COLON);
+
+US_DOUBLE_QUOTED_STRING : DQ_STRING       -> type(DOUBLE_QUOTED_STRING);
+US_SINGLE_QUOTED_STRING : SQ_STRING       -> type(SINGLE_QUOTED_STRING);
+US_ENV_VAR              : VAR_REF         -> type(ENV_VAR);
+US_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
+US_DOLLAR               : '$'             -> type(DOLLAR);
+
+US_UNQUOTED_TEXT : ( US_TEXT_CHAR | ESCAPED_CHAR )+ -> type(UNQUOTED_TEXT);
+
+fragment US_TEXT_CHAR : ~[: \t\r\n\\"'$];
 
 // ----------------------------------------------------------------------------------------------
 // HEREDOC_PREAMBLE mode - for parsing shell command preamble after heredoc marker(s)

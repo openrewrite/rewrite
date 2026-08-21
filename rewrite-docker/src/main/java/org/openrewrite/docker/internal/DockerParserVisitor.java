@@ -37,7 +37,6 @@ import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
@@ -137,16 +136,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         DockerParser.ImageReferenceContext reference = ctx.imageReference();
         TerminalNode colon = reference.COLON();
         TerminalNode at = reference.AT();
-        Docker.Argument imageName = referencePart(reference.imageName(), colon != null ? colon : at);
+        Docker.Argument imageName = separatedPart(reference.imageName(), colon != null ? colon : at);
         Docker.Argument tag = null;
         if (colon != null) {
             skip(colon.getSymbol());
-            tag = referencePart(reference.tag(), at);
+            tag = separatedPart(reference.tag(), at);
         }
         Docker.Argument digest = null;
         if (at != null) {
             skip(at.getSymbol());
-            digest = referencePart(reference.digest(), null);
+            digest = separatedPart(reference.digest(), null);
         }
 
         Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
@@ -179,11 +178,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         );
     }
 
-    /// One part of an image reference, reaching up to the separator that follows it so that a line
-    /// continuation written before that separator stays with the part. A part can be absent while its
-    /// separator is present, as in `FROM alpine:`, and is then empty rather than missing, which keeps
-    /// the separator in the printed source.
-    private Docker.Argument referencePart(@Nullable ParserRuleContext ctx, @Nullable TerminalNode separator) {
+    /// One part of a value the grammar split on a separator, an image reference or a `USER` specification,
+    /// reaching up to the separator that follows it so that a line continuation written before that
+    /// separator stays with the part. A part can be absent while its separator is present, as in
+    /// `FROM alpine:` or `USER root:`, and is then empty rather than missing, which keeps the separator
+    /// in the printed source.
+    private Docker.Argument separatedPart(@Nullable ParserRuleContext ctx, @Nullable TerminalNode separator) {
         if (ctx == null) {
             Space prefix = separator == null ? Space.EMPTY : prefix(separator.getSymbol());
             return new Docker.Argument(randomId(), prefix, Markers.EMPTY, emptyList());
@@ -864,10 +864,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         String userKeyword = ctx.USER().getText();
         skip(ctx.USER().getSymbol());
 
-        // Parse userSpec and split into user and optional group
-        Docker.@Nullable Argument[] userAndGroup = parseUserSpec(ctx.userSpec());
-        Docker.Argument user = requireNonNull(userAndGroup[0]);
-        Docker.Argument group = userAndGroup[1];
+        DockerParser.UserSpecContext spec = ctx.userSpec();
+        TerminalNode colon = spec.COLON();
+        Docker.Argument user = separatedPart(spec.user(), colon);
+        Docker.Argument group = null;
+        if (colon != null) {
+            skip(colon.getSymbol());
+            group = separatedPart(spec.group(), null);
+        }
 
         // Advance cursor to end of instruction
         if (ctx.getStop() != null) {
@@ -875,62 +879,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         return new Docker.User(randomId(), prefix, Markers.EMPTY, userKeyword, user, group);
-    }
-
-    private Docker.@Nullable Argument[] parseUserSpec(DockerParser.UserSpecContext ctx) {
-        Space prefix = prefix(ctx);
-
-        // Parse the text
-        List<Docker.ArgumentContent> contents = parseText(ctx.text());
-
-        // Advance cursor to end of text
-        advanceCursor(ctx.text().getStop().getStopIndex() + 1);
-
-        // Find the colon separator to split user and group
-        List<Docker.ArgumentContent> userContents = new ArrayList<>();
-        List<Docker.ArgumentContent> groupContents = new ArrayList<>();
-        boolean foundColon = false;
-
-        for (Docker.ArgumentContent content : contents) {
-            if (content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
-                String text = ((Docker.Literal) content).getText();
-                int colonIndex = text.indexOf(':');
-
-                if (colonIndex >= 0 && !foundColon) {
-                    // Split at the colon
-                    foundColon = true;
-                    String userPart = text.substring(0, colonIndex);
-                    String groupPart = text.substring(colonIndex + 1);
-
-                    if (!userPart.isEmpty()) {
-                        userContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, userPart, null));
-                    }
-                    if (!groupPart.isEmpty()) {
-                        groupContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, groupPart, null));
-                    }
-                } else {
-                    // Add to the appropriate list
-                    if (foundColon) {
-                        groupContents.add(content);
-                    } else {
-                        userContents.add(content);
-                    }
-                }
-            } else {
-                // Environment variables or quoted strings
-                if (foundColon) {
-                    groupContents.add(content);
-                } else {
-                    userContents.add(content);
-                }
-            }
-        }
-
-        Docker.Argument user = new Docker.Argument(randomId(), prefix, Markers.EMPTY, userContents);
-        Docker.Argument group = groupContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, groupContents);
-
-        return new Docker.@Nullable Argument[]{user, group};
     }
 
     @Override
