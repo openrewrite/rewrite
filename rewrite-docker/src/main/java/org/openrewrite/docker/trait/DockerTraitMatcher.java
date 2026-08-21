@@ -15,8 +15,6 @@
  */
 package org.openrewrite.docker.trait;
 
-import org.jetbrains.annotations.Contract;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
@@ -37,7 +35,7 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      * @param arg The argument to extract text from
      * @return Text with environment variables replaced by '*'
      */
-    protected String extractTextForMatching(Docker.Argument arg) {
+    static String extractTextForMatching(Docker.Argument arg) {
         StringBuilder sb = new StringBuilder();
         for (Docker.ArgumentContent content : arg.getContents()) {
             if (content instanceof Docker.Literal) {
@@ -50,41 +48,6 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
     }
 
     /**
-     * Extracts text from a Docker argument, returning null if the argument contains
-     * any environment variables (since the actual value cannot be determined statically).
-     *
-     * @param arg The argument to extract text from, may be null
-     * @return The literal text content, or null if the argument is null or contains environment variables
-     */
-    @Contract(value = "null -> null", pure = true)
-    protected @Nullable String extractText(Docker.@Nullable Argument arg) {
-        return arg == null ? null : arg.getText();
-    }
-
-    /**
-     * Extracts text from a Docker argument, including environment variable references
-     * in their original form (e.g., ${VAR} or $VAR).
-     *
-     * @param arg The argument to extract text from, may be null
-     * @return The text content with environment variable references preserved, or null if arg is null
-     */
-    @Contract(value = "null -> null; !null -> !null", pure = true)
-    protected @Nullable String extractTextWithVariables(Docker.@Nullable Argument arg) {
-        return arg == null ? null : arg.getTextWithVariables();
-    }
-
-    /**
-     * Checks if a Docker argument contains any environment variables.
-     *
-     * @param arg The argument to check, may be null
-     * @return true if the argument contains environment variables, false otherwise
-     */
-    @Contract(value = "null -> false", pure = true)
-    protected boolean hasEnvironmentVariables(Docker.@Nullable Argument arg) {
-        return arg != null && arg.hasEnvironmentVariables();
-    }
-
-    /**
      * Performs bidirectional glob matching when environment variables are present.
      * When the text contains wildcards (from env vars), we need to check if either
      * the pattern matches the text OR the text (as a pattern) matches the pattern.
@@ -94,7 +57,7 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      * @param hasEnvVars Whether the original text contained environment variables
      * @return true if there's a match in either direction
      */
-    protected boolean matchesBidirectional(String text, String pattern, boolean hasEnvVars) {
+    static boolean matchesBidirectional(String text, String pattern, boolean hasEnvVars) {
         if (hasEnvVars) {
             return StringUtils.matchesGlob(text, pattern) ||
                     StringUtils.matchesGlob(pattern, text);
@@ -103,12 +66,14 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
     }
 
     /**
-     * Gets the quote style from a Docker argument, if any literal content is quoted.
+     * Checks whether one part of an image reference matches a glob pattern, treating any
+     * environment variable it contains as a wildcard.
      *
-     * @param arg The argument to check
-     * @return The quote style, or null if unquoted
+     * @param part    The image name, tag or digest to match
+     * @param pattern The glob pattern to match against
+     * @return true if the part matches
      */
-    protected Docker.Literal.@Nullable QuoteStyle getQuoteStyle(Docker.Argument arg) {
-        return arg.getQuoteStyle();
+    static boolean partMatches(Docker.Argument part, String pattern) {
+        return matchesBidirectional(extractTextForMatching(part), pattern, part.hasEnvironmentVariables());
     }
 }

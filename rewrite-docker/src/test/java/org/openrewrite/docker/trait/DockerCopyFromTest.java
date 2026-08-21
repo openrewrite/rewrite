@@ -359,4 +359,75 @@ class DockerCopyFromTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void stageReferenceFollowedByAnotherFlag() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getFromValue()).contains("build");
+                assertThat(image.isStageReference()).isTrue();
+                assertThat(image.getImageName()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM golang AS build
+              COPY --from=build --link /target/ /
+              """,
+            """
+              FROM golang AS build
+              ~~>COPY --from=build --link /target/ /
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedValueKeepsItsColon() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).contains("alpine:3");
+                assertThat(image.getTag()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from="alpine:3" /out /app
+              """,
+            """
+              FROM ubuntu
+              ~~>COPY --from="alpine:3" /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableDefaultIsNotATag() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).contains("${BUILDER:-golang:1.24}");
+                assertThat(image.getTag()).isEmpty();
+                assertThat(image.isStageReference()).isFalse();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from=${BUILDER:-golang:1.24} /out /app
+              """,
+            """
+              FROM ubuntu
+              ~~>COPY --from=${BUILDER:-golang:1.24} /out /app
+              """
+          )
+        );
+    }
 }

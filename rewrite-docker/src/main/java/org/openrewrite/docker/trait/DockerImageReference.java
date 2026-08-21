@@ -27,6 +27,8 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Optional;
 
+import static org.openrewrite.docker.trait.DockerTraitMatcher.partMatches;
+
 /**
  * A trait representing an image reference anywhere in a Dockerfile: the base image of a
  * {@code FROM} instruction (see {@link DockerFrom}) or the image carried by the {@code --from}
@@ -45,50 +47,109 @@ import java.util.Optional;
 public interface DockerImageReference<T extends Docker.Instruction> extends Trait<T> {
 
     /**
-     * Returns the image name (without tag or digest), or empty if the reference does not
-     * resolve to an external image (e.g. a build-stage reference).
+     * Returns the image name as it appears in the tree, or {@code null} where the instruction does
+     * not name an image at all: a {@code COPY} without a {@code --from} flag, or one whose
+     * {@code --from} names an earlier build stage. The tag and digest are {@code null} whenever
+     * this is.
      */
-    Optional<String> getImageName();
+    Docker.@Nullable Argument getImageNameArgument();
+
+    /**
+     * Returns the tag as it appears in the tree, or {@code null} if the reference has none.
+     */
+    Docker.@Nullable Argument getTagArgument();
+
+    /**
+     * Returns the digest as it appears in the tree, or {@code null} if the reference has none.
+     */
+    Docker.@Nullable Argument getDigestArgument();
+
+    /**
+     * Returns the image name (without tag or digest), or empty if the reference does not
+     * resolve to an external image (e.g. a build-stage reference). Environment variable
+     * references are preserved in their original form.
+     */
+    default Optional<String> getImageName() {
+        Docker.Argument imageName = getImageNameArgument();
+        return imageName == null ? Optional.empty() : Optional.of(imageName.getTextWithVariables());
+    }
 
     /**
      * Returns the tag, or empty if no tag is specified.
      */
-    Optional<String> getTag();
+    default Optional<String> getTag() {
+        Docker.Argument tag = getTagArgument();
+        return tag == null ? Optional.empty() : Optional.of(tag.getTextWithVariables());
+    }
 
     /**
      * Returns the digest, or empty if no digest is specified.
      */
-    Optional<String> getDigest();
+    default Optional<String> getDigest() {
+        Docker.Argument digest = getDigestArgument();
+        return digest == null ? Optional.empty() : Optional.of(digest.getTextWithVariables());
+    }
 
     /**
-     * Returns true if the referenced image is pinned by digest.
+     * Returns true if the referenced image is pinned by digest, whatever its tag.
      */
-    boolean isDigestPinned();
+    default boolean isDigestPinned() {
+        return getDigestArgument() != null;
+    }
 
     /**
      * Returns true if the referenced image is unpinned (no tag or an explicit "latest" tag).
      */
-    boolean isUnpinned();
+    default boolean isUnpinned() {
+        return getUnpinnedReason().isPresent();
+    }
 
     /**
-     * Returns the reason the referenced image is unpinned, or empty if it is pinned.
+     * Returns the reason the referenced image is unpinned, or empty if it is pinned. An image
+     * carrying a digest is pinned whatever its tag, and one whose name is an unresolved
+     * environment variable cannot be classified, so it is conservatively taken to be pinned.
      */
-    Optional<UnpinnedReason> getUnpinnedReason();
+    default Optional<UnpinnedReason> getUnpinnedReason() {
+        Docker.Argument imageName = getImageNameArgument();
+        if (imageName == null || getDigestArgument() != null) {
+            return Optional.empty();
+        }
+        Docker.Argument tag = getTagArgument();
+        if (tag == null) {
+            if (imageName.hasEnvironmentVariables()) {
+                return Optional.empty();
+            }
+            return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
+        }
+        if ("latest".equals(tag.getText())) {
+            return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
+        }
+        return Optional.empty();
+    }
 
     /**
      * Checks if the image name matches the given glob pattern.
      */
-    boolean imageNameMatches(String pattern);
+    default boolean imageNameMatches(String pattern) {
+        Docker.Argument imageName = getImageNameArgument();
+        return imageName != null && partMatches(imageName, pattern);
+    }
 
     /**
-     * Checks if the tag matches the given glob pattern.
+     * Checks if the tag matches the given glob pattern; false if no tag is specified.
      */
-    boolean tagMatches(String pattern);
+    default boolean tagMatches(String pattern) {
+        Docker.Argument tag = getTagArgument();
+        return tag != null && partMatches(tag, pattern);
+    }
 
     /**
-     * Checks if the digest matches the given glob pattern.
+     * Checks if the digest matches the given glob pattern; false if no digest is specified.
      */
-    boolean digestMatches(String pattern);
+    default boolean digestMatches(String pattern) {
+        Docker.Argument digest = getDigestArgument();
+        return digest != null && partMatches(digest, pattern);
+    }
 
     /**
      * Returns the instruction with its image reference replaced by {@code reference}

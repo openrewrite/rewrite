@@ -23,6 +23,7 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -35,6 +36,15 @@ import static org.openrewrite.Tree.randomId;
 public final class ImageReferences {
 
     private ImageReferences() {
+    }
+
+    /**
+     * Splits an image reference a recipe supplied as text, such as {@code "nginx:1.25"}, into
+     * {@code {imageName, tag, digest}}. The parts are unquoted literals, so that a colon in the
+     * text separates the tag rather than being kept as part of a quoted name.
+     */
+    public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
+        return split(singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)), prefix);
     }
 
     /**
