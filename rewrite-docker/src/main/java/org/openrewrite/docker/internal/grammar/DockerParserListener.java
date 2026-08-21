@@ -333,16 +333,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitShellFormText(DockerParser.ShellFormTextContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#shellFormTextElement}.
-	 * @param ctx the parse tree
-	 */
-	void enterShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#shellFormTextElement}.
-	 * @param ctx the parse tree
-	 */
-	void exitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link DockerParser#heredoc}.
 	 * @param ctx the parse tree
 	 */
@@ -362,16 +352,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitHeredocPreamble(DockerParser.HeredocPreambleContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#preambleElement}.
-	 * @param ctx the parse tree
-	 */
-	void enterPreambleElement(DockerParser.PreambleElementContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#preambleElement}.
-	 * @param ctx the parse tree
-	 */
-	void exitPreambleElement(DockerParser.PreambleElementContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#heredocBody}.
 	 * @param ctx the parse tree
@@ -493,16 +473,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitLabelValue(DockerParser.LabelValueContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#labelValueElement}.
-	 * @param ctx the parse tree
-	 */
-	void enterLabelValueElement(DockerParser.LabelValueElementContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#labelValueElement}.
-	 * @param ctx the parse tree
-	 */
-	void exitLabelValueElement(DockerParser.LabelValueElementContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link DockerParser#labelOldValue}.
 	 * @param ctx the parse tree
 	 */
@@ -512,16 +482,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitLabelOldValue(DockerParser.LabelOldValueContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#labelOldValueElement}.
-	 * @param ctx the parse tree
-	 */
-	void enterLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#labelOldValueElement}.
-	 * @param ctx the parse tree
-	 */
-	void exitLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#portList}.
 	 * @param ctx the parse tree
@@ -592,26 +552,6 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitEnvValueSpace(DockerParser.EnvValueSpaceContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#envTextEquals}.
-	 * @param ctx the parse tree
-	 */
-	void enterEnvTextEquals(DockerParser.EnvTextEqualsContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#envTextEquals}.
-	 * @param ctx the parse tree
-	 */
-	void exitEnvTextEquals(DockerParser.EnvTextEqualsContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#envTextElementEquals}.
-	 * @param ctx the parse tree
-	 */
-	void enterEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#envTextElementEquals}.
-	 * @param ctx the parse tree
-	 */
-	void exitEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#sourceList}.
 	 * @param ctx the parse tree
@@ -732,6 +672,16 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitText(DockerParser.TextContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#valueElement}.
+	 * @param ctx the parse tree
+	 */
+	void enterValueElement(DockerParser.ValueElementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#valueElement}.
+	 * @param ctx the parse tree
+	 */
+	void exitValueElement(DockerParser.ValueElementContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#textElement}.
 	 * @param ctx the parse tree

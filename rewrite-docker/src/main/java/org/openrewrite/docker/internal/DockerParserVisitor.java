@@ -566,9 +566,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // Handle both forms: KEY=value (envValueEquals) or KEY value (envValueSpace)
             Docker.Argument value;
             if (pairCtx.envValueEquals() != null) {
-                value = parseArgument(pairCtx.envValueEquals().envTextEquals());
+                value = parseArgument(pairCtx.envValueEquals());
             } else {
-                value = parseArgument(pairCtx.envValueSpace() == null ? null : pairCtx.envValueSpace().text());
+                value = parseArgument(pairCtx.envValueSpace());
             }
 
             pairs.add(new Docker.Env.EnvPair(randomId(), pairPrefix, Markers.EMPTY, key, hasEquals, value));
@@ -1405,98 +1405,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     /**
-     * Parse an exec form from a string like: {@code ["curl", "-f", "http://localhost/"]}
-     * Used when the ANTLR grammar's greedy flagValue rule has consumed the exec form tokens.
-     * Note: Commas are skipped during parsing and printed explicitly by the printer.
-     */
-    private Docker.ExecForm parseExecFormFromText(String text) {
-        List<Docker.Literal> args = new ArrayList<>();
-
-        // Find leading whitespace before [
-        int i = 0;
-        while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
-            i++;
-        }
-        Space prefix = Space.format(text.substring(0, i));
-
-        // Find opening bracket
-        if (i >= text.length() || text.charAt(i) != '[') {
-            // Fallback - return empty exec form
-            return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, Space.EMPTY);
-        }
-        i++; // skip [
-
-        // Parse elements: "string" separated by commas
-        while (i < text.length()) {
-            // Capture prefix: whitespace only (not comma)
-            int prefixStart = i;
-
-            // Skip whitespace
-            while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
-                i++;
-            }
-
-            if (i >= text.length()) break;
-
-            // Check for closing bracket
-            if (text.charAt(i) == ']') {
-                // Closing bracket found - remaining whitespace is the closing bracket prefix
-                return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args,
-                        Space.format(text.substring(prefixStart, i)));
-            }
-
-            // Handle comma - skip it and capture only whitespace after it
-            if (text.charAt(i) == ',') {
-                i++; // skip comma
-                prefixStart = i; // start prefix after comma
-                // Skip whitespace after comma
-                while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
-                    i++;
-                }
-            }
-
-            if (i >= text.length()) break;
-
-            // Check for closing bracket again
-            if (text.charAt(i) == ']') {
-                return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args,
-                        Space.format(text.substring(prefixStart, i)));
-            }
-
-            String elemPrefixStr = text.substring(prefixStart, i);
-            Space elemPrefix = Space.format(elemPrefixStr);
-
-            // Parse quoted string
-            if (text.charAt(i) == '"') {
-                i++; // skip opening quote
-                StringBuilder value = new StringBuilder();
-                while (i < text.length() && text.charAt(i) != '"') {
-                    // Handle escapes
-                    if (text.charAt(i) == '\\' && i + 1 < text.length()) {
-                        i++; // skip backslash
-                        value.append(text.charAt(i));
-                    } else {
-                        value.append(text.charAt(i));
-                    }
-                    i++;
-                }
-                if (i < text.length() && text.charAt(i) == '"') {
-                    i++; // skip closing quote
-                }
-                args.add(new Docker.Literal(randomId(), elemPrefix, Markers.EMPTY, value.toString(),
-                        Docker.Literal.QuoteStyle.DOUBLE));
-            } else {
-                // Unexpected - skip to next comma or bracket
-                while (i < text.length() && text.charAt(i) != ',' && text.charAt(i) != ']') {
-                    i++;
-                }
-            }
-        }
-
-        return new Docker.ExecForm(randomId(), prefix, Markers.EMPTY, args, Space.EMPTY);
-    }
-
-    /**
      * Visit a heredoc context using the unified structure.
      * Handles both single heredocs (RUN <<EOF ... EOF) and multiple heredocs
      * (RUN <<EOF1 cmd1 && <<EOF2 cmd2 ... EOF1 ... EOF2).
@@ -1529,8 +1437,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     preambleBuilder.append(tokenPrefix.getWhitespace());
                     preambleBuilder.append(tn.getText());
                     skip(tn.getSymbol());
-                } else if (child instanceof DockerParser.PreambleElementContext) {
-                    DockerParser.PreambleElementContext elemCtx = (DockerParser.PreambleElementContext) child;
+                } else if (child instanceof DockerParser.TextElementContext) {
+                    DockerParser.TextElementContext elemCtx = (DockerParser.TextElementContext) child;
                     Token token = elemCtx.getStart();
                     Space tokenPrefix = prefix(token);
 
@@ -1570,7 +1478,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      * Create an Argument from a preamble element (for destination extraction in COPY/ADD).
      * The prefix is passed in since it was already consumed when building the preamble.
      */
-    private Docker.Argument createArgumentFromPreambleElement(DockerParser.PreambleElementContext ctx, Space argPrefix) {
+    private Docker.Argument createArgumentFromPreambleElement(DockerParser.TextElementContext ctx, Space argPrefix) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         Token token = ctx.getStart();
         String text = token.getText();
