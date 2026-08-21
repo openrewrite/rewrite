@@ -274,35 +274,14 @@ envKey
     : UNQUOTED_TEXT
     ;
 
-// For COPY/ADD: each sourcePath is a separate source
-// The parser will group adjacent tokens without whitespace into single arguments
+// For COPY/ADD: each pathElement is a separate source
 sourceList
-    : sourcePath+
-    ;
-
-sourcePath
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
+    : pathElement+
     ;
 
 // Destination is the last path element
 destination
-    : destinationPath
-    ;
-
-destinationPath
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
+    : pathElement
     ;
 
 path
@@ -375,6 +354,14 @@ valueElement
     | SPECIAL_VAR     // Allow $!, $$, $?, etc. in values
     | DOLLAR          // Allow lone $ in values (e.g., $'hello' ANSI-C quoting)
     // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
+    ;
+
+// A single COPY/ADD path: one source, or the destination. Whitespace separates paths, so `=` and `,`
+// are ordinary characters here rather than the separators they are in a value list.
+pathElement
+    : valueElement
+    | EQUALS
+    | COMMA
     ;
 
 // Generic text element - used for paths, image names, arg values, shell form and heredoc preambles.

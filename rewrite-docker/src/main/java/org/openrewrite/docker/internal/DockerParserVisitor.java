@@ -453,7 +453,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      */
     private List<Docker.Argument> parseSourcePaths(DockerParser.SourceListContext ctx) {
         List<Docker.Argument> sources = new ArrayList<>();
-        for (DockerParser.SourcePathContext pathCtx : ctx.sourcePath()) {
+        for (DockerParser.PathElementContext pathCtx : ctx.pathElement()) {
             sources.add(parsePathToken(pathCtx));
         }
         return sources;
@@ -463,7 +463,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      * Parse destination path from the grammar's destination context.
      */
     private Docker.Argument parseDestinationPath(DockerParser.DestinationContext ctx) {
-        return parsePathToken(ctx.destinationPath());
+        return parsePathToken(ctx.pathElement());
     }
 
     /**

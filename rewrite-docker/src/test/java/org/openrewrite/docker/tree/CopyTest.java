@@ -366,4 +366,52 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void pathsContainingEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY a=b /dest
+              COPY app /dest=x
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
+                // `=` is a token of its own and adjacency is not modelled, so one path is several arguments
+                var inSource = (Docker.Copy) instructions.getFirst();
+                assertThat(inSource.getShellForm()).isNotNull();
+                assertThat(inSource.getShellForm().getSources()).map(CopyTest::text).containsExactly("a", "=", "b");
+                assertThat(text(inSource.getShellForm().getDestination())).isEqualTo("/dest");
+
+                var inDestination = (Docker.Copy) instructions.getLast();
+                assertThat(inDestination.getShellForm()).isNotNull();
+                assertThat(inDestination.getShellForm().getSources()).map(CopyTest::text).containsExactly("app", "/dest", "=");
+                assertThat(text(inDestination.getShellForm().getDestination())).isEqualTo("x");
+            })
+          )
+        );
+    }
+
+    @Test
+    void pathContainingLoneDollar() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY cost$.txt /dest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getSources()).map(CopyTest::text).containsExactly("cost", "$", ".txt");
+                assertThat(text(copy.getShellForm().getDestination())).isEqualTo("/dest");
+            })
+          )
+        );
+    }
+
+    private static String text(Docker.Argument argument) {
+        return ((Docker.Literal) argument.getContents().getFirst()).getText();
+    }
 }

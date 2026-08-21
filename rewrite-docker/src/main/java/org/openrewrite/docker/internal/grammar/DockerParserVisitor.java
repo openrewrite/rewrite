@@ -344,23 +344,11 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitSourceList(DockerParser.SourceListContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#sourcePath}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitSourcePath(DockerParser.SourcePathContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#destination}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitDestination(DockerParser.DestinationContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#destinationPath}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDestinationPath(DockerParser.DestinationPathContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#path}.
 	 * @param ctx the parse tree
@@ -427,6 +415,12 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitValueElement(DockerParser.ValueElementContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#pathElement}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPathElement(DockerParser.PathElementContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#textElement}.
 	 * @param ctx the parse tree
