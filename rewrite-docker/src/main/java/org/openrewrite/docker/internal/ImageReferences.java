@@ -26,9 +26,11 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Splits a parsed image reference (the {@code name:tag@digest} form used by {@code FROM} and by
- * the {@code --from} flag of {@code COPY}/{@code ADD}) into its component {@link Docker.Argument}s.
- * Shared by the parser and the trait layer to keep a single source of truth.
+ * Splits an image reference (the {@code name:tag@digest} form) into its component
+ * {@link Docker.Argument}s. Used where the reference reaches the trait layer as text rather than as
+ * a parse tree: the value of the {@code --from} flag of {@code COPY}/{@code ADD}, which the lexer
+ * keeps as one token, and a reference handed in by a recipe. A {@code FROM} instruction is split by
+ * the grammar instead, in the {@code IMAGE_REF} lexer mode.
  */
 public final class ImageReferences {
 

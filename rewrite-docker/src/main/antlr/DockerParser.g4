@@ -54,7 +54,7 @@ instruction
     ;
 
 fromInstruction
-    : FROM flags? imageName ( AS stageName )?
+    : FROM flags? imageReference ( AS stageName )?
     ;
 
 runInstruction
@@ -201,8 +201,27 @@ jsonString
     : DOUBLE_QUOTED_STRING
     ;
 
+// name:tag@digest, the reference used by FROM. The IMAGE_REF lexer mode emits ':' and '@' as
+// tokens only where they separate the parts, so a colon inside a quoted string, a variable
+// reference or a registry port belongs to the part that holds it.
+imageReference
+    : imageName ( COLON tag? )? ( AT digest? )?
+    | COLON tag? ( AT digest? )?
+    | AT digest?
+    ;
+
 imageName
-    : text
+    : textElement+
+    ;
+
+// The first colon separates the tag, any later one is part of it
+tag
+    : ( textElement | COLON )+
+    ;
+
+// A digest carries its algorithm as a prefix, as in sha256:abc123
+digest
+    : ( textElement | COLON | AT )+
     ;
 
 stageName

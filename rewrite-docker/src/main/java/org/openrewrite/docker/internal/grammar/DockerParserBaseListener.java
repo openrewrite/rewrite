@@ -500,6 +500,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterImageReference(DockerParser.ImageReferenceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitImageReference(DockerParser.ImageReferenceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterImageName(DockerParser.ImageNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -507,6 +519,30 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitImageName(DockerParser.ImageNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterTag(DockerParser.TagContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTag(DockerParser.TagContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDigest(DockerParser.DigestContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDigest(DockerParser.DigestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -296,6 +296,89 @@ class FromTest implements RewriteTest {
     }
 
     @Test
+    void registryPortIsNotATag() {
+        rewriteRun(
+          docker(
+            """
+              FROM localhost:5000/my/app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("localhost:5000/my/app");
+                assertThat(from.getTag()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void registryPortWithTagAndDigest() {
+        rewriteRun(
+          docker(
+            """
+              FROM localhost:5000/my/app:1.2.3@sha256:abc123
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("localhost:5000/my/app");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("1.2.3");
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedImageReferenceKeepsItsColon() {
+        rewriteRun(
+          docker(
+            """
+              FROM "ubuntu:22.04"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                Docker.Literal imageName = (Docker.Literal) from.getImageName().getContents().getFirst();
+                assertThat(imageName.getText()).isEqualTo("ubuntu:22.04");
+                assertThat(imageName.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(from.getTag()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void separatorWithoutATag() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                assertThat(from.getTag().getContents()).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void continuationBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu\\
+                :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    @Test
     void quotedImageReferenceWithVariableStaysWhole() {
         rewriteRun(
           docker(
