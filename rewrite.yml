@@ -26,10 +26,6 @@ description: Best practices for OpenRewrite recipe development.
 preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: "!(**/internal/grammar/*.*)"
-# Refaster templates intentionally contain patterns that recipes would otherwise "fix"
-#  - org.openrewrite.java.search.DoesNotUseType:  # we have no Refaster templates in this repository
-#      fullyQualifiedTypeName: com.google.errorprone.refaster.annotation.BeforeTemplate
-#      includeImplicit: true
 # Uncomment to run on a specific module
 #  - org.openrewrite.FindSourceFiles:
 #      filePattern: "rewrite-docker/**"
