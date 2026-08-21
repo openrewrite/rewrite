@@ -21,6 +21,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
@@ -48,9 +52,7 @@ func TestParseProjectExcludesGitIgnored(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -65,14 +67,10 @@ func TestParseProjectExcludesGitIgnored(t *testing.T) {
 		}
 	}
 	for _, want := range []string{"probe.go", "pkg/build/legit.go"} {
-		if !parsed[want] {
-			t.Errorf("expected %q to be parsed, but it was not", want)
-		}
+		assert.Truef(t,parsed[want], "expected %q to be parsed, but it was not", want)
 	}
 	for _, unwanted := range []string{"build/generated/rootbuild.go", "sub/build/generated/subbuild.go"} {
-		if parsed[unwanted] {
-			t.Errorf("expected gitignored %q to be excluded, but it was parsed", unwanted)
-		}
+		assert.Falsef(t, parsed[unwanted], "expected gitignored %q to be excluded, but it was parsed", unwanted)
 	}
 }
 

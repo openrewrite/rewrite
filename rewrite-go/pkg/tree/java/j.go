@@ -1533,12 +1533,16 @@ func (n *Parentheses) WithMarkers(markers Markers) *Parentheses {
 	return &c
 }
 
+// TypeCast is Go's conversion `T(x)`. J's own cast is the mirror image — Java
+// parenthesizes the type ahead of the operand — so Clazz holds the type, where
+// J.TypeCast.getType reads it, and the parentheses it carries stand after that
+// type: its Prefix leads the `(`, its After the `)`.
 type TypeCast struct {
 	ID      uuid.UUID
 	Prefix  Space
 	Markers Markers
-	Clazz   *ControlParentheses // the type in parentheses
-	Expr    Expression          // the expression being cast/asserted
+	Clazz   *ControlParentheses // the type, and the parentheses following it
+	Expr    Expression          // the operand being converted
 }
 
 func (*TypeCast) IsTree()       {}

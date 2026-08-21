@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -36,12 +38,8 @@ func genericsScaffold(t *testing.T, files map[string]string, modulePath, mainRel
 	root := t.TempDir()
 	for rel, content := range files {
 		full := filepath.Join(root, rel)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", full, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", full, err)
-		}
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755), "mkdir")
+		require.NoError(t, os.WriteFile(full, []byte(content), 0o644), "write")
 	}
 	pi := parser.NewProjectImporter(modulePath, nil)
 	pi.SetProjectRoot(root)
@@ -53,9 +51,7 @@ func genericsScaffold(t *testing.T, files map[string]string, modulePath, mainRel
 
 	mainContent := files[mainRel]
 	cu, err := p.Parse(mainRel, mainContent)
-	if err != nil {
-		t.Fatalf("parse %s: %v", mainRel, err)
-	}
+	require.NoErrorf(t, err, "parse %s", mainRel)
 	return cu
 }
 

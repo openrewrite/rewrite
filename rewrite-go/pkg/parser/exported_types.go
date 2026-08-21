@@ -269,13 +269,14 @@ func containsGoMod(dir string) bool {
 	return err == nil
 }
 
-// goBuildContext pins GOOS/GOARCH/CgoEnabled so table content is deterministic
-// across build machines; captures the linux/amd64 view.
+// goBuildContext captures the linux/amd64 gc view, pinned so that table
+// content is deterministic across build machines.
 func goBuildContext() build.Context {
 	ctx := build.Default
 	ctx.GOOS = "linux"
 	ctx.GOARCH = "amd64"
 	ctx.CgoEnabled = false
+	ctx.Compiler = "gc"
 	return ctx
 }
 

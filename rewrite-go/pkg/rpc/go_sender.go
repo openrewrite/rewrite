@@ -71,8 +71,7 @@ func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.
 	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).SourcePath }, nil)
 	// charset - Go doesn't track this, send empty/default
 	q.GetAndSend(cu, func(_ any) any { return "UTF-8" }, nil)
-	// charsetBomMarked
-	q.GetAndSend(cu, func(_ any) any { return false }, nil)
+	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).CharsetBomMarked }, nil)
 	// checksum
 	q.GetAndSend(cu, func(_ any) any { return nil }, nil)
 	// fileAttributes
@@ -150,6 +149,8 @@ func (s *GoSender) VisitGoUnary(u *golang.Unary, p any) java.J {
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSend(u, func(v any) any { return v.(*golang.Unary).Expression },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(u, func(v any) any { return AsRef(v.(*golang.Unary).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return u
 }
 
@@ -202,6 +203,8 @@ func (s *GoSender) VisitComposite(c *golang.Composite, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(c, func(v any) any { return v.(*golang.Composite).Elements },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return AsRef(v.(*golang.Composite).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return c
 }
 
@@ -249,6 +252,24 @@ func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).Value },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	return mt
+}
+
+func (s *GoSender) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(ta, func(v any) any { return v.(*golang.TypeAssertion).Left },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(ta, func(v any) any { return v.(*golang.TypeAssertion).AssertedType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ta, func(v any) any { return AsRef(v.(*golang.TypeAssertion).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
+	return ta
+}
+
+func (s *GoSender) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(es, func(v any) any { return v.(*golang.ExpressionStatement).Expression },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return es
 }
 
 func (s *GoSender) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {

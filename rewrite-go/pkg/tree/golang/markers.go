@@ -51,6 +51,20 @@ func NewGoProject(projectName, modulePath string) GoProject {
 	return GoProject{Ident: uuid.New(), ProjectName: projectName, ModulePath: modulePath}
 }
 
+// Builtin marks a J.MethodInvocation of one of Go's predeclared functions
+// (`len`, `copy`, `append`, ...). They have no signature to attribute, so the
+// marker is what separates them from a call to a user-defined function of the
+// same name. Mirrors org.openrewrite.golang.marker.Builtin.
+type Builtin struct {
+	Ident uuid.UUID
+}
+
+func (m Builtin) ID() uuid.UUID { return m.Ident }
+
+func NewBuiltin() Builtin {
+	return Builtin{Ident: uuid.New()}
+}
+
 // ImplicitForClauses marks a J.ForLoop.Control whose init/update are synthetic
 // J.Empty placeholders (Go's `for cond {}` / `for {}`), so the printer omits
 // them and their `;`. Mirrors org.openrewrite.golang.marker.ImplicitForClauses.

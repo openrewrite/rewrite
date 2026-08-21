@@ -531,27 +531,27 @@ def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
     it would emit a GET_REF for a ref the child no longer holds; if it rewound while the child did
     not, it would reuse a number still bound to the old object and serve a wrong tree silently."""
     import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
 
     bundle, first, second = "pkg", "file-1", "file-2"
-    server._hub_send_refs[bundle] = {}
-    server._hub_send_next[bundle] = 0
+    refs = server._hub_send_refs[bundle] = ReferenceMap()
 
     # Serving the first file advances this child's numbering and records where it started.
-    server._hub_send_checkpoint.setdefault((bundle, first), server._hub_send_next[bundle])
-    server._hub_send_refs[bundle].update({"obj-a": (object(), 1), "obj-b": (object(), 2)})
-    server._hub_send_next[bundle] = 2
+    server._hub_send_checkpoint.setdefault((bundle, first), refs.snapshot())
+    refs.create(object())
+    refs.create(object())
     server._hub_served[(bundle, first)] = object()
     server._hub_tree[first] = object()
 
     server._hub_release(first)
 
     # Everything that file introduced is gone, and the counter is back where it began.
-    assert server._hub_send_next[bundle] == 0
-    assert server._hub_send_refs[bundle] == {}
+    assert refs.snapshot() == 0
+    assert len(refs) == 0
     assert (bundle, first) not in server._hub_served
     assert (bundle, first) not in server._hub_send_checkpoint
     assert first not in server._hub_tree
 
     # So the next file reuses the same ref numbers rather than continuing past them.
-    server._hub_send_checkpoint.setdefault((bundle, second), server._hub_send_next[bundle])
+    server._hub_send_checkpoint.setdefault((bundle, second), refs.snapshot())
     assert server._hub_send_checkpoint[(bundle, second)] == 0

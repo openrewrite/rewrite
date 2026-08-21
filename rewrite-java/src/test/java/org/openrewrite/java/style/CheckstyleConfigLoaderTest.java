@@ -18,9 +18,8 @@ package org.openrewrite.java.style;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.style.NamedStyles;
 
-import java.util.Collections;
-
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleConfig;
 
@@ -1063,7 +1062,7 @@ class CheckstyleConfigLoaderTest {
         // - star import thresholds from AvoidStarImport (MAX_VALUE)
         // - layout ordering from ImportOrder (statics on top, grouped)
         ImportLayoutStyle merged = NamedStyles.merge(ImportLayoutStyle.class,
-                Collections.singletonList(checkstyle));
+                singletonList(checkstyle));
         assertThat(merged).isNotNull();
         assertThat(merged.getClassCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
         assertThat(merged.getNameCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
@@ -1093,7 +1092,7 @@ class CheckstyleConfigLoaderTest {
         """, emptyMap());
 
         ImportLayoutStyle merged = NamedStyles.merge(ImportLayoutStyle.class,
-                Collections.singletonList(checkstyle));
+                singletonList(checkstyle));
         assertThat(merged).isNotNull();
         assertThat(merged.getClassCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
         assertThat(merged.getNameCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
@@ -1127,7 +1126,7 @@ class CheckstyleConfigLoaderTest {
         // - ImportOrder contributes layout (comes last, so its layout wins over CustomImportOrder)
         // - CustomImportOrder's layout is superseded by ImportOrder's
         ImportLayoutStyle merged = NamedStyles.merge(ImportLayoutStyle.class,
-                Collections.singletonList(checkstyle));
+                singletonList(checkstyle));
         assertThat(merged).isNotNull();
         // Star thresholds from AvoidStarImport
         assertThat(merged.getClassCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);

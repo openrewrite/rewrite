@@ -4,13 +4,13 @@ import org.openrewrite.codegen.dsl.LanguageDescriptor
 
 plugins {
     id("org.openrewrite.build.language-library")
-    kotlin("jvm") version "2.2.21"
+    kotlin("jvm") version "2.4.10"
 }
 
 // When bumping this version, also update the kotlin-bom platform version
 // in rewrite-gradle/build.gradle.kts and rewrite-maven/build.gradle.kts so
 // the kotlin-stdlib alignment stays in lockstep across modules.
-val kotlinVersion = "2.3.20"
+val kotlinVersion = "2.4.10"
 
 recipeDependencies {
     parserClasspath("jakarta.persistence:jakarta.persistence-api:3.1.0")
@@ -65,7 +65,7 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 
     // For driving kotlinc with the rewrite-kotlin compiler plugin loaded in tests.
-    testImplementation("dev.zacsweers.kctfork:core:0.12.1")
+    testImplementation("dev.zacsweers.kctfork:core:0.13.0")
 }
 
 configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {

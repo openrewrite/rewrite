@@ -19,7 +19,7 @@ present, what was added in this PR, and what is intentionally deferred.
 | Context-sensitive parsing | `.contextSensitive()` | not yet | deferred (recipes in the wild rarely flip this on for refactoring; revisit if a real recipe asks) |
 | Named placeholders | `#{name}` substitution by name + type constraint | positional `#{X}` capture-by-name through `*Capture` | ✓ named via `*Capture` already; type constraints are deferred (see below) |
 | Type-checked named placeholders | `#{name:any(java.util.List)}` | not yet | deferred — out-of-scope per the eng review's v1 scope cut |
-| Cursor-aware insertion | parameter to `.apply(cursor, ...)` | parameter to `.Apply(cursor, ...)` | ✓ shipped — cursor is threaded but unused in the v1 substitution engine; placeholder for future block/scope-aware substitution |
+| Cursor-aware insertion | parameter to `.apply(cursor, ...)` | parameter to `.Apply(cursor, ...)` | ✓ shipped — the cursor names the node being replaced, from which `Apply` takes the leading whitespace, whether the result needs parenthesizing against the expression around it, and the level to indent to |
 
 ## Already present before this PR (no delta required)
 
@@ -32,12 +32,13 @@ Surface that was already at parity:
   `JavaTemplate.builder` (which infers the kind from the substitution
   coordinate). Recipe authors don't need to know coordinate semantics.
 - `Apply(cursor, *MatchResult)` returns the substituted subtree with
-  capture values spliced in.
+  capture values spliced in, placed at the site the cursor names.
 - `Rewrite(before, after)` packages match-and-replace into a single
   `RewriteVisitor` — convenient for 1:1 rewrites.
-- `getLeadingPrefix` / `setLeadingPrefix` preserve formatting on the
-  outer node when a template replaces an existing subtree (e.g. the
-  prefix on a `MethodInvocation.Select.Element` survives the swap).
+- `getLeadingPrefix` / `setLeadingPrefix` carry the replaced node's own
+  leading whitespace onto the replacement (e.g. the prefix on a
+  `MethodInvocation.Select.Element` survives the swap), which is the first
+  of the steps `Apply` takes to place a result.
 - Scaffold-based parser (`pkg/template/scaffold.go`) compiles a template
   string into an AST that's cached per `GoTemplate` instance.
 

@@ -49,7 +49,9 @@ func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) jav
 	// Preserve the placeholder's prefix whitespace on the substituted node.
 	// Use setLeadingPrefix to handle compound nodes where the prefix
 	// lives on the first child (e.g., MethodInvocation's Select).
-	return setLeadingPrefix(val, ident.Prefix)
+	// The cursor here walks the template, so the position a capture lands in is
+	// the placeholder's own.
+	return parenthesized(setLeadingPrefix(val, ident.Prefix), v.Cursor())
 }
 
 // substitute applies the substitution visitor to the template tree,
@@ -100,6 +102,8 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 	case *java.VariableDeclarator:
 		return n.WithPrefix(prefix)
 	case *java.Parentheses:
+		return n.WithPrefix(prefix)
+	case *golang.TypeAssertion:
 		return n.WithPrefix(prefix)
 	case *java.TypeCast:
 		return n.WithPrefix(prefix)

@@ -51,7 +51,6 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -64,6 +63,7 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static java.util.Collections.*;
 
 /**
  * A {@link RewriteRunner} that drives recipe execution through the moderne-cli
@@ -522,7 +522,7 @@ public class ModwRunner implements RewriteRunner {
         System.out.println("[modw] Configuring CLI license key from $" + LICENSE_KEY_ENV);
         // Redact the key from any failure output so it never reaches CI logs. The
         // license is persisted into the per-test MODERNE_CLI_HOME config.
-        exec(repoDir, env, Collections.singleton(licenseKey),
+        exec(repoDir, env, singleton(licenseKey),
                 modwScript.toString(), "config", "license", "edit", licenseKey);
     }
 
@@ -533,12 +533,12 @@ public class ModwRunner implements RewriteRunner {
     }
 
     private void execIn(Path cwd, String... command) throws IOException, InterruptedException {
-        exec(cwd, Collections.emptyMap(), Collections.emptySet(), command);
+        exec(cwd, emptyMap(), emptySet(), command);
     }
 
     private void exec(Path cwd, Map<String, String> env, String... command)
             throws IOException, InterruptedException {
-        exec(cwd, env, Collections.emptySet(), command);
+        exec(cwd, env, emptySet(), command);
     }
 
     private void exec(Path cwd, Map<String, String> env, Set<String> redactions, String... command)
@@ -596,7 +596,7 @@ public class ModwRunner implements RewriteRunner {
                                       Context context, Recipe recipe) throws IOException {
         Path afterFenced = runDir.resolve("after-fenced");
         if (!Files.isDirectory(afterFenced)) {
-            return Collections.emptyList();
+            return emptyList();
         }
         Map<Path, SourceSpec<?>> specByPath = new HashMap<>();
         for (SourceSpec<?> spec : context.getSourceSpecs()) {
@@ -621,7 +621,7 @@ public class ModwRunner implements RewriteRunner {
                 String afterContent = new String(Files.readAllBytes(after), StandardCharsets.UTF_8);
                 SourceFile afterLst = reparse(spec, beforeLst, relative, afterContent);
                 results.add(new Result(beforeLst, afterLst,
-                        Collections.singletonList(Collections.singletonList(recipe))));
+                        singletonList(singletonList(recipe))));
             }
         }
         return results;
@@ -652,7 +652,7 @@ public class ModwRunner implements RewriteRunner {
         Parser.Input input = new Parser.Input(sourcePath,
                 () -> new java.io.ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         java.util.Optional<SourceFile> parsed = parser.parseInputs(
-                        Collections.singletonList(input), null, new InMemoryExecutionContext())
+                        singletonList(input), null, new InMemoryExecutionContext())
                 .findFirst();
         return parsed.orElseThrow(() -> new AssertionError(
                 "[modw] Parser produced no result for " + sourcePath));
@@ -712,7 +712,7 @@ public class ModwRunner implements RewriteRunner {
 
     private static List<Object> readTypedRows(Path csvGz, Class<?> rowType, CsvMapper mapper) throws IOException {
         String csv = readUndecoratedCsv(csvGz);
-        if (csv.isEmpty()) return Collections.emptyList();
+        if (csv.isEmpty()) return emptyList();
         CsvSchema schema = CsvSchema.emptySchema().withHeader();
         try (MappingIterator<?> it = mapper.readerFor(rowType).with(schema).readValues(csv)) {
             List<Object> out = new ArrayList<>();
@@ -727,7 +727,7 @@ public class ModwRunner implements RewriteRunner {
         // Fallback when we can't load the DataTable class. Each row is a
         // Map<String, String> keyed by column name.
         String csv = readUndecoratedCsv(csvGz);
-        if (csv.isEmpty()) return Collections.emptyList();
+        if (csv.isEmpty()) return emptyList();
         CsvMapper mapper = new CsvMapper();
         CsvSchema schema = CsvSchema.emptySchema().withHeader();
         try (MappingIterator<Map<String, String>> it = mapper
@@ -806,12 +806,12 @@ public class ModwRunner implements RewriteRunner {
 
         @Override
         public Stream<?> getRows(String dataTableName, @Nullable String group) {
-            return rowsByName.getOrDefault(dataTableName, Collections.emptyList()).stream();
+            return rowsByName.getOrDefault(dataTableName, emptyList()).stream();
         }
 
         @Override
         public Collection<DataTable<?>> getDataTables() {
-            return Collections.unmodifiableList(tables);
+            return unmodifiableList(tables);
         }
     }
 }

@@ -28,6 +28,7 @@ import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
@@ -1398,7 +1399,7 @@ class ChangeDependencyTest implements RewriteTest {
                 .findFirst().orElseThrow()
                 .withSourcePath(Path.of("build.gradle"))
                 .withMarkers(new org.openrewrite.marker.Markers(org.openrewrite.Tree.randomId(),
-                        java.util.Collections.singletonList(GradleProject.builder()
+                        singletonList(GradleProject.builder()
                                 .group("com.example")
                                 .name("test")
                                 .version("1.0")

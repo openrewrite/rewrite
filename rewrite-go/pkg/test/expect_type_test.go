@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 )
 
@@ -36,9 +38,7 @@ func main() {
 	_ = p
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectType(t, cu, "p", "main.Point")
 }
 
@@ -53,9 +53,7 @@ func main() {
 	_ = y
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectPrimitiveType(t, cu, "x", "int")
 	ExpectPrimitiveType(t, cu, "y", "String")
 }
@@ -70,9 +68,7 @@ func main() {
 	fmt.Println("hello")
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectMethodType(t, cu, "Println", "fmt")
 }
 
@@ -84,8 +80,6 @@ func add(a int, b int) int {
 	return a + b
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectMethodType(t, cu, "add", "main")
 }

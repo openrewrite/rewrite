@@ -16,7 +16,10 @@
 
 package rpc
 
-import "testing"
+import (
+	"testing"
+	"github.com/stretchr/testify/require"
+)
 
 func TestReferenceMapReusesStrongIdentity(t *testing.T) {
 	type object struct{ value int }
@@ -24,9 +27,7 @@ func TestReferenceMapReusesStrongIdentity(t *testing.T) {
 	refs := NewReferenceMap()
 
 	firstID, existed := refs.GetOrCreate(shared)
-	if existed || firstID != 1 {
-		t.Fatalf("first allocation = (%d, %v), want (1, false)", firstID, existed)
-	}
+	require.Falsef(t, existed || firstID != 1, "first allocation = (%d, %v), want (1, false)", firstID, existed)
 	if got := refs.Len(); got != 1 {
 		t.Fatalf("reference count = %d, want 1", got)
 	}

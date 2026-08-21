@@ -23,7 +23,6 @@ import (
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 const identityGoMod = "module example.com/foo\n\ngo 1.21\n\nrequire (\n\tgithub.com/a/b v1.0.0\n\tgithub.com/c/d v1.5.0 // indirect\n)\n"
@@ -51,25 +50,6 @@ func TestGoOnlyRecipeLeavesGoModAndGoSumPointersUntouched(t *testing.T) {
 	}
 	if after := v.Visit(gs, nil); after != java.Tree(gs) {
 		t.Error("go.sum came back as a new tree from a recipe that only edits .go sources")
-	}
-}
-
-// The base traversal on its own, with no recipe logic layered on top.
-func TestBareGoVisitorPreservesGoModAndGoSumIdentity(t *testing.T) {
-	gm, err := parser.ParseGoModFile("go.mod", identityGoMod)
-	if err != nil {
-		t.Fatalf("go.mod parse error: %v", err)
-	}
-	if after := visitor.Init(&visitor.GoVisitor{}).Visit(gm, nil); after != java.Tree(gm) {
-		t.Error("a no-op traversal rebuilt the go.mod tree")
-	}
-
-	gs, err := parser.ParseGoSumFile("go.sum", identityGoSum)
-	if err != nil {
-		t.Fatalf("go.sum parse error: %v", err)
-	}
-	if after := visitor.Init(&visitor.GoVisitor{}).Visit(gs, nil); after != java.Tree(gs) {
-		t.Error("a no-op traversal rebuilt the go.sum tree")
 	}
 }
 

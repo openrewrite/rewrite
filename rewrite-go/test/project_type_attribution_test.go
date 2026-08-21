@@ -19,6 +19,10 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -48,15 +52,9 @@ func TestProjectImporterResolvesIntraProjectImport(t *testing.T) {
 	pi.AddSource("sub/sub.go", "package sub\n\nfunc Hello() string { return \"hi\" }\n")
 
 	pkg, err := pi.Import("example.com/foo/sub")
-	if err != nil {
-		t.Fatalf("Import returned error: %v", err)
-	}
-	if pkg == nil {
-		t.Fatal("Import returned nil package")
-	}
-	if pkg.Name() != "sub" {
-		t.Errorf("package name: want %q, got %q", "sub", pkg.Name())
-	}
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "Import returned nil package")
+	assert.Equalf(t, "sub", pkg.Name(), "package name: want %q", "sub")
 	if hello := pkg.Scope().Lookup("Hello"); hello == nil {
 		t.Fatal("expected sub.Hello to be defined in the resolved package")
 	}
@@ -68,12 +66,8 @@ func TestProjectImporterResolvesIntraProjectImport(t *testing.T) {
 func TestProjectImporterFallsBackToStdlib(t *testing.T) {
 	pi := parser.NewProjectImporter("example.com/foo", nil)
 	pkg, err := pi.Import("fmt")
-	if err != nil {
-		t.Fatalf("stdlib fallback failed: %v", err)
-	}
-	if pkg == nil || pkg.Name() != "fmt" {
-		t.Fatalf("expected pkg=fmt, got %v", pkg)
-	}
+	require.NoError(t, err, "stdlib fallback failed")
+	require.False(t, pkg == nil || pkg.Name() != "fmt", "expected pkg=fmt")
 }
 
 // TestGoProjectWiresImporterIntoHarness is the integration assertion: a
@@ -94,12 +88,8 @@ func TestGoProjectWiresImporterIntoHarness(t *testing.T) {
 		// these would all be nil because importer.Default() doesn't know
 		// about example.com/foo/sub.
 		identTypes := collectIdentTypes(cu)
-		if identTypes["sub"] == nil {
-			t.Errorf("expected `sub` identifier in main.go to have a resolved Type, got nil")
-		}
-		if identTypes["Hello"] == nil {
-			t.Errorf("expected `Hello` identifier in main.go to have a resolved Type, got nil")
-		}
+		assert.NotNil(t,identTypes["sub"], "expected `sub` identifier in main.go to have a resolved Type, got nil")
+		assert.NotNil(t,identTypes["Hello"], "expected `Hello` identifier in main.go to have a resolved Type, got nil")
 	}
 
 	spec := test.NewRecipeSpec()

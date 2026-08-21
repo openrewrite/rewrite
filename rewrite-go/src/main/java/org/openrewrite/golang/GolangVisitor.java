@@ -184,6 +184,34 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitTypeAssertion(Go.TypeAssertion typeAssertion, P p) {
+        Go.TypeAssertion ta = typeAssertion;
+        ta = ta.withPrefix(visitSpace(ta.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        Expression tempExpression = (Expression) visitExpression(ta, p);
+        if (!(tempExpression instanceof Go.TypeAssertion)) {
+            return tempExpression;
+        }
+        ta = (Go.TypeAssertion) tempExpression;
+        ta = ta.withMarkers(visitMarkers(ta.getMarkers(), p));
+        ta = ta.getPadding().withLeft(visitRightPadded(ta.getPadding().getLeft(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        //noinspection unchecked
+        ta = ta.withAssertedType((J.ControlParentheses<Expression>) visitAndCast(ta.getAssertedType(), p));
+        return ta;
+    }
+
+    public J visitExpressionStatement(Go.ExpressionStatement expressionStatement, P p) {
+        Go.ExpressionStatement es = expressionStatement;
+        es = es.withPrefix(visitSpace(es.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        Statement tempStatement = (Statement) visitStatement(es, p);
+        if (!(tempStatement instanceof Go.ExpressionStatement)) {
+            return tempStatement;
+        }
+        es = (Go.ExpressionStatement) tempStatement;
+        es = es.withMarkers(visitMarkers(es.getMarkers(), p));
+        es = es.withExpression((Expression) visitAndCast(es.getExpression(), p));
+        return es;
+    }
+
     public J visitStatementExpression(Go.StatementExpression statementExpression, P p) {
         Go.StatementExpression se = statementExpression;
         se = se.withPrefix(visitSpace(se.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

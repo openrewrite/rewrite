@@ -27,7 +27,6 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 

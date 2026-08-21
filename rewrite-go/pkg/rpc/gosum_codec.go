@@ -80,8 +80,8 @@ func receiveGoSum(gs *golang.GoSum, q *ReceiveQueue) *golang.GoSum {
 	gs.SourcePath = receiveScalar[string](q, gs.SourcePath)
 	gs.Charset = receiveScalar[string](q, gs.Charset)
 	gs.CharsetBomMarked = receiveScalar[bool](q, gs.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	gs.Lines = recvGoSumLineList(q, gs.Lines)
 	gs.Eof = recvGoModSpace(q, gs.Eof)
 	return gs

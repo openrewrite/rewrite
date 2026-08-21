@@ -137,6 +137,68 @@ class DirectiveTest implements RewriteTest {
     }
 
     @Test
+    void percentInLeadingCommentIsNotADirective() {
+        rewriteRun(
+          yaml(
+            """
+              # 100%
+
+              key: value
+              """,
+            spec -> spec.afterRecipe(y -> assertThat(y.getDocuments().getFirst().getDirectives()).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void percentInLeadingCommentBeforeSequence() {
+        rewriteRun(
+          yaml(
+            """
+              # 100%
+
+              - a
+              """,
+            spec -> spec.afterRecipe(y -> assertThat(y.getDocuments().getFirst().getDirectives()).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void percentAtStartOfLeadingComment() {
+        rewriteRun(
+          yaml(
+            """
+              #%
+              # other
+
+              key: value
+              """,
+            spec -> spec.afterRecipe(y -> assertThat(y.getDocuments().getFirst().getDirectives()).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void directiveAfterLeadingComment() {
+        rewriteRun(
+          yaml(
+            """
+              # comment
+              %YAML 1.2
+              ---
+              key: value
+              """,
+            spec -> spec.afterRecipe(y -> {
+                Yaml.Document doc = y.getDocuments().getFirst();
+                assertThat(doc.getDirectives()).hasSize(1);
+                assertThat(doc.getDirectives().getFirst().getValue()).isEqualTo("YAML 1.2");
+            })
+          )
+        );
+    }
+
+    @Test
     void directiveCopyPaste() {
         // given
         var original = new Yaml.Directive(

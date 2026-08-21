@@ -37,7 +37,10 @@ type GoTemplate struct {
 }
 
 // Apply produces a new AST node by parsing the template and substituting
-// captured values from the MatchResult.
+// captured values from the MatchResult. cursor is the node the result replaces,
+// and is what lets Apply place the result there: leading whitespace,
+// parentheses where the expression around it binds tighter, indentation. Pass
+// nil for the substituted tree alone, carrying the template's own whitespace.
 func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	templateTree, err := t.getTree()
 	if err != nil || templateTree == nil {
@@ -55,8 +58,10 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	if values != nil {
 		fresh = substitute(fresh, values)
 	}
-
-	return fresh
+	if cursor == nil {
+		return fresh
+	}
+	return placeAt(fresh, cursor)
 }
 
 // getTree lazily parses the template and caches the result.
@@ -137,13 +142,13 @@ func (v *RewriteVisitor) Visit(t java.Tree, p any) java.Tree {
 		return result
 	}
 
-	replaced := v.after.Apply(nil, match)
+	// The cursor names t, not the visited j: rewriting a descendant leaves j a
+	// new node, while the parent Apply consults still holds t.
+	replaced := v.after.Apply(visitor.NewCursor(v.Cursor(), t), match)
 	if replaced == nil {
 		return result
 	}
-
-	// Preserve the original node's leading prefix on the replacement.
-	return setLeadingPrefix(replaced, getLeadingPrefix(j))
+	return replaced
 }
 
 // setLeadingPrefix sets the node's own leading whitespace. The parser

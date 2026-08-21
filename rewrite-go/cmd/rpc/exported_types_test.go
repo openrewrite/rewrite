@@ -26,6 +26,10 @@ import (
 
 	"golang.org/x/mod/module"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -61,17 +65,11 @@ func TestHandleExportedTypes(t *testing.T) {
 
 	s, _ := newTestServer(t)
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/foo", Version: "v1.0.0"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("ExportedTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "ExportedTypes failed")
 	data := result.([]rpc.RpcObjectData)
-	if len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject {
-		t.Fatalf("expected a batch ending in END_OF_OBJECT, got %d items", len(data))
-	}
+	require.Falsef(t, len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject, "expected a batch ending in END_OF_OBJECT, got %d items", len(data))
 
 	// The own-FQN list is sent first and must name every enumerated type, so the
 	// caller can tell defined types from references before the first type arrives.
@@ -79,9 +77,7 @@ func TestHandleExportedTypes(t *testing.T) {
 	for _, f := range receiveFqnList(t, data) {
 		fqnSet[f] = true
 	}
-	if !fqnSet["example.com/foo.Greeter"] || !fqnSet["example.com/foo"] {
-		t.Errorf("own-FQN list missing enumerated FQNs; got %v", fqnSet)
-	}
+	assert.Falsef(t, !fqnSet["example.com/foo.Greeter"] || !fqnSet["example.com/foo"], "own-FQN list missing enumerated FQNs; got %v", fqnSet)
 
 	types := receiveTypeList(t, data)
 	if len(types) == 0 {
@@ -96,9 +92,7 @@ func TestHandleExportedTypes(t *testing.T) {
 	}
 
 	greeter := byFqn["example.com/foo.Greeter"]
-	if greeter == nil {
-		t.Fatalf("Greeter type not enumerated; got %v", keys(byFqn))
-	}
+	require.NotNilf(t, greeter, "Greeter type not enumerated; got %v", keys(byFqn))
 	if len(greeter.Methods) == 0 {
 		t.Error("Greeter.Methods is empty; expected Greet")
 	}
@@ -107,9 +101,7 @@ func TestHandleExportedTypes(t *testing.T) {
 	}
 
 	pkg := byFqn["example.com/foo"]
-	if pkg == nil {
-		t.Fatalf("synthetic package class not enumerated; got %v", keys(byFqn))
-	}
+	require.NotNilf(t, pkg, "synthetic package class not enumerated; got %v", keys(byFqn))
 	if len(pkg.Methods) == 0 {
 		t.Error("package class Methods is empty; expected NewGreeter")
 	}
@@ -125,13 +117,8 @@ func TestHandleExportedTypes(t *testing.T) {
 		}
 	}
 	sc, ok := out.(*java.JavaTypeShallowClass)
-	if !ok {
-		t.Fatalf("io.Writer reference is %T, want *java.JavaTypeShallowClass", out)
-	}
-	if sc.FullyQualifiedName != "io.Writer" || len(sc.Members) != 0 || len(sc.Methods) != 0 {
-		t.Errorf("shallow ref = %s (members=%d methods=%d); want io.Writer with an empty body",
-			sc.FullyQualifiedName, len(sc.Members), len(sc.Methods))
-	}
+	require.Truef(t, ok, "io.Writer reference is %T, want *java.JavaTypeShallowClass", out)
+	assert.Falsef(t, sc.FullyQualifiedName != "io.Writer" || len(sc.Members) != 0 || len(sc.Methods) != 0, "shallow ref = %s (members=%d methods=%d); want io.Writer with an empty body", sc.FullyQualifiedName, len(sc.Members), len(sc.Methods))
 	sawShallowTag := false
 	for _, d := range data {
 		if d.ValueType != nil && *d.ValueType == java.JavaTypeShallowClassKind {
@@ -139,9 +126,7 @@ func TestHandleExportedTypes(t *testing.T) {
 			break
 		}
 	}
-	if !sawShallowTag {
-		t.Error("no JavaType$ShallowClass valueType tag on the wire")
-	}
+	assert.True(t, sawShallowTag, "no JavaType$ShallowClass valueType tag on the wire")
 }
 
 // Covers the enumerator's correctness fixes: an alias to an external type is not
@@ -174,15 +159,9 @@ func (g *Greeter) Greet() string { return g.Name }
 	byFqn := exportedTypesByFqn(t, "example.com/foo", "v1.0.0")
 
 	greeter := byFqn["example.com/foo.Greeter"]
-	if greeter == nil {
-		t.Fatalf("Greeter not enumerated; got %v", keys(byFqn))
-	}
-	if !hasMethod(greeter, "Greet") {
-		t.Errorf("Greeter missing Greet method")
-	}
-	if !hasMember(greeter, "Name") {
-		t.Errorf("Greeter missing Name field")
-	}
+	require.NotNilf(t, greeter, "Greeter not enumerated; got %v", keys(byFqn))
+	assert.True(t, hasMethod(greeter, "Greet"), "Greeter missing Greet method")
+	assert.True(t, hasMember(greeter, "Name"), "Greeter missing Name field")
 	if _, ok := byFqn["io.Reader"]; ok {
 		t.Errorf("external alias target io.Reader was collected as an owned type")
 	}
@@ -196,15 +175,9 @@ func (g *Greeter) Greet() string { return g.Name }
 		t.Errorf("bar package class missing NewBar; got %v", barPkg)
 	}
 	config := byFqn["example.com/foo.Config"]
-	if config == nil {
-		t.Fatalf("Config not enumerated; got %v", keys(byFqn))
-	}
-	if !hasMember(config, "Linux") {
-		t.Errorf("Config missing Linux field (fixed linux/amd64 context)")
-	}
-	if hasMember(config, "Windows") {
-		t.Errorf("Config has Windows field; _windows.go should be filtered out")
-	}
+	require.NotNilf(t, config, "Config not enumerated; got %v", keys(byFqn))
+	assert.True(t, hasMember(config, "Linux"), "Config missing Linux field (fixed linux/amd64 context)")
+	assert.False(t, hasMember(config, "Windows"), "Config has Windows field; _windows.go should be filtered out")
 }
 
 // A subdirectory with its own go.mod is a separate module; its files must not be
@@ -243,19 +216,11 @@ func TestExportedTypes_StdlibPackage(t *testing.T) {
 	}
 
 	stringer := byFqn["fmt.Stringer"]
-	if stringer == nil {
-		t.Fatalf("fmt.Stringer not enumerated; got %v", keys(byFqn))
-	}
-	if !hasMethod(stringer, "String") {
-		t.Errorf("fmt.Stringer missing String method")
-	}
+	require.NotNilf(t, stringer, "fmt.Stringer not enumerated; got %v", keys(byFqn))
+	assert.True(t, hasMethod(stringer, "String"), "fmt.Stringer missing String method")
 	pkg := byFqn["fmt"]
-	if pkg == nil {
-		t.Fatalf("synthetic fmt package class not enumerated; got %v", keys(byFqn))
-	}
-	if !hasMethod(pkg, "Sprintf") {
-		t.Errorf("fmt package class missing Sprintf; got %v", pkg.Methods)
-	}
+	require.NotNilf(t, pkg, "synthetic fmt package class not enumerated; got %v", keys(byFqn))
+	assert.True(t, hasMethod(pkg, "Sprintf"), "fmt package class missing Sprintf")
 	// A stdlib package's cross-package references are shallow too.
 	for _, m := range pkg.Methods {
 		if m.Name != "Fprintf" {
@@ -282,24 +247,16 @@ func TestHandleDependencyTypes_StdlibCoordinate(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.batchSize = 1 << 20
 	params, err := json.Marshal(dependencyRequest{ModulePath: "fmt"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("stdlib DependencyTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "stdlib DependencyTypes failed")
 	data := result.([]rpc.RpcObjectData)
-	if len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject {
-		t.Fatalf("expected a batch ending in END_OF_OBJECT, got %d items", len(data))
-	}
+	require.Falsef(t, len(data) == 0 || data[len(data)-1].State != rpc.EndOfObject, "expected a batch ending in END_OF_OBJECT, got %d items", len(data))
 	fqns := map[string]bool{}
 	for _, f := range receiveFqnList(t, data) {
 		fqns[f] = true
 	}
-	if !fqns["fmt"] || !fqns["fmt.Stringer"] {
-		t.Errorf("own-FQN list missing fmt package FQNs; got %d FQNs", len(fqns))
-	}
+	assert.Falsef(t, !fqns["fmt"] || !fqns["fmt.Stringer"], "own-FQN list missing fmt package FQNs; got %d FQNs", len(fqns))
 }
 
 // A versioned coordinate resolves against the parsed project's vendor/ tree before the module
@@ -313,30 +270,22 @@ func TestHandleDependencyTypes_VendorTree(t *testing.T) {
 
 	s, _ := newTestServer(t)
 	pp, err := json.Marshal(parseProjectRequest{ProjectPath: proj})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 	if _, rpcErr := s.handleParseProject(pp); rpcErr != nil {
 		t.Fatalf("ParseProject failed: %+v", rpcErr)
 	}
 
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/foo", Version: "v1.0.0"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("vendored DependencyTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "vendored DependencyTypes failed")
 	byFqn := map[string]*java.JavaTypeClass{}
 	for _, ty := range receiveTypeList(t, result.([]rpc.RpcObjectData)) {
 		if cls, ok := ty.(*java.JavaTypeClass); ok {
 			byFqn[cls.FullyQualifiedName] = cls
 		}
 	}
-	if byFqn["example.com/foo.Greeter"] == nil {
-		t.Errorf("vendored Greeter not enumerated; got %v", keys(byFqn))
-	}
+	assert.NotNilf(t,byFqn["example.com/foo.Greeter"], "vendored Greeter not enumerated; got %v", keys(byFqn))
 }
 
 // A coordinate found in neither the vendor tree nor the module cache is a per-dependency
@@ -345,9 +294,7 @@ func TestHandleDependencyTypes_UnresolvableCoordinate(t *testing.T) {
 	t.Setenv("GOMODCACHE", t.TempDir())
 	s, _ := newTestServer(t)
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/missing", Version: "v9.9.9"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 	if _, rpcErr := s.handleDependencyTypes(params); rpcErr == nil {
 		t.Fatal("expected an error for an unresolvable coordinate")
 	}
@@ -363,21 +310,15 @@ func TestExportedTypes_Paginates(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "greeter.go"), greeterModule)
 
 	params, err := json.Marshal(dependencyRequest{ModulePath: "example.com/foo", Version: "v1.0.0"})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// Single-shot reference run with a batch large enough to hold the whole table.
 	single, _ := newTestServer(t)
 	single.batchSize = 1 << 20
 	oneShot, rpcErr := single.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("single-shot ExportedTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "single-shot ExportedTypes failed")
 	want := oneShot.([]rpc.RpcObjectData)
-	if len(want) == 0 || want[len(want)-1].State != rpc.EndOfObject {
-		t.Fatalf("single-shot must end in END_OF_OBJECT; got %d items", len(want))
-	}
+	require.Falsef(t, len(want) == 0 || want[len(want)-1].State != rpc.EndOfObject, "single-shot must end in END_OF_OBJECT; got %d items", len(want))
 
 	// Paginated run: same params, tiny batch, drained across repeated calls.
 	s, _ := newTestServer(t)
@@ -388,9 +329,7 @@ func TestExportedTypes_Paginates(t *testing.T) {
 			t.Fatalf("pagination did not terminate after %d calls", calls)
 		}
 		result, rpcErr := s.handleDependencyTypes(params)
-		if rpcErr != nil {
-			t.Fatalf("paginated ExportedTypes failed: %+v", rpcErr)
-		}
+		require.Nil(t, rpcErr, "paginated ExportedTypes failed")
 		batch := result.([]rpc.RpcObjectData)
 		if len(batch) > s.batchSize {
 			t.Fatalf("batch of %d exceeds batchSize %d", len(batch), s.batchSize)
@@ -401,16 +340,12 @@ func TestExportedTypes_Paginates(t *testing.T) {
 		}
 	}
 
-	if len(s.pendingDependencyTypes) != 0 {
-		t.Errorf("cache not freed after drain: %d entries remain", len(s.pendingDependencyTypes))
-	}
+	assert.Lenf(t, s.pendingDependencyTypes, 0, "cache not freed after drain: %d entries remain", len(s.pendingDependencyTypes))
 	if len(got) != len(want) {
 		t.Fatalf("paginated total %d != single-shot %d", len(got), len(want))
 	}
 	for i := range want {
-		if !reflect.DeepEqual(got[i], want[i]) {
-			t.Fatalf("item %d differs between paginated and single-shot runs:\n paginated=%+v\n single=%+v", i, got[i], want[i])
-		}
+		require.Truef(t, reflect.DeepEqual(got[i], want[i]), "item %d differs between paginated and single-shot runs:\n paginated=%+v\n single=%+v", i, got[i], want[i])
 	}
 }
 
@@ -421,13 +356,9 @@ func modCacheDir(t *testing.T, modulePath, version string) string {
 	cache := t.TempDir()
 	t.Setenv("GOMODCACHE", cache)
 	esc, err := module.EscapePath(modulePath)
-	if err != nil {
-		t.Fatalf("escape %q: %v", modulePath, err)
-	}
+	require.NoErrorf(t, err, "escape %q", modulePath)
 	escVer, err := module.EscapeVersion(version)
-	if err != nil {
-		t.Fatalf("escape %q: %v", version, err)
-	}
+	require.NoErrorf(t, err, "escape %q", version)
 	return filepath.Join(cache, filepath.FromSlash(esc)+"@"+escVer)
 }
 
@@ -437,13 +368,9 @@ func exportedTypesByFqn(t *testing.T, modulePath, version string) map[string]*ja
 	t.Helper()
 	s, _ := newTestServer(t)
 	params, err := json.Marshal(dependencyRequest{ModulePath: modulePath, Version: version})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 	result, rpcErr := s.handleDependencyTypes(params)
-	if rpcErr != nil {
-		t.Fatalf("ExportedTypes failed: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "ExportedTypes failed")
 	byFqn := map[string]*java.JavaTypeClass{}
 	for _, ty := range receiveTypeList(t, result.([]rpc.RpcObjectData)) {
 		if cls, ok := ty.(*java.JavaTypeClass); ok {

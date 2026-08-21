@@ -350,6 +350,48 @@ class GolangRecipeIntegTest implements RewriteTest {
         );
     }
 
+    /**
+     * Reproduces the reported EmptyBlock/Go corruption root cause: a Java recipe
+     * that mutates a {@code J.Binary} operator ({@code ==} -> {@code !=}) must
+     * round-trip through the Go RPC print path. If the operator change is dropped,
+     * the source prints unchanged (== stays ==).
+     */
+    @Test
+    void flipBinaryOperatorRoundTrips() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Binary visitBinary(J.Binary binary, org.openrewrite.ExecutionContext ctx) {
+                  J.Binary b = super.visitBinary(binary, ctx);
+                  if (b.getOperator() == J.Binary.Type.Equal) {
+                      return b.withOperator(J.Binary.Type.NotEqual);
+                  }
+                  return b;
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          go(
+            """
+              package main
+
+              func test() {
+              \tif err == nil {
+              \t\thandle(err)
+              \t}
+              }
+              """,
+            """
+              package main
+
+              func test() {
+              \tif err != nil {
+              \t\thandle(err)
+              \t}
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void renameIdentifier() {
         rewriteRun(

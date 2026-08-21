@@ -34,8 +34,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -94,7 +94,7 @@ class ParseProjectModuleContextTest {
                 """);
 
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
+        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(toList());
 
         // Both .go files carry the lightweight GoProject marker (module path);
         // the heavy GoResolutionResult stays on the sibling go.mod, mirroring
@@ -102,7 +102,7 @@ class ParseProjectModuleContextTest {
         List<Go.CompilationUnit> cus = sources.stream()
                 .filter(s -> s instanceof Go.CompilationUnit)
                 .map(s -> (Go.CompilationUnit) s)
-                .collect(Collectors.toList());
+                .collect(toList());
         assertThat(cus).as("expected 2 .go compilation units").hasSize(2);
 
         for (Go.CompilationUnit cu : cus) {
@@ -133,12 +133,12 @@ class ParseProjectModuleContextTest {
                 """);
 
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
+        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(toList());
 
         List<GoMod> goMods = sources.stream()
                 .filter(s -> s instanceof GoMod)
                 .map(s -> (GoMod) s)
-                .collect(Collectors.toList());
+                .collect(toList());
         assertThat(goMods).as("expected the go.mod to be parsed as a GoMod").hasSize(1);
         assertThat(sources).noneMatch(s -> s instanceof PlainText);
 
@@ -178,7 +178,7 @@ class ParseProjectModuleContextTest {
                 """);
 
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
+        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(toList());
 
         Go.CompilationUnit rootCu = findBySuffix(sources, "main.go");
         Go.CompilationUnit nestedCu = findBySuffix(sources, "nested/lib.go");
@@ -200,7 +200,7 @@ class ParseProjectModuleContextTest {
                 """);
 
         GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
+        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(toList());
 
         Go.CompilationUnit cu = findBySuffix(sources, "main.go");
         assertThat(cu.getMarkers().findFirst(GoResolutionResult.class)).isEmpty();
@@ -214,7 +214,7 @@ class ParseProjectModuleContextTest {
                 .filter(cu -> cu.getSourcePath().toString().replace('\\', '/').endsWith(suffix))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no source ending with " + suffix +
-                        "; got " + sources.stream().map(SourceFile::getSourcePath).collect(Collectors.toList())));
+                        "; got " + sources.stream().map(SourceFile::getSourcePath).collect(toList())));
     }
 
     private static void write(Path path, String content) throws java.io.IOException {

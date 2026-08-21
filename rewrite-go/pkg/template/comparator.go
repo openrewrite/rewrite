@@ -195,6 +195,10 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 	case *java.Parentheses:
 		cand := candidate.(*java.Parentheses)
 		return c.matchNode(p.Tree.Element, cand.Tree.Element)
+	case *golang.TypeAssertion:
+		cand := candidate.(*golang.TypeAssertion)
+		return c.matchNode(p.AssertedType, cand.AssertedType) &&
+			c.matchNode(p.Left.Element, cand.Left.Element)
 	case *java.TypeCast:
 		cand := candidate.(*java.TypeCast)
 		return c.matchNode(p.Clazz, cand.Clazz) &&

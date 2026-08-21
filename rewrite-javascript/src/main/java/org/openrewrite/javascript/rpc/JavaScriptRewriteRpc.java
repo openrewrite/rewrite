@@ -56,6 +56,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import java.util.stream.StreamSupport;
 
@@ -291,7 +292,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         private final Set<String> unsetEnvNames = new LinkedHashSet<>();
         private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");

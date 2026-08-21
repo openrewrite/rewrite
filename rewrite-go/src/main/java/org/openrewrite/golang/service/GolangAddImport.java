@@ -24,8 +24,10 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 /**
  * Adds a Go import to a {@link Go.CompilationUnit} if it doesn't already exist.
@@ -85,7 +87,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
             // No existing imports — create import section with grouped style
             List<JRightPadded<J.Import>> imports = new ArrayList<>();
             imports.add(new JRightPadded<>(newImport, Space.format("\n"), Markers.EMPTY));
-            Markers containerMarkers = Markers.build(Collections.singletonList(
+            Markers containerMarkers = Markers.build(singletonList(
                     new GroupedImport(Tree.randomId(), Space.SINGLE_SPACE)));
             return cu.withImportsContainer(JContainer.build(
                     Space.format("\n\n"), imports, containerMarkers));
@@ -115,7 +117,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
                 new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY),
                 JLeftPadded.build(new J.Identifier(
                         Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        Collections.emptyList(), importPath, null, null)),
+                        emptyList(), importPath, null, null)),
                 null
         );
 
@@ -125,7 +127,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
             aliasField = new JLeftPadded<>(
                     Space.EMPTY,
                     new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                            Collections.emptyList(), aliasName, null, null),
+                            emptyList(), aliasName, null, null),
                     Markers.EMPTY
             );
         }
