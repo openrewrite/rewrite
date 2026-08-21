@@ -81,9 +81,9 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 
 // A value that carries no valueType is bound on the JVM side by its JSON shape,
 // and Go writes a float64 without a fraction or an exponent for every magnitude
-// between 1e-6 and 1e21 -- a shape the receiver reads as an integer. A literal's
-// value is the only float64 the Go LST holds, and it occupies a message of its
-// own, so the top-level value is the whole of it.
+// between 1e-6 and 1e21 -- a shape the receiver reads as an integer. Only a value
+// sent on its own is bound that way; one nested in an inlined map arrives under a
+// valueType, which binds it against the type of the field it fills.
 func wireNumber(v any) any {
 	f, ok := v.(float64)
 	if !ok {
