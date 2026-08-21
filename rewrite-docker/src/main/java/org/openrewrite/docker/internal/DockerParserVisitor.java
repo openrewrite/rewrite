@@ -224,21 +224,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         // Complex case: parse token by token
-        boolean foundComment = false;
-        for (int i = textCtx.getChildCount() - 1; i >= 0; i--) {
-            ParseTree child = textCtx.getChild(i);
-            if (child instanceof DockerParser.TextElementContext) {
-                DockerParser.TextElementContext textElement = (DockerParser.TextElementContext) child;
-                if (textElement.getChildCount() > 0 && textElement.getChild(0) instanceof TerminalNode) {
-                    TerminalNode terminal = (TerminalNode) textElement.getChild(0);
-                    if (terminal.getSymbol().getType() == DockerLexer.COMMENT) {
-                        foundComment = true;
-                        break;
-                    }
-                }
-            }
-        }
-
         for (int i = 0; i < textCtx.getChildCount(); i++) {
             ParseTree child = textCtx.getChild(i);
 
@@ -249,10 +234,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     Token token = terminal.getSymbol();
                     String tokenText = token.getText();
 
-                    if (token.getType() == DockerLexer.COMMENT) {
-                        // COMMENT tokens are ignored - they will be part of next element's prefix
-                        break; // Stop processing tokens once we hit a comment
-                    } else if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
+                    if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
                         Space elementPrefix = prefix(token);
                         skip(token);
                         String value = tokenText.substring(1, tokenText.length() - 1);
@@ -1283,6 +1265,20 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 // Not a valid env var, treat $ as literal
                 current.append(c);
                 i++;
+            } else if (c == '"' || c == '\'') {
+                int close = findClosingQuote(text, i);
+                if (close < 0) {
+                    current.append(c);
+                    i++;
+                    continue;
+                }
+                if (current.length() > 0) {
+                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
+                    current.setLength(0);
+                }
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
+                        c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
+                i = close + 1;
             } else if (c == '=') {
                 // Flush any accumulated text
                 if (current.length() > 0) {
@@ -1304,6 +1300,19 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         }
 
         return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
+    }
+
+    private static int findClosingQuote(String text, int openIndex) {
+        char quote = text.charAt(openIndex);
+        for (int i = openIndex + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote == '"' && c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private boolean isVarChar(char c, boolean isFirst) {

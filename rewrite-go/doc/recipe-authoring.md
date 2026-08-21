@@ -198,12 +198,13 @@ resolve, and commit what lands:
 
 ```
 go run github.com/openrewrite/rewrite/rewrite-go/cmd/goexportdata \
-    -o internal/exportdata encoding/json/jsontext github.com/pkg/errors
+    -o internal/jsonv2exportdata encoding/json/v2 encoding/json/jsontext
 ```
 
 The output directory can sit anywhere in the module; its name becomes
 the generated package's name, or pass `-pkg` when the two should
-differ. A module can generate as many of these as it likes — one per
+differ. Name it for what it carries rather than `exportdata`, which
+collides with this package when a test calls `Verify`. A module can generate as many of these as it likes — one per
 dependency it templates against, say — and a template draws on however
 many it needs, since sets accumulate the way `Imports` does.
 
@@ -265,8 +266,8 @@ func TestExportDataIsReadable(t *testing.T) {
 }
 ```
 
-`exportdata` there is `pkg/exportdata`; the generated package needs an
-import name of its own, which is why the examples alias it.
+`exportdata` there is this package; `jsonv2exportdata` is the generated
+one.
 
 Regenerate when that test fails, or when the shipped package's API
 moves and the templates should follow.

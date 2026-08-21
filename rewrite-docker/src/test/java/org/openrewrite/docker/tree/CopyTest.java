@@ -342,4 +342,28 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void quotedChownFlagValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --chown="me":"grp" src /dst
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags()).isNotNull();
+                Docker.Argument chown = copy.getFlags().getFirst().getValue();
+                assertThat(chown).isNotNull();
+                Docker.Literal first = (Docker.Literal) chown.getContents().getFirst();
+                assertThat(first.getText()).isEqualTo("me");
+                assertThat(first.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                Docker.Literal last = (Docker.Literal) chown.getContents().getLast();
+                assertThat(last.getText()).isEqualTo("grp");
+                assertThat(last.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+            })
+          )
+        );
+    }
 }

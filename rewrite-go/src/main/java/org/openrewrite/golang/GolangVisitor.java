@@ -374,6 +374,14 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
+    public J visitSelect(Go.Select select, P p) {
+        Go.Select s = select;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withBody((J.Block) visitAndCast(s.getBody(), p));
+        return s;
+    }
+
     public J visitIndexList(Go.IndexList indexList, P p) {
         Go.IndexList i = indexList;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

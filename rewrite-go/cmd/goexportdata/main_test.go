@@ -52,7 +52,7 @@ func TestGenerateWritesACompilingEmbedShim(t *testing.T) {
 	shim, err := os.ReadFile(filepath.Join(out, shimFile))
 	require.NoError(t, err)
 	assert.Contains(t, string(shim), "package exportdata")
-	assert.Contains(t, string(shim), "//go:embed "+blobDir)
+	assert.Contains(t, string(shim), "//go:embed all:"+blobDir)
 	assert.Contains(t, string(shim), test.ShippedPath)
 
 	cmd := exec.Command("gofmt", "-l", filepath.Join(out, shimFile))

@@ -80,3 +80,19 @@ func TestNoOpVisitPreservesIdentity(t *testing.T) {
 		}
 	}
 }
+
+// go.mod and go.sum are not J nodes and carry their own node set, so they ride
+// a separate branch of the traversal from the .go samples above.
+func TestNoOpVisitPreservesGoModAndGoSumIdentity(t *testing.T) {
+	gm, err := parser.ParseGoModFile("go.mod", identityGoMod)
+	require.NoError(t, err, "go.mod parse")
+	if got := visitor.Init(&visitor.GoVisitor{}).Visit(gm, nil); got != java.Tree(gm) {
+		t.Error("no-op visit did not preserve go.mod identity (returned a new pointer)")
+	}
+
+	gs, err := parser.ParseGoSumFile("go.sum", identityGoSum)
+	require.NoError(t, err, "go.sum parse")
+	if got := visitor.Init(&visitor.GoVisitor{}).Visit(gs, nil); got != java.Tree(gs) {
+		t.Error("no-op visit did not preserve go.sum identity (returned a new pointer)")
+	}
+}

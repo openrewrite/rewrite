@@ -374,6 +374,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchStatementList(p.Body, cand.Body)
+	case *golang.Select:
+		cand := candidate.(*golang.Select)
+		return c.matchOptionalNode(p.Body, cand.Body)
 	case *golang.IndexList:
 		cand := candidate.(*golang.IndexList)
 		if !c.matchNode(p.Target, cand.Target) {

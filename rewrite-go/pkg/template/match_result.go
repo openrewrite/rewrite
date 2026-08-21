@@ -16,7 +16,11 @@
 
 package template
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+import (
+	"reflect"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
 
 type MatchResult struct {
 	bindings map[string]any // single: java.J, variadic: []java.J
@@ -29,6 +33,14 @@ func NewMatchResult() *MatchResult {
 // bind stores a single captured value.
 func (m *MatchResult) bind(name string, value java.J) {
 	m.bindings[name] = value
+}
+
+// Bind associates a capture with the subtree to substitute for it, so a
+// template can be instantiated without a pattern match. Returns the receiver,
+// for chaining.
+func (m *MatchResult) Bind(c *Capture, value java.J) *MatchResult {
+	m.bind(c.Name(), value)
+	return m
 }
 
 // bindList stores a variadic captured list.
@@ -46,10 +58,18 @@ func (m *MatchResult) Get(name string) java.J {
 	if !ok {
 		return nil
 	}
-	if j, ok := v.(java.J); ok {
+	if j, ok := v.(java.J); ok && !isNilTree(j) {
 		return j
 	}
 	return nil
+}
+
+// isNilTree reports a J holding no node. A caller that binds the nil result of
+// a helper returning a concrete type leaves an interface that is itself
+// non-nil, which every consumer would otherwise dereference.
+func isNilTree(j java.J) bool {
+	v := reflect.ValueOf(j)
+	return v.Kind() == reflect.Ptr && v.IsNil()
 }
 
 func (m *MatchResult) GetList(name string) []java.J {

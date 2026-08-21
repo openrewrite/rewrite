@@ -483,6 +483,14 @@ func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	return cc
 }
 
+func (r *GoReceiver) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *sel // shallow copy to avoid mutating remoteObjects baseline
+	sel = &c
+	sel.Body = receiveValue(q, sel.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	return sel
+}
+
 func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *il // shallow copy to avoid mutating remoteObjects baseline

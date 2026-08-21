@@ -599,11 +599,7 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 		prefix = wrapper.Prefix
 	}
 	p.beforeSyntax(prefix, sw.Markers, out)
-	if java.FindMarker[golang.SelectStmt](sw.Markers) != nil {
-		out.Append("select")
-	} else {
-		out.Append("switch")
-	}
+	out.Append("switch")
 	if wrapped {
 		p.Visit(wrapper.Init.Element, out)
 		p.visitSpace(wrapper.Init.After, out)
@@ -618,6 +614,15 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
 	return sw
+}
+
+func (p *GoPrinter) VisitSelect(sel *golang.Select, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(sel.Prefix, sel.Markers, out)
+	out.Append("select")
+	p.Visit(sel.Body, out)
+	p.afterSyntax(sel.Markers, out)
+	return sel
 }
 
 // isDefaultCase reports whether a J.Case is Go's `default:` clause, modeled as a
@@ -1014,13 +1019,24 @@ func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J 
 	return paren
 }
 
-// VisitTypeCast renders J's prefix cast, which reaches this printer from
-// a synthesized or Java-side tree; Go's own `x.(T)` is a TypeAssertion.
+// VisitTypeCast renders Go's conversion `T(x)`.
 func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)
-	p.Visit(tc.Clazz, out)
+	if tc.Clazz != nil {
+		p.Visit(tc.Clazz.Tree.Element, out)
+		p.visitSpace(tc.Clazz.Prefix, out)
+	}
+	out.Append("(")
 	p.Visit(tc.Expr, out)
+	if trailing := java.FindMarker[golang.TrailingComma](tc.Markers); trailing != nil {
+		p.visitSpace(trailing.Before, out)
+		out.Append(",")
+		p.visitSpace(trailing.After, out)
+	} else if tc.Clazz != nil {
+		p.visitSpace(tc.Clazz.Tree.After, out)
+	}
+	out.Append(")")
 	p.afterSyntax(tc.Markers, out)
 	return tc
 }

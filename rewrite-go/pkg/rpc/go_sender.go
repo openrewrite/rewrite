@@ -531,6 +531,13 @@ func (s *GoSender) sendParseError(pe *java.ParseError, q *SendQueue) {
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Text }, nil)
 }
 
+func (s *GoSender) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(sel, func(v any) any { return v.(*golang.Select).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return sel
+}
+
 func (s *GoSender) VisitIndexList(il *golang.IndexList, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(il, func(v any) any { return v.(*golang.IndexList).Target },

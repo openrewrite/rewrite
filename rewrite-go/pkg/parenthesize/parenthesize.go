@@ -81,10 +81,11 @@ func Needed(e java.Expression, site *visitor.Cursor) bool {
 		return any(parent.Indexed) == any(replaced) && needsDelimiting(e)
 	case *golang.TypeAssertion:
 		return any(parent.Left.Element) == any(replaced) && needsDelimiting(e)
-	// The callee slot holds the type a conversion names, which is subject to
-	// the same rule.
 	case *java.MethodInvocation:
 		return parent.Select != nil && any(parent.Select.Element) == any(replaced) && needsDelimiting(e)
+	// The type a conversion names leads it, so it is subject to the same rule.
+	case *java.ControlParentheses:
+		return isConversionType(site) && needsDelimiting(e)
 	default:
 		prec, _, _, isBinary := format.BinaryOperands(e)
 		if !isBinary {
@@ -110,13 +111,24 @@ func Needed(e java.Expression, site *visitor.Cursor) bool {
 	}
 }
 
+// isConversionType reports whether site holds the type a conversion names,
+// which the cursor reaches through the parentheses TypeCast carries.
+func isConversionType(site *visitor.Cursor) bool {
+	grandparent := site.Parent().Parent()
+	if grandparent == nil {
+		return false
+	}
+	tc, ok := grandparent.Value().(*java.TypeCast)
+	return ok && any(tc.Clazz) == any(site.Parent().Value())
+}
+
 // needsDelimiting reports whether e is a form Go's grammar does not admit where
 // a primary expression belongs: anything built from operators, and the pointer,
 // channel and func type spellings, which a conversion names in that position.
 // Slice, array and map types open with a bracket and read unambiguously.
 func needsDelimiting(e java.Expression) bool {
 	switch e.(type) {
-	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary, *java.TypeCast:
+	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary:
 		return true
 	case *golang.Channel, *golang.FuncType:
 		return true
@@ -144,6 +156,10 @@ func bracesReadAsABlock(e java.Expression, site *visitor.Cursor) bool {
 			return false
 		case *java.MethodInvocation:
 			if parent.Select == nil || any(parent.Select.Element) != any(child) {
+				return false
+			}
+		case *java.TypeCast:
+			if parent.Clazz == nil || any(parent.Clazz) != any(child) {
 				return false
 			}
 		case *java.ArrayAccess:

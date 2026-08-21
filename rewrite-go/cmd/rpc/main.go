@@ -2116,6 +2116,15 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 		// visitor added any new ones (`hasNewMessages`).
 		preKeys := stringSet(ctx.MessageKeys())
 		after := v.Visit(current, ctx)
+		if t, ok := after.(java.Tree); ok {
+			// Part of this visitor's edit, on the same terms as in handleVisit.
+			after = visitor.DrainAfterVisits(v, t, ctx)
+		} else if q, ok := v.(visitor.AfterVisitsProvider); ok {
+			// A deleted tree leaves nothing to apply them to, and an editor
+			// instance can be shared across files: emptying the queue is what
+			// keeps them off the next one.
+			q.AfterVisits()
+		}
 
 		deleted := after == nil
 		modified := !deleted && !treeIdentical(before, after)

@@ -1109,9 +1109,9 @@ public interface Go extends J {
     // ---------------------------------------------------------------
 
     /**
-     * Go's postfix {@code x.(T)}, where {@link J.TypeCast} is a prefix
-     * cast. The left expression is right-padded, so its padding holds what
-     * stands before the dot — a space, or a comment.
+     * Go's postfix {@code x.(T)}, which reads an interface's dynamic type where
+     * {@link J.TypeCast} converts. The left expression is right-padded, so its
+     * padding holds what stands before the dot — a space, or a comment.
      */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2359,6 +2359,43 @@ public interface Go extends J {
             public Go.CommClause withBody(List<JRightPadded<Statement>> body) {
                 return t.body == body ? t : new Go.CommClause(t.padding, t.id, t.prefix, t.markers, t.comm, t.colon, body);
             }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Select (select { case <-ch: ... })
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class Select implements Go, Statement {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.Block body;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitSelect(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 

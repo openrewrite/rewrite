@@ -102,7 +102,15 @@ func Verify(fsys fs.FS, importPaths ...string) error {
 // go/importer off its default search entirely, which is why Importer chains
 // this rather than handing it the whole job.
 func shippedOnly(fsys fs.FS) types.Importer {
-	return importer.ForCompiler(token.NewFileSet(), "gc", func(path string) (io.ReadCloser, error) {
+	return importer.ForCompiler(token.NewFileSet(), "gc", func(path string) (rc io.ReadCloser, err error) {
+		// A set is supplied by the recipe module; one that panics on Open
+		// costs the attribution it would have carried, like one that has no
+		// blob for the path.
+		defer func() {
+			if r := recover(); r != nil {
+				rc, err = nil, fmt.Errorf("export data for %q: %v", path, r)
+			}
+		}()
 		blob, err := fs.ReadFile(fsys, BlobName(path))
 		if err != nil {
 			return nil, err

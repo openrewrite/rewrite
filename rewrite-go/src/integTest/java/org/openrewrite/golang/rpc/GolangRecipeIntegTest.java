@@ -114,6 +114,51 @@ class GolangRecipeIntegTest implements RewriteTest {
     }
 
     /**
+     * A {@code JavaVisitor} walking {@code J.Switch#getCases()} may cast each
+     * statement to {@code J.Case} — the contract every parser but Go honours
+     * (this is exactly what {@code MinimumSwitchCases} does). Go's {@code select}
+     * is not a Java {@code switch}: it maps to {@code Go.Select}, whose clauses
+     * are {@code Go.CommClause}. Before {@code Go.Select} existed, {@code select}
+     * was a {@code J.Switch} full of {@code Go.CommClause}, so this recipe threw
+     * {@code ClassCastException: Go$CommClause cannot be cast to J$Case}. The
+     * regular {@code switch} in the same file must still be visited and yield
+     * {@code J.Case} unharmed.
+     */
+    @Test
+    void switchVisitorNeverSeesSelectClauses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Switch visitSwitch(J.Switch switch_, org.openrewrite.ExecutionContext ctx) {
+                  for (org.openrewrite.java.tree.Statement s : switch_.getCases().getStatements()) {
+                      J.Case c = (J.Case) s;
+                      c.getCaseLabels();
+                  }
+                  return super.visitSwitch(switch_, ctx);
+              }
+          })).expectedCyclesThatMakeChanges(0).cycles(1),
+          go(
+            """
+              package main
+
+              func f(c chan int, d chan int, x int) {
+              \tselect {
+              \tcase v := <-c:
+              \t\t_ = v
+              \tcase d <- 1:
+              \tdefault:
+              \t}
+              \tswitch x {
+              \tcase 1:
+              \tdefault:
+              \t}
+              }
+              """
+          )
+        );
+    }
+
+    /**
      * Renames an identifier declared inside a grouped {@code const ( ... )}
      * block. This only works if the grouped declarations (modeled as
      * Go.DeclarationBlock) round-trip their inner specs to the Java side —

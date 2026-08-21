@@ -95,7 +95,7 @@ func TestExportDataSetsAccumulate(t *testing.T) {
 	mathx := test.ShippedExportDataFor(t, test.ShippedPath)
 	strx := test.ShippedExportDataFor(t, test.ShippedPathB)
 
-	both := template.ExpressionTemplate(`mathx.Clamp(strx.Repeat("a", 2) == "" && true, 0, 10)`).
+	both := template.ExpressionTemplate(`mathx.Clamp(len(strx.Repeat("a", 2)), 0, 10)`).
 		Imports(test.ShippedPath, test.ShippedPathB).
 		ExportData(mathx).
 		ExportData(strx).
@@ -106,9 +106,12 @@ func TestExportDataSetsAccumulate(t *testing.T) {
 	c := &invocationCollector{}
 	c.Self = c
 	c.Visit(both, nil)
-	require.Len(t, c.calls, 2)
+	resolved := map[string]bool{}
 	for _, mi := range c.calls {
-		assert.True(t, matcher.IsResolved(mi), "%s lost attribution when a second set was added", mi.Name.Name)
+		resolved[mi.Name.Name] = matcher.IsResolved(mi)
+	}
+	for _, name := range []string{"Clamp", "Repeat"} {
+		assert.True(t, resolved[name], "%s lost attribution when a second set was added", name)
 	}
 }
 
