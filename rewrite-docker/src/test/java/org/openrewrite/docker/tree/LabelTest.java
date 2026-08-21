@@ -145,4 +145,124 @@ class LabelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void environmentVariableValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL version=$VAL
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(pair.getKey().getText()).isEqualTo("version");
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) pair.getValue().getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("VAL");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(pair.getValue().hasEnvironmentVariables()).isTrue();
+                assertThat(pair.getValue().getText()).isNull();
+                assertThat(pair.getValue().getTextWithVariables()).isEqualTo("$VAL");
+            })
+          )
+        );
+    }
+
+    @Test
+    void bracedEnvironmentVariableWithSuffix() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL version=${BASE}-suffix
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(pair.getValue().getContents()).hasSize(2);
+                assertThat(pair.getValue().getTextWithVariables()).isEqualTo("${BASE}-suffix");
+            })
+          )
+        );
+    }
+
+    @Test
+    void multiplePairsWithEnvironmentVariable() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL a=1 b=$X c=3
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(label.getPairs()).hasSize(3);
+                assertThat(label.getPairs()).allSatisfy(pair -> assertThat(pair.isHasEquals()).isTrue());
+                assertThat(label.getPairs().get(0).getValue().getTextWithVariables()).isEqualTo("1");
+                assertThat(label.getPairs().get(1).getValue().getTextWithVariables()).isEqualTo("$X");
+                assertThat(label.getPairs().get(2).getValue().getTextWithVariables()).isEqualTo("3");
+            })
+          )
+        );
+    }
+
+    @Test
+    void oldFormatValueKeepsSpacesBetweenWords() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author John Doe
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(pair.getValue().getText()).isEqualTo("John Doe");
+            })
+          )
+        );
+    }
+
+    @Test
+    void oldFormatValueIsOneLiteralHoldingSourceText() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author "John Doe" of ACME
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(pair.getValue().getContents()).hasSize(1);
+                assertThat(pair.getValue().getQuoteStyle()).isNull();
+                assertThat(pair.getValue().getText()).isEqualTo("\"John Doe\" of ACME");
+            })
+          )
+        );
+    }
+
+    @Test
+    void singleQuotedSectionOfAValueDoesNotExpand() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author 'John $D' of ACME
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.getValue().getContents()).hasSize(1);
+                assertThat(pair.getValue().hasEnvironmentVariables()).isFalse();
+                assertThat(pair.getValue().getText()).isEqualTo("'John $D' of ACME");
+            })
+          )
+        );
+    }
+
+    private static Docker.Label.LabelPair onlyPair(Docker.File doc) {
+        var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
+        return assertThat(label.getPairs()).singleElement().actual();
+    }
 }

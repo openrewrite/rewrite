@@ -214,4 +214,98 @@ class AddOrUpdateLabelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void updateLabelWhoseValueIsAnEnvironmentVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("foo", "newvalue", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL foo=$BAR
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL foo=newvalue
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateBracedEnvironmentVariableLabel() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("foo", "newvalue", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL foo=${BAR}
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL foo=newvalue
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateEnvironmentVariableLabelKeepsSiblingPairs() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("b", "new", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL a=1 b=$X c=3
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL a=1 b=new c=3
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeWhenOldFormatMultiWordValueAlreadyMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("author", "John Doe", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL author John Doe
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateOldFormatValueKeepsSeparatingSpace() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("author", "Jane Roe", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL author John Doe
+              """,
+            """
+              FROM ubuntu:22.04
+              LABEL author "Jane Roe"
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeWhenMultiTokenValueAlreadyMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateLabel("desc", "\"a b\" c", true, null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              LABEL desc="a b" c
+              """
+          )
+        );
+    }
 }

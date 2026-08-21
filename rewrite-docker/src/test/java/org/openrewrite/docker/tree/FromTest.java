@@ -294,4 +294,22 @@ class FromTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void quotedImageReferenceWithVariableStaysWhole() {
+        rewriteRun(
+          docker(
+            """
+              ARG TAG=22.04
+              FROM "ubuntu:${TAG}"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getLast().getFrom();
+                assertThat(from.getImageName().getTextWithVariables()).isEqualTo("\"ubuntu:${TAG}\"");
+                assertThat(from.getTag()).isNull();
+                assertThat(from.getImageName().hasEnvironmentVariables()).isTrue();
+            })
+          )
+        );
+    }
 }
