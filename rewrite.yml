@@ -16,6 +16,8 @@
 ---
 # Apply a subset of best practices to OpenRewrite recipes; typically run before committing changes.
 # Any differences produced by this recipe will result in code suggestion comments on pull requests.
+# Recipes from org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPractices that we deliberately do
+# not apply here are listed but commented out, each with the reason it stays disabled.
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset
@@ -24,29 +26,64 @@ description: Best practices for OpenRewrite recipe development.
 preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: "!(**/internal/grammar/*.*)"
+# Refaster templates intentionally contain patterns that recipes would otherwise "fix"
+#  - org.openrewrite.java.search.DoesNotUseType:  # we have no Refaster templates in this repository
+#      fullyQualifiedTypeName: com.google.errorprone.refaster.annotation.BeforeTemplate
+#      includeImplicit: true
+# Uncomment to run on a specific module
+#  - org.openrewrite.FindSourceFiles:
+#      filePattern: "rewrite-docker/**"
 recipeList:
+  - org.openrewrite.gradle.plugins.SetDevelocityServer:
+      server: "https://community.develocity.cloud"
+  - org.openrewrite.gradle.plugins.SetDevelocityProjectId:
+      projectId: openrewrite
+  - org.openrewrite.recipes.rewrite.InlineMethods
+#  - org.openrewrite.java.recipes.GenerateDeprecatedMethodRecipes  # would add 6 new inline-deprecated-methods.yml files; shipping recipes is a product decision
   - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
   - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
   - org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
-#  - org.openrewrite.java.recipes.ExamplesExtractor
-#  - org.openrewrite.java.OrderImports
+#  - org.openrewrite.java.recipes.RemoveToBeRemoved  # deletes 195 lines of past-due @ToBeRemoved code in 16 files; do that in a reviewed PR, not as a suggestion bot
+#  - org.openrewrite.java.recipes.UpgradeTestsToJava21  # 166 files, +2512/-1983; a version bump, not a cleanup
+#  - org.openrewrite.java.recipes.ExamplesExtractor  # deliberately not applied here: too opinionated for this repository
+#  - org.openrewrite.java.OrderImports  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.java.RemoveUnusedImports
   - org.openrewrite.java.SimplifySingleElementAnnotation
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
   - org.openrewrite.java.format.RemoveTrailingWhitespace
+  - org.openrewrite.staticanalysis.CombineSemanticallyEqualCatchBlocks
   - org.openrewrite.staticanalysis.CompareEnumsWithEqualityOperator
   - org.openrewrite.staticanalysis.EqualsAvoidsNull
+  - org.openrewrite.staticanalysis.EqualsToContentEquals
   - org.openrewrite.staticanalysis.InlineVariable
   - org.openrewrite.staticanalysis.LambdaBlockToExpression
   - org.openrewrite.staticanalysis.MissingOverrideAnnotation
   - org.openrewrite.staticanalysis.OperatorWrap:
       wrapOption: EOL
-#  - org.openrewrite.staticanalysis.RemoveRedundantNullCheckBeforeInstanceof
-#  - org.openrewrite.staticanalysis.RemoveUnusedLocalVariables
-#  - org.openrewrite.staticanalysis.RemoveUnusedPrivateFields
-#  - org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods
-#  - org.openrewrite.staticanalysis.UnwrapElseAfterReturn
+  - org.openrewrite.staticanalysis.RemoveCallsToObjectFinalize
+  - org.openrewrite.staticanalysis.RemoveCallsToSystemGc
+  - org.openrewrite.staticanalysis.RemoveHashCodeCallsFromArrayInstances
+#  - org.openrewrite.staticanalysis.RemoveRedundantNullCheckBeforeInstanceof  # deliberately not applied here: too opinionated for this repository
+#  - org.openrewrite.staticanalysis.RemoveRedundantTypeCast  # 77 files, including 26 rewrite-csharp/**/*.cs sources that our Gradle build never compiles
+  - org.openrewrite.staticanalysis.RemoveToStringCallsFromArrayInstances
+#  - org.openrewrite.staticanalysis.RemoveUnusedLocalVariables  # deliberately not applied here: too opinionated for this repository
+#  - org.openrewrite.staticanalysis.RemoveUnusedPrivateFields  # deliberately not applied here: too opinionated for this repository
+#  - org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods  # deliberately not applied here: too opinionated for this repository
+  - org.openrewrite.staticanalysis.ReplaceLambdaWithMethodReference
+#  - org.openrewrite.staticanalysis.ReplaceStackWithDeque  # 9 files; ArrayDeque flips iteration order and drops Stack's synchronization, in parser hot paths
+  - org.openrewrite.staticanalysis.ReplaceStringBuilderWithString
+  - org.openrewrite.staticanalysis.ReplaceWeekYearWithYear
+  - org.openrewrite.staticanalysis.URLEqualsHashCodeRecipes
+#  - org.openrewrite.staticanalysis.UnnecessaryParentheses  # 136 files of churn, and some removals hurt readability
+#  - org.openrewrite.staticanalysis.UnnecessaryThrows  # 65 files; strips checked exceptions from public API, breaking consumers that catch them (commented upstream too)
+#  - org.openrewrite.staticanalysis.UnwrapElseAfterReturn  # deliberately not applied here: too opinionated for this repository
+#  - org.openrewrite.staticanalysis.UseCollectionInterfaces  # 28 files; rewrites public signatures (IdentityHashMap -> Map), which is binary incompatible
   - org.openrewrite.staticanalysis.UseDiamondOperator
+#  - org.openrewrite.staticanalysis.UseListSort  # 6 files; Collections.sort(x) -> x.sort(null) reads worse than what it replaces
+  - org.openrewrite.staticanalysis.UseObjectNotifyAll
+  - org.openrewrite.staticanalysis.UseStandardCharset
+  - org.openrewrite.staticanalysis.UseStringReplace
+  - org.openrewrite.staticanalysis.UseSystemLineSeparator
   - org.openrewrite.java.UseStaticImport:
       methodPattern: java.util.stream.Collectors *(..)
   - org.openrewrite.java.UseStaticImport:
@@ -63,19 +100,24 @@ preconditions:
 recipeList:
   - org.openrewrite.java.recipes.BlankLinesAroundFieldsWithAnnotations
   - org.openrewrite.java.recipes.CorrectlySpacedDescriptions
-#  - org.openrewrite.java.recipes.ExecutionContextParameterName
+#  - org.openrewrite.java.recipes.ExecutionContextParameterName  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.java.recipes.IsLiteralNullRecipe
   - org.openrewrite.java.recipes.MissingOptionExample
   - org.openrewrite.java.recipes.NoMutableStaticFieldsInRecipes
+  - org.openrewrite.java.recipes.RecipeClassesShouldBePublic
   - org.openrewrite.java.recipes.RecipeEqualsAndHashCodeCallSuper
+  - org.openrewrite.java.recipes.RemoveImportBeforeAddImport
+  - org.openrewrite.java.recipes.RemoveNlsRewriteAnnotations
+#  - org.openrewrite.java.recipes.UseDisplayNameAndDescriptionFields  # restructures the getDisplayName()/getDescription() overrides in ~50 core files
+#  - org.openrewrite.java.recipes.UseEstimatedEffortPerOccurrenceField  # same restructuring for the 8 getEstimatedEffortPerOccurrence() overrides
+  - org.openrewrite.java.recipes.UseJavaTemplateStaticApply
+#  - org.openrewrite.java.recipes.UseStringUtilsRecipes  # rewrites StringUtils.isNullOrEmpty/isNotEmpty in rewrite-core to call themselves: infinite recursion
+#  - org.openrewrite.java.recipes.UseTagsField  # same restructuring for the 2 getTags() overrides
   - org.openrewrite.java.recipes.UseTreeRandomId
+  - org.openrewrite.java.recipes.UseVisitWithParentCursor
   - org.openrewrite.java.recipes.migrate.RemoveTraitsUsageRecipes
   - org.openrewrite.staticanalysis.NeedBraces
-#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
-#  - org.openrewrite.java.RemoveAnnotation:
-#      annotationPattern: '@org.openrewrite.NlsRewrite.DisplayName'
-#  - org.openrewrite.java.RemoveAnnotation:
-#      annotationPattern: '@org.openrewrite.NlsRewrite.Description'
+#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln  # deliberately not applied here: too opinionated for this repository
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.RecipeTestingBestPracticesSubset
@@ -86,33 +128,66 @@ preconditions:
       fullyQualifiedTypeName: org.openrewrite.test.RewriteTest
       checkAssignability: true
 recipeList:
+#  - org.openrewrite.java.migrate.util.ReplaceStreamCollectWithToList:  # no matches today; collector style in tests is a choice we have not made
+#      convertToList: true
+#  - org.openrewrite.java.recipes.ClasspathArgumentsOnePerLine  # no matches today; test formatting opinion
   - org.openrewrite.java.recipes.RewriteTestClassesShouldNotBePublic
-#  - org.openrewrite.java.recipes.SelectRecipeExamples
+#  - org.openrewrite.java.recipes.SelectRecipeExamples  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.java.recipes.SingleDocumentExample
   - org.openrewrite.java.recipes.ReorderTestMethods
   - org.openrewrite.java.recipes.ReplaceNullWithDoesNotExist
   - org.openrewrite.java.recipes.SourceSpecTextBlockNewLine
   - org.openrewrite.java.recipes.SourceSpecTextBlockIndentation
+#  - org.openrewrite.java.recipes.UseRewriteTestDefaults  # no matches today; test structure opinion
+#  - org.openrewrite.java.recipes.UseStringUtilsRecipes  # rewrites StringUtils.isNullOrEmpty/isNotEmpty in rewrite-core to call themselves: infinite recursion
+
+  # Local variable type inference — targeted, non-controversial uses
+  # NOTE: UseVarForGenericsConstructors and UseVarForGenericMethodInvocations must run
+  # before UseDiamondOperator, as they need the explicit type arguments on constructors
+  # to safely infer the type for var. Diamond would erase that information.
+#  - org.openrewrite.java.migrate.lang.var.UseVarForTypeCast  # no matches today; `var` in tests is a style choice we have not made
+#  - org.openrewrite.java.migrate.lang.var.UseVarForConstructors  # no matches today; `var` in tests is a style choice we have not made
+#  - org.openrewrite.java.migrate.lang.var.UseVarForGenericsConstructors  # no matches today; `var` in tests is a style choice we have not made
+#  - org.openrewrite.java.migrate.lang.var.UseVarForGenericMethodInvocations  # no matches today; `var` in tests is a style choice we have not made
+#  - org.openrewrite.java.migrate.lang.var.UseVarForPrimitive  # no matches today; `var` in tests is a style choice we have not made
+  # Prefer modern Java collection factories and utilities
+#  - org.openrewrite.java.migrate.util.JavaUtilAPIs  # no matches today; several modules still compile against Java 8
+  # Markdown documentation comments (JEP 467, Java 23+)
+#  - org.openrewrite.java.migrate.lang.JavadocToMarkdownDocComment  # 3 files here, 1267 without the precondition; /// doc comments need JDK 23+ tooling
+
+#  - org.openrewrite.java.testing.junit.JUnit6BestPractices  # no matches; we are on JUnit 5
+#  - org.openrewrite.java.testing.assertj.Assertj  # no matches under the precondition (17 files without it); an assertion-style migration, not a cleanup
   - org.openrewrite.java.testing.cleanup.RemoveTestPrefix
   - org.openrewrite.java.testing.cleanup.TestsShouldNotBePublic
   - org.openrewrite.staticanalysis.NeedBraces
-#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.staticanalysis.ReorderAnnotations
   - org.openrewrite.java.UseStaticImport:
       methodPattern: 'org.openrewrite..Assertions *(..)'
+#  - org.openrewrite.java.UseStaticImport:  # no matches today; import style opinion
+#      methodPattern: 'org.openrewrite.test.RewriteTest *(..)'
+#  - org.openrewrite.java.UseStaticImport:  # no matches today; import style opinion
+#      methodPattern: 'org.openrewrite.test.SourceSpecs *(..)'
+
+#  - org.openrewrite.java.ChangeMethodTargetToStatic:  # List.of() is not equivalent to Arrays.asList(): immutable and null-hostile
+#      methodPattern: java.util.Arrays asList(..)
+#      fullyQualifiedTargetTypeName: java.util.List
+#  - org.openrewrite.java.ChangeMethodName:  # second half of the Arrays.asList -> List.of change above
+#      methodPattern: java.util.List asList(..)
+#      newMethodName: of
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
 displayName: Recipe nullability best practices
 description: Use OpenRewrite internal nullability annotations; drop JetBrains annotations; use `package-info.java` instead.
 recipeList:
-#  - org.openrewrite.java.jspecify.MigrateFromOpenRewriteAnnotations
+#  - org.openrewrite.java.jspecify.MigrateFromOpenRewriteAnnotations  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@org.jetbrains.annotations.NotNull'
-#  - org.openrewrite.java.RemoveAnnotation:
+#  - org.openrewrite.java.RemoveAnnotation:  # deliberately not applied here: too opinionated for this repository
 #      annotationPattern: '@javax.annotation.Nonnull'
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@jakarta.annotation.Nonnull'
-#  - org.openrewrite.java.jspecify.MigrateToJspecify
-#  - org.openrewrite.staticanalysis.AnnotateNullableMethods
+#  - org.openrewrite.java.jspecify.MigrateToJSpecify  # deliberately not applied here: too opinionated for this repository
+#  - org.openrewrite.staticanalysis.AnnotateNullableMethods  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.staticanalysis.NullableOnMethodReturnType
