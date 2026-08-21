@@ -219,7 +219,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             String unquoted = text.substring(1, text.length() - 1);
             // Single quotes never expand, so such a value is always whole. Double quotes do, and a value
             // holding a reference is no longer one literal, which puts its quotes into the text.
-            if (quoteStyle == Docker.Literal.QuoteStyle.SINGLE || !containsVariable(unquoted)) {
+            if (quoteStyle == Docker.Literal.QuoteStyle.SINGLE || !ArgumentContents.containsVariable(unquoted)) {
                 Space prefix = prefix(quoted);
                 skip(quoted);
                 contents.add(new Docker.Literal(randomId(), prefix, Markers.EMPTY, unquoted, quoteStyle));
@@ -231,7 +231,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         int startIndex = textCtx.getStart().getStartIndex();
         int endIndex = Math.max(stopIndex, textCtx.getStop().getStopIndex());
         skip(textCtx.getStop());
-        contents.addAll(splitVariables(sourceText(startIndex, endIndex), prefix));
+        contents.addAll(ArgumentContents.splitVariables(sourceText(startIndex, endIndex), prefix));
         return contents;
     }
 
@@ -240,95 +240,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     private @Nullable Token quotedValue(ParserRuleContext ctx) {
         ParseTree first = ctx.getChild(0);
         return first instanceof DockerParser.QuotedContext ? ((DockerParser.QuotedContext) first).getStart() : null;
-    }
-
-    /// Splits environment variable references out of a value's text. Token boundaries are no guide here:
-    /// the lexer emits `--name=value` as a single token, so a reference can sit inside one. What counts
-    /// as a reference mirrors the lexer's `ENV_VAR` and `SPECIAL_VAR` rules, so `$$` and `$1` stay text.
-    private List<Docker.ArgumentContent> splitVariables(String text, Space prefix) {
-        List<Docker.ArgumentContent> contents = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean singleQuoted = false;
-        int i = 0;
-        while (i < text.length()) {
-            char c = text.charAt(i);
-            char next = i + 1 < text.length() ? text.charAt(i + 1) : 0;
-            if (c == '\'') {
-                singleQuoted = !singleQuoted;
-                current.append(c);
-                i++;
-                continue;
-            }
-            if (c == '\\' && next != 0 && !singleQuoted) {
-                current.append(c).append(next);
-                i += 2;
-                continue;
-            }
-            if (singleQuoted) {
-                current.append(c);
-                i++;
-                continue;
-            }
-            String name = null;
-            boolean braced = false;
-            if (c == '$' && next == '{') {
-                int close = text.indexOf('}', i + 2);
-                if (close > i + 2 && isVarStart(text.charAt(i + 2))) {
-                    name = text.substring(i + 2, close);
-                    braced = true;
-                    i = close + 1;
-                }
-            } else if (c == '$' && isVarStart(next)) {
-                int end = i + 1;
-                while (end < text.length() && isVarPart(text.charAt(end))) {
-                    end++;
-                }
-                name = text.substring(i + 1, end);
-                i = end;
-            } else if (c == '$' && isSpecialVar(next)) {
-                current.append(c).append(next);
-                i += 2;
-                continue;
-            }
-            if (name == null) {
-                current.append(c);
-                i++;
-                continue;
-            }
-            if (current.length() > 0) {
-                contents.add(new Docker.Literal(randomId(), contents.isEmpty() ? prefix : Space.EMPTY,
-                        Markers.EMPTY, current.toString(), null));
-                current.setLength(0);
-            }
-            contents.add(new Docker.EnvironmentVariable(randomId(), contents.isEmpty() ? prefix : Space.EMPTY,
-                    Markers.EMPTY, name, braced));
-        }
-        if (current.length() > 0 || contents.isEmpty()) {
-            contents.add(new Docker.Literal(randomId(), contents.isEmpty() ? prefix : Space.EMPTY,
-                    Markers.EMPTY, current.toString(), null));
-        }
-        return contents;
-    }
-
-    private boolean containsVariable(String text) {
-        for (Docker.ArgumentContent content : splitVariables(text, Space.EMPTY)) {
-            if (content instanceof Docker.EnvironmentVariable) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isVarStart(char c) {
-        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
-    }
-
-    private static boolean isVarPart(char c) {
-        return isVarStart(c) || (c >= '0' && c <= '9');
-    }
-
-    private static boolean isSpecialVar(char c) {
-        return c == '!' || c == '$' || c == '?' || c == '#' || c == '@' || c == '*' || (c >= '0' && c <= '9');
     }
 
     private String sourceText(int startIndex, int stopIndex) {
@@ -1061,7 +972,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     /// Splits the value of a command's flag into its quoted literals, environment variable references
     /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
-    /// quote or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
+    /// quote or a separator is handed to [ArgumentContents#splitVariables(String, Space)], so a variable reference means
     /// the same thing here as it does in an argument's value.
     private List<Docker.ArgumentContent> parseFlagValue(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
@@ -1098,7 +1009,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     private void flushFlagText(StringBuilder current, List<Docker.ArgumentContent> contents) {
         if (current.length() > 0) {
-            contents.addAll(splitVariables(current.toString(), Space.EMPTY));
+            contents.addAll(ArgumentContents.splitVariables(current.toString(), Space.EMPTY));
             current.setLength(0);
         }
     }

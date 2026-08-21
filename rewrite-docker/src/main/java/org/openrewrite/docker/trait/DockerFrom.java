@@ -23,6 +23,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
@@ -32,7 +33,6 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Optional;
 
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -126,7 +126,7 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
     @Override
     public Docker.From withTag(String tag) {
         return getTree().withTag(new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
-                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tag, getQuoteStyle()))));
+                ArgumentContents.of(tag, getQuoteStyle())));
     }
 
     /**

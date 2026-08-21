@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -162,7 +163,6 @@ public class AddOrUpdateLabel extends Recipe {
             Docker.Literal.QuoteStyle originalStyle = original == null ? null : original.getQuoteStyle();
             quoteStyle = originalStyle == null ? Docker.Literal.QuoteStyle.DOUBLE : originalStyle;
         }
-        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(
-                new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle)));
+        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, ArgumentContents.of(text, quoteStyle));
     }
 }

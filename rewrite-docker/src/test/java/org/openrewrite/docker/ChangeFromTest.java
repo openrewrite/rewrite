@@ -18,6 +18,7 @@ package org.openrewrite.docker;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -768,7 +769,75 @@ class ChangeFromTest implements RewriteTest {
                 """
                   FROM ubuntu:22.04
                   RUN apt-get update
-                  """
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(from.getImageName().getText()).isEqualTo("ubuntu");
+                    assertThat(from.getTag()).isNotNull();
+                    assertThat(from.getTag().getText()).isEqualTo("22.04");
+                })
+              )
+            );
+        }
+
+        @Test
+        void newImageNameCarryingATagFillsTheTagField() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "eclipse-temurin:17", null, null, null)),
+              docker(
+                """
+                  FROM ubuntu
+                  """,
+                """
+                  FROM eclipse-temurin:17
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(from.getImageName().getText()).isEqualTo("eclipse-temurin");
+                    assertThat(from.getTag()).isNotNull();
+                    assertThat(from.getTag().getText()).isEqualTo("17");
+                })
+              )
+            );
+        }
+
+        @Test
+        void newImageNameCarryingADigestFillsTheDigestField() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu@sha256:abc123", null, null, null)),
+              docker(
+                """
+                  FROM ubuntu
+                  """,
+                """
+                  FROM ubuntu@sha256:abc123
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(from.getImageName().getText()).isEqualTo("ubuntu");
+                    assertThat(from.getDigest()).isNotNull();
+                    assertThat(from.getDigest().getText()).isEqualTo("sha256:abc123");
+                })
+              )
+            );
+        }
+
+        @Test
+        void newImageNameKeepsARegistryPortInTheName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "localhost:5000/ubuntu", null, null, null)),
+              docker(
+                """
+                  FROM ubuntu
+                  """,
+                """
+                  FROM localhost:5000/ubuntu
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(from.getImageName().getText()).isEqualTo("localhost:5000/ubuntu");
+                    assertThat(from.getTag()).isNull();
+                })
               )
             );
         }
@@ -785,7 +854,13 @@ class ChangeFromTest implements RewriteTest {
                 """
                   FROM ubuntu@sha256:abc123
                   RUN apt-get update
-                  """
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(from.getImageName().getText()).isEqualTo("ubuntu");
+                    assertThat(from.getDigest()).isNotNull();
+                    assertThat(from.getDigest().getText()).isEqualTo("sha256:abc123");
+                })
               )
             );
         }
@@ -1114,7 +1189,15 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 """
                   FROM ubuntu:22.04-$VAR
-                  """
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    // "\$" only stops $VAR being read as a capture reference; what it writes is a
+                    // variable reference like any other, and is modelled as one.
+                    Docker.Argument tag = doc.getStages().getFirst().getFrom().getTag();
+                    assertThat(tag).isNotNull();
+                    assertThat(tag.getText()).isNull();
+                    assertThat(tag.getTextWithVariables()).isEqualTo("22.04-$VAR");
+                })
               )
             );
         }

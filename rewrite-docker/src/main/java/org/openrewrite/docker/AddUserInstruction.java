@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -29,7 +30,6 @@ import org.openrewrite.marker.Markers;
 
 import java.util.List;
 
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -176,18 +176,11 @@ public class AddUserInstruction extends Recipe {
             }
 
             private Docker.Argument createArgument(String text, Space prefix) {
-                Docker.ArgumentContent content = new Docker.Literal(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        text,
-                        null
-                );
                 return new Docker.Argument(
                         randomId(),
                         prefix,
                         Markers.EMPTY,
-                        singletonList(content)
+                        ArgumentContents.of(text, null)
                 );
             }
         };
