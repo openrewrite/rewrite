@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.trait.DockerFrom;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.Objects;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -194,15 +194,15 @@ public class ChangeFrom extends Recipe {
                 }
             }
 
-            // Get quote style from original
             Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
 
-            // Check if the original was a single content item (e.g., a single quoted string)
-            boolean wasSingleContent = f.getImageName().getContents().size() == 1 &&
+            // A quoted reference is one literal holding image, tag and digest together, and splitting it
+            // would quote each part on its own. Everything else keeps image, tag and digest in the fields
+            // the parser would put them in, so that reading the result back finds the same tree.
+            boolean wasSingleQuotedReference = quoteStyle != null && f.getImageName().getContents().size() == 1 &&
                     f.getTag() == null && f.getDigest() == null;
 
-            if (wasSingleContent) {
-                // Keep as a single content item (don't split)
+            if (wasSingleQuotedReference) {
                 String imagePart = resolvedNewImageName != null ? resolvedNewImageName : currentImageName;
                 StringBuilder sb = new StringBuilder(imagePart);
                 // For tag: null=keep existing, ""=remove, value=set
@@ -221,15 +221,13 @@ public class ChangeFrom extends Recipe {
                 } else if (currentDigest != null) {
                     sb.append("@").append(currentDigest);
                 }
-                Docker.ArgumentContent newContent = createContent(sb.toString(), quoteStyle);
-                Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
+                Docker.Argument newImageArg = f.getImageName().withContents(ArgumentContents.of(sb.toString(), quoteStyle));
                 return result.withImageName(newImageArg);
             }
 
             // Update image name: null=keep, value=set
             if (resolvedNewImageName != null) {
-                Docker.ArgumentContent newImageContent = createContent(resolvedNewImageName, quoteStyle);
-                Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
+                Docker.Argument newImageArg = f.getImageName().withContents(ArgumentContents.of(resolvedNewImageName, quoteStyle));
                 result = result.withImageName(newImageArg);
             }
 
@@ -238,8 +236,8 @@ public class ChangeFrom extends Recipe {
                 if (resolvedNewTag.isEmpty()) {
                     result = result.withTag(null);
                 } else {
-                    Docker.ArgumentContent newTagContent = createContent(resolvedNewTag, quoteStyle);
-                    Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
+                    Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                            ArgumentContents.of(resolvedNewTag, quoteStyle));
                     result = result.withTag(newTagArg);
                 }
             }
@@ -249,8 +247,8 @@ public class ChangeFrom extends Recipe {
                 if (resolvedNewDigest.isEmpty()) {
                     result = result.withDigest(null);
                 } else {
-                    Docker.ArgumentContent newDigestContent = createContent(resolvedNewDigest, quoteStyle);
-                    Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
+                    Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                            ArgumentContents.of(resolvedNewDigest, quoteStyle));
                     result = result.withDigest(newDigestArg);
                 }
             }
@@ -363,10 +361,6 @@ public class ChangeFrom extends Recipe {
         return highest;
     }
 
-    private Docker.ArgumentContent createContent(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
-        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
-    }
-
     private Docker.From updatePlatformFlag(Docker.From from, @Nullable String platform) {
         List<Docker.Flag> oldFlags = from.getFlags();
 
@@ -399,12 +393,7 @@ public class ChangeFrom extends Recipe {
 
     private Docker.Argument updatePlatformValue(Docker.@Nullable Argument existingValue, String platform) {
         if (existingValue != null && !existingValue.getContents().isEmpty()) {
-            // Update existing value using withers
-            Docker.ArgumentContent firstContent = existingValue.getContents().get(0);
-            if (firstContent instanceof Docker.Literal) {
-                Docker.Literal updated = ((Docker.Literal) firstContent).withText(platform);
-                return existingValue.withContents(singletonList(updated));
-            }
+            return existingValue.withContents(ArgumentContents.of(platform, existingValue.getQuoteStyle()));
         }
         // Fallback: create new value
         return createPlatformValue(platform, existingValue != null ? existingValue.getPrefix() : Space.EMPTY);
@@ -415,13 +404,7 @@ public class ChangeFrom extends Recipe {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                singletonList(new Docker.Literal(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        platform,
-                        null
-                ))
+                ArgumentContents.of(platform, null)
         );
     }
 }
