@@ -76,4 +76,26 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
     static boolean partMatches(Docker.Argument part, String pattern) {
         return matchesBidirectional(extractTextForMatching(part), pattern, part.hasEnvironmentVariables());
     }
+
+    /**
+     * As {@link #partMatches}, but for an image name, where a pattern also matches a name that
+     * spells the same image differently: {@code ubuntu} matches {@code docker.io/library/ubuntu},
+     * and the other way round. The pattern is normalized alongside the name, so a glob keeps
+     * matching whichever spelling it was written for.
+     *
+     * @param imageName The image name to match
+     * @param pattern   The glob pattern to match against
+     * @return true if the name matches the pattern in any spelling
+     */
+    static boolean imageNameMatches(Docker.Argument imageName, String pattern) {
+        if (partMatches(imageName, pattern)) {
+            return true;
+        }
+        String text = extractTextForMatching(imageName);
+        boolean hasEnvVars = imageName.hasEnvironmentVariables();
+        ImageName name = ImageName.parse(text);
+        ImageName patternName = ImageName.parse(pattern);
+        return matchesBidirectional(name.getCanonical(), patternName.getCanonical(), hasEnvVars) ||
+                matchesBidirectional(name.getFamiliar(), patternName.getFamiliar(), hasEnvVars);
+    }
 }

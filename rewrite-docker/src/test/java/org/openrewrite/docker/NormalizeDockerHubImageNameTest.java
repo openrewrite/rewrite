@@ -18,9 +18,11 @@ package org.openrewrite.docker;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class NormalizeDockerHubImageNameTest implements RewriteTest {
@@ -209,6 +211,57 @@ class NormalizeDockerHubImageNameTest implements RewriteTest {
               FROM scratch
               COPY /app /app
               """
+          )
+        );
+    }
+
+    @Test
+    void normalizeLibraryPrefixWithoutRegistry() {
+        rewriteRun(
+          docker(
+            """
+              FROM library/ubuntu:22.04
+              RUN apt-get update
+              """,
+            """
+              FROM ubuntu:22.04
+              RUN apt-get update
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeForAnOrganizationThatLooksLikeARegistry() {
+        rewriteRun(
+          docker(
+            """
+              FROM redhat/ubi9-minimal:9.4
+              RUN microdnf update
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesAVariableReferenceInTheImageName() {
+        rewriteRun(
+          docker(
+            """
+              FROM docker.io/library/${BASE_IMAGE}:22.04
+              RUN apt-get update
+              """,
+            """
+              FROM ${BASE_IMAGE}:22.04
+              RUN apt-get update
+              """,
+            spec -> spec.afterRecipe(file -> {
+                Docker.From from = file.getStages().getFirst().getFrom();
+                assertThat(from.getImageName().getContents())
+                  .singleElement()
+                  .isInstanceOfSatisfying(Docker.EnvironmentVariable.class, variable ->
+                    assertThat(variable.getName()).isEqualTo("BASE_IMAGE"));
+            })
           )
         );
     }

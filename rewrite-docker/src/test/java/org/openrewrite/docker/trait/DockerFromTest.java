@@ -323,6 +323,91 @@ class DockerFromTest implements RewriteTest {
         }
 
         @Test
+        void matchesEverySpellingOfAnOfficialImage() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubuntu").asVisitor((image, ctx) ->
+                  SearchResult.found(image.getTree())
+                )
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  FROM library/ubuntu:20.04
+                  FROM docker.io/library/ubuntu:20.04
+                  FROM index.docker.io/library/ubuntu:20.04
+                  FROM gcr.io/myproject/ubuntu:20.04
+                  """,
+                """
+                  ~~>FROM ubuntu:20.04
+                  ~~>FROM library/ubuntu:20.04
+                  ~~>FROM docker.io/library/ubuntu:20.04
+                  ~~>FROM index.docker.io/library/ubuntu:20.04
+                  FROM gcr.io/myproject/ubuntu:20.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchesAFullyQualifiedPatternAgainstAShortName() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("docker.io/library/ubuntu").asVisitor((image, ctx) ->
+                  SearchResult.found(image.getTree())
+                )
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  FROM alpine:latest
+                  """,
+                """
+                  ~~>FROM ubuntu:20.04
+                  FROM alpine:latest
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aWildcardPatternMatchesTheFamiliarSpelling() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubun*").asVisitor((image, ctx) ->
+                  SearchResult.found(image.getTree())
+                )
+              )),
+              docker(
+                """
+                  FROM docker.io/library/ubuntu:20.04
+                  FROM docker.io/library/alpine:latest
+                  """,
+                """
+                  ~~>FROM docker.io/library/ubuntu:20.04
+                  FROM docker.io/library/alpine:latest
+                  """
+              )
+            );
+        }
+
+        @Test
+        void anOrganizationIsNotStrippedWhenMatching() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().imageName("ubi9-minimal").asVisitor((image, ctx) ->
+                  SearchResult.found(image.getTree())
+                )
+              )),
+              docker(
+                """
+                  FROM redhat/ubi9-minimal
+                  """
+              )
+            );
+        }
+
+        @Test
         void matchesPlatform() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
@@ -646,6 +731,96 @@ class DockerFromTest implements RewriteTest {
                   """,
                 """
                   ~~>FROM registry.example.com:5000/app:1.2
+                  """
+              )
+            );
+        }
+
+        @Test
+        void decomposesAnExplicitRegistry() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getRegistry()).contains("mcr.microsoft.com");
+                    assertThat(image.getImage().map(ImageName::getNamespace)).contains("windows");
+                    assertThat(image.getImage().map(ImageName::getRepository)).contains("servercore");
+                    assertThat(image.getFamiliarImageName()).contains("mcr.microsoft.com/windows/servercore");
+                    assertThat(image.getCanonicalImageName()).contains("mcr.microsoft.com/windows/servercore");
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM mcr.microsoft.com/windows/servercore:ltsc2022
+                  """,
+                """
+                  ~~>FROM mcr.microsoft.com/windows/servercore:ltsc2022
+                  """
+              )
+            );
+        }
+
+        @Test
+        void anOrganizationIsNotARegistry() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getRegistry()).isEmpty();
+                    assertThat(image.getImage().map(ImageName::getResolvedRegistry)).contains("docker.io");
+                    assertThat(image.getFamiliarImageName()).contains("redhat/ubi9-minimal");
+                    assertThat(image.getCanonicalImageName()).contains("docker.io/redhat/ubi9-minimal");
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM redhat/ubi9-minimal
+                  """,
+                """
+                  ~~>FROM redhat/ubi9-minimal
+                  """
+              )
+            );
+        }
+
+        @Test
+        void anImplicitRegistryResolvesToDockerHub() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getRegistry()).isEmpty();
+                    assertThat(image.getImage().map(ImageName::getResolvedRegistry)).contains("docker.io");
+                    assertThat(image.getCanonicalImageName()).contains("docker.io/library/ubuntu");
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM ubuntu:22.04
+                  """,
+                """
+                  ~~>FROM ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aVariableRegistryIsRecognized() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.getRegistry()).contains("${REGISTRY}");
+                    assertThat(image.getImage().map(ImageName::getRepository)).contains("app");
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM ${REGISTRY}/app:1.0
+                  """,
+                """
+                  ~~>FROM ${REGISTRY}/app:1.0
                   """
               )
             );

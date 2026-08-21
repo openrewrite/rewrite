@@ -316,6 +316,56 @@ class DockerCopyFromTest implements RewriteTest {
     }
 
     @Test
+    void decomposesTheRegistryOfAnExternalImage() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().excludeStageReferences().asVisitor((image, ctx) -> {
+                assertThat(image.getRegistry()).contains("registry.example.com:5000");
+                assertThat(image.getImage().map(ImageName::getRepository)).contains("app");
+                assertThat(image.getCanonicalImageName()).contains("registry.example.com:5000/app");
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              COPY --from=registry.example.com:5000/app:1.2 /out /app
+              """,
+            """
+              FROM alpine
+              ~~>COPY --from=registry.example.com:5000/app:1.2 /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void aStageReferenceHasNoRegistry() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.isStageReference()).isTrue();
+                assertThat(image.getImage()).isEmpty();
+                assertThat(image.getRegistry()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine AS builder
+              FROM alpine
+              COPY --from=builder /out /app
+              """,
+            """
+              FROM alpine AS builder
+              FROM alpine
+              ~~>COPY --from=builder /out /app
+              """
+          )
+        );
+    }
+
+    @Test
     void registryPortWithTag() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->

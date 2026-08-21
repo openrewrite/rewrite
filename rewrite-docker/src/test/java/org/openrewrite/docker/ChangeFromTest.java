@@ -966,6 +966,67 @@ class ChangeFromTest implements RewriteTest {
     }
 
     @Nested
+    class Registries implements RewriteTest {
+
+        @Test
+        void aShortPatternMatchesAFullyQualifiedName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              docker(
+                """
+                  FROM docker.io/library/ubuntu:20.04
+                  """,
+                """
+                  FROM docker.io/library/ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aFullyQualifiedPatternMatchesAShortName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("docker.io/library/ubuntu", null, null, null, null, "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void anOrganizationIsNotTakenForARegistry() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubi9-minimal", null, null, null, null, "9.5", null, null)),
+              docker(
+                """
+                  FROM redhat/ubi9-minimal:9.4
+                  """
+              )
+            );
+        }
+
+        @Test
+        void captureFromTheSpellingThatMatched() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubun*", null, null, null, "alpine-$1", "22.04", null, null)),
+              docker(
+                """
+                  FROM docker.io/library/ubuntu:20.04
+                  """,
+                """
+                  FROM alpine-tu:22.04
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class Captures implements RewriteTest {
 
         @Test

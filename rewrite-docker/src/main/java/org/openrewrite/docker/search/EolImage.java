@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.InputStream;
@@ -84,10 +85,8 @@ public class EolImage {
     }
 
     private static boolean matchesImageName(String actual, String pattern) {
-        // Handle library images (e.g., "library/debian" == "debian")
-        String normalizedActual = actual.startsWith("library/") ?
-                actual.substring("library/".length()) : actual;
-        return normalizedActual.equals(pattern);
+        // An entry names an official image, which "docker.io/library/debian" and "library/debian" also name
+        return ImageName.parse(actual).getFamiliar().equals(pattern);
     }
 
     private static boolean matchesTag(String tag, List<String> patterns) {

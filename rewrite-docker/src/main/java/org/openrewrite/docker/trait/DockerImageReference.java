@@ -75,6 +75,41 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
     }
 
     /**
+     * Returns the image name decomposed into the registry it is pulled from and the path within
+     * that registry, or empty where the reference does not resolve to an external image. Where
+     * {@link #getImageName()} gives the name as written, this gives the parts it is made of and the
+     * other spellings of the same image; see {@link ImageName}.
+     */
+    default Optional<ImageName> getImage() {
+        return getImageName().map(ImageName::parse);
+    }
+
+    /**
+     * Returns the registry as written, or empty where the image name does not name one, in which
+     * case the image is pulled from Docker Hub. For the registry an image is pulled from whether or
+     * not it is written, take {@link ImageName#getResolvedRegistry()} of {@link #getImage()}.
+     */
+    default Optional<String> getRegistry() {
+        return getImage().map(ImageName::getRegistry);
+    }
+
+    /**
+     * Returns the shortest image name that resolves to the same image, so that
+     * {@code docker.io/library/ubuntu} reads as {@code ubuntu}.
+     */
+    default Optional<String> getFamiliarImageName() {
+        return getImage().map(ImageName::getFamiliar);
+    }
+
+    /**
+     * Returns the fully qualified image name, so that {@code ubuntu} reads as
+     * {@code docker.io/library/ubuntu}.
+     */
+    default Optional<String> getCanonicalImageName() {
+        return getImage().map(ImageName::getCanonical);
+    }
+
+    /**
      * Returns the tag, or empty if no tag is specified.
      */
     default Optional<String> getTag() {
@@ -128,11 +163,12 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
     }
 
     /**
-     * Checks if the image name matches the given glob pattern.
+     * Checks if the image name matches the given glob pattern, in whichever spelling the pattern
+     * was written: {@code ubuntu} matches {@code docker.io/library/ubuntu} and the other way round.
      */
     default boolean imageNameMatches(String pattern) {
         Docker.Argument imageName = getImageNameArgument();
-        return imageName != null && partMatches(imageName, pattern);
+        return imageName != null && DockerTraitMatcher.imageNameMatches(imageName, pattern);
     }
 
     /**
