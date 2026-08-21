@@ -1868,6 +1868,11 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			control.Prefix, cond = hoistLeftPrefix(cond)
 			condRP := java.RightPadded[java.Expression]{Element: cond}
 			control.Condition = &condRP
+		} else {
+			// Infinite `for {}`: Java models `for (;;)` with a J.Empty condition,
+			// so the field is never null. Fill it with a synthetic J.Empty rather
+			// than leaving it nil; GoPrinter omits it via the ImplicitForClauses marker.
+			control.Condition = &java.RightPadded[java.Expression]{Element: &java.Empty{ID: uuid.New()}}
 		}
 		control.Init = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
 		control.Update = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
