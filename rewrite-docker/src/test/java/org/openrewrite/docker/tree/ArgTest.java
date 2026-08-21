@@ -247,6 +247,89 @@ class ArgTest implements RewriteTest {
         );
     }
 
+    @Test
+    void flagValuedArgKeepsQuotesInTheModel() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG OPTS=--flag="a b"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(2);
+                assertThat(((Docker.Literal) value.getContents().getFirst()).getText()).isEqualTo("--flag=");
+                Docker.Literal quoted = (Docker.Literal) value.getContents().getLast();
+                assertThat(quoted.getText()).isEqualTo("a b");
+                assertThat(quoted.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(value.getText()).isEqualTo("--flag=a b");
+            })
+          )
+        );
+    }
+
+    @Test
+    void singleQuotedFlagValuedArg() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG OPTS=--flag='a b'
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(((Docker.Literal) value.getContents().getLast()).getQuoteStyle())
+                  .isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
+                assertThat(value.getText()).isEqualTo("--flag=a b");
+            })
+          )
+        );
+    }
+
+    @Test
+    void flagValuedArgWithEnvironmentVariable() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG OPTS=--flag=$VAR
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("--flag=$VAR");
+            })
+          )
+        );
+    }
+
+    @Test
+    void flagValuedArgWithTrailingText() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG OPTS=--flag="a b",more
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(argValue(doc).getText()).isEqualTo("--flag=a b,more"))
+          )
+        );
+    }
+
+    @Test
+    void emptyQuotedFlagValuedArg() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG OPTS=--flag=""
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(argValue(doc).getText()).isEqualTo("--flag="))
+          )
+        );
+    }
+
     private static Docker.Argument argValue(Docker.File doc) {
         Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(arg.getValue()).isNotNull().actual();

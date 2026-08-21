@@ -266,6 +266,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                         varName,
                         braced
                 ));
+            } else if (token.getType() == DockerLexer.FLAG) {
+                // Only commands take flags; here the lexer has merely tokenized text that starts with
+                // "--", so decompose it as text rather than treating it as an option.
+                Space elementPrefix = prefix(token);
+                skip(token);
+                List<Docker.ArgumentContent> segments = splitTokenText(tokenText, false);
+                for (int j = 0; j < segments.size(); j++) {
+                    Docker.ArgumentContent segment = segments.get(j);
+                    contents.add(j == 0 ? segment.withPrefix(elementPrefix) : segment);
+                }
             } else {
                 Space elementPrefix = prefix(token);
                 skip(token);
@@ -1148,8 +1158,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             flagName = flagContent.substring(0, equalsIdx);
             String valueText = flagContent.substring(equalsIdx + 1);
 
-            // Parse the value text into its components
-            List<Docker.ArgumentContent> contents = parseFlagValueText(valueText);
+            List<Docker.ArgumentContent> contents = splitTokenText(valueText, true);
             flagValue = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
         } else {
             flagName = flagContent;
@@ -1162,7 +1171,14 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
      * Parse a flag value text into its component parts.
      * Recognizes environment variables ($VAR, ${VAR}), and splits on = signs.
      */
-    private List<Docker.ArgumentContent> parseFlagValueText(String text) {
+    /**
+     * Splits raw token text into quoted literals and environment variable references.
+     *
+     * @param splitOnEquals whether {@code =} separates a key from a value, as it does inside a compound
+     *                      flag value like {@code --mount=type=bind}. False for ordinary text, where
+     *                      {@code =} carries no structure.
+     */
+    private List<Docker.ArgumentContent> splitTokenText(String text, boolean splitOnEquals) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         int i = 0;
@@ -1224,7 +1240,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
                         c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
                 i = close + 1;
-            } else if (c == '=') {
+            } else if (c == '=' && splitOnEquals) {
                 // Flush any accumulated text
                 if (current.length() > 0) {
                     contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
