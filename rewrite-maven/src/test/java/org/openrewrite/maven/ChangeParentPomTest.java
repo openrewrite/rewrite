@@ -23,6 +23,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -31,9 +34,6 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedPom;
 
 class ChangeParentPomTest implements RewriteTest {
 
@@ -1641,6 +1641,70 @@ class ChangeParentPomTest implements RewriteTest {
                           </dependencies>
                       </project>
                       """,
+                    spec -> spec.afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(result.getPom().getManagedVersion("javax.servlet", "javax.servlet-api", null, null))
+                          .describedAs("The version the parent brought down is visible to the child")
+                          .isEqualTo("4.0.1");
+                    })
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8595")
+        @Test
+        void chainedUpgradesRetainVersionStrippedByEarlierUpgrade() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, false, null),
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "3.0.13", null, null, null, false, null)
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.7.5</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>3.0.13</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  // The first upgrade strips this version as redundant under 2.7.18, which drops it from the
+                  // parent's view of this module. The second upgrade, where 3.0.13 stops managing it, has to
+                  // put it back rather than leave the dependency with no version at all.
+                  pomXml(
                     """
                       <project>
                           <modelVersion>4.0.0</modelVersion>
@@ -1651,13 +1715,107 @@ class ChangeParentPomTest implements RewriteTest {
                           </parent>
                           <artifactId>child</artifactId>
                           <dependencies>
-                              <!--~~(No version provided for direct dependency javax.servlet:javax.servlet-api:compile)~~>--><dependency>
-                                  <groupId>javax.servlet</groupId>
-                                  <artifactId>javax.servlet-api</artifactId>
+                              <dependency>
+                                  <groupId>org.glassfish</groupId>
+                                  <artifactId>jakarta.el</artifactId>
+                                  <version>3.0.4</version>
                               </dependency>
                           </dependencies>
                       </project>
-                      """
+                      """,
+                    spec -> spec.afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(result.getDependencies().get(Scope.Compile))
+                          .describedAs("The dependency still resolves to a version")
+                          .anyMatch(dep -> "org.glassfish:jakarta.el:3.0.4".equals(dep.getGav().toString()));
+                    })
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8595")
+        @Test
+        void chainedUpgradesBringDownRemovedManagedVersionForChildModule() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, false, null),
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "3.0.13", null, null, null, false, null)
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.7.5</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>3.0.13</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.glassfish</groupId>
+                                    <artifactId>jakarta.el</artifactId>
+                                    <version>3.0.4</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.glassfish</groupId>
+                                  <artifactId>jakarta.el</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    spec -> spec.afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(result.getPom().getManagedVersion("org.glassfish", "jakarta.el", null, null))
+                          .describedAs("The version the parent brought down is visible to the child")
+                          .isEqualTo("3.0.4");
+                    })
                   )
                 )
               )
