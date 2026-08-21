@@ -360,6 +360,49 @@ class ArgTest implements RewriteTest {
         );
     }
 
+    @Test
+    void lowercaseEnvironmentVariableValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG version=$base
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("base");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("$base");
+            })
+          )
+        );
+    }
+
+    @Test
+    void mixedCaseEnvironmentVariableValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG version=$Java_Version
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(1);
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("Java_Version");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("$Java_Version");
+            })
+          )
+        );
+    }
+
     private static Docker.Argument argValue(Docker.File doc) {
         Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(arg.getValue()).isNotNull().actual();

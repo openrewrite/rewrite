@@ -327,7 +327,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     private static boolean isVarStart(char c) {
-        return (c >= 'A' && c <= 'Z') || c == '_';
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
     }
 
     private static boolean isVarPart(char c) {
@@ -1228,12 +1228,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue);
     }
 
-    /**
-     * Parse a flag value text into its component parts.
-     * Recognizes environment variables ($VAR, ${VAR}), and splits on = signs.
-     */
     /// Splits the value of a command's flag into its quoted literals, environment variable references
-    /// and the `=` separating a key from a value, as in `--mount=type=bind`.
+    /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
+    /// quote or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
+    /// the same thing here as it does in an argument's value.
     private List<Docker.ArgumentContent> parseFlagValue(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -1242,67 +1240,19 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         while (i < text.length()) {
             char c = text.charAt(i);
 
-            if (c == '$') {
-                // Flush any accumulated text
-                if (current.length() > 0) {
-                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
-                    current.setLength(0);
-                }
-
-                // Parse environment variable
-                if (i + 1 < text.length() && text.charAt(i + 1) == '{') {
-                    // Braced form: ${VAR}
-                    int endBrace = text.indexOf('}', i + 2);
-                    if (endBrace > i + 2) {
-                        String varContent = text.substring(i + 2, endBrace);
-                        // Handle ${VAR:-default} and similar forms
-                        String varName = varContent;
-                        int colonIdx = varContent.indexOf(':');
-                        if (colonIdx >= 0) {
-                            varName = varContent.substring(0, colonIdx);
-                        }
-                        contents.add(new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, true));
-                        i = endBrace + 1;
-                        continue;
-                    }
-                } else if (i + 1 < text.length()) {
-                    // Unbraced form: $VAR
-                    int varStart = i + 1;
-                    int varEnd = varStart;
-                    while (varEnd < text.length() && isVarChar(text.charAt(varEnd), varEnd == varStart)) {
-                        varEnd++;
-                    }
-                    if (varEnd > varStart) {
-                        String varName = text.substring(varStart, varEnd);
-                        contents.add(new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, false));
-                        i = varEnd;
-                        continue;
-                    }
-                }
-                // Not a valid env var, treat $ as literal
-                current.append(c);
-                i++;
-            } else if (c == '"' || c == '\'') {
+            if (c == '"' || c == '\'') {
                 int close = findClosingQuote(text, i);
                 if (close < 0) {
                     current.append(c);
                     i++;
                     continue;
                 }
-                if (current.length() > 0) {
-                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
-                    current.setLength(0);
-                }
+                flushFlagText(current, contents);
                 contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
                         c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
                 i = close + 1;
             } else if (c == '=') {
-                // Flush any accumulated text
-                if (current.length() > 0) {
-                    contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
-                    current.setLength(0);
-                }
-                // Add the equals sign as its own element
+                flushFlagText(current, contents);
                 contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
                 i++;
             } else {
@@ -1310,13 +1260,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 i++;
             }
         }
-
-        // Flush remaining text
-        if (current.length() > 0) {
-            contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, current.toString(), null));
-        }
+        flushFlagText(current, contents);
 
         return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
+    }
+
+    private void flushFlagText(StringBuilder current, List<Docker.ArgumentContent> contents) {
+        if (current.length() > 0) {
+            contents.addAll(splitVariables(current.toString(), Space.EMPTY));
+            current.setLength(0);
+        }
     }
 
     private static int findClosingQuote(String text, int openIndex) {
@@ -1330,13 +1283,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             }
         }
         return -1;
-    }
-
-    private boolean isVarChar(char c, boolean isFirst) {
-        if (isFirst) {
-            return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
-        }
-        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {
