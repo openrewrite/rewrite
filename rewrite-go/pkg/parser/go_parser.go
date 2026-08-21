@@ -1656,19 +1656,16 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 	}
 }
 
-// mapSelectStmt maps a select statement, reusing Switch+Case with SelectStmt marker.
-func (ctx *parseContext) mapSelectStmt(stmt *ast.SelectStmt) *java.Switch {
+// mapSelectStmt maps a select statement. select is not a Java switch, so it maps
+// to golang.Select — its clauses are golang.CommClause, which are not java.Case.
+func (ctx *parseContext) mapSelectStmt(stmt *ast.SelectStmt) *golang.Select {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("select"))
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &java.Switch{
+	return &golang.Select{
 		ID:     uuid.New(),
 		Prefix: prefix,
-		Markers: java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{golang.SelectStmt{Ident: uuid.New()}},
-		},
-		Body: body,
+		Body:   body,
 	}
 }
 

@@ -219,8 +219,6 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedSpec).Ident.String() }, nil)
 	case golang.InterfaceMethod:
 		q.GetAndSend(m, func(x any) any { return x.(golang.InterfaceMethod).Ident.String() }, nil)
-	case golang.SelectStmt:
-		q.GetAndSend(m, func(x any) any { return x.(golang.SelectStmt).Ident.String() }, nil)
 	case golang.TypeSwitchGuard:
 		q.GetAndSend(m, func(x any) any { return x.(golang.TypeSwitchGuard).Ident.String() }, nil)
 	case golang.ImplicitForClauses:
@@ -440,14 +438,6 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			}
 			return m
 		case golang.InterfaceMethod:
-			idStr := receiveScalar[string](q, m.Ident.String())
-			if idStr != "" {
-				if parsed, err := uuid.Parse(idStr); err == nil {
-					m.Ident = parsed
-				}
-			}
-			return m
-		case golang.SelectStmt:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {

@@ -599,11 +599,7 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 		prefix = wrapper.Prefix
 	}
 	p.beforeSyntax(prefix, sw.Markers, out)
-	if java.FindMarker[golang.SelectStmt](sw.Markers) != nil {
-		out.Append("select")
-	} else {
-		out.Append("switch")
-	}
+	out.Append("switch")
 	if wrapped {
 		p.Visit(wrapper.Init.Element, out)
 		p.visitSpace(wrapper.Init.After, out)
@@ -618,6 +614,15 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
 	return sw
+}
+
+func (p *GoPrinter) VisitSelect(sel *golang.Select, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(sel.Prefix, sel.Markers, out)
+	out.Append("select")
+	p.Visit(sel.Body, out)
+	p.afterSyntax(sel.Markers, out)
+	return sel
 }
 
 // isDefaultCase reports whether a J.Case is Go's `default:` clause, modeled as a

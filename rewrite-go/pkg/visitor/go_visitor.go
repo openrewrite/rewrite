@@ -265,6 +265,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitStatementWithInit(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
+	case *golang.Select:
+		return v.self().VisitSelect(n, p)
 	case *golang.Unary:
 		return v.self().VisitGoUnary(n, p)
 	case *golang.Binary:
@@ -365,6 +367,7 @@ type VisitorI interface {
 	VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J
 	VisitStatementWithInit(s *golang.StatementWithInit, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
+	VisitSelect(sel *golang.Select, p any) java.J
 	VisitGoUnary(u *golang.Unary, p any) java.J
 	VisitGoBinary(b *golang.Binary, p any) java.J
 	VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J
@@ -1910,6 +1913,20 @@ func (v *GoVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	c.Markers = markers
 	c.Comm = comm
 	c.Colon = colon
+	c.Body = body
+	return &c
+}
+
+func (v *GoVisitor) VisitSelect(sel *golang.Select, p any) java.J {
+	prefix := v.self().VisitSpace(sel.Prefix, p)
+	markers := v.visitMarkers(sel.Markers, p)
+	body := visitAndCast[*java.Block](v, sel.Body, p)
+	if java.SpaceEqual(prefix, sel.Prefix) && java.MarkersEqual(markers, sel.Markers) && body == sel.Body {
+		return sel
+	}
+	c := *sel
+	c.Prefix = prefix
+	c.Markers = markers
 	c.Body = body
 	return &c
 }
