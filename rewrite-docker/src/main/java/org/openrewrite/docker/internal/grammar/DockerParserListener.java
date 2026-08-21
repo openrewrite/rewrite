@@ -543,45 +543,25 @@ public interface DockerParserListener extends ParseTreeListener {
 	 */
 	void exitEnvKey(DockerParser.EnvKeyContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#sourceList}.
+	 * Enter a parse tree produced by {@link DockerParser#copyPaths}.
 	 * @param ctx the parse tree
 	 */
-	void enterSourceList(DockerParser.SourceListContext ctx);
+	void enterCopyPaths(DockerParser.CopyPathsContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link DockerParser#sourceList}.
+	 * Exit a parse tree produced by {@link DockerParser#copyPaths}.
 	 * @param ctx the parse tree
 	 */
-	void exitSourceList(DockerParser.SourceListContext ctx);
+	void exitCopyPaths(DockerParser.CopyPathsContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link DockerParser#sourcePath}.
+	 * Enter a parse tree produced by {@link DockerParser#pathArgument}.
 	 * @param ctx the parse tree
 	 */
-	void enterSourcePath(DockerParser.SourcePathContext ctx);
+	void enterPathArgument(DockerParser.PathArgumentContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link DockerParser#sourcePath}.
+	 * Exit a parse tree produced by {@link DockerParser#pathArgument}.
 	 * @param ctx the parse tree
 	 */
-	void exitSourcePath(DockerParser.SourcePathContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#destination}.
-	 * @param ctx the parse tree
-	 */
-	void enterDestination(DockerParser.DestinationContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#destination}.
-	 * @param ctx the parse tree
-	 */
-	void exitDestination(DockerParser.DestinationContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link DockerParser#destinationPath}.
-	 * @param ctx the parse tree
-	 */
-	void enterDestinationPath(DockerParser.DestinationPathContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link DockerParser#destinationPath}.
-	 * @param ctx the parse tree
-	 */
-	void exitDestinationPath(DockerParser.DestinationPathContext ctx);
+	void exitPathArgument(DockerParser.PathArgumentContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#path}.
 	 * @param ctx the parse tree
@@ -692,6 +672,16 @@ public interface DockerParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitValueElement(DockerParser.ValueElementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DockerParser#pathElement}.
+	 * @param ctx the parse tree
+	 */
+	void enterPathElement(DockerParser.PathElementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DockerParser#pathElement}.
+	 * @param ctx the parse tree
+	 */
+	void exitPathElement(DockerParser.PathElementContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link DockerParser#textElement}.
 	 * @param ctx the parse tree

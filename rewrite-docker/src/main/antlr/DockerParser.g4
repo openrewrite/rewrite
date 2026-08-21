@@ -7,6 +7,18 @@ options {
     tokenVocab = DockerLexer;
 }
 
+@members {
+    /**
+     * Whether the next token follows the previous one with nothing between them. Whitespace is on the
+     * hidden channel, so this is how a rule states that its elements are one unbroken run of source.
+     */
+    private boolean adjacent() {
+        Token previous = _input.LT(-1);
+        Token next = _input.LT(1);
+        return previous != null && next != null && previous.getStopIndex() + 1 == next.getStartIndex();
+    }
+}
+
 // Root rule
 dockerfile
     : parserDirective* globalArgs stage+ EOF
@@ -78,11 +90,11 @@ envInstruction
     ;
 
 addInstruction
-    : ADD flags? ( heredoc | jsonArray | sourceList destination )
+    : ADD flags? ( heredoc | jsonArray | copyPaths )
     ;
 
 copyInstruction
-    : COPY flags? ( heredoc | jsonArray | sourceList destination )
+    : COPY flags? ( heredoc | jsonArray | copyPaths )
     ;
 
 entrypointInstruction
@@ -274,35 +286,18 @@ envKey
     : UNQUOTED_TEXT
     ;
 
-// For COPY/ADD: each sourcePath is a separate source
-// The parser will group adjacent tokens without whitespace into single arguments
-sourceList
-    : sourcePath+
+// Every path of a COPY/ADD. The last is the destination and the ones before it are the sources, a
+// split the grammar cannot make itself: were the destination a rule of its own, the sources would
+// have to give up their last element to leave it something to match.
+copyPaths
+    : pathArgument pathArgument+
     ;
 
-sourcePath
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
-    ;
-
-// Destination is the last path element
-destination
-    : destinationPath
-    ;
-
-destinationPath
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST
-    | BACKTICK_SUBST
-    | SPECIAL_VAR
+// A path ends at the next whitespace, so it is a run of elements that follow one another with nothing
+// between them, unlike `text` and `value`, which span whitespace and so take every element left.
+pathArgument
+    : quoted
+    | pathElement ( {adjacent()}? pathElement )*
     ;
 
 path
@@ -375,6 +370,14 @@ valueElement
     | SPECIAL_VAR     // Allow $!, $$, $?, etc. in values
     | DOLLAR          // Allow lone $ in values (e.g., $'hello' ANSI-C quoting)
     // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
+    ;
+
+// A single COPY/ADD path: one source, or the destination. Whitespace separates paths, so `=` and `,`
+// are ordinary characters here rather than the separators they are in a value list.
+pathElement
+    : valueElement
+    | EQUALS
+    | COMMA
     ;
 
 // Generic text element - used for paths, image names, arg values, shell form and heredoc preambles.

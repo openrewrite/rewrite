@@ -366,4 +366,72 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void pathsContainingEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY a=b /dest
+              COPY app /dest=x
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                List<Docker.Instruction> instructions = doc.getStages().getFirst().getInstructions();
+                var inSource = (Docker.Copy) instructions.getFirst();
+                assertThat(inSource.getShellForm()).isNotNull();
+                assertThat(inSource.getShellForm().getSources()).map(CopyTest::text).containsExactly("a=b");
+                assertThat(text(inSource.getShellForm().getDestination())).isEqualTo("/dest");
+
+                var inDestination = (Docker.Copy) instructions.getLast();
+                assertThat(inDestination.getShellForm()).isNotNull();
+                assertThat(inDestination.getShellForm().getSources()).map(CopyTest::text).containsExactly("app");
+                assertThat(text(inDestination.getShellForm().getDestination())).isEqualTo("/dest=x");
+            })
+          )
+        );
+    }
+
+    @Test
+    void pathContainingLoneDollar() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY cost$.txt /dest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getSources()).map(CopyTest::text).containsExactly("cost$.txt");
+                assertThat(text(copy.getShellForm().getDestination())).isEqualTo("/dest");
+            })
+          )
+        );
+    }
+
+    @Test
+    void pathHoldingAVariableReferenceIsOneDestination() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY app ${DIR}/dest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getSources()).map(CopyTest::text).containsExactly("app");
+                Docker.Argument destination = copy.getShellForm().getDestination();
+                assertThat(destination.getContents()).hasSize(2);
+                assertThat(((Docker.EnvironmentVariable) destination.getContents().getFirst()).getName()).isEqualTo("DIR");
+                assertThat(((Docker.Literal) destination.getContents().getLast()).getText()).isEqualTo("/dest");
+            })
+          )
+        );
+    }
+
+    private static String text(Docker.Argument argument) {
+        return ((Docker.Literal) argument.getContents().getFirst()).getText();
+    }
 }
