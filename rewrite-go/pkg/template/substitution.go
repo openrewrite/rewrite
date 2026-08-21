@@ -54,15 +54,145 @@ func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) jav
 	return parenthesized(setLeadingPrefix(val, ident.Prefix), v.Cursor())
 }
 
-// substitute applies the substitution visitor to the template tree,
-// replacing all placeholder identifiers with captured values.
+// A list binding expands within the list its placeholder sits in, so the
+// placeholder's own visit leaves it in place for the enclosing call or block to
+// replace. Get holds only single bindings, and returns nil for a list.
+func (v *substitutionVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	visited := v.GoVisitor.VisitMethodInvocation(mi, p)
+	call, ok := visited.(*java.MethodInvocation)
+	if !ok {
+		return visited
+	}
+	expanded, changed := expandList(v, call.Arguments.Elements, expressionSeparator)
+	if !changed {
+		return call
+	}
+	c := *call
+	c.Arguments.Elements = expanded
+	return &c
+}
+
+func (v *substitutionVisitor) VisitBlock(block *java.Block, p any) java.J {
+	visited := v.GoVisitor.VisitBlock(block, p)
+	b, ok := visited.(*java.Block)
+	if !ok {
+		return visited
+	}
+	expanded, changed := expandList(v, b.Statements, statementSeparator)
+	if !changed {
+		return b
+	}
+	return b.WithStatements(expanded)
+}
+
+// separator supplies the leading whitespace of the nth element a placeholder
+// expands to, given the whitespace the placeholder itself carried.
+type separator func(n int, placeholder java.Space) java.Space
+
+// Arguments are separated by the comma the printer emits plus a space, which is
+// what the parser leaves on every argument after the first.
+func expressionSeparator(n int, placeholder java.Space) java.Space {
+	if n == 0 {
+		return placeholder
+	}
+	return java.SingleSpace
+}
+
+// Statements are separated by the line break and indent the placeholder already
+// stands at, so every one of them starts where it did.
+func statementSeparator(_ int, placeholder java.Space) java.Space {
+	return placeholder
+}
+
+// expandList replaces each list-bound placeholder with the subtrees bound to
+// it. The run takes over the placeholder's padding: the whitespace before it
+// goes to the run's first element, the whitespace after it to the last. An
+// empty run hands the whitespace before it to the element taking its place.
+func expandList[T java.J](v *substitutionVisitor, elements []java.RightPadded[T], sep separator) ([]java.RightPadded[T], bool) {
+	changed := false
+	expanded := make([]java.RightPadded[T], 0, len(elements))
+	var vacated *java.Space
+
+	for _, rp := range elements {
+		prefix := rp.Element.GetPrefix()
+		if vacated != nil {
+			prefix, vacated = *vacated, nil
+		}
+
+		var values []java.J
+		isList := false
+		if name, isPlaceholder := placeholderName(java.J(rp.Element)); isPlaceholder {
+			values, isList = v.values.listBinding(name)
+		}
+
+		if !isList {
+			if !java.SpaceEqual(prefix, rp.Element.GetPrefix()) {
+				element, ok := setPrefix(rp.Element, prefix).(T)
+				if !ok {
+					return elements, false
+				}
+				rp.Element = element
+			}
+			expanded = append(expanded, rp)
+			continue
+		}
+
+		changed = true
+		if len(values) == 0 {
+			vacated = &prefix
+			continue
+		}
+		for i, value := range values {
+			// Returning the list untouched leaves the placeholder
+			// standing, which substitute reads as the failure it is.
+			element, ok := setPrefix(value, sep(i, prefix)).(T)
+			if !ok {
+				return elements, false
+			}
+			padded := java.RightPadded[T]{Element: element}
+			if i == len(values)-1 {
+				padded.After, padded.Markers = rp.After, rp.Markers
+			}
+			expanded = append(expanded, padded)
+		}
+	}
+	return expanded, changed
+}
+
+// substitute applies the substitution visitor to the template tree, replacing
+// all placeholder identifiers with captured values. It is nil unless every
+// placeholder was replaced, a placeholder in the output being no valid Go.
 func substitute(templateTree java.J, values *MatchResult) java.J {
 	v := newSubstitutionVisitor(values)
 	result := v.Visit(templateTree, nil)
 	if result == nil {
 		return nil
 	}
-	return result.(java.J)
+	substituted, ok := result.(java.J)
+	if !ok || holdsPlaceholder(substituted) {
+		return nil
+	}
+	return substituted
+}
+
+func holdsPlaceholder(j java.J) bool {
+	found := false
+	f := &placeholderFinder{found: &found}
+	f.Self = f
+	f.Visit(j, nil)
+	return found
+}
+
+type placeholderFinder struct {
+	visitor.GoVisitor
+	found *bool
+}
+
+func (v *placeholderFinder) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	if IsPlaceholder(ident.Name) {
+		*v.found = true
+	}
+	return v.GoVisitor.VisitIdentifier(ident, p)
 }
 
 func setPrefix(j java.J, prefix java.Space) java.J {
