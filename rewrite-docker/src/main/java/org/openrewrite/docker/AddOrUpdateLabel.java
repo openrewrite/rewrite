@@ -89,7 +89,8 @@ public class AddOrUpdateLabel extends Recipe {
             if (key.equals(extractText(pair.getKey()))) {
                 boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
                 return shouldOverwrite && !value.equals(extractText(pair.getValue())) ?
-                        pair.withValue(createArgument(value, pair.getValue())) : pair;
+                        pair.withValue(createArgument(value, pair.getValue())
+                                .withPrefix(pair.getValue().getPrefix())) : pair;
             }
             return super.visitLabelPair(pair, ctx);
         }
@@ -160,7 +161,12 @@ public class AddOrUpdateLabel extends Recipe {
             return null;
         }
         StringBuilder builder = new StringBuilder();
-        for (Docker.ArgumentContent content : arg.getContents()) {
+        List<Docker.ArgumentContent> contents = arg.getContents();
+        for (int i = 0; i < contents.size(); i++) {
+            Docker.ArgumentContent content = contents.get(i);
+            if (i > 0) {
+                builder.append(content.getPrefix().getWhitespace());
+            }
             if (content instanceof Docker.Literal) {
                 builder.append(((Docker.Literal) content).getText());
             } else if (content instanceof Docker.EnvironmentVariable) {
