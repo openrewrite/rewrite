@@ -362,6 +362,18 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitUserSpec(DockerParser.UserSpecContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link DockerParser#user}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitUser(DockerParser.UserContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#group}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitGroup(DockerParser.GroupContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link DockerParser#argName}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

@@ -305,8 +305,25 @@ path
     : text
     ;
 
+// user:group, the specification used by USER. The USER_SPEC lexer mode emits ':' as a token only
+// where it separates the two, so a colon inside a quoted string or a variable reference belongs to
+// the name that holds it.
 userSpec
-    : text
+    : user ( COLON group? )?
+    | COLON group?
+    ;
+
+// As `imageName`: nothing but the separator or the next instruction can follow a name, so the quoted
+// alternative is only viable when it is the whole name.
+user
+    : quoted
+    | textElement+
+    ;
+
+// The first colon separates the group, any later one is part of it
+group
+    : quoted
+    | ( textElement | COLON )+
     ;
 
 argName

@@ -56,4 +56,150 @@ class UserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void onlyTheFirstColonSeparatesTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER app:group:extra
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getText()).isEqualTo("app");
+                assertThat(user.getGroup().getText()).isEqualTo("group:extra");
+            })
+          )
+        );
+    }
+
+    /// A quoted specification is one lexical unit, as a quoted image reference is to FROM, so the parser
+    /// does not look inside it for a separator. Docker itself strips the quotes before splitting, so it
+    /// reads this as the group `group` of the user `app`.
+    @Test
+    void quotedSpecificationIsOneName() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER "app:group"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                var name = (Docker.Literal) user.getUser().getContents().getFirst();
+                assertThat(name.getText()).isEqualTo("app:group");
+                assertThat(name.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(user.getGroup()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedGroupKeepsItsQuoteStyle() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER app:'group'
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getText()).isEqualTo("app");
+                var group = (Docker.Literal) user.getGroup().getContents().getFirst();
+                assertThat(group.getText()).isEqualTo("group");
+                assertThat(group.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
+            })
+          )
+        );
+    }
+
+    @Test
+    void separatorWithoutAGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER app:
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getText()).isEqualTo("app");
+                assertThat(user.getGroup().getContents()).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void separatorWithoutAUser() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER :group
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getContents()).isEmpty();
+                assertThat(user.getGroup().getText()).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    @Test
+    void variableReferenceKeepsItsDefaultValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER ${APP_USER:-root}
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                var name = (Docker.EnvironmentVariable) user.getUser().getContents().getFirst();
+                assertThat(name.getName()).isEqualTo("APP_USER:-root");
+                assertThat(name.isBraced()).isTrue();
+                assertThat(user.getGroup()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void variableReferencesOnBothSidesOfTheSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER $UID:$GID
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(((Docker.EnvironmentVariable) user.getUser().getContents().getFirst()).getName()).isEqualTo("UID");
+                assertThat(((Docker.EnvironmentVariable) user.getGroup().getContents().getFirst()).getName()).isEqualTo("GID");
+            })
+          )
+        );
+    }
+
+    @Test
+    void continuationBeforeTheSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER app\\
+                :group
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getText()).isEqualTo("app\\\n  ");
+                assertThat(user.getGroup().getText()).isEqualTo("group");
+            })
+          )
+        );
+    }
 }
