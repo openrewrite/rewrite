@@ -216,40 +216,85 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             }
         }
 
-        Space spanPrefix = Space.EMPTY;
-        int spanStart = -1;
-        int spanStop = -1;
+        Space prefix = prefix(tokens.get(0));
+        int startIndex = tokens.get(0).getStartIndex();
+        int stopIndex = tokens.get(0).getStopIndex();
         for (Token token : tokens) {
-            if (token.getType() == DockerLexer.ENV_VAR) {
-                if (spanStart >= 0) {
-                    contents.add(sourceLiteral(spanPrefix, spanStart, spanStop));
-                    spanStart = -1;
-                }
-                Space prefix = prefix(token);
-                skip(token);
-                String text = token.getText();
-                boolean braced = text.startsWith("${");
-                contents.add(new Docker.EnvironmentVariable(randomId(), prefix, Markers.EMPTY,
-                        braced ? text.substring(2, text.length() - 1) : text.substring(1), braced));
-            } else {
-                if (spanStart < 0) {
-                    spanPrefix = prefix(token);
-                    spanStart = token.getStartIndex();
-                }
-                skip(token);
-                spanStop = token.getStopIndex();
-            }
+            skip(token);
+            stopIndex = Math.max(stopIndex, token.getStopIndex());
         }
-        if (spanStart >= 0) {
-            contents.add(sourceLiteral(spanPrefix, spanStart, spanStop));
+        contents.addAll(splitVariables(sourceText(startIndex, stopIndex), prefix));
+        return contents;
+    }
+
+    /**
+     * Splits environment variable references out of a value's text. Token boundaries are no guide here:
+     * the lexer emits `--name=value` as a single token, so a reference can sit inside one. What counts
+     * as a reference mirrors the lexer's ENV_VAR and SPECIAL_VAR rules, so that `$$` and `$1` stay text.
+     */
+    private List<Docker.ArgumentContent> splitVariables(String text, Space prefix) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            char next = i + 1 < text.length() ? text.charAt(i + 1) : 0;
+            String name = null;
+            boolean braced = false;
+            if (c == '$' && next == '{') {
+                int close = text.indexOf('}', i + 2);
+                if (close > i + 2 && isVarStart(text.charAt(i + 2))) {
+                    name = text.substring(i + 2, close);
+                    braced = true;
+                    i = close + 1;
+                }
+            } else if (c == '$' && isVarStart(next)) {
+                int end = i + 1;
+                while (end < text.length() && isVarPart(text.charAt(end))) {
+                    end++;
+                }
+                name = text.substring(i + 1, end);
+                i = end;
+            } else if (c == '$' && isSpecialVar(next)) {
+                current.append(c).append(next);
+                i += 2;
+                continue;
+            }
+            if (name == null) {
+                current.append(c);
+                i++;
+                continue;
+            }
+            if (current.length() > 0) {
+                contents.add(new Docker.Literal(randomId(), contents.isEmpty() ? prefix : Space.EMPTY,
+                        Markers.EMPTY, current.toString(), null));
+                current.setLength(0);
+            }
+            contents.add(new Docker.EnvironmentVariable(randomId(), contents.isEmpty() ? prefix : Space.EMPTY,
+                    Markers.EMPTY, name, braced));
+        }
+        if (current.length() > 0 || contents.isEmpty()) {
+            contents.add(new Docker.Literal(randomId(), contents.isEmpty() ? prefix : Space.EMPTY,
+                    Markers.EMPTY, current.toString(), null));
         }
         return contents;
     }
 
-    private Docker.Literal sourceLiteral(Space prefix, int startIndex, int stopIndex) {
-        String text = source.substring(source.offsetByCodePoints(0, startIndex),
+    private static boolean isVarStart(char c) {
+        return (c >= 'A' && c <= 'Z') || c == '_';
+    }
+
+    private static boolean isVarPart(char c) {
+        return isVarStart(c) || (c >= '0' && c <= '9');
+    }
+
+    private static boolean isSpecialVar(char c) {
+        return c == '!' || c == '$' || c == '?' || c == '#' || c == '@' || c == '*' || (c >= '0' && c <= '9');
+    }
+
+    private String sourceText(int startIndex, int stopIndex) {
+        return source.substring(source.offsetByCodePoints(0, startIndex),
                 source.offsetByCodePoints(0, stopIndex + 1));
-        return new Docker.Literal(randomId(), prefix, Markers.EMPTY, text, null);
     }
 
     private Docker.Literal.@Nullable QuoteStyle quoteStyleOf(Token token) {
