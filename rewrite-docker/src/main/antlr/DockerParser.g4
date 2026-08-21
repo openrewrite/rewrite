@@ -210,18 +210,23 @@ imageReference
     | AT digest?
     ;
 
+// Nothing but a separator, `AS` or the next instruction can follow a part of a reference, so the
+// quoted alternative is only viable when it is the whole part.
 imageName
-    : textElement+
+    : quoted
+    | textElement+
     ;
 
 // The first colon separates the tag, any later one is part of it
 tag
-    : ( textElement | COLON )+
+    : quoted
+    | ( textElement | COLON )+
     ;
 
 // A digest carries its algorithm as a prefix, as in sha256:abc123
 digest
-    : ( textElement | COLON | AT )+
+    : quoted
+    | ( textElement | COLON | AT )+
     ;
 
 stageName
@@ -233,23 +238,14 @@ labelPairs
     ;
 
 labelPair
-    : labelKey EQUALS labelValue    // New format: key=value
-    | labelKey labelOldValue        // Old format: key value
+    : labelKey EQUALS value    // New format: key=value
+    | labelKey text            // Old format: key value, the rest of the line
     ;
 
 // Label key - instruction keywords become UNQUOTED_TEXT since they're not at line start
 labelKey
-    : UNQUOTED_TEXT | DOUBLE_QUOTED_STRING | SINGLE_QUOTED_STRING
-    ;
-
-labelValue
-    : valueElement+
-    ;
-
-// Value in old-style LABEL (rest of line after key)
-// Instruction keywords are UNQUOTED_TEXT here (not at line start)
-labelOldValue
-    : textElement+
+    : quoted
+    | UNQUOTED_TEXT
     ;
 
 portList
@@ -269,21 +265,13 @@ envPairs
     ;
 
 envPair
-    : envKey EQUALS envValueEquals  // New form: KEY=value (no = in value)
-    | envKey envValueSpace           // Old form: KEY value (rest of line, can have =)
+    : envKey EQUALS value  // New form: KEY=value (no = in value)
+    | envKey text          // Old form: KEY value (rest of line, can have =)
     ;
 
 // Env key - instruction keywords become UNQUOTED_TEXT (not at line start)
 envKey
     : UNQUOTED_TEXT
-    ;
-
-envValueEquals
-    : valueElement+
-    ;
-
-envValueSpace
-    : textElement+
     ;
 
 // For COPY/ADD: each sourcePath is a separate source
@@ -351,8 +339,28 @@ signal
     : UNQUOTED_TEXT
     ;
 
+// A value written as a single quoted string. Only such a value carries a quote style; anywhere else
+// the quotes are part of the text, which is why the rules that hold a value state this case as an
+// alternative of its own rather than leaving the visitor to count tokens.
+quoted
+    : DOUBLE_QUOTED_STRING
+    | SINGLE_QUOTED_STRING
+    ;
+
+// The alternative of more than one element comes first, as ANTLR resolves an ambiguity in favour of
+// the first alternative: `quoted` would otherwise match `LABEL author "John Doe" of ACME` as a value
+// of `John Doe` and leave `of ACME` to a second pair.
 text
-    : textElement+
+    : textElement textElement+
+    | quoted
+    | textElement
+    ;
+
+// As `text`, for a value that ends at the next `=` so that `KEY=value` pairs can repeat.
+value
+    : valueElement valueElement+
+    | quoted
+    | valueElement
     ;
 
 // An element of a value that ends at the next `=`, so that `KEY=value` pairs can repeat on one

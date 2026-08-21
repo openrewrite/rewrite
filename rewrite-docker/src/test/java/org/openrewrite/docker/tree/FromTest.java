@@ -347,6 +347,24 @@ class FromTest implements RewriteTest {
     }
 
     @Test
+    void quotedTagKeepsItsQuoteStyle() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:"22.04"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                Docker.Literal tag = (Docker.Literal) from.getTag().getContents().getFirst();
+                assertThat(tag.getText()).isEqualTo("22.04");
+                assertThat(tag.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+            })
+          )
+        );
+    }
+
+    @Test
     void separatorWithoutATag() {
         rewriteRun(
           docker(

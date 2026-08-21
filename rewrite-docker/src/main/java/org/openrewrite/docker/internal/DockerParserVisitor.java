@@ -196,9 +196,9 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     /// A value is a single literal holding its source text, so that a value spanning whitespace stays
-    /// whole. Quote style is recorded only when the entire value is one quoted token; anywhere else the
-    /// quotes are part of the text. Environment variable references are always split out, since their
-    /// value cannot be resolved from the source.
+    /// whole. Quote style is recorded only for a value the grammar matched as one quoted string;
+    /// anywhere else the quotes are part of the text. Environment variable references are always split
+    /// out, since their value cannot be resolved from the source.
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx) {
         return parseText(textCtx, -1);
     }
@@ -207,46 +207,39 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     /// continues past its last token, as it does when whitespace precedes an image reference separator.
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx, int stopIndex) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
-        if (textCtx == null) {
+        if (textCtx == null || textCtx.getChildCount() == 0) {
             return contents;
         }
 
-        List<Token> tokens = new ArrayList<>();
-        for (int i = 0; i < textCtx.getChildCount(); i++) {
-            TerminalNode terminal = elementTerminal(textCtx.getChild(i));
-            if (terminal != null) {
-                tokens.add(terminal.getSymbol());
-            }
-        }
-        if (tokens.isEmpty()) {
-            return contents;
-        }
-
-        if (tokens.size() == 1 && stopIndex <= tokens.get(0).getStopIndex()) {
-            Token only = tokens.get(0);
-            Docker.Literal.QuoteStyle quoteStyle = quoteStyleOf(only);
-            String text = only.getText();
-            String unquoted = quoteStyle == null ? "" : text.substring(1, text.length() - 1);
+        Token quoted = quotedValue(textCtx);
+        if (quoted != null && stopIndex <= quoted.getStopIndex()) {
+            Docker.Literal.QuoteStyle quoteStyle = quoted.getType() == DockerLexer.DOUBLE_QUOTED_STRING ?
+                    Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE;
+            String text = quoted.getText();
+            String unquoted = text.substring(1, text.length() - 1);
             // Single quotes never expand, so such a value is always whole. Double quotes do, and a value
             // holding a reference is no longer one literal, which puts its quotes into the text.
-            if (quoteStyle == Docker.Literal.QuoteStyle.SINGLE ||
-                    (quoteStyle == Docker.Literal.QuoteStyle.DOUBLE && !containsVariable(unquoted))) {
-                Space prefix = prefix(only);
-                skip(only);
+            if (quoteStyle == Docker.Literal.QuoteStyle.SINGLE || !containsVariable(unquoted)) {
+                Space prefix = prefix(quoted);
+                skip(quoted);
                 contents.add(new Docker.Literal(randomId(), prefix, Markers.EMPTY, unquoted, quoteStyle));
                 return contents;
             }
         }
 
-        Space prefix = prefix(tokens.get(0));
-        int startIndex = tokens.get(0).getStartIndex();
-        int endIndex = stopIndex;
-        for (Token token : tokens) {
-            skip(token);
-            endIndex = Math.max(endIndex, token.getStopIndex());
-        }
+        Space prefix = prefix(textCtx.getStart());
+        int startIndex = textCtx.getStart().getStartIndex();
+        int endIndex = Math.max(stopIndex, textCtx.getStop().getStopIndex());
+        skip(textCtx.getStop());
         contents.addAll(splitVariables(sourceText(startIndex, endIndex), prefix));
         return contents;
+    }
+
+    /// The token of a value that the grammar matched as one quoted string, and null for any other
+    /// value, whose quotes, if it has any, are part of its text.
+    private @Nullable Token quotedValue(ParserRuleContext ctx) {
+        ParseTree first = ctx.getChild(0);
+        return first instanceof DockerParser.QuotedContext ? ((DockerParser.QuotedContext) first).getStart() : null;
     }
 
     /// Splits environment variable references out of a value's text. Token boundaries are no guide here:
@@ -341,27 +334,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     private String sourceText(int startIndex, int stopIndex) {
         return source.substring(source.offsetByCodePoints(0, startIndex),
                 source.offsetByCodePoints(0, stopIndex + 1));
-    }
-
-    private Docker.Literal.@Nullable QuoteStyle quoteStyleOf(Token token) {
-        if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
-            return Docker.Literal.QuoteStyle.DOUBLE;
-        }
-        if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
-            return Docker.Literal.QuoteStyle.SINGLE;
-        }
-        return null;
-    }
-
-    private @Nullable TerminalNode elementTerminal(ParseTree child) {
-        if (child instanceof TerminalNode) {
-            return (TerminalNode) child;
-        }
-        if (child instanceof ParserRuleContext && child.getChildCount() > 0 &&
-                child.getChild(0) instanceof TerminalNode) {
-            return (TerminalNode) child.getChild(0);
-        }
-        return null;
     }
 
     private Docker.Argument parseArgument(@Nullable ParserRuleContext elementsCtx) {
@@ -584,13 +556,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                 skip(pairCtx.EQUALS().getSymbol());
             }
 
-            // Handle both forms: KEY=value (envValueEquals) or KEY value (envValueSpace)
-            Docker.Argument value;
-            if (pairCtx.envValueEquals() != null) {
-                value = parseArgument(pairCtx.envValueEquals());
-            } else {
-                value = parseArgument(pairCtx.envValueSpace());
-            }
+            // Handle both forms: KEY=value or KEY value
+            Docker.Argument value = parseArgument(hasEquals ? pairCtx.value() : pairCtx.text());
 
             pairs.add(new Docker.Env.EnvPair(randomId(), pairPrefix, Markers.EMPTY, key, hasEquals, value));
         }
@@ -616,18 +583,15 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         for (DockerParser.LabelPairContext pairCtx : ctx.labelPairs().labelPair()) {
             Space pairPrefix = prefix(pairCtx.getStart());
             boolean hasEquals = pairCtx.EQUALS() != null;
-            Docker.Argument key;
+            Docker.Argument key = parseArgument(pairCtx.labelKey());
             Docker.Argument value;
-
             if (hasEquals) {
                 // New format: LABEL key=value
-                key = parseArgument(pairCtx.labelKey());
                 skip(pairCtx.EQUALS().getSymbol());
-                value = parseArgument(pairCtx.labelValue());
+                value = parseArgument(pairCtx.value());
             } else {
                 // Old format: LABEL key value
-                key = parseArgument(pairCtx.labelKey());
-                value = parseArgument(pairCtx.labelOldValue());
+                value = parseArgument(pairCtx.text());
             }
 
             pairs.add(new Docker.Label.LabelPair(randomId(), pairPrefix, Markers.EMPTY, key, hasEquals, value));
