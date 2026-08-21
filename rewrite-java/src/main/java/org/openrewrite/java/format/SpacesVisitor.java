@@ -26,7 +26,6 @@ import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.Arrays;
@@ -53,7 +52,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
+        this(StyleHelper.getStyle(SpacesStyle.class, styles, (Supplier<SpacesStyle>) IntelliJ::spaces), StyleHelper.getStyle(EmptyForInitializerPadStyle.class, styles), StyleHelper.getStyle(EmptyForIteratorPadStyle.class, styles), StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces), stopAfter);
     }
 
     @Deprecated

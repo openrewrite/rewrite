@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -32,7 +31,7 @@ import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<P> {
     public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
+        this(StyleHelper.getStyle(SpacesStyle.class, styles, (Supplier<SpacesStyle>) IntelliJ::spaces), StyleHelper.getStyle(EmptyForInitializerPadStyle.class, styles), StyleHelper.getStyle(EmptyForIteratorPadStyle.class, styles), StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces), stopAfter);
     }
 
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {

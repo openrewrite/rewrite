@@ -26,8 +26,6 @@ import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 
 import java.util.List;
 import java.util.Objects;

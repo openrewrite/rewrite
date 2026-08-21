@@ -30,7 +30,6 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.ArrayList;
@@ -50,9 +49,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public TabsAndIndentsVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents),
-                getStyle(SpacesStyle.class, styles, IntelliJ::spaces),
-                getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces),
+        this(StyleHelper.getStyle(TabsAndIndentsStyle.class, styles, (Supplier<TabsAndIndentsStyle>) IntelliJ::tabsAndIndents),
+                StyleHelper.getStyle(SpacesStyle.class, styles, (Supplier<SpacesStyle>) IntelliJ::spaces),
+                StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces),
                 stopAfter);
     }
 

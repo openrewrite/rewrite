@@ -28,7 +28,6 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -45,7 +44,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public NormalizeTabsOrSpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(TabsAndIndentsStyle.class, styles, IntelliJ::tabsAndIndents), stopAfter);
+        this(StyleHelper.getStyle(TabsAndIndentsStyle.class, styles, (Supplier<TabsAndIndentsStyle>) IntelliJ::tabsAndIndents), stopAfter);
     }
 
     @Deprecated

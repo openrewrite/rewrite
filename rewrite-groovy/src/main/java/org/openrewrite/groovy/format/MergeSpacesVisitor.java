@@ -26,7 +26,6 @@ import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -38,7 +37,7 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
     private final WrappingAndBracesStyle wrappingAndBracesStyle;
 
     public MergeSpacesVisitor(List<NamedStyles> styles) {
-        this.wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces);
+        this.wrappingAndBracesStyle = StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces);
     }
 
     @Override

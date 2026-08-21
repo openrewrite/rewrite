@@ -1047,7 +1047,7 @@ public class CheckstyleConfigLoader {
                         }
                     }
 
-                    boolean isInflow = !staticsOnTop && !staticsOnBottom && shouldKnowInflowStyle();
+                    boolean isInflow = !staticsOnTop && !staticsOnBottom;
 
                     // Add non-static import groups
                     if (groups != null && !groups.isEmpty()) {

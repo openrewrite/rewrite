@@ -22,8 +22,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.*;
 
@@ -76,7 +76,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
         if (tree instanceof JavaSourceFile) {
-            return addStyleMarker((JavaSourceFile) tree, styles);
+            return StyleHelper.addStyleMarker((JavaSourceFile) tree, styles);
         }
 
         return (J) tree;
@@ -112,7 +112,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p);
 
             if (tree instanceof J.CompilationUnit) {
-                return addStyleMarker((JavaSourceFile) tree, styles);
+                return StyleHelper.addStyleMarker((JavaSourceFile) tree, styles);
             }
         }
         //noinspection DataFlowIssue

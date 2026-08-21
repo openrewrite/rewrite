@@ -24,7 +24,6 @@ import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -51,7 +50,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public NormalizeLineBreaksVisitor(List<NamedStyles> styles, JavaSourceFile cu, @Nullable Tree stopAfter) {
-        this(getStyle(GeneralFormatStyle.class, styles, () -> autodetectGeneralFormatStyle(cu)), stopAfter);
+        this(StyleHelper.getStyle(GeneralFormatStyle.class, styles, (Supplier<GeneralFormatStyle>) () -> autodetectGeneralFormatStyle(cu)), stopAfter);
     }
 
     public NormalizeLineBreaksVisitor(GeneralFormatStyle style, @Nullable Tree stopAfter) {

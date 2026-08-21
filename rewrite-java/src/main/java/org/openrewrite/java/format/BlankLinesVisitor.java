@@ -25,7 +25,6 @@ import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.HashSet;
@@ -47,7 +46,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public BlankLinesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this.style = getStyle(BlankLinesStyle.class, styles, IntelliJ::blankLines);
+        this.style = StyleHelper.getStyle(BlankLinesStyle.class, styles, (Supplier<BlankLinesStyle>) IntelliJ::blankLines);
         this.stopAfter = stopAfter;
     }
 
