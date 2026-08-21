@@ -22,7 +22,9 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 /**
  * A comma-separated set of PEP 440 specifier clauses, ported from pypa/packaging's
@@ -97,14 +99,14 @@ public class PythonVersionSpecifierSet {
         return specifiers.stream()
                 .sorted(Comparator.comparing(PythonVersionSpecifier::toString))
                 .filter(s -> seen.add(s.toString()))
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     @Override
     public String toString() {
         return canonicalSpecifiers().stream()
                 .map(PythonVersionSpecifier::toString)
-                .collect(Collectors.joining(","));
+                .collect(joining(","));
     }
 
     @Override

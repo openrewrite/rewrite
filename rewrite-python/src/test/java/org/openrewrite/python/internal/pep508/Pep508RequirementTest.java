@@ -24,14 +24,14 @@ import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class Pep508RequirementTest {
@@ -81,8 +81,8 @@ class Pep508RequirementTest {
         List<String> names = Arrays.asList(
           "package", "pAcKaGe", "Package", "foo-bar.quux_bAz", "installer", "android12");
         List<List<String>> extrasSets = Arrays.asList(
-          Collections.emptyList(),
-          Collections.singletonList("a"),
+          emptyList(),
+          singletonList("a"),
           Arrays.asList("a", "b"),
           Arrays.asList("a", "B", "CDEF123"));
         // Pairs of (url, specifier); exactly one may be non-empty.
@@ -131,7 +131,7 @@ class Pep508RequirementTest {
         parts.add(name);
         if (!extras.isEmpty()) {
             List<String> sorted = new ArrayList<>(extras);
-            Collections.sort(sorted);
+            sort(sorted);
             parts.add("[");
             parts.add(String.join(ws + "," + ws, sorted));
             parts.add("]");
@@ -220,7 +220,7 @@ class Pep508RequirementTest {
     }
 
     private static Set<String> canonicalExtras(Pep508Requirement req) {
-        return req.getExtras().stream().map(Pep508Requirement::canonicalize).collect(Collectors.toSet());
+        return req.getExtras().stream().map(Pep508Requirement::canonicalize).collect(toSet());
     }
 
     @ParameterizedTest

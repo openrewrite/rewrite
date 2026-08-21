@@ -33,7 +33,6 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
@@ -288,7 +289,7 @@ public final class NpmLockPatcher implements LockPatcher {
      */
     private Json.JsonObject reconcileConstraintMap(String name, Json.JsonObject entry, String mapKey,
                                                    @Nullable Map<String, String> newDeps, boolean allowDrops) {
-        Map<String, String> deps = newDeps == null ? Collections.emptyMap() : newDeps;
+        Map<String, String> deps = newDeps == null ? emptyMap() : newDeps;
         if (deps.isEmpty() && !allowDrops) {
             return entry; // no constraint reconciliation requested (plain bump / leaf mover)
         }
@@ -317,7 +318,7 @@ public final class NpmLockPatcher implements LockPatcher {
                 }
             }
             if (dropped.equals(mapKeys)) {
-                return removeMembers(entry, Collections.singleton(mapKey)); // every edge dropped: drop the map
+                return removeMembers(entry, singleton(mapKey)); // every edge dropped: drop the map
             }
             if (!dropped.isEmpty()) {
                 map = removeMembers(map, dropped);
@@ -438,9 +439,9 @@ public final class NpmLockPatcher implements LockPatcher {
             if (scopeObj == null || LockJson.member(scopeObj, edit.getName()) == null) {
                 continue;
             }
-            Json.JsonObject trimmed = removeMembers(scopeObj, Collections.singleton(edit.getName()));
+            Json.JsonObject trimmed = removeMembers(scopeObj, singleton(edit.getName()));
             if (isEmptyObject(trimmed) && (editedManifest == null || !editedManifest.has(scope))) {
-                importer = removeMembers(importer, Collections.singleton(scope));
+                importer = removeMembers(importer, singleton(scope));
             } else {
                 importer = LockJson.replaceValue(importer, scope, trimmed);
             }
@@ -954,7 +955,7 @@ public final class NpmLockPatcher implements LockPatcher {
         if (want == (LockJson.member(entry, key) != null)) {
             return entry;
         }
-        return want ? graftSorted(entry, key, "true", false) : removeMembers(entry, Collections.singleton(key));
+        return want ? graftSorted(entry, key, "true", false) : removeMembers(entry, singleton(key));
     }
 
     /** Add, replace, or remove the entry's {@code engines} object at npm's field position (byte-exact). */
@@ -967,7 +968,7 @@ public final class NpmLockPatcher implements LockPatcher {
     /** Add, replace, or remove an object-valued entry member at npm's field position (byte-exact). */
     private Json.JsonObject writeObjectMember(String name, Json.JsonObject packages, Json.JsonObject entry,
                                                      String key, @Nullable JsonNode value) {
-        entry = removeMembers(entry, Collections.singleton(key));
+        entry = removeMembers(entry, singleton(key));
         if (value == null) {
             return entry; // member removed on upgrade
         }
@@ -1021,7 +1022,7 @@ public final class NpmLockPatcher implements LockPatcher {
             if (importer != null) {
                 Json.JsonObject scope = LockJson.objectMember(importer, removal.getScope());
                 if (scope != null && LockJson.member(scope, removal.getName()) != null) {
-                    Json.JsonObject trimmed = removeMembers(scope, Collections.singleton(removal.getName()));
+                    Json.JsonObject trimmed = removeMembers(scope, singleton(removal.getName()));
                     if (isEmptyObject(trimmed)) {
                         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, removal.getName(),
                                 "removing " + removal.getName() + " empties the " + removal.getScope() + " scope");

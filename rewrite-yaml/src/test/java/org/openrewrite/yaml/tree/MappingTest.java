@@ -64,11 +64,10 @@ class MappingTest implements RewriteTest {
               type : specs.openrewrite.org/v1beta/visitor # comment with colon :
               name : org.openrewrite.text.ChangeTextToJon
               """,
-            spec -> spec.afterRecipe(y -> {
+            spec -> spec.afterRecipe(y ->
                 assertThat(((Yaml.Mapping) (y.getDocuments().getFirst().getBlock())).getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
-                  .map(Scalar::getValue)).containsExactly("type", "name");
-            })
+                  .map(Scalar::getValue)).containsExactly("type", "name"))
           )
         );
     }

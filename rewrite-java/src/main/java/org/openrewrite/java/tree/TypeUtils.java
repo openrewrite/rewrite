@@ -403,11 +403,11 @@ public class TypeUtils {
         }
 
         JavaType.FullyQualified[] toFq = to.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         JavaType.FullyQualified[] fromFq = from.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         for (int i = 0; i < toFq.length; i++) {

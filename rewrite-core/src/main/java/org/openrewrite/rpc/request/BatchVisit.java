@@ -41,12 +41,15 @@ public class BatchVisit implements RpcRequest {
     String sourceFileType;
     String treeId;
     String p;
+
     @Nullable List<String> cursor;
+
     List<BatchVisitItem> visitors;
 
     @Value
     public static class BatchVisitItem {
         String visitor;
+
         @Nullable Map<String, Object> visitorOptions;
     }
 

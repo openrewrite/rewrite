@@ -173,7 +173,7 @@ public class GoModParser implements Parser {
             }
 
             // Close block on trailing ')'
-            if (block != BlockState.NONE && line.trim().equals(")")) {
+            if (block != BlockState.NONE && ")".equals(line.trim())) {
                 block = BlockState.NONE;
                 continue;
             }

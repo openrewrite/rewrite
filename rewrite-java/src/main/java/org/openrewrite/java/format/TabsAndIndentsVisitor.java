@@ -420,7 +420,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
-        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(elem -> elem instanceof J.Empty)) {
+        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(J.Empty.class::isInstance)) {
             return super.visitContainer(container, loc, p);
         }
 

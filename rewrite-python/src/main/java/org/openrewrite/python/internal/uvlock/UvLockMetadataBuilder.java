@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.sort;
 
 /**
  * Rebuilds the root package's {@code [package.metadata]} (requires-dist, provides-extras, and
@@ -256,8 +257,8 @@ final class UvLockMetadataBuilder {
                 List<String> oldRendered = UvLockRequirements.rendered(oldRun);
                 List<String> newSorted = new ArrayList<>(newRendered);
                 List<String> oldSorted = new ArrayList<>(oldRendered);
-                java.util.Collections.sort(newSorted);
-                java.util.Collections.sort(oldSorted);
+                sort(newSorted);
+                sort(oldSorted);
                 if (newSorted.equals(oldSorted)) {
                     for (int j = 0; j < oldRun.size(); j++) {
                         entries.set(i + j, oldRun.get(j));

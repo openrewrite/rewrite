@@ -50,16 +50,14 @@ public class GoModVisitor<P> extends TreeVisitor<GoModTree, P> {
         g = g.withPrefix(visitSpace(g.getPrefix(), p));
         g = g.withMarkers(visitMarkers(g.getMarkers(), p));
         g = g.withStatements(ListUtils.map(g.getStatements(), s -> visitRightPadded(s, p)));
-        g = g.withEof(visitSpace(g.getEof(), p));
-        return g;
+        return g.withEof(visitSpace(g.getEof(), p));
     }
 
     public GoModTree visitDirective(GoMod.Directive directive, P p) {
         GoMod.Directive d = directive;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        d = d.withValues(ListUtils.map(d.getValues(), v -> (GoMod.Value) visit(v, p)));
-        return d;
+        return d.withValues(ListUtils.map(d.getValues(), v -> (GoMod.Value) visit(v, p)));
     }
 
     public GoModTree visitBlock(GoMod.Block block, P p) {
@@ -68,15 +66,13 @@ public class GoModVisitor<P> extends TreeVisitor<GoModTree, P> {
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
         b = b.withBeforeLParen(visitSpace(b.getBeforeLParen(), p));
         b = b.withEntries(ListUtils.map(b.getEntries(), e -> visitRightPadded(e, p)));
-        b = b.withBeforeRParen(visitSpace(b.getBeforeRParen(), p));
-        return b;
+        return b.withBeforeRParen(visitSpace(b.getBeforeRParen(), p));
     }
 
     public GoModTree visitValue(GoMod.Value value, P p) {
         GoMod.Value v = value;
         v = v.withPrefix(visitSpace(v.getPrefix(), p));
-        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
-        return v;
+        return v.withMarkers(visitMarkers(v.getMarkers(), p));
     }
 
     /**
