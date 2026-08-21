@@ -129,6 +129,21 @@ public final class ImageReferences {
     }
 
     private static int tagColonIndex(String text) {
-        return text.indexOf(':', text.lastIndexOf('/') + 1);
+        // A quoted image reference carries its tag inside the quotes, so a colon there separates nothing.
+        boolean quoted = false;
+        int candidate = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '"' || c == '\'') {
+                quoted = !quoted;
+            } else if (quoted) {
+                continue;
+            } else if (c == '/') {
+                candidate = -1;
+            } else if (c == ':' && candidate < 0) {
+                candidate = i;
+            }
+        }
+        return candidate;
     }
 }

@@ -158,6 +158,24 @@ class EnvTest implements RewriteTest {
         );
     }
 
+    @Test
+    void variableInQuotedPathAppend() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV PATH="/opt/venv/bin:$PATH"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = envValue(doc);
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getText()).isNull();
+                assertThat(value.getTextWithVariables()).isEqualTo("\"/opt/venv/bin:$PATH\"");
+            })
+          )
+        );
+    }
+
     private static Docker.Argument envValue(Docker.File doc) {
         var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(env.getPairs()).singleElement().actual().getValue();

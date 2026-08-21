@@ -243,6 +243,24 @@ class LabelTest implements RewriteTest {
         );
     }
 
+    @Test
+    void singleQuotedSectionOfAValueDoesNotExpand() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author 'John $D' of ACME
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.getValue().getContents()).hasSize(1);
+                assertThat(pair.getValue().hasEnvironmentVariables()).isFalse();
+                assertThat(pair.getValue().getText()).isEqualTo("'John $D' of ACME");
+            })
+          )
+        );
+    }
+
     private static Docker.Label.LabelPair onlyPair(Docker.File doc) {
         var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(label.getPairs()).singleElement().actual();

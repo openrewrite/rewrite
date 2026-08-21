@@ -206,12 +206,15 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         if (tokens.size() == 1) {
             Token only = tokens.get(0);
             Docker.Literal.QuoteStyle quoteStyle = quoteStyleOf(only);
-            if (quoteStyle != null) {
+            String text = only.getText();
+            String unquoted = quoteStyle == null ? "" : text.substring(1, text.length() - 1);
+            // Single quotes never expand, so such a value is always whole. Double quotes do, and a value
+            // holding a reference is no longer one literal, which puts its quotes into the text.
+            if (quoteStyle == Docker.Literal.QuoteStyle.SINGLE ||
+                    (quoteStyle == Docker.Literal.QuoteStyle.DOUBLE && !containsVariable(unquoted))) {
                 Space prefix = prefix(only);
                 skip(only);
-                String text = only.getText();
-                contents.add(new Docker.Literal(randomId(), prefix, Markers.EMPTY,
-                        text.substring(1, text.length() - 1), quoteStyle));
+                contents.add(new Docker.Literal(randomId(), prefix, Markers.EMPTY, unquoted, quoteStyle));
                 return contents;
             }
         }
@@ -235,10 +238,27 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     private List<Docker.ArgumentContent> splitVariables(String text, Space prefix) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();
+        boolean singleQuoted = false;
         int i = 0;
         while (i < text.length()) {
             char c = text.charAt(i);
             char next = i + 1 < text.length() ? text.charAt(i + 1) : 0;
+            if (c == '\'') {
+                singleQuoted = !singleQuoted;
+                current.append(c);
+                i++;
+                continue;
+            }
+            if (c == '\\' && next != 0 && !singleQuoted) {
+                current.append(c).append(next);
+                i += 2;
+                continue;
+            }
+            if (singleQuoted) {
+                current.append(c);
+                i++;
+                continue;
+            }
             String name = null;
             boolean braced = false;
             if (c == '$' && next == '{') {
@@ -278,6 +298,15 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     Markers.EMPTY, current.toString(), null));
         }
         return contents;
+    }
+
+    private boolean containsVariable(String text) {
+        for (Docker.ArgumentContent content : splitVariables(text, Space.EMPTY)) {
+            if (content instanceof Docker.EnvironmentVariable) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isVarStart(char c) {

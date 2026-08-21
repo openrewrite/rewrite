@@ -283,6 +283,83 @@ class ArgTest implements RewriteTest {
         );
     }
 
+    @Test
+    void variableInsideDoubleQuotedValueIsSplitOut() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG GREETING="pre $V post"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(3);
+                assertThat(((Docker.Literal) value.getContents().get(0)).getText()).isEqualTo("\"pre ");
+                assertThat(((Docker.EnvironmentVariable) value.getContents().get(1)).getName()).isEqualTo("V");
+                assertThat(((Docker.Literal) value.getContents().get(2)).getText()).isEqualTo(" post\"");
+                assertThat(value.getQuoteStyle()).isNull();
+                assertThat(value.hasEnvironmentVariables()).isTrue();
+                assertThat(value.getTextWithVariables()).isEqualTo("\"pre $V post\"");
+            })
+          )
+        );
+    }
+
+    @Test
+    void variableInsideSingleQuotedValueStaysLiteral() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG GREETING='pre $V post'
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(1);
+                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
+                assertThat(value.hasEnvironmentVariables()).isFalse();
+                assertThat(value.getText()).isEqualTo("pre $V post");
+            })
+          )
+        );
+    }
+
+    @Test
+    void escapedDollarInQuotedValueStaysLiteral() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG GREETING="pre \\$V post"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(1);
+                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(value.hasEnvironmentVariables()).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedValueWithoutVariablesKeepsItsQuoteStyle() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              ARG GREETING="no vars here"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = argValue(doc);
+                assertThat(value.getContents()).hasSize(1);
+                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(value.getText()).isEqualTo("no vars here");
+            })
+          )
+        );
+    }
+
     private static Docker.Argument argValue(Docker.File doc) {
         Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(arg.getValue()).isNotNull().actual();
