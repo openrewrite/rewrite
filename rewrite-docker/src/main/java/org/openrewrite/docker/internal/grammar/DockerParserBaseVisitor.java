@@ -397,14 +397,14 @@ public class DockerParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> impl
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSourceList(DockerParser.SourceListContext ctx) { return visitChildren(ctx); }
+	@Override public T visitCopyPaths(DockerParser.CopyPathsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDestination(DockerParser.DestinationContext ctx) { return visitChildren(ctx); }
+	@Override public T visitPathArgument(DockerParser.PathArgumentContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *

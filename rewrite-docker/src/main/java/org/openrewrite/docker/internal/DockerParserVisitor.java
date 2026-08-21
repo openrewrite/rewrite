@@ -377,25 +377,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         Docker.CopyAddForm form;
 
-        // Check if heredoc, jsonArray, or sourceList is present
+        // Check if heredoc, jsonArray, or paths are present
         if (ctx.heredoc() != null) {
             // For ADD with heredoc, extract destination from preamble
             form = visitHeredocContext(ctx.heredoc(), true);
         } else if (ctx.jsonArray() != null) {
             form = visitJsonArrayAsExecForm(ctx.jsonArray());
-        } else if (ctx.sourceList() != null) {
-            // Parse sources and destination into CopyShellForm
-            List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
-            Docker.Argument destination = parseDestinationPath(ctx.destination());
-            // The prefix for shellForm comes from the first source
-            Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
-            if (!sources.isEmpty()) {
-                // Remove prefix from first source since it's now on the shellForm
-                sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
-            }
-            form = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+        } else if (ctx.copyPaths() != null) {
+            form = copyShellForm(ctx.copyPaths());
         } else {
-            throw new IllegalStateException("ADD must have either sourceList or jsonArray or heredoc");
+            throw new IllegalStateException("ADD must have either paths or jsonArray or heredoc");
         }
 
         // Advance cursor to end of instruction
@@ -418,25 +409,16 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         Docker.CopyAddForm form;
 
-        // Check if heredoc, jsonArray, or sourceList is present
+        // Check if heredoc, jsonArray, or paths are present
         if (ctx.heredoc() != null) {
             // For COPY with heredoc, extract destination from preamble
             form = visitHeredocContext(ctx.heredoc(), true);
         } else if (ctx.jsonArray() != null) {
             form = visitJsonArrayAsExecForm(ctx.jsonArray());
-        } else if (ctx.sourceList() != null) {
-            // Parse sources and destination into CopyShellForm
-            List<Docker.Argument> sources = parseSourcePaths(ctx.sourceList());
-            Docker.Argument destination = parseDestinationPath(ctx.destination());
-            // The prefix for shellForm comes from the first source
-            Space shellFormPrefix = sources.isEmpty() ? Space.EMPTY : sources.get(0).getPrefix();
-            if (!sources.isEmpty()) {
-                // Remove prefix from first source since it's now on the shellForm
-                sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
-            }
-            form = new Docker.CopyShellForm(randomId(), shellFormPrefix, Markers.EMPTY, sources, destination);
+        } else if (ctx.copyPaths() != null) {
+            form = copyShellForm(ctx.copyPaths());
         } else {
-            throw new IllegalStateException("COPY must have either sourceList or jsonArray or heredoc");
+            throw new IllegalStateException("COPY must have either paths or jsonArray or heredoc");
         }
 
         // Advance cursor to end of instruction
@@ -448,50 +430,22 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     }
 
     /**
-     * Parse source paths from the grammar's sourceList context.
-     * With lexer modes for flag values, the grammar's token allocation is now correct.
+     * The shell form of a COPY/ADD: the last path is the destination and the ones before it are the
+     * sources. The space before the first path is held by the form itself, as the paths follow the
+     * instruction keyword.
      */
-    private List<Docker.Argument> parseSourcePaths(DockerParser.SourceListContext ctx) {
+    private Docker.CopyShellForm copyShellForm(DockerParser.CopyPathsContext ctx) {
         List<Docker.Argument> sources = new ArrayList<>();
-        for (DockerParser.PathElementContext pathCtx : ctx.pathElement()) {
-            sources.add(parsePathToken(pathCtx));
+        for (DockerParser.PathArgumentContext pathCtx : ctx.pathArgument()) {
+            sources.add(parseArgument(pathCtx));
         }
-        return sources;
-    }
-
-    /**
-     * Parse destination path from the grammar's destination context.
-     */
-    private Docker.Argument parseDestinationPath(DockerParser.DestinationContext ctx) {
-        return parsePathToken(ctx.pathElement());
-    }
-
-    /**
-     * Parse a single path token (source or destination) into an Argument.
-     */
-    private Docker.Argument parsePathToken(ParserRuleContext pathCtx) {
-        Space argPrefix = prefix(pathCtx.getStart());
-        Token token = pathCtx.getStart();
-        String tokenText = token.getText();
-        skip(token);
-
-        Docker.ArgumentContent content;
-        if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
-            String value = tokenText.substring(1, tokenText.length() - 1);
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.DOUBLE);
-        } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
-            String value = tokenText.substring(1, tokenText.length() - 1);
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, Docker.Literal.QuoteStyle.SINGLE);
-        } else if (token.getType() == DockerLexer.ENV_VAR) {
-            boolean braced = tokenText.startsWith("${");
-            String varName = braced ? tokenText.substring(2, tokenText.length() - 1) : tokenText.substring(1);
-            content = new Docker.EnvironmentVariable(randomId(), Space.EMPTY, Markers.EMPTY, varName, braced);
-        } else {
-            // UNQUOTED_TEXT - store as plain literal (includes complex paths like ${VAR}/path)
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tokenText, null);
+        Docker.Argument destination = sources.remove(sources.size() - 1);
+        Space prefix = Space.EMPTY;
+        if (!sources.isEmpty()) {
+            prefix = sources.get(0).getPrefix();
+            sources.set(0, sources.get(0).withPrefix(Space.EMPTY));
         }
-
-        return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, singletonList(content));
+        return new Docker.CopyShellForm(randomId(), prefix, Markers.EMPTY, sources, destination);
     }
 
     @Override
