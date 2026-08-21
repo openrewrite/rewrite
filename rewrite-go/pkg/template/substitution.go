@@ -75,6 +75,24 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *java.Unary:
 		return n.WithPrefix(prefix)
+	case *golang.Binary:
+		return n.WithPrefix(prefix)
+	case *golang.Unary:
+		return n.WithPrefix(prefix)
+	case *golang.AssignmentOperation:
+		return n.WithPrefix(prefix)
+	case *golang.PointerType:
+		return n.WithPrefix(prefix)
+	case *golang.Variadic:
+		return n.WithPrefix(prefix)
+	case *golang.StatementExpression:
+		return n.WithPrefix(prefix)
+	case *golang.ExpressionStatement:
+		return n.WithPrefix(prefix)
+	case *golang.DeclarationBlock:
+		return n.WithPrefix(prefix)
+	case *java.ParameterizedType:
+		return n.WithPrefix(prefix)
 	case *java.FieldAccess:
 		return n.WithPrefix(prefix)
 	case *java.MethodInvocation:

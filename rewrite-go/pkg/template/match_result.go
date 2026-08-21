@@ -31,6 +31,14 @@ func (m *MatchResult) bind(name string, value java.J) {
 	m.bindings[name] = value
 }
 
+// Bind associates a capture with the subtree to substitute for it, so a
+// template can be instantiated without a pattern match. Returns the receiver,
+// for chaining.
+func (m *MatchResult) Bind(c *Capture, value java.J) *MatchResult {
+	m.bind(c.Name(), value)
+	return m
+}
+
 // bindList stores a variadic captured list.
 func (m *MatchResult) bindList(name string, values []java.J) {
 	m.bindings[name] = values

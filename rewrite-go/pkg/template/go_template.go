@@ -19,6 +19,8 @@ package template
 import (
 	"sync"
 
+	"github.com/google/uuid"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -62,6 +64,46 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 		return fresh
 	}
 	return placeAt(fresh, cursor)
+}
+
+// Instantiate produces the template as a detached node for a recipe that
+// inserts the result somewhere new, where Apply replaces a matched node. Bound
+// values are copied, so a spliced subtree may also stay where it came from.
+// The result carries no leading whitespace. It is nil unless every capture is
+// bound to a single subtree, the only form substitution handles.
+func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
+	for name, capture := range t.captures {
+		if capture.IsVariadic() || values == nil || values.Get(name) == nil {
+			return nil
+		}
+	}
+	instantiated := t.Apply(nil, values)
+	if instantiated == nil {
+		return nil
+	}
+	// The prefix is the gap the scaffold leaves before the template code,
+	// not whitespace the template itself declares.
+	return setLeadingPrefix(withFreshIDs(instantiated), java.EmptySpace)
+}
+
+// withFreshIDs returns a copy of j in which every node has a new ID, keeping
+// IDs unique within whatever tree the result is inserted into.
+func withFreshIDs(j java.J) java.J {
+	v := &idRefreshVisitor{}
+	v.Self = v
+	return v.Visit(j, nil).(java.J)
+}
+
+type idRefreshVisitor struct {
+	visitor.GoVisitor
+}
+
+func (v *idRefreshVisitor) Visit(t java.Tree, p any) java.Tree {
+	visited := v.GoVisitor.Visit(t, p)
+	if j, ok := visited.(java.J); ok && j != nil {
+		return j.WithID(uuid.New())
+	}
+	return visited
 }
 
 // getTree lazily parses the template and caches the result.
