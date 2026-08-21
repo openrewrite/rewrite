@@ -58,10 +58,8 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 	}
 
 	// Check if the pattern node is a placeholder identifier.
-	if ident, ok := pattern.(*java.Identifier); ok {
-		if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
-			return c.bindCapture(name, candidate)
-		}
+	if name, isPlaceholder := placeholderName(pattern); isPlaceholder {
+		return c.bindCapture(name, candidate)
 	}
 
 	// Both nodes must be the same concrete type.
@@ -374,6 +372,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchStatementList(p.Body, cand.Body)
+	case *golang.Select:
+		cand := candidate.(*golang.Select)
+		return c.matchOptionalNode(p.Body, cand.Body)
 	case *golang.IndexList:
 		cand := candidate.(*golang.IndexList)
 		if !c.matchNode(p.Target, cand.Target) {
@@ -450,11 +451,104 @@ func (c *patternComparator) matchOptionalRightPaddedExpr(pattern, candidate *jav
 }
 
 func (c *patternComparator) matchExpressionList(pattern, candidate []java.RightPadded[java.Expression]) bool {
-	if len(pattern) != len(candidate) {
+	return matchList(c, pattern, candidate)
+}
+
+// matchList compares two element lists, letting a variadic capture in the
+// pattern absorb a run of candidate elements. One variadic makes the run's
+// length arithmetic — every other pattern element takes one — so the captures
+// after it match positionally. Two leave the split undetermined, and fail.
+func matchList[T java.J](c *patternComparator, pattern, candidate []java.RightPadded[T]) bool {
+	at, ok := variadicIndex(c, pattern)
+	if !ok {
 		return false
 	}
+	if at < 0 {
+		return len(pattern) == len(candidate) && matchElements(c, pattern, candidate)
+	}
+
+	run := len(candidate) - (len(pattern) - 1)
+	name, _ := placeholderName(java.J(pattern[at].Element))
+	if !c.captures[name].allowsCount(run) {
+		return false
+	}
+	if !matchElements(c, pattern[:at], candidate[:at]) {
+		return false
+	}
+	if !matchElements(c, pattern[at+1:], candidate[at+run:]) {
+		return false
+	}
+	return c.bindRun(name, unwrap(candidate[at:at+run]))
+}
+
+func matchElements[T java.J](c *patternComparator, pattern, candidate []java.RightPadded[T]) bool {
 	for i := range pattern {
 		if !c.matchNode(pattern[i].Element, candidate[i].Element) {
+			return false
+		}
+	}
+	return true
+}
+
+// variadicIndex returns the position of the pattern's variadic capture, -1 when
+// it has none, and ok=false when it has more than one.
+func variadicIndex[T java.J](c *patternComparator, pattern []java.RightPadded[T]) (int, bool) {
+	at := -1
+	for i := range pattern {
+		name, ok := placeholderName(java.J(pattern[i].Element))
+		if !ok || !c.isVariadic(name) {
+			continue
+		}
+		if at >= 0 {
+			return 0, false
+		}
+		at = i
+	}
+	return at, true
+}
+
+func unwrap[T java.J](padded []java.RightPadded[T]) []java.J {
+	values := make([]java.J, len(padded))
+	for i, rp := range padded {
+		values[i] = rp.Element
+	}
+	return values
+}
+
+// placeholderName returns the capture name j stands for, if j is a placeholder
+// identifier. An identifier is an expression, so one written in statement
+// position reaches here inside the wrapper the parser puts it in.
+func placeholderName(j java.J) (string, bool) {
+	if stmt, ok := j.(*golang.ExpressionStatement); ok {
+		j = stmt.Expression
+	}
+	ident, ok := j.(*java.Identifier)
+	if !ok {
+		return "", false
+	}
+	return FromPlaceholder(ident.Name)
+}
+
+// A comparator built for structural equality carries no captures, so every
+// placeholder it meets is an ordinary identifier.
+func (c *patternComparator) isVariadic(name string) bool {
+	capture, ok := c.captures[name]
+	return ok && capture.IsVariadic()
+}
+
+// bindRun binds the run a variadic capture absorbed, enforcing structural
+// equality with a prior binding the way bindCapture does for a single node.
+func (c *patternComparator) bindRun(name string, values []java.J) bool {
+	prev, bound := c.result.listBinding(name)
+	if !bound {
+		c.result.bindList(name, values)
+		return true
+	}
+	if len(prev) != len(values) {
+		return false
+	}
+	for i := range prev {
+		if !structurallyEqual(prev[i], values[i]) {
 			return false
 		}
 	}
@@ -466,15 +560,7 @@ func (c *patternComparator) matchExpressionRightPaddedList(pattern, candidate []
 }
 
 func (c *patternComparator) matchStatementList(pattern, candidate []java.RightPadded[java.Statement]) bool {
-	if len(pattern) != len(candidate) {
-		return false
-	}
-	for i := range pattern {
-		if !c.matchNode(pattern[i].Element, candidate[i].Element) {
-			return false
-		}
-	}
-	return true
+	return matchList(c, pattern, candidate)
 }
 
 func (c *patternComparator) matchStatementContainer(pattern, candidate java.Container[java.Statement]) bool {

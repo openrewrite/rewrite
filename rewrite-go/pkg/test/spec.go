@@ -474,6 +474,10 @@ type JavaRecipeConfig struct {
 
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
+	// CheckUnchangedTreeIdentity asserts that a source whose printed output is
+	// unchanged comes back as the same tree pointer. Turn it off for fixtures that
+	// deliberately rebuild nodes into printed-identical replacements.
+	CheckUnchangedTreeIdentity bool
 	Recipe                     recipe.Recipe
 	JavaRecipe                 *JavaRecipeConfig     // when set, delegates to Java RPC
 	JavaRpcClient              *JavaRpcClient        // injected Java RPC client
@@ -483,6 +487,7 @@ type RecipeSpec struct {
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence: true,
+		CheckUnchangedTreeIdentity: true,
 	}
 }
 
@@ -707,15 +712,25 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	}
 
 	actual := printTree(ps.result, spec.markerPrinter())
-	if src.After != nil {
+	if src.After != nil && *src.After != src.Before {
 		if actual != *src.After {
 			t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
 			showDiff(t, *src.After, actual)
 		}
 		return
 	}
-	// No after state: expect no changes.
-	assert.Equal(t, src.Before, actual, "recipe made unexpected changes\n\nexpected (no change")
+	// An after state restating the before means the same thing as omitting it.
+	if !assert.Equal(t, src.Before, actual, "recipe made unexpected changes\n\nexpected (no change") {
+		return
+	}
+	// The RPC layer derives its `modified` flag — and hence the SourcesFileResults
+	// row credited to the recipe — from tree pointer identity, not printed text, so
+	// an untouched source must come back as the very same pointer.
+	if spec.CheckUnchangedTreeIdentity && ps.result != ps.tree {
+		assert.Failf(t, "recipe returned a new tree without changing it",
+			"recipe %q rebuilt %q; the visitor must return the original pointer when nothing changed",
+			spec.Recipe.Name(), src.Path)
+	}
 }
 
 func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, generated []java.Tree) {

@@ -20,6 +20,7 @@ present, what was added in this PR, and what is intentionally deferred.
 | Named placeholders | `#{name}` substitution by name + type constraint | positional `#{X}` capture-by-name through `*Capture` | ✓ named via `*Capture` already; type constraints are deferred (see below) |
 | Type-checked named placeholders | `#{name:any(java.util.List)}` | not yet | deferred — out-of-scope per the eng review's v1 scope cut |
 | Cursor-aware insertion | parameter to `.apply(cursor, ...)` | parameter to `.Apply(cursor, ...)` | ✓ shipped — the cursor names the node being replaced, from which `Apply` takes the leading whitespace, whether the result needs parenthesizing against the expression around it, and the level to indent to |
+| Variadic placeholders | n/a | `Capture.Variadic(min, max)` matched by `GoPattern`, expanded by `GoTemplate` | ✓ shipped — Go-side delta over Java. `JavaTemplate` has no variadic placeholder; `Substitutions.maybeExpandVarargsNewArray` flattens a captured varargs `J.NewArray` back into an argument list, which is a Java-language repair rather than a capture kind |
 
 ## Already present before this PR (no delta required)
 

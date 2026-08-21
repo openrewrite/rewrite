@@ -347,6 +347,11 @@ class RpcSendQueue:
             if math.isinf(obj) or math.isnan(obj):
                 return None
             return obj
+        if isinstance(obj, complex):
+            # Java has no complex primitive, so carry the value as a string. Python's
+            # repr parenthesizes a complex with a non-zero real part ("(3+4j)"); strip
+            # those so the value matches the source, which is also kept in valueSource.
+            return str(obj).strip('()')
         if isinstance(obj, UUID):
             return str(obj)
         if isinstance(obj, Path):

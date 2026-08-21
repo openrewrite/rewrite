@@ -24,6 +24,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"math"
 	"math/big"
 	"path/filepath"
 	"reflect"
@@ -1656,19 +1657,16 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 	}
 }
 
-// mapSelectStmt maps a select statement, reusing Switch+Case with SelectStmt marker.
-func (ctx *parseContext) mapSelectStmt(stmt *ast.SelectStmt) *java.Switch {
+// mapSelectStmt maps a select statement. select is not a Java switch, so it maps
+// to golang.Select — its clauses are golang.CommClause, which are not java.Case.
+func (ctx *parseContext) mapSelectStmt(stmt *ast.SelectStmt) *golang.Select {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("select"))
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &java.Switch{
+	return &golang.Select{
 		ID:     uuid.New(),
 		Prefix: prefix,
-		Markers: java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{golang.SelectStmt{Ident: uuid.New()}},
-		},
-		Body: body,
+		Body:   body,
 	}
 }
 
@@ -1868,6 +1866,11 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 			control.Prefix, cond = hoistLeftPrefix(cond)
 			condRP := java.RightPadded[java.Expression]{Element: cond}
 			control.Condition = &condRP
+		} else {
+			// Infinite `for {}`: Java models `for (;;)` with a J.Empty condition,
+			// so the field is never null. Fill it with a synthetic J.Empty rather
+			// than leaving it nil; GoPrinter omits it via the ImplicitForClauses marker.
+			control.Condition = &java.RightPadded[java.Expression]{Element: &java.Empty{ID: uuid.New()}}
 		}
 		control.Init = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
 		control.Update = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
@@ -2141,6 +2144,31 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 	l.Type = ctx.valueTypeOf(lit)
 
+	// An untyped constant compared against a value of a named type (e.g.
+	// `type Code int`; `2052 <= i` where `i Code`) is converted to that named
+	// type, so go/types reports the literal's type as the named type. A
+	// J.Literal on the Java side can only carry a JavaType.Primitive, so a named
+	// type is dropped to null there. Map the literal through the named type's
+	// underlying basic to preserve the primitive (e.g. int).
+	if tv, ok := ctx.typeInfo.Types[lit]; ok {
+		if named, ok := tv.Type.(*types.Named); ok {
+			if basic, ok := named.Underlying().(*types.Basic); ok {
+				l.Type = ctx.mapper.mapType(basic)
+			}
+		}
+	}
+
+	// A Go int constant is 64-bit, but Java's int is 32-bit. When the value
+	// overflows Integer, fall back to long so the JVM LST deserializer does not
+	// reconstruct it via Integer.valueOf, which throws and drops the file.
+	if lit.Kind == token.INT {
+		if prim, ok := l.Type.(*java.JavaTypePrimitive); ok && prim.Keyword == "int" {
+			if v, ok := l.Value.(int64); ok && v > math.MaxInt32 {
+				l.Type = &java.JavaTypePrimitive{Keyword: "long"}
+			}
+		}
+	}
+
 	return l
 }
 
@@ -2237,6 +2265,10 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 
 // mapCallExpr maps a function/method call.
 func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
+	if ctx.isConversion(expr) {
+		return ctx.mapConversion(expr)
+	}
+
 	// `Map[int](42)` / `Pair[K, V](...)`: the callee is a generic function (or
 	// type) instantiated with explicit type arguments. Go reuses *ast.IndexExpr
 	// for both this and ordinary indexing (`funcs[0]()`), so disambiguate via the
@@ -2384,25 +2416,70 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		}
 	}
 
-	if marker := ctx.callKindMarker(expr.Fun); marker != nil {
+	if marker := ctx.builtinMarker(expr.Fun); marker != nil {
 		mi.Markers = java.AddMarker(mi.Markers, marker)
 	}
 
 	return mi
 }
 
-// callKindMarker reports whether a call's callee denotes a type (making the
-// call a conversion) or one of Go's predeclared functions.
-func (ctx *parseContext) callKindMarker(callee ast.Expr) java.Marker {
-	if tv, ok := ctx.typeInfo.Types[callee]; ok && tv.IsType() {
-		return golang.NewConversion()
-	}
+func (ctx *parseContext) builtinMarker(callee ast.Expr) java.Marker {
 	if ident, ok := callee.(*ast.Ident); ok {
 		if _, ok := ctx.typeInfo.Uses[ident].(*types.Builtin); ok {
 			return golang.NewBuiltin()
 		}
 	}
 	return nil
+}
+
+// isConversion reports whether a call is Go's `T(x)`, which converts one value
+// to a type and is spelled exactly like a call to a function named T. Only a
+// single operand with no `...` converts, so a callee naming a type in any other
+// shape leaves a call.
+func (ctx *parseContext) isConversion(expr *ast.CallExpr) bool {
+	tv, ok := ctx.typeInfo.Types[expr.Fun]
+	return ok && tv.IsType() && len(expr.Args) == 1 && !expr.Ellipsis.IsValid()
+}
+
+// mapConversion maps `T(x)` onto the slots java.TypeCast describes.
+func (ctx *parseContext) mapConversion(expr *ast.CallExpr) java.Expression {
+	prefix, typeExpr := hoistLeftPrefix(ctx.mapTypeExpr(expr.Fun))
+
+	lparenPrefix := ctx.prefix(expr.Lparen)
+	ctx.skip(1) // "("
+
+	operand := ctx.mapExpr(expr.Args[0])
+
+	var markers java.Markers
+	var rparenPrefix java.Space
+	if commaOffset := ctx.findNextBefore(',', ctx.boundaryAt(expr.Rparen)); commaOffset >= 0 {
+		commaBefore := ctx.prefix(ctx.file.Pos(commaOffset))
+		ctx.skip(1) // ","
+		commaAfter := ctx.prefix(expr.Rparen)
+		markers = java.Markers{
+			ID: uuid.New(),
+			Entries: []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}},
+		}
+	} else {
+		rparenPrefix = ctx.prefix(expr.Rparen)
+	}
+	ctx.skip(1) // ")"
+
+	return &java.TypeCast{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Markers: markers,
+		Clazz: &java.ControlParentheses{
+			ID:     uuid.New(),
+			Prefix: lparenPrefix,
+			Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
+		},
+		Expr: operand,
+	}
 }
 
 // calleeSignature is the signature a call goes through, whether the

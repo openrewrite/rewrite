@@ -204,6 +204,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             J parenthesized = ((J.Parentheses<?>) expr).getTree();
             if (parenthesized instanceof J.Binary) {
                 J.Binary binary = (J.Binary) parenthesized;
+                if (isComparison(binary.getLeft()) || isComparison(binary.getRight())) {
+                    return j;
+                }
                 J.Binary.Type negated = maybeNegate(binary.getOperator());
                 if (negated != binary.getOperator()) {
                     j = binary.withOperator(negated).withPrefix(j.getPrefix());
@@ -229,9 +232,12 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     private Expression maybeNegate(Expression expr) {
         if (expr instanceof J.Binary) {
-            J.Binary.Type negated = maybeNegate(((J.Binary) expr).getOperator());
-            if (negated != ((J.Binary) expr).getOperator()) {
-                return ((J.Binary) expr).withOperator(negated).withPrefix(expr.getPrefix());
+            J.Binary binary = (J.Binary) expr;
+            if (!isComparison(binary.getLeft()) && !isComparison(binary.getRight())) {
+                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                if (negated != binary.getOperator()) {
+                    return binary.withOperator(negated).withPrefix(expr.getPrefix());
+                }
             }
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
             return ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
@@ -268,6 +274,21 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             default:
                 return operator;
         }
+    }
+
+    private boolean isComparison(Expression expr) {
+        if (expr instanceof J.Binary) {
+            switch (((J.Binary) expr).getOperator()) {
+                case LessThan:
+                case GreaterThan:
+                case LessThanOrEqual:
+                case GreaterThanOrEqual:
+                case Equal:
+                case NotEqual:
+                    return true;
+            }
+        }
+        return false;
     }
 
     private final MethodMatcher isEmpty = new MethodMatcher("java.lang.String isEmpty()");

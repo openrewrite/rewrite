@@ -196,16 +196,19 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 	case java.RecipesThatMadeChanges:
 		sendRecipesThatMadeChanges(m, q)
 	case golang.GroupedImport:
-		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
+		// GroupedImport.rpcSend sends: id (UUID string), before Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Before },
+			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ImportBlock:
-		// ImportBlock.rpcSend sends: id, closePrevious, before, grouped, groupedBefore
+		// ImportBlock.rpcSend sends: id, closePrevious, before Space, grouped, groupedBefore Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).ClosePrevious }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Before },
+			func(v any) { sendSpace(v.(java.Space), q) })
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Grouped }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).GroupedBefore.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).GroupedBefore },
+			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ShortVarDecl:
 		q.GetAndSend(m, func(x any) any { return x.(golang.ShortVarDecl).Ident.String() }, nil)
 	case golang.VarKeyword:
@@ -216,14 +219,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedSpec).Ident.String() }, nil)
 	case golang.InterfaceMethod:
 		q.GetAndSend(m, func(x any) any { return x.(golang.InterfaceMethod).Ident.String() }, nil)
-	case golang.SelectStmt:
-		q.GetAndSend(m, func(x any) any { return x.(golang.SelectStmt).Ident.String() }, nil)
 	case golang.TypeSwitchGuard:
 		q.GetAndSend(m, func(x any) any { return x.(golang.TypeSwitchGuard).Ident.String() }, nil)
 	case golang.ImplicitForClauses:
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImplicitForClauses).Ident.String() }, nil)
-	case golang.Conversion:
-		q.GetAndSend(m, func(x any) any { return x.(golang.Conversion).Ident.String() }, nil)
 	case golang.Builtin:
 		q.GetAndSend(m, func(x any) any { return x.(golang.Builtin).Ident.String() }, nil)
 	case golang.StructTag:
@@ -231,10 +230,12 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Tag.Source }, nil)
 	case golang.TrailingComma:
-		// TrailingComma.rpcSend sends: id (UUID string), before whitespace, after whitespace
+		// TrailingComma.rpcSend sends: id (UUID string), before Space, after Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before.Whitespace }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before },
+			func(v any) { sendSpace(v.(java.Space), q) })
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After },
+			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.StructTagQuote:
 		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
@@ -382,15 +383,14 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 		case java.RecipesThatMadeChanges:
 			return receiveRecipesThatMadeChanges(m, q)
 		case golang.GroupedImport:
-			// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
+			// GroupedImport.rpcSend sends: id (UUID string), before Space
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
 					m.Ident = parsed
 				}
 			}
-			ws := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: ws}
+			m.Before = receiveValue(q, m.Before, func(s java.Space) any { return receiveSpace(s, q) })
 			return m
 		case golang.ImportBlock:
 			// ImportBlock.rpcReceive: id, closePrevious, before, grouped, groupedBefore
@@ -401,11 +401,9 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			m.ClosePrevious = receiveScalar[bool](q, m.ClosePrevious)
-			ws := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: ws}
+			m.Before = receiveValue(q, m.Before, func(s java.Space) any { return receiveSpace(s, q) })
 			m.Grouped = receiveScalar[bool](q, m.Grouped)
-			gbWs := receiveScalar[string](q, m.GroupedBefore.Whitespace)
-			m.GroupedBefore = java.Space{Whitespace: gbWs}
+			m.GroupedBefore = receiveValue(q, m.GroupedBefore, func(s java.Space) any { return receiveSpace(s, q) })
 			return m
 		case golang.ShortVarDecl:
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -447,14 +445,6 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			return m
-		case golang.SelectStmt:
-			idStr := receiveScalar[string](q, m.Ident.String())
-			if idStr != "" {
-				if parsed, err := uuid.Parse(idStr); err == nil {
-					m.Ident = parsed
-				}
-			}
-			return m
 		case golang.TypeSwitchGuard:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -464,14 +454,6 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			}
 			return m
 		case golang.ImplicitForClauses:
-			idStr := receiveScalar[string](q, m.Ident.String())
-			if idStr != "" {
-				if parsed, err := uuid.Parse(idStr); err == nil {
-					m.Ident = parsed
-				}
-			}
-			return m
-		case golang.Conversion:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -528,10 +510,8 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 					m.Ident = parsed
 				}
 			}
-			beforeWs := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: beforeWs}
-			afterWs := receiveScalar[string](q, m.After.Whitespace)
-			m.After = java.Space{Whitespace: afterWs}
+			m.Before = receiveValue(q, m.Before, func(s java.Space) any { return receiveSpace(s, q) })
+			m.After = receiveValue(q, m.After, func(s java.Space) any { return receiveSpace(s, q) })
 			return m
 		case golang.Semicolon:
 			idStr := receiveScalar[string](q, m.Ident.String())

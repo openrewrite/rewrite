@@ -378,3 +378,31 @@ func TestTypeOfExpressionDerivesThroughWrappers(t *testing.T) {
 		t.Errorf("TypeCast: got %v, want derived Clazz type %v", castType, strType)
 	}
 }
+
+// A declaring type of Unknown carries no name, so the call reads as unresolved
+// and its receiver's own type supplies the name.
+func unknownDeclaringTypeInvocation() *java.MethodInvocation {
+	return &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{
+				Name: "fmt",
+				Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"},
+			},
+		},
+		Name:       &java.Identifier{Name: "Println"},
+		MethodType: &java.JavaTypeMethod{Name: "Println", DeclaringType: java.UnknownType},
+	}
+}
+
+func TestMethodMatcherUnattributedDeclaringType(t *testing.T) {
+	mm := NewMethodMatcher("fmt Println(..)")
+	assert.True(t, mm.Matches(unknownDeclaringTypeInvocation()))
+}
+
+func TestDeclaringTypeFQNUnattributedDeclaringType(t *testing.T) {
+	assert.Equal(t, "fmt", DeclaringTypeFQN(unknownDeclaringTypeInvocation()))
+}
+
+func TestIsResolvedUnattributedDeclaringType(t *testing.T) {
+	assert.False(t, IsResolved(unknownDeclaringTypeInvocation()))
+}

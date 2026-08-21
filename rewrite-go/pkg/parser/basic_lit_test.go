@@ -86,6 +86,51 @@ func TestBasicLitDecodedValue(t *testing.T) {
 	}
 }
 
+// A Go int constant whose value exceeds Integer.MAX_VALUE must fall back to the
+// `long` primitive, since the JVM LST deserializer reconstructs an `int`-keyword
+// literal via Integer.valueOf, which throws on an out-of-range value.
+func TestIntLiteralExceedingInt32FallsBackToLong(t *testing.T) {
+	// given: an untyped int constant larger than Integer.MAX_VALUE (2147483647)
+	src := "package main\n\nfunc main() {\n\tv := 5243700879\n\t_ = v\n}\n"
+
+	// when
+	lit := litRHS(t, src)
+
+	// then
+	prim, ok := lit.Type.(*java.JavaTypePrimitive)
+	require.Truef(t, ok, "expected *java.JavaTypePrimitive, got %T", lit.Type)
+	assert.Equal(t, "long", prim.Keyword, "keyword")
+	assert.Equal(t, int64(5243700879), lit.Value, "value")
+}
+
+// An untyped constant compared against a value of a named type (here `i Code`,
+// `type Code int`) is converted to that named type by go/types. Because a
+// J.Literal on the Java side can only carry a JavaType.Primitive, the literal
+// must be attributed the named type's underlying basic (int) rather than the
+// named type itself, which the Java receiver would drop to null.
+func TestUntypedConstantAgainstNamedTypeKeepsPrimitive(t *testing.T) {
+	// given
+	src := "package main\n\ntype Code int\n\nfunc (i Code) String() string {\n\tif 2052 <= i {\n\t\treturn \"x\"\n\t}\n\treturn \"\"\n}\n"
+
+	// when
+	cu, err := parser.NewGoParser().Parse("g.go", src)
+	require.NoError(t, err, "parse")
+	var found *java.Literal
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if lit, ok := n.(*java.Literal); ok && lit.Value == int64(2052) {
+			found = lit
+			return false
+		}
+		return true
+	})
+	require.NotNil(t, found, "literal 2052 not found")
+
+	// then
+	prim, ok := found.Type.(*java.JavaTypePrimitive)
+	require.Truef(t, ok, "expected *java.JavaTypePrimitive, got %T (a named type would be dropped to null on the Java side)", found.Type)
+	assert.Equal(t, "int", prim.Keyword, "keyword")
+}
+
 // firstLiteralOfType parses src and returns the first *java.Literal whose
 // attributed Type is the primitive `keyword` (e.g. "byte", "char").
 func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {

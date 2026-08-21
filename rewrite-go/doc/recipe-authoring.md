@@ -184,6 +184,113 @@ The `parseProject` RPC handles this automatically — every `.go` file
 under the project root resolves against its closest-ancestor `go.mod`.
 Multi-module repos (root + nested submodules) are honored.
 
+## Shipped export data
+
+A template is type-checked as a file belonging to no module, against
+whatever `importer.Default()` can load. That covers the stdlib and
+nothing else, so `Imports("github.com/pkg/errors")` yields a call with
+no signature — `matcher.IsResolved` is false, and any recipe that later
+reads the template's output sees an unattributed tree.
+
+A recipe module closes that gap by carrying the compiler export data
+for the packages its templates import. Generate it where those packages
+resolve, and commit what lands:
+
+```
+go run github.com/openrewrite/rewrite/rewrite-go/cmd/goexportdata \
+    -o internal/jsonv2exportdata encoding/json/v2 encoding/json/jsontext
+```
+
+The output directory can sit anywhere in the module; its name becomes
+the generated package's name, or pass `-pkg` when the two should
+differ. Name it for what it carries rather than `exportdata`, which
+collides with this package when a test calls `Verify`. A module can generate as many of these as it likes — one per
+dependency it templates against, say — and a template draws on however
+many it needs, since sets accumulate the way `Imports` does.
+
+That writes one blob per import path plus an `embed.FS` shim, which a
+recipe consumes through the `ExportData` option:
+
+```go
+r := template.NewRecipe(
+    template.RecipeName("com.example.MarshalIndentToV2"),
+    template.WithCaptures(v, pre, ind),
+    template.WithBefore(fmt.Sprintf(`json.MarshalIndent(%s, %s, %s)`, v, pre, ind),
+        template.Imports("encoding/json")),
+    template.WithAfter(fmt.Sprintf(`json.Marshal(%s, jsontext.WithIndent(%s), jsontext.WithIndentPrefix(%s))`, v, ind, pre),
+        template.Imports("encoding/json/v2", "encoding/json/jsontext"),
+        template.ExportData(jsonv2exportdata.FS),
+        template.SourceImports("encoding/json/v2", "encoding/json/jsontext")),
+)
+```
+
+`ExportData` on `WithAfter` is what makes the emitted code carry real
+types, and that is what lets `RemoveUnusedImports` tell the superseded
+`encoding/json` from the `encoding/json/v2` replacing it — the two bind
+the same `json` qualifier, so without attribution the old import reads
+as still in use. On `WithBefore` it bears only on shape: a generic
+function instantiation parses as a call carrying type arguments once
+attributed and as an index expression otherwise, so set it there only
+when the source is parsed the same way. The builder form takes the same
+option:
+
+```go
+tmpl := template.ExpressionTemplate(`jsontext.WithIndent("  ")`).
+    Imports("encoding/json/jsontext").
+    ExportData(jsonv2exportdata.FS).
+    Build()
+```
+
+Blobs are a few percent of the archive `go build` produces — 99 KB for
+`encoding/json/jsontext`, 10 KB for `github.com/pkg/errors` — because
+the generator keeps only the export data and drops the object code. A
+package's own dependencies need no blobs of their own: the types they
+contribute to its API travel inside the one blob that names them.
+
+Nothing about a blob is pinned to the machine that made it. The
+GOOS/GOARCH and toolchain version recorded in it are not checked on
+read; only the binary export format is, and it changes rarely. A blob a
+toolchain can no longer read leaves the template where shipping none
+would: it still applies, carrying no types.
+
+That is harmless on its own and is not harmless with `SourceImports`.
+Dropping a superseded import needs attribution naming the path that
+replaced it, so an unattributed after-template emits both and the file
+stops compiling — the same output an un-rewritten reference produces,
+below. Since losing attribution is silent, a module that ships blobs
+should assert on its own:
+
+```go
+func TestExportDataIsReadable(t *testing.T) {
+    require.NoError(t, exportdata.Verify(jsonv2exportdata.FS, jsonv2exportdata.Paths...))
+}
+```
+
+`exportdata` there is this package; `jsonv2exportdata` is the generated
+one.
+
+Regenerate when that test fails, or when the shipped package's API
+moves and the templates should follow.
+
+One limit is worth knowing before reaching for `SourceImports` here. A
+template rewrites one expression, but swapping a package under a
+preserved qualifier is a whole-file decision. Where any un-rewritten
+reference to the old package survives, both imports are emitted and
+bind the same name, which does not compile:
+
+```go
+import (
+	"encoding/json"     // an untouched json.Marshal still references it
+	"encoding/json/v2"  // the rewritten call references this
+)
+```
+
+Each half is individually right, and no alias helps, since the emitted
+text says `json.`. Only a recipe that has established whole-file
+coverage may swap a package this way. Omitting `SourceImports` leaves
+the template doing node replacement alone — fully attributed, imports
+untouched — which composes with a hand-written file-level gate.
+
 ## Composing import edits — `ImportService` and `DoAfterVisit`
 
 Most refactor recipes don't ONLY rewrite imports — they edit a method
@@ -277,6 +384,47 @@ name, and assert on its attributed type. Throw `AssertionError` with a
 descriptive message on mismatch — drop them straight into an
 `afterRecipe(cu -> ...)` lambda.
 
+## Variadic captures
+
+A capture marked `Variadic(min, max)` stands for a run of list elements
+rather than one subtree, so one pattern covers a call of any arity
+(`-1` for `max` means unlimited):
+
+```go
+args := template.Expr("args").Variadic(0, -1)
+before := template.Expression(fmt.Sprintf("assert.Equal(%s)", args)).Captures(args).Build()
+after := template.ExpressionTemplate(fmt.Sprintf("require.Equal(%s)", args)).Captures(args).Build()
+```
+
+`MatchResult.GetList(name)` reads the run back, and `BindList` supplies
+one by hand for `Instantiate`:
+
+```go
+tmpl.Instantiate(template.NewMatchResult().
+    Bind(recv, tIdent).
+    BindList(args, template.Elems(coreArgs, msgArgs)))
+```
+
+`Elems` is there because Go converts neither `[]java.Expression` nor
+`[]java.Statement` to the `[]java.J` `BindList` takes, and a recipe
+holds one of those. It concatenates any number of element slices, so
+a leading single node goes in as `Elems([]java.Expression{recv}, ...)`.
+
+A run of any length is a binding, zero included, so an empty one
+leaves the call reading as `require.Equal(t)`. A run outside the
+capture's bounds is not, and `Instantiate` returns nil — the same
+bounds the match path enforces.
+
+Two rules bound what this covers. **A list splits at one variadic
+capture**: with one, every other pattern element takes one candidate
+element, so the run's length is arithmetic and the captures after it
+match positionally. A list holding two variadic captures leaves the
+split undetermined, and the match fails.
+**A run needs a list to expand into**: a call's arguments or a block's
+statements. A variadic placeholder anywhere else has nowhere to go, and
+`Apply` returns nil rather than emit the placeholder — as it does for
+any capture left unbound.
+
 ## Surface boundaries
 
 When in doubt about what pattern to use:
@@ -304,3 +452,4 @@ When in doubt about what pattern to use:
   OrderImports recipes.
 - `test/cross_package_generics_test.go` — what to expect from
   cross-package type attribution.
+- `pkg/exportdata` — the importer, the packer, and `Verify`.

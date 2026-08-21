@@ -178,6 +178,12 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitSelect(Go.Select select, RpcSendQueue q) {
+        q.getAndSend(select, Go.Select::getBody, el -> visit(el, q));
+        return select;
+    }
+
+    @Override
     public J visitInterfaceType(Go.InterfaceType interfaceType, RpcSendQueue q) {
         q.getAndSend(interfaceType, Go.InterfaceType::getBody, el -> visit(el, q));
         return interfaceType;

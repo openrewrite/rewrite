@@ -17,7 +17,10 @@
 package template
 
 import (
+	"io/fs"
 	"sync"
+
+	"github.com/google/uuid"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -30,6 +33,7 @@ type GoTemplate struct {
 	captures map[string]*Capture
 	imports  []string
 	kind     ScaffoldKind
+	importerCache
 
 	once     sync.Once
 	cached   java.J
@@ -50,7 +54,7 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
 	// and we need a fresh tree to substitute into).
 	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind)
+	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
 	if err != nil {
 		return nil
 	}
@@ -64,19 +68,61 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	return placeAt(fresh, cursor)
 }
 
+// Instantiate produces the template as a detached node for a recipe that
+// inserts the result somewhere new, where Apply replaces a matched node. Bound
+// values are copied, so a spliced subtree may also stay where it came from.
+// The result carries no leading whitespace. It is nil unless every capture is
+// bound, through Bind for a single subtree or BindList for a run of them
+// within the capture's declared bounds.
+func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
+	for _, capture := range t.captures {
+		if values == nil || !values.satisfies(capture) {
+			return nil
+		}
+	}
+	instantiated := t.Apply(nil, values)
+	if instantiated == nil {
+		return nil
+	}
+	// The prefix is the gap the scaffold leaves before the template code,
+	// not whitespace the template itself declares.
+	return setLeadingPrefix(withFreshIDs(instantiated), java.EmptySpace)
+}
+
+// withFreshIDs returns a copy of j in which every node has a new ID, keeping
+// IDs unique within whatever tree the result is inserted into.
+func withFreshIDs(j java.J) java.J {
+	v := &idRefreshVisitor{}
+	v.Self = v
+	return v.Visit(j, nil).(java.J)
+}
+
+type idRefreshVisitor struct {
+	visitor.GoVisitor
+}
+
+func (v *idRefreshVisitor) Visit(t java.Tree, p any) java.Tree {
+	visited := v.GoVisitor.Visit(t, p)
+	if j, ok := visited.(java.J); ok && j != nil {
+		return j.WithID(uuid.New())
+	}
+	return visited
+}
+
 // getTree lazily parses the template and caches the result.
 func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
-		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind)
+		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
 	})
 	return t.cached, t.parseErr
 }
 
 type TemplateBuilder struct {
-	code     string
-	captures []*Capture
-	imports  []string
-	kind     ScaffoldKind
+	code       string
+	captures   []*Capture
+	imports    []string
+	kind       ScaffoldKind
+	exportData []fs.FS
 }
 
 func ExpressionTemplate(code string) *TemplateBuilder {
@@ -102,12 +148,22 @@ func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	return b
 }
 
+// ExportData attributes the template against compiler export data the recipe
+// module carries, reaching packages the running toolchain cannot load. Sets
+// accumulate, as Imports does, so a module can draw on several generated
+// packages; see exportdata.Importer for what none of them covers.
+func (b *TemplateBuilder) ExportData(sets ...fs.FS) *TemplateBuilder {
+	b.exportData = append(b.exportData, sets...)
+	return b
+}
+
 func (b *TemplateBuilder) Build() *GoTemplate {
 	return &GoTemplate{
-		code:     b.code,
-		captures: captureMap(b.captures),
-		imports:  b.imports,
-		kind:     b.kind,
+		code:          b.code,
+		captures:      captureMap(b.captures),
+		imports:       b.imports,
+		kind:          b.kind,
+		importerCache: importerCache{exportData: b.exportData},
 	}
 }
 

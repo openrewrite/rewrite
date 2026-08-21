@@ -225,9 +225,9 @@ func h() {
 	assert.Equal(t, "crypto/tls.Config", matcher.GetFullyQualifiedName(matcher.TypeOfExpression(inner)))
 }
 
-// Markers separate a conversion and a builtin from an ordinary call.
+// A conversion is its own node; a marker separates a builtin from an ordinary call.
 
-func TestConversionIsMarked(t *testing.T) {
+func TestConversionIsATypeCast(t *testing.T) {
 	c := collectAttribution(t, `package main
 
 import "time"
@@ -245,15 +245,13 @@ func k(src []byte, n int64) {
 }
 `)
 
-	var marked []string
-	for _, mi := range c.Invocations {
-		if java.FindMarker[golang.Conversion](mi.Markers) != nil {
-			marked = append(marked, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(mi)))
-		}
+	var converted []string
+	for _, tc := range c.Conversions {
+		converted = append(converted, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(tc)))
 	}
 	// Go's `string` maps to the JavaTypePrimitive whose keyword is "String".
 	// A package-qualified conversion is the type it names, not its package.
-	assert.Equal(t, []string{"byte[]", "String", "main.MyInt", "time.Duration"}, marked)
+	assert.Equal(t, []string{"byte[]", "String", "main.MyInt", "time.Duration"}, converted)
 }
 
 func TestBuiltinIsMarked(t *testing.T) {
