@@ -395,4 +395,104 @@ class FromTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void lowercaseArgReferenceInTag() {
+        rewriteRun(
+          docker(
+            """
+              ARG java_version=17
+              FROM eclipse-temurin:${java_version}
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
+                assertThat(tag).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) tag.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("java_version");
+                assertThat(var.isBraced()).isTrue();
+                assertThat(tag.hasEnvironmentVariables()).isTrue();
+                assertThat(tag.getText()).isNull();
+                assertThat(tag.getTextWithVariables()).isEqualTo("${java_version}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void unbracedLowercaseArgReferenceInTag() {
+        rewriteRun(
+          docker(
+            """
+              ARG java_version=17
+              FROM eclipse-temurin:$java_version
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
+                assertThat(tag).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) tag.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("java_version");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(tag.getText()).isNull();
+                assertThat(tag.getTextWithVariables()).isEqualTo("$java_version");
+            })
+          )
+        );
+    }
+
+    @Test
+    void mixedCaseArgReferenceInTag() {
+        rewriteRun(
+          docker(
+            """
+              ARG Java_Version=17
+              FROM eclipse-temurin:${Java_Version}
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
+                assertThat(tag).isNotNull();
+                assertThat(((Docker.EnvironmentVariable) tag.getContents().getFirst()).getName()).isEqualTo("Java_Version");
+                assertThat(tag.getText()).isNull();
+                assertThat(tag.getTextWithVariables()).isEqualTo("${Java_Version}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void lowercaseVariableInPlatformFlag() {
+        rewriteRun(
+          docker(
+            """
+              FROM --platform=$target_platform alpine:latest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument flagValue = doc.getStages().getFirst().getFrom().getFlags().getFirst().getValue();
+                assertThat(flagValue).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) flagValue.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("target_platform");
+                assertThat(flagValue.getText()).isNull();
+                assertThat(flagValue.getTextWithVariables()).isEqualTo("$target_platform");
+            })
+          )
+        );
+    }
+
+    @Test
+    void platformFlagKeepsVariableDefault() {
+        rewriteRun(
+          docker(
+            """
+              FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:latest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument flagValue = doc.getStages().getFirst().getFrom().getFlags().getFirst().getValue();
+                assertThat(flagValue).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) flagValue.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("TARGETPLATFORM:-linux/amd64");
+                assertThat(var.isBraced()).isTrue();
+                assertThat(flagValue.getTextWithVariables()).isEqualTo("${TARGETPLATFORM:-linux/amd64}");
+            })
+          )
+        );
+    }
 }
