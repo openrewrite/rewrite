@@ -92,6 +92,9 @@ func TestRemoveUnusedImports_KeepsImportReferencedByUnattributedQualifier(t *tes
 	// when RemoveUnusedImports runs after
 	// then the import survives on the lexical qualifier match alone
 	spec := NewRecipeSpec().WithRecipe(&handBuiltCallThenRemoveUnused{})
+	// stripQualifierAttribution swaps in a fresh, un-attributed qualifier that
+	// prints identically, so the tree legitimately differs from the parsed one.
+	spec.CheckUnchangedTreeIdentity = false
 	spec.RewriteRun(t,
 		Golang(`
 			package main

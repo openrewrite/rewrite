@@ -127,6 +127,8 @@ func TestSearchRecipeWithSanitizedMarkerPrinter(t *testing.T) {
 	spec := test.NewRecipeSpec().
 		WithRecipe(&findFoo{}).
 		WithMarkerPrinter(printer.SanitizedMarkerPrinter)
+	// findFoo adds a search marker that the sanitized printer does not render.
+	spec.CheckUnchangedTreeIdentity = false
 	spec.RewriteRun(t,
 		test.GolangRaw(
 			"package main\n\nfunc foo() {\n}\n",
