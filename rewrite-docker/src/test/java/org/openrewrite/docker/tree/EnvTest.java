@@ -199,6 +199,24 @@ class EnvTest implements RewriteTest {
         );
     }
 
+    @Test
+    void quotedValueFollowedByMoreTextIsWhole() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV DESCRIPTION "a title" and more
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument value = envValue(doc);
+                Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("\"a title\" and more");
+                assertThat(literal.getQuoteStyle()).isNull();
+            })
+          )
+        );
+    }
+
     private static Docker.Argument envValue(Docker.File doc) {
         var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(env.getPairs()).singleElement().actual().getValue();

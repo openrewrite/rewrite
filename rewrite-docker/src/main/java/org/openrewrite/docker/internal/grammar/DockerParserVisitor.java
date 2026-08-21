@@ -308,18 +308,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitLabelKey(DockerParser.LabelKeyContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#labelValue}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitLabelValue(DockerParser.LabelValueContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#labelOldValue}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitLabelOldValue(DockerParser.LabelOldValueContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#portList}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -349,18 +337,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitEnvKey(DockerParser.EnvKeyContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#envValueEquals}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitEnvValueEquals(DockerParser.EnvValueEqualsContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#envValueSpace}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitEnvValueSpace(DockerParser.EnvValueSpaceContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#sourceList}.
 	 * @param ctx the parse tree
@@ -428,11 +404,23 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitSignal(DockerParser.SignalContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link DockerParser#quoted}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitQuoted(DockerParser.QuotedContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link DockerParser#text}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitText(DockerParser.TextContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link DockerParser#value}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitValue(DockerParser.ValueContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#valueElement}.
 	 * @param ctx the parse tree
