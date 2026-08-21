@@ -48,6 +48,49 @@ func (m *MatchResult) bindList(name string, values []java.J) {
 	m.bindings[name] = values
 }
 
+// BindList associates a capture with the subtrees to substitute for it, which
+// the placeholder's enclosing list expands to. A run of any length is a
+// binding, zero included. Elems builds the argument from the element slices a
+// recipe holds. Returns the receiver, for chaining.
+func (m *MatchResult) BindList(c *Capture, values []java.J) *MatchResult {
+	m.bindList(c.Name(), values)
+	return m
+}
+
+// Elems concatenates element slices into the []java.J BindList takes. Go
+// converts neither []java.Expression nor []java.Statement to that on its own,
+// and a recipe holds one of those rather than a []java.J.
+func Elems[T java.J](groups ...[]T) []java.J {
+	n := 0
+	for _, group := range groups {
+		n += len(group)
+	}
+	values := make([]java.J, 0, n)
+	for _, group := range groups {
+		for _, value := range group {
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
+// listBinding returns the list bound to name, and whether the binding is a list
+// at all. It is the binding's shape, not the capture's declaration, that
+// decides how substitution treats a placeholder.
+func (m *MatchResult) listBinding(name string) ([]java.J, bool) {
+	list, ok := m.bindings[name].([]java.J)
+	return list, ok
+}
+
+// satisfies reports whether c has a value substitution can use: a run within
+// the capture's bounds, or a single subtree that holds a node.
+func (m *MatchResult) satisfies(c *Capture) bool {
+	if run, ok := m.listBinding(c.Name()); ok {
+		return c.allowsCount(len(run))
+	}
+	return m.Get(c.Name()) != nil
+}
+
 func (m *MatchResult) Has(name string) bool {
 	_, ok := m.bindings[name]
 	return ok

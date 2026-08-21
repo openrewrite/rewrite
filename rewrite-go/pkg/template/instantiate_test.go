@@ -220,16 +220,6 @@ func literalArgOf(t *testing.T, decl java.J) *java.Literal {
 	return lit
 }
 
-func TestInstantiateRejectsVariadicCapture(t *testing.T) {
-	args := Expr("args").Variadic(0, -1)
-	tmpl := ExpressionTemplate(fmt.Sprintf("errors.New(%s)", args)).
-		Captures(args).
-		Imports("errors").
-		Build()
-
-	assert.Nil(t, tmpl.Instantiate(NewMatchResult().Bind(args, &java.Literal{Source: `"x"`})))
-}
-
 func TestBindIsChainableAndReadable(t *testing.T) {
 	a, b := Expr("a"), Expr("b")
 	lit := &java.Literal{Source: "1"}

@@ -72,10 +72,11 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 // inserts the result somewhere new, where Apply replaces a matched node. Bound
 // values are copied, so a spliced subtree may also stay where it came from.
 // The result carries no leading whitespace. It is nil unless every capture is
-// bound to a single subtree, the only form substitution handles.
+// bound, through Bind for a single subtree or BindList for a run of them
+// within the capture's declared bounds.
 func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
-	for name, capture := range t.captures {
-		if capture.IsVariadic() || values == nil || values.Get(name) == nil {
+	for _, capture := range t.captures {
+		if values == nil || !values.satisfies(capture) {
 			return nil
 		}
 	}

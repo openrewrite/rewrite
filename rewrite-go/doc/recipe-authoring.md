@@ -384,6 +384,47 @@ name, and assert on its attributed type. Throw `AssertionError` with a
 descriptive message on mismatch — drop them straight into an
 `afterRecipe(cu -> ...)` lambda.
 
+## Variadic captures
+
+A capture marked `Variadic(min, max)` stands for a run of list elements
+rather than one subtree, so one pattern covers a call of any arity
+(`-1` for `max` means unlimited):
+
+```go
+args := template.Expr("args").Variadic(0, -1)
+before := template.Expression(fmt.Sprintf("assert.Equal(%s)", args)).Captures(args).Build()
+after := template.ExpressionTemplate(fmt.Sprintf("require.Equal(%s)", args)).Captures(args).Build()
+```
+
+`MatchResult.GetList(name)` reads the run back, and `BindList` supplies
+one by hand for `Instantiate`:
+
+```go
+tmpl.Instantiate(template.NewMatchResult().
+    Bind(recv, tIdent).
+    BindList(args, template.Elems(coreArgs, msgArgs)))
+```
+
+`Elems` is there because Go converts neither `[]java.Expression` nor
+`[]java.Statement` to the `[]java.J` `BindList` takes, and a recipe
+holds one of those. It concatenates any number of element slices, so
+a leading single node goes in as `Elems([]java.Expression{recv}, ...)`.
+
+A run of any length is a binding, zero included, so an empty one
+leaves the call reading as `require.Equal(t)`. A run outside the
+capture's bounds is not, and `Instantiate` returns nil — the same
+bounds the match path enforces.
+
+Two rules bound what this covers. **A list splits at one variadic
+capture**: with one, every other pattern element takes one candidate
+element, so the run's length is arithmetic and the captures after it
+match positionally. A list holding two variadic captures leaves the
+split undetermined, and the match fails.
+**A run needs a list to expand into**: a call's arguments or a block's
+statements. A variadic placeholder anywhere else has nowhere to go, and
+`Apply` returns nil rather than emit the placeholder — as it does for
+any capture left unbound.
+
 ## Surface boundaries
 
 When in doubt about what pattern to use:
