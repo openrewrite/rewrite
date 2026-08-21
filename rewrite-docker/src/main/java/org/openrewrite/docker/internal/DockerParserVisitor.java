@@ -133,14 +133,23 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         skip(ctx.FROM().getSymbol());
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
-        Docker.@Nullable Argument[] imageComponents = parseImageName(ctx.imageName());
-        Docker.Argument imageName = requireNonNull(imageComponents[0]);
-        Docker.Argument tag = imageComponents[1];
-        Docker.Argument digest = imageComponents[2];
-        Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
 
-        // Cursor has already been advanced by parseImageName and other parsing methods
-        // No additional advancement needed here
+        DockerParser.ImageReferenceContext reference = ctx.imageReference();
+        TerminalNode colon = reference.COLON();
+        TerminalNode at = reference.AT();
+        Docker.Argument imageName = referencePart(reference.imageName(), colon != null ? colon : at);
+        Docker.Argument tag = null;
+        if (colon != null) {
+            skip(colon.getSymbol());
+            tag = referencePart(reference.tag(), at);
+        }
+        Docker.Argument digest = null;
+        if (at != null) {
+            skip(at.getSymbol());
+            digest = referencePart(reference.digest(), null);
+        }
+
+        Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
 
         return new Docker.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, imageName, tag, digest, as);
     }
@@ -170,14 +179,20 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         );
     }
 
-    private Docker.@Nullable Argument[] parseImageName(DockerParser.ImageNameContext ctx) {
+    /// One part of an image reference, reaching up to the separator that follows it so that a line
+    /// continuation written before that separator stays with the part. A part can be absent while its
+    /// separator is present, as in `FROM alpine:`, and is then empty rather than missing, which keeps
+    /// the separator in the printed source.
+    private Docker.Argument referencePart(@Nullable ParserRuleContext ctx, @Nullable TerminalNode separator) {
+        if (ctx == null) {
+            Space prefix = separator == null ? Space.EMPTY : prefix(separator.getSymbol());
+            return new Docker.Argument(randomId(), prefix, Markers.EMPTY, emptyList());
+        }
         Space prefix = prefix(ctx);
-
-        // Parse the text and split out environment variables
-        List<Docker.ArgumentContent> contents = parseText(ctx.text());
-
-        advanceCursor(ctx.text().getStop().getStopIndex() + 1);
-        return ImageReferences.split(contents, prefix);
+        int stopIndex = separator == null ? ctx.getStop().getStopIndex() : separator.getSymbol().getStartIndex() - 1;
+        List<Docker.ArgumentContent> contents = parseText(ctx, stopIndex);
+        advanceCursor(stopIndex + 1);
+        return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
     }
 
     /// A value is a single literal holding its source text, so that a value spanning whitespace stays
@@ -185,6 +200,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     /// quotes are part of the text. Environment variable references are always split out, since their
     /// value cannot be resolved from the source.
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx) {
+        return parseText(textCtx, -1);
+    }
+
+    /// As {@link #parseText(ParserRuleContext)}, reading up to {@code stopIndex} when the value
+    /// continues past its last token, as it does when whitespace precedes an image reference separator.
+    private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx, int stopIndex) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         if (textCtx == null) {
             return contents;
@@ -201,7 +222,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             return contents;
         }
 
-        if (tokens.size() == 1) {
+        if (tokens.size() == 1 && stopIndex <= tokens.get(0).getStopIndex()) {
             Token only = tokens.get(0);
             Docker.Literal.QuoteStyle quoteStyle = quoteStyleOf(only);
             String text = only.getText();
@@ -219,12 +240,12 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         Space prefix = prefix(tokens.get(0));
         int startIndex = tokens.get(0).getStartIndex();
-        int stopIndex = tokens.get(0).getStopIndex();
+        int endIndex = stopIndex;
         for (Token token : tokens) {
             skip(token);
-            stopIndex = Math.max(stopIndex, token.getStopIndex());
+            endIndex = Math.max(endIndex, token.getStopIndex());
         }
-        contents.addAll(splitVariables(sourceText(startIndex, stopIndex), prefix));
+        contents.addAll(splitVariables(sourceText(startIndex, endIndex), prefix));
         return contents;
     }
 
