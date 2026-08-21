@@ -976,18 +976,16 @@ public interface Docker extends Tree {
         List<ArgumentContent> contents;
 
         /**
-         * @return The unquoted text of every content joined by its separating whitespace, or {@code null}
-         * if an environment variable reference makes it impossible to resolve statically.
+         * @return The text of every content, or {@code null} if an environment variable reference makes it
+         * impossible to resolve statically.
          */
         public @Nullable String getText() {
             StringBuilder text = new StringBuilder();
-            for (int i = 0; i < contents.size(); i++) {
-                ArgumentContent content = contents.get(i);
+            for (ArgumentContent content : contents) {
                 if (content instanceof EnvironmentVariable) {
                     return null;
                 }
                 if (content instanceof Literal) {
-                    appendSeparator(text, content, i);
                     text.append(((Literal) content).getText());
                 }
             }
@@ -1000,24 +998,15 @@ public interface Docker extends Tree {
          */
         public String getTextWithVariables() {
             StringBuilder text = new StringBuilder();
-            for (int i = 0; i < contents.size(); i++) {
-                ArgumentContent content = contents.get(i);
+            for (ArgumentContent content : contents) {
                 if (content instanceof Literal) {
-                    appendSeparator(text, content, i);
                     text.append(((Literal) content).getText());
                 } else if (content instanceof EnvironmentVariable) {
-                    appendSeparator(text, content, i);
                     EnvironmentVariable env = (EnvironmentVariable) content;
                     text.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
                 }
             }
             return text.toString();
-        }
-
-        private void appendSeparator(StringBuilder text, ArgumentContent content, int index) {
-            if (index > 0) {
-                text.append(content.getPrefix().getWhitespace());
-            }
         }
 
         /**
