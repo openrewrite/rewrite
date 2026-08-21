@@ -770,7 +770,7 @@ public class YamlParser implements org.openrewrite.Parser {
         // a document. Strip any leading sequence-entry dashes, then any mapping key,
         // to isolate the value portion.
         String value = trimmedLine;
-        while (value.equals("-") || value.startsWith("- ")) {
+        while ("-".equals(value) || value.startsWith("- ")) {
             value = value.length() == 1 ? "" : value.substring(2).trim();
         }
         int colonIndex = value.indexOf(':');

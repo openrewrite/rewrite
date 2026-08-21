@@ -21,10 +21,12 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -337,7 +339,7 @@ class NpmGraphBuilderTest {
                 .add("b", "2.3.0", emptyMap());
 
         ResolutionGraph graph = new NpmGraphBuilder(registry, false,
-                singletonMap("b", Collections.singleton("2.1.0")))
+                singletonMap("b", singleton("2.1.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\"}}"));
 
         assertThat(graph.getNodes()).containsOnlyKeys("a@1.2.0", "b@2.1.0");
@@ -353,7 +355,7 @@ class NpmGraphBuilderTest {
                 .add("b", "2.3.0", emptyMap());
 
         ResolutionGraph graph = new NpmGraphBuilder(registry, false,
-                singletonMap("b", Collections.singleton("1.9.0")))
+                singletonMap("b", singleton("1.9.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\"}}"));
 
         assertThat(graph.getNodes()).containsOnlyKeys("a@1.2.0", "b@2.3.0");
@@ -369,7 +371,7 @@ class NpmGraphBuilderTest {
         registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
 
         ResolutionGraph graph = new NpmGraphBuilder(registry, true,
-                singletonMap("react", Collections.singleton("18.2.0")))
+                singletonMap("react", singleton("18.2.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}"));
 
         assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0", "react@18.2.0");
@@ -383,7 +385,7 @@ class NpmGraphBuilderTest {
                 .add("react-is", "18.3.1", emptyMap());
 
         ResolutionGraph graph = new NpmGraphBuilder(registry, false,
-                singletonMap("react-is-18", Collections.singleton("18.2.0")))
+                singletonMap("react-is-18", singleton("18.2.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"react-is-18\":\"npm:react-is@^18.0.0\"}}"));
 
         assertThat(graph.getNodes()).containsOnlyKeys("react-is-18@18.2.0");
@@ -413,7 +415,7 @@ class NpmGraphBuilderTest {
 
         @Override
         public Set<String> versions(String name) {
-            return versionsByName.getOrDefault(name, Collections.emptySet());
+            return versionsByName.getOrDefault(name, emptySet());
         }
 
         @Override

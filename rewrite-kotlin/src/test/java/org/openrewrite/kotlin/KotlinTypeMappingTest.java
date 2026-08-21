@@ -1073,7 +1073,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 //language=none
                 "class A : RemoteStub",
-                    spec -> spec.afterRecipe(cu -> {
+                    spec -> spec.afterRecipe(cu ->
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1082,8 +1082,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitIdentifier(identifier, integer);
                             }
-                        }.visit(cu, 0);
-                })
+                        }.visit(cu, 0))
               )
             );
         }

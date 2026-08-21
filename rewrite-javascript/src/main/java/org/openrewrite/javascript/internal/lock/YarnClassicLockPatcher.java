@@ -21,7 +21,6 @@ import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import static java.util.Collections.emptySet;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.FORCED_MOVE;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.PROMOTION;
@@ -124,7 +124,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         List<String> names = new ArrayList<>();
         boolean inDeps = false;
         for (String line : block.split("\n", -1)) {
-            if (line.equals("  dependencies:") || line.equals("  optionalDependencies:")) {
+            if ("  dependencies:".equals(line) || "  optionalDependencies:".equals(line)) {
                 inDeps = true; // reachability follows optional edges too — yarn installs and locks them
             } else if (inDeps && line.startsWith("    ")) {
                 names.add(unwrap(line.trim().split("\\s+", 2)[0]));
@@ -213,7 +213,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         }
 
         if (edit.isPrunesOrphans()) {
-            Set<String> kept = edit.getNewDependencies() == null ? Collections.emptySet() : edit.getNewDependencies().keySet();
+            Set<String> kept = edit.getNewDependencies() == null ? emptySet() : edit.getNewDependencies().keySet();
             for (String dep : blockDepNames(blocks.get(bi))) {
                 if (!kept.contains(dep)) {
                     droppedTargets.add(dep);
@@ -268,11 +268,11 @@ public final class YarnClassicLockPatcher implements LockPatcher {
 
     /** Drop every {@code dependencies:} line whose edge the bump removed, and the section header if it empties. */
     private static String dropOrphanedDeps(String body, @Nullable Map<String, String> newDeps) {
-        Set<String> keep = newDeps == null ? Collections.emptySet() : newDeps.keySet();
+        Set<String> keep = newDeps == null ? emptySet() : newDeps.keySet();
         String[] lines = body.split("\n", -1);
         List<String> out = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
-            if (lines[i].equals("  dependencies:")) {
+            if ("  dependencies:".equals(lines[i])) {
                 List<String> kept = new ArrayList<>();
                 int j = i + 1;
                 for (; j < lines.length && lines[j].startsWith("    "); j++) {
@@ -301,7 +301,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         boolean inDeps = false;
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
-            if (line.equals("  dependencies:")) {
+            if ("  dependencies:".equals(line)) {
                 inDeps = true;
             } else if (inDeps && line.startsWith("    ")) {
                 String depName = unwrap(line.trim().split("\\s+", 2)[0]);
@@ -596,7 +596,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             for (String block : blocks) {
                 boolean inDeps = false;
                 for (String line : block.split("\n", -1)) {
-                    if (line.equals("  dependencies:") || line.equals("  optionalDependencies:")) {
+                    if ("  dependencies:".equals(line) || "  optionalDependencies:".equals(line)) {
                         inDeps = true;
                     } else if (inDeps && line.startsWith("    ")) {
                         String[] parts = line.trim().split("\\s+", 2);

@@ -481,10 +481,10 @@ public class ModwRunner implements RewriteRunner {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         if (os.contains("linux")) {
-            if (arch.equals("amd64") || arch.equals("x86_64")) {
+            if ("amd64".equals(arch) || "x86_64".equals(arch)) {
                 return "moderne-cli-linux-x64";
             }
-            if (arch.equals("aarch64") || arch.equals("arm64")) {
+            if ("aarch64".equals(arch) || "arm64".equals(arch)) {
                 return "moderne-cli-linux-aarch64";
             }
             return null;

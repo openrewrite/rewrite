@@ -45,7 +45,6 @@ import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.Iterator;
@@ -56,6 +55,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static java.util.Collections.*;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
@@ -249,7 +249,7 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock))
-                .build(Collections.singletonMap("", editedPackageJson));
+                .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
                 PackageManager.Npm, editedPackageJson, edits);
@@ -265,7 +265,7 @@ public final class NativeLockEngine {
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock))
-                .build(Collections.singletonMap("", editedPackageJson));
+                .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
             if (edit.getNewResolved() != null) {
@@ -307,7 +307,7 @@ public final class NativeLockEngine {
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock))
-                .build(Collections.singletonMap("", editedPackageJson));
+                .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
                 PackageManager.YarnClassic, editedPackageJson, edits);
@@ -342,7 +342,7 @@ public final class NativeLockEngine {
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock))
-                .build(Collections.singletonMap("", editedPackageJson));
+                .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
                 PackageManager.Pnpm, editedPackageJson, edits);
@@ -376,7 +376,7 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock))
-                .build(Collections.singletonMap("", editedPackageJson));
+                .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
@@ -538,7 +538,7 @@ public final class NativeLockEngine {
         if (change.newConstraint == null) {
             // Removal: the patcher drops the entry and its orphans.
             String oldVersion = lockedVersions.isEmpty() ? "" : lockedVersions.iterator().next();
-            return Collections.singletonList(LockEditSet.PackageEdit.builder()
+            return singletonList(LockEditSet.PackageEdit.builder()
                     .name(name)
                     .oldVersion(oldVersion)
                     .newVersion(null)
@@ -613,7 +613,7 @@ public final class NativeLockEngine {
         if (targetVersion.equals(oldVersion)) {
             // Constraint-only widening: the resolved version does not move, so the package entry keeps
             // its resolved/integrity and only the importer's declared constraint is re-pinned.
-            return Collections.singletonList(edit.build());
+            return singletonList(edit.build());
         }
 
         if (npmForkRescoped) {
@@ -637,10 +637,10 @@ public final class NativeLockEngine {
             if (fork != null) {
                 return fork;
             }
-            nestEdits = Collections.emptyList();
+            nestEdits = emptyList();
         } else {
             proveReverseDependentsAccept(pm, name, oldVersion, targetVersion, existingLock);
-            nestEdits = Collections.emptyList();
+            nestEdits = emptyList();
         }
 
         NodeRegistry registry = registries.registryFor(name);
@@ -729,7 +729,7 @@ public final class NativeLockEngine {
         // shared transitive's union substitute EVERY moved requirer's new constraint for its stale lock value.
         Map<String, Map<String, String>> movedNewDeps = new LinkedHashMap<>();
         movedNewDeps.put(rootName, rootNew.getDependencies() == null ?
-                Collections.emptyMap() : rootNew.getDependencies());
+                emptyMap() : rootNew.getDependencies());
         Deque<String> worklist = new ArrayDeque<>();
         worklist.add(rootName);
 
@@ -937,9 +937,9 @@ public final class NativeLockEngine {
         Map<String, String> cascadeDeps = null;
         if (!dependenciesEqual(oldManifest, newManifest)) {
             Map<String, String> oldDeps = oldManifest.getDependencies() == null ?
-                    Collections.emptyMap() : oldManifest.getDependencies();
+                    emptyMap() : oldManifest.getDependencies();
             Map<String, String> newDeps = newManifest.getDependencies() == null ?
-                    Collections.emptyMap() : newManifest.getDependencies();
+                    emptyMap() : newManifest.getDependencies();
             if (!oldDeps.keySet().equals(newDeps.keySet())) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                         "moving " + dep + " to " + target + " adds/drops a dependency edge " +
@@ -1060,7 +1060,7 @@ public final class NativeLockEngine {
                                                                         VersionManifest rootNew, String existingLock,
                                                                         NodeRegistries registries, NpmRegistryClient client) {
         Map<String, String> newDeps = rootNew.getDependencies() == null ?
-                Collections.emptyMap() : rootNew.getDependencies();
+                emptyMap() : rootNew.getDependencies();
 
         // A dropped edge is handled by the patcher's snapshot prune + orphan GC (flagged via prunesOrphans);
         // this loop only re-resolves kept edges.
@@ -1110,7 +1110,7 @@ public final class NativeLockEngine {
 
         NodeRegistry registry = registries.registryFor(dep);
         Set<String> published = client.getPackument(registry, dep).getVersions();
-        String target = maxSatisfyingAll(published, Collections.singleton(newConstraint));
+        String target = maxSatisfyingAll(published, singleton(newConstraint));
         if (target == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                     "no single version of " + dep + " satisfies " + newConstraint + " (deferred)");
@@ -1204,7 +1204,7 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name, name + "@" + targetVersion + " has no registry integrity");
         }
 
-        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+        return singletonList(LockEditSet.PackageEdit.builder()
                 .name(name)
                 .oldVersion(oldVersion)
                 .newVersion(targetVersion)
@@ -1283,7 +1283,7 @@ public final class NativeLockEngine {
         }
         for (Map.Entry<?, ?> e : ((Map<?, ?>) snapshots).entrySet()) {
             String key = stripPnpmKey(String.valueOf(e.getKey()));
-            if ((ownerKey != null && key.equals(ownerKey)) || !(e.getValue() instanceof Map)) {
+            if ((key.equals(ownerKey)) || !(e.getValue() instanceof Map)) {
                 continue;
             }
             Map<?, ?> body = (Map<?, ?>) e.getValue();
@@ -1631,7 +1631,7 @@ public final class NativeLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
                         promoteVersion + " which excludes " + rootConstraint + " (bun would fork); deferred");
             }
-            return Collections.singletonList(LockEditSet.PackageEdit.builder()
+            return singletonList(LockEditSet.PackageEdit.builder()
                     .name(rootName)
                     .newConstraint(rootConstraint)
                     .scope(change.scope)
@@ -1840,7 +1840,7 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
                     locked.iterator().next() + " which excludes " + rootConstraint + " (yarn would fork); deferred");
         }
-        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+        return singletonList(LockEditSet.PackageEdit.builder()
                 .name(rootName)
                 .newConstraint(rootConstraint)
                 .scope(change.scope)
@@ -2080,14 +2080,14 @@ public final class NativeLockEngine {
         Object packages = parseJsonObject(lock, false).get("packages");
         Object rootImporter = packages instanceof Map ? ((Map<?, ?>) packages).get("") : null;
         if (!(rootImporter instanceof Map)) {
-            return Collections.emptySet();
+            return emptySet();
         }
         String declared = declaredConstraintIn((Map<?, ?>) rootImporter, name, DECLARED_SCOPES);
         if (declared == null || (oldConstraint != null && !oldConstraint.equals(declared))) {
-            return Collections.emptySet();
+            return emptySet();
         }
         String topLevel = topLevelVersionsNpm(lock).get(name);
-        return topLevel == null ? Collections.emptySet() : Collections.singleton(topLevel);
+        return topLevel == null ? emptySet() : singleton(topLevel);
     }
 
     private static String resolveAddedVersion(NpmRegistryClient client, NodeRegistry registry,
@@ -2136,7 +2136,7 @@ public final class NativeLockEngine {
     private static Set<String> nonOptionalPeers(VersionManifest m) {
         Map<String, String> peers = m.getPeerDependencies();
         if (peers == null || peers.isEmpty()) {
-            return Collections.emptySet();
+            return emptySet();
         }
         JsonNode meta = m.getPeerDependenciesMeta();
         Set<String> result = new LinkedHashSet<>();
@@ -2300,7 +2300,7 @@ public final class NativeLockEngine {
             return;
         }
         Map<String, String> oldPeers = oldM.getPeerDependencies() == null ?
-                Collections.emptyMap() : oldM.getPeerDependencies();
+                emptyMap() : oldM.getPeerDependencies();
         JsonNode oldMeta = oldM.getPeerDependenciesMeta();
         JsonNode newMeta = newM.getPeerDependenciesMeta();
         Set<String> rootAnchored = rootDirectDependencyNames(lock);
@@ -2341,7 +2341,7 @@ public final class NativeLockEngine {
             return false;
         }
         Set<String> declared = m.getPeerDependencies() == null ?
-                Collections.emptySet() : m.getPeerDependencies().keySet();
+                emptySet() : m.getPeerDependencies().keySet();
         for (Iterator<String> it = meta.fieldNames(); it.hasNext(); ) {
             if (!declared.contains(it.next())) {
                 return true;
@@ -2357,7 +2357,7 @@ public final class NativeLockEngine {
             return false;
         }
         Map<String, String> newPeers = newM.getPeerDependencies() == null ?
-                Collections.emptyMap() : newM.getPeerDependencies();
+                emptyMap() : newM.getPeerDependencies();
         for (String p : oldPeers.keySet()) {
             if (!newPeers.containsKey(p)) {
                 return true;
@@ -2419,7 +2419,7 @@ public final class NativeLockEngine {
             return false;
         }
         Map<String, String> newDeps = newM.getDependencies() == null ?
-                Collections.emptyMap() : newM.getDependencies();
+                emptyMap() : newM.getDependencies();
         for (String dep : oldDeps.keySet()) {
             if (!newDeps.containsKey(dep)) {
                 return true;
@@ -2449,7 +2449,7 @@ public final class NativeLockEngine {
                                                                               NpmRegistryClient client) {
         Map<String, String> conflicts = conflictingReverseDependentsNpm(lock, name, targetVersion);
         if (conflicts.isEmpty()) {
-            return Collections.emptyList();
+            return emptyList();
         }
         if (conflicts.size() > 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -2481,14 +2481,14 @@ public final class NativeLockEngine {
         // newer in-range version would be a fresh resolve npm serializes into a new entry instead.
         NodeRegistry registry = registries.registryFor(name);
         Set<String> published = client.getPackument(registry, name).getVersions();
-        String nested = maxSatisfyingAll(published, Collections.singleton(constraint));
+        String nested = maxSatisfyingAll(published, singleton(constraint));
         if (!oldVersion.equals(nested)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, dependentName + " requires " + name + "@" +
                     constraint + " which resolves to " + nested + ", not the locked " + oldVersion +
                     "; nesting a re-resolved version is not yet supported");
         }
 
-        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+        return singletonList(LockEditSet.PackageEdit.builder()
                 .name(name)
                 .oldVersion(oldVersion)
                 .newVersion(oldVersion)
@@ -2601,7 +2601,7 @@ public final class NativeLockEngine {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> packagesMap(String lock) {
         Object packages = parseJsonObject(lock, false).get("packages");
-        return packages instanceof Map ? (Map<String, Object>) packages : Collections.emptyMap();
+        return packages instanceof Map ? (Map<String, Object>) packages : emptyMap();
     }
 
     private static @Nullable Map<?, ?> entryMap(@Nullable Object value) {
@@ -2626,7 +2626,7 @@ public final class NativeLockEngine {
                                                                               NpmRegistryClient client) {
         Map<String, String> conflicts = conflictingReverseDependentsBun(lock, name, targetVersion);
         if (conflicts.isEmpty()) {
-            return Collections.emptyList();
+            return emptyList();
         }
         if (conflicts.size() > 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -2639,14 +2639,14 @@ public final class NativeLockEngine {
 
         NodeRegistry registry = registries.registryFor(name);
         Set<String> published = client.getPackument(registry, name).getVersions();
-        String nested = maxSatisfyingAll(published, Collections.singleton(only.getValue()));
+        String nested = maxSatisfyingAll(published, singleton(only.getValue()));
         if (!oldVersion.equals(nested)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, dependent + " requires " + name + "@" +
                     only.getValue() + " which resolves to " + nested + ", not the locked " + oldVersion +
                     "; nesting a re-resolved version is not yet supported");
         }
 
-        return Collections.singletonList(LockEditSet.PackageEdit.builder()
+        return singletonList(LockEditSet.PackageEdit.builder()
                 .name(name)
                 .oldVersion(oldVersion)
                 .newVersion(oldVersion)
@@ -3199,7 +3199,7 @@ public final class NativeLockEngine {
             case YarnBerry:
                 return findLockedVersionsBerry(lock, name);
             default:
-                return Collections.emptySet();
+                return emptySet();
         }
     }
 
@@ -3244,8 +3244,8 @@ public final class NativeLockEngine {
     private static List<LockEditSet.PackageEdit> cascadeForcedMovesYarn(PackageManager pm, String rootName,
                                                                         VersionManifest rootOld, VersionManifest rootNew,
                                                                         String lock, NodeRegistries registries, NpmRegistryClient client) {
-        Map<String, String> oldDeps = rootOld.getDependencies() == null ? Collections.emptyMap() : rootOld.getDependencies();
-        Map<String, String> newDeps = rootNew.getDependencies() == null ? Collections.emptyMap() : rootNew.getDependencies();
+        Map<String, String> oldDeps = rootOld.getDependencies() == null ? emptyMap() : rootOld.getDependencies();
+        Map<String, String> newDeps = rootNew.getDependencies() == null ? emptyMap() : rootNew.getDependencies();
         // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop re-resolves
         // only kept edges.
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
@@ -3294,7 +3294,7 @@ public final class NativeLockEngine {
                     dep + " is directly declared; moving it via cascade is not yet supported");
         }
         NodeRegistry registry = registries.registryFor(dep);
-        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), Collections.singleton(newConstraint));
+        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), singleton(newConstraint));
         if (target == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no version of " + dep + " satisfies " + newConstraint);
         }
@@ -3413,7 +3413,7 @@ public final class NativeLockEngine {
     private static List<LockEditSet.PackageEdit> cascadeForcedMovesBun(String rootName, VersionManifest rootNew,
                                                                        String lock, NodeRegistries registries,
                                                                        NpmRegistryClient client) {
-        Map<String, String> newDeps = rootNew.getDependencies() == null ? Collections.emptyMap() : rootNew.getDependencies();
+        Map<String, String> newDeps = rootNew.getDependencies() == null ? emptyMap() : rootNew.getDependencies();
         List<LockEditSet.PackageEdit> moves = new ArrayList<>();
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
             String dep = e.getKey();
@@ -3452,7 +3452,7 @@ public final class NativeLockEngine {
                     dep + " is directly declared; moving it via cascade is not yet supported");
         }
         NodeRegistry registry = registries.registryFor(dep);
-        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), Collections.singleton(newConstraint));
+        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), singleton(newConstraint));
         if (target == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no version of " + dep + " satisfies " + newConstraint);
         }

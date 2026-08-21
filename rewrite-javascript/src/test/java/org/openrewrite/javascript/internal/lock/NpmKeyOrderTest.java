@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.shuffle;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NpmKeyOrderTest {
@@ -59,7 +59,7 @@ class NpmKeyOrderTest {
                 "node_modules/zebra");
 
         List<String> shuffled = new ArrayList<>(expected);
-        Collections.shuffle(shuffled, new java.util.Random(42));
+        shuffle(shuffled, new java.util.Random(42));
         shuffled.sort(NpmKeyOrder::compareKeys);
 
         assertThat(shuffled).containsExactlyElementsOf(expected);

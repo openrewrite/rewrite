@@ -280,6 +280,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return m.withAnnotations(visitContainer(m.getAnnotations(), newMultiAnnotationType.getAnnotations()));
     }
 
+    @Override
     @SuppressWarnings("DataFlowIssue")
     public J visitProperty(K.Property property, @Nullable Object ctx) {
         if (property == ctx || !(ctx instanceof K.Property)) {

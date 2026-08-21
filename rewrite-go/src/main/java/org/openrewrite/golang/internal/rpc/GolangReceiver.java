@@ -27,9 +27,9 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.UUID;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
@@ -371,14 +371,13 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                                 new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY),
                                 JLeftPadded.build(new J.Identifier(
                                         Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                                        Collections.emptyList(), name, null, null)),
+                                        emptyList(), name, null, null)),
                                 null);
                     });
             importStmt = importStmt.withQualid(qualid);
 
-            importStmt = importStmt.getPadding().withAlias(
+            return importStmt.getPadding().withAlias(
                     q.receive(importStmt.getPadding().getAlias(), a -> visitLeftPadded(a, q)));
-            return importStmt;
         }
     }
 }

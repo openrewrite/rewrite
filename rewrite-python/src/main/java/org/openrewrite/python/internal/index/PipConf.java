@@ -25,6 +25,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+
 /**
  * The {@code index-url}/{@code extra-index-url} slice of pip's INI configuration.
  */
@@ -37,7 +40,7 @@ class PipConf {
 
     static PipConf load(Environment env) {
         String indexUrl = null;
-        List<String> extraIndexUrls = Collections.emptyList();
+        List<String> extraIndexUrls = emptyList();
         for (Path file : configFiles(env)) {
             if (!Files.isRegularFile(file)) {
                 continue;
@@ -90,7 +93,7 @@ class PipConf {
         try {
             lines = Files.readAllLines(file, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, Map<String, String>> sections = new LinkedHashMap<>();
         String section = null;

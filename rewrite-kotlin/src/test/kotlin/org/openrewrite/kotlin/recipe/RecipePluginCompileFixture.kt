@@ -53,4 +53,3 @@ internal object RecipePluginCompileFixture {
 }
 
 internal fun JvmCompilationResult.exitOk(): Boolean = exitCode == KotlinCompilation.ExitCode.OK
-
