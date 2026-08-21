@@ -190,3 +190,34 @@ func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
 		t.Errorf("version: want %q, got %v", "8.0", gm.Data["version"])
 	}
 }
+
+func TestTrailingCommaMarkerRoundTripKeepsComments(t *testing.T) {
+	id := uuid.MustParse("cccccccc-dddd-eeee-ffff-000000000000")
+	tc := golang.TrailingComma{
+		Ident:  id,
+		Before: java.Space{Whitespace: " "},
+		After: java.Space{
+			Whitespace: " ",
+			Comments:   []java.Comment{{Text: " third", Suffix: "\n\t\t"}},
+		},
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{tc}}
+
+	after := roundTripMarkers(t, before)
+	got, ok := after.Entries[0].(golang.TrailingComma)
+	if !ok {
+		t.Fatalf("entry is %T, want golang.TrailingComma", after.Entries[0])
+	}
+	if got.Before.Whitespace != tc.Before.Whitespace {
+		t.Errorf("Before.Whitespace: want %q, got %q", tc.Before.Whitespace, got.Before.Whitespace)
+	}
+	if got.After.Whitespace != tc.After.Whitespace {
+		t.Errorf("After.Whitespace: want %q, got %q", tc.After.Whitespace, got.After.Whitespace)
+	}
+	if len(got.After.Comments) != 1 {
+		t.Fatalf("After.Comments: want 1, got %d", len(got.After.Comments))
+	}
+	if got.After.Comments[0].Text != " third" || got.After.Comments[0].Suffix != "\n\t\t" {
+		t.Errorf("After.Comments[0]: want %#v, got %#v", tc.After.Comments[0], got.After.Comments[0])
+	}
+}

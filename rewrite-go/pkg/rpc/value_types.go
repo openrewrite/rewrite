@@ -245,7 +245,7 @@ func init() {
 	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.DeserializationError"} })
 	// SearchResult: IS an RpcCodec, sends 2 sub-fields (id, description)
 	RegisterFactory("org.openrewrite.marker.SearchResult", func() any { return java.SearchResult{} })
-	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before whitespace)
+	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before Space)
 	RegisterFactory("org.openrewrite.golang.marker.GroupedImport", func() any { return golang.GroupedImport{} })
 	// ImportBlock: IS an RpcCodec, sends 5 sub-fields (id, closePrevious, before, grouped, groupedBefore)
 	RegisterFactory("org.openrewrite.golang.marker.ImportBlock", func() any { return golang.ImportBlock{} })
