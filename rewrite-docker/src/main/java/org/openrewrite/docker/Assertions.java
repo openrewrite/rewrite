@@ -37,6 +37,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public class Assertions {
@@ -447,6 +448,9 @@ public class Assertions {
         public Docker.Argument visitArgument(Docker.Argument argument, List<String> violations) {
             List<Docker.ArgumentContent> contents = argument.getContents();
             for (int i = 1; i < contents.size(); i++) {
+                if (i + 1 == contents.size() && isEmptyLiteral(contents.get(i))) {
+                    continue;
+                }
                 Space prefix = contents.get(i).getPrefix();
                 if (!prefix.getWhitespace().isEmpty() || !prefix.getComments().isEmpty()) {
                     violations.add("expected the contents of the argument " + quoted(ArgumentContents.textWithVariables(argument)) +
@@ -459,11 +463,46 @@ public class Assertions {
         @Override
         public Docker.Literal visitLiteral(Docker.Literal literal, List<String> violations) {
             Docker.Literal.QuoteStyle style = literal.getQuoteStyle();
+            if (style == null) {
+                outerWhitespace(literal, violations);
+            }
             if (style != null && hasUnescapedQuote(literal.getText(), style)) {
                 violations.add("expected the quoted literal " + quoted(literal.getText()) + " to hold no unescaped " +
                         quoteOf(style) + ", which ends the string when it is read back");
             }
             return super.visitLiteral(literal, violations);
+        }
+
+        /// An empty content closing an argument is the one place whitespace between contents is not that
+        /// argument's text: it is what a part reaching a separator has to write back, and the separator
+        /// has no prefix of its own to hold it.
+        private static boolean isEmptyLiteral(Docker.ArgumentContent content) {
+            return content instanceof Docker.Literal && ((Docker.Literal) content).getText().isEmpty();
+        }
+
+        /// A literal whose text runs into the whitespace around it hands every recipe reading its value
+        /// the formatting too. Only where the value itself begins and ends is formatting: whitespace
+        /// where two contents meet is the value's own text, as the space in `"pre $V post"` is.
+        private void outerWhitespace(Docker.Literal literal, List<String> violations) {
+            String text = literal.getText();
+            if (text.isEmpty()) {
+                return;
+            }
+            List<Docker.ArgumentContent> value = valueItIsPartOf(literal);
+            if ((value.get(0) == literal && Character.isWhitespace(text.charAt(0))) ||
+                    (value.get(value.size() - 1) == literal &&
+                            Character.isWhitespace(text.charAt(text.length() - 1)))) {
+                violations.add("expected the literal " + quoted(text) + " to hold only its value, but it starts or" +
+                        " ends with whitespace that belongs in the space around it");
+            }
+        }
+
+        /// The contents the literal shares its value with, which is the literal alone where it is a whole
+        /// value of its own, as an `ARG`'s name and an `ENV`'s key are.
+        private List<Docker.ArgumentContent> valueItIsPartOf(Docker.Literal literal) {
+            Object parent = getCursor().getParentTreeCursor().getValue();
+            return parent instanceof Docker.Argument ? ((Docker.Argument) parent).getContents() :
+                    singletonList(literal);
         }
 
         /// Recipes that copy a subtree, as combining or adding instructions do, hand the same element

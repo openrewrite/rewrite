@@ -381,32 +381,59 @@ class FromTest implements RewriteTest {
         );
     }
 
+    /// A continuation joins the lines it spans, and Docker keeps the indent of the line that follows
+    /// it, so only an unindented continuation leaves an image reference Docker still reads as one:
+    /// `FROM ubuntu\<newline>  :22.04` reaches it as `FROM ubuntu  :22.04`, two arguments where FROM
+    /// takes one or three.
     @Test
     void continuationBeforeTagSeparator() {
         rewriteRun(
           docker(
             """
               FROM ubuntu\\
-                :22.04
+              :22.04
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
                 assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
             })
           )
         );
     }
 
+    /// Whitespace may sit between the escape character and the newline it ends the line with.
     @Test
     void continuationPaddedWithSpacesBeforeTagSeparator() {
         rewriteRun(
           docker(
             """
               FROM ubuntu\\  \s
-                :22.04
+              :22.04
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    /// A backtick ends a line only under an `# escape=` directive, which is how a Windows Dockerfile
+    /// writes a path without escaping every separator.
+    @Test
+    void backtickContinuationBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu`
+              :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
                 assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
             })
           )
@@ -414,16 +441,18 @@ class FromTest implements RewriteTest {
     }
 
     @Test
-    void backtickContinuationBeforeTagSeparator() {
+    void continuationBeforeTheDigestSeparator() {
         rewriteRun(
           docker(
             """
-              FROM ubuntu`
-                :22.04
+              FROM ubuntu\\
+              @sha256:0000000000000000000000000000000000000000000000000000000000000000
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getFirst().getFrom();
-                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(ArgumentContents.text(from.getDigest()))
+                  .isEqualTo("sha256:0000000000000000000000000000000000000000000000000000000000000000");
             })
           )
         );

@@ -299,6 +299,12 @@ class UserTest implements RewriteTest {
         );
     }
 
+    /// Unlike the same shape in a `FROM`, Docker accepts this: `USER` reads everything after the
+    /// keyword as one specification, so the whitespace the continuation leaves behind is part of the
+    /// value, which is why the user holds it rather than the space around it.
+    /// As in a `FROM`, only an unindented continuation leaves a specification Docker still reads the
+    /// same way: it keeps the indent of the line that follows, and `USER app\<newline>  :group` reaches
+    /// it as the user `app  :group`.
     @Test
     void continuationBeforeTheSeparator() {
         rewriteRun(
@@ -306,11 +312,11 @@ class UserTest implements RewriteTest {
             """
               FROM ubuntu:20.04
               USER app\\
-                :group
+              :group
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app\\\n  ");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
                 assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
