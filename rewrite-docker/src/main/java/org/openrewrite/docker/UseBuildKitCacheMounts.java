@@ -290,17 +290,6 @@ public class UseBuildKitCacheMounts extends Recipe {
         return slash < 0 ? image : image.substring(slash + 1);
     }
 
-    private static final Pattern APT_LISTS_CLEANUP = Pattern.compile("rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists");
-    private static final Pattern PIP_CACHE_PURGE = Pattern.compile("\\bpip3?\\s+cache\\s+purge\\b");
-    private static final Pattern NPM_CACHE_CLEAN = Pattern.compile("\\bnpm\\s+cache\\s+(clean|clear)\\b");
-    private static final Pattern YARN_CACHE_CLEAN = Pattern.compile("\\byarn\\s+cache\\s+clean\\b");
-    private static final Pattern YARN_CACHE_FOLDER = Pattern.compile("\\bYARN_CACHE_FOLDER=");
-    private static final Pattern GO_CLEAN_CACHE = Pattern.compile("\\bgo\\s+clean\\b[^&|;]*-(mod)?cache\\b");
-
-    /// A cache mount starts out empty and hides what the image already has at the target, so an
-    /// `apt-get install` only finds its packages when the same `RUN` refreshes the lists it reads.
-    private static final Pattern APT_UPDATE = Pattern.compile("\\bapt-get\\s+(-\\S+\\s+)*update\\b");
-
     private static final String DOCKER_CLEAN = "/etc/apt/apt.conf.d/docker-clean";
     private static final String REMOVE_DOCKER_CLEAN = "rm -f " + DOCKER_CLEAN + " && ";
 
@@ -492,40 +481,145 @@ public class UseBuildKitCacheMounts extends Recipe {
     private static final String[][] HOME = {{"HOME", "/root"}};
 
     enum PackageManager {
-        MAVEN("maven", new String[]{"mvn", "mvnw"}, new String[][]{},
-                new Target[]{new Target("/root/.m2", HOME)}, true, false),
-        GRADLE("gradle", new String[]{"gradle", "gradlew"}, new String[][]{},
-                new Target[]{new Target("/root/.gradle", new String[][]{{"HOME", "/root"}, {"GRADLE_USER_HOME", "/root/.gradle"}})}, true, false),
-        NPM("npm", new String[]{"npm"}, new String[][]{{"ci"}, {"install"}},
-                new Target[]{new Target("/root/.npm", new String[][]{{"HOME", "/root"}, {"npm_config_cache", null}, {"NPM_CONFIG_CACHE", null}})}, false, false),
-        YARN("yarn", new String[]{"yarn"}, new String[][]{{"install"}},
-                new Target[]{new Target("/usr/local/share/.cache/yarn", new String[][]{{"YARN_CACHE_FOLDER", null}})}, false, false),
-        PIP("pip", new String[]{"pip", "pip3", "python", "python3"}, new String[][]{{"install"}, {"pip", "install"}},
-                new Target[]{new Target("/root/.cache/pip", new String[][]{{"HOME", "/root"}, {"PIP_CACHE_DIR", null}, {"PIP_NO_CACHE_DIR", null}, {"XDG_CACHE_HOME", null}})}, false, false),
-        GO("go", new String[]{"go"}, new String[][]{{"build"}, {"install"}, {"mod", "download"}},
+        MAVEN(
+                "maven",
+                new String[]{"mvn", "mvnw"},
+                new String[][]{},
+                new Target[]{
+                        new Target("/root/.m2", HOME)},
+                new String[]{},
+                null,
+                null,
+                true,
+                false),
+        GRADLE(
+                "gradle",
+                new String[]{"gradle", "gradlew"},
+                new String[][]{},
+                new Target[]{
+                        new Target("/root/.gradle", new String[][]{{"HOME", "/root"}, {"GRADLE_USER_HOME", "/root/.gradle"}})},
+                new String[]{},
+                null,
+                null,
+                true,
+                false),
+        NPM(
+                "npm",
+                new String[]{"npm"},
+                new String[][]{{"ci"}, {"install"}},
+                new Target[]{
+                        new Target("/root/.npm", new String[][]{{"HOME", "/root"}, {"npm_config_cache", null}, {"NPM_CONFIG_CACHE", null}})},
+                new String[]{},
+                Pattern.compile("\\bnpm\\s+cache\\s+(clean|clear)\\b"),
+                null,
+                false,
+                false),
+        YARN(
+                "yarn",
+                new String[]{"yarn"},
+                new String[][]{{"install"}},
+                new Target[]{
+                        new Target("/usr/local/share/.cache/yarn", new String[][]{{"YARN_CACHE_FOLDER", null}})},
+                new String[]{},
+                Pattern.compile("\\byarn\\s+cache\\s+clean\\b|\\bYARN_CACHE_FOLDER="),
+                null,
+                false,
+                false),
+        PIP(
+                "pip",
+                new String[]{"pip", "pip3", "python", "python3"},
+                new String[][]{{"install"}, {"pip", "install"}},
+                new Target[]{
+                        new Target("/root/.cache/pip", new String[][]{{"HOME", "/root"}, {"PIP_CACHE_DIR", null}, {"PIP_NO_CACHE_DIR", null}, {"XDG_CACHE_HOME", null}})},
+                new String[]{"--target", "-t", "--no-cache-dir", "--no-cache"},
+                Pattern.compile("\\bpip3?\\s+cache\\s+purge\\b"),
+                null,
+                false,
+                false),
+        GO(
+                "go",
+                new String[]{"go"},
+                new String[][]{{"build"}, {"install"}, {"mod", "download"}},
                 new Target[]{
                         new Target("/root/.cache/go-build", new String[][]{{"HOME", "/root"}, {"GOCACHE", null}}),
-                        new Target("/go/pkg/mod", new String[][]{{"GOPATH", "/go"}, {"GOMODCACHE", null}})}, false, false),
-        CARGO("cargo", new String[]{"cargo"}, new String[][]{{"build"}, {"install"}, {"fetch"}},
-                new Target[]{new Target("/usr/local/cargo/registry", new String[][]{{"CARGO_HOME", "/usr/local/cargo"}})}, false, false),
-        APT("apt", new String[]{"apt-get"}, new String[][]{{"install"}},
-                new Target[]{new Target("/var/cache/apt", new String[][]{}), new Target("/var/lib/apt/lists", new String[][]{})}, true, true),
-        APK("apk", new String[]{"apk"}, new String[][]{{"add"}},
-                new Target[]{new Target("/var/cache/apk", new String[][]{})}, true, true);
+                        new Target("/go/pkg/mod", new String[][]{{"GOPATH", "/go"}, {"GOMODCACHE", null}})},
+                new String[]{},
+                Pattern.compile("\\bgo\\s+clean\\b[^&|;]*-(mod)?cache\\b"),
+                null,
+                false,
+                false),
+        CARGO(
+                "cargo",
+                new String[]{"cargo"},
+                new String[][]{{"build"}, {"install"}, {"fetch"}},
+                new Target[]{
+                        new Target("/usr/local/cargo/registry", new String[][]{{"CARGO_HOME", "/usr/local/cargo"}})},
+                new String[]{},
+                null,
+                null,
+                false,
+                false),
+        APT(
+                "apt",
+                new String[]{"apt-get"},
+                new String[][]{{"install"}},
+                new Target[]{
+                        new Target("/var/cache/apt", new String[][]{}),
+                        new Target("/var/lib/apt/lists", new String[][]{})},
+                new String[]{},
+                Pattern.compile("rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists"),
+                Pattern.compile("\\bapt-get\\s+(-\\S+\\s+)*update\\b"),
+                true,
+                true),
+        APK(
+                "apk",
+                new String[]{"apk"},
+                new String[][]{{"add"}},
+                new Target[]{
+                        new Target("/var/cache/apk", new String[][]{})},
+                new String[]{"--no-cache"},
+                null,
+                null,
+                true,
+                true);
 
         final String id;
         final Target[] targets;
         final boolean explicitOnly;
         private final String[] executables;
         private final String[][] subcommands;
+
+        /// Arguments that tell this package manager not to cache at all, so that a mount over its cache
+        /// directory would keep nothing.
+        private final String[] cacheDisablingArguments;
+
+        /// What a command does to empty the cache it has just filled, such as `npm cache clean`, or to fill
+        /// somewhere else, such as assigning `YARN_CACHE_FOLDER`.
+        private final @Nullable Pattern cacheDefeatedBy;
+
+        /// What a command must also do for the mount to be filled rather than merely hiding what the image
+        /// already has at the target: an `apt-get install` only reads package lists another command wrote.
+        private final @Nullable Pattern cacheFilledBy;
+
         private final boolean locked;
 
-        PackageManager(String id, String[] executables, String[][] subcommands, Target[] targets,
-                       boolean locked, boolean explicitOnly) {
+        PackageManager(
+                String id,
+                String[] executables,
+                String[][] subcommands,
+                Target[] targets,
+                String[] cacheDisablingArguments,
+                @Nullable Pattern cacheDefeatedBy,
+                @Nullable Pattern cacheFilledBy,
+                boolean locked,
+                boolean explicitOnly) {
             this.id = id;
             this.executables = executables;
             this.subcommands = subcommands;
             this.targets = targets;
+            this.cacheDisablingArguments = cacheDisablingArguments;
+            this.cacheDefeatedBy = cacheDefeatedBy;
+            this.cacheFilledBy = cacheFilledBy;
             this.locked = locked;
             this.explicitOnly = explicitOnly;
         }
@@ -556,27 +650,15 @@ public class UseBuildKitCacheMounts extends Recipe {
         /// for a command told to install into the image from what it downloads, one that turns caching off,
         /// one that empties the cache it just filled, or one that reads a directory the empty cache would hide.
         boolean caches(List<String> arguments, String commandText) {
-            switch (this) {
-                case PIP:
-                    return arguments.stream().noneMatch(argument ->
-                            "--target".equals(argument) || argument.startsWith("--target=") || "-t".equals(argument) ||
-                                    "--no-cache-dir".equals(argument) || "--no-cache".equals(argument)) &&
-                            !PIP_CACHE_PURGE.matcher(commandText).find();
-                case NPM:
-                    return !NPM_CACHE_CLEAN.matcher(commandText).find();
-                case YARN:
-                    return !YARN_CACHE_CLEAN.matcher(commandText).find() &&
-                            !YARN_CACHE_FOLDER.matcher(commandText).find();
-                case GO:
-                    return !GO_CLEAN_CACHE.matcher(commandText).find();
-                case APK:
-                    return !arguments.contains("--no-cache");
-                case APT:
-                    return !APT_LISTS_CLEANUP.matcher(commandText).find() &&
-                            APT_UPDATE.matcher(commandText).find();
-                default:
-                    return true;
+            for (String argument : arguments) {
+                for (String disabling : cacheDisablingArguments) {
+                    if (argument.equals(disabling) || argument.startsWith(disabling + "=")) {
+                        return false;
+                    }
+                }
             }
+            return (cacheDefeatedBy == null || !cacheDefeatedBy.matcher(commandText).find()) &&
+                    (cacheFilledBy == null || cacheFilledBy.matcher(commandText).find());
         }
 
         /// The official `gradle` image ships a `GRADLE_USER_HOME` that is not under `/root`, so the directory
