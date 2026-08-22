@@ -26,8 +26,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 )
 
-// A declaration the pattern names but no package exports is what Context is
-// for; Imports and ExportData between them cover everything importable.
 const wrapDecls = `type Wrapped struct{ V int }
 
 func Wrap(v Wrapped) Wrapped { return v }`
@@ -53,8 +51,6 @@ func TestContextComposesWithImports(t *testing.T) {
 	require.Equal(t, []string{"time.Duration"}, patternParamFQNs(call))
 }
 
-// A statement pattern puts its context at the top level and its captures in
-// the function body, so the two offsets are counted apart.
 func TestContextLeavesAStatementPatternOnTheRightNode(t *testing.T) {
 	body := template.Stmt("body")
 	pat := template.StatementPattern(fmt.Sprintf("if Ready() {\n%s\n}", body)).

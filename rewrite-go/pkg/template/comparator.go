@@ -33,8 +33,7 @@ type patternComparator struct {
 	cursor   *visitor.Cursor
 	mode     TypeMatchingMode
 
-	// skipFastPath routes every node through the reflective walk, so a test
-	// can hold the hand-written comparisons to what the walk says.
+	// skipFastPath routes every node through the reflective walk.
 	skipFastPath bool
 
 	// tracking records where a missing attribution decided a comparison, for
@@ -67,7 +66,6 @@ func (c *patternComparator) allowsDeclaredType(name string, candidate java.J) bo
 	return matcher.IsAssignableTo(actual, capture.TypeName())
 }
 
-// matchTypeSlot compares the attribution two nodes carry.
 func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool {
 	if c.mode == TypeMatchingOff {
 		return true

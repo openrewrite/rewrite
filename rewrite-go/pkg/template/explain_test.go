@@ -24,9 +24,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 )
 
-// A pattern that reads attribution answers false against a package go/types
-// could not resolve, which is the same answer it gives source that simply
-// differs. Explain separates the two.
 func TestExplainCountsWhatAMissingAttributionDecided(t *testing.T) {
 	pat := template.Expression(`nowhere.Println("x")`).
 		TypeMatching(template.TypeMatchingStrict).Build()
@@ -60,7 +57,6 @@ func TestExplainReportsAMatch(t *testing.T) {
 	require.Zero(t, why.InconclusiveTypes)
 }
 
-// Structural matching reads no attribution, so nothing can be inconclusive.
 func TestExplainCountsNothingWhenTypeMatchingIsOff(t *testing.T) {
 	pat := template.Expression(`nowhere.Println("x")`).Build()
 	why := pat.Explain(firstCall(t, unattributed), nil)

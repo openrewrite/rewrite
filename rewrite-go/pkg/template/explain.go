@@ -24,11 +24,9 @@ import (
 )
 
 // MatchExplanation reports why a match came out as it did. A pattern reading
-// attribution answers false against a package go/types could not resolve, and
-// against source that genuinely differs; InconclusiveTypes tells them apart.
-//
-// A package known to be partly attributed should be refused outright rather
-// than counted, which waits on a marker saying so; see PARITY-AUDIT.md.
+// attribution answers false against a package go/types could not resolve and
+// against source that differs; InconclusiveTypes tells the two apart. See
+// PARITY-AUDIT.md for the marker that would let the first be refused outright.
 type MatchExplanation struct {
 	Matched bool
 
@@ -48,7 +46,7 @@ func (p *GoPattern) Explain(candidate java.J, cursor *visitor.Cursor) *MatchExpl
 	}
 	cmp := newPatternComparator(p.captures, cursor, p.mode)
 	// The walk names the field it is at, which the hand-written comparisons
-	// do not, and answers the same by TestFastPathAgreesWithWalk.
+	// do not.
 	cmp.tracking, cmp.skipFastPath = true, true
 	matched := cmp.match(tree, candidate) != nil
 	return &MatchExplanation{

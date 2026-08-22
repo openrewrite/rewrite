@@ -24,7 +24,7 @@ import (
 // pattern most often lands on read their own fields rather than reflect over
 // them. TestFastPathAgreesWithWalk holds these to what the walk answers; the
 // only slots it cannot reach are the ones Go source never fills and the RPC
-// peer sends — an identifier”'s annotations, a call”'s type parameters.
+// peer sends — an identifier's annotations, a call's type parameters.
 func (c *patternComparator) fastMatch(pattern, candidate java.J) (bool, bool) {
 	switch p := pattern.(type) {
 	case *java.Identifier:
@@ -62,8 +62,8 @@ func (c *patternComparator) fastMatch(pattern, candidate java.J) (bool, bool) {
 	return false, false
 }
 
-// A typed nil in a JavaType slot is an absent type, not a present one, so the
-// nil-vs-nil comparison the walk makes is reproduced rather than sidestepped.
+// A typed nil in a JavaType slot is an absent type, so it reaches the
+// comparison as an untyped one and two of them are equal.
 func fieldTypeOf(i *java.Identifier) java.JavaType {
 	if i.FieldType == nil {
 		return nil
@@ -106,10 +106,7 @@ func (c *patternComparator) matchContainer(pattern, candidate *java.Container[ja
 	return matchList(c, pattern.Elements, candidate.Elements)
 }
 
-// matchList compares two element lists, letting a variadic capture in the
-// pattern absorb a run of candidate elements. One variadic makes the run's
-// length arithmetic — every other pattern element takes one — so the elements
-// after it match positionally. Two leave the split undetermined, and fail.
+// matchList is matchRun over a typed list, for the hand-written comparisons.
 func matchList[T java.J](c *patternComparator, pattern, candidate []java.RightPadded[T]) bool {
 	at, ok := variadicIndex(c, pattern)
 	if !ok {

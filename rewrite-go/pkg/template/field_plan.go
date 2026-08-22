@@ -95,8 +95,8 @@ func planFor(t reflect.Type) *typePlan {
 	return plan
 }
 
-// stepFor resolves a type to its rule and whatever that rule needs to run
-// without touching reflect's name tables again.
+// stepFor resolves a type to its rule and whatever that rule needs, so the
+// walk reads reflect's name tables only while a plan is being built.
 func stepFor(t reflect.Type) fieldStep {
 	step := fieldStep{rule: ruleFor(t)}
 	switch step.rule {

@@ -240,8 +240,8 @@ func TestMatcherDistinctness(t *testing.T) {
 	}
 }
 
-// unreachableKinds are LST nodes for go.mod and go.sum. A pattern is parsed
-// from Go source, which yields neither, so the matcher owes them nothing.
+// unreachableCollector finds the go.mod and go.sum nodes a pattern can never
+// meet, since a pattern is parsed from Go source and that yields neither.
 type unreachableCollector struct {
 	visitor.GoVisitor
 	found map[string]bool

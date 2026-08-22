@@ -83,8 +83,9 @@ For most refactors, the Go-side template surface is what you want:
 ```go
 import "github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 
-before := template.Expression(`errors.Is(#{X}, #{Y})`).Build()
-after  := template.ExpressionTemplate(`xerrors.Is(#{X}, #{Y})`).Imports("xerrors").Build()
+x, y := template.Expr("x"), template.Expr("y")
+before := template.Expression(fmt.Sprintf(`errors.Is(%s, %s)`, x, y)).Captures(x, y).Build()
+after  := template.ExpressionTemplate(fmt.Sprintf(`xerrors.Is(%s, %s)`, x, y)).Imports("xerrors").Build()
 visitor := template.Rewrite(before, after)
 ```
 
@@ -110,7 +111,7 @@ The Java →  Go porting cheat-sheet:
 | `JavaTemplate.builder("…").build()`    | `template.StatementTemplate("…").Build()`                |
 | `.imports("foo")`                      | `.Imports("foo")`                                        |
 | `.apply(getCursor(), JavaCoordinates.replace(target), arg1, arg2)` | match `target` with a `GoPattern`, then `template.Rewrite(before, after)` — the `RewriteVisitor` does the splice |
-| `#{any()}` as a wildcard placeholder    | `template.Expression("#{X}").Build()` with an unconstrained `Capture` |
+| `#{any()}` as a wildcard placeholder    | a `*Capture` interpolated into the pattern string, which prints as its placeholder |
 | `#{name:any(java.util.List)}`           | not yet — file an issue if you hit this                  |
 
 ### Conclusion
@@ -202,6 +203,27 @@ once and cached. Each exported field resolves to one rule:
 
 The padded rule keys on field name, so it holds for every instantiation of `T`
 without enumerating them, and `LeftPadded[Space]` degenerates to a skip.
+
+A recipe's visitor method calls `Match` once per node it has narrowed to, so
+the candidate usually shares the pattern's kind and the reject on concrete
+type never fires. `Identifier`, `MethodInvocation`, `FieldAccess`, `Binary`
+and `Block` therefore read their own fields, which costs 91ns against the
+walk's 207ns on that call, and 254ns against 1072ns once arguments nest.
+Everything else goes through the walk, so a new node kind needs no work.
+
+`TestFastPathAgreesWithWalk` is what makes hand-written comparison safe here
+in a way it was not before: the walk reaches every field by construction, so
+it is the answer the hand-written cases are held to, under each matching
+mode. Mutating their clauses one at a time, thirteen of seventeen fail a
+test. Of the four that do not, two are slots Go source never fills and the
+RPC peer sends — an identifier's annotations, a call's type parameters — and
+two are type slots on `FieldAccess` and `Binary` that the corpus does not
+attribute.
+
+Generating the comparison per node type from the model would give the same
+speed without the hand-written half. It is the principled successor to both
+the walk and the fast path, and wants its own change: there is no model
+generator in the tree today.
 
 Explicit handling survives ahead of the walk where a node's meaning is not its
 fields: placeholder binding, `java.Literal` (compared by `Source`),

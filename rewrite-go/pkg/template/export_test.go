@@ -23,8 +23,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// MatchesViaWalk runs the match through the reflective walk alone, so a test
-// can hold the hand-written comparisons in fast_path.go to what it says.
+// MatchesViaWalk runs the match through the reflective walk alone.
 func (p *GoPattern) MatchesViaWalk(candidate java.J, cursor *visitor.Cursor) bool {
 	tree, err := p.getTree()
 	if err != nil || tree == nil {
