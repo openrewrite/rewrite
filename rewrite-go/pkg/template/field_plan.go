@@ -125,6 +125,9 @@ func (c *patternComparator) matchFields(pattern, candidate java.J) bool {
 	if pv.Kind() != reflect.Pointer || pv.IsNil() || cv.IsNil() {
 		return pv.IsNil() && cv.IsNil()
 	}
+	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
+		return false
+	}
 	pv, cv = pv.Elem(), cv.Elem()
 	for _, step := range planFor(pv.Type()).steps {
 		if !c.matchValue(step, pv.Field(step.index), cv.Field(step.index)) {
