@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.internal.ParserDirectives;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 
@@ -35,11 +36,17 @@ public class UseKeyValueEnvAndLabel extends Recipe {
             "value is the whole rest of the line, in favour of `ENV key=value`, whose value ends at the next " +
             "space. A value that spans a space therefore has to be quoted to keep its meaning, and one whose " +
             "quoting cannot be decided from the source, because it already carries quotes or escapes of its " +
-            "own, is left in the legacy form rather than silently given a different value.";
+            "own, is left in the legacy form rather than silently given a different value. A file whose " +
+            "`# escape=` directive names the backtick is left alone, because a backslash escapes nothing there.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new DockerIsoVisitor<ExecutionContext>() {
+            @Override
+            public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
+                return ParserDirectives.escapeChar(file) == '\\' ? super.visitFile(file, ctx) : file;
+            }
+
             @Override
             public Docker.Env.EnvPair visitEnvPair(Docker.Env.EnvPair pair, ExecutionContext ctx) {
                 Docker.Env.EnvPair p = super.visitEnvPair(pair, ctx);

@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.internal.ParserDirectives;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -43,11 +44,17 @@ public class ReplaceMaintainerWithLabel extends Recipe {
 
     String description = "BuildKit's `MaintainerDeprecated` check reports the `MAINTAINER` instruction, whose place has been " +
             "taken by the `org.opencontainers.image.authors` label. A stage that already carries that label " +
-            "has its `MAINTAINER` dropped rather than gaining a second one.";
+            "has its `MAINTAINER` dropped rather than gaining a second one. A file whose `# escape=` directive " +
+            "names the backtick is left alone, because a backslash escapes nothing there.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new DockerIsoVisitor<ExecutionContext>() {
+            @Override
+            public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
+                return ParserDirectives.escapeChar(file) == '\\' ? super.visitFile(file, ctx) : file;
+            }
+
             @Override
             public Docker.Stage visitStage(Docker.Stage stage, ExecutionContext ctx) {
                 Docker.Stage s = super.visitStage(stage, ctx);
