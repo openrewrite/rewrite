@@ -25,6 +25,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Comment;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
@@ -37,12 +38,14 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonMap;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -107,21 +110,19 @@ public class UseBuildKitCacheMounts extends Recipe {
             "here, and a mount over such a directory hides what is in it. Nor does a Dockerfile say which " +
             "builder reads it, and a builder that is not BuildKit does not accept `RUN --mount` at all.";
 
-    private static final Set<String> SHARING_MODES = new HashSet<>(Arrays.asList("shared", "private", "locked"));
+    private static final Set<String> SHARING_MODES = new LinkedHashSet<>(Arrays.asList("shared", "private", "locked"));
 
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
         if (packageManagers != null) {
-            for (String packageManager : packageManagers) {
-                validated = validated.and(Validated.test("packageManagers",
-                        "must be one of " + Arrays.stream(PackageManager.values()).map(pm -> pm.id).collect(joining(", ")),
-                        packageManager, pm -> PackageManager.of(pm) != null));
-            }
+            validated = validated.and(Validated.test("packageManagers",
+                    "must each be one of " + Arrays.stream(PackageManager.values()).map(pm -> pm.id).collect(joining(", ")),
+                    packageManagers, names -> names.stream().allMatch(name -> PackageManager.of(name) != null)));
         }
         if (sharing != null) {
-            validated = validated.and(Validated.test("sharing", "must be one of shared, private, locked",
-                    sharing, mode -> SHARING_MODES.contains(mode)));
+            validated = validated.and(Validated.test("sharing", "must be one of " + String.join(", ", SHARING_MODES),
+                    sharing, SHARING_MODES::contains));
         }
         return validated;
     }
@@ -140,11 +141,11 @@ public class UseBuildKitCacheMounts extends Recipe {
 
             @Override
             public Docker.Stage visitStage(Docker.Stage stage, ExecutionContext ctx) {
-                Stage context = new Stage(baseImage(stage.getFrom()));
+                Stage context = new Stage(stage.getFrom());
                 return stage.withInstructions(ListUtils.map(stage.getInstructions(), instruction -> {
                     if (instruction instanceof Docker.Run) {
                         return context.root ?
-                                addCacheMounts((Docker.Run) instruction, context.applicable(enabled), context, sharing) :
+                                addCacheMounts((Docker.Run) instruction, enabled, context, sharing) :
                                 instruction;
                     }
                     context.read(instruction);
@@ -225,13 +226,16 @@ public class UseBuildKitCacheMounts extends Recipe {
     /// at its target, and the target this recipe knows is the one a root user with an untouched environment
     /// would use.
     private static class Stage {
-        private final String baseImage;
         private final Map<String, String> environment = new HashMap<>();
         private final List<String> writtenPaths = new ArrayList<>();
         private boolean root = true;
 
-        private Stage(String baseImage) {
-            this.baseImage = baseImage;
+        private Stage(Docker.From from) {
+            String[] baseImageEnvironment = BASE_IMAGE_ENVIRONMENT.get(
+                    ImageName.parse(ArgumentContents.textWithVariables(from.getImageName())).getFamiliar());
+            if (baseImageEnvironment != null) {
+                environment.put(baseImageEnvironment[0], baseImageEnvironment[1]);
+            }
         }
 
         private void read(Docker.Instruction instruction) {
@@ -256,27 +260,21 @@ public class UseBuildKitCacheMounts extends Recipe {
 
         private void destination(Docker.CopyAddForm form) {
             if (form instanceof Docker.CopyShellForm) {
-                writtenPaths.add(ArgumentContents.textWithVariables(((Docker.CopyShellForm) form).getDestination()));
+                written(((Docker.CopyShellForm) form).getDestination());
             } else if (form instanceof Docker.HeredocForm && ((Docker.HeredocForm) form).getDestination() != null) {
-                writtenPaths.add(ArgumentContents.textWithVariables(((Docker.HeredocForm) form).getDestination()));
+                written(((Docker.HeredocForm) form).getDestination());
             }
         }
 
-        private Set<PackageManager> applicable(Set<PackageManager> enabled) {
-            Set<PackageManager> applicable = EnumSet.noneOf(PackageManager.class);
-            for (PackageManager packageManager : enabled) {
-                if (!packageManager.cacheMovedByBaseImage(baseImage)) {
-                    applicable.add(packageManager);
-                }
-            }
-            return applicable;
+        private void written(Docker.Argument destination) {
+            String path = ArgumentContents.textWithVariables(destination);
+            writtenPaths.add(path.endsWith("/") ? path.substring(0, path.length() - 1) : path);
         }
 
         /// Whether the stage has already put something at `target`, which a mount over it would hide, as a
         /// `COPY` of a `settings.xml` into `/root/.m2` does.
         private boolean holds(String target) {
-            for (String written : writtenPaths) {
-                String path = written.endsWith("/") ? written.substring(0, written.length() - 1) : written;
+            for (String path : writtenPaths) {
                 if (path.equals(target) || path.startsWith(target + "/") || target.startsWith(path + "/")) {
                     return true;
                 }
@@ -285,11 +283,11 @@ public class UseBuildKitCacheMounts extends Recipe {
         }
     }
 
-    private static String baseImage(Docker.From from) {
-        String image = ArgumentContents.textWithVariables(from.getImageName());
-        int slash = image.lastIndexOf('/');
-        return slash < 0 ? image : image.substring(slash + 1);
-    }
+    /// What a base image says about where a cache lives, which a Dockerfile building on it does not repeat.
+    /// The official `gradle` image ships a `GRADLE_USER_HOME` outside `/root`, so a mount at the directory
+    /// this recipe would otherwise assume is not the one Gradle reads.
+    private static final Map<String, String[]> BASE_IMAGE_ENVIRONMENT = singletonMap(
+            "gradle", new String[]{"GRADLE_USER_HOME", "/home/gradle/.gradle"});
 
     private static final String DOCKER_CLEAN = "/etc/apt/apt.conf.d/docker-clean";
     private static final String REMOVE_DOCKER_CLEAN = "rm -f " + DOCKER_CLEAN + " && ";
@@ -310,21 +308,22 @@ public class UseBuildKitCacheMounts extends Recipe {
             return run;
         }
 
-        Set<PackageManager> detected = detect(commands, enabled, commandText);
-        if (!shellForm) {
-            detected.remove(PackageManager.APT);
-        }
+        Map<String, String> environment = new HashMap<>(stage.environment);
+        Set<PackageManager> detected = detect(commands,
+                shellForm ? enabled : without(enabled, PackageManager.APT), commandText, environment);
         if (detected.isEmpty()) {
             return run;
         }
 
+        Set<String> mounted = mountedTargets(run);
         List<Docker.Flag> mounts = new ArrayList<>();
         for (PackageManager packageManager : detected) {
             for (Target target : packageManager.targets) {
-                if (!target.movedBy(stage.environment) && !alreadyMounted(run, target.path) &&
-                        !stage.holds(target.path) && !removes(commandText, target.path)) {
+                if (!mounted.contains(target.path) && !target.movedBy(environment) &&
+                        !stage.holds(target.path) && !target.removedBy.matcher(commandText).find()) {
                     mounts.add(new Docker.Flag(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, "mount",
-                            flagValue(packageManager.mount(target.path, sharing))));
+                            new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                                    ArgumentContents.flagValue(packageManager.mount(target.path, sharing)))));
                 }
             }
         }
@@ -333,8 +332,7 @@ public class UseBuildKitCacheMounts extends Recipe {
             return run;
         }
 
-        Docker.Run withMounts = mounts.isEmpty() ? run : run.withFlags(ListUtils.concatAll(
-                run.getFlags() == null ? emptyList() : run.getFlags(), mounts));
+        Docker.Run withMounts = mounts.isEmpty() ? run : run.withFlags(ListUtils.concatAll(run.getFlags(), mounts));
         if (removeDockerClean) {
             Docker.ShellForm command = (Docker.ShellForm) withMounts.getCommand();
             withMounts = withMounts.withCommand(command.withArgument(
@@ -343,11 +341,13 @@ public class UseBuildKitCacheMounts extends Recipe {
         return withMounts;
     }
 
-    private static Set<PackageManager> detect(List<List<String>> commands, Set<PackageManager> enabled, String commandText) {
+    private static Set<PackageManager> detect(List<List<String>> commands, Set<PackageManager> enabled,
+                                              String commandText, Map<String, String> environment) {
         Set<PackageManager> detected = EnumSet.noneOf(PackageManager.class);
         for (List<String> command : commands) {
             List<String> words = command;
-            while (!words.isEmpty() && (ENVIRONMENT_ASSIGNMENT.matcher(words.get(0)).matches() || "sudo".equals(words.get(0)))) {
+            while (!words.isEmpty() && (isEnvironmentAssignment(words.get(0)) || "sudo".equals(words.get(0)))) {
+                assign(words.get(0), environment);
                 words = words.subList(1, words.size());
             }
             if (words.isEmpty()) {
@@ -355,8 +355,18 @@ public class UseBuildKitCacheMounts extends Recipe {
             }
             String executable = basename(words.get(0));
             List<String> arguments = words.subList(1, words.size());
+            if ("export".equals(executable)) {
+                arguments.forEach(argument -> assign(argument, environment));
+                continue;
+            }
+            List<String> operands = new ArrayList<>();
+            for (String argument : arguments) {
+                if (!argument.startsWith("-")) {
+                    operands.add(argument);
+                }
+            }
             for (PackageManager packageManager : enabled) {
-                if (packageManager.matches(executable, arguments) && packageManager.caches(arguments, commandText)) {
+                if (packageManager.matches(executable, operands) && packageManager.caches(arguments, commandText)) {
                     detected.add(packageManager);
                 }
             }
@@ -364,8 +374,27 @@ public class UseBuildKitCacheMounts extends Recipe {
         return detected;
     }
 
+    /// A command may move a cache for the length of its own line, as `YARN_CACHE_FOLDER=$(mktemp -d) yarn install`
+    /// does, which reads the same as the stage having set it.
+    private static void assign(String word, Map<String, String> environment) {
+        int equals = word.indexOf('=');
+        if (equals > 0) {
+            environment.put(word.substring(0, equals), word.substring(equals + 1));
+        }
+    }
+
+    private static boolean isEnvironmentAssignment(String word) {
+        return word.indexOf('=') > 0 && ENVIRONMENT_ASSIGNMENT.matcher(word).matches();
+    }
+
+    private static Set<PackageManager> without(Set<PackageManager> enabled, PackageManager excluded) {
+        Set<PackageManager> remaining = EnumSet.copyOf(enabled);
+        remaining.remove(excluded);
+        return remaining;
+    }
+
     private static final Pattern ENVIRONMENT_ASSIGNMENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*=.*");
-    private static final Pattern CONTINUATION = Pattern.compile("^[\\\\`]$");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     /// The words of each command a shell would run in turn, so that a package manager is recognized by the
     /// command it heads rather than by appearing anywhere in the text, and each command of a chain is read.
@@ -374,9 +403,12 @@ public class UseBuildKitCacheMounts extends Recipe {
     private static List<List<String>> shellCommands(String text) {
         List<List<String>> commands = new ArrayList<>();
         for (String command : splitOnSeparators(text)) {
-            List<String> words = Arrays.stream(command.trim().split("\\s+"))
-                    .filter(word -> !word.isEmpty() && !CONTINUATION.matcher(word).matches())
-                    .collect(toList());
+            List<String> words = new ArrayList<>();
+            for (String word : WHITESPACE.split(command.trim())) {
+                if (!word.isEmpty() && !isContinuation(word)) {
+                    words.add(word);
+                }
+            }
             if (!words.isEmpty()) {
                 commands.add(words);
             }
@@ -414,6 +446,12 @@ public class UseBuildKitCacheMounts extends Recipe {
         return commands;
     }
 
+    /// A line continuation is whitespace to Docker, so the `\\` or `` ` `` that introduces one is not a word
+    /// of the command it continues.
+    private static boolean isContinuation(String word) {
+        return word.length() == 1 && (word.charAt(0) == '\\' || word.charAt(0) == '`');
+    }
+
     private static String basename(String executable) {
         int slash = executable.lastIndexOf('/');
         return slash < 0 ? executable : executable.substring(slash + 1);
@@ -421,39 +459,26 @@ public class UseBuildKitCacheMounts extends Recipe {
 
     private static final Pattern MOUNT_TARGET = Pattern.compile("(?:^|,)target=([^,]*)");
 
-    private static boolean alreadyMounted(Docker.Run run, String target) {
+    private static Set<String> mountedTargets(Docker.Run run) {
         if (run.getFlags() == null) {
-            return false;
+            return emptySet();
         }
+        Set<String> targets = new HashSet<>();
         for (Docker.Flag flag : run.getFlags()) {
             if ("mount".equals(flag.getName()) && flag.getValue() != null) {
                 Matcher existing = MOUNT_TARGET.matcher(ArgumentContents.textWithVariables(flag.getValue()));
-                if (existing.find() && existing.group(1).equals(target)) {
-                    return true;
+                if (existing.find()) {
+                    targets.add(existing.group(1));
                 }
             }
         }
-        return false;
+        return targets;
     }
 
-    /// Whether the command deletes the directory the mount would keep, which would leave the mount holding
-    /// nothing the next build could use.
-    private static boolean removes(String commandText, String target) {
-        return Pattern.compile("rm\\s+(-\\S+\\s+)*\\S*" + Pattern.quote(target)).matcher(commandText).find();
-    }
-
-    /// A flag's value is split on the `=` that separates each key from its value, so that the flag this recipe
-    /// builds holds what the same flag would hold had it been written in the file to begin with.
-    private static Docker.Argument flagValue(String value) {
-        List<Docker.ArgumentContent> contents = new ArrayList<>();
-        int start = 0;
-        for (int equals = value.indexOf('='); equals >= 0; equals = value.indexOf('=', start)) {
-            contents.addAll(ArgumentContents.of(value.substring(start, equals), null));
-            contents.addAll(ArgumentContents.of("=", null));
-            start = equals + 1;
-        }
-        contents.addAll(ArgumentContents.of(value.substring(start), null));
-        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
+    /// What a command does to delete a directory, which leaves a mount over it holding nothing the next
+    /// build could use.
+    private static Pattern removalOf(String path) {
+        return Pattern.compile("rm\\s+(-\\S+\\s+)*\\S*" + Pattern.quote(path));
     }
 
     /// A directory a package manager downloads into, and the environment variables that move it, each paired
@@ -462,10 +487,12 @@ public class UseBuildKitCacheMounts extends Recipe {
     static class Target {
         final String path;
         final String[][] variables;
+        final Pattern removedBy;
 
         Target(String path, String[][] variables) {
             this.path = path;
             this.variables = variables;
+            this.removedBy = removalOf(path);
         }
 
         boolean movedBy(Map<String, String> environment) {
@@ -479,7 +506,7 @@ public class UseBuildKitCacheMounts extends Recipe {
         }
     }
 
-    private static final String[][] HOME = {{"HOME", "/root"}};
+    private static final String[] HOME = {"HOME", "/root"};
 
     @RequiredArgsConstructor
     enum PackageManager {
@@ -488,7 +515,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                 new String[]{"mvn", "mvnw"},
                 new String[][]{},
                 new Target[]{
-                        new Target("/root/.m2", HOME)},
+                        new Target("/root/.m2", new String[][]{HOME})},
                 new String[]{},
                 null,
                 null,
@@ -499,7 +526,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                 new String[]{"gradle", "gradlew"},
                 new String[][]{},
                 new Target[]{
-                        new Target("/root/.gradle", new String[][]{{"HOME", "/root"}, {"GRADLE_USER_HOME", "/root/.gradle"}})},
+                        new Target("/root/.gradle", new String[][]{HOME, {"GRADLE_USER_HOME", "/root/.gradle"}})},
                 new String[]{},
                 null,
                 null,
@@ -510,7 +537,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                 new String[]{"npm"},
                 new String[][]{{"ci"}, {"install"}},
                 new Target[]{
-                        new Target("/root/.npm", new String[][]{{"HOME", "/root"}, {"npm_config_cache", null}, {"NPM_CONFIG_CACHE", null}})},
+                        new Target("/root/.npm", new String[][]{HOME, {"npm_config_cache", null}, {"NPM_CONFIG_CACHE", null}})},
                 new String[]{},
                 Pattern.compile("\\bnpm\\s+cache\\s+(clean|clear)\\b"),
                 null,
@@ -523,7 +550,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                 new Target[]{
                         new Target("/usr/local/share/.cache/yarn", new String[][]{{"YARN_CACHE_FOLDER", null}})},
                 new String[]{},
-                Pattern.compile("\\byarn\\s+cache\\s+clean\\b|\\bYARN_CACHE_FOLDER="),
+                Pattern.compile("\\byarn\\s+cache\\s+clean\\b"),
                 null,
                 false,
                 false),
@@ -532,7 +559,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                 new String[]{"pip", "pip3", "python", "python3"},
                 new String[][]{{"install"}, {"pip", "install"}},
                 new Target[]{
-                        new Target("/root/.cache/pip", new String[][]{{"HOME", "/root"}, {"PIP_CACHE_DIR", null}, {"PIP_NO_CACHE_DIR", null}, {"XDG_CACHE_HOME", null}})},
+                        new Target("/root/.cache/pip", new String[][]{HOME, {"PIP_CACHE_DIR", null}, {"PIP_NO_CACHE_DIR", null}, {"XDG_CACHE_HOME", null}})},
                 new String[]{"--target", "-t", "--no-cache-dir", "--no-cache"},
                 Pattern.compile("\\bpip3?\\s+cache\\s+purge\\b"),
                 null,
@@ -543,7 +570,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                 new String[]{"go"},
                 new String[][]{{"build"}, {"install"}, {"mod", "download"}},
                 new Target[]{
-                        new Target("/root/.cache/go-build", new String[][]{{"HOME", "/root"}, {"GOCACHE", null}}),
+                        new Target("/root/.cache/go-build", new String[][]{HOME, {"GOCACHE", null}}),
                         new Target("/go/pkg/mod", new String[][]{{"GOPATH", "/go"}, {"GOMODCACHE", null}})},
                 new String[]{},
                 Pattern.compile("\\bgo\\s+clean\\b[^&|;]*-(mod)?cache\\b"),
@@ -569,7 +596,7 @@ public class UseBuildKitCacheMounts extends Recipe {
                         new Target("/var/cache/apt", new String[][]{}),
                         new Target("/var/lib/apt/lists", new String[][]{})},
                 new String[]{},
-                Pattern.compile("rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists"),
+                removalOf("/var/lib/apt/lists"),
                 Pattern.compile("\\bapt-get\\s+(-\\S+\\s+)*update\\b"),
                 true,
                 true),
@@ -640,12 +667,6 @@ public class UseBuildKitCacheMounts extends Recipe {
             }
             return (cacheDefeatedBy == null || !cacheDefeatedBy.matcher(commandText).find()) &&
                     (cacheFilledBy == null || cacheFilledBy.matcher(commandText).find());
-        }
-
-        /// The official `gradle` image ships a `GRADLE_USER_HOME` that is not under `/root`, so the directory
-        /// this recipe would mount is not the one Gradle reads.
-        boolean cacheMovedByBaseImage(String baseImage) {
-            return this == GRADLE && "gradle".equals(baseImage);
         }
 
         String mount(String target, @Nullable String sharing) {

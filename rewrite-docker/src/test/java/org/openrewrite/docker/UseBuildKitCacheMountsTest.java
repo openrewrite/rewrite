@@ -21,6 +21,8 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.function.Consumer;
+
 import java.util.List;
 
 import static java.util.Collections.singletonList;
@@ -32,6 +34,10 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UseBuildKitCacheMounts(null, null));
+    }
+
+    static Consumer<RecipeSpec> forPackageManager(String packageManager) {
+        return spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList(packageManager), null));
     }
 
     @DocumentExample
@@ -184,7 +190,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     @Test
     void aptAsksForTheCacheItCachesInto() {
         rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+          forPackageManager("apt"),
           docker(
             """
               FROM ubuntu:22.04
@@ -201,7 +207,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     @Test
     void aptCacheWithoutTheConfigurationThatDiscardsIt() {
         rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+          forPackageManager("apt"),
           docker(
             """
               FROM ubuntu:22.04
@@ -218,7 +224,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     @Test
     void apk() {
         rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apk"), null)),
+          forPackageManager("apk"),
           docker(
             """
               FROM alpine:3.20
@@ -407,7 +413,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     @Test
     void packageManagersSelectsWhatIsMounted() {
         rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("npm"), null)),
+          forPackageManager("npm"),
           docker(
             """
               FROM node:22
@@ -585,7 +591,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
         @Test
         void aptCleanupDiscardsTheCache() {
             rewriteRun(
-              spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+              forPackageManager("apt"),
               docker(
                 """
                   FROM ubuntu:22.04
@@ -598,7 +604,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
         @Test
         void apkNoCacheKeepsNothingToCache() {
             rewriteRun(
-              spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apk"), null)),
+              forPackageManager("apk"),
               docker(
                 """
                   FROM alpine:3.20
@@ -687,7 +693,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
         @Test
         void aptWithoutTheUpdateThatFillsTheCache() {
             rewriteRun(
-              spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+              forPackageManager("apt"),
               docker(
                 """
                   FROM ubuntu:22.04
@@ -756,6 +762,30 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
                 """
                   FROM node:22
                   RUN npm ci && npm cache clean --force
+                  """
+              )
+            );
+        }
+
+        @Test
+        void commandExportingAnotherCacheFolder() {
+            rewriteRun(
+              docker(
+                """
+                  FROM node:22
+                  RUN export YARN_CACHE_FOLDER="$(mktemp -d)" && yarn install --frozen-lockfile
+                  """
+              )
+            );
+        }
+
+        @Test
+        void commandAssigningAnotherCacheDirectory() {
+            rewriteRun(
+              docker(
+                """
+                  FROM python:3.12
+                  RUN PIP_CACHE_DIR=/tmp/pip pip install -r requirements.txt
                   """
               )
             );

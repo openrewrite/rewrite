@@ -993,70 +993,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             flagName = flagContent.substring(0, equalsIdx);
             String valueText = flagContent.substring(equalsIdx + 1);
 
-            List<Docker.ArgumentContent> contents = parseFlagValue(valueText);
+            List<Docker.ArgumentContent> contents = ArgumentContents.flagValue(valueText);
             flagValue = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
         } else {
             flagName = flagContent;
         }
 
         return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue);
-    }
-
-    /// Splits the value of a command's flag into its quoted literals, environment variable references
-    /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
-    /// quote or a separator is handed to [ArgumentContents#splitVariables(String, Space)], so a variable reference means
-    /// the same thing here as it does in an argument's value.
-    private List<Docker.ArgumentContent> parseFlagValue(String text) {
-        List<Docker.ArgumentContent> contents = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        int i = 0;
-
-        while (i < text.length()) {
-            char c = text.charAt(i);
-
-            if (c == '"' || c == '\'') {
-                int close = findClosingQuote(text, i);
-                if (close < 0) {
-                    current.append(c);
-                    i++;
-                    continue;
-                }
-                flushFlagText(current, contents);
-                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
-                        c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
-                i = close + 1;
-            } else if (c == '=') {
-                flushFlagText(current, contents);
-                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
-                i++;
-            } else {
-                current.append(c);
-                i++;
-            }
-        }
-        flushFlagText(current, contents);
-
-        return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
-    }
-
-    private void flushFlagText(StringBuilder current, List<Docker.ArgumentContent> contents) {
-        if (current.length() > 0) {
-            contents.addAll(ArgumentContents.splitVariables(current.toString(), Space.EMPTY));
-            current.setLength(0);
-        }
-    }
-
-    private static int findClosingQuote(String text, int openIndex) {
-        char quote = text.charAt(openIndex);
-        for (int i = openIndex + 1; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (quote == '"' && c == '\\') {
-                i++;
-            } else if (c == quote) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {
