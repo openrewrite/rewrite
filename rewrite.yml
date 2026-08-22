@@ -104,11 +104,11 @@ recipeList:
   - org.openrewrite.java.recipes.RecipeEqualsAndHashCodeCallSuper
   - org.openrewrite.java.recipes.RemoveImportBeforeAddImport
   - org.openrewrite.java.recipes.RemoveNlsRewriteAnnotations
-#  - org.openrewrite.java.recipes.UseDisplayNameAndDescriptionFields  # restructures the getDisplayName()/getDescription() overrides in ~50 core files
-#  - org.openrewrite.java.recipes.UseEstimatedEffortPerOccurrenceField  # same restructuring for the 8 getEstimatedEffortPerOccurrence() overrides
+  - org.openrewrite.java.recipes.UseDisplayNameAndDescriptionFields  # TEMPORARY: enabled while the precondition is scoped to one module
+  - org.openrewrite.java.recipes.UseEstimatedEffortPerOccurrenceField  # TEMPORARY: enabled while the precondition is scoped to one module
   - org.openrewrite.java.recipes.UseJavaTemplateStaticApply
 #  - org.openrewrite.java.recipes.UseStringUtilsRecipes  # rewrites StringUtils.isNullOrEmpty/isNotEmpty in rewrite-core to call themselves: infinite recursion
-#  - org.openrewrite.java.recipes.UseTagsField  # same restructuring for the 2 getTags() overrides
+  - org.openrewrite.java.recipes.UseTagsField  # TEMPORARY: enabled while the precondition is scoped to one module
   - org.openrewrite.java.recipes.UseTreeRandomId
   - org.openrewrite.java.recipes.UseVisitWithParentCursor
   - org.openrewrite.java.recipes.migrate.RemoveTraitsUsageRecipes
