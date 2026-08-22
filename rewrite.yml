@@ -26,9 +26,9 @@ description: Best practices for OpenRewrite recipe development.
 preconditions:
   - org.openrewrite.FindSourceFiles:
       filePattern: "!(**/internal/grammar/*.*)"
-# Uncomment to run on a specific module
-#  - org.openrewrite.FindSourceFiles:
-#      filePattern: "rewrite-docker/**"
+# TEMPORARY: scoped to one module to surface what the suggestion bot has to say about it. Revert before merging.
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "rewrite-docker/**"
 recipeList:
   - org.openrewrite.gradle.plugins.SetDevelocityServer:
       server: "https://community.develocity.cloud"
