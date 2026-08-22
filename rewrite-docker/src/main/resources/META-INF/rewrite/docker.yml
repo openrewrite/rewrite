@@ -54,10 +54,12 @@ name: org.openrewrite.docker.DockerBuildOptimization
 displayName: Optimize Docker builds
 description: >-
   Apply build optimization best practices to Dockerfiles. This includes combining RUN
-  instructions to reduce layers and adding cleanup commands to reduce image size.
+  instructions to reduce layers, adding cleanup commands to reduce image size, and caching
+  package manager downloads across builds with BuildKit cache mounts.
 tags:
   - docker
   - optimization
 recipeList:
   - org.openrewrite.docker.CombineRunInstructions
   - org.openrewrite.docker.AddAptGetCleanup
+  - org.openrewrite.docker.UseBuildKitCacheMounts
