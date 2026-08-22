@@ -422,12 +422,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitValueElement(DockerParser.ValueElementContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link DockerParser#pathElement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitPathElement(DockerParser.PathElementContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link DockerParser#textElement}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
