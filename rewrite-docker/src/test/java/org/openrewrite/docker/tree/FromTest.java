@@ -404,6 +404,25 @@ class FromTest implements RewriteTest {
         );
     }
 
+    @Test
+    void anEscapeDirectiveBehindAnotherDirective() {
+        rewriteRun(
+          docker(
+            """
+              # syntax=docker/dockerfile:1
+              # escape=`
+              FROM ubuntu`
+              :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(ArgumentContents.text(from.getTag())).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
     /// A backtick ends a line only under an `# escape=` directive, which is how a Windows Dockerfile
     /// writes a path without escaping every separator.
     @Test
