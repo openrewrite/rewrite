@@ -143,6 +143,61 @@ class UseKeyValueEnvAndLabelTest implements RewriteTest {
     }
 
     @Test
+    void leaveAValueThatOpensWithAnEqualsAlone() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              ENV KEY =value
+              LABEL L =v
+              """
+          )
+        );
+    }
+
+    @Test
+    void quoteAValueThatOpensWithAnEqualsAndSpansASpace() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              ENV KEY =a b
+              """,
+            """
+              FROM ubuntu:22.04
+              ENV KEY="=a b"
+              """
+          )
+        );
+    }
+
+    @Test
+    void aValueBeginningWithAnEqualsDoesNotGainASecondOne() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              ENV KEY==value
+              LABEL L==v
+              """
+          )
+        );
+    }
+
+    @Test
+    void aWordWrittenHardAgainstItsKeyIsNotAPairAtAll() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              ENV KEY"value"
+              ENV OTHER$VAR
+              """
+          )
+        );
+    }
+
+    @Test
     void aValueWrittenHardAgainstItsKeyIsNotTheLegacyForm() {
         rewriteRun(
           docker(
