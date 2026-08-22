@@ -27,6 +27,7 @@ import org.openrewrite.docker.internal.grammar.DockerParserBaseVisitor;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -189,20 +190,27 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         );
     }
 
-    /// One part of a value the grammar split on a separator, an image reference or a `USER` specification,
-    /// reaching up to the separator that follows it so that a line continuation written before that
-    /// separator stays with the part. A part can be absent while its separator is present, as in
-    /// `FROM alpine:` or `USER root:`, and is then empty rather than missing, which keeps the separator
-    /// in the printed source.
+    /// One part of a value the grammar split on a separator, an image reference or a `USER` specification.
+    /// A part can be absent while its separator is present, as in `FROM alpine:` or `USER root:`, and is
+    /// then empty rather than missing, which keeps the separator in the printed source. Whitespace
+    /// written before the separator is formatting the printer has to write back, and the separator has
+    /// no prefix of its own to hold it, so it becomes the prefix of an empty content closing the part
+    /// rather than text the part does not mean.
     private Docker.Argument separatedPart(@Nullable ParserRuleContext ctx, @Nullable TerminalNode separator) {
         if (ctx == null) {
             Space prefix = separator == null ? Space.EMPTY : prefix(separator.getSymbol());
             return new Docker.Argument(randomId(), prefix, Markers.EMPTY, emptyList());
         }
         Space prefix = prefix(ctx);
-        int stopIndex = separator == null ? ctx.getStop().getStopIndex() : separator.getSymbol().getStartIndex() - 1;
-        List<Docker.ArgumentContent> contents = parseText(ctx, stopIndex);
-        advanceCursor(stopIndex + 1);
+        List<Docker.ArgumentContent> contents = parseText(ctx);
+        advanceCursor(ctx.getStop().getStopIndex() + 1);
+        if (separator != null) {
+            Space beforeSeparator = prefix(separator.getSymbol());
+            if (!beforeSeparator.isEmpty()) {
+                contents = ListUtils.concat(contents,
+                        new Docker.Literal(randomId(), beforeSeparator, Markers.EMPTY, "", null));
+            }
+        }
         return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
     }
 
@@ -211,19 +219,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     /// anywhere else the quotes are part of the text. Environment variable references are always split
     /// out, since their value cannot be resolved from the source.
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx) {
-        return parseText(textCtx, -1);
-    }
-
-    /// As {@link #parseText(ParserRuleContext)}, reading up to {@code stopIndex} when the value
-    /// continues past its last token, as it does when whitespace precedes an image reference separator.
-    private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx, int stopIndex) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         if (textCtx == null || textCtx.getChildCount() == 0) {
             return contents;
         }
 
         Token quoted = quotedValue(textCtx);
-        if (quoted != null && stopIndex <= quoted.getStopIndex()) {
+        if (quoted != null) {
             Docker.Literal.QuoteStyle quoteStyle = quoted.getType() == DockerLexer.DOUBLE_QUOTED_STRING ?
                     Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE;
             String text = quoted.getText();
@@ -240,7 +242,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         Space prefix = prefix(textCtx.getStart());
         int startIndex = textCtx.getStart().getStartIndex();
-        int endIndex = Math.max(stopIndex, textCtx.getStop().getStopIndex());
+        int endIndex = textCtx.getStop().getStopIndex();
         skip(textCtx.getStop());
         contents.addAll(ArgumentContents.splitVariables(sourceText(startIndex, endIndex), prefix));
         return contents;
