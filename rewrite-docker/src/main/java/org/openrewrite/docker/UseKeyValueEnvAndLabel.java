@@ -26,6 +26,8 @@ import org.openrewrite.docker.internal.ParserDirectives;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 
+import java.util.List;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UseKeyValueEnvAndLabel extends Recipe {
@@ -73,24 +75,34 @@ public class UseKeyValueEnvAndLabel extends Recipe {
     /// legacy form gives, or null when no such word can be built from the source.
     ///
     /// The legacy form separates its key from its value with whitespace, so a value written hard against its key
-    /// is not one: it is a `key=value` whose value holds something the grammar reads as the rest of a line rather
-    /// than as a value, such as `ENV NODE_OPTIONS=--max-old-space-size=4096`. Writing an `=` before it would give
-    /// the pair a second one.
+    /// is not one. It is either a pair whose value opens with an `=`, which the grammar hands back whole because
+    /// a value cannot start with one, or a single word that Docker refuses outright, as it does `ENV KEY"value"`.
+    ///
+    /// A value that opens with an `=` and would be written unquoted cannot be given the `key=value` form at all.
+    /// `ENV KEY =value` binds `KEY` to `=value` and so does `ENV KEY==value`, but the grammar reads the second
+    /// back as the legacy form with a value of `==value`, so the conversion would leave a tree that no longer
+    /// models what it prints. Quoting the value instead puts a `"` after the `=` and is read back as written.
     private static Docker.@Nullable Argument singleWord(Docker.Argument value) {
         if (value.getPrefix().getWhitespace().isEmpty()) {
             return null;
         }
-        if (ArgumentContents.quoteStyle(value) != null) {
-            return value;
-        }
         String text = ArgumentContents.textWithVariables(value);
-        if (isSingleWord(text)) {
-            return value;
+        if (ArgumentContents.quoteStyle(value) != null || isSingleWord(text)) {
+            return opensWithEquals(value) ? null : value;
         }
         if (text.indexOf('"') >= 0 || text.indexOf('\'') >= 0 || text.indexOf('\\') >= 0) {
             return null;
         }
         return value.withContents(ArgumentContents.of(text, Docker.Literal.QuoteStyle.DOUBLE));
+    }
+
+    private static boolean opensWithEquals(Docker.Argument value) {
+        List<Docker.ArgumentContent> contents = value.getContents();
+        if (contents.isEmpty() || !(contents.get(0) instanceof Docker.Literal)) {
+            return false;
+        }
+        Docker.Literal first = (Docker.Literal) contents.get(0);
+        return first.getQuoteStyle() == null && first.getText().startsWith("=");
     }
 
     /// Whether the shell reads `text` as one word, which it does when every space it holds is quoted or escaped.
