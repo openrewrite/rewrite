@@ -19,6 +19,9 @@ import org.openrewrite.docker.internal.Heredocs;}
     private boolean afterHealthcheck = false;
     // Whether the flags of a COPY or ADD are still being read, where --from carries an image reference
     private boolean copyAddFlags = false;
+    // Whether a parser directive is still recognized here, and whether a comment is
+    private boolean atFileHead = true;
+    private boolean atLineHead = true;
 
     // Each flag above holds over a region of one logical line, so each is one question about the token
     // just matched: does that token still belong to the region, or is it the first one past its end?
@@ -33,6 +36,8 @@ import org.openrewrite.docker.internal.Heredocs;}
         atLineStart = lineEnded || atLineStart && continuesLineStart();
         afterHealthcheck = !lineEnded && (_type == HEALTHCHECK || afterHealthcheck && _type != CMD && _type != NONE);
         copyAddFlags = !lineEnded && (_type == COPY || _type == ADD || copyAddFlags && continuesCopyAddFlags());
+        atFileHead = atFileHead && continuesFileHead();
+        atLineHead = beginsLineHead() || atLineHead && _type == WS;
         return super.emit();
     }
 
@@ -73,6 +78,18 @@ import org.openrewrite.docker.internal.Heredocs;}
         }
     }
 
+    // A written line, unlike the logical one atLineStart holds to, ends at a continuation as well - the
+    // FLAG_END form included, which is how a continuation closing the value of a --from reaches here.
+    private boolean beginsLineHead() {
+        return _type == NEWLINE && _mode != HEREDOC || _type == LINE_CONTINUATION || _type == PARSER_DIRECTIVE ||
+               _type == FLAG_END && getText().endsWith("\n");
+    }
+
+    // Docker gives up on directives at the first comment, blank line or instruction
+    private boolean continuesFileHead() {
+        return _type == PARSER_DIRECTIVE || _type == WS;
+    }
+
     // Both rules that open a heredoc queue its marker exactly as written after the '<<', dash and all,
     // because the dash is the only thing that tells the rule matching the terminator whether a line
     // indented with tabs closes this body.
@@ -111,10 +128,12 @@ options {
 
 // Parser directives (must be at the beginning of file)
 // After a parser directive, we're at line start (it consumes the newline)
-PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
+// As at FLAG, the predicate sits behind the '#' this rule and COMMENT share: one reachable without
+// consuming anything would stop ANTLR caching the start state of the mode that holds it.
+PARSER_DIRECTIVE : '#' {atFileHead}? WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
 
 // Comments (after parser directives) - HIDDEN in main mode
-COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
+COMMENT : '#' {atLineHead}? ~[\r\n]* -> channel(HIDDEN);
 
 // Instructions (case-insensitive)
 // Instructions are only recognized at line start. Otherwise they become UNQUOTED_TEXT.
@@ -185,25 +204,24 @@ DASH_DASH  : '--';
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
 // This matches text that doesn't start with -- or <<
 // Note: < is excluded to allow HEREDOC_START (<<) to match
-fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<];
-fragment ESCAPED_CHAR : '\\' .;
+fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<`];
 
 // String literals
-// Double-quoted strings support escape sequences, line continuation, and bare newlines
+// Double-quoted strings support escape sequences and line continuation
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
-// Bare newlines are allowed (e.g., comment lines inside PowerShell strings don't need trailing backtick)
 DOUBLE_QUOTED_STRING : DQ_STRING;
 
-fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | [\r\n] | ~["\\\r\n`] )* '"';
+fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
-// Bare newlines are also allowed for multi-line strings
 SINGLE_QUOTED_STRING : SQ_STRING;
 
-fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | [\r\n] | ~['\r\n] )* '\'';
+fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'';
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
-fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
+// Docker drops a comment line while joining the lines a continuation holds together, so one does not
+// reach the string that spans it.
+fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+ ( WS_CHAR* '#' ~[\r\n]* [\r\n]+ )*;
 
 fragment ESCAPE_SEQUENCE
     : '\\' ~[\r\n]   // Backslash followed by any char except newline (includes \n, \t, \\, \", Windows paths like \P)
@@ -249,14 +267,19 @@ DOLLAR : '$';
 // We structure this to not match text starting with -- (so DASH_DASH can match first)
 // Also exclude < from starting char to allow HEREDOC_START (<<) to match
 UNQUOTED_TEXT
-    : ( ~[-< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*   // Start with non-hyphen, non-<, non-space
-    | '-' ~[- \t\r\n\\"'$[\]=<] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single hyphen followed by non-hyphen, non-space
+    : ( ~[-< \t\r\n\\"'$[\]=`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*   // Start with non-hyphen, non-<, non-space
+    | '-' ~[- \t\r\n\\"'$[\]=<`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Single hyphen followed by non-hyphen, non-space
     | '-'  // Just a hyphen by itself
-    | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
+    | '<' ~[< \t\r\n\\"'$[\]=`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Single < followed by non-<
     | '<'  // Just a < by itself
-    | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
+    | TEXT_ESCAPE ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Start with escaped char (e.g., \; in find -exec)
     )
     ;
+
+// Docker reads no strings in the arguments of an instruction, so a quote the end of its line leaves
+// open is an ordinary character. Not so of the reference a FROM or a --from names, where an unpaired
+// quote is 'invalid reference format' and nothing to read on.
+UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 // Whitespace - HIDDEN in main mode
 WS : WS_CHAR+ -> channel(HIDDEN);
@@ -278,7 +301,7 @@ mode IMAGE_REF;
 
 IR_WS                : WS_CHAR+      -> type(WS), channel(HIDDEN);
 IR_LINE_CONTINUATION : LINE_CONT     -> type(LINE_CONTINUATION), channel(HIDDEN);
-IR_COMMENT           : '#' ~[\r\n]*  -> type(COMMENT), channel(HIDDEN);
+IR_COMMENT           : '#' {atLineHead}? ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
 IR_NEWLINE           : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 COLON : ':';
@@ -338,7 +361,7 @@ mode USER_SPEC;
 
 US_WS                : WS_CHAR+     -> type(WS), channel(HIDDEN);
 US_LINE_CONTINUATION : LINE_CONT    -> type(LINE_CONTINUATION), channel(HIDDEN);
-US_COMMENT           : '#' ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
+US_COMMENT           : '#' {atLineHead}? ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
 US_NEWLINE           : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 US_COLON : ':' -> type(COLON);
@@ -350,6 +373,8 @@ US_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
 US_DOLLAR               : '$'             -> type(DOLLAR);
 
 US_UNQUOTED_TEXT : ( US_TEXT_CHAR | TEXT_ESCAPE )+ -> type(UNQUOTED_TEXT);
+
+US_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 fragment US_TEXT_CHAR : ~[: \t\r\n\\"'$`];
 

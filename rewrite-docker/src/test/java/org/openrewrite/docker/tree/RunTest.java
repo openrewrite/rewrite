@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -538,15 +539,17 @@ class RunTest implements RewriteTest {
         );
     }
 
+    /// A backtick ends a line only under an `# escape=` directive.
     @Test
     void commentLineWithoutBacktick() {
         rewriteRun(
           docker(
               """
+                  # escape=`
                   FROM mcr.microsoft.com/windows/servercore:ltsc2022
                   RUN powershell -Command " `
                       $var = 'value'; `
-                      # Comment with no trailing backtick   <-- this line breaks parsing
+                      # Comment with no trailing backtick
                       $next = 'value'; `
                       ..."
                   """
@@ -570,6 +573,75 @@ class RunTest implements RewriteTest {
           docker(
             "FROM ubuntu:latest\n" +
             "RUN wget --header=\"Auth: tok\"\n"
+          )
+        );
+    }
+
+    @Test
+    void continuationBeforeAnUnindentedLine() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN apt-get update \\
+              && apt-get install -y curl
+              VOLUME /data
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(((Docker.ShellForm) ((Docker.Run) run).getCommand()).getArgument().getText())
+                  .isEqualTo("apt-get update \\\n&& apt-get install -y curl"),
+                volume -> assertThat(volume).isInstanceOf(Docker.Volume.class)))
+          )
+        );
+    }
+
+    /// Docker drops a comment line while joining the lines a continuation holds together. We keep it
+    /// where it was written, in the text of the command that spans it, rather than on the instruction
+    /// below - which is the one that would carry it were the continuation not there.
+    @Test
+    void commentLineInsideALineContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:3.20
+              RUN apk del .checksum-deps \\
+              # if we have leftovers from building, let's purge them
+                  && rm -rf /tmp/build
+              VOLUME /data
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(((Docker.ShellForm) ((Docker.Run) run).getCommand()).getArgument().getText())
+                  .isEqualTo("""
+                    apk del .checksum-deps \\
+                    # if we have leftovers from building, let's purge them
+                        && rm -rf /tmp/build\
+                    """),
+                volume -> {
+                    assertThat(volume.getPrefix().getComments()).isEmpty();
+                    assertThat(volume.getPrefix().getWhitespace()).isEqualTo("\n");
+                }))
+          )
+        );
+    }
+
+    @Test
+    void unpairedQuote() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN echo don't
+              VOLUME /data
+              USER 'nobody'
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(((Docker.ShellForm) ((Docker.Run) run).getCommand()).getArgument().getText())
+                  .isEqualTo("echo don't"),
+                volume -> assertThat(volume).isInstanceOf(Docker.Volume.class),
+                user -> assertThat(ArgumentContents.text(((Docker.User) user).getUser())).isEqualTo("nobody")))
           )
         );
     }

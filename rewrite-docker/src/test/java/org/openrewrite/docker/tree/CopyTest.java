@@ -531,6 +531,30 @@ class CopyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void aCommentAfterTheContinuationEndingAFromFlagValueIsAComment() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=nginx:1.25\\
+              # the built assets
+                /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
+                var form = (Docker.CopyShellForm) copy.getForm();
+                assertThat(form.getPrefix().getComments()).singleElement()
+                  .satisfies(comment -> assertThat(comment.getText()).isEqualTo("# the built assets"));
+                assertThat(form.getSources()).map(CopyTest::text).containsExactly("/build");
+                assertThat(text(form.getDestination())).isEqualTo("/app");
+            })
+          )
+        );
+    }
+
     private static String text(Docker.Argument argument) {
         return literal(argument.getContents().getFirst());
     }

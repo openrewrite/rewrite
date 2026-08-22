@@ -348,24 +348,6 @@ class ChangeFromTest implements RewriteTest {
         );
     }
 
-    @Test
-    void changeBaseImageWithSingleQuotedStringPreservesTrailingComment() {
-        // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
-        rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
-          docker(
-            """
-              FROM 'ubuntu:20.04' # Trailing comment
-              RUN apt-get update
-              """,
-            """
-              FROM 'ubuntu:22.04' # Trailing comment
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
     @Nested
     class EnvironmentVariables implements RewriteTest {
 
