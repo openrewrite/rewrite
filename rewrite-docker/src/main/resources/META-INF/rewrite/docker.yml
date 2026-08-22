@@ -26,8 +26,28 @@ tags:
 recipeList:
   - org.openrewrite.docker.DockerSecurityBestPractices
   - org.openrewrite.docker.DockerBuildOptimization
+  - org.openrewrite.docker.FixBuildKitLintWarnings
   - org.openrewrite.docker.NormalizeDockerHubImageName
   - org.openrewrite.docker.UseExecFormEntrypoint
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.docker.FixBuildKitLintWarnings
+displayName: Fix BuildKit lint warnings
+description: >-
+  Fix the warnings `docker build --check` reports that can be fixed without knowing anything the
+  Dockerfile does not say. Covers the `ConsistentInstructionCasing`, `FromAsCasing`,
+  `StageNameCasing`, `LegacyKeyValueFormat`, `MaintainerDeprecated` and `RedundantTargetPlatform`
+  checks.
+tags:
+  - docker
+recipeList:
+  - org.openrewrite.docker.UpperCaseInstructions
+  - org.openrewrite.docker.NormalizeFromAsCasing
+  - org.openrewrite.docker.LowerCaseStageNames
+  - org.openrewrite.docker.UseKeyValueEnvAndLabel
+  - org.openrewrite.docker.ReplaceMaintainerWithLabel
+  - org.openrewrite.docker.RemoveRedundantTargetPlatform
 
 ---
 type: specs.openrewrite.org/v1beta/recipe
