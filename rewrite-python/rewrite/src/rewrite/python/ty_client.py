@@ -31,12 +31,16 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Deque, Dict, Optional
 
 from .type_mapping import SessionTypeCache
 
 logger = logging.getLogger(__name__)
+
+# Enough to carry a panic message and its backtrace into the exit warning.
+_STDERR_TAIL_LINES = 50
 
 
 class TyTypesClient:
@@ -90,8 +94,7 @@ class TyTypesClient:
         # ids, lets per-file mappings fall back to the cumulative table for any
         # id missing from their own response, restoring resolution while keeping
         # ty's dedup performance benefit. It is reset whenever a new session
-        # starts (a fresh client, or ``initialize`` with a different root) so no
-        # state leaks across unrelated parses.
+        # starts, since ty's ids start over with it.
         self.session_types: Dict[int, Dict[str, Any]] = {}
 
         # The JavaTypes those descriptors resolve to, sharing their lifetime.
@@ -132,10 +135,13 @@ class TyTypesClient:
         # because a pipe read cannot be bounded on Windows.
         self._responses: queue.Queue = queue.Queue()
         self._consecutive_timeouts = 0
+        self._stderr_lines: Deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
         threading.Thread(target=self._drain_stdout, args=(self._process,),
                          name="ty-types-stdout", daemon=True).start()
-        threading.Thread(target=self._drain_stderr, args=(self._process,),
-                         name="ty-types-stderr", daemon=True).start()
+        self._stderr_thread = threading.Thread(
+            target=self._drain_stderr, args=(self._process, self._stderr_lines),
+            name="ty-types-stderr", daemon=True)
+        self._stderr_thread.start()
 
     def _drain_stdout(self, process: subprocess.Popen) -> None:
         """Read response lines into the queue until EOF; EOF enqueues None."""
@@ -147,18 +153,38 @@ class TyTypesClient:
                 responses.put(None)
                 return
             try:
-                responses.put(json.loads(line.decode('utf-8')))
+                response = json.loads(line.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                logger.debug("ty-types emitted a non-JSON line on stdout")
+                logger.warning("ty-types emitted a non-JSON line on stdout")
+                continue
+            # A bare ``null`` reads as the EOF sentinel, and no other JSON value carries an id.
+            if isinstance(response, dict):
+                responses.put(response)
+            else:
+                logger.warning("ty-types emitted a non-object JSON line on stdout")
 
     @staticmethod
-    def _drain_stderr(process: subprocess.Popen) -> None:
+    def _drain_stderr(process: subprocess.Popen, lines: Deque[str]) -> None:
+        """Buffer stderr for ``_note_exit``; ty writes there only as it dies."""
         stderr = process.stderr
         while True:
             line = stderr.readline()
             if not line:
                 return
-            logger.debug("ty-types stderr: %s", line.decode('utf-8', 'replace').rstrip())
+            lines.append(line.decode('utf-8', 'replace').rstrip())
+
+    def _note_exit(self, process: subprocess.Popen) -> None:
+        """Record that ty exited, surfacing its stderr when the exit was abnormal."""
+        self._initialized = False
+        try:
+            returncode = process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            return
+        if returncode:
+            # ty is gone, so stderr is at EOF and the reader only needs to finish.
+            self._stderr_thread.join(timeout=1)
+            logger.warning("ty-types exited with code %s: %s",
+                           returncode, "\n".join(self._stderr_lines))
 
     @staticmethod
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
@@ -274,7 +300,10 @@ class TyTypesClient:
                 return None
 
             if response is None:
-                # EOF sentinel: the process exited.
+                # EOF sentinel: ty closed stdout.
+                process = self._process
+                if process is not None:
+                    self._note_exit(process)
                 return None
             # A response to an abandoned earlier request; drop it and keep waiting.
             if response.get('id') != self._request_id:
@@ -296,8 +325,9 @@ class TyTypesClient:
 
         if self._initialized:
             self.shutdown()
-            # A different project root means a brand-new ty session whose type
-            # ids start over; drop the accumulated table so ids don't collide.
+        # Only ``_kill`` and ``shutdown`` detach ``_process``; one that exited on
+        # its own is still attached, so its liveness has to be polled for.
+        if self._process is None or self._process.poll() is not None:
             self.session_types.clear()
             self.java_types.clear()
             self._start_process()
