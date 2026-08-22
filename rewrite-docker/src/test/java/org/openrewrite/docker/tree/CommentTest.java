@@ -18,6 +18,7 @@ package org.openrewrite.docker.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class CommentTest implements RewriteTest {
@@ -76,6 +77,27 @@ class CommentTest implements RewriteTest {
               # Install packages
               RUN apt-get install -y curl wget
               """
+          )
+        );
+    }
+
+    /// Docker looks for a parser directive only at the head of the file and gives up on the first
+    /// comment or instruction, so a `# NAME=value` line anywhere past that is an ordinary comment.
+    @Test
+    void keyValueCommentIsNoDirectivePastTheHeadOfTheFile() {
+        rewriteRun(
+          docker(
+            """
+              # syntax=docker/dockerfile:1
+              FROM ubuntu:20.04
+              # DEBIAN_FRONTEND=noninteractive keeps apt-get from asking
+              RUN apt-get update
+              ENV LANG=C.UTF-8
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(run).isInstanceOf(Docker.Run.class),
+                env -> assertThat(env).isInstanceOf(Docker.Env.class)))
           )
         );
     }

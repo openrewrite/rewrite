@@ -19,6 +19,8 @@ import org.openrewrite.docker.internal.Heredocs;}
     private boolean afterHealthcheck = false;
     // Whether the flags of a COPY or ADD are still being read, where --from carries an image reference
     private boolean copyAddFlags = false;
+    // Whether a parser directive is still recognized here, i.e. nothing but directives has been read yet
+    private boolean atFileHead = true;
 
     // Each flag above holds over a region of one logical line, so each is one question about the token
     // just matched: does that token still belong to the region, or is it the first one past its end?
@@ -33,6 +35,7 @@ import org.openrewrite.docker.internal.Heredocs;}
         atLineStart = lineEnded || atLineStart && continuesLineStart();
         afterHealthcheck = !lineEnded && (_type == HEALTHCHECK || afterHealthcheck && _type != CMD && _type != NONE);
         copyAddFlags = !lineEnded && (_type == COPY || _type == ADD || copyAddFlags && continuesCopyAddFlags());
+        atFileHead = atFileHead && continuesFileHead();
         return super.emit();
     }
 
@@ -73,6 +76,12 @@ import org.openrewrite.docker.internal.Heredocs;}
         }
     }
 
+    // Directives stand at the head of the file and nowhere else. Docker gives up on them at the first
+    // comment, blank line or instruction, so a '# name=value' anywhere past that is an ordinary comment.
+    private boolean continuesFileHead() {
+        return _type == PARSER_DIRECTIVE || _type == WS;
+    }
+
     // Both rules that open a heredoc queue its marker exactly as written after the '<<', dash and all,
     // because the dash is the only thing that tells the rule matching the terminator whether a line
     // indented with tabs closes this body.
@@ -111,7 +120,10 @@ options {
 
 // Parser directives (must be at the beginning of file)
 // After a parser directive, we're at line start (it consumes the newline)
-PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
+// The predicate sits behind the '#' that this rule and COMMENT share, so that only a token starting
+// with one pays for it: a predicate reachable without consuming anything would stop ANTLR caching the
+// start state of this mode, and every token in the file would be read without a cached edge.
+PARSER_DIRECTIVE : '#' {atFileHead}? WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
 
 // Comments (after parser directives) - HIDDEN in main mode
 COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
