@@ -191,6 +191,45 @@ class ArgTest implements RewriteTest {
         );
     }
 
+    /// Docker joins the lines a continuation holds together before it reads what they say, so a
+    /// default written on the far side of the join belongs to the name all the same.
+    @Test
+    void aDefaultBoundAcrossAContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a=\\
+              1
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).singleElement().satisfies(a ->
+                  assertThat(ArgumentContents.text(a.getValue())).isEqualTo("1"));
+            })
+          )
+        );
+    }
+
+    /// The continuation stays in the text of the default, as it does in the value of an `ENV`.
+    @Test
+    void aDefaultSplitByAContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a=he\\
+              llo
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).singleElement().satisfies(a ->
+                  assertThat(ArgumentContents.text(a.getValue())).isEqualTo("he\\\nllo"));
+            })
+          )
+        );
+    }
+
     /// A name written with an `=` and nothing after it takes an empty default, which Docker tells apart
     /// from a name declared without one.
     @Test

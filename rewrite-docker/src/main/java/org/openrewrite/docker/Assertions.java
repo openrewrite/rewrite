@@ -247,7 +247,10 @@ public class Assertions {
     }
 
     private static class WellFormedVisitor extends DockerIsoVisitor<List<String>> {
-        private static final Pattern HEREDOC_MARKER = Pattern.compile("<<(-?[A-Za-z_][A-Za-z0-9_]*)");
+        // The lookarounds keep a here-string out: `<<<'x'` redirects a word rather than opening a heredoc,
+        // and its last two '<' would otherwise read as a marker naming the word that follows them.
+        private static final Pattern HEREDOC_MARKER =
+                Pattern.compile("(?<!<)<<(?!<)(-?(?:[A-Za-z_][A-Za-z0-9_]*|'[^'\\r\\n]*'|\"[^\"\\r\\n]*\")+)");
 
         private final Set<UUID> ids = new HashSet<>();
 
@@ -427,7 +430,7 @@ public class Assertions {
             for (int i = 0; i < form.getBodies().size(); i++) {
                 Docker.HeredocBody body = form.getBodies().get(i);
                 if (i < markers.size() && !Heredocs.closes(markers.get(i), body.getClosing())) {
-                    String name = markers.get(i).startsWith("-") ? markers.get(i).substring(1) : markers.get(i);
+                    String name = Heredocs.delimiter(markers.get(i));
                     violations.add("expected the heredoc opened by " + quoted(name) + " to close with it," +
                             " but it closes with " + quoted(body.getClosing()));
                 }
