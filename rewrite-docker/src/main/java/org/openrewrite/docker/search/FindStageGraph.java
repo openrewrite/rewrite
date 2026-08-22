@@ -17,15 +17,11 @@ package org.openrewrite.docker.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerIsoVisitor;
 import org.openrewrite.docker.internal.ArgumentContents;
-import org.openrewrite.docker.internal.BuildTargets;
 import org.openrewrite.docker.internal.StageGraph;
 import org.openrewrite.docker.table.StageDependencies;
 import org.openrewrite.docker.trait.ImageName;
@@ -33,72 +29,48 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.HashSet;
 import java.util.Set;
 
 import static java.lang.String.join;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindStageGraph extends ScanningRecipe<Set<String>> {
+public class FindStageGraph extends Recipe {
 
     transient StageDependencies stageDependencies = new StageDependencies(this);
 
     final String displayName = "Find Docker build stage dependencies";
 
     final String description = "Record which build stages of a multi-stage Dockerfile depend on which others, and mark the stages " +
-            "nothing builds. A stage is built when it is the last stage of the file, when a stage that is itself " +
-            "built names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag, or when something in " +
-            "the repository asks for it by name: a `docker build --target`, a `docker-bake.hcl`, a compose file, " +
-            "a CI workflow, or a comment in the Dockerfile showing how to build it. Where a reference cannot be " +
-            "resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
-            "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every " +
-            "stage in that file is reported as built. A stage nothing builds is dead weight that classic builds " +
-            "still build, so reading this across a fleet shows where that weight sits before anything is removed.";
+            "the file never reaches. A stage is reached when it is the last stage of the file, or when a stage that is " +
+            "itself reached names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag. Where a reference " +
+            "cannot be resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
+            "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every stage in " +
+            "that file is reported as reached. Only the Dockerfile is read, so a stage that exists to be built on its " +
+            "own with `docker build --target` is reported as unreached: this says what the file builds, not what a " +
+            "repository asks for.";
 
     @Override
-    public Set<String> getInitialValue(ExecutionContext ctx) {
-        return new HashSet<>();
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Set<String> builtStageNames) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof SourceFile) {
-                    BuildTargets.scan((SourceFile) tree, builtStageNames);
-                }
-                return tree;
-            }
-        };
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Set<String> builtStageNames) {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
                 StageGraph graph = StageGraph.of(file);
-                Set<String> built = new HashSet<>(builtStageNames);
-                built.addAll(BuildTargets.inComments(file));
-                Set<Integer> reachable = graph.reachableGiven(built);
+                Set<Integer> reachable = graph.reachable();
 
                 String sourcePath = file.getSourcePath().toString();
                 return file.withStages(ListUtils.map(file.getStages(), (i, stage) -> {
-                    String name = graph.getName(i);
                     stageDependencies.insertRow(ctx, new StageDependencies.Row(
                             sourcePath,
-                            name,
+                            graph.getName(i),
                             i,
                             baseImage(stage.getFrom()),
                             graph.extendsStage(i) ? "" : registry(stage.getFrom()),
                             join(",", graph.getReferencedBy(i)),
-                            name != null && built.contains(name),
                             reachable.contains(i)
                     ));
                     return reachable.contains(i) ? stage :
-                            stage.withFrom(SearchResult.found(stage.getFrom(), "unused"));
+                            stage.withFrom(SearchResult.found(stage.getFrom(), "unreached"));
                 }));
             }
         };
