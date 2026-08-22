@@ -934,10 +934,50 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     private List<Docker.Flag> convertFlags(DockerParser.FlagsContext ctx) {
         List<Docker.Flag> flags = new ArrayList<>();
-        for (DockerParser.FlagContext flagCtx : ctx.flag()) {
-            flags.add(parseFlag(flagCtx.FLAG().getSymbol()));
+        for (ParseTree child : ctx.children) {
+            if (child instanceof DockerParser.FlagContext) {
+                flags.add(parseFlag(((DockerParser.FlagContext) child).FLAG().getSymbol()));
+            } else if (child instanceof DockerParser.FromFlagContext) {
+                flags.add(parseFromFlag((DockerParser.FromFlagContext) child));
+            }
         }
         return flags;
+    }
+
+    /// The `--from` of a `COPY` or `ADD`, whose value the `FLAG_IMAGE_REF` lexer mode splits into
+    /// image name, tag and digest just as `IMAGE_REF` splits the reference of a `FROM`. The
+    /// separators are contents of their own, which is what tells [org.openrewrite.docker.trait.DockerCopyFrom]
+    /// where the parts of the value it carries begin and end.
+    private Docker.Flag parseFromFlag(DockerParser.FromFlagContext ctx) {
+        Token token = ctx.FROM_FLAG().getSymbol();
+        Space flagPrefix = prefix(token);
+        String tokenText = token.getText();
+        skip(token);
+
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        DockerParser.ImageReferenceContext reference = ctx.imageReference();
+        if (reference != null) {
+            TerminalNode colon = reference.COLON();
+            TerminalNode at = reference.AT();
+            contents.addAll(separatedPart(reference.imageName(), colon != null ? colon : at).getContents());
+            if (colon != null) {
+                contents.add(separator(colon));
+                contents.addAll(separatedPart(reference.tag(), at).getContents());
+            }
+            if (at != null) {
+                contents.add(separator(at));
+                contents.addAll(separatedPart(reference.digest(), null).getContents());
+            }
+        }
+
+        String flagName = tokenText.substring(2, tokenText.length() - 1);
+        Docker.Argument value = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
+        return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, value);
+    }
+
+    private Docker.Literal separator(TerminalNode node) {
+        skip(node.getSymbol());
+        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, node.getText(), null);
     }
 
     /**

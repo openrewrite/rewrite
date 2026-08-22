@@ -17,6 +17,22 @@ import java.util.Queue;}
     private boolean atLineStart = true;
     // Track if we're after HEALTHCHECK to recognize CMD/NONE as keywords
     private boolean afterHealthcheck = false;
+    // Track if we're in the flag section of a COPY or ADD, where --from carries an image reference
+    private boolean copyAddFlags = false;
+
+    private boolean atFromFlag() {
+        if (!copyAddFlags) {
+            return false;
+        }
+        String fromFlag = "--from=";
+        for (int i = 0; i < fromFlag.length(); i++) {
+            int c = _input.LA(i + 1);
+            if (c == -1 || Character.toLowerCase(c) != fromFlag.charAt(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 options {
@@ -42,8 +58,8 @@ NONE       : 'NONE'       { if (!afterHealthcheck) setType(UNQUOTED_TEXT); atLin
 LABEL      : 'LABEL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 EXPOSE     : 'EXPOSE'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 ENV        : 'ENV'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-ADD        : 'ADD'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-COPY       : 'COPY'       { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+ADD        : 'ADD'        { if (!atLineStart) setType(UNQUOTED_TEXT); else copyAddFlags = true; atLineStart = false; };
+COPY       : 'COPY'       { if (!atLineStart) setType(UNQUOTED_TEXT); else copyAddFlags = true; atLineStart = false; };
 ENTRYPOINT : 'ENTRYPOINT' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 VOLUME     : 'VOLUME'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 USER       : 'USER'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(USER_SPEC); atLineStart = false; };
@@ -86,7 +102,12 @@ EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
 // Captures the entire flag as a single token, stopping at whitespace
 // This avoids the greedy flagValue+ parsing issue while keeping shell commands working
 // Flag values can contain quoted strings (which may include spaces)
-FLAG : FLAG_TOKEN { if (!afterHealthcheck) atLineStart = false; };
+// The predicate excludes this rule where FROM_FLAG applies. Lexing is maximal munch, so without it
+// this longer token would always win and the image reference of a --from would stay unsplit.
+FLAG : {!atFromFlag()}? FLAG_TOKEN { if (!afterHealthcheck) atLineStart = false; };
+
+// The --from of a COPY or ADD names an image, so its value is lexed as an image reference
+FROM_FLAG : {atFromFlag()}? '--from=' { atLineStart = false; } -> pushMode(FLAG_IMAGE_REF);
 
 fragment FLAG_TOKEN : '--' [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
 fragment FLAG_VALUE_PART
@@ -164,7 +185,7 @@ UNQUOTED_TEXT
     | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
     | '<'  // Just a < by itself
     | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
-    ) { if (!afterHealthcheck) atLineStart = false; }
+    ) { if (!afterHealthcheck) atLineStart = false; copyAddFlags = false; }
     ;
 
 // Whitespace - HIDDEN in main mode
@@ -173,7 +194,7 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 fragment WS_CHAR : [ \t];
 
 // Newlines - HIDDEN in main mode, reset state for next line
-NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> channel(HIDDEN);
+NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; copyAddFlags = false; } -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 
@@ -205,10 +226,38 @@ IR_DOLLAR               : '$'             -> type(DOLLAR);
 
 // Text of one part of the reference. A colon that a '/' follows belongs to a registry port rather
 // than to a tag ('host:5000/img:tag'), so it stays inside the token.
-IR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQUOTED_TEXT);
+IR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | IR_ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQUOTED_TEXT);
 
 fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$];
 fragment IR_PORT_COLON : ':' ( IR_TEXT_CHAR | ':' )* '/';
+// Unlike ESCAPED_CHAR, this stops before a newline, which lexing longest-match-first would otherwise
+// take into the token and so hide the line continuation that ends the reference
+fragment IR_ESCAPED_CHAR : '\\' ~[\r\n];
+
+// ----------------------------------------------------------------------------------------------
+// FLAG_IMAGE_REF mode - the image reference carried by the --from flag of a COPY or ADD
+// As IMAGE_REF, except that the reference ends at the whitespace before the paths that follow it
+// rather than at the end of the line, and AS is not a keyword because no stage alias can appear here.
+// ----------------------------------------------------------------------------------------------
+mode FLAG_IMAGE_REF;
+
+// The end of the reference is a token of its own rather than hidden whitespace: popping a mode does
+// not bound a parser rule, so without a token to name the `imageName` of `COPY --from=build --link .`
+// would carry on into the flag that follows it.
+FLAG_END : ( WS_CHAR+ | LINE_CONT ) -> popMode;
+
+FIR_NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; copyAddFlags = false; } -> type(NEWLINE), channel(HIDDEN), popMode;
+
+FIR_COLON : ':' -> type(COLON);
+FIR_AT    : '@' -> type(AT);
+
+FIR_DOUBLE_QUOTED_STRING : DQ_STRING       -> type(DOUBLE_QUOTED_STRING);
+FIR_SINGLE_QUOTED_STRING : SQ_STRING       -> type(SINGLE_QUOTED_STRING);
+FIR_ENV_VAR              : VAR_REF         -> type(ENV_VAR);
+FIR_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
+FIR_DOLLAR               : '$'             -> type(DOLLAR);
+
+FIR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | IR_ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQUOTED_TEXT);
 
 // ----------------------------------------------------------------------------------------------
 // USER_SPEC mode - the user:group of a USER instruction

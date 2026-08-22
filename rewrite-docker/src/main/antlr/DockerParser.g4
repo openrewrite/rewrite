@@ -149,13 +149,20 @@ maintainerInstruction
 
 // Common elements
 flags
-    : flag+
+    : ( flag | fromFlag )+
     ;
 
 // Flag token captures entire flag: --name or --name=value
 // The lexer handles stopping at whitespace, so no greedy parsing issues
 flag
     : FLAG
+    ;
+
+// The --from of a COPY or ADD holds the same name:tag@digest reference a FROM does, split by the
+// same rule. FLAG_END is the whitespace that ends the reference, without which this rule would
+// carry on into the flags and paths that follow it.
+fromFlag
+    : FROM_FLAG imageReference? FLAG_END?
     ;
 
 execForm

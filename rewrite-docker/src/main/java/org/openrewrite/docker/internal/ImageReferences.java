@@ -26,11 +26,10 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Splits an image reference (the {@code name:tag@digest} form) into its component
- * {@link Docker.Argument}s. Used where the reference reaches the trait layer as text rather than as
- * a parse tree: the value of the {@code --from} flag of {@code COPY}/{@code ADD}, which the lexer
- * keeps as one token, and a reference handed in by a recipe. A {@code FROM} instruction is split by
- * the grammar instead, in the {@code IMAGE_REF} lexer mode.
+ * Splits an image reference a recipe supplied as text, such as {@code "nginx:1.25"}, into its
+ * component {@link Docker.Argument}s. A reference read from a Dockerfile is split by the grammar
+ * instead, in the {@code IMAGE_REF} and {@code FLAG_IMAGE_REF} lexer modes, so this is only reached
+ * for text that was never parsed.
  */
 public final class ImageReferences {
 
@@ -38,112 +37,52 @@ public final class ImageReferences {
     }
 
     /**
-     * Splits an image reference a recipe supplied as text, such as {@code "nginx:1.25"}, into
-     * {@code {imageName, tag, digest}}. The parts are unquoted literals, so that a colon in the
-     * text separates the tag rather than being kept as part of a quoted name.
+     * Splits {@code reference} into {@code {imageName, tag, digest}}, with {@code tag} and
+     * {@code digest} null when the reference does not carry them. Environment variable references
+     * are split out first, so a colon inside {@code ${VAR:-default}} separates nothing.
      */
     public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
-        return split(ArgumentContents.of(reference, null), prefix);
-    }
+        List<Docker.ArgumentContent> imageName = new ArrayList<>();
+        List<Docker.ArgumentContent> tag = null;
+        List<Docker.ArgumentContent> digest = null;
+        List<Docker.ArgumentContent> part = imageName;
 
-    /**
-     * Splits image reference contents into {@code {imageName, tag, digest}}, with {@code tag} and
-     * {@code digest} null when absent. A single quoted string is kept intact as the image name.
-     */
-    public static Docker.@Nullable Argument[] split(List<Docker.ArgumentContent> contents, Space prefix) {
-        if (contents.size() == 1 && contents.get(0) instanceof Docker.Literal && ((Docker.Literal) contents.get(0)).isQuoted()) {
-            Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
-            return new Docker.@Nullable Argument[]{imageName, null, null};
-        }
-
-        List<Docker.ArgumentContent> imageNameContents = new ArrayList<>();
-        List<Docker.ArgumentContent> tagContents = new ArrayList<>();
-        List<Docker.ArgumentContent> digestContents = new ArrayList<>();
-
-        boolean foundColon = false;
-        boolean foundAt = false;
-
-        for (Docker.ArgumentContent content : contents) {
-            if (content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
-                String text = ((Docker.Literal) content).getText();
-
-                int atIndex = text.indexOf('@');
-                int colonIndex = tagColonIndex(text);
-
-                if (atIndex >= 0 && !foundAt) {
-                    foundAt = true;
-                    String beforeAt = text.substring(0, atIndex);
-                    String digestPart = text.substring(atIndex + 1);
-
-                    int colonInBeforeAt = tagColonIndex(beforeAt);
-                    if (colonInBeforeAt >= 0 && !foundColon) {
-                        foundColon = true;
-                        String imagePart = beforeAt.substring(0, colonInBeforeAt);
-                        String tagPart = beforeAt.substring(colonInBeforeAt + 1);
-
-                        if (!imagePart.isEmpty()) {
-                            imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
-                        }
-                        if (!tagPart.isEmpty()) {
-                            tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
-                        }
-                    } else {
-                        if (!beforeAt.isEmpty()) {
-                            if (foundColon) {
-                                tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
-                            } else {
-                                imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
-                            }
-                        }
-                    }
-                    if (!digestPart.isEmpty()) {
-                        digestContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, digestPart, null));
-                    }
-                } else if (colonIndex >= 0 && !foundColon && !foundAt) {
-                    foundColon = true;
-                    String imagePart = text.substring(0, colonIndex);
-                    String tagPart = text.substring(colonIndex + 1);
-
-                    if (!imagePart.isEmpty()) {
-                        imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
-                    }
-                    if (!tagPart.isEmpty()) {
-                        tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
-                    }
-                } else {
-                    if (foundAt) {
-                        digestContents.add(content);
-                    } else if (foundColon) {
-                        tagContents.add(content);
-                    } else {
-                        imageNameContents.add(content);
-                    }
-                }
-            } else {
-                if (foundAt) {
-                    digestContents.add(content);
-                } else if (foundColon) {
-                    tagContents.add(content);
-                } else {
-                    imageNameContents.add(content);
-                }
+        for (Docker.ArgumentContent content : ArgumentContents.of(reference, null)) {
+            if (!(content instanceof Docker.Literal)) {
+                part.add(content);
+                continue;
             }
+            String text = ((Docker.Literal) content).getText();
+            int separator;
+            while ((separator = separatorIndex(text, tag != null, digest != null)) >= 0) {
+                addText(part, text.substring(0, separator));
+                part = text.charAt(separator) == '@' ? (digest = new ArrayList<>()) : (tag = new ArrayList<>());
+                text = text.substring(separator + 1);
+            }
+            addText(part, text);
         }
 
-        Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, imageNameContents);
-        Docker.Argument tag = tagContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
-        Docker.Argument digest = digestContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
-
-        return new Docker.@Nullable Argument[]{imageName, tag, digest};
+        return new Docker.@Nullable Argument[]{
+                new Docker.Argument(randomId(), prefix, Markers.EMPTY, imageName),
+                tag == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tag),
+                digest == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digest)};
     }
 
-    /**
-     * The index of the colon that separates the tag, or {@code -1} when there is none. A colon
-     * before the last {@code /} is a registry port rather than a tag separator.
-     */
-    private static int tagColonIndex(String text) {
-        return text.indexOf(':', text.lastIndexOf('/') + 1);
+    /// The index of the first separator still to come, or `-1` when the text holds none. A colon
+    /// before the last `/` is a registry port rather than a tag separator, and one after a `@` or a
+    /// tag that was already found belongs to the part that holds it.
+    private static int separatorIndex(String text, boolean taggedAlready, boolean digestedAlready) {
+        int at = digestedAlready ? -1 : text.indexOf('@');
+        int colon = taggedAlready || digestedAlready ? -1 : text.indexOf(':', text.lastIndexOf('/') + 1);
+        if (at >= 0 && colon >= 0) {
+            return Math.min(at, colon);
+        }
+        return at >= 0 ? at : colon;
+    }
+
+    private static void addText(List<Docker.ArgumentContent> part, String text) {
+        if (!text.isEmpty()) {
+            part.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
+        }
     }
 }

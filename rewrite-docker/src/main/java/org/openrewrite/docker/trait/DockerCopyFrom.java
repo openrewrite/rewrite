@@ -23,16 +23,20 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
-import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.VisitFunction2;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import static org.openrewrite.Tree.randomId;
 
 /**
  * A trait representing the image reference carried by the {@code --from} flag of a
@@ -85,6 +89,10 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         return componentsValue;
     }
 
+    /// The `name`, `tag` and `digest` of the `--from` value, read off the separators the
+    /// `FLAG_IMAGE_REF` lexer mode left in its contents. Only a separator is a content of its own, so
+    /// a colon that belongs to a registry port, a quoted name or a variable reference stays inside the
+    /// part that holds it without this having to know the rule that put it there.
     private Docker.@Nullable Argument @Nullable [] computeComponents() {
         if (isStageReference()) {
             return null;
@@ -93,7 +101,46 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return null;
         }
-        return ImageReferences.split(arg.getContents(), arg.getPrefix());
+
+        List<Docker.ArgumentContent> imageName = new ArrayList<>();
+        List<Docker.ArgumentContent> tag = null;
+        List<Docker.ArgumentContent> digest = null;
+        List<Docker.ArgumentContent> part = imageName;
+        for (Docker.ArgumentContent content : arg.getContents()) {
+            if (digest == null && isSeparator(content, "@")) {
+                part = digest = new ArrayList<>();
+            } else if (tag == null && digest == null && isSeparator(content, ":")) {
+                part = tag = new ArrayList<>();
+            } else {
+                part.add(content);
+            }
+        }
+
+        return new Docker.@Nullable Argument[]{
+                new Docker.Argument(randomId(), arg.getPrefix(), Markers.EMPTY, imageName),
+                tag == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tag),
+                digest == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digest)};
+    }
+
+    private static boolean isSeparator(Docker.ArgumentContent content, String separator) {
+        return content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted() &&
+                separator.equals(((Docker.Literal) content).getText());
+    }
+
+    /// The contents of a reference given as text, with the separators kept as contents of their own
+    /// so that a value a recipe writes is read back the way a parsed one is.
+    private static List<Docker.ArgumentContent> referenceContents(String reference) {
+        Docker.@Nullable Argument[] parts = ImageReferences.split(reference, Space.EMPTY);
+        List<Docker.ArgumentContent> contents = new ArrayList<>(parts[0].getContents());
+        if (parts[1] != null) {
+            contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, ":", null));
+            contents.addAll(parts[1].getContents());
+        }
+        if (parts[2] != null) {
+            contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "@", null));
+            contents.addAll(parts[2].getContents());
+        }
+        return contents;
     }
 
     /**
@@ -189,7 +236,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return getTree();
         }
-        Docker.Argument newValue = arg.withContents(ArgumentContents.of(reference, null));
+        Docker.Argument newValue = arg.withContents(referenceContents(reference));
         List<Docker.Flag> newFlags = ListUtils.map(flags(), f ->
           "from".equals(f.getName()) ? f.withValue(newValue) : f);
         Docker.Instruction instruction = getTree();
