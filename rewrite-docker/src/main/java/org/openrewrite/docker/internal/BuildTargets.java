@@ -29,15 +29,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The build stages a repository asks for by name. A Dockerfile records which of its stages feed the
- * image it ends with, and nothing else: that a stage is built on its own is said elsewhere, by a
- * {@code docker build --target}, a {@code docker-bake.hcl}, a compose file, a CI job, or a comment
- * in the Dockerfile itself showing how to build it.
+ * The build stages a repository asks for by name. A Dockerfile says which of its stages feed the image
+ * it ends with, and nothing else; that a stage is built on its own is said elsewhere.
  */
 public class BuildTargets {
 
-    /// `docker build --target x`, a bake `target = "x"` or `target "x" {`, a compose `target: x`, a Go
-    /// `Target: "x"`. Each says outright that `x` is built.
+    /// `docker build --target x`, a bake `target = "x"` or `target "x" {`, a compose `target: x`, a Go `Target: "x"`.
     private static final Pattern[] NAMED = {
             Pattern.compile("--target[= \\t]+\"?([A-Za-z0-9][A-Za-z0-9._-]*)"),
             Pattern.compile("target\\s*=\\s*\"([A-Za-z0-9][A-Za-z0-9._-]*)\""),
@@ -46,9 +43,8 @@ public class BuildTargets {
             Pattern.compile("Target:\\s*\"([A-Za-z0-9][A-Za-z0-9._-]*)\"")
     };
 
-    /// A quoted word in a file that exists to orchestrate builds. Too loose to mean "target" on its own,
-    /// which is why it is read only from those files, where a word matching a stage name is unlikely to be
-    /// a coincidence and cheap to honour when it is.
+    /// Too loose to mean "target" on its own, so read only from files that exist to orchestrate builds,
+    /// where a word matching a stage name is unlikely to be a coincidence.
     private static final Pattern QUOTED_WORD = Pattern.compile("\"([A-Za-z0-9][A-Za-z0-9._-]{0,63})\"");
 
     private static final Pattern BUILD_SCRIPT = Pattern.compile("(?i)" +
@@ -61,18 +57,10 @@ public class BuildTargets {
     private BuildTargets() {
     }
 
-    /**
-     * Whether the given file is worth reading for the stages it builds. Files that only hold program
-     * source are not: a target is named where a build is driven from.
-     */
     public static boolean isBuildScript(Path path) {
         return BUILD_SCRIPT.matcher(path.getFileName().toString()).matches() || isWorkflow(path);
     }
 
-    /**
-     * Reads the stage names {@code source} builds, lowercased the way Dockerfile compares them, into
-     * {@code into}.
-     */
     public static void collect(Path path, String source, Set<String> into) {
         for (Pattern pattern : NAMED) {
             Matcher matcher = pattern.matcher(source);
@@ -88,10 +76,6 @@ public class BuildTargets {
         }
     }
 
-    /**
-     * Reads the stage names the Dockerfile's own comments show being built, which is how a Dockerfile
-     * that is meant to be built with {@code --target} usually says so.
-     */
     public static Set<String> inComments(Docker.File file) {
         StringBuilder comments = new StringBuilder();
         new DockerIsoVisitor<StringBuilder>() {
@@ -109,10 +93,6 @@ public class BuildTargets {
         return targets;
     }
 
-    /**
-     * Reads {@code sourceFile} into {@code into} if it is a file builds are driven from, and leaves it
-     * unread otherwise.
-     */
     public static void scan(SourceFile sourceFile, Set<String> into) {
         if (isBuildScript(sourceFile.getSourcePath())) {
             collect(sourceFile.getSourcePath(), sourceFile.printAll(), into);
