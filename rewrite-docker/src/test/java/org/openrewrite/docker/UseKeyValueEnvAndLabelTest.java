@@ -157,6 +157,86 @@ class UseKeyValueEnvAndLabelTest implements RewriteTest {
     }
 
     @Test
+    void leaveAFileDeclaringABacktickEscape() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu:22.04
+              ENV JAVA_OPTS -Xmx1g -Xms1g
+              LABEL k a\\ b
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveAFileDeclaringABacktickEscapeAfterAnotherDirective() {
+        rewriteRun(
+          docker(
+            """
+              # syntax=docker/dockerfile:1
+              # escape=`
+              FROM ubuntu:22.04
+              ENV JAVA_OPTS -Xmx1g -Xms1g
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveAFileDeclaringABacktickEscapeAheadOfAGlobalArg() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              ARG VERSION=22.04
+              FROM ubuntu:${VERSION}
+              ENV JAVA_OPTS -Xmx1g -Xms1g
+              """
+          )
+        );
+    }
+
+    @Test
+    void convertUnderABackslashEscapeDeclaredOutright() {
+        rewriteRun(
+          docker(
+            """
+              # escape=\\
+              FROM ubuntu:22.04
+              ENV JAVA_OPTS -Xmx1g -Xms1g
+              """,
+            """
+              # escape=\\
+              FROM ubuntu:22.04
+              ENV JAVA_OPTS="-Xmx1g -Xms1g"
+              """
+          )
+        );
+    }
+
+    @Test
+    void aCommentPastTheHeadOfTheFileDeclaresNothing() {
+        rewriteRun(
+          docker(
+            """
+              # what follows is not a directive
+              # escape=`
+              FROM ubuntu:22.04
+              ENV JAVA_OPTS -Xmx1g -Xms1g
+              """,
+            """
+              # what follows is not a directive
+              # escape=`
+              FROM ubuntu:22.04
+              ENV JAVA_OPTS="-Xmx1g -Xms1g"
+              """
+          )
+        );
+    }
+
+    @Test
     void multiStage() {
         rewriteRun(
           docker(

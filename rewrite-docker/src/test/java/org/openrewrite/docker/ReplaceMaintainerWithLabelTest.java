@@ -145,6 +145,37 @@ class ReplaceMaintainerWithLabelTest implements RewriteTest {
     }
 
     @Test
+    void leaveAFileDeclaringABacktickEscape() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu:22.04
+              MAINTAINER The "A" Team <$TEAM>
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceUnderABackslashEscapeDeclaredOutright() {
+        rewriteRun(
+          docker(
+            """
+              # escape=\\
+              FROM ubuntu:22.04
+              MAINTAINER The "A" Team <$TEAM>
+              """,
+            """
+              # escape=\\
+              FROM ubuntu:22.04
+              LABEL org.opencontainers.image.authors="The \\"A\\" Team <\\$TEAM>"
+              """
+          )
+        );
+    }
+
+    @Test
     void theLastMaintainerIsTheAuthor() {
         rewriteRun(
           docker(
