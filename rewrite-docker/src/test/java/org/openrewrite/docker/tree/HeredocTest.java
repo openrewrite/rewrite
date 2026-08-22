@@ -69,6 +69,35 @@ class HeredocTest implements RewriteTest {
     }
 
     @Test
+    void tabIndentedTerminatorClosesADashHeredoc() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<-FILE_END
+              	echo "Hello World"
+              	FILE_END
+              """
+          )
+        );
+    }
+
+    @Test
+    void indentedTerminatorIsContentOfAPlainHeredoc() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOF
+                echo "Hello World"
+                EOF
+              EOF
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleHeredocsInRunCommand() {
         // Multiple heredocs chained together with && - a common pattern for creating multiple files
         // See: https://github.com/Bindernews/minblur/blob/7915e7d8765eb3785da4fabda38e744702ec5985/docker/Dockerfile#L13

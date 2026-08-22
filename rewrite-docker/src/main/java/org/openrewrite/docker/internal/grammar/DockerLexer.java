@@ -17,6 +17,7 @@
 package org.openrewrite.docker.internal.grammar;
 import java.util.LinkedList;
 import java.util.Queue;
+import org.openrewrite.docker.internal.Heredocs;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.Token;
@@ -198,6 +199,13 @@ public class DockerLexer extends Lexer {
 	            default:
 	                return false;
 	        }
+	    }
+
+	    // Both rules that open a heredoc queue its marker exactly as written after the '<<', dash and all,
+	    // because the dash is the only thing that tells the rule matching the terminator whether a line
+	    // indented with tabs closes this body.
+	    private void pushHeredocMarker() {
+	        heredocIdentifiers.add(getText().substring(2));
 	    }
 
 	    private boolean atLineContinuation() {
@@ -455,26 +463,14 @@ public class DockerLexer extends Lexer {
 	private void HEREDOC_START_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 19:
-
-			    // Extract and store the heredoc marker identifier in FIFO order
-			    String text = getText();
-			    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
-			    String marker = text.substring(prefixLen);
-			    heredocIdentifiers.add(marker);
-
+			 pushHeredocMarker();
 			break;
 		}
 	}
 	private void HP_HEREDOC_START_action(RuleContext _localctx, int actionIndex) {
 		switch (actionIndex) {
 		case 20:
-
-			    // Extract and store the heredoc marker identifier in FIFO order
-			    String text = getText();
-			    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
-			    String marker = text.substring(prefixLen);
-			    heredocIdentifiers.add(marker);
-
+			 pushHeredocMarker();
 			break;
 		}
 	}
@@ -482,7 +478,7 @@ public class DockerLexer extends Lexer {
 		switch (actionIndex) {
 		case 21:
 
-			  if(!heredocIdentifiers.isEmpty() && getText().equals(heredocIdentifiers.peek())) {
+			  if(!heredocIdentifiers.isEmpty() && Heredocs.closes(heredocIdentifiers.peek(), getText())) {
 			      setType(UNQUOTED_TEXT);
 			      heredocIdentifiers.poll();  // Remove from front of queue (FIFO)
 			      // Only pop mode when all heredoc markers have been matched
