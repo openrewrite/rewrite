@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -616,4 +617,25 @@ class RunTest implements RewriteTest {
         );
     }
 
+    /// A quote the end of the line leaves open is a character of the command, not the start of a string
+    /// that reaches into the instructions below it.
+    @Test
+    void unpairedQuote() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN echo don't
+              VOLUME /data
+              USER 'nobody'
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(((Docker.ShellForm) ((Docker.Run) run).getCommand()).getArgument().getText())
+                  .isEqualTo("echo don't"),
+                volume -> assertThat(volume).isInstanceOf(Docker.Volume.class),
+                user -> assertThat(ArgumentContents.text(((Docker.User) user).getUser())).isEqualTo("nobody")))
+          )
+        );
+    }
 }

@@ -190,21 +190,23 @@ DASH_DASH  : '--';
 fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<`];
 
 // String literals
-// Double-quoted strings support escape sequences, line continuation, and bare newlines
+// Double-quoted strings support escape sequences and line continuation
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
-// Bare newlines are allowed (e.g., comment lines inside PowerShell strings don't need trailing backtick)
+// A string reaches over a newline only by continuing the line it stands on: a bare newline ends the
+// instruction, so a quote left open by the end of a line is an ordinary character rather than a string.
 DOUBLE_QUOTED_STRING : DQ_STRING;
 
-fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | [\r\n] | ~["\\\r\n`] )* '"';
+fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
-// Bare newlines are also allowed for multi-line strings
 SINGLE_QUOTED_STRING : SQ_STRING;
 
-fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | [\r\n] | ~['\r\n] )* '\'';
+fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'';
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
-fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
+// A comment line that a continuation runs into is none of the string's business: Docker drops such a
+// line while joining the ones the continuation holds together, so the string closes on the line after.
+fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+ ( WS_CHAR* '#' ~[\r\n]* [\r\n]+ )*;
 
 fragment ESCAPE_SEQUENCE
     : '\\' ~[\r\n]   // Backslash followed by any char except newline (includes \n, \t, \\, \", Windows paths like \P)
@@ -258,6 +260,11 @@ UNQUOTED_TEXT
     | TEXT_ESCAPE ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Start with an escaped character (e.g., \; in find -exec)
     )
     ;
+
+// A quote that the end of its line leaves open is an ordinary character of the text around it. The
+// arguments of an instruction hold no strings to Docker, so an unpaired quote closes nothing and
+// starts nothing; only the rules above, where a pair is what is written, read one as a string.
+UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 // Whitespace - HIDDEN in main mode
 WS : WS_CHAR+ -> channel(HIDDEN);
