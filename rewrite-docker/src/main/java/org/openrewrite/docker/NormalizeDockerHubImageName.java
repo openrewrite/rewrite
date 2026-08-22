@@ -54,7 +54,7 @@ public class NormalizeDockerHubImageName extends Recipe {
         return new DockerImageReference.Matcher()
                 .excludeScratch()
                 .asVisitor(image -> {
-                    Docker.Instruction instruction = image.getTree();
+                    Docker instruction = image.getTree();
                     Docker.Argument nameArgument = image.getImageNameArgument();
                     Optional<ImageName> parsed = image.getImage();
                     if (nameArgument == null || !parsed.isPresent()) {

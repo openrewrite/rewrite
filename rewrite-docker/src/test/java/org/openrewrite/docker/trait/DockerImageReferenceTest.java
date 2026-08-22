@@ -52,6 +52,30 @@ class DockerImageReferenceTest implements RewriteTest {
     }
 
     @Test
+    void matchesTheImageAMountPullsFrom() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerImageReference.Matcher().asVisitor((ref, ctx) ->
+              ref.isUnpinned() ? ref.withTag("2.8.3") : ref.getTree())
+          )),
+          docker(
+            """
+              FROM alpine:3.19 AS upstream
+              FROM alpine:3.19
+              RUN --mount=type=bind,from=upstream,target=/src \
+                  --mount=type=bind,from=composer,source=/usr/bin/composer,target=/usr/bin/composer composer install
+              """,
+            """
+              FROM alpine:3.19 AS upstream
+              FROM alpine:3.19
+              RUN --mount=type=bind,from=upstream,target=/src \
+                  --mount=type=bind,from=composer:2.8.3,source=/usr/bin/composer,target=/usr/bin/composer composer install
+              """
+          )
+        );
+    }
+
+    @Test
     void matchesEveryImageReferenceButSkipsStageReferences() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
@@ -64,12 +88,16 @@ class DockerImageReferenceTest implements RewriteTest {
               FROM alpine
               COPY --from=builder /out /app
               COPY --from=nginx:1.25 /web /app/web
+              RUN --mount=type=bind,from=builder,target=/src --mount=type=cache,target=/cache \
+                  --mount=type=bind,from=composer:2.5.5,target=/opt composer install
               """,
             """
               ~~>FROM alpine AS builder
               ~~>FROM alpine
               COPY --from=builder /out /app
               ~~>COPY --from=nginx:1.25 /web /app/web
+              RUN --mount=type=bind,from=builder,target=/src --mount=type=cache,target=/cache \
+                  ~~>--mount=type=bind,from=composer:2.5.5,target=/opt composer install
               """
           )
         );

@@ -51,8 +51,9 @@ public class ArgumentContents {
     }
 
     /// Splits the value of a command's flag into its quoted literals, environment variable references
-    /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
-    /// quote or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
+    /// and the separators of an option list: the `=` between a key and its value and the `,` between
+    /// one option and the next, as in `--mount=type=bind,from=alpine`. Everything that is not a quote
+    /// or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
     /// the same thing here as it does in an argument's value.
     public static List<Docker.ArgumentContent> flagValue(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
@@ -73,9 +74,9 @@ public class ArgumentContents {
                 contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
                         c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
                 i = close + 1;
-            } else if (c == '=') {
+            } else if (c == '=' || c == ',') {
                 flushFlagText(current, contents);
-                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, String.valueOf(c), null));
                 i++;
             } else {
                 current.append(c);
@@ -178,8 +179,14 @@ public class ArgumentContents {
     /// @return The text of every content of `argument`, or `null` if an environment variable
     /// reference makes it impossible to resolve statically.
     public static @Nullable String text(Docker.Argument argument) {
+        return text(argument.getContents());
+    }
+
+    /// @return As [#text(Docker.Argument)], for contents that do not stand in an argument of their
+    /// own, as the value of one option of a flag's option list does not.
+    public static @Nullable String text(List<Docker.ArgumentContent> contents) {
         StringBuilder text = new StringBuilder();
-        for (Docker.ArgumentContent content : argument.getContents()) {
+        for (Docker.ArgumentContent content : contents) {
             if (content instanceof Docker.EnvironmentVariable) {
                 return null;
             }
@@ -193,8 +200,14 @@ public class ArgumentContents {
     /// @return As [#text], but rendering environment variable references in their original
     /// `$VAR` or `${VAR}` form rather than giving up.
     public static String textWithVariables(Docker.Argument argument) {
+        return textWithVariables(argument.getContents());
+    }
+
+    /// @return As [#textWithVariables(Docker.Argument)], for contents that do not stand in an
+    /// argument of their own.
+    public static String textWithVariables(List<Docker.ArgumentContent> contents) {
         StringBuilder text = new StringBuilder();
-        for (Docker.ArgumentContent content : argument.getContents()) {
+        for (Docker.ArgumentContent content : contents) {
             if (content instanceof Docker.Literal) {
                 text.append(((Docker.Literal) content).getText());
             } else if (content instanceof Docker.EnvironmentVariable) {
@@ -219,7 +232,11 @@ public class ArgumentContents {
     }
 
     public static boolean containsVariable(Docker.Argument argument) {
-        for (Docker.ArgumentContent content : argument.getContents()) {
+        return containsVariable(argument.getContents());
+    }
+
+    public static boolean containsVariable(List<Docker.ArgumentContent> contents) {
+        for (Docker.ArgumentContent content : contents) {
             if (content instanceof Docker.EnvironmentVariable) {
                 return true;
             }

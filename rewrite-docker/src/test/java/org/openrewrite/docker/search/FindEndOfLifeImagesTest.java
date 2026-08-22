@@ -423,6 +423,42 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     }
 
     @Test
+    void detectAnEolImageMountedFrom() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(EolDockerImages.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
+              Dockerfile,runtime,debian,buster,2022-09-10,"trixie (13)"
+              """
+          ),
+          docker(
+            """
+              FROM busybox:1.36 AS runtime
+              RUN --mount=type=bind,from=debian:buster,source=/usr/bin,target=/opt/bin /opt/bin/tool
+              """,
+            """
+              FROM busybox:1.36 AS runtime
+              RUN ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>--mount=type=bind,from=debian:buster,source=/usr/bin,target=/opt/bin /opt/bin/tool
+              """
+          )
+        );
+    }
+
+    @Test
+    void mountFromAStageIsNotAnImage() {
+        rewriteRun(
+          docker(
+            """
+              FROM busybox:1.36 AS buster
+              FROM busybox:1.36
+              RUN --mount=type=bind,from=buster,source=/usr/bin,target=/opt/bin /opt/bin/tool
+              """
+          )
+        );
+    }
+
+    @Test
     void copyFromAStageIsNotAnImage() {
         rewriteRun(
           docker(

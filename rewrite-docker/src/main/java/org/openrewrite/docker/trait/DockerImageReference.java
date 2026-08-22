@@ -32,20 +32,23 @@ import static org.openrewrite.docker.trait.DockerTraitMatcher.partMatches;
 
 /**
  * A trait representing an image reference anywhere in a Dockerfile: the base image of a
- * {@code FROM} instruction (see {@link DockerFrom}) or the image carried by the {@code --from}
- * flag of a {@code COPY} instruction (see {@link DockerCopyFrom}).
+ * {@code FROM} instruction (see {@link DockerFrom}), the image carried by the {@code --from}
+ * flag of a {@code COPY} instruction (see {@link DockerCopyFrom}), or the one the {@code from}
+ * option of a {@code RUN --mount} mounts from (see {@link DockerRunMount}).
  * <p>
- * This is the common contract shared by both concrete traits, providing semantic access to
+ * This is the common contract shared by the concrete traits, providing semantic access to
  * the image name, tag, and digest, pinning classification, glob matching, and the ability to
  * update the reference. Location-specific concepts (platform, stage name, {@code scratch},
  * stage references) live on the concrete traits.
  * <p>
  * Use {@link Matcher} to find and update image references regardless of where they occur.
  *
- * @param <T> The instruction type carrying the image reference ({@link Docker.From} for a
- *            {@code FROM}, or {@link Docker.Copy} for a {@code COPY}).
+ * @param <T> The element carrying the image reference: the instruction itself where it holds only
+ *            one ({@link Docker.From} for a {@code FROM}, {@link Docker.Copy} for a {@code COPY}),
+ *            or the {@link Docker.Flag} where an instruction may carry several, as a {@code RUN}
+ *            does its mounts.
  */
-public interface DockerImageReference<T extends Docker.Instruction> extends Trait<T> {
+public interface DockerImageReference<T extends Docker> extends Trait<T> {
 
     /**
      * Returns the image name as it appears in the tree, or {@code null} where the instruction does
@@ -231,13 +234,15 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
     }
 
     /**
-     * Matcher that finds image references in {@code FROM} and {@code COPY --from} alike,
-     * yielding the shared {@link DockerImageReference} contract.
-     * Build-stage references (e.g. {@code COPY --from=builder}) are not images and are skipped.
+     * Matcher that finds image references in {@code FROM}, {@code COPY --from} and
+     * {@code RUN --mount=...,from=} alike, yielding the shared {@link DockerImageReference}
+     * contract. Build-stage references (e.g. {@code COPY --from=builder}) are not images and are
+     * skipped.
      * <p>
-     * Only the options common to all locations are offered here; use {@link DockerFrom.Matcher}
-     * or {@link DockerCopyFrom.Matcher} directly for location-specific options such as
-     * {@code platform}, {@code excludeScratch}, or {@code onlyUnpinned}.
+     * Only the options common to all locations are offered here; use {@link DockerFrom.Matcher},
+     * {@link DockerCopyFrom.Matcher} or {@link DockerRunMount.Matcher} directly for
+     * location-specific options such as {@code platform}, {@code excludeScratch},
+     * {@code onlyUnpinned}, or a mount's {@code onlyWithFrom}.
      */
     class Matcher extends DockerTraitMatcher<DockerImageReference<?>> {
         private @Nullable String imageNamePattern;
@@ -295,6 +300,20 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
             return m;
         }
 
+        private DockerRunMount.Matcher runMountMatcher() {
+            DockerRunMount.Matcher m = new DockerRunMount.Matcher().excludeStageReferences();
+            if (imageNamePattern != null) {
+                m.imageName(imageNamePattern);
+            }
+            if (tagPattern != null) {
+                m.tag(tagPattern);
+            }
+            if (digestPattern != null) {
+                m.digest(digestPattern);
+            }
+            return m;
+        }
+
         private DockerCopyFrom.Matcher copyFromMatcher() {
             DockerCopyFrom.Matcher m = new DockerCopyFrom.Matcher().excludeStageReferences();
             if (imageNamePattern != null) {
@@ -317,8 +336,13 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
                 reference = fromMatcher().test(cursor);
             } else if (value instanceof Docker.Copy) {
                 reference = copyFromMatcher().test(cursor);
+            } else if (value instanceof Docker.Flag) {
+                reference = runMountMatcher().test(cursor);
             }
-            return reference == null || excludeScratch && reference.isScratch() ? null : reference;
+            if (reference == null || reference.getImageNameArgument() == null) {
+                return null;
+            }
+            return excludeScratch && reference.isScratch() ? null : reference;
         }
 
         @Override
@@ -340,6 +364,15 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
                         return (Docker) visitor.visit(ref, p);
                     }
                     return super.visitCopy(copy, p);
+                }
+
+                @Override
+                public Docker visitFlag(Docker.Flag flag, P p) {
+                    DockerImageReference<?> ref = test(getCursor());
+                    if (ref != null) {
+                        return (Docker) visitor.visit(ref, p);
+                    }
+                    return super.visitFlag(flag, p);
                 }
             };
         }
