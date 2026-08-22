@@ -54,6 +54,8 @@ public class FindStageGraph extends Recipe {
             "own with `docker build --target` is reported as unreached: this says what the file builds, not what a " +
             "repository asks for.";
 
+    private static final String SCRATCH = "scratch";
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new DockerIsoVisitor<ExecutionContext>() {
@@ -81,8 +83,18 @@ public class FindStageGraph extends Recipe {
         };
     }
 
-    private static String registry(Docker.From from) {
-        return ImageName.parse(ArgumentContents.textWithVariables(from.getImageName())).getResolvedRegistry();
+    /// @return The registry the stage's base image is pulled from, or `null` where nothing is pulled
+    /// (`FROM scratch`) or where the name is spelled by a build argument that leaves the registry unknown.
+    private static @Nullable String registry(Docker.From from) {
+        String plain = ArgumentContents.text(from.getImageName());
+        if (SCRATCH.equals(plain)) {
+            return null;
+        }
+        ImageName imageName = ImageName.parse(ArgumentContents.textWithVariables(from.getImageName()));
+        if (plain == null && imageName.getRegistry() == null) {
+            return null;
+        }
+        return imageName.getResolvedRegistry();
     }
 
     private static String baseImage(Docker.From from) {
@@ -123,7 +135,7 @@ public class FindStageGraph extends Recipe {
             List<@Nullable String> names = new ArrayList<>(stages.size());
             for (Docker.Stage stage : stages) {
                 Docker.From.As as = stage.getFrom().getAs();
-                names.add(as == null ? null : as.getName().getText().toLowerCase(Locale.ROOT));
+                names.add(as == null ? null : as.getName().getText());
             }
 
             List<Set<Integer>> references = new ArrayList<>(stages.size());
@@ -256,9 +268,8 @@ public class FindStageGraph extends Recipe {
                     ambiguous = true;
                     return false;
                 }
-                String name = value.toLowerCase(Locale.ROOT);
                 for (int i = limit - 1; i >= 0; i--) {
-                    if (i != stage && name.equals(names.get(i))) {
+                    if (i != stage && value.equalsIgnoreCase(names.get(i))) {
                         targets.add(i);
                         return true;
                     }

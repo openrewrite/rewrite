@@ -50,7 +50,9 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
 
         @Column(displayName = "Registry",
                 description = "The registry the base image is pulled from, `docker.io` when the image name does not " +
-                              "name one, and absent where the stage extends another stage rather than an image.")
+                              "name one. Absent where nothing is pulled from a registry: the stage extends another " +
+                              "stage, its `FROM` is `scratch`, or a build argument spells the name and leaves the " +
+                              "registry unknown.")
         @Nullable
         String registry;
 

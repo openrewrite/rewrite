@@ -253,6 +253,73 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
+    void scratchIsPulledFromNoRegistry() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,,0,scratch,,,true
+              """
+          ),
+          docker(
+            """
+              FROM scratch
+              COPY hello /hello
+              """
+          )
+        );
+    }
+
+    @Test
+    void aBuildArgumentSpellingTheImageLeavesTheRegistryUnknown() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,build,0,"${BASE}",,"#1",true
+              Dockerfile,,1,alpine,docker.io,,true
+              """
+          ),
+          docker(
+            """
+              ARG BASE=alpine
+
+              FROM ${BASE} AS build
+              RUN make
+
+              FROM alpine
+              COPY --from=build /a /a
+              """
+          )
+        );
+    }
+
+    @Test
+    void aStageNameKeepsItsSpellingAndMatchesIgnoringCase() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,Builder,0,alpine,docker.io,"#1",true
+              Dockerfile,,1,alpine,docker.io,,true
+              """
+          ),
+          docker(
+            """
+              FROM alpine AS Builder
+              RUN make
+
+              FROM alpine
+              COPY --from=BUILDER /a /a
+              """
+          )
+        );
+    }
+
+    @Test
     void recordTheDigestOfAPinnedBaseImage() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
