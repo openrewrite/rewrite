@@ -957,7 +957,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return flags;
     }
 
-    /// The `--from` of a `COPY` or `ADD`, whose value the `FLAG_IMAGE_REF` lexer mode splits by the
+    /// The `--from` of a `COPY`, whose value the `FLAG_IMAGE_REF` lexer mode splits by the
     /// same rule that splits the reference of a `FROM`. A flag holds one value, so the parts are
     /// flattened back into it with their separators, the form [ImageReferences] reads them from.
     private Docker.Flag parseFromFlag(DockerParser.FromFlagContext ctx) {

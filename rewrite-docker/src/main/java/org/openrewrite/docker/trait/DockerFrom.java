@@ -90,15 +90,6 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
     }
 
     /**
-     * Returns true if this is the special "scratch" base image.
-     *
-     * @return true if the image is "scratch"
-     */
-    public boolean isScratch() {
-        return "scratch".equals(ArgumentContents.text(getTree().getImageName()));
-    }
-
-    /**
      * Returns the quote style used for the image name, if any.
      *
      * @return The quote style, or null if unquoted
@@ -127,6 +118,15 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
     public Docker.From withTag(String tag) {
         return getTree().withTag(new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
                 ArgumentContents.of(tag, getQuoteStyle())));
+    }
+
+    /**
+     * Returns the FROM instruction with its image name replaced by {@code imageName}, preserving
+     * any tag and digest.
+     */
+    @Override
+    public Docker.From withImageNameArgument(Docker.Argument imageName) {
+        return getTree().withImageName(imageName);
     }
 
     /**

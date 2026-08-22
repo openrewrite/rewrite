@@ -266,6 +266,40 @@ class NormalizeDockerHubImageNameTest implements RewriteTest {
         );
     }
 
+    @Test
+    void normalizeCopyFrom() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              COPY --from=docker.io/library/alpine:3.19 /lib /app/lib
+              """,
+            """
+              FROM ubuntu:22.04
+              COPY --from=alpine:3.19 /lib /app/lib
+              """
+          )
+        );
+    }
+
+    @Test
+    void copyFromAStageIsNotAnImageName() {
+        rewriteRun(
+          docker(
+            """
+              FROM docker.io/library/ubuntu:22.04 AS library
+              FROM alpine:3.19
+              COPY --from=library /lib /app/lib
+              """,
+            """
+              FROM ubuntu:22.04 AS library
+              FROM alpine:3.19
+              COPY --from=library /lib /app/lib
+              """
+          )
+        );
+    }
+
     @Nested
     class QuotedStrings implements RewriteTest {
 
