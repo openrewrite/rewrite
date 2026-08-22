@@ -30,13 +30,6 @@ import static org.openrewrite.Tree.randomId;
  * Builds the contents of a {@link Docker.Argument} from text, and reads them back out. Both the
  * parser and recipes that synthesize values go through here, so a value a recipe writes is modelled
  * the same way as one read back from the printed Dockerfile.
- * <p>
- * The readers live here rather than on {@link Docker.Argument} because the Moderne CLI's
- * {@code RecipeClassLoader} delegates {@code org.openrewrite.docker.tree} to the rewrite-docker the
- * CLI itself bundles, while loading recipes, traits and this package from the recipe jar. A method
- * added to an LST class is therefore missing at runtime for anyone whose CLI predates it, and
- * calling one raises {@link NoSuchMethodError} mid-recipe. These statics ship alongside their
- * callers, and read only LST members that long predate them.
  */
 public class ArgumentContents {
     private ArgumentContents() {
