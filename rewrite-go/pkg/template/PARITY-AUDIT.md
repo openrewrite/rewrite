@@ -156,6 +156,8 @@ parsed from Go source by `parser.NewGoParser`, which produces neither.
 **Fields the cases forgot.** A case that compares some of a node's children
 and ignores the rest reports a match the source does not support:
 
+The audit corpus finds thirteen such pairs; five stand for the rest:
+
 | pattern | candidate | matched |
 |---|---|---|
 | `func F(y bool) {…}` | `func F(x int) {…}` | yes |
@@ -166,9 +168,16 @@ and ignores the rest reports a match the source does not support:
 
 `java.MethodDeclaration` compared `Name` and `Body` only, leaving
 `Parameters`, `ReturnType`, `TypeParameters` and `LeadingAnnotations`
-unread; `golang.MethodDeclaration` compared `Declaration` and never
-`Receiver`; `java.MethodInvocation` ignored call-site `TypeParameters`.
-A false match is worse than a missing one, because the recipe rewrites on it.
+unread, and `golang.MethodDeclaration` compared `Declaration` and never
+`Receiver`. A false match is worse than a missing one, because the recipe
+rewrites on it.
+
+**A nil child read as a present one.** `type I interface{ M() }` crashed the
+match. An interface method has no body, and `MethodDeclaration.Body` is a
+`*java.Block`, so the nil arrives at a parameter of interface type as a
+non-nil `java.J` holding a nil pointer; the guard against a missing child
+tests the interface and lets it through. `match_result.go` carries an
+`isNilTree` helper for the same hazard on the binding side.
 
 **Markers, which the peers can afford to ignore and Go cannot.** JavaScript
 and Python drop the marker collection wholesale, and their models let them:
