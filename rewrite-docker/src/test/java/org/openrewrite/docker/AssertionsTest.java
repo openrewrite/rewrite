@@ -232,12 +232,7 @@ class AssertionsTest implements RewriteTest {
             FROM alpine
             ENTRYPOINT ["java", "-jar", "app.jar"]
             """,
-          new DockerIsoVisitor<>() {
-              @Override
-              public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
-                  return literal.withQuoteStyle(null);
-              }
-          },
+          unquoteLiterals(),
           "expected the JSON array element \"java\" to be double quoted");
     }
 
@@ -248,12 +243,7 @@ class AssertionsTest implements RewriteTest {
             FROM alpine
             SHELL ["/bin/bash", "-c"]
             """,
-          new DockerIsoVisitor<>() {
-              @Override
-              public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
-                  return literal.withQuoteStyle(null);
-              }
-          },
+          unquoteLiterals(),
           "expected the JSON array element \"/bin/bash\" to be double quoted");
     }
 
@@ -264,12 +254,7 @@ class AssertionsTest implements RewriteTest {
             FROM alpine
             VOLUME ["/data"]
             """,
-          new DockerIsoVisitor<>() {
-              @Override
-              public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
-                  return literal.withQuoteStyle(null);
-              }
-          },
+          unquoteLiterals(),
           "expected the JSON array element \"/data\" to be double quoted");
     }
 
@@ -558,6 +543,23 @@ class AssertionsTest implements RewriteTest {
           "to hold no unescaped \"");
     }
 
+    @Test
+    void catchesASingleQuotedLiteralHoldingTheQuoteThatEndsIt() {
+        assertMalformed(
+          """
+            FROM alpine
+            ENV KEY='value'
+            """,
+          new DockerIsoVisitor<>() {
+              @Override
+              public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
+                  return literal.getQuoteStyle() == Docker.Literal.QuoteStyle.SINGLE ?
+                    literal.withText("va'lue") : literal;
+              }
+          },
+          "to hold no unescaped '");
+    }
+
     /// An ONBUILD's instruction, and a HEALTHCHECK's CMD, correctly sit on the same line as the
     /// instruction that introduces them.
     @Test
@@ -576,21 +578,34 @@ class AssertionsTest implements RewriteTest {
         Assertions.assertWellFormed(parse("FROM alpine\n# no newline after this"));
     }
 
+    /// That exemption is only from needing a newline. A trailing comment lives in the file's `eof`
+    /// [Space], which every other check still reaches.
     @Test
-    void catchesASingleQuotedLiteralHoldingTheQuoteThatEndsIt() {
+    void catchesATrailingCommentThatIsNotOne() {
         assertMalformed(
           """
             FROM alpine
-            ENV KEY='value'
+            # trailing
             """,
           new DockerIsoVisitor<>() {
               @Override
-              public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
-                  return literal.getQuoteStyle() == Docker.Literal.QuoteStyle.SINGLE ?
-                    literal.withText("va'lue") : literal;
+              public Space visitSpace(Space space, ExecutionContext ctx) {
+                  return space.withComments(ListUtils.map(space.getComments(),
+                    comment -> comment.withText(comment.getText().substring(1))));
               }
           },
-          "to hold no unescaped '");
+          "to start with \"#\"");
+    }
+
+    /// The same defect in three places the checks reach separately: an exec form, a SHELL and a
+    /// JSON form VOLUME.
+    private static DockerIsoVisitor<ExecutionContext> unquoteLiterals() {
+        return new DockerIsoVisitor<>() {
+            @Override
+            public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
+                return literal.withQuoteStyle(null);
+            }
+        };
     }
 
     private static void assertMalformed(@Language("dockerfile") String source,

@@ -24,6 +24,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.docker.tree.Comment;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -37,6 +38,8 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 
 public class Assertions {
+    private static final Pattern LINE_CONTINUATION = Pattern.compile("[\\\\`][ \\t]*(?=\\r?\\n)");
+
     private Assertions() {
     }
 
@@ -107,7 +110,7 @@ public class Assertions {
     /// Line continuations are whitespace to a Dockerfile, so the `\` or `` ` `` that introduces one is
     /// not text sitting where only formatting belongs.
     private static boolean isWhitespace(String text) {
-        return text.replaceAll("[\\\\`][ \\t]*(?=\\r?\\n)", "").trim().isEmpty();
+        return LINE_CONTINUATION.matcher(text).replaceAll("").trim().isEmpty();
     }
 
     /// A tree prints losslessly by construction, so printing alone cannot tell whether its elements
@@ -246,7 +249,7 @@ public class Assertions {
         private final Set<UUID> ids = new HashSet<>();
 
         /// The one [Space] that nothing follows, and so the one whose trailing comment needs no newline
-        /// after it.
+        /// after it. A [Space] holding comments is never a flyweight, so reference identity is enough.
         private @Nullable Space eof;
 
         @Override
@@ -254,7 +257,9 @@ public class Assertions {
             if (tree instanceof Docker) {
                 Docker d = (Docker) tree;
                 uniqueId(d.getId(), d.getClass(), violations);
-                keyword(d, violations);
+                if (d instanceof Docker.Instruction) {
+                    keyword(((Docker.Instruction) d).getKeyword(), d.getClass(), violations);
+                }
             }
             return super.visit(tree, violations);
         }
@@ -266,10 +271,10 @@ public class Assertions {
             for (int i = 1; i < globalArgs.size(); i++) {
                 startsItsOwnLine(globalArgs.get(i), violations);
             }
-            for (int i = 0; i < file.getStages().size(); i++) {
-                Docker.Stage stage = file.getStages().get(i);
-                if ((i > 0 || !globalArgs.isEmpty()) &&
-                        !containsNewline(stage.getPrefix()) && !containsNewline(stage.getFrom().getPrefix())) {
+            List<Docker.Stage> stages = file.getStages();
+            for (int i = globalArgs.isEmpty() ? 1 : 0; i < stages.size(); i++) {
+                Docker.Stage stage = stages.get(i);
+                if (!containsNewline(stage.getPrefix()) && !containsNewline(stage.getFrom().getPrefix())) {
                     violations.add("expected the Stage to start its own line, but neither it nor its From has a" +
                             " newline in its prefix");
                 }
@@ -319,7 +324,7 @@ public class Assertions {
         @Override
         public Docker.From.@Nullable As visitFromAs(Docker.From.As as, List<String> violations) {
             uniqueId(as.getId(), as.getClass(), violations);
-            keyword(as.getKeyword(), "AS", "As", violations);
+            keyword(as.getKeyword(), as.getClass(), violations);
             return super.visitFromAs(as, violations);
         }
 
@@ -350,7 +355,7 @@ public class Assertions {
         @Override
         public Docker.Flag visitFlag(Docker.Flag flag, List<String> violations) {
             String name = flag.getName();
-            if (name.startsWith("-") || name.indexOf('=') >= 0 || containsWhitespace(name)) {
+            if (name.startsWith("-") || name.indexOf('=') >= 0 || StringUtils.containsWhitespace(name)) {
                 violations.add("expected the flag name " + quoted(name) + " to be bare, as the printer writes the" +
                         " leading \"--\" and any \"=\" itself");
             }
@@ -377,7 +382,7 @@ public class Assertions {
         @Override
         public Docker.Shell visitShell(Docker.Shell shell, List<String> violations) {
             for (Docker.Argument argument : shell.getArguments()) {
-                doubleQuoted(argument, violations);
+                doubleQuotedContents(argument, violations);
             }
             return super.visitShell(shell, violations);
         }
@@ -386,7 +391,7 @@ public class Assertions {
         public Docker.Volume visitVolume(Docker.Volume volume, List<String> violations) {
             if (volume.isJsonForm()) {
                 for (Docker.Argument value : volume.getValues()) {
-                    doubleQuoted(value, violations);
+                    doubleQuotedContents(value, violations);
                 }
             }
             return super.visitVolume(volume, violations);
@@ -446,13 +451,9 @@ public class Assertions {
         @Override
         public Docker.Literal visitLiteral(Docker.Literal literal, List<String> violations) {
             Docker.Literal.QuoteStyle style = literal.getQuoteStyle();
-            if (style != null) {
-                boolean escapable = style == Docker.Literal.QuoteStyle.DOUBLE;
-                char quote = escapable ? '"' : '\'';
-                if (hasUnescapedQuote(literal.getText(), quote, escapable)) {
-                    violations.add("expected the quoted literal " + quoted(literal.getText()) + " to hold no" +
-                            " unescaped " + quote + ", which ends the string when it is read back");
-                }
+            if (style != null && hasUnescapedQuote(literal.getText(), style)) {
+                violations.add("expected the quoted literal " + quoted(literal.getText()) + " to hold no unescaped " +
+                        quoteOf(style) + ", which ends the string when it is read back");
             }
             return super.visitLiteral(literal, violations);
         }
@@ -467,53 +468,16 @@ public class Assertions {
             }
         }
 
-        private void keyword(Docker d, List<String> violations) {
-            if (d instanceof Docker.From) {
-                keyword(((Docker.From) d).getKeyword(), "FROM", "From", violations);
-            } else if (d instanceof Docker.Run) {
-                keyword(((Docker.Run) d).getKeyword(), "RUN", "Run", violations);
-            } else if (d instanceof Docker.Add) {
-                keyword(((Docker.Add) d).getKeyword(), "ADD", "Add", violations);
-            } else if (d instanceof Docker.Copy) {
-                keyword(((Docker.Copy) d).getKeyword(), "COPY", "Copy", violations);
-            } else if (d instanceof Docker.Arg) {
-                keyword(((Docker.Arg) d).getKeyword(), "ARG", "Arg", violations);
-            } else if (d instanceof Docker.Env) {
-                keyword(((Docker.Env) d).getKeyword(), "ENV", "Env", violations);
-            } else if (d instanceof Docker.Label) {
-                keyword(((Docker.Label) d).getKeyword(), "LABEL", "Label", violations);
-            } else if (d instanceof Docker.Cmd) {
-                keyword(((Docker.Cmd) d).getKeyword(), "CMD", "Cmd", violations);
-            } else if (d instanceof Docker.Entrypoint) {
-                keyword(((Docker.Entrypoint) d).getKeyword(), "ENTRYPOINT", "Entrypoint", violations);
-            } else if (d instanceof Docker.Expose) {
-                keyword(((Docker.Expose) d).getKeyword(), "EXPOSE", "Expose", violations);
-            } else if (d instanceof Docker.Volume) {
-                keyword(((Docker.Volume) d).getKeyword(), "VOLUME", "Volume", violations);
-            } else if (d instanceof Docker.Shell) {
-                keyword(((Docker.Shell) d).getKeyword(), "SHELL", "Shell", violations);
-            } else if (d instanceof Docker.Workdir) {
-                keyword(((Docker.Workdir) d).getKeyword(), "WORKDIR", "Workdir", violations);
-            } else if (d instanceof Docker.User) {
-                keyword(((Docker.User) d).getKeyword(), "USER", "User", violations);
-            } else if (d instanceof Docker.Stopsignal) {
-                keyword(((Docker.Stopsignal) d).getKeyword(), "STOPSIGNAL", "Stopsignal", violations);
-            } else if (d instanceof Docker.Onbuild) {
-                keyword(((Docker.Onbuild) d).getKeyword(), "ONBUILD", "Onbuild", violations);
-            } else if (d instanceof Docker.Healthcheck) {
-                keyword(((Docker.Healthcheck) d).getKeyword(), "HEALTHCHECK", "Healthcheck", violations);
-            } else if (d instanceof Docker.Maintainer) {
-                keyword(((Docker.Maintainer) d).getKeyword(), "MAINTAINER", "Maintainer", violations);
-            }
-        }
-
+        /// Every element that has a keyword spells it the same as its own type, so the type is the
+        /// expectation and a new instruction is checked without anyone remembering to add it here.
         /// Dockerfile keywords are case insensitive, so a lower case keyword is the one the source
         /// wrote. Anything else is a keyword that no longer says what its element is, or one holding
         /// whitespace the printer expects to find on whatever follows it.
-        private void keyword(String keyword, String expected, String element, List<String> violations) {
-            if (!expected.equalsIgnoreCase(keyword)) {
-                violations.add("expected the keyword of a " + element + " to be " + expected +
-                        " ignoring case, but it is " + quoted(keyword));
+        private void keyword(String keyword, Class<?> type, List<String> violations) {
+            String element = type.getSimpleName();
+            if (!element.equalsIgnoreCase(keyword)) {
+                violations.add("expected the keyword of a " + element + " to be " +
+                        element.toUpperCase(Locale.ROOT) + " ignoring case, but it is " + quoted(keyword));
             }
         }
 
@@ -532,7 +496,7 @@ public class Assertions {
             }
         }
 
-        private void doubleQuoted(Docker.Argument argument, List<String> violations) {
+        private void doubleQuotedContents(Docker.Argument argument, List<String> violations) {
             for (Docker.ArgumentContent content : argument.getContents()) {
                 if (content instanceof Docker.Literal) {
                     doubleQuoted((Docker.Literal) content, violations);
@@ -553,11 +517,11 @@ public class Assertions {
         /// printed source ever saying so.
         private void portModelsItsText(Docker.Port port, List<String> violations) {
             String text = port.getText();
-            String range = text;
+            String ports = text;
             Docker.Port.Protocol protocol = Docker.Port.Protocol.TCP;
             int slash = text.indexOf('/');
             if (slash >= 0) {
-                range = text.substring(0, slash);
+                ports = text.substring(0, slash);
                 String name = text.substring(slash + 1);
                 if ("udp".equalsIgnoreCase(name)) {
                     protocol = Docker.Port.Protocol.UDP;
@@ -568,17 +532,17 @@ public class Assertions {
             }
             Integer start;
             Integer end = null;
-            int dash = range.indexOf('-');
+            int dash = ports.indexOf('-');
             try {
-                start = Integer.valueOf(dash < 0 ? range : range.substring(0, dash));
+                start = Integer.valueOf(dash < 0 ? ports : ports.substring(0, dash));
                 if (dash >= 0) {
-                    end = Integer.valueOf(range.substring(dash + 1));
+                    end = Integer.valueOf(ports.substring(dash + 1));
                 }
             } catch (NumberFormatException e) {
                 violations.add("expected the port " + quoted(text) + " to hold a port number or a range of them");
                 return;
             }
-            if (!start.equals(port.getStart()) || !Objects.equals(end, port.getEnd()) ||
+            if (!Objects.equals(start, port.getStart()) || !Objects.equals(end, port.getEnd()) ||
                     protocol != port.getProtocol()) {
                 violations.add("expected the port " + quoted(text) + " to model " + range(start, end) + " " +
                         protocol + ", but it models " + range(port.getStart(), port.getEnd()) + " " +
@@ -597,7 +561,11 @@ public class Assertions {
             return port != null && (port < 0 || port > 65535);
         }
 
-        private static boolean hasUnescapedQuote(String text, char quote, boolean escapable) {
+        /// A single quoted string has no escape processing at all, so any quote of its own style ends
+        /// it; a double quoted one can hold an escaped quote.
+        private static boolean hasUnescapedQuote(String text, Docker.Literal.QuoteStyle style) {
+            boolean escapable = style == Docker.Literal.QuoteStyle.DOUBLE;
+            char quote = quoteOf(style);
             for (int i = 0; i < text.length(); i++) {
                 char c = text.charAt(i);
                 if (escapable && c == '\\') {
@@ -609,13 +577,8 @@ public class Assertions {
             return false;
         }
 
-        private static boolean containsWhitespace(String text) {
-            for (int i = 0; i < text.length(); i++) {
-                if (Character.isWhitespace(text.charAt(i))) {
-                    return true;
-                }
-            }
-            return false;
+        private static char quoteOf(Docker.Literal.QuoteStyle style) {
+            return style == Docker.Literal.QuoteStyle.DOUBLE ? '"' : '\'';
         }
 
         /// [Space#getLastWhitespace()] and [Space#getIndent()] answer with the last comment's prefix

@@ -148,6 +148,10 @@ public interface Docker extends Tree {
      * Base interface for all Dockerfile instructions
      */
     interface Instruction extends Docker {
+        /**
+         * The instruction's keyword as the source wrote it, which Dockerfile matches ignoring case.
+         */
+        String getKeyword();
     }
 
     /**
