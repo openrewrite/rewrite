@@ -1701,9 +1701,6 @@ class ChangeParentPomTest implements RewriteTest {
                     """
                 ),
                 mavenProject("child",
-                  // The first upgrade strips this version as redundant under 2.7.18, which drops it from the
-                  // parent's view of this module. The second upgrade, where 3.0.13 stops managing it, has to
-                  // put it back rather than leave the dependency with no version at all.
                   pomXml(
                     """
                       <project>

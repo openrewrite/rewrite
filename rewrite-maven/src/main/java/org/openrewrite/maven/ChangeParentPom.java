@@ -181,12 +181,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
          */
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> updatedByPom = new ConcurrentHashMap<>();
 
-        /**
-         * The re-resolved marker of a changed pom, with the dependency management that the edit phase restores
-         * in it declared explicitly, so that a descendant re-parented onto it resolves the same versions the
-         * changed pom will actually declare. Computed on demand in the edit phase, keyed by the changed pom's
-         * resolved GAV.
-         */
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> restoredByPom = new ConcurrentHashMap<>();
     }
 
@@ -526,8 +520,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
     /**
      * The changed pom re-resolved as it will look once the edit phase has restored the dependency management
-     * that the new parent no longer provides. Without this a descendant would be re-parented onto a view of the
-     * changed pom that manages neither the old parent's versions nor the restored ones, and would resolve to no
+     * that the new parent no longer provides, so that a descendant re-parented onto it does not resolve to no
      * version at all for a dependency it declares without one.
      */
     private MavenResolutionResult withRestoredManagement(MavenResolutionResult before, MavenResolutionResult updated, Accumulator acc, ExecutionContext ctx) {
@@ -542,8 +535,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 MavenPomDownloader mpd = new MavenPomDownloader(updated.getProjectPoms(), ctx, updated.getMavenSettings(), updated.getActiveProfiles());
                 ResolvedPom newParent = mpd.download(newParentRef.getGav(), null, updated.getPom(), updated.getPom().getRepositories())
                         .resolve(emptyList(), mpd, ctx);
-                // Read the management to restore off the pre-change resolution, exactly as the edit phase
-                // does; the post-change resolution no longer holds the entries the new parent dropped.
+                // Read off the pre-change resolution; the post-change one no longer holds the dropped entries
                 List<ResolvedManagedDependency> toRestore = getDependenciesUnmanagedByNewParent(before, newParent);
                 if (!toRestore.isEmpty()) {
                     Pom requested = updated.getPom().getRequested();
@@ -558,7 +550,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             .resolve(ctx, mpd));
                 }
             } catch (MavenDownloadingException e) {
-                // The changed pom's own edit reports any download failure; descendants keep the unrestored view.
+                // The changed pom's own edit reports the failure; descendants keep the unrestored view
             }
         }
         acc.restoredByPom.put(updated.getPom().getGav(), restored);
@@ -567,10 +559,9 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
     /**
      * Write back an explicit version for any dependency this pom declares without one that the changed ancestor
-     * no longer manages. The ancestor restores management on behalf of the modules it can see, but its snapshot
-     * of those modules dates from the start of the cycle, so a module whose version was stripped as redundant
-     * by an earlier recipe in the same run is invisible to it. Left alone such a dependency resolves to no
-     * version at all, which fails the build and leaves every later recipe reading a stale model.
+     * no longer manages. The ancestor restores management only for the modules it can see, and its snapshot of
+     * them predates any edit made earlier in the same run, so a module whose version was stripped as redundant
+     * by an earlier recipe has to restore it here or resolve to no version at all.
      */
     private static Xml.Document pinVersionsDroppedByChangedAncestor(Xml.Document document, MavenResolutionResult before,
                                                                     MavenResolutionResult reparented, ExecutionContext ctx) {
@@ -638,10 +629,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         }
     }
 
-    /**
-     * The dependency management that {@code mrr} and its descendant modules rely on today and that the new
-     * parent no longer provides, so it can be restored in {@code mrr} itself.
-     */
     private static List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
         // Remove from the list any that would still be managed under the new parent
         Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
@@ -664,10 +651,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         return new ArrayList<>(unmanaged.values());
     }
 
-    /**
-     * The dependency management that {@code mrr} inherits from its parent for the dependencies it declares
-     * without an explicit version, and would therefore have to declare itself if that parent went away.
-     */
     private static List<ResolvedManagedDependency> getManagementInheritedFromParent(MavenResolutionResult mrr) {
         ResolvedPom resolvedPom = mrr.getPom();
 
