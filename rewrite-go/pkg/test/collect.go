@@ -33,6 +33,7 @@ type TypedNodes struct {
 	GoUnaries          []*golang.Unary
 	ParameterizedTypes []*java.ParameterizedType
 	Conversions        []*java.TypeCast
+	TypeAssertions     []*golang.TypeAssertion
 }
 
 func (v *TypedNodes) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
@@ -43,6 +44,11 @@ func (v *TypedNodes) VisitMethodInvocation(mi *java.MethodInvocation, p any) jav
 func (v *TypedNodes) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	v.Conversions = append(v.Conversions, tc)
 	return v.GoVisitor.VisitTypeCast(tc, p)
+}
+
+func (v *TypedNodes) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	v.TypeAssertions = append(v.TypeAssertions, ta)
+	return v.GoVisitor.VisitTypeAssertion(ta, p)
 }
 
 func (v *TypedNodes) VisitComposite(c *golang.Composite, p any) java.J {

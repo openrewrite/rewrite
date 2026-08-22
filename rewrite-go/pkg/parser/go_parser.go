@@ -2142,21 +2142,7 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 
 	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: decodeBasicLitValue(lit), Source: lit.Value}
 
-	l.Type = ctx.valueTypeOf(lit)
-
-	// An untyped constant compared against a value of a named type (e.g.
-	// `type Code int`; `2052 <= i` where `i Code`) is converted to that named
-	// type, so go/types reports the literal's type as the named type. A
-	// J.Literal on the Java side can only carry a JavaType.Primitive, so a named
-	// type is dropped to null there. Map the literal through the named type's
-	// underlying basic to preserve the primitive (e.g. int).
-	if tv, ok := ctx.typeInfo.Types[lit]; ok {
-		if named, ok := tv.Type.(*types.Named); ok {
-			if basic, ok := named.Underlying().(*types.Basic); ok {
-				l.Type = ctx.mapper.mapType(basic)
-			}
-		}
-	}
+	l.Type = ctx.literalTypeOf(lit)
 
 	// A Go int constant is 64-bit, but Java's int is 32-bit. When the value
 	// overflows Integer, fall back to long so the JVM LST deserializer does not
@@ -2170,6 +2156,29 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	}
 
 	return l
+}
+
+// literalTypeOf resolves a literal's type through a named type's underlying
+// basic, since an untyped constant compared against a value of a named type
+// (`type Code int`; `2052 <= i` where `i Code`) is converted to that named type
+// by go/types. Nil when Go's type has no Java primitive to name it.
+func (ctx *parseContext) literalTypeOf(lit *ast.BasicLit) java.JavaType {
+	tv, ok := ctx.typeInfo.Types[lit]
+	if !ok {
+		return nil
+	}
+	t := tv.Type
+	if named, ok := types.Unalias(t).(*types.Named); ok {
+		t = named.Underlying()
+	}
+	basic, ok := t.(*types.Basic)
+	if !ok {
+		return nil
+	}
+	if prim := literalPrimitive(basic); prim != nil {
+		return prim
+	}
+	return nil
 }
 
 func decodeBasicLitValue(lit *ast.BasicLit) any {
@@ -2415,6 +2424,14 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 			mi.MethodType = ctx.calleeSignature(obj, ident.Name, nil)
 		}
 	}
+	if mi.MethodType == nil {
+		if bt := ctx.builtinSignature(expr.Fun, name.Name); bt != nil {
+			mi.MethodType = bt
+			// The callee identifier carries the method type, as a declared
+			// function's does.
+			name.Type = bt
+		}
+	}
 
 	if marker := ctx.builtinMarker(expr.Fun); marker != nil {
 		mi.Markers = java.AddMarker(mi.Markers, marker)
@@ -2430,6 +2447,28 @@ func (ctx *parseContext) builtinMarker(callee ast.Expr) java.Marker {
 		}
 	}
 	return nil
+}
+
+// builtinSignature types a call to a builtin. Go resolves one to a
+// *types.Builtin, whose own type is invalid, and records the signature the call
+// site instantiated on the callee expression instead. A builtin belongs to no
+// package, so it takes `builtin`, the one Go's own documentation files it under.
+func (ctx *parseContext) builtinSignature(callee ast.Expr, name string) *java.JavaTypeMethod {
+	var obj types.Object
+	switch c := callee.(type) {
+	case *ast.Ident:
+		obj = ctx.typeInfo.Uses[c]
+	case *ast.SelectorExpr:
+		obj = ctx.typeInfo.Uses[c.Sel]
+	}
+	if _, ok := obj.(*types.Builtin); !ok {
+		return nil
+	}
+	sig, ok := ctx.typeInfo.Types[callee].Type.(*types.Signature)
+	if !ok {
+		return nil
+	}
+	return ctx.mapper.mapSignature(sig, name, &java.JavaTypeClass{FullyQualifiedName: "builtin", Kind: "Class"})
 }
 
 // isConversion reports whether a call is Go's `T(x)`, which converts one value
@@ -3087,9 +3126,9 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 		Left:         java.RightPadded[java.Expression]{Element: x, After: dotPrefix},
 		AssertedType: clazz,
 	}
-	if tv, ok := ctx.typeInfo.Types[expr]; ok {
-		ta.Type = ctx.mapper.mapType(tv.Type)
-	}
+	// In the comma-ok form the checker records `(T, bool)`; valueTypeOf takes
+	// the T the assertion evaluates to either way.
+	ta.Type = ctx.valueTypeOf(expr)
 	return ta
 }
 

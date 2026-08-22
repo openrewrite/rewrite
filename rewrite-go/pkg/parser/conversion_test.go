@@ -94,7 +94,7 @@ func TestConversionCarriesTheTypeItNames(t *testing.T) {
 	for _, tc := range []struct{ conversion, want string }{
 		{"time.Duration(n)", "time.Duration"},
 		{"MyInt(3)", "main.MyInt"},
-		{"string(b)", "String"},
+		{"string(b)", "string"},
 		{"[]byte(s)", "byte[]"},
 		{"(*MyInt)(q)", "main.MyInt"},
 	} {
