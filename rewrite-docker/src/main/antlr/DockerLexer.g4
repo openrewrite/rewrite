@@ -19,9 +19,8 @@ import org.openrewrite.docker.internal.Heredocs;}
     private boolean afterHealthcheck = false;
     // Whether the flags of a COPY or ADD are still being read, where --from carries an image reference
     private boolean copyAddFlags = false;
-    // Whether a parser directive is still recognized here, i.e. nothing but directives has been read yet
+    // Whether a parser directive is still recognized here, and whether a comment is
     private boolean atFileHead = true;
-    // Whether a comment is recognized here, i.e. at the start of a written line rather than a logical one
     private boolean atLineHead = true;
 
     // Each flag above holds over a region of one logical line, so each is one question about the token
@@ -79,18 +78,14 @@ import org.openrewrite.docker.internal.Heredocs;}
         }
     }
 
-    // A comment is a line, not the tail of one: Docker reads a '#' as a comment only where it is the
-    // first thing written on a written line. A continuation ends a written line without ending the
-    // logical one, which is why this is asked apart from atLineStart, where a continuation carries on.
-    // A continuation that ends the image reference of a --from reaches here as the FLAG_END that bounds
-    // the reference rather than as a LINE_CONTINUATION, and it ends a written line all the same.
+    // A written line, unlike the logical one atLineStart holds to, ends at a continuation as well - the
+    // FLAG_END form included, which is how a continuation closing the value of a --from reaches here.
     private boolean beginsLineHead() {
         return _type == NEWLINE && _mode != HEREDOC || _type == LINE_CONTINUATION || _type == PARSER_DIRECTIVE ||
                _type == FLAG_END && getText().endsWith("\n");
     }
 
-    // Directives stand at the head of the file and nowhere else. Docker gives up on them at the first
-    // comment, blank line or instruction, so a '# name=value' anywhere past that is an ordinary comment.
+    // Docker gives up on directives at the first comment, blank line or instruction
     private boolean continuesFileHead() {
         return _type == PARSER_DIRECTIVE || _type == WS;
     }
@@ -133,15 +128,11 @@ options {
 
 // Parser directives (must be at the beginning of file)
 // After a parser directive, we're at line start (it consumes the newline)
-// The predicate sits behind the '#' that this rule and COMMENT share, so that only a token starting
-// with one pays for it: a predicate reachable without consuming anything would stop ANTLR caching the
-// start state of this mode, and every token in the file would be read without a cached edge.
+// As at FLAG, the predicate sits behind the '#' this rule and COMMENT share: one reachable without
+// consuming anything would stop ANTLR caching the start state of the mode that holds it.
 PARSER_DIRECTIVE : '#' {atFileHead}? WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
 
 // Comments (after parser directives) - HIDDEN in main mode
-// As with PARSER_DIRECTIVE, the predicate sits behind the '#' the two rules share, so that only a
-// token starting with one is read without a cached edge. Where it fails the '#' is text: a '#' that
-// something else on its line comes before is a character of the argument holding it, not a comment.
 COMMENT : '#' {atLineHead}? ~[\r\n]* -> channel(HIDDEN);
 
 // Instructions (case-insensitive)
@@ -213,15 +204,11 @@ DASH_DASH  : '--';
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
 // This matches text that doesn't start with -- or <<
 // Note: < is excluded to allow HEREDOC_START (<<) to match
-// Neither escape character is a character of the text: each one ends the line it stands at the end of,
-// and TEXT_ESCAPE is what tells that position from any other.
 fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<`];
 
 // String literals
 // Double-quoted strings support escape sequences and line continuation
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
-// A string reaches over a newline only by continuing the line it stands on: a bare newline ends the
-// instruction, so a quote left open by the end of a line is an ordinary character rather than a string.
 DOUBLE_QUOTED_STRING : DQ_STRING;
 
 fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
@@ -232,8 +219,8 @@ SINGLE_QUOTED_STRING : SQ_STRING;
 fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'';
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
-// A comment line that a continuation runs into is none of the string's business: Docker drops such a
-// line while joining the ones the continuation holds together, so the string closes on the line after.
+// Docker drops a comment line while joining the lines a continuation holds together, so one does not
+// reach the string that spans it.
 fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+ ( WS_CHAR* '#' ~[\r\n]* [\r\n]+ )*;
 
 fragment ESCAPE_SEQUENCE
@@ -285,13 +272,12 @@ UNQUOTED_TEXT
     | '-'  // Just a hyphen by itself
     | '<' ~[< \t\r\n\\"'$[\]=`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Single < followed by non-<
     | '<'  // Just a < by itself
-    | TEXT_ESCAPE ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Start with an escaped character (e.g., \; in find -exec)
+    | TEXT_ESCAPE ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Start with escaped char (e.g., \; in find -exec)
     )
     ;
 
-// A quote that the end of its line leaves open is an ordinary character of the text around it. The
-// arguments of an instruction hold no strings to Docker, so an unpaired quote closes nothing and
-// starts nothing; only the rules above, where a pair is what is written, read one as a string.
+// Docker reads no strings in the arguments of an instruction, so a quote the end of its line leaves
+// open is an ordinary character. Mirrored into every mode that reads an argument of its own.
 UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 // Whitespace - HIDDEN in main mode
@@ -334,8 +320,6 @@ IR_DOLLAR               : '$'             -> type(DOLLAR);
 // than to a tag ('host:5000/img:tag'), so it stays inside the token.
 IR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
-// As UNPAIRED_QUOTE in the default mode: a quote the end of its line leaves open is a character of the
-// reference around it rather than the start of a string.
 IR_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 // Shared with FLAG_IMAGE_REF, which reads the same reference.

@@ -365,8 +365,6 @@ class FromTest implements RewriteTest {
         );
     }
 
-    /// A quote the end of its line leaves open is a character of the reference around it, as it is of
-    /// any other argument, rather than the start of a string reaching into the instructions below.
     @Test
     void unpairedQuoteInAnImageReference() {
         rewriteRun(

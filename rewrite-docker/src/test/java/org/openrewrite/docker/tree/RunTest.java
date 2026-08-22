@@ -539,9 +539,7 @@ class RunTest implements RewriteTest {
         );
     }
 
-    /// A backtick ends a line only under an `# escape=` directive, which is how a Windows Dockerfile
-    /// declares it. Docker drops the comment line inside the continuations while joining them, so the
-    /// string closes on the line that follows it.
+    /// A backtick ends a line only under an `# escape=` directive.
     @Test
     void commentLineWithoutBacktick() {
         rewriteRun(
@@ -579,8 +577,6 @@ class RunTest implements RewriteTest {
         );
     }
 
-    /// A continued line is read from its first column, so nothing about the escape character that ends
-    /// the line before it depends on what the next one begins with.
     @Test
     void continuationBeforeAnUnindentedLine() {
         rewriteRun(
@@ -600,8 +596,7 @@ class RunTest implements RewriteTest {
         );
     }
 
-    /// Docker drops a comment line while joining the lines a continuation holds together, so the
-    /// instruction carries on past one and the instruction after it is still its own.
+    /// Docker drops a comment line while joining the lines a continuation holds together.
     @Test
     void commentLineInsideALineContinuation() {
         rewriteRun(
@@ -621,8 +616,6 @@ class RunTest implements RewriteTest {
         );
     }
 
-    /// A quote the end of the line leaves open is a character of the command, not the start of a string
-    /// that reaches into the instructions below it.
     @Test
     void unpairedQuote() {
         rewriteRun(

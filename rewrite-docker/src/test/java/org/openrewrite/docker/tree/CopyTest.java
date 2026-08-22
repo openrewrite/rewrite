@@ -531,8 +531,6 @@ class CopyTest implements RewriteTest {
         );
     }
 
-    /// The continuation that ends a `--from` value ends the written line it stands at the end of just
-    /// as any other does, so the comment line that follows it is a comment rather than a path.
     @Test
     void aCommentAfterTheContinuationEndingAFromFlagValueIsAComment() {
         rewriteRun(
@@ -553,8 +551,6 @@ class CopyTest implements RewriteTest {
         );
     }
 
-    /// A quote the end of its line leaves open is a character of the reference around it, as it is of
-    /// any other argument, rather than the start of a string reaching into the lines below.
     @Test
     void anUnpairedQuoteInAFromFlagValue() {
         rewriteRun(

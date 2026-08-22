@@ -186,8 +186,6 @@ class UserTest implements RewriteTest {
         );
     }
 
-    /// A quote the end of its line leaves open is a character of the name around it, as it is of any
-    /// other argument, rather than the start of a string reaching into the instructions below.
     @Test
     void unpairedQuoteInAUserSpecification() {
         rewriteRun(

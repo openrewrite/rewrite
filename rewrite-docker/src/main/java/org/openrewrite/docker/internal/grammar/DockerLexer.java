@@ -146,9 +146,8 @@ public class DockerLexer extends Lexer {
 	    private boolean afterHealthcheck = false;
 	    // Whether the flags of a COPY or ADD are still being read, where --from carries an image reference
 	    private boolean copyAddFlags = false;
-	    // Whether a parser directive is still recognized here, i.e. nothing but directives has been read yet
+	    // Whether a parser directive is still recognized here, and whether a comment is
 	    private boolean atFileHead = true;
-	    // Whether a comment is recognized here, i.e. at the start of a written line rather than a logical one
 	    private boolean atLineHead = true;
 
 	    // Each flag above holds over a region of one logical line, so each is one question about the token
@@ -206,18 +205,14 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // A comment is a line, not the tail of one: Docker reads a '#' as a comment only where it is the
-	    // first thing written on a written line. A continuation ends a written line without ending the
-	    // logical one, which is why this is asked apart from atLineStart, where a continuation carries on.
-	    // A continuation that ends the image reference of a --from reaches here as the FLAG_END that bounds
-	    // the reference rather than as a LINE_CONTINUATION, and it ends a written line all the same.
+	    // A written line, unlike the logical one atLineStart holds to, ends at a continuation as well - the
+	    // FLAG_END form included, which is how a continuation closing the value of a --from reaches here.
 	    private boolean beginsLineHead() {
 	        return _type == NEWLINE && _mode != HEREDOC || _type == LINE_CONTINUATION || _type == PARSER_DIRECTIVE ||
 	               _type == FLAG_END && getText().endsWith("\n");
 	    }
 
-	    // Directives stand at the head of the file and nowhere else. Docker gives up on them at the first
-	    // comment, blank line or instruction, so a '# name=value' anywhere past that is an ordinary comment.
+	    // Docker gives up on directives at the first comment, blank line or instruction
 	    private boolean continuesFileHead() {
 	        return _type == PARSER_DIRECTIVE || _type == WS;
 	    }

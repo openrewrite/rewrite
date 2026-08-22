@@ -36,9 +36,7 @@ class CommentTest implements RewriteTest {
         );
     }
 
-    /// A comment is a line of its own. Docker reads a `#` that something else on its line comes before
-    /// as a character of the argument holding it, so what looks like a trailing comment on a `RUN` is
-    /// part of the command it runs.
+    /// Docker runs the `#` too: a comment is a line of its own, never the tail of one.
     @Test
     void hashAfterAnArgumentIsNoComment() {
         rewriteRun(
@@ -89,8 +87,7 @@ class CommentTest implements RewriteTest {
         );
     }
 
-    /// Docker looks for a parser directive only at the head of the file and gives up on the first
-    /// comment or instruction, so a `# NAME=value` line anywhere past that is an ordinary comment.
+    /// Docker gives up on directives at the first comment or instruction.
     @Test
     void keyValueCommentIsNoDirectivePastTheHeadOfTheFile() {
         rewriteRun(
