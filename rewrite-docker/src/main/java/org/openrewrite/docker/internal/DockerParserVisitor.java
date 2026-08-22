@@ -1226,10 +1226,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         // Create a literal for the element
         Docker.Literal.QuoteStyle quoteStyle = null;
-        if (ctx.DOUBLE_QUOTED_STRING() != null) {
+        if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
             quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
             text = text.substring(1, text.length() - 1); // Remove quotes
-        } else if (ctx.SINGLE_QUOTED_STRING() != null) {
+        } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
             quoteStyle = Docker.Literal.QuoteStyle.SINGLE;
             text = text.substring(1, text.length() - 1); // Remove quotes
         }
