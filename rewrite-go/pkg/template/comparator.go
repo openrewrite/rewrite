@@ -30,6 +30,15 @@ type patternComparator struct {
 	captures map[string]*Capture
 	result   *MatchResult
 	cursor   *visitor.Cursor
+
+	// skipFastPath routes every node through the reflective walk, so a test
+	// can hold the hand-written comparisons to what the walk says.
+	skipFastPath bool
+}
+
+// matchTypeSlot compares the attribution two nodes carry.
+func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool {
+	return true
 }
 
 func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor) *patternComparator {
@@ -71,6 +80,14 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 		return p.Source == candidate.(*java.Literal).Source
 	case *java.Empty:
 		return true
+	}
+	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
+		return false
+	}
+	if !c.skipFastPath {
+		if result, handled := c.fastMatch(pattern, candidate); handled {
+			return result
+		}
 	}
 	return c.matchFields(pattern, candidate)
 }

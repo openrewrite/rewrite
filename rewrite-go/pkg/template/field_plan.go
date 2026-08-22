@@ -63,6 +63,7 @@ var (
 	spaceType    = reflect.TypeOf(java.Space{})
 	markersType  = reflect.TypeOf(java.Markers{})
 	jType        = reflect.TypeOf((*java.J)(nil)).Elem()
+	treeType     = reflect.TypeOf((*java.Tree)(nil)).Elem()
 	javaTypeType = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 )
 
@@ -131,7 +132,10 @@ func ruleFor(t reflect.Type) fieldRule {
 	if t.Implements(javaTypeType) {
 		return ruleTypeSlot
 	}
-	if t.Implements(jType) || reflect.PointerTo(t).Implements(jType) {
+	// A Tree-typed slot holds a node too. Comparing it as an opaque value
+	// would read two identical subtrees as different, since an interface
+	// holding a pointer compares by address.
+	if t.Implements(jType) || t.Implements(treeType) || reflect.PointerTo(t).Implements(jType) {
 		return ruleNode
 	}
 	deref := t
@@ -161,9 +165,6 @@ func (c *patternComparator) matchFields(pattern, candidate java.J) bool {
 	pv, cv := reflect.ValueOf(pattern), reflect.ValueOf(candidate)
 	if pv.IsNil() || cv.IsNil() {
 		return pv.IsNil() && cv.IsNil()
-	}
-	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
-		return false
 	}
 	pv, cv = pv.Elem(), cv.Elem()
 	for _, step := range planFor(pv.Type()).steps {
@@ -197,8 +198,10 @@ func asJ(v reflect.Value) java.J {
 
 func (c *patternComparator) matchValue(step fieldStep, pv, cv reflect.Value) bool {
 	switch step.rule {
-	case ruleSkip, ruleTypeSlot:
+	case ruleSkip:
 		return true
+	case ruleTypeSlot:
+		return c.matchTypeSlot(asJavaType(pv), asJavaType(cv))
 	case ruleNode:
 		return c.matchNode(asJ(pv), asJ(cv))
 	case rulePadded:
@@ -308,4 +311,12 @@ func elemJ(elem fieldStep, v reflect.Value) java.J {
 		return asJ(v.Field(elem.padded.index))
 	}
 	return asJ(v)
+}
+
+func asJavaType(v reflect.Value) java.JavaType {
+	if v.IsZero() {
+		return nil
+	}
+	t, _ := v.Interface().(java.JavaType)
+	return t
 }

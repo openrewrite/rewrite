@@ -52,10 +52,19 @@ func auditFixtures() []fixture {
 		{"literalString", expr, `"a"`},
 		{"binary", expr, `a + b`},
 		{"binaryOtherOp", expr, `a - b`},
+		{"binaryOtherLeft", expr, `c + b`},
+		{"binaryOtherRight", expr, `a + c`},
 		{"unary", expr, `-a`},
 		{"fieldAccess", expr, `a.b`},
+		{"fieldAccessOtherTarget", expr, `c.b`},
+		{"fieldAccessOtherName", expr, `a.c`},
 		{"call", expr, `f(1)`},
 		{"callOtherArg", expr, `f(2)`},
+		{"callOtherName", expr, `g(1)`},
+		{"callNoArgs", expr, `f()`},
+		{"callTwoArgs", expr, `f(1, 2)`},
+		{"callSelect", expr, `a.f(1)`},
+		{"callOtherSelect", expr, `b.f(1)`},
 		{"callTypeArgs", expr, `f[int](1)`},
 		{"callTypeArgsOther", expr, `f[string](1)`},
 		{"index", expr, `a[0]`},
@@ -81,6 +90,8 @@ func auditFixtures() []fixture {
 		{"assignOp", stmt, `x += 1`},
 		{"assignOpOther", stmt, `x -= 1`},
 		{"ifStmt", stmt, `if c { g() }`},
+		{"ifTwoStmts", stmt, "if c {\n\tg()\n\th()\n}"},
+		{"ifEmptyBlock", stmt, `if c { }`},
 		{"ifElse", stmt, `if c { g() } else { h() }`},
 		{"ifInit", stmt, `if v := f(); c { g() }`},
 		{"forLoop", stmt, `for i := 0; i < 3; i++ { g() }`},
@@ -249,4 +260,41 @@ func TestMatcherUnreachableKinds(t *testing.T) {
 		u.Visit(cu, nil)
 	}
 	require.Empty(t, u.found, "go.mod and go.sum nodes are not reachable from Go source")
+}
+
+// TestFastPathAgreesWithWalk is what makes the hand-written comparisons in
+// fast_path.go safe: the walk reaches every field by construction, so it is
+// the answer they are held to.
+func TestFastPathAgreesWithWalk(t *testing.T) {
+	fixtures := auditFixtures()
+	candidates := make([]java.J, len(fixtures))
+	for i, f := range fixtures {
+		candidates[i] = candidateFor(t, f)
+	}
+	for i, f := range fixtures {
+		pat := patternFor(f)
+		for j, other := range fixtures {
+			if f.kind != other.kind {
+				continue
+			}
+			label := fmt.Sprintf("%s vs %s", f.name, other.name)
+			viaWalk := matchesVia(t, pat.MatchesViaWalk, candidates[j], label)
+			viaFast := matches(t, pat, candidates[j], label)
+			if viaWalk != viaFast {
+				t.Errorf("%s: fast path says %v, walk says %v", label, viaFast, viaWalk)
+			}
+			_ = i
+		}
+	}
+}
+
+func matchesVia(t *testing.T, match func(java.J, *visitor.Cursor) bool, candidate java.J, label string) (result bool) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("%s: walk panicked: %v", label, r)
+			result = false
+		}
+	}()
+	return match(candidate, nil)
 }
