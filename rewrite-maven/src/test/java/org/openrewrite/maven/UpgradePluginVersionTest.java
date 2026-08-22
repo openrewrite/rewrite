@@ -208,7 +208,6 @@ class UpgradePluginVersionTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5065")
         @Test
-        @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
         void repoUnreachable() {
             rewriteRun(
               spec -> spec.recipe(new UpgradePluginVersion(
@@ -248,7 +247,6 @@ class UpgradePluginVersionTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5065")
         @Test
-        @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
         void noNewerVersion() {
             rewriteRun(
               spec -> spec.recipe(new UpgradePluginVersion(
