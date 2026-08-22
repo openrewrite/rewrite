@@ -33,6 +33,7 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -71,27 +72,25 @@ public class UseBuildKitCacheMounts extends Recipe {
     @Nullable
     String sharing;
 
-    @Override
-    public String getDisplayName() {
-        return "Use BuildKit cache mounts";
-    }
+    String displayName = "Use BuildKit cache mounts";
 
-    @Override
-    public String getDescription() {
-        return "Adds a BuildKit cache mount to each `RUN` instruction that invokes a package manager, so that " +
-                "downloaded dependencies survive across builds instead of being fetched again for every layer. " +
-                "Cache mounts require BuildKit, so a Dockerfile that pins a `# syntax=` frontend older than " +
-                "`docker/dockerfile:1.2` is left alone. A mount is only added where the cache directory is a pure " +
-                "download cache, so a command that installs into the image from that directory, such as " +
-                "`pip install --target`, keeps fetching what it needs. `RUN` instructions in shell form and in " +
-                "exec form are both handled; a heredoc body is left alone, because the commands it holds are not " +
-                "modelled as commands. A `RUN` that already mounts the same target, and a `RUN` that a preceding " +
-                "`USER` has left running as somebody other than root, whose home directory this recipe cannot " +
-                "know, are both left alone. `apt` and `apk` are not in the default set: an `apt-get` cache mount " +
-                "only caches once the `docker-clean` configuration that discards the cache is removed, which this " +
-                "recipe adds along with the mount, and it is incompatible with the `rm -rf /var/lib/apt/lists/*` " +
-                "cleanup that `org.openrewrite.docker.AddAptGetCleanup` adds, which this recipe leaves in place.";
-    }
+    String description = "Adds a BuildKit cache mount to each `RUN` instruction that invokes a package manager, so " +
+            "that downloaded dependencies survive across builds instead of being fetched again for every layer. " +
+            "Cache mounts require BuildKit, so a Dockerfile that pins a `# syntax=` frontend older than " +
+            "`docker/dockerfile:1.2` is left alone. A mount is only added where the cache directory is a pure " +
+            "download cache, so a command that installs into the image from that directory, such as " +
+            "`pip install --target`, keeps fetching what it needs. `RUN` instructions in shell form and in exec " +
+            "form are both handled; a heredoc body is left alone, because the commands it holds are not modelled " +
+            "as commands. A `RUN` that already mounts the same target, and a `RUN` that a preceding `USER` has " +
+            "left running as somebody other than root, whose home directory this recipe cannot know, are both " +
+            "left alone. `apt` and `apk` are not in the default set. An `apt-get` cache mount is only added to a " +
+            "`RUN` that runs `apt-get update` itself, since an empty cache hides the package lists an earlier " +
+            "layer wrote; it only caches once the `docker-clean` configuration that discards the cache is " +
+            "removed, which this recipe adds along with the mount; and it is incompatible with the " +
+            "`rm -rf /var/lib/apt/lists/*` cleanup that `org.openrewrite.docker.AddAptGetCleanup` adds, which " +
+            "this recipe leaves in place.";
+
+    private static final Set<String> SHARING_MODES = new HashSet<>(Arrays.asList("shared", "private", "locked"));
 
     @Override
     public Validated<Object> validate() {
@@ -102,6 +101,10 @@ public class UseBuildKitCacheMounts extends Recipe {
                         "must be one of " + Arrays.stream(PackageManager.values()).map(pm -> pm.id).collect(joining(", ")),
                         packageManager, pm -> PackageManager.of(pm) != null));
             }
+        }
+        if (sharing != null) {
+            validated = validated.and(Validated.test("sharing", "must be one of shared, private, locked",
+                    sharing, mode -> SHARING_MODES.contains(mode)));
         }
         return validated;
     }
@@ -153,7 +156,7 @@ public class UseBuildKitCacheMounts extends Recipe {
         return enabled;
     }
 
-    private static final Pattern SYNTAX_DIRECTIVE = Pattern.compile("^#\\s*syntax\\s*=\\s*\\S+:([^\\s@]+)",
+    private static final Pattern SYNTAX_DIRECTIVE = Pattern.compile("^#\\s*syntax\\s*=\\s*[^\\s@]+:([^\\s@]+)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern FRONTEND_VERSION = Pattern.compile("^(\\d+)\\.(\\d+)");
 
@@ -162,15 +165,11 @@ public class UseBuildKitCacheMounts extends Recipe {
     /// pins nothing is built by the daemon's own frontend, which on any Docker that still receives updates is
     /// BuildKit.
     private static boolean supportsCacheMounts(Docker.File file) {
-        Comment comment = firstComment(file);
-        if (comment == null) {
+        String frontendTag = frontendTag(file);
+        if (frontendTag == null) {
             return true;
         }
-        Matcher directive = SYNTAX_DIRECTIVE.matcher(comment.getText().trim());
-        if (!directive.find()) {
-            return true;
-        }
-        Matcher version = FRONTEND_VERSION.matcher(directive.group(1));
+        Matcher version = FRONTEND_VERSION.matcher(frontendTag);
         if (!version.find()) {
             return true;
         }
@@ -179,9 +178,10 @@ public class UseBuildKitCacheMounts extends Recipe {
         return major > 1 || (major == 1 && minor >= 2);
     }
 
-    /// A directive is only read at the head of the file, where the first comment of the file sits in the
-    /// prefix of whichever element the parser reached first.
-    private static @Nullable Comment firstComment(Docker.File file) {
+    /// A directive is only read at the head of the file, where the leading comments of the file sit in the
+    /// prefix of whichever element the parser reached first. Every one of them is read, because a `syntax`
+    /// directive may be preceded by another directive such as `escape`.
+    private static @Nullable String frontendTag(Docker.File file) {
         List<Space> spaces = new ArrayList<>();
         spaces.add(file.getPrefix());
         if (!file.getGlobalArgs().isEmpty()) {
@@ -192,8 +192,11 @@ public class UseBuildKitCacheMounts extends Recipe {
             spaces.add(file.getStages().get(0).getFrom().getPrefix());
         }
         for (Space space : spaces) {
-            if (!space.getComments().isEmpty()) {
-                return space.getComments().get(0);
+            for (Comment comment : space.getComments()) {
+                Matcher directive = SYNTAX_DIRECTIVE.matcher(comment.getText().trim());
+                if (directive.find()) {
+                    return directive.group(1);
+                }
             }
         }
         return null;
@@ -205,6 +208,11 @@ public class UseBuildKitCacheMounts extends Recipe {
     }
 
     private static final Pattern APT_LISTS_CLEANUP = Pattern.compile("rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists");
+
+    /// A cache mount starts out empty and hides what the image already has at the target, so an
+    /// `apt-get install` only finds its packages when the same `RUN` refreshes the lists it reads.
+    private static final Pattern APT_UPDATE = Pattern.compile("\\bapt-get\\s+(-\\S+\\s+)*update\\b");
+
     private static final String DOCKER_CLEAN = "/etc/apt/apt.conf.d/docker-clean";
     private static final String REMOVE_DOCKER_CLEAN = "rm -f " + DOCKER_CLEAN + " && ";
 
@@ -277,14 +285,15 @@ public class UseBuildKitCacheMounts extends Recipe {
     }
 
     private static final Pattern ENVIRONMENT_ASSIGNMENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*=.*");
-    private static final Pattern COMMAND_SEPARATOR = Pattern.compile("&&|\\|\\||[;|]");
     private static final Pattern CONTINUATION = Pattern.compile("^[\\\\`]$");
 
     /// The words of each command a shell would run in turn, so that a package manager is recognized by the
     /// command it heads rather than by appearing anywhere in the text, and each command of a chain is read.
+    /// A separator inside a quoted string separates nothing, so the words of `echo "build && test"` are one
+    /// command headed by `echo` rather than two.
     private static List<List<String>> shellCommands(String text) {
         List<List<String>> commands = new ArrayList<>();
-        for (String command : COMMAND_SEPARATOR.split(text)) {
+        for (String command : splitOnSeparators(text)) {
             List<String> words = Arrays.stream(command.trim().split("\\s+"))
                     .filter(word -> !word.isEmpty() && !CONTINUATION.matcher(word).matches())
                     .collect(toList());
@@ -292,6 +301,36 @@ public class UseBuildKitCacheMounts extends Recipe {
                 commands.add(words);
             }
         }
+        return commands;
+    }
+
+    private static List<String> splitOnSeparators(String text) {
+        List<String> commands = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        char quote = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote != 0) {
+                current.append(c);
+                if (c == quote) {
+                    quote = 0;
+                } else if (c == '\\' && quote == '"' && i + 1 < text.length()) {
+                    current.append(text.charAt(++i));
+                }
+            } else if (c == '\'' || c == '"') {
+                quote = c;
+                current.append(c);
+            } else if (c == ';' || c == '|' || c == '&') {
+                commands.add(current.toString());
+                current.setLength(0);
+                if (i + 1 < text.length() && text.charAt(i + 1) == c) {
+                    i++;
+                }
+            } else {
+                current.append(c);
+            }
+        }
+        commands.add(current.toString());
         return commands;
     }
 
@@ -385,7 +424,8 @@ public class UseBuildKitCacheMounts extends Recipe {
         }
 
         /// Whether the cache directory holds nothing the built image goes on to need, which is not so for a
-        /// command told to install into the image from what it downloads, or one that already turns caching off.
+        /// command told to install into the image from what it downloads, or one that already turns caching
+        /// off, or one that reads a directory an empty cache would hide the contents of.
         boolean cacheIsPure(List<String> arguments, String commandText) {
             switch (this) {
                 case PIP:
@@ -394,7 +434,8 @@ public class UseBuildKitCacheMounts extends Recipe {
                 case APK:
                     return !arguments.contains("--no-cache");
                 case APT:
-                    return !APT_LISTS_CLEANUP.matcher(commandText).find();
+                    return !APT_LISTS_CLEANUP.matcher(commandText).find() &&
+                            APT_UPDATE.matcher(commandText).find();
                 default:
                     return true;
             }

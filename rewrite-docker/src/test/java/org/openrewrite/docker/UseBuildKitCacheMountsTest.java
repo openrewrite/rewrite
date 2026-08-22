@@ -554,7 +554,65 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     }
 
     @Test
+    void aptWithoutTheUpdateThatFillsTheCache() {
+        rewriteRun(
+          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+          docker(
+            """
+              FROM ubuntu:22.04
+              RUN apt-get update
+              RUN apt-get install -y curl
+              """
+          )
+        );
+    }
+
+    @Test
+    void separatorInsideAQuotedStringSeparatesNothing() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              RUN echo "first && mvn package"
+              """
+          )
+        );
+    }
+
+    @Test
+    void frontendOlderThanCacheMountsPinnedByDigest() {
+        rewriteRun(
+          docker(
+            """
+              # syntax=docker/dockerfile:1.0@sha256:1234567890abcdef
+              FROM maven:3.9-eclipse-temurin-21
+              RUN mvn -B package
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapeDirectiveBeforeTheSyntaxDirective() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              # syntax=docker/dockerfile:1.0
+              FROM maven:3.9-eclipse-temurin-21
+              RUN mvn -B package
+              """
+          )
+        );
+    }
+
+    @Test
     void unknownPackageManagerIsRejected() {
         assertThat(new UseBuildKitCacheMounts(List.of("bower"), null).validate().isValid()).isFalse();
+    }
+
+    @Test
+    void unknownSharingModeIsRejected() {
+        assertThat(new UseBuildKitCacheMounts(null, "exclusive").validate().isValid()).isFalse();
     }
 }
