@@ -539,15 +539,19 @@ class RunTest implements RewriteTest {
         );
     }
 
+    /// A backtick ends a line only under an `# escape=` directive, which is how a Windows Dockerfile
+    /// declares it. Docker drops the comment line inside the continuations while joining them, so the
+    /// string closes on the line that follows it.
     @Test
     void commentLineWithoutBacktick() {
         rewriteRun(
           docker(
               """
+                  # escape=`
                   FROM mcr.microsoft.com/windows/servercore:ltsc2022
                   RUN powershell -Command " `
                       $var = 'value'; `
-                      # Comment with no trailing backtick   <-- this line breaks parsing
+                      # Comment with no trailing backtick
                       $next = 'value'; `
                       ..."
                   """
