@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -111,7 +112,7 @@ class EnvTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("18.0.0");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.getText()).isEqualTo("18.0.0");
+                assertThat(ArgumentContents.text(value)).isEqualTo("18.0.0");
             })
           )
         );
@@ -130,7 +131,7 @@ class EnvTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("18.0.0");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.getText()).isEqualTo("18.0.0");
+                assertThat(ArgumentContents.text(value)).isEqualTo("18.0.0");
             })
           )
         );
@@ -150,9 +151,9 @@ class EnvTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("BASE");
                 assertThat(var.isBraced()).isTrue();
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("${BASE}-suffix");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("${BASE}-suffix");
             })
           )
         );
@@ -168,9 +169,9 @@ class EnvTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = envValue(doc);
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("\"/opt/venv/bin:$PATH\"");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("\"/opt/venv/bin:$PATH\"");
             })
           )
         );
@@ -191,9 +192,9 @@ class EnvTest implements RewriteTest {
                   .filteredOn(Docker.EnvironmentVariable.class::isInstance)
                   .extracting(content -> ((Docker.EnvironmentVariable) content).getName())
                   .containsExactly("path_prefix", "PATH");
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("\"$path_prefix/bin:$PATH\"");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("\"$path_prefix/bin:$PATH\"");
             })
           )
         );

@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +53,7 @@ class MaintainerTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) maintainer.getText().getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("John Doe");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(maintainer.getText().getText()).isEqualTo("John Doe");
+                assertThat(ArgumentContents.text(maintainer.getText())).isEqualTo("John Doe");
             })
           )
         );

@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +53,7 @@ class WorkdirTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) workdir.getPath().getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("/app dir");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(workdir.getPath().getText()).isEqualTo("/app dir");
+                assertThat(ArgumentContents.text(workdir.getPath())).isEqualTo("/app dir");
             })
           )
         );
@@ -68,9 +69,9 @@ class WorkdirTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(workdir.getPath().hasEnvironmentVariables()).isTrue();
-                assertThat(workdir.getPath().getText()).isNull();
-                assertThat(workdir.getPath().getTextWithVariables()).isEqualTo("/app/$SUB");
+                assertThat(ArgumentContents.containsVariable(workdir.getPath())).isTrue();
+                assertThat(ArgumentContents.text(workdir.getPath())).isNull();
+                assertThat(ArgumentContents.textWithVariables(workdir.getPath())).isEqualTo("/app/$SUB");
             })
           )
         );

@@ -22,7 +22,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.docker.DockerVisitor;
-import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.DockerPrinter;
 import org.openrewrite.marker.Markers;
 
@@ -979,27 +978,6 @@ public interface Docker extends Tree {
         Markers markers;
 
         List<ArgumentContent> contents;
-
-        /// @return The text of every content, or `null` if an environment variable reference makes it
-        /// impossible to resolve statically.
-        public @Nullable String getText() {
-            return ArgumentContents.text(this);
-        }
-
-        /// @return As [#getText()], but rendering environment variable references in their original
-        /// `$VAR` or `${VAR}` form rather than giving up.
-        public String getTextWithVariables() {
-            return ArgumentContents.textWithVariables(this);
-        }
-
-        /// @return The quote style of the first quoted literal, or `null` if none is quoted.
-        public Literal.@Nullable QuoteStyle getQuoteStyle() {
-            return ArgumentContents.quoteStyle(this);
-        }
-
-        public boolean hasEnvironmentVariables() {
-            return ArgumentContents.containsVariable(this);
-        }
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
