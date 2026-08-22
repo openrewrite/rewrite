@@ -50,11 +50,8 @@ func (c *patternComparator) match(pattern, candidate java.J) *MatchResult {
 }
 
 func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
-	if pattern == nil && candidate == nil {
-		return true
-	}
 	if pattern == nil || candidate == nil {
-		return false
+		return pattern == nil && candidate == nil
 	}
 
 	// Check if the pattern node is a placeholder identifier.

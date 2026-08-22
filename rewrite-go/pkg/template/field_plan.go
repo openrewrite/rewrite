@@ -38,17 +38,27 @@ const (
 )
 
 // fieldStep is a field's rule, resolved once. elem carries the rule for a
-// slice's element type, so the walk resolves nothing per element.
+// slice's element type and padded the shape of a wrapper, so the walk
+// resolves nothing per value it visits.
 type fieldStep struct {
+	index  int
+	rule   fieldRule
+	elem   *fieldStep
+	padded *paddedStep
+}
+
+// paddedStep locates what a wrapper wraps: the position of its Element or
+// Elements field, and that field's own rule.
+type paddedStep struct {
 	index int
-	rule  fieldRule
-	elem  *fieldStep
+	inner fieldStep
 }
 
 type typePlan struct{ steps []fieldStep }
 
 var (
 	planCache    sync.Map // reflect.Type -> *typePlan
+	paddedCache  sync.Map // reflect.Type -> *paddedStep
 	uuidType     = reflect.TypeOf(uuid.UUID{})
 	spaceType    = reflect.TypeOf(java.Space{})
 	markersType  = reflect.TypeOf(java.Markers{})
@@ -72,18 +82,45 @@ func planFor(t reflect.Type) *typePlan {
 		if f.PkgPath != "" || fileFields[f.Name] {
 			continue
 		}
-		step := fieldStep{index: i, rule: ruleFor(f.Type)}
+		step := stepFor(f.Type)
 		if step.rule == ruleSkip {
 			continue
 		}
-		if step.rule == ruleSlice {
-			elem := fieldStep{rule: ruleFor(f.Type.Elem())}
-			step.elem = &elem
-		}
+		step.index = i
 		plan.steps = append(plan.steps, step)
 	}
 	planCache.Store(t, plan)
 	return plan
+}
+
+// stepFor resolves a type to its rule and whatever that rule needs to run
+// without touching reflect's name tables again.
+func stepFor(t reflect.Type) fieldStep {
+	step := fieldStep{rule: ruleFor(t)}
+	switch step.rule {
+	case ruleSlice:
+		elem := stepFor(t.Elem())
+		step.elem = &elem
+	case rulePadded:
+		step.padded = paddedFor(t)
+	}
+	return step
+}
+
+func paddedFor(t reflect.Type) *paddedStep {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if cached, ok := paddedCache.Load(t); ok {
+		return cached.(*paddedStep)
+	}
+	field, ok := t.FieldByName("Elements")
+	if !ok {
+		field, _ = t.FieldByName("Element")
+	}
+	step := &paddedStep{index: field.Index[0], inner: stepFor(field.Type)}
+	paddedCache.Store(t, step)
+	return step
 }
 
 func ruleFor(t reflect.Type) fieldRule {
@@ -122,7 +159,7 @@ func wrapsElement(t reflect.Type) bool {
 // matchFields compares two nodes of the same concrete type field by field.
 func (c *patternComparator) matchFields(pattern, candidate java.J) bool {
 	pv, cv := reflect.ValueOf(pattern), reflect.ValueOf(candidate)
-	if pv.Kind() != reflect.Pointer || pv.IsNil() || cv.IsNil() {
+	if pv.IsNil() || cv.IsNil() {
 		return pv.IsNil() && cv.IsNil()
 	}
 	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
@@ -137,24 +174,10 @@ func (c *patternComparator) matchFields(pattern, candidate java.J) bool {
 	return true
 }
 
-func (c *patternComparator) matchValue(step fieldStep, pv, cv reflect.Value) bool {
-	switch step.rule {
-	case ruleSkip, ruleTypeSlot:
-		return true
-	case ruleNode:
-		return c.matchNode(asJ(pv), asJ(cv))
-	case rulePadded:
-		return c.matchPadded(pv, cv)
-	case ruleSlice:
-		return c.matchSlice(*step.elem, pv, cv)
-	default:
-		return pv.Equal(cv)
-	}
-}
-
-// asJ reads a field as a J. A node held by value has its address taken, since
-// the interface is satisfied by pointer receivers, and a nil pointer is
-// returned as a nil J rather than an interface holding one.
+// asJ reads a value as the node it holds. A node held by value has its
+// address taken, since java.J is satisfied by pointer receivers, and a nil
+// pointer inside a non-nil interface is a missing child rather than a
+// present one.
 func asJ(v reflect.Value) java.J {
 	if v.Kind() == reflect.Interface {
 		if v.IsNil() {
@@ -172,19 +195,29 @@ func asJ(v reflect.Value) java.J {
 	return j
 }
 
-func (c *patternComparator) matchPadded(pv, cv reflect.Value) bool {
+func (c *patternComparator) matchValue(step fieldStep, pv, cv reflect.Value) bool {
+	switch step.rule {
+	case ruleSkip, ruleTypeSlot:
+		return true
+	case ruleNode:
+		return c.matchNode(asJ(pv), asJ(cv))
+	case rulePadded:
+		return c.matchPadded(step.padded, pv, cv)
+	case ruleSlice:
+		return c.matchSlice(*step.elem, pv, cv)
+	default:
+		return pv.Equal(cv)
+	}
+}
+
+func (c *patternComparator) matchPadded(step *paddedStep, pv, cv reflect.Value) bool {
 	if pv.Kind() == reflect.Pointer {
 		if pv.IsNil() || cv.IsNil() {
 			return pv.IsNil() && cv.IsNil()
 		}
 		pv, cv = pv.Elem(), cv.Elem()
 	}
-	if elements := pv.FieldByName("Elements"); elements.IsValid() {
-		elem := fieldStep{rule: ruleFor(elements.Type().Elem())}
-		return c.matchSlice(elem, elements, cv.FieldByName("Elements"))
-	}
-	inner := pv.FieldByName("Element")
-	return c.matchValue(fieldStep{rule: ruleFor(inner.Type())}, inner, cv.FieldByName("Element"))
+	return c.matchValue(step.inner, pv.Field(step.index), cv.Field(step.index))
 }
 
 // matchSlice compares two slices, letting a variadic capture absorb a run
@@ -272,11 +305,7 @@ func elemJ(elem fieldStep, v reflect.Value) java.J {
 			}
 			v = v.Elem()
 		}
-		inner := v.FieldByName("Element")
-		if !inner.IsValid() {
-			return nil
-		}
-		return asJ(inner)
+		return asJ(v.Field(elem.padded.index))
 	}
 	return asJ(v)
 }

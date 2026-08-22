@@ -42,38 +42,45 @@ func semanticMarkerNames() map[string]bool {
 	return names
 }
 
-// matchMarkers compares the semantic markers two nodes carry as sets.
+// matchMarkers compares the semantic markers two nodes carry as sets. Most
+// nodes carry none, so the counts settle it without touching the entries.
 func matchMarkers(pattern, candidate java.Markers) bool {
-	p := semanticMarkerSet(pattern)
-	q := semanticMarkerSet(candidate)
-	if len(p) != len(q) {
+	n := countSemantic(pattern)
+	if n != countSemantic(candidate) {
 		return false
 	}
-	for t, marker := range p {
-		other, ok := q[t]
-		if !ok {
-			return false
+	if n == 0 {
+		return true
+	}
+	for _, marker := range pattern.Entries {
+		t := reflect.TypeOf(marker)
+		if !semanticMarkers[t] {
+			continue
 		}
-		if !sameMarkerValue(marker, other) {
+		if !hasMatchingMarker(candidate, t, marker) {
 			return false
 		}
 	}
 	return true
 }
 
-func semanticMarkerSet(markers java.Markers) map[reflect.Type]java.Marker {
-	var set map[reflect.Type]java.Marker
+func countSemantic(markers java.Markers) int {
+	n := 0
 	for _, m := range markers.Entries {
-		t := reflect.TypeOf(m)
-		if !semanticMarkers[t] {
-			continue
+		if semanticMarkers[reflect.TypeOf(m)] {
+			n++
 		}
-		if set == nil {
-			set = make(map[reflect.Type]java.Marker, 1)
-		}
-		set[t] = m
 	}
-	return set
+	return n
+}
+
+func hasMatchingMarker(markers java.Markers, t reflect.Type, marker java.Marker) bool {
+	for _, other := range markers.Entries {
+		if reflect.TypeOf(other) == t {
+			return sameMarkerValue(marker, other)
+		}
+	}
+	return false
 }
 
 // A StructTag carries the tag it stands for, so presence alone would read
