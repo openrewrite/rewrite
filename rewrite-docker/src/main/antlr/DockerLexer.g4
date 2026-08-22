@@ -364,9 +364,7 @@ HP_LINE_CONTINUATION : LINE_CONT -> channel(HIDDEN);
 // Newline without continuation - transition to HEREDOC mode for body content
 HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);
 
-HP_WS      : [ \t\r\u000C]+ -> channel(HIDDEN);
-HP_COMMENT : '/*' .*? '*/'  -> channel(HIDDEN);
-HP_LINE_COMMENT : ('//' | '#') ~[\r\n]* '\r'? -> channel(HIDDEN);
+HP_WS : [ \t\r\u000C]+ -> channel(HIDDEN);
 
 // Additional heredoc marker in preamble (for multi-heredoc support)
 HP_HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {

@@ -119,4 +119,46 @@ class HeredocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void heredocPreambleKeepsAHashWord() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOF cat > /etc/motd #banner
+              echo "Hello World"
+              EOF
+              """
+          )
+        );
+    }
+
+    @Test
+    void heredocPreambleKeepsAPathWithTwoSlashes() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOF cp //a/b dst
+              echo "Hello World"
+              EOF
+              """
+          )
+        );
+    }
+
+    @Test
+    void heredocPreambleKeepsACStyleComment() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOF cat /*x*/ y
+              echo "Hello World"
+              EOF
+              """
+          )
+        );
+    }
 }
