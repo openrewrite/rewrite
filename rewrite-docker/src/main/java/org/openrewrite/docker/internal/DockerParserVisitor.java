@@ -133,24 +133,35 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
-        DockerParser.ImageReferenceContext reference = ctx.imageReference();
-        TerminalNode colon = reference.COLON();
-        TerminalNode at = reference.AT();
-        Docker.Argument imageName = separatedPart(reference.imageName(), colon != null ? colon : at);
+        Docker.@Nullable Argument[] reference = imageReferenceParts(ctx.imageReference());
+
+        Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
+
+        return new Docker.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, reference[0], reference[1], reference[2], as);
+    }
+
+    /// The `{imageName, tag, digest}` a reference splits into, or an empty name where the reference is
+    /// absent, as it is in the `--from=` of a `COPY` that names nothing. Shared by `FROM` and by the
+    /// `--from` of a `COPY`/`ADD`, which the grammar splits by the same `imageReference` rule.
+    private Docker.@Nullable Argument[] imageReferenceParts(DockerParser.@Nullable ImageReferenceContext ctx) {
+        if (ctx == null) {
+            return new Docker.@Nullable Argument[]{
+                    new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, emptyList()), null, null};
+        }
+        TerminalNode colon = ctx.COLON();
+        TerminalNode at = ctx.AT();
+        Docker.Argument imageName = separatedPart(ctx.imageName(), colon != null ? colon : at);
         Docker.Argument tag = null;
         if (colon != null) {
             skip(colon.getSymbol());
-            tag = separatedPart(reference.tag(), at);
+            tag = separatedPart(ctx.tag(), at);
         }
         Docker.Argument digest = null;
         if (at != null) {
             skip(at.getSymbol());
-            digest = separatedPart(reference.digest(), null);
+            digest = separatedPart(ctx.digest(), null);
         }
-
-        Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
-
-        return new Docker.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, imageName, tag, digest, as);
+        return new Docker.@Nullable Argument[]{imageName, tag, digest};
     }
 
     private Docker.From.As visitFromAs(DockerParser.FromInstructionContext ctx) {
@@ -934,10 +945,29 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     private List<Docker.Flag> convertFlags(DockerParser.FlagsContext ctx) {
         List<Docker.Flag> flags = new ArrayList<>();
-        for (DockerParser.FlagContext flagCtx : ctx.flag()) {
-            flags.add(parseFlag(flagCtx.FLAG().getSymbol()));
+        for (ParseTree child : ctx.children) {
+            if (child instanceof DockerParser.FlagContext) {
+                flags.add(parseFlag(((DockerParser.FlagContext) child).FLAG().getSymbol()));
+            } else if (child instanceof DockerParser.FromFlagContext) {
+                flags.add(parseFromFlag((DockerParser.FromFlagContext) child));
+            }
         }
         return flags;
+    }
+
+    /// The `--from` of a `COPY` or `ADD`, whose value the `FLAG_IMAGE_REF` lexer mode splits by the
+    /// same rule that splits the reference of a `FROM`. A flag holds one value, so the parts are
+    /// flattened back into it with their separators, the form [ImageReferences] reads them from.
+    private Docker.Flag parseFromFlag(DockerParser.FromFlagContext ctx) {
+        Token token = ctx.FROM_FLAG().getSymbol();
+        Space flagPrefix = prefix(token);
+        String tokenText = token.getText();
+        skip(token);
+
+        String flagName = tokenText.substring(2, tokenText.indexOf('='));
+        Docker.Argument value = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                ImageReferences.contents(imageReferenceParts(ctx.imageReference())));
+        return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, value);
     }
 
     /**

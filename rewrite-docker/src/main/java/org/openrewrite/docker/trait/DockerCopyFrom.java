@@ -23,7 +23,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
-import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.ListUtils;
@@ -90,10 +89,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
             return null;
         }
         Docker.Argument arg = fromArgument();
-        if (arg == null) {
-            return null;
-        }
-        return ImageReferences.split(arg.getContents(), arg.getPrefix());
+        return arg == null ? null : ImageReferences.split(arg.getContents(), arg.getPrefix());
     }
 
     /**
@@ -189,7 +185,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return getTree();
         }
-        Docker.Argument newValue = arg.withContents(ArgumentContents.of(reference, null));
+        Docker.Argument newValue = arg.withContents(ImageReferences.contents(reference));
         List<Docker.Flag> newFlags = ListUtils.map(flags(), f ->
           "from".equals(f.getName()) ? f.withValue(newValue) : f);
         Docker.Instruction instruction = getTree();

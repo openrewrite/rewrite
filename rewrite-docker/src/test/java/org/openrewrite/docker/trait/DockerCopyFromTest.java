@@ -16,7 +16,9 @@
 package org.openrewrite.docker.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -452,6 +454,55 @@ class DockerCopyFromTest implements RewriteTest {
             """
               FROM ubuntu
               ~~>COPY --from="alpine:3" /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableTagIsSplitFromItsVariableImageName() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).contains("${IMAGE}");
+                assertThat(image.getTag()).contains("${TAG}");
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from=${IMAGE}:${TAG} /out /app
+              """,
+            """
+              FROM ubuntu
+              ~~>COPY --from=${IMAGE}:${TAG} /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void aReferenceARecipeWroteIsReadBackAsItsParts() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().imageName("nginx").asVisitor((image, ctx) -> {
+                Docker.Instruction updated = image.withImageReference("registry.example.com:5000/nginx:1.25@sha256:abc");
+                DockerCopyFrom reread = new DockerCopyFrom(new Cursor(image.getCursor().getParentOrThrow(), updated));
+                assertThat(reread.getImageName()).contains("registry.example.com:5000/nginx");
+                assertThat(reread.getTag()).contains("1.25");
+                assertThat(reread.getDigest()).contains("sha256:abc");
+                return updated;
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from=nginx /out /app
+              """,
+            """
+              FROM ubuntu
+              COPY --from=registry.example.com:5000/nginx:1.25@sha256:abc /out /app
               """
           )
         );
