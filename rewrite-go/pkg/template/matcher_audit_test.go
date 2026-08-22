@@ -156,13 +156,17 @@ func matches(t *testing.T, pat *template.GoPattern, candidate java.J, label stri
 }
 
 func patternFor(f fixture) *template.GoPattern {
+	return builderFor(f).Build()
+}
+
+func builderFor(f fixture) *template.PatternBuilder {
 	switch f.kind {
 	case template.ScaffoldStatement:
-		return template.StatementPattern(f.code).Build()
+		return template.StatementPattern(f.code)
 	case template.ScaffoldTopLevel:
-		return template.TopLevel(f.code).Build()
+		return template.TopLevel(f.code)
 	default:
-		return template.Expression(f.code).Build()
+		return template.Expression(f.code)
 	}
 }
 
@@ -266,13 +270,21 @@ func TestMatcherUnreachableKinds(t *testing.T) {
 // fast_path.go safe: the walk reaches every field by construction, so it is
 // the answer they are held to.
 func TestFastPathAgreesWithWalk(t *testing.T) {
+	for _, mode := range []template.TypeMatchingMode{
+		template.TypeMatchingOff, template.TypeMatchingLenient, template.TypeMatchingStrict,
+	} {
+		t.Run(fmt.Sprintf("mode%d", mode), func(t *testing.T) { fastPathAgrees(t, mode) })
+	}
+}
+
+func fastPathAgrees(t *testing.T, mode template.TypeMatchingMode) {
 	fixtures := auditFixtures()
 	candidates := make([]java.J, len(fixtures))
 	for i, f := range fixtures {
 		candidates[i] = candidateFor(t, f)
 	}
 	for i, f := range fixtures {
-		pat := patternFor(f)
+		pat := builderFor(f).TypeMatching(mode).Build()
 		for j, other := range fixtures {
 			if f.kind != other.kind {
 				continue
@@ -297,4 +309,16 @@ func matchesVia(t *testing.T, match func(java.J, *visitor.Cursor) bool, candidat
 		}
 	}()
 	return match(candidate, nil)
+}
+
+type callFinder struct {
+	visitor.GoVisitor
+	call *java.MethodInvocation
+}
+
+func (c *callFinder) PreVisit(t java.Tree, p any) java.Tree {
+	if mi, ok := t.(*java.MethodInvocation); ok && c.call == nil {
+		c.call = mi
+	}
+	return t
 }

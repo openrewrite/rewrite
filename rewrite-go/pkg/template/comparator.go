@@ -30,6 +30,7 @@ type patternComparator struct {
 	captures map[string]*Capture
 	result   *MatchResult
 	cursor   *visitor.Cursor
+	mode     TypeMatchingMode
 
 	// skipFastPath routes every node through the reflective walk, so a test
 	// can hold the hand-written comparisons to what the walk says.
@@ -38,14 +39,18 @@ type patternComparator struct {
 
 // matchTypeSlot compares the attribution two nodes carry.
 func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool {
-	return true
+	if c.mode == TypeMatchingOff {
+		return true
+	}
+	return compareTypes(pattern, candidate, c.mode)
 }
 
-func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor) *patternComparator {
+func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor, mode TypeMatchingMode) *patternComparator {
 	return &patternComparator{
 		captures: captures,
 		result:   NewMatchResult(),
 		cursor:   cursor,
+		mode:     mode,
 	}
 }
 
@@ -83,6 +88,11 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 	}
 	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
 		return false
+	}
+	if p, ok := pattern.(*java.MethodInvocation); ok {
+		if result, handled := c.matchByDeclaringType(p, candidate.(*java.MethodInvocation)); handled {
+			return result
+		}
 	}
 	if !c.skipFastPath {
 		if result, handled := c.fastMatch(pattern, candidate); handled {
@@ -154,6 +164,6 @@ func structurallyEqual(a, b java.J) bool {
 		return false
 	}
 	// Use a comparator with no captures — if it matches, they're equal.
-	cmp := newPatternComparator(nil, nil)
+	cmp := newPatternComparator(nil, nil, TypeMatchingOff)
 	return cmp.matchNode(a, b)
 }

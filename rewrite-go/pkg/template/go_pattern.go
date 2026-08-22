@@ -33,6 +33,7 @@ type GoPattern struct {
 	captures map[string]*Capture
 	imports  []string
 	kind     ScaffoldKind
+	mode     TypeMatchingMode
 	importerCache
 
 	once     sync.Once
@@ -62,7 +63,7 @@ func (p *GoPattern) Match(candidate java.J, cursor *visitor.Cursor) *MatchResult
 		return nil
 	}
 
-	cmp := newPatternComparator(p.captures, cursor)
+	cmp := newPatternComparator(p.captures, cursor, p.mode)
 	return cmp.match(patternTree, candidate)
 }
 
@@ -83,6 +84,7 @@ type PatternBuilder struct {
 	captures   []*Capture
 	imports    []string
 	kind       ScaffoldKind
+	mode       TypeMatchingMode
 	exportData []fs.FS
 }
 
@@ -115,12 +117,20 @@ func (b *PatternBuilder) ExportData(sets ...fs.FS) *PatternBuilder {
 	return b
 }
 
+// TypeMatching says whether the match reads the attribution the pattern and
+// the candidate carry. Structural comparison is the default.
+func (b *PatternBuilder) TypeMatching(mode TypeMatchingMode) *PatternBuilder {
+	b.mode = mode
+	return b
+}
+
 func (b *PatternBuilder) Build() *GoPattern {
 	return &GoPattern{
 		code:          b.code,
 		captures:      captureMap(b.captures),
 		imports:       b.imports,
 		kind:          b.kind,
+		mode:          b.mode,
 		importerCache: importerCache{exportData: b.exportData},
 	}
 }
