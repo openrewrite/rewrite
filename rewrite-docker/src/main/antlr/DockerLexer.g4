@@ -22,6 +22,8 @@ import org.openrewrite.docker.internal.Heredocs;}
     // Whether a parser directive is still recognized here, and whether a comment is
     private boolean atFileHead = true;
     private boolean atLineHead = true;
+    // Named by an '# escape=' directive, and unlike the flags below not scoped to a line
+    private char escapeChar = '\\';
 
     // Each flag above holds over a region of one logical line, so each is one question about the token
     // just matched: does that token still belong to the region, or is it the first one past its end?
@@ -38,6 +40,7 @@ import org.openrewrite.docker.internal.Heredocs;}
         copyFlags = !lineEnded && (_type == COPY || copyFlags && continuesCopyFlags());
         atFileHead = atFileHead && continuesFileHead();
         atLineHead = beginsLineHead() || atLineHead && _type == WS;
+        escapeChar = _type == PARSER_DIRECTIVE ? declaredEscape() : escapeChar;
         return super.emit();
     }
 
@@ -88,6 +91,18 @@ import org.openrewrite.docker.internal.Heredocs;}
     // Docker gives up on directives at the first comment, blank line or instruction
     private boolean continuesFileHead() {
         return _type == PARSER_DIRECTIVE || _type == WS;
+    }
+
+    // Docker takes only '\' or '`' here and fails the build on anything else, a second escape
+    // directive included; we read such a file on with the last value that was one of the two.
+    private char declaredEscape() {
+        String directive = getText();
+        int equals = directive.indexOf('=');
+        if (!"escape".equalsIgnoreCase(directive.substring(1, equals).trim())) {
+            return escapeChar;
+        }
+        String value = directive.substring(equals + 1).trim();
+        return value.length() == 1 && (value.charAt(0) == '\\' || value.charAt(0) == '`') ? value.charAt(0) : escapeChar;
     }
 
     // Both rules that open a heredoc queue its marker exactly as written after the '<<', dash and all,
@@ -164,10 +179,14 @@ MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); };
 HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* { pushHeredocMarker(); } -> pushMode(HEREDOC_PREAMBLE);
 
 // Line continuation - HIDDEN in main mode
-// Supports both backslash (Linux) and backtick (Windows with # escape=`)
 LINE_CONTINUATION : LINE_CONT -> channel(HIDDEN);
 
-fragment LINE_CONT : ('\\' | '`') [ \t]* '\r'? '\n';
+fragment LINE_CONT : ESCAPE WS_CHAR* '\r'? '\n';
+
+// As at FLAG, each predicate sits behind the character it qualifies: one reachable without consuming
+// anything would stop ANTLR caching the start state of every mode these fragments reach.
+fragment ESCAPE     : '\\' {escapeChar == '\\'}? | '`' {escapeChar == '`'}?;
+fragment NOT_ESCAPE : '\\' {escapeChar != '\\'}? | '`' {escapeChar != '`'}?;
 
 // JSON array delimiters (for exec form) - no mode switching, handled in parser
 LBRACKET : '[';
@@ -208,31 +227,27 @@ fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<`];
 
 // String literals
 // Double-quoted strings support escape sequences and line continuation
-// Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
 DOUBLE_QUOTED_STRING : DQ_STRING;
 
-fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | ~["\\\r\n`] )* '"';
+fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | NOT_ESCAPE | ~["\\\r\n`] )* '"';
 // Single-quoted strings in shell are literal - no escape processing inside
-// But they DO support line continuation (backslash or backtick followed by newline)
+// But they DO support line continuation (the escape character followed by newline)
 SINGLE_QUOTED_STRING : SQ_STRING;
 
 fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | ~['\r\n] )* '\'';
 
-// Inline line continuation (inside strings) - backtick or backslash followed by newline
+// Inline line continuation (inside strings) - the escape character followed by newline
 // Docker drops a comment line while joining the lines a continuation holds together, so one does not
 // reach the string that spans it.
-fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+ ( WS_CHAR* '#' ~[\r\n]* [\r\n]+ )*;
+fragment INLINE_CONTINUATION : ESCAPE WS_CHAR* [\r\n]+ ( WS_CHAR* '#' ~[\r\n]* [\r\n]+ )*;
 
-fragment ESCAPE_SEQUENCE
-    : '\\' ~[\r\n]   // Backslash followed by any char except newline (includes \n, \t, \\, \", Windows paths like \P)
-    ;
+fragment ESCAPE_SEQUENCE : ESCAPE ~[\r\n];
 
 // An escape character that LINE_CONT would match, longest-match-first would otherwise carry into the
-// text before it. The predicate sits behind the character it qualifies: one reachable without
-// consuming anything would stop ANTLR caching the start state of every mode this fragment reaches.
+// text before it. What it escapes is optional because the end of the file can stand there.
 fragment TEXT_ESCAPE
-    : '\\' {!atLineContinuation()}? ~[\r\n]
-    | '`' {!atLineContinuation()}?
+    : ESCAPE {!atLineContinuation()}? ~[\r\n]?
+    | NOT_ESCAPE
     ;
 
 // Environment variable reference
@@ -251,9 +266,10 @@ COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* '
 fragment COMMAND_SUBST_INNER : COMMAND_SUBST | ~[()];
 
 // Backtick command substitution `command`
+// Only where the directive leaves the backtick to the shell; where it names one, TEXT_ESCAPE reads it
 // First char after backtick must NOT be whitespace/newline (which would be line continuation)
 // Content cannot span newlines (backtick command substitution doesn't support that)
-BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`';
+BACKTICK_SUBST : '`' {escapeChar != '`'}? ~[ \t\r\n`] ~[`\r\n]* '`';
 
 // Lone dollar sign that doesn't match ENV_VAR, SPECIAL_VAR, or COMMAND_SUBST
 // This handles cases like $'hello' (bash ANSI-C quoting) where $ precedes a quote
@@ -396,8 +412,8 @@ HP_HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* { pushHeredocMarker(); } -> type(H
 
 // Any text on the heredoc line after the marker (destination paths, interpreter names, shell commands, etc.)
 // Exclude < to allow HP_HEREDOC_START to match <<
-// Exclude \ and ` to allow HP_LINE_CONTINUATION to match
-HP_UNQUOTED_TEXT : ( ~[<\\` \t\r\n]+
+// Only the file's escape character is excluded, so that HP_LINE_CONTINUATION matches it
+HP_UNQUOTED_TEXT : ( ( ~[<\\` \t\r\n] | NOT_ESCAPE )+
                    | '<' ~[< \t\r\n] ~[ \t\r\n]*  // single < followed by non-< char
                    | '<'  // standalone <
                    ) -> type(UNQUOTED_TEXT);

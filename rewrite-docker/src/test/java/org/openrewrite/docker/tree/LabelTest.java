@@ -262,6 +262,24 @@ class LabelTest implements RewriteTest {
         );
     }
 
+    @Test
+    void theEscapeCharacterHoldsAQuoteInsideAValue() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu:20.04
+              LABEL author="John `"Doe`" Smith"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(ArgumentContents.quoteStyle(pair.getValue())).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("John `\"Doe`\" Smith");
+            })
+          )
+        );
+    }
+
     private static Docker.Label.LabelPair onlyPair(Docker.File doc) {
         var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(label.getPairs()).singleElement().actual();

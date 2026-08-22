@@ -19,6 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
@@ -374,6 +377,79 @@ class RunTest implements RewriteTest {
         );
     }
 
+    /// Docker joins two lines only on the one escape character a `# escape=` directive names, and with
+    /// no directive that is the backslash.
+    @Test
+    void aBacktickEndsNoLineWithoutADirective() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine
+              RUN echo hi `
+              RUN echo there
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo hi `", "echo there"))
+          )
+        );
+    }
+
+    /// The directive names one escape character rather than adding one.
+    @Test
+    void aBackslashEndsNoLineUnderABacktickDirective() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM alpine
+              RUN echo one \\
+              RUN echo two
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo one \\", "echo two"))
+          )
+        );
+    }
+
+    /// Neither a directive that is not `escape` nor an `# escape=` below an instruction, which Docker
+    /// reads as a comment, names the escape character.
+    @Test
+    void onlyAnEscapeDirectiveAtTheHeadOfTheFileNamesTheCharacter() {
+        rewriteRun(
+          docker(
+            """
+              # syntax=docker/dockerfile:1
+              FROM alpine
+              # escape=`
+              RUN echo hi `
+              RUN echo there
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo hi `", "echo there"))
+          )
+        );
+    }
+
+    /// Docker reads a continuation to nothing and drops the character; we keep it, as text.
+    @Test
+    void anEscapeCharacterAtTheEndOfTheFileJoinsNothing() {
+        rewriteRun(
+          docker(
+            "FROM alpine\n" +
+            "RUN echo a\\",
+            spec -> spec.path("linux/Dockerfile").afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo a\\"))
+          ),
+          docker(
+            "# escape=`\n" +
+            "FROM alpine\n" +
+            "RUN echo a`",
+            spec -> spec.path("windows/Dockerfile").afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo a`"))
+          )
+        );
+    }
+
     @Test
     void runWithWindowsBacktickContinuation() {
         // Test Windows-style backtick line continuation
@@ -644,5 +720,11 @@ class RunTest implements RewriteTest {
                 user -> assertThat(ArgumentContents.text(((Docker.User) user).getUser())).isEqualTo("nobody")))
           )
         );
+    }
+
+    private static List<String> shellCommands(Docker.File doc) {
+        return doc.getStages().getFirst().getInstructions().stream()
+          .map(instruction -> ((Docker.ShellForm) ((Docker.Run) instruction).getCommand()).getArgument().getText())
+          .collect(toList());
     }
 }

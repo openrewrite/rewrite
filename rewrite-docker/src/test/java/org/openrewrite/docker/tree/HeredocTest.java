@@ -177,6 +177,52 @@ class HeredocTest implements RewriteTest {
         );
     }
 
+    /// A preamble ends at the escape character its file names, and holds the other of the two as text.
+    @Test
+    void heredocPreambleKeepsTheCharacterThatIsNotTheEscape() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN <<EOF cat >f1 `
+              echo "Hello World"
+              EOF
+              """,
+            spec -> spec.path("linux/Dockerfile").afterRecipe(doc ->
+              assertThat(preamble(doc)).isEqualTo("<<EOF cat >f1 `"))
+          ),
+          docker(
+            """
+              # escape=`
+              FROM ubuntu:20.04
+              RUN <<EOF cat >f1 \\
+              echo "Hello World"
+              EOF
+              """,
+            spec -> spec.path("windows/Dockerfile").afterRecipe(doc ->
+              assertThat(preamble(doc)).isEqualTo("<<EOF cat >f1 \\"))
+          )
+        );
+    }
+
+    @Test
+    void heredocPreambleContinuesOnTheEscapeCharacter() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu:20.04
+              RUN <<EOF cat >f1 &&`
+                  chmod +x f1
+              echo "Hello World"
+              EOF
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(preamble(doc)).isEqualTo("<<EOF cat >f1 &&`\n    chmod +x f1"))
+          )
+        );
+    }
+
     @Test
     void heredocPreambleKeepsACStyleComment() {
         rewriteRun(
@@ -357,5 +403,10 @@ class HeredocTest implements RewriteTest {
             })
           )
         );
+    }
+
+    private static String preamble(Docker.File doc) {
+        var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
+        return ((Docker.HeredocForm) run.getCommand()).getPreamble();
     }
 }
