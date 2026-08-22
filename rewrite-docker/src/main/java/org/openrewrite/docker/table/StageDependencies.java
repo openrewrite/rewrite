@@ -33,7 +33,7 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
     public static class Row {
         @Column(displayName = "Source file",
                 description = "The Dockerfile containing the build stage.")
-        String sourcePath;
+        String sourceFile;
 
         @Column(displayName = "Stage name",
                 description = "The build stage name (from the `AS` clause), if it has one.")
@@ -50,7 +50,8 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
 
         @Column(displayName = "Registry",
                 description = "The registry the base image is pulled from, `docker.io` when the image name does not " +
-                              "name one, and empty where the stage extends another stage rather than an image.")
+                              "name one, and absent where the stage extends another stage rather than an image.")
+        @Nullable
         String registry;
 
         @Column(displayName = "Referenced by",

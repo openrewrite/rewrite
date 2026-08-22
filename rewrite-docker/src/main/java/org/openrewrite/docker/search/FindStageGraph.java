@@ -28,16 +28,14 @@ import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import static java.lang.String.join;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -64,18 +62,19 @@ public class FindStageGraph extends Recipe {
                 StageGraph graph = StageGraph.of(file);
                 Set<Integer> reachable = graph.reachable();
 
-                String sourcePath = file.getSourcePath().toString();
+                String sourceFile = file.getSourcePath().toString();
                 return file.withStages(ListUtils.map(file.getStages(), (i, stage) -> {
+                    boolean reached = reachable.contains(i);
                     stageDependencies.insertRow(ctx, new StageDependencies.Row(
-                            sourcePath,
+                            sourceFile,
                             graph.getName(i),
                             i,
                             baseImage(stage.getFrom()),
-                            graph.extendsStage(i) ? "" : registry(stage.getFrom()),
-                            join(",", graph.getReferencedBy(i)),
-                            reachable.contains(i)
+                            graph.extendsStage(i) ? null : registry(stage.getFrom()),
+                            graph.getReferencedBy(i),
+                            reached
                     ));
-                    return reachable.contains(i) ? stage :
+                    return reached ? stage :
                             stage.withFrom(SearchResult.found(stage.getFrom(), "unreached"));
                 }));
             }
@@ -109,24 +108,14 @@ public class FindStageGraph extends Recipe {
 
         private final List<@Nullable String> names;
         private final List<Set<Integer>> references;
-        private final List<Set<Integer>> referencedBy;
-        private final Set<Integer> extendsStage;
+        private final boolean[] extendsStage;
         private final boolean ambiguous;
 
-        private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, Set<Integer> extendsStage, boolean ambiguous) {
+        private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, boolean[] extendsStage, boolean ambiguous) {
             this.names = names;
             this.references = references;
             this.extendsStage = extendsStage;
             this.ambiguous = ambiguous;
-            this.referencedBy = new ArrayList<>(names.size());
-            for (int i = 0; i < names.size(); i++) {
-                this.referencedBy.add(new LinkedHashSet<>());
-            }
-            for (int i = 0; i < references.size(); i++) {
-                for (Integer target : references.get(i)) {
-                    this.referencedBy.get(target).add(i);
-                }
-            }
         }
 
         static StageGraph of(Docker.File file) {
@@ -138,15 +127,13 @@ public class FindStageGraph extends Recipe {
             }
 
             List<Set<Integer>> references = new ArrayList<>(stages.size());
-            Set<Integer> extendsStage = new LinkedHashSet<>();
+            boolean[] extendsStage = new boolean[stages.size()];
             boolean ambiguous = !isFullyParsed(file);
             for (int i = 0; i < stages.size(); i++) {
                 ReferenceCollector collector = new ReferenceCollector(names, i);
                 collector.visit(stages.get(i), 0);
                 references.add(collector.targets);
-                if (collector.extendsStage) {
-                    extendsStage.add(i);
-                }
+                extendsStage[i] = collector.extendsStage;
                 ambiguous |= collector.ambiguous;
             }
             return new StageGraph(names, references, extendsStage, ambiguous);
@@ -158,7 +145,11 @@ public class FindStageGraph extends Recipe {
             return new DockerIsoVisitor<AtomicBoolean>() {
                 @Override
                 public Space visitSpace(Space space, AtomicBoolean parsed) {
-                    if (!LINE_CONTINUATION.matcher(space.getWhitespace()).replaceAll("").trim().isEmpty()) {
+                    String whitespace = space.getWhitespace();
+                    if (whitespace.indexOf('\\') >= 0 || whitespace.indexOf('`') >= 0) {
+                        whitespace = LINE_CONTINUATION.matcher(whitespace).replaceAll("");
+                    }
+                    if (!whitespace.trim().isEmpty()) {
                         parsed.set(false);
                     }
                     return super.visitSpace(space, parsed);
@@ -172,42 +163,37 @@ public class FindStageGraph extends Recipe {
 
         /// Whether the stage's `FROM` names another stage of the same file rather than an image to pull.
         boolean extendsStage(int stage) {
-            return extendsStage.contains(stage);
+            return extendsStage[stage];
         }
 
-        List<String> getReferencedBy(int stage) {
-            Set<Integer> referrers = referencedBy.get(stage);
-            if (referrers.isEmpty()) {
-                return emptyList();
+        String getReferencedBy(int stage) {
+            StringJoiner referrers = new StringJoiner(",");
+            for (int i = 0; i < references.size(); i++) {
+                if (references.get(i).contains(stage)) {
+                    String name = names.get(i);
+                    referrers.add(name == null ? "#" + i : name);
+                }
             }
-            List<String> described = new ArrayList<>(referrers.size());
-            for (Integer referrer : referrers) {
-                String name = names.get(referrer);
-                described.add(name == null ? "#" + referrer : name);
-            }
-            return described;
+            return referrers.toString();
         }
 
         /// The stages the image the file ends with is built from, so the last stage and everything it names, directly
         /// or through another stage it names.
         Set<Integer> reachable() {
             if (ambiguous) {
-                return allIndices(names.size());
+                Set<Integer> all = new LinkedHashSet<>();
+                for (int i = 0; i < names.size(); i++) {
+                    all.add(i);
+                }
+                return all;
             }
-            return names.isEmpty() ? emptySet() : reachableFrom(singletonList(names.size() - 1));
+            return names.isEmpty() ? emptySet() : reachableFrom(names.size() - 1);
         }
 
-        private static Set<Integer> allIndices(int size) {
-            Set<Integer> all = new LinkedHashSet<>();
-            for (int i = 0; i < size; i++) {
-                all.add(i);
-            }
-            return all;
-        }
-
-        private Set<Integer> reachableFrom(Collection<Integer> roots) {
+        private Set<Integer> reachableFrom(int root) {
             Set<Integer> reached = new LinkedHashSet<>();
-            Deque<Integer> worklist = new ArrayDeque<>(roots);
+            Deque<Integer> worklist = new ArrayDeque<>();
+            worklist.add(root);
             while (!worklist.isEmpty()) {
                 Integer stage = worklist.remove();
                 if (reached.add(stage)) {
@@ -246,14 +232,16 @@ public class FindStageGraph extends Recipe {
             @Override
             public Docker.Flag visitFlag(Docker.Flag flag, Integer p) {
                 Docker.Argument value = flag.getValue();
-                if (value != null) {
-                    if ("from".equals(flag.getName())) {
-                        reference(ArgumentContents.textWithVariables(value), names.size());
-                    } else if ("mount".equals(flag.getName())) {
-                        for (String field : ArgumentContents.textWithVariables(value).split(",")) {
-                            if (field.regionMatches(true, 0, "from=", 0, "from=".length())) {
-                                reference(field.substring("from=".length()), names.size());
-                            }
+                if (value == null) {
+                    return super.visitFlag(flag, p);
+                }
+                int limit = names.size();
+                if ("from".equals(flag.getName())) {
+                    reference(ArgumentContents.textWithVariables(value), limit);
+                } else if ("mount".equals(flag.getName())) {
+                    for (String field : ArgumentContents.textWithVariables(value).split(",")) {
+                        if (field.regionMatches(true, 0, "from=", 0, "from=".length())) {
+                            reference(field.substring("from=".length()), limit);
                         }
                     }
                 }
@@ -264,7 +252,7 @@ public class FindStageGraph extends Recipe {
             /// so it reaches later stages too; hence `limit`. Searching backwards leaves a duplicated name at its last
             /// declaration, as it is for Docker.
             private boolean reference(String value, int limit) {
-                if (value.indexOf('$') >= 0 || isIndex(value)) {
+                if (value.indexOf('$') >= 0 || StringUtils.isNumeric(value)) {
                     ambiguous = true;
                     return false;
                 }
@@ -276,18 +264,6 @@ public class FindStageGraph extends Recipe {
                     }
                 }
                 return false;
-            }
-
-            private static boolean isIndex(String value) {
-                if (value.isEmpty()) {
-                    return false;
-                }
-                for (int i = 0; i < value.length(); i++) {
-                    if (!Character.isDigit(value.charAt(i))) {
-                        return false;
-                    }
-                }
-                return true;
             }
         }
     }
