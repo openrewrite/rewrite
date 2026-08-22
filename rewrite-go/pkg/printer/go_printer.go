@@ -1019,6 +1019,14 @@ func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J 
 	return paren
 }
 
+func (p *GoPrinter) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ptt.Prefix, ptt.Markers, out)
+	p.Visit(ptt.Type, out)
+	p.afterSyntax(ptt.Markers, out)
+	return ptt
+}
+
 // VisitTypeCast renders Go's conversion `T(x)`.
 func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)

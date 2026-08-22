@@ -229,8 +229,14 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return n.Type
 	case *java.Parentheses:
 		return TypeOfExpression(n.Tree.Element)
+	case *java.ParenthesizedTypeTree:
+		return TypeOfExpression(n.Type.Tree.Element)
 	case *java.ControlParentheses:
 		return TypeOfExpression(n.Tree.Element)
+	// A pointer carries the type it points to; the type mapper draws no
+	// distinction between `T` and `*T`.
+	case *golang.PointerType:
+		return TypeOfExpression(n.Elem)
 	case *java.MethodInvocation:
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType

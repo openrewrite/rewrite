@@ -193,6 +193,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 	case *java.Parentheses:
 		cand := candidate.(*java.Parentheses)
 		return c.matchNode(p.Tree.Element, cand.Tree.Element)
+	case *java.ParenthesizedTypeTree:
+		cand := candidate.(*java.ParenthesizedTypeTree)
+		return c.matchNode(p.Type, cand.Type)
 	case *golang.TypeAssertion:
 		cand := candidate.(*golang.TypeAssertion)
 		return c.matchNode(p.AssertedType, cand.AssertedType) &&
@@ -333,6 +336,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		cand := candidate.(*golang.Channel)
 		return p.Dir == cand.Dir &&
 			c.matchNode(p.Value, cand.Value)
+	case *golang.PointerType:
+		cand := candidate.(*golang.PointerType)
+		return c.matchNode(p.Elem, cand.Elem)
 	case *golang.FuncType:
 		cand := candidate.(*golang.FuncType)
 		if !c.matchStatementContainer(p.Parameters, cand.Parameters) {
