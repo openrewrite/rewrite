@@ -87,9 +87,9 @@ public class AddOrUpdateLabel extends Recipe {
 
         @Override
         public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, ExecutionContext ctx) {
-            if (key.equals(pair.getKey().getTextWithVariables())) {
+            if (key.equals(ArgumentContents.textWithVariables(pair.getKey()))) {
                 boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
-                return shouldOverwrite && !value.equals(pair.getValue().getTextWithVariables()) ?
+                return shouldOverwrite && !value.equals(ArgumentContents.textWithVariables(pair.getValue())) ?
                         pair.withValue(createArgument(value, pair.getValue())
                                 .withPrefix(pair.getValue().getPrefix())) : pair;
             }
@@ -125,7 +125,7 @@ public class AddOrUpdateLabel extends Recipe {
             return new DockerIsoVisitor<AtomicBoolean>() {
                 @Override
                 public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, AtomicBoolean matchFound) {
-                    if (!matchFound.get() && key.equals(pair.getKey().getTextWithVariables())) {
+                    if (!matchFound.get() && key.equals(ArgumentContents.textWithVariables(pair.getKey()))) {
                         matchFound.set(true);
                     }
                     return pair;
@@ -160,7 +160,7 @@ public class AddOrUpdateLabel extends Recipe {
     private static Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
         Docker.Literal.@Nullable QuoteStyle quoteStyle = null;
         if (text.contains(" ") || text.contains("=")) {
-            Docker.Literal.QuoteStyle originalStyle = original == null ? null : original.getQuoteStyle();
+            Docker.Literal.QuoteStyle originalStyle = original == null ? null : ArgumentContents.quoteStyle(original);
             quoteStyle = originalStyle == null ? Docker.Literal.QuoteStyle.DOUBLE : originalStyle;
         }
         return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, ArgumentContents.of(text, quoteStyle));

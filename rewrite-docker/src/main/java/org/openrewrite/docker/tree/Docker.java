@@ -22,6 +22,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.DockerPrinter;
 import org.openrewrite.marker.Markers;
 
@@ -982,53 +983,22 @@ public interface Docker extends Tree {
         /// @return The text of every content, or `null` if an environment variable reference makes it
         /// impossible to resolve statically.
         public @Nullable String getText() {
-            StringBuilder text = new StringBuilder();
-            for (ArgumentContent content : contents) {
-                if (content instanceof EnvironmentVariable) {
-                    return null;
-                }
-                if (content instanceof Literal) {
-                    text.append(((Literal) content).getText());
-                }
-            }
-            return text.toString();
+            return ArgumentContents.text(this);
         }
 
         /// @return As [#getText()], but rendering environment variable references in their original
         /// `$VAR` or `${VAR}` form rather than giving up.
         public String getTextWithVariables() {
-            StringBuilder text = new StringBuilder();
-            for (ArgumentContent content : contents) {
-                if (content instanceof Literal) {
-                    text.append(((Literal) content).getText());
-                } else if (content instanceof EnvironmentVariable) {
-                    EnvironmentVariable env = (EnvironmentVariable) content;
-                    text.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
-                }
-            }
-            return text.toString();
+            return ArgumentContents.textWithVariables(this);
         }
 
         /// @return The quote style of the first quoted literal, or `null` if none is quoted.
         public Literal.@Nullable QuoteStyle getQuoteStyle() {
-            for (ArgumentContent content : contents) {
-                if (content instanceof Literal) {
-                    Literal.QuoteStyle style = ((Literal) content).getQuoteStyle();
-                    if (style != null) {
-                        return style;
-                    }
-                }
-            }
-            return null;
+            return ArgumentContents.quoteStyle(this);
         }
 
         public boolean hasEnvironmentVariables() {
-            for (ArgumentContent content : contents) {
-                if (content instanceof EnvironmentVariable) {
-                    return true;
-                }
-            }
-            return false;
+            return ArgumentContents.containsVariable(this);
         }
 
         @Override

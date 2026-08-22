@@ -27,9 +27,16 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Builds the contents of a {@link Docker.Argument} from text. Both the parser and recipes that
- * synthesize values go through here, so a value a recipe writes is modelled the same way as one
- * read back from the printed Dockerfile.
+ * Builds the contents of a {@link Docker.Argument} from text, and reads them back out. Both the
+ * parser and recipes that synthesize values go through here, so a value a recipe writes is modelled
+ * the same way as one read back from the printed Dockerfile.
+ * <p>
+ * {@link Docker.Argument} exposes the readers below as instance methods for recipe authors, but
+ * everything in this module that the Moderne CLI loads from a recipe jar calls them here instead.
+ * The CLI's {@code RecipeClassLoader} delegates {@code org.openrewrite.docker.tree} to its own
+ * bundled rewrite-docker while loading recipes, traits and this package from the recipe jar, so a
+ * method added to an LST class is missing at runtime whenever the CLI predates it. These statics
+ * ship alongside their callers, and read only LST members that long predate them.
  */
 public class ArgumentContents {
     private ArgumentContents() {
@@ -116,6 +123,58 @@ public class ArgumentContents {
                     Markers.EMPTY, current.toString(), null));
         }
         return contents;
+    }
+
+    /// @return The text of every content of `argument`, or `null` if an environment variable
+    /// reference makes it impossible to resolve statically.
+    public static @Nullable String text(Docker.Argument argument) {
+        StringBuilder text = new StringBuilder();
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.EnvironmentVariable) {
+                return null;
+            }
+            if (content instanceof Docker.Literal) {
+                text.append(((Docker.Literal) content).getText());
+            }
+        }
+        return text.toString();
+    }
+
+    /// @return As [#text], but rendering environment variable references in their original
+    /// `$VAR` or `${VAR}` form rather than giving up.
+    public static String textWithVariables(Docker.Argument argument) {
+        StringBuilder text = new StringBuilder();
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.Literal) {
+                text.append(((Docker.Literal) content).getText());
+            } else if (content instanceof Docker.EnvironmentVariable) {
+                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
+                text.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
+            }
+        }
+        return text.toString();
+    }
+
+    /// @return The quote style of the first quoted literal in `argument`, or `null` if none is quoted.
+    public static Docker.Literal.@Nullable QuoteStyle quoteStyle(Docker.Argument argument) {
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.Literal) {
+                Docker.Literal.QuoteStyle style = ((Docker.Literal) content).getQuoteStyle();
+                if (style != null) {
+                    return style;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static boolean containsVariable(Docker.Argument argument) {
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.EnvironmentVariable) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean containsVariable(String text) {
