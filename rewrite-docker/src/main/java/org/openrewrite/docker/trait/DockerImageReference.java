@@ -21,6 +21,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
@@ -71,7 +72,7 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
      */
     default Optional<String> getImageName() {
         Docker.Argument imageName = getImageNameArgument();
-        return imageName == null ? Optional.empty() : Optional.of(imageName.getTextWithVariables());
+        return imageName == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(imageName));
     }
 
     /// As [#getImageName()], but decomposed into the registry the image is pulled from and the path
@@ -102,7 +103,7 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
      */
     default Optional<String> getTag() {
         Docker.Argument tag = getTagArgument();
-        return tag == null ? Optional.empty() : Optional.of(tag.getTextWithVariables());
+        return tag == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(tag));
     }
 
     /**
@@ -110,7 +111,7 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
      */
     default Optional<String> getDigest() {
         Docker.Argument digest = getDigestArgument();
-        return digest == null ? Optional.empty() : Optional.of(digest.getTextWithVariables());
+        return digest == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(digest));
     }
 
     /**
@@ -139,12 +140,12 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         }
         Docker.Argument tag = getTagArgument();
         if (tag == null) {
-            if (imageName.hasEnvironmentVariables()) {
+            if (ArgumentContents.containsVariable(imageName)) {
                 return Optional.empty();
             }
             return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
         }
-        if ("latest".equals(tag.getText())) {
+        if ("latest".equals(ArgumentContents.text(tag))) {
             return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
         }
         return Optional.empty();
