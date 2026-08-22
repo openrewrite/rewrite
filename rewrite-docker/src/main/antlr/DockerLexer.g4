@@ -235,8 +235,6 @@ fragment TEXT_ESCAPE
     | '`' {!atLineContinuation()}?
     ;
 
-fragment HEX_DIGIT : [0-9A-F];
-
 // Environment variable reference
 ENV_VAR : VAR_REF;
 
