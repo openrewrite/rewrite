@@ -95,17 +95,11 @@ public class ChangeFrom extends Recipe {
     @Nullable
     String newPlatform;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Docker FROM";
-    }
+    String displayName = "Change Docker FROM";
 
-    @Override
-    public String getDescription() {
-        return "Change the base image in a Dockerfile FROM instruction. " +
-                "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
-                "`$0` substitutes the full original value; `\\$` is a literal dollar.";
-    }
+    String description = "Change the base image in a Dockerfile FROM instruction. " +
+            "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
+            "`$0` substitutes the full original value; `\\$` is a literal dollar.";
 
     @Override
     public Validated<Object> validate() {

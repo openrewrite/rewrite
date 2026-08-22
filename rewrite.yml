@@ -15,7 +15,6 @@
 #
 ---
 # Apply a subset of best practices to OpenRewrite recipes; typically run before committing changes.
-# Any differences produced by this recipe will result in code suggestion comments on pull requests.
 # Recipes from org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPractices that we deliberately do
 # not apply here are listed but commented out, each with the reason it stays disabled.
 ---

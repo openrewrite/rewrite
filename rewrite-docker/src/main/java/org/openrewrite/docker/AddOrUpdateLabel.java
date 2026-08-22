@@ -58,15 +58,9 @@ public class AddOrUpdateLabel extends Recipe {
     @Nullable
     String stageName;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Docker LABEL instruction";
-    }
+    String displayName = "Add Docker LABEL instruction";
 
-    @Override
-    public String getDescription() {
-        return "Adds or updates a LABEL instruction in a Dockerfile. By default, adds to the final stage only.";
-    }
+    String description = "Adds or updates a LABEL instruction in a Dockerfile. By default, adds to the final stage only.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
