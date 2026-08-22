@@ -247,8 +247,10 @@ public class Assertions {
     }
 
     private static class WellFormedVisitor extends DockerIsoVisitor<List<String>> {
+        // The lookarounds keep a here-string out: `<<<'x'` redirects a word rather than opening a heredoc,
+        // and its last two '<' would otherwise read as a marker naming the word that follows them.
         private static final Pattern HEREDOC_MARKER =
-                Pattern.compile("<<(-?(?:[A-Za-z_][A-Za-z0-9_]*|'[^'\\r\\n]*'|\"[^\"\\r\\n]*\")+)");
+                Pattern.compile("(?<!<)<<(?!<)(-?(?:[A-Za-z_][A-Za-z0-9_]*|'[^'\\r\\n]*'|\"[^\"\\r\\n]*\")+)");
 
         private final Set<UUID> ids = new HashSet<>();
 

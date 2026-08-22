@@ -459,6 +459,43 @@ class HeredocTest implements RewriteTest {
     }
 
     @Test
+    void aQuoteOfTheOtherKindBelongsToTheDelimiter() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN <<"it's"
+              echo hi
+              it's
+              RUN echo after
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var instructions = file.getStages().getFirst().getInstructions();
+                var heredoc = (Docker.HeredocForm) ((Docker.Run) instructions.getFirst()).getCommand();
+                assertThat(heredoc.getBodies()).hasSize(1);
+                assertThat(heredoc.getBodies().getFirst().getClosing()).isEqualTo("it's");
+                assertThat(instructions).hasSize(2);
+            })
+          )
+        );
+    }
+
+    @Test
+    void aHereStringInThePreambleOpensNothing() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN <<EOF psql <<<'select 1'
+              select 2
+              EOF
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(preamble(file)).isEqualTo("<<EOF psql <<<'select 1'"))
+          )
+        );
+    }
+
+    @Test
     void partlyQuotedDelimiterNamesTheWholeWord() {
         rewriteRun(
           docker(
