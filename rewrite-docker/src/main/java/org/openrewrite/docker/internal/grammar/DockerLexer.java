@@ -143,8 +143,8 @@ public class DockerLexer extends Lexer {
 	    private boolean atLineStart = true;
 	    // Whether the CMD or NONE that a HEALTHCHECK takes is still to come
 	    private boolean afterHealthcheck = false;
-	    // Whether the flags of a COPY or ADD are still being read, where --from carries an image reference
-	    private boolean copyAddFlags = false;
+	    // Whether the flags of a COPY are still being read, where --from carries an image reference
+	    private boolean copyFlags = false;
 	    // Whether a parser directive is still recognized here, and whether a comment is
 	    private boolean atFileHead = true;
 	    private boolean atLineHead = true;
@@ -161,7 +161,7 @@ public class DockerLexer extends Lexer {
 	        boolean lineEnded = endsLine();
 	        atLineStart = lineEnded || atLineStart && continuesLineStart();
 	        afterHealthcheck = !lineEnded && (_type == HEALTHCHECK || afterHealthcheck && _type != CMD && _type != NONE);
-	        copyAddFlags = !lineEnded && (_type == COPY || _type == ADD || copyAddFlags && continuesCopyAddFlags());
+	        copyFlags = !lineEnded && (_type == COPY || copyFlags && continuesCopyFlags());
 	        atFileHead = atFileHead && continuesFileHead();
 	        atLineHead = beginsLineHead() || atLineHead && _type == WS;
 	        return super.emit();
@@ -189,9 +189,9 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // The flag section of a COPY or ADD reaches to the first of its paths. FLAG_IMAGE_REF holds the
+	    // The flag section of a COPY reaches to the first of its paths. FLAG_IMAGE_REF holds the
 	    // value of a --from, which is part of the section rather than the end of it.
-	    private boolean continuesCopyAddFlags() {
+	    private boolean continuesCopyFlags() {
 	        if (_mode == FLAG_IMAGE_REF) {
 	            return true;
 	        }
@@ -232,9 +232,9 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // Whether what follows the '--' that both flag rules begin with is the '--from=' of a COPY or ADD
+	    // Whether what follows the '--' that both flag rules begin with is the '--from=' of a COPY
 	    private boolean atFromFlag() {
-	        if (!copyAddFlags) {
+	        if (!copyFlags) {
 	            return false;
 	        }
 	        String fromFlag = "from=";

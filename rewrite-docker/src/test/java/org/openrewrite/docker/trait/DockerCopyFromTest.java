@@ -59,12 +59,10 @@ class DockerCopyFromTest implements RewriteTest {
             """
               FROM ubuntu
               COPY --from=alpine /lib /app/lib
-              ADD --from=alpine:latest /etc /app/etc
               """,
             """
               FROM ubuntu
               COPY --from=alpine:3.19 /lib /app/lib
-              ADD --from=alpine:3.19 /etc /app/etc
               """
           )
         );
@@ -199,7 +197,7 @@ class DockerCopyFromTest implements RewriteTest {
     }
 
     @Test
-    void decomposesDigestInAddFrom() {
+    void decomposesDigestInCopyFrom() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
@@ -214,11 +212,11 @@ class DockerCopyFromTest implements RewriteTest {
           docker(
             """
               FROM alpine
-              ADD --from=alpine@sha256:abc123 /out /app
+              COPY --from=alpine@sha256:abc123 /out /app
               """,
             """
               FROM alpine
-              ~~>ADD --from=alpine@sha256:abc123 /out /app
+              ~~>COPY --from=alpine@sha256:abc123 /out /app
               """
           )
         );

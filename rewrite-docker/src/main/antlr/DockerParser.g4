@@ -158,7 +158,7 @@ flag
     : FLAG
     ;
 
-// The --from of a COPY or ADD holds the same name:tag@digest reference a FROM does, split by the
+// The --from of a COPY holds the same name:tag@digest reference a FROM does, split by the
 // same rule. FLAG_END is the whitespace that ends the reference, without which this rule would
 // carry on into the flags and paths that follow it.
 fromFlag
