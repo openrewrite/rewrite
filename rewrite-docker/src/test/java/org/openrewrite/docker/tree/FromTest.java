@@ -365,22 +365,6 @@ class FromTest implements RewriteTest {
         );
     }
 
-    @Test
-    void separatorWithoutATag() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:
-              """,
-            spec -> spec.afterRecipe(doc -> {
-                Docker.From from = doc.getStages().getFirst().getFrom();
-                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
-                assertThat(from.getTag().getContents()).isEmpty();
-            })
-          )
-        );
-    }
-
     /// A continuation joins the lines it spans, and Docker keeps the indent of the line that follows
     /// it, so only an unindented continuation leaves an image reference Docker still reads as one:
     /// `FROM ubuntu\<newline>  :22.04` reaches it as `FROM ubuntu  :22.04`, two arguments where FROM

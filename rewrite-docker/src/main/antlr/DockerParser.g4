@@ -225,8 +225,6 @@ jsonString
 // reference or a registry port belongs to the part that holds it.
 imageReference
     : imageName ( COLON tag? )? ( AT digest? )?
-    | COLON tag? ( AT digest? )?
-    | AT digest?
     ;
 
 // Nothing but a separator, `AS` or the next instruction can follow a part of a reference, so the
