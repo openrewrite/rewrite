@@ -28,6 +28,17 @@ import java.util.Queue;}
         copyAddFlags = false;
     }
 
+    // Whether the escape character just matched is the one LINE_CONT ends a logical line with, rather
+    // than one of the text it holds. A mode whose text may end at a continuation asks before taking it.
+    private boolean atLineContinuation() {
+        for (int i = 1; ; i++) {
+            int c = _input.LA(i);
+            if (c != ' ' && c != '\t') {
+                return c == '\n' || (c == '\r' && _input.LA(i + 1) == '\n');
+            }
+        }
+    }
+
     // Whether what follows the '--' that both flag rules begin with is the '--from=' of a COPY or ADD
     private boolean atFromFlag() {
         if (!copyAddFlags) {
@@ -158,6 +169,16 @@ fragment ESCAPE_SEQUENCE
     : '\\' ~[\r\n]   // Backslash followed by any char except newline (includes \n, \t, \\, \", Windows paths like \P)
     ;
 
+// The escape character LINE_CONT ends a logical line with belongs to no token before it, so a mode
+// whose text can end at a continuation takes one only where none begins. Lexing longest-match-first
+// would otherwise carry it, and with it any spaces and the newline, into the text that precedes it.
+// The predicate sits behind the character it qualifies: one reachable without consuming anything
+// would stop ANTLR caching the start state of every mode this fragment reaches.
+fragment TEXT_ESCAPE
+    : '\\' {!atLineContinuation()}? ~[\r\n]
+    | '`' {!atLineContinuation()}?
+    ;
+
 fragment HEX_DIGIT : [0-9A-F];
 
 // Environment variable reference
@@ -239,11 +260,10 @@ IR_DOLLAR               : '$'             -> type(DOLLAR);
 // than to a tag ('host:5000/img:tag'), so it stays inside the token.
 IR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
-// Shared with FLAG_IMAGE_REF, which reads the same reference. ESCAPE_SEQUENCE rather than
-// ESCAPED_CHAR because it stops before a newline, which lexing longest-match-first would otherwise
-// take into the token and so hide the line continuation that ends the reference.
-fragment IR_TEXT       : ( IR_TEXT_CHAR | ESCAPE_SEQUENCE | IR_PORT_COLON )+;
-fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$];
+// Shared with FLAG_IMAGE_REF, which reads the same reference. TEXT_ESCAPE rather than ESCAPED_CHAR
+// because a reference ends at the line continuation that TEXT_ESCAPE leaves alone.
+fragment IR_TEXT       : ( IR_TEXT_CHAR | TEXT_ESCAPE | IR_PORT_COLON )+;
+fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$`];
 fragment IR_PORT_COLON : ':' ( IR_TEXT_CHAR | ':' )* '/';
 
 // ----------------------------------------------------------------------------------------------
@@ -292,9 +312,10 @@ US_ENV_VAR              : VAR_REF         -> type(ENV_VAR);
 US_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
 US_DOLLAR               : '$'             -> type(DOLLAR);
 
-US_UNQUOTED_TEXT : ( US_TEXT_CHAR | ESCAPED_CHAR )+ -> type(UNQUOTED_TEXT);
+// As IR_TEXT: a specification ends at the line continuation that TEXT_ESCAPE leaves alone.
+US_UNQUOTED_TEXT : ( US_TEXT_CHAR | TEXT_ESCAPE )+ -> type(UNQUOTED_TEXT);
 
-fragment US_TEXT_CHAR : ~[: \t\r\n\\"'$];
+fragment US_TEXT_CHAR : ~[: \t\r\n\\"'$`];
 
 // ----------------------------------------------------------------------------------------------
 // HEREDOC_PREAMBLE mode - for parsing shell command preamble after heredoc marker(s)

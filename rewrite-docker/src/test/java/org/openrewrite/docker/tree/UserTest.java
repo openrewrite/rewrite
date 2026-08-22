@@ -185,6 +185,126 @@ class UserTest implements RewriteTest {
         );
     }
 
+    /// The continuation that ends the line is not part of the group. Lexing longest-match-first used to
+    /// take it into the token before it, which left the newline in `getText()` and so in any match on it.
+    @Test
+    void continuationAfterTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:group\\
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(user.getUser().getText()).isEqualTo("root");
+                assertThat(user.getGroup().getText()).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    @Test
+    void continuationAfterAUserWithNoGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root\\
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(user.getUser().getText()).isEqualTo("root");
+                assertThat(user.getGroup()).isNull();
+            })
+          )
+        );
+    }
+
+    /// A backtick continues a line as a backslash does, since the lexer reads both without asking which
+    /// one the `escape` directive names.
+    @Test
+    void backtickContinuationAfterTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:group`
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(user.getUser().getText()).isEqualTo("root");
+                assertThat(user.getGroup().getText()).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    /// Spaces and tabs may sit between the escape character and the newline it continues over, so the
+    /// group ends before the escape character rather than before the newline.
+    @Test
+    void continuationPaddedWithSpacesAfterTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:group\\  \s
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(user.getUser().getText()).isEqualTo("root");
+                assertThat(user.getGroup().getText()).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    /// Where a continuation splits a name rather than ending it, the name is still one unbroken run of
+    /// source, so it keeps the continuation the way `continuationBeforeTheSeparator` keeps it.
+    @Test
+    void continuationInsideTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:gr\\
+              oup
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getText()).isEqualTo("root");
+                assertThat(user.getGroup().getText()).isEqualTo("gr\\\noup");
+            })
+          )
+        );
+    }
+
+    /// An escape character that no newline follows is text, and stays in the name that holds it.
+    @Test
+    void escapeCharactersInsideANameAreText() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER ro\\ ot:gr`oup
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(user.getUser().getText()).isEqualTo("ro\\ ot");
+                assertThat(user.getGroup().getText()).isEqualTo("gr`oup");
+            })
+          )
+        );
+    }
+
     @Test
     void continuationBeforeTheSeparator() {
         rewriteRun(

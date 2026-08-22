@@ -396,6 +396,42 @@ class FromTest implements RewriteTest {
         );
     }
 
+    /// Spaces and tabs may sit between the escape character and the newline it continues over, so the
+    /// name ends before the escape character rather than carrying it and losing the tag with it.
+    @Test
+    void continuationPaddedWithSpacesBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu\\  \s
+                :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    /// A backtick continues a line as a backslash does, since the lexer reads both without asking which
+    /// one the `escape` directive names.
+    @Test
+    void backtickContinuationBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu`
+                :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
     @Test
     void quotedImageReferenceWithVariableStaysWhole() {
         rewriteRun(
