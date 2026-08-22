@@ -405,6 +405,118 @@ class HeredocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void quotedDelimiterOnCopy() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              COPY --chmod=0644 <<'EOF' /etc/config.toml
+              a = 1
+              EOF
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var copy = (Docker.Copy) file.getStages().getFirst().getInstructions().getFirst();
+                assertThat(copy.getHeredoc()).isNotNull();
+                assertThat(copy.getHeredoc().getPreamble()).isEqualTo("<<'EOF'");
+                assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
+                  .isEqualTo("/etc/config.toml");
+                assertThat(copy.getHeredoc().getBodies()).hasSize(1);
+                assertThat(copy.getHeredoc().getBodies().getFirst().getClosing()).isEqualTo("EOF");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedDelimiterOnRun() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN <<'EOF'
+              echo hi
+              EOF
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(preamble(file)).isEqualTo("<<'EOF'"))
+          )
+        );
+    }
+
+    @Test
+    void doubleQuotedDelimiterOnADashHeredoc() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN <<-"EOF"
+              \techo hi
+              \tEOF
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(preamble(file)).isEqualTo("<<-\"EOF\""))
+          )
+        );
+    }
+
+    @Test
+    void partlyQuotedDelimiterNamesTheWholeWord() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN <<E'O'F
+              echo hi
+              EOF
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var heredoc = (Docker.HeredocForm) ((Docker.Run) file.getStages().getFirst().getInstructions()
+                        .getFirst()).getCommand();
+                assertThat(heredoc.getBodies().getFirst().getOpening()).isEqualTo("<<E'O'F");
+                assertThat(heredoc.getBodies().getFirst().getClosing()).isEqualTo("EOF");
+            })
+          )
+        );
+    }
+
+    @Test
+    void heredocOpenedAfterARedirect() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN cat >> /etc/hosts <<EOF
+              127.0.0.1 localhost
+              EOF
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(preamble(file)).isEqualTo("cat >> /etc/hosts <<EOF"))
+          )
+        );
+    }
+
+    @Test
+    void multipleHeredocsOpenedAfterRedirects() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              RUN cat >/a <<E1 && cat >/b <<E2
+              one
+              E1
+              two
+              E2
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var heredoc = (Docker.HeredocForm) ((Docker.Run) file.getStages().getFirst().getInstructions()
+                        .getFirst()).getCommand();
+                assertThat(heredoc.getPreamble()).isEqualTo("cat >/a <<E1 && cat >/b <<E2");
+                assertThat(heredoc.getBodies()).hasSize(2);
+                assertThat(heredoc.getBodies().getFirst().getContentLines()).containsExactly("one\n");
+                assertThat(heredoc.getBodies().getLast().getContentLines()).contains("two\n");
+            })
+          )
+        );
+    }
+
     private static String preamble(Docker.File doc) {
         var run = (Docker.Run) doc.getStages().getFirst().getInstructions().getLast();
         return ((Docker.HeredocForm) run.getCommand()).getPreamble();

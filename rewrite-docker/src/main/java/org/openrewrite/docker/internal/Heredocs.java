@@ -37,13 +37,34 @@ public final class Heredocs {
      * @param line   a whole line of the body, without its newline
      */
     public static boolean closes(String marker, String line) {
+        String delimiter = delimiter(marker);
         if (marker.startsWith("-")) {
             int indent = 0;
             while (indent < line.length() && line.charAt(indent) == '\t') {
                 indent++;
             }
-            return line.substring(indent).equals(marker.substring(1));
+            return line.substring(indent).equals(delimiter);
         }
-        return line.equals(marker);
+        return line.equals(delimiter);
+    }
+
+    /**
+     * The delimiter a marker names, which is the marker without its {@code -} and with the quotes taken
+     * off. Docker puts the marker through the same quote removal a shell word gets, so {@code <<'EOF'},
+     * {@code <<"EOF"} and {@code <<EOF} all name {@code EOF}; what the quotes say is that the body is
+     * not to have its variables expanded, which is no part of the name the terminator line carries.
+     *
+     * @param marker the marker as written after {@code <<}, so {@code "EOF"}, {@code "-EOF"} or {@code "'EOF'"}
+     */
+    public static String delimiter(String marker) {
+        String name = marker.startsWith("-") ? marker.substring(1) : marker;
+        StringBuilder unquoted = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c != '\'' && c != '"') {
+                unquoted.append(c);
+            }
+        }
+        return unquoted.toString();
     }
 }
