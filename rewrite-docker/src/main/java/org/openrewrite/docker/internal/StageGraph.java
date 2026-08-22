@@ -173,7 +173,7 @@ public class StageGraph {
             if (from.getTag() == null && from.getDigest() == null) {
                 String plain = ArgumentContents.text(from.getImageName());
                 if (plain != null) {
-                    reference(plain);
+                    reference(plain, stage);
                 } else if (!ArgumentContents.textWithVariables(from.getImageName()).contains("/")) {
                     ambiguous = true;
                 }
@@ -186,11 +186,11 @@ public class StageGraph {
             Docker.Argument value = flag.getValue();
             if (value != null) {
                 if ("from".equals(flag.getName())) {
-                    reference(ArgumentContents.textWithVariables(value));
+                    reference(ArgumentContents.textWithVariables(value), names.size());
                 } else if ("mount".equals(flag.getName())) {
                     for (String field : ArgumentContents.textWithVariables(value).split(",")) {
                         if (field.regionMatches(true, 0, "from=", 0, "from=".length())) {
-                            reference(field.substring("from=".length()));
+                            reference(field.substring("from=".length()), names.size());
                         }
                     }
                 }
@@ -198,14 +198,17 @@ public class StageGraph {
             return super.visitFlag(flag, p);
         }
 
-        private void reference(String value) {
+        /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole file is read,
+        /// so it reaches a stage declared later too. Hence `limit`, the number of stages in scope, and the search
+        /// running backwards from it: where a name is declared twice, the last declaration is the one that stands.
+        private void reference(String value, int limit) {
             if (value.indexOf('$') >= 0 || isIndex(value)) {
                 ambiguous = true;
                 return;
             }
             String name = value.toLowerCase(Locale.ROOT);
-            for (int i = stage - 1; i >= 0; i--) {
-                if (name.equals(names.get(i))) {
+            for (int i = limit - 1; i >= 0; i--) {
+                if (i != stage && name.equals(names.get(i))) {
                     targets.add(i);
                     return;
                 }
