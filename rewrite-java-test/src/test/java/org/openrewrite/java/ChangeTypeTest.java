@@ -66,6 +66,38 @@ class ChangeTypeTest implements RewriteTest {
       }
       """;
 
+    @Language("java")
+    String flatOld = """
+      package a;
+      public enum Old { A }
+      """;
+
+    @Language("java")
+    String nestedTargetOuter = """
+      package b;
+      public class Outer {
+          public enum Nested { A }
+      }
+      """;
+
+    @Language("java")
+    String nestedOriginalOuter = """
+      package a;
+      public class Outer {
+          public enum Nested { A }
+      }
+      """;
+
+    @Language("java")
+    String deeplyNestedTarget = """
+      package b;
+      public class A {
+          public static class B {
+              public enum C { A }
+          }
+      }
+      """;
+
     @DocumentExample
     @Test
     void doNotAddJavaLangWrapperImports() {
@@ -332,6 +364,235 @@ class ChangeTypeTest implements RewriteTest {
 
               class Test {
                   Map.Entry p;
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Test
+    void replaceFullyQualifiedReferenceWithNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.io.File", "java.util.Map$Entry", true)),
+          java(
+            """
+              class Test {
+                  java.io.File p;
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class Test {
+                  Map.Entry p;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-cucumber-jvm/issues/47")
+    @Test
+    void changeToNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Nested", null)),
+          java(nestedTargetOuter, SourceSpec::skip),
+          java(flatOld, SourceSpec::skip),
+          java(
+            """
+              package c;
+              public class Nested {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.Old;
+
+              class Test {
+                  Old value = Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+
+              class Test {
+                  Outer.Nested value = Outer.Nested.A;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+              import c.Nested;
+
+              class UnrelatedSameSimpleName {
+                  Nested other;
+                  Old value = Old.A;
+              }
+              """,
+            """
+              import b.Outer;
+              import c.Nested;
+
+              class UnrelatedSameSimpleName {
+                  Nested other;
+                  Outer.Nested value = Outer.Nested.A;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToNestedTypeWhenOuterClassNameIsTaken() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$Nested", null)),
+          java(nestedTargetOuter, SourceSpec::skip),
+          java(flatOld, SourceSpec::skip),
+          java(
+            """
+              package c;
+              public class Outer {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.Old;
+              import c.Outer;
+
+              class Test {
+                  Outer other;
+                  Old value = Old.A;
+              }
+              """,
+            """
+              import c.Outer;
+
+              class Test {
+                  Outer other;
+                  b.Outer.Nested value = b.Outer.Nested.A;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeFromNestedTypeToFlatType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Nested", "b.New", null)),
+          java(nestedOriginalOuter, SourceSpec::skip),
+          java(
+            """
+              package b;
+              public enum New { A }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.Outer.Nested;
+
+              class Test {
+                  Nested value = Nested.A;
+              }
+              """,
+            """
+              import b.New;
+
+              class Test {
+                  New value = New.A;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeFromNestedTypeToNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Nested", "b.Other$Inner", null)),
+          java(nestedOriginalOuter, SourceSpec::skip),
+          java(
+            """
+              package b;
+              public class Other {
+                  public enum Inner { A }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.Outer.Nested;
+
+              class ViaImport {
+                  Nested value = Nested.A;
+              }
+              """,
+            """
+              import b.Other;
+
+              class ViaImport {
+                  Other.Inner value = Other.Inner.A;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Outer;
+
+              class ViaOuterClass {
+                  Outer.Nested value = Outer.Nested.A;
+              }
+              """,
+            """
+              import b.Other;
+
+              class ViaOuterClass {
+                  Other.Inner value = Other.Inner.A;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToDeeplyNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.A$B$C", null)),
+          java(deeplyNestedTarget, SourceSpec::skip),
+          java(flatOld, SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              class ViaImport {
+                  Old value = Old.A;
+              }
+              """,
+            """
+              import b.A;
+
+              class ViaImport {
+                  A.B.C value = A.B.C.A;
+              }
+              """
+          ),
+          java(
+            """
+              class ViaPackageQualifiedName {
+                  a.Old value = a.Old.A;
+              }
+              """,
+            """
+              import b.A;
+
+              class ViaPackageQualifiedName {
+                  A.B.C value = A.B.C.A;
               }
               """
           )
