@@ -573,4 +573,47 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    /// A continued line is read from its first column, so nothing about the escape character that ends
+    /// the line before it depends on what the next one begins with.
+    @Test
+    void continuationBeforeAnUnindentedLine() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              RUN apt-get update \\
+              && apt-get install -y curl
+              VOLUME /data
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(((Docker.ShellForm) ((Docker.Run) run).getCommand()).getArgument().getText())
+                  .isEqualTo("apt-get update \\\n&& apt-get install -y curl"),
+                volume -> assertThat(volume).isInstanceOf(Docker.Volume.class)))
+          )
+        );
+    }
+
+    /// Docker drops a comment line while joining the lines a continuation holds together, so the
+    /// instruction carries on past one and the instruction after it is still its own.
+    @Test
+    void commentLineInsideALineContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:3.20
+              RUN apk del .checksum-deps \\
+              # if we have leftovers from building, let's purge them
+                  && rm -rf /tmp/build
+              VOLUME /data
+              """,
+            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
+              .satisfiesExactly(
+                run -> assertThat(run).isInstanceOf(Docker.Run.class),
+                volume -> assertThat(volume).isInstanceOf(Docker.Volume.class)))
+          )
+        );
+    }
+
 }

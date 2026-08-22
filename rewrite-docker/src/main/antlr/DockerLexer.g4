@@ -185,8 +185,9 @@ DASH_DASH  : '--';
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
 // This matches text that doesn't start with -- or <<
 // Note: < is excluded to allow HEREDOC_START (<<) to match
-fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<];
-fragment ESCAPED_CHAR : '\\' .;
+// Neither escape character is a character of the text: each one ends the line it stands at the end of,
+// and TEXT_ESCAPE is what tells that position from any other.
+fragment UNQUOTED_CHAR : ~[ \t\r\n\\"'$[\]=<`];
 
 // String literals
 // Double-quoted strings support escape sequences, line continuation, and bare newlines
@@ -249,12 +250,12 @@ DOLLAR : '$';
 // We structure this to not match text starting with -- (so DASH_DASH can match first)
 // Also exclude < from starting char to allow HEREDOC_START (<<) to match
 UNQUOTED_TEXT
-    : ( ~[-< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*   // Start with non-hyphen, non-<, non-space
-    | '-' ~[- \t\r\n\\"'$[\]=<] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single hyphen followed by non-hyphen, non-space
+    : ( ~[-< \t\r\n\\"'$[\]=`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*   // Start with non-hyphen, non-<, non-space
+    | '-' ~[- \t\r\n\\"'$[\]=<`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Single hyphen followed by non-hyphen, non-space
     | '-'  // Just a hyphen by itself
-    | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
+    | '<' ~[< \t\r\n\\"'$[\]=`] ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Single < followed by non-<
     | '<'  // Just a < by itself
-    | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
+    | TEXT_ESCAPE ( UNQUOTED_CHAR | TEXT_ESCAPE )*  // Start with an escaped character (e.g., \; in find -exec)
     )
     ;
 
