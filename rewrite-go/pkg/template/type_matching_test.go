@@ -17,6 +17,7 @@
 package template_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -114,4 +115,48 @@ func TestTypeMatchingMatchesTheSameCall(t *testing.T) {
 	} {
 		require.True(t, printlnPattern(mode).Matches(call, nil), "mode %v", mode)
 	}
+}
+
+func durationCall(t *testing.T) *java.MethodInvocation {
+	t.Helper()
+	return firstCall(t, `package a
+
+import "time"
+
+func f() { g(time.Second) }
+
+func g(d time.Duration) {}
+`)
+}
+
+func intCall(t *testing.T) *java.MethodInvocation {
+	t.Helper()
+	return firstCall(t, `package a
+
+func f() { g(1) }
+
+func g(n int) {}
+`)
+}
+
+func capturePattern(mode template.TypeMatchingMode) *template.GoPattern {
+	arg := template.Expr("d").WithType("time.Duration")
+	return template.Expression(fmt.Sprintf("g(%s)", arg)).
+		Captures(arg).Imports("time").TypeMatching(mode).Build()
+}
+
+func TestCaptureTypeBindsAMatchingArgument(t *testing.T) {
+	match := capturePattern(template.TypeMatchingLenient).Match(durationCall(t), nil)
+	require.NotNil(t, match)
+	require.NotNil(t, match.Get("d"))
+}
+
+func TestCaptureTypeRefusesAnArgumentOfAnotherType(t *testing.T) {
+	require.Nil(t, capturePattern(template.TypeMatchingLenient).Match(intCall(t), nil))
+}
+
+// Without type matching the declared type is scaffold context only, which is
+// what it has always been.
+func TestCaptureTypeIsUnenforcedWhenTypeMatchingIsOff(t *testing.T) {
+	require.NotNil(t, capturePattern(template.TypeMatchingOff).Match(intCall(t), nil))
 }

@@ -19,6 +19,7 @@ package template
 import (
 	"reflect"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -35,6 +36,25 @@ type patternComparator struct {
 	// skipFastPath routes every node through the reflective walk, so a test
 	// can hold the hand-written comparisons to what the walk says.
 	skipFastPath bool
+}
+
+// allowsDeclaredType holds a capture to the type it was declared with. The
+// declaration reaches the scaffold preamble either way; reading it here is
+// what makes it a constraint rather than only parse context.
+func (c *patternComparator) allowsDeclaredType(name string, candidate java.J) bool {
+	capture, ok := c.captures[name]
+	if !ok || c.mode == TypeMatchingOff || capture.TypeName() == "" {
+		return true
+	}
+	expr, ok := candidate.(java.Expression)
+	if !ok {
+		return false
+	}
+	actual := matcher.TypeOfExpression(expr)
+	if actual == nil {
+		return c.mode == TypeMatchingLenient
+	}
+	return matcher.IsAssignableTo(actual, capture.TypeName())
 }
 
 // matchTypeSlot compares the attribution two nodes carry.
@@ -105,6 +125,9 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 // bindCapture binds a captured value, checking for repeated captures
 // (which enforce structural equality).
 func (c *patternComparator) bindCapture(name string, candidate java.J) bool {
+	if !c.allowsDeclaredType(name, candidate) {
+		return false
+	}
 	if c.result.Has(name) {
 		// Repeated capture: enforce structural equality with prior binding.
 		prev := c.result.Get(name)
