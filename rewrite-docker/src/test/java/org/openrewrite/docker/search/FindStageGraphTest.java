@@ -120,6 +120,33 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
+    void aCopyReachesAStageDeclaredAfterIt() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
+            //language=csv
+            """
+              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
+              Dockerfile,runtime,0,alpine,"#2",false,true
+              Dockerfile,builder,1,golang,runtime,false,true
+              Dockerfile,,2,runtime,,false,true
+              """
+          ),
+          docker(
+            """
+              FROM alpine AS runtime
+              COPY --from=builder /app /app
+
+              FROM golang AS builder
+              RUN go build
+
+              FROM runtime
+              CMD ["/app"]
+              """
+          )
+        );
+    }
+
+    @Test
     void reportEveryStageAsNeededWhenAReferenceNamesAPosition() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
