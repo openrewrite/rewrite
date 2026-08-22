@@ -2752,10 +2752,12 @@ func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) java.Expression {
 }
 
 // mapTypeExpr maps an expression that is known to be in a type position.
-// It delegates to mapExpr but overrides StarExpr to produce PointerType
-// and IndexExpr to produce ParameterizedType (generic instantiation).
+// It delegates to mapExpr but overrides the spellings a type reads differently
+// from an expression: ParenExpr, StarExpr and IndexExpr.
 func (ctx *parseContext) mapTypeExpr(expr ast.Expr) java.Expression {
 	switch e := expr.(type) {
+	case *ast.ParenExpr:
+		return ctx.mapParenthesizedType(e)
 	case *ast.StarExpr:
 		return ctx.mapPointerType(e)
 	case *ast.IndexExpr:
@@ -2778,6 +2780,23 @@ func (ctx *parseContext) mapTypeExpr(expr ast.Expr) java.Expression {
 		return ctx.mapExpr(expr)
 	default:
 		return ctx.mapExpr(expr)
+	}
+}
+
+func (ctx *parseContext) mapParenthesizedType(expr *ast.ParenExpr) *java.ParenthesizedTypeTree {
+	prefix := ctx.prefix(expr.Lparen)
+	ctx.skip(1) // "("
+	inner := ctx.mapTypeExpr(expr.X)
+	after := ctx.prefix(expr.Rparen)
+	ctx.skip(1) // ")"
+
+	return &java.ParenthesizedTypeTree{
+		ID:     uuid.New(),
+		Prefix: prefix,
+		Type: &java.Parentheses{
+			ID:   uuid.New(),
+			Tree: java.RightPadded[java.Expression]{Element: inner, After: after},
+		},
 	}
 }
 

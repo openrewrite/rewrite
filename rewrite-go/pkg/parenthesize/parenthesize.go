@@ -39,6 +39,9 @@ func Maybe(e java.Expression, site *visitor.Cursor) java.Expression {
 	if !Needed(e, site) {
 		return e
 	}
+	if isConversionType(site) {
+		return WrapType(e)
+	}
 	return Wrap(e)
 }
 
@@ -53,6 +56,20 @@ func Wrap(e java.Expression) java.Expression {
 		ID:     uuid.New(),
 		Prefix: format.PrefixOf(e),
 		Tree:   java.RightPadded[java.Expression]{Element: inner},
+	}
+}
+
+// WrapType puts e in parentheses as a type, which is what a type position such
+// as the one a conversion names admits.
+func WrapType(e java.Expression) java.Expression {
+	parens, ok := Wrap(e).(*java.Parentheses)
+	if !ok {
+		return e
+	}
+	return &java.ParenthesizedTypeTree{
+		ID:     uuid.New(),
+		Prefix: parens.Prefix,
+		Type:   parens.WithPrefix(java.Space{}),
 	}
 }
 
@@ -130,7 +147,7 @@ func needsDelimiting(e java.Expression) bool {
 	switch e.(type) {
 	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary:
 		return true
-	case *golang.Channel, *golang.FuncType:
+	case *golang.Channel, *golang.FuncType, *golang.PointerType:
 		return true
 	}
 	return false
@@ -202,8 +219,5 @@ func (v *Visitor) Visit(t java.Tree, p any) java.Tree {
 	}
 	// The cursor has popped back to the parent by now, and the parent still
 	// holds t, so t is the node out is replacing.
-	if Needed(expr, visitor.NewCursor(v.Cursor(), t)) {
-		return Wrap(expr)
-	}
-	return out
+	return Maybe(expr, visitor.NewCursor(v.Cursor(), t))
 }
