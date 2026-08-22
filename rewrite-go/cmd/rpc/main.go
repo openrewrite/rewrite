@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -41,6 +42,7 @@ import (
 	"github.com/grafana/pyroscope-go"
 	"golang.org/x/mod/module"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/diff"
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
@@ -537,10 +539,11 @@ func (s *server) handleGetLanguages() []string {
 // them, the server falls back to per-file parsing with the stdlib
 // importer (today's behavior).
 type parseRequest struct {
-	Inputs       []parseInput `json:"inputs"`
-	RelativeTo   *string      `json:"relativeTo"`
-	Module       string       `json:"module,omitempty"`
-	GoModContent string       `json:"goModContent,omitempty"`
+	Inputs       []parseInput   `json:"inputs"`
+	RelativeTo   *string        `json:"relativeTo"`
+	Module       string         `json:"module,omitempty"`
+	GoModContent string         `json:"goModContent,omitempty"`
+	Options      map[string]any `json:"options,omitempty"`
 }
 
 // parseInput can be a path-based or text-based input.
@@ -566,6 +569,51 @@ func (p *parseInput) UnmarshalJSON(data []byte) error {
 	}
 	*p = parseInput(a)
 	return nil
+}
+
+// Mirrors org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.
+const requirePrintEqualsInputKey = "org.openrewrite.requirePrintEqualsInput"
+
+// A variable so tests can substitute a printer that produces the mismatch
+// this check exists to catch.
+var printGoCompilationUnit = func(cu *golang.CompilationUnit) string {
+	return printer.Print(cu)
+}
+
+// requirePrintEqualsInput reports whether parse results must print back to
+// their input, which they must unless the client says otherwise. Option maps
+// are loosely typed across peers, so both the string and bool forms count.
+func requirePrintEqualsInput(options map[string]any) bool {
+	switch v := options[requirePrintEqualsInputKey].(type) {
+	case bool:
+		return v
+	case string:
+		enabled, err := strconv.ParseBool(v)
+		return err != nil || enabled
+	}
+	return true
+}
+
+// packageParseError describes, for the file at path, why it has no compilation
+// unit: its own syntax error, or that of the sibling that stopped the package.
+func packageParseError(err error, path string) error {
+	var ppe *goparser.PackageParseError
+	if errors.As(err, &ppe) && ppe.Path != path {
+		return fmt.Errorf("package not parsed: %v", ppe)
+	}
+	return err
+}
+
+// printIdempotencyError reports a compilation unit that does not print back to
+// the source it was parsed from. The message matches the JVM's
+// Parser.requirePrintEqualsInput so both engines word the failure the same way.
+func printIdempotencyError(cu *golang.CompilationUnit, source string) error {
+	printed := printGoCompilationUnit(cu)
+	if printed == source {
+		return nil
+	}
+	return fmt.Errorf("%s is not print idempotent. \n%s", cu.SourcePath,
+		diff.Unified(source, printed, cu.SourcePath))
 }
 
 // When req.Module + req.GoModContent are set, the handler builds a
@@ -678,6 +726,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	// `included` subset of the group.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(resolvedInputs))
 	parseErrByIdx := make(map[int]error)
+	checkPrint := requirePrintEqualsInput(req.Options)
 	for _, group := range groups {
 		included := make([]fileEntry, 0, len(group))
 		files := make([]goparser.FileInput, 0, len(group))
@@ -703,11 +752,17 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			// Whole-package parse failure — record per-file ParseErrors
 			// for every file the build context didn't exclude.
 			for _, g := range included {
-				parseErrByIdx[g.idx] = err
+				parseErrByIdx[g.idx] = packageParseError(err, g.input.Path)
 			}
 			continue
 		}
 		for i, cu := range cus {
+			if checkPrint {
+				if perr := printIdempotencyError(cu, included[i].input.Content); perr != nil {
+					parseErrByIdx[included[i].idx] = perr
+					continue
+				}
+			}
 			cuByIdx[included[i].idx] = cu
 		}
 	}
@@ -2252,9 +2307,10 @@ func (s *server) handleTraceGetObject(params json.RawMessage) (any, *rpcError) {
 }
 
 type parseProjectRequest struct {
-	ProjectPath string   `json:"projectPath"`
-	Exclusions  []string `json:"exclusions"`
-	RelativeTo  *string  `json:"relativeTo"`
+	ProjectPath string         `json:"projectPath"`
+	Exclusions  []string       `json:"exclusions"`
+	RelativeTo  *string        `json:"relativeTo"`
+	Options     map[string]any `json:"options,omitempty"`
 }
 
 type parseProjectResponseItem struct {
@@ -2572,6 +2628,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	groups := make(map[groupKey][]fileEntry)
 	type ordered struct {
 		idx        int
+		path       string
 		sourcePath string
 		modCtx     *modCtx
 	}
@@ -2599,7 +2656,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			sourcePath: sourcePath,
 			content:    src,
 		})
-		order = append(order, ordered{idx: i, sourcePath: sourcePath, modCtx: m})
+		order = append(order, ordered{idx: i, path: goFile, sourcePath: sourcePath, modCtx: m})
 	}
 
 	// Parse each group; collect CUs by original input index so the
@@ -2608,6 +2665,8 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	// don't appear in the response — handled here so the post-parse
 	// `cus` slice aligns with the `included` subset of entries.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(disc.goFiles))
+	parseErrByIdx := make(map[int]error)
+	checkPrint := requirePrintEqualsInput(req.Options)
 	for key, entries := range groups {
 		p := goparser.NewGoParser()
 		if pi, ok := piByModule[key.moduleDir]; ok {
@@ -2636,10 +2695,18 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if err != nil {
 			for _, e := range included {
 				s.logger.Printf("ParseProject: parse error in %s: %v", e.path, err)
+				parseErrByIdx[e.idx] = packageParseError(err, e.sourcePath)
 			}
 			continue
 		}
 		for i, cu := range cus {
+			if checkPrint {
+				if perr := printIdempotencyError(cu, included[i].content); perr != nil {
+					s.logger.Printf("ParseProject: %v", perr)
+					parseErrByIdx[included[i].idx] = perr
+					continue
+				}
+			}
 			cuByIdx[included[i].idx] = cu
 		}
 	}
@@ -2650,6 +2717,19 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	for _, o := range order {
 		cu, ok := cuByIdx[o.idx]
 		if !ok || cu == nil {
+			// Two ways to reach this: the BuildContext excluded the file, which
+			// stays out of the response, or parsing failed, which is reported so
+			// the file still reaches the JVM.
+			if perr := parseErrByIdx[o.idx]; perr != nil {
+				pe := java.NewParseError(o.sourcePath, contents[o.path], perr)
+				id := pe.Ident.String()
+				s.localObjects[id] = pe
+				items = append(items, parseProjectResponseItem{
+					ID:             id,
+					SourceFileType: "org.openrewrite.tree.ParseError",
+					SourcePath:     o.sourcePath,
+				})
+			}
 			continue
 		}
 		if o.modCtx != nil {
