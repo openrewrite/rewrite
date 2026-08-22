@@ -134,8 +134,15 @@ workdirInstruction
     : WORKDIR path
     ;
 
+// A list of names, each with an optional default, the shape `ENV` and `LABEL` have. As there, the `=`
+// belongs to the name written against it, and a name written apart from it declares a name of its own,
+// which leaves an empty one for Docker to fail the build on.
 argInstruction
-    : ARG argName ( EQUALS argValue )?
+    : ARG argPair+
+    ;
+
+argPair
+    : argName ( {bound()}? EQUALS ( {bound()}? argValue )? )?
     ;
 
 onbuildInstruction
@@ -360,8 +367,13 @@ argName
     : UNQUOTED_TEXT
     ;
 
+// The default of an `ARG` ends at the next whitespace, where the value of an `ENV` or a `LABEL` takes
+// the rest of the line: `ARG a=hello world` gives `a` the default `hello` and declares `world` besides.
+// So it is `text` narrowed to one unbroken run of the logical line. `quoted` leads rather than standing
+// as an alternative of its own, as it does in `text`: a quote style belongs only to a default that is
+// nothing but a quoted string, and which of the two this is cannot be told before the run has been read.
 argValue
-    : text
+    : ( quoted | textElement ) ( {bound()}? textElement )*
     ;
 
 signal

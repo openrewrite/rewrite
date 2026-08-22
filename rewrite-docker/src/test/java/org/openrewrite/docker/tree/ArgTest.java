@@ -33,10 +33,10 @@ class ArgTest implements RewriteTest {
               ARG VERSION=1.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                var arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(arg.getName().getText()).isEqualTo("VERSION");
-                assertThat(arg.getValue()).isNotNull();
-                assertThat(((Docker.Literal) arg.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
+                Docker.Arg.ArgPair pair = onlyPair(doc);
+                assertThat(pair.getName().getText()).isEqualTo("VERSION");
+                assertThat(pair.getValue()).isNotNull();
+                assertThat(((Docker.Literal) pair.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
             })
           )
         );
@@ -51,9 +51,219 @@ class ArgTest implements RewriteTest {
               ARG VERSION
               """,
             spec -> spec.afterRecipe(doc -> {
-                var arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(arg.getName().getText()).isEqualTo("VERSION");
-                assertThat(arg.getValue()).isNull();
+                Docker.Arg.ArgPair pair = onlyPair(doc);
+                assertThat(pair.getName().getText()).isEqualTo("VERSION");
+                assertThat(pair.getValue()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void severalNames() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG TARGETOS TARGETARCH
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  os -> {
+                      assertThat(os.getName().getText()).isEqualTo("TARGETOS");
+                      assertThat(os.getValue()).isNull();
+                  },
+                  arch -> {
+                      assertThat(arch.getName().getText()).isEqualTo("TARGETARCH");
+                      assertThat(arch.getValue()).isNull();
+                  });
+            })
+          )
+        );
+    }
+
+    @Test
+    void severalNamesWithDefaults() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a=1 b=2
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  a -> {
+                      assertThat(a.getName().getText()).isEqualTo("a");
+                      assertThat(ArgumentContents.text(a.getValue())).isEqualTo("1");
+                  },
+                  b -> {
+                      assertThat(b.getName().getText()).isEqualTo("b");
+                      assertThat(ArgumentContents.text(b.getValue())).isEqualTo("2");
+                  });
+            })
+          )
+        );
+    }
+
+    @Test
+    void severalNamesOnlySomeWithDefaults() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a b=2 c
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  a -> {
+                      assertThat(a.getName().getText()).isEqualTo("a");
+                      assertThat(a.getValue()).isNull();
+                  },
+                  b -> {
+                      assertThat(b.getName().getText()).isEqualTo("b");
+                      assertThat(ArgumentContents.text(b.getValue())).isEqualTo("2");
+                  },
+                  c -> {
+                      assertThat(c.getName().getText()).isEqualTo("c");
+                      assertThat(c.getValue()).isNull();
+                  });
+            })
+          )
+        );
+    }
+
+    /// A default ends at the next whitespace, where the value of an ENV or a LABEL takes the rest of
+    /// the line.
+    @Test
+    void whitespaceAfterADefaultBeginsAnotherName() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a=hello world
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  a -> assertThat(ArgumentContents.text(a.getValue())).isEqualTo("hello"),
+                  world -> {
+                      assertThat(world.getName().getText()).isEqualTo("world");
+                      assertThat(world.getValue()).isNull();
+                  });
+            })
+          )
+        );
+    }
+
+    @Test
+    void severalNamesSpanningAContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a \
+                  b=2
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  a -> assertThat(a.getValue()).isNull(),
+                  b -> assertThat(ArgumentContents.text(b.getValue())).isEqualTo("2"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void severalGlobalNames() {
+        rewriteRun(
+          docker(
+            """
+              ARG TARGETOS TARGETARCH
+              FROM scratch
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getGlobalArgs()).singleElement()
+              .satisfies(arg -> assertThat(arg.getPairs()).hasSize(2)))
+          )
+        );
+    }
+
+    /// Docker joins the lines a continuation holds together before it reads what they say, so a
+    /// default written on the far side of the join belongs to the name all the same.
+    @Test
+    void aDefaultBoundAcrossAContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a=\\
+              1
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).singleElement().satisfies(a ->
+                  assertThat(ArgumentContents.text(a.getValue())).isEqualTo("1"));
+            })
+          )
+        );
+    }
+
+    /// The continuation stays in the text of the default, as it does in the value of an `ENV`.
+    @Test
+    void aDefaultSplitByAContinuation() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a=he\\
+              llo
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).singleElement().satisfies(a ->
+                  assertThat(ArgumentContents.text(a.getValue())).isEqualTo("he\\\nllo"));
+            })
+          )
+        );
+    }
+
+    /// A name written with an `=` and nothing after it takes an empty default, which Docker tells apart
+    /// from a name declared without one.
+    @Test
+    void emptyDefault() {
+        rewriteRun(
+          docker(
+            """
+              ARG MAKE_JOBS=
+              FROM scratch
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg.ArgPair pair = doc.getGlobalArgs().getFirst().getPairs().getFirst();
+                assertThat(pair.getName().getText()).isEqualTo("MAKE_JOBS");
+                assertThat(pair.getValue()).isNotNull();
+                assertThat(ArgumentContents.text(pair.getValue())).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void emptyDefaultAmongOthers() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a= b=2 c
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  a -> assertThat(ArgumentContents.text(a.getValue())).isEmpty(),
+                  b -> assertThat(ArgumentContents.text(b.getValue())).isEqualTo("2"),
+                  c -> assertThat(c.getValue()).isNull());
             })
           )
         );
@@ -83,7 +293,7 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 assertThat(doc.getGlobalArgs()).hasSize(1);
                 Docker.Arg globalArg = doc.getGlobalArgs().getFirst();
-                assertThat(globalArg.getName().getText()).isEqualTo("VERSION");
+                assertThat(globalArg.getPairs().getFirst().getName().getText()).isEqualTo("VERSION");
             })
           )
         );
@@ -404,8 +614,12 @@ class ArgTest implements RewriteTest {
         );
     }
 
-    private static Docker.Argument argValue(Docker.File doc) {
+    private static Docker.Arg.ArgPair onlyPair(Docker.File doc) {
         Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
-        return assertThat(arg.getValue()).isNotNull().actual();
+        return assertThat(arg.getPairs()).singleElement().actual();
+    }
+
+    private static Docker.Argument argValue(Docker.File doc) {
+        return assertThat(onlyPair(doc).getValue()).isNotNull().actual();
     }
 }

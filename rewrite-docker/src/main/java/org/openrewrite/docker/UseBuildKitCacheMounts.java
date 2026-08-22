@@ -247,9 +247,10 @@ public class UseBuildKitCacheMounts extends Recipe {
                     environment.put(pair.getKey().getText(), ArgumentContents.textWithVariables(pair.getValue()));
                 }
             } else if (instruction instanceof Docker.Arg) {
-                Docker.Arg arg = (Docker.Arg) instruction;
-                if (arg.getValue() != null) {
-                    environment.put(arg.getName().getText(), ArgumentContents.textWithVariables(arg.getValue()));
+                for (Docker.Arg.ArgPair pair : ((Docker.Arg) instruction).getPairs()) {
+                    if (pair.getValue() != null) {
+                        environment.put(pair.getName().getText(), ArgumentContents.textWithVariables(pair.getValue()));
+                    }
                 }
             } else if (instruction instanceof Docker.Copy) {
                 destination(((Docker.Copy) instruction).getForm());
