@@ -37,8 +37,9 @@ public final class FlagOptions {
     }
 
     /**
-     * The contents of the value of {@code key}, empty where it carries none, or {@code null} where
-     * the option list does not hold the key at all.
+     * The contents of the value of {@code key}, empty where the option is carried without one, as
+     * a boolean option such as {@code ro} is, or {@code null} where the option list does not hold
+     * the key at all.
      */
     public static @Nullable List<Docker.ArgumentContent> value(List<Docker.ArgumentContent> contents, String key) {
         int[] range = range(contents, key);
@@ -47,12 +48,12 @@ public final class FlagOptions {
 
     /**
      * The option list with the value of {@code key} replaced by {@code value}, or unchanged where
-     * the list does not hold the key.
+     * the list does not hold the key with a value.
      */
     public static List<Docker.ArgumentContent> withValue(List<Docker.ArgumentContent> contents, String key,
                                                          List<Docker.ArgumentContent> value) {
         int[] range = range(contents, key);
-        if (range == null) {
+        if (range == null || range[2] == 0) {
             return contents;
         }
         List<Docker.ArgumentContent> replaced = new ArrayList<>(contents.subList(0, range[0]));
@@ -61,8 +62,9 @@ public final class FlagOptions {
         return replaced;
     }
 
-    /// The `{start, end}` indices of the value of `key` in `contents`, or `null` where the option
-    /// list holds no such key or holds it without a value.
+    /// The `{start, end, valued}` indices of the value of `key` in `contents`, where `valued` is
+    /// `1` when an `=` separates the key from a value and `0` when the option is one Docker reads
+    /// as a boolean, as `ro` is. Null where the option list holds no such key.
     private static int @Nullable [] range(List<Docker.ArgumentContent> contents, String key) {
         int i = 0;
         while (i < contents.size()) {
@@ -73,14 +75,13 @@ public final class FlagOptions {
                 }
                 i++;
             }
-            if (i < contents.size() && isSeparator(contents.get(i), '=')) {
-                int start = ++i;
-                while (i < contents.size() && !isSeparator(contents.get(i), ',')) {
-                    i++;
-                }
-                if (key.equalsIgnoreCase(name.toString())) {
-                    return new int[]{start, i};
-                }
+            boolean valued = i < contents.size() && isSeparator(contents.get(i), '=');
+            int start = valued ? ++i : i;
+            while (i < contents.size() && !isSeparator(contents.get(i), ',')) {
+                i++;
+            }
+            if (key.equalsIgnoreCase(name.toString())) {
+                return new int[]{start, i, valued ? 1 : 0};
             }
             i++;
         }

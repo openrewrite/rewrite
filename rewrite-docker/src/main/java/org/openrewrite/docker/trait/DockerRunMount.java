@@ -28,13 +28,11 @@ import org.openrewrite.docker.internal.FlagOptions;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.VisitFunction2;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * A trait representing one {@code --mount} flag of a {@code RUN} instruction, whose {@code from}
@@ -64,10 +62,10 @@ public class DockerRunMount implements DockerImageReference<Docker.Flag> {
 
     /**
      * The value of the {@code type} option, which Docker defaults to {@code bind} where the mount
-     * does not give one.
+     * does not give one and reads without regard to case, so {@code TYPE=Cache} is a cache mount.
      */
     public String getType() {
-        return getOption("type").orElse("bind");
+        return getOption("type").map(type -> type.toLowerCase(Locale.ROOT)).orElse("bind");
     }
 
     /**
@@ -94,11 +92,12 @@ public class DockerRunMount implements DockerImageReference<Docker.Flag> {
 
     /**
      * The value of the named option with environment variable references preserved, or empty where
-     * the mount does not carry it.
+     * the mount does not carry it. An option Docker reads as a boolean, as {@code ro} is, carries
+     * no value, so it reads as the empty string rather than as absent.
      */
     public Optional<String> getOption(String key) {
         List<Docker.ArgumentContent> value = optionValue(key);
-        return value == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(argument(value)));
+        return value == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(value));
     }
 
     /**
@@ -109,7 +108,7 @@ public class DockerRunMount implements DockerImageReference<Docker.Flag> {
     public boolean isStageReference() {
         if (stageReference == null) {
             List<Docker.ArgumentContent> from = optionValue("from");
-            String value = from == null ? null : ArgumentContents.text(argument(from));
+            String value = from == null ? null : ArgumentContents.text(from);
             stageReference = value != null && Stages.isDeclaredStage(cursor, value);
         }
         return stageReference;
@@ -133,15 +132,10 @@ public class DockerRunMount implements DockerImageReference<Docker.Flag> {
         if (from == null || from.isEmpty() || isStageReference()) {
             return null;
         }
-        Docker.Argument argument = argument(from);
-        if (ArgumentContents.containsVariable(argument) || ArgumentContents.textWithVariables(argument).isEmpty()) {
+        if (ArgumentContents.containsVariable(from) || ArgumentContents.textWithVariables(from).isEmpty()) {
             return null;
         }
         return ImageReferences.split(ImageReferences.separated(from), Space.EMPTY);
-    }
-
-    private static Docker.Argument argument(List<Docker.ArgumentContent> contents) {
-        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
     }
 
     /**

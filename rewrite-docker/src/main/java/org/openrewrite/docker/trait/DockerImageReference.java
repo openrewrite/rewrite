@@ -242,7 +242,7 @@ public interface DockerImageReference<T extends Docker> extends Trait<T> {
      * Only the options common to all locations are offered here; use {@link DockerFrom.Matcher},
      * {@link DockerCopyFrom.Matcher} or {@link DockerRunMount.Matcher} directly for
      * location-specific options such as {@code platform}, {@code excludeScratch},
-     * {@code onlyUnpinned}, or a mount's {@code type}.
+     * {@code onlyUnpinned}, or a mount's {@code onlyWithFrom}.
      */
     class Matcher extends DockerTraitMatcher<DockerImageReference<?>> {
         private @Nullable String imageNamePattern;

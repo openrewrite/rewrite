@@ -100,6 +100,54 @@ class DockerRunMountTest implements RewriteTest {
     }
 
     @Test
+    void aBooleanOptionIsCarriedWithoutAValue() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerRunMount.Matcher().asVisitor((mount, ctx) -> {
+                assertThat(mount.getType()).isEqualTo("secret");
+                assertThat(mount.getOption("ro")).contains("");
+                assertThat(mount.getOption("required")).contains("");
+                assertThat(mount.getOption("rw")).isEmpty();
+                return SearchResult.found(mount.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              RUN --mount=type=secret,id=aws,target=/root/.aws/creds,required,ro cat /root/.aws/creds
+              """,
+            """
+              FROM alpine
+              RUN ~~>--mount=type=secret,id=aws,target=/root/.aws/creds,required,ro cat /root/.aws/creds
+              """
+          )
+        );
+    }
+
+    @Test
+    void anOptionIsReadWithoutRegardToCase() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerRunMount.Matcher().asVisitor((mount, ctx) -> {
+                assertThat(mount.getType()).isEqualTo("cache");
+                assertThat(mount.getTarget()).contains("/c");
+                return SearchResult.found(mount.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              RUN --mount=TYPE=Cache,TARGET=/c go build
+              """,
+            """
+              FROM alpine
+              RUN ~~>--mount=TYPE=Cache,TARGET=/c go build
+              """
+          )
+        );
+    }
+
+    @Test
     void identifiesStageReferenceByName() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
