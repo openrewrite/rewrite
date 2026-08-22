@@ -398,6 +398,38 @@ class FromTest implements RewriteTest {
     }
 
     @Test
+    void continuationPaddedWithSpacesBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu\\  \s
+                :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    @Test
+    void backtickContinuationBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu`
+                :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    @Test
     void quotedImageReferenceWithVariableStaysWhole() {
         rewriteRun(
           docker(

@@ -187,6 +187,119 @@ class UserTest implements RewriteTest {
     }
 
     @Test
+    void continuationAfterTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:group\\
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    @Test
+    void continuationAfterAUserWithNoGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root\\
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(user.getGroup()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void backtickContinuationAfterTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:group`
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    @Test
+    void continuationPaddedWithSpacesAfterTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:group\\  \s
+
+              RUN echo done
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
+            })
+          )
+        );
+    }
+
+    /// A continuation that splits a name rather than ending it stays in the name, as in
+    /// `continuationBeforeTheSeparator`.
+    @Test
+    void continuationInsideTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:gr\\
+              oup
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("gr\\\noup");
+            })
+          )
+        );
+    }
+
+    @Test
+    void escapeCharactersInsideANameAreText() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER ro\\ ot:gr`oup
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("ro\\ ot");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("gr`oup");
+            })
+          )
+        );
+    }
+
+    @Test
     void continuationBeforeTheSeparator() {
         rewriteRun(
           docker(

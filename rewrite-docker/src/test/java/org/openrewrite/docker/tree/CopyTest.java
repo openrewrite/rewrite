@@ -513,6 +513,24 @@ class CopyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void aPaddedLineContinuationEndsAFromFlagValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=nginx:1.25\\  \s
+                /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
+            })
+          )
+        );
+    }
+
     private static String text(Docker.Argument argument) {
         return literal(argument.getContents().getFirst());
     }
