@@ -58,7 +58,8 @@ public class FindStageGraph extends ScanningRecipe<Set<String>> {
                "resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
                "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every " +
                "stage in that file is reported as built. A stage nothing builds is dead weight that classic builds " +
-               "still build, so reading this across a fleet shows where that weight sits before anything is removed.";
+               "still build. This reaches the same verdict as `RemoveUnusedStages`, so reading it across a fleet " +
+               "shows what that recipe would delete before it deletes anything.";
     }
 
     @Override
