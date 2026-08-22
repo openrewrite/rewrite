@@ -259,6 +259,61 @@ class EnvTest implements RewriteTest {
     }
 
     @Test
+    void aValueWrittenAgainstItsKeyMayOpenWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV GREETING==hello
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(pair.getKey().getText()).isEqualTo("GREETING");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=hello");
+            })
+          )
+        );
+    }
+
+    @Test
+    void onlyTheFirstOfARunOfEqualsBindsThePair() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV GREETING===hello
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("==hello");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueSeparatedFromItsKeyByASpaceIsStillTheLegacyForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV GREETING =hello
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=hello");
+            })
+          )
+        );
+    }
+
+    @Test
     void bracketedValueBindsToItsKey() {
         rewriteRun(
           docker(

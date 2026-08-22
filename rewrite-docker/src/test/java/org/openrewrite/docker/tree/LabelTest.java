@@ -20,6 +20,7 @@ import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.docker.Assertions.docker;
 
 class LabelTest implements RewriteTest {
@@ -310,6 +311,42 @@ class LabelTest implements RewriteTest {
                 Docker.Label.LabelPair pair = onlyPair(doc);
                 assertThat(pair.isHasEquals()).isFalse();
                 assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=John");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueWrittenAgainstItsKeyMayOpenWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author==John
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getKey())).isEqualTo("author");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=John");
+            })
+          )
+        );
+    }
+
+    @Test
+    void pairsRepeatWhenTheirValuesOpenWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author==John build==2
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(label.getPairs())
+                  .extracting(pair -> ArgumentContents.text(pair.getKey()), pair -> ArgumentContents.text(pair.getValue()))
+                  .containsExactly(tuple("author", "=John"), tuple("build", "=2"));
             })
           )
         );
