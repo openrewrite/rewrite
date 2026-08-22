@@ -531,6 +531,28 @@ class CopyTest implements RewriteTest {
         );
     }
 
+    /// The continuation that ends a `--from` value ends the written line it stands at the end of just
+    /// as any other does, so the comment line that follows it is a comment rather than a path.
+    @Test
+    void aCommentAfterTheContinuationEndingAFromFlagValueIsAComment() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=nginx:1.25\\
+              # the built assets
+                /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                var form = (Docker.CopyShellForm) copy.getForm();
+                assertThat(form.getSources()).map(CopyTest::text).containsExactly("/build");
+                assertThat(text(form.getDestination())).isEqualTo("/app");
+            })
+          )
+        );
+    }
+
     private static String text(Docker.Argument argument) {
         return literal(argument.getContents().getFirst());
     }
