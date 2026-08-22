@@ -200,8 +200,6 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // Whether the escape character just matched is the one LINE_CONT ends a logical line with, rather
-	    // than one of the text it holds. A mode whose text may end at a continuation asks before taking it.
 	    private boolean atLineContinuation() {
 	        for (int i = 1; ; i++) {
 	            int c = _input.LA(i);

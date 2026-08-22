@@ -397,8 +397,6 @@ class FromTest implements RewriteTest {
         );
     }
 
-    /// Spaces and tabs may sit between the escape character and the newline it continues over, so the
-    /// name ends before the escape character rather than carrying it and losing the tag with it.
     @Test
     void continuationPaddedWithSpacesBeforeTagSeparator() {
         rewriteRun(
@@ -415,8 +413,6 @@ class FromTest implements RewriteTest {
         );
     }
 
-    /// A backtick continues a line as a backslash does, since the lexer reads both without asking which
-    /// one the `escape` directive names.
     @Test
     void backtickContinuationBeforeTagSeparator() {
         rewriteRun(
