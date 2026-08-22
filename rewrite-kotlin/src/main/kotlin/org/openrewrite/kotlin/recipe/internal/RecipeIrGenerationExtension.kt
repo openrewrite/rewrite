@@ -33,11 +33,13 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.builders.declarations.addConstructor
 import org.jetbrains.kotlin.ir.builders.declarations.addFunction
+import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.irBlockBody
 import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.builders.irDelegatingConstructorCall
+import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irInt
 import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.builders.irString
@@ -73,6 +75,7 @@ import org.jetbrains.kotlin.ir.types.IrTypeArgument
 import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.addChild
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
@@ -139,6 +142,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         const val EDIT_SCOPE_REWRITE_FQN = "org.openrewrite.EditScope.rewrite"
         const val RECIPE_BUILDER_EDIT_FQN = "org.openrewrite.RecipeBuilder.edit"
+        const val RECIPE_BUILDER_SCAN_FQN = "org.openrewrite.RecipeBuilder.scan"
+        const val RECIPE_BUILDER_GENERATE_FQN = "org.openrewrite.RecipeBuilder.generate"
 
         /**
          * K2 FIR2IR represents `expr!!` as a call to this synthetic intrinsic,
@@ -221,7 +226,32 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * DSL's anonymous-Recipe path.
          */
         val buildImperativeVisitorSymbol: IrSimpleFunctionSymbol?,
-    )
+        // ScanningRecipe + its lifecycle methods and the buildImperative* helpers,
+        // for the scan/generate synthesis path. Any null (older rewrite-kotlin
+        // without the helpers) leaves the recipe as a runtime `recipe(...)` call.
+        val scanningRecipeClassSymbol: IrClassSymbol?,
+        val scanningRecipeNoArgCtorSymbol: IrConstructorSymbol?,
+        val scanningGetInitialValue: IrSimpleFunction?,
+        val scanningGetScanner: IrSimpleFunction?,
+        val scanningGetVisitor: IrSimpleFunction?,
+        val scanningGenerate: IrSimpleFunction?,
+        val buildImperativeInitialValueSymbol: IrSimpleFunctionSymbol?,
+        val buildImperativeScannerSymbol: IrSimpleFunctionSymbol?,
+        val buildImperativeEditVisitorSymbol: IrSimpleFunctionSymbol?,
+        val buildImperativeGenerateSymbol: IrSimpleFunctionSymbol?,
+    ) {
+        fun canSynthesizeScanningRecipe(): Boolean =
+            scanningRecipeClassSymbol != null &&
+                scanningRecipeNoArgCtorSymbol != null &&
+                scanningGetInitialValue != null &&
+                scanningGetScanner != null &&
+                scanningGetVisitor != null &&
+                scanningGenerate != null &&
+                buildImperativeInitialValueSymbol != null &&
+                buildImperativeScannerSymbol != null &&
+                buildImperativeEditVisitorSymbol != null &&
+                buildImperativeGenerateSymbol != null
+    }
 
     private fun buildIrGenContext(pluginContext: IrPluginContext): RecipeIrGenContext? {
         val recipeClassId = ClassId.topLevel(FqName("org.openrewrite.Recipe"))
@@ -291,6 +321,36 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             ))
             .singleOrNull { it.owner.valueParameters.size == 1 }
 
+        val scanningRecipeClassId = ClassId.topLevel(FqName("org.openrewrite.ScanningRecipe"))
+        val scanningRecipeClassSymbol = pluginContext.referenceClass(scanningRecipeClassId)
+        val scanningRecipeNoArgCtor = pluginContext.referenceConstructors(scanningRecipeClassId)
+            .singleOrNull { it.owner.valueParameters.isEmpty() }
+        val scanningMembers = scanningRecipeClassSymbol?.owner?.declarations
+            ?.filterIsInstance<IrSimpleFunction>().orEmpty()
+        val scanningGetInitialValue = scanningMembers.firstOrNull {
+            it.name.asString() == "getInitialValue" && it.valueParameters.size == 1
+        }
+        val scanningGetScanner = scanningMembers.firstOrNull {
+            it.name.asString() == "getScanner" && it.valueParameters.size == 1
+        }
+        val scanningGetVisitor = scanningMembers.firstOrNull {
+            it.name.asString() == "getVisitor" && it.valueParameters.size == 1
+        }
+        val scanningGenerate = scanningMembers.firstOrNull {
+            it.name.asString() == "generate" && it.valueParameters.size == 3
+        }
+
+        fun topLevelHelper(name: String, arity: Int): IrSimpleFunctionSymbol? = pluginContext
+            .referenceFunctions(org.jetbrains.kotlin.name.CallableId(
+                packageName = FqName("org.openrewrite"),
+                callableName = Name.identifier(name),
+            ))
+            .singleOrNull { it.owner.valueParameters.size == arity }
+        val buildImperativeInitialValueSymbol = topLevelHelper("buildImperativeInitialValue", 2)
+        val buildImperativeScannerSymbol = topLevelHelper("buildImperativeScanner", 2)
+        val buildImperativeEditVisitorSymbol = topLevelHelper("buildImperativeEditVisitor", 2)
+        val buildImperativeGenerateSymbol = topLevelHelper("buildImperativeGenerate", 4)
+
         return RecipeIrGenContext(
             pluginContext = pluginContext,
             recipeClassSymbol = recipeClassSymbol,
@@ -307,6 +367,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             methodInvocationRewriteKotlinNotNullSymbol = kotlinNotNullHelper,
             propertyAccessRewriteKotlinSymbol = propertyAccessHelper,
             buildImperativeVisitorSymbol = buildImperativeVisitorSymbol,
+            scanningRecipeClassSymbol = scanningRecipeClassSymbol,
+            scanningRecipeNoArgCtorSymbol = scanningRecipeNoArgCtor,
+            scanningGetInitialValue = scanningGetInitialValue,
+            scanningGetScanner = scanningGetScanner,
+            scanningGetVisitor = scanningGetVisitor,
+            scanningGenerate = scanningGenerate,
+            buildImperativeInitialValueSymbol = buildImperativeInitialValueSymbol,
+            buildImperativeScannerSymbol = buildImperativeScannerSymbol,
+            buildImperativeEditVisitorSymbol = buildImperativeEditVisitorSymbol,
+            buildImperativeGenerateSymbol = buildImperativeGenerateSymbol,
         )
     }
 
@@ -363,15 +433,29 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                         )
                     } else {
                         val imperativeBlock = findTrailingLambda(initializerExpr) ?: continue
-                        val helperSymbol = ctx.buildImperativeVisitorSymbol ?: continue
-                        buildImperativeRecipeClass(
-                            ctx = ctx,
-                            parentFile = file,
-                            propertyName = declaration.name,
-                            metadata = metadata,
-                            recipeBlock = imperativeBlock,
-                            helperSymbol = helperSymbol,
-                        )
+                        // A scan/generate recipe must extend ScanningRecipe or the
+                        // scan/generate phases are silently dropped; edit-only keeps
+                        // the lighter Recipe + getVisitor synthesis.
+                        if (recipeBlockDeclaresScanOrGenerate(imperativeBlock)) {
+                            if (!ctx.canSynthesizeScanningRecipe()) continue
+                            buildScanningRecipeClass(
+                                ctx = ctx,
+                                parentFile = file,
+                                propertyName = declaration.name,
+                                metadata = metadata,
+                                recipeBlock = imperativeBlock,
+                            )
+                        } else {
+                            val helperSymbol = ctx.buildImperativeVisitorSymbol ?: continue
+                            buildImperativeRecipeClass(
+                                ctx = ctx,
+                                parentFile = file,
+                                propertyName = declaration.name,
+                                metadata = metadata,
+                                recipeBlock = imperativeBlock,
+                                helperSymbol = helperSymbol,
+                            )
+                        }
                     }
                 }
                 RECIPES_FQN -> {
@@ -1892,6 +1976,160 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 )
                 factoryCall.arguments[0] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
                 +irReturn(factoryCall)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Scanning-shape class synthesis (for `scan { }` / `generate { }` recipes).
+    // ------------------------------------------------------------------
+
+    /**
+     * True when the recipe trailing lambda declares a `scan { }` or bare
+     * `generate { }` phase. Inspects only the block's top-level statements (never
+     * user code inside phase lambdas), walking each dispatch-receiver chain to a
+     * `RecipeBuilder.scan` / `.generate` head.
+     */
+    private fun recipeBlockDeclaresScanOrGenerate(recipeBlock: IrFunctionExpression): Boolean {
+        val stmts = (recipeBlock.function.body as? IrBlockBody)?.statements ?: return false
+        for (stmt in stmts) {
+            // `Scan.generate` returns Scan<A> (non-Unit), so K2 wraps the
+            // statement in IMPLICIT_COERCION_TO_UNIT; peel it to reach the call.
+            val rawStmt = (stmt as? IrReturn)?.value ?: stmt
+            val unwrapped = if (rawStmt is IrTypeOperatorCall &&
+                rawStmt.operator == IrTypeOperator.IMPLICIT_COERCION_TO_UNIT
+            ) {
+                rawStmt.argument
+            } else {
+                rawStmt
+            }
+            var cursor: IrCall? = unwrapped as? IrCall
+            while (cursor != null) {
+                when (cursor.symbol.owner.kotlinFqName.asString()) {
+                    RECIPE_BUILDER_SCAN_FQN, RECIPE_BUILDER_GENERATE_FQN -> return true
+                }
+                cursor = cursor.dispatchReceiver as? IrCall
+            }
+        }
+        return false
+    }
+
+    /**
+     * Synthesize a field-less `<Name>$KtRecipe` extending `ScanningRecipe<Any>`
+     * for a scan/generate recipe, overriding all four lifecycle methods to
+     * delegate to the `org.openrewrite.buildImperative*` runtime helpers. Unlike
+     * [buildImperativeRecipeClass] (plain `Recipe`, `getVisitor()` only), this
+     * preserves every phase.
+     */
+    private fun buildScanningRecipeClass(
+        ctx: RecipeIrGenContext,
+        parentFile: IrFile,
+        propertyName: Name,
+        metadata: RecipeMetadata,
+        recipeBlock: IrFunctionExpression,
+    ): IrClass {
+        val anyType = ctx.pluginContext.irBuiltIns.anyType
+        val cls = ctx.pluginContext.irFactory.buildClass {
+            name = Name.identifier("${propertyName.asString()}\$KtRecipe")
+            kind = ClassKind.CLASS
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
+        }
+        cls.parent = parentFile
+        cls.createThisReceiverParameter()
+        cls.superTypes = listOf(ctx.scanningRecipeClassSymbol!!.typeWith(anyType))
+
+        cls.addConstructor {
+            isPrimary = true
+            returnType = cls.symbol.defaultType
+            visibility = DescriptorVisibilities.PUBLIC
+        }.apply {
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                +irDelegatingConstructorCall(ctx.scanningRecipeNoArgCtorSymbol!!.owner)
+            }
+        }
+
+        addMetadataOverrides(cls, ctx, metadata)
+        addScanningLifecycleOverrides(cls, ctx, recipeBlock, anyType)
+        return cls
+    }
+
+    private fun addScanningLifecycleOverrides(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        recipeBlock: IrFunctionExpression,
+        anyType: IrType,
+    ) {
+        val getInitialValue = ctx.scanningGetInitialValue!!
+        val getScanner = ctx.scanningGetScanner!!
+        val getVisitor = ctx.scanningGetVisitor!!
+        val generate = ctx.scanningGenerate!!
+
+        cls.addFunction(
+            name = "getInitialValue",
+            returnType = anyType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            val ctxParam = addValueParameter("ctx", getInitialValue.valueParameters[0].type)
+            overriddenSymbols = listOf(getInitialValue.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val call = irCall(ctx.buildImperativeInitialValueSymbol!!, type = anyType)
+                call.arguments[0] = irGet(ctxParam)
+                call.arguments[1] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
+                +irReturn(call)
+            }
+        }
+
+        cls.addFunction(
+            name = "getScanner",
+            returnType = getScanner.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            val accParam = addValueParameter("acc", anyType)
+            overriddenSymbols = listOf(getScanner.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val call = irCall(ctx.buildImperativeScannerSymbol!!, type = getScanner.returnType)
+                call.arguments[0] = irGet(accParam)
+                call.arguments[1] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
+                +irReturn(call)
+            }
+        }
+
+        cls.addFunction(
+            name = "getVisitor",
+            returnType = getVisitor.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            val accParam = addValueParameter("acc", anyType)
+            overriddenSymbols = listOf(getVisitor.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val call = irCall(ctx.buildImperativeEditVisitorSymbol!!, type = getVisitor.returnType)
+                call.arguments[0] = irGet(accParam)
+                call.arguments[1] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
+                +irReturn(call)
+            }
+        }
+
+        cls.addFunction(
+            name = "generate",
+            returnType = generate.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            val accParam = addValueParameter("acc", anyType)
+            val generatedParam = addValueParameter("generatedInThisCycle", generate.valueParameters[1].type)
+            val ctxParam = addValueParameter("ctx", generate.valueParameters[2].type)
+            overriddenSymbols = listOf(generate.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val call = irCall(ctx.buildImperativeGenerateSymbol!!, type = generate.returnType)
+                call.arguments[0] = irGet(accParam)
+                call.arguments[1] = irGet(generatedParam)
+                call.arguments[2] = irGet(ctxParam)
+                call.arguments[3] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
+                +irReturn(call)
             }
         }
     }

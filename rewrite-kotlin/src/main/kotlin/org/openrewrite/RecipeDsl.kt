@@ -713,3 +713,61 @@ public fun buildImperativeVisitor(
     builder.block()
     return builder.build("", "", emptySet(), null).getVisitor()
 }
+
+private fun buildImperativeRecipe(block: RecipeBuilder.() -> Unit): Recipe {
+    val builder = RecipeBuilder()
+    builder.block()
+    return builder.build("", "", emptySet(), null)
+}
+
+/**
+ * Scanning counterparts to [buildImperativeVisitor], one per [ScanningRecipe]
+ * lifecycle method. The K2 plugin's synthesized `<Name>$KtRecipe` extends
+ * [ScanningRecipe] and routes each call here so all phases survive synthesis.
+ * The accumulator is threaded by the framework, so the generated class stays
+ * field-less; an edit-only block leaves [buildImperativeRecipe] returning a
+ * plain [Recipe], for which the scanner/generate helpers no-op.
+ */
+public fun buildImperativeInitialValue(
+    ctx: ExecutionContext,
+    block: RecipeBuilder.() -> Unit,
+): Any {
+    val recipe = buildImperativeRecipe(block)
+    @Suppress("UNCHECKED_CAST")
+    return if (recipe is ScanningRecipe<*>) (recipe as ScanningRecipe<Any>).getInitialValue(ctx) else Unit
+}
+
+public fun buildImperativeScanner(
+    acc: Any,
+    block: RecipeBuilder.() -> Unit,
+): TreeVisitor<*, ExecutionContext> {
+    val recipe = buildImperativeRecipe(block)
+    @Suppress("UNCHECKED_CAST")
+    return if (recipe is ScanningRecipe<*>) (recipe as ScanningRecipe<Any>).getScanner(acc)
+    else TreeVisitor.noop<Tree, ExecutionContext>()
+}
+
+public fun buildImperativeEditVisitor(
+    acc: Any,
+    block: RecipeBuilder.() -> Unit,
+): TreeVisitor<*, ExecutionContext> {
+    val recipe = buildImperativeRecipe(block)
+    @Suppress("UNCHECKED_CAST")
+    return if (recipe is ScanningRecipe<*>) (recipe as ScanningRecipe<Any>).getVisitor(acc)
+    else recipe.getVisitor()
+}
+
+public fun buildImperativeGenerate(
+    acc: Any,
+    generatedInThisCycle: Collection<SourceFile>,
+    ctx: ExecutionContext,
+    block: RecipeBuilder.() -> Unit,
+): Collection<SourceFile> {
+    val recipe = buildImperativeRecipe(block)
+    @Suppress("UNCHECKED_CAST")
+    return if (recipe is ScanningRecipe<*>) {
+        (recipe as ScanningRecipe<Any>).generate(acc, generatedInThisCycle, ctx).toList()
+    } else {
+        emptyList()
+    }
+}
