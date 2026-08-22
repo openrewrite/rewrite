@@ -51,6 +51,16 @@ func BenchmarkMatchMiss(b *testing.B) {
 	benchMatch(b, `f(1)`, template.ScaffoldExpression, fixture{name: "binary", kind: template.ScaffoldExpression, code: `a + b`})
 }
 
+// A visitor method has already narrowed by kind, so most candidates reaching
+// a match differ somewhere inside rather than at the root.
+func BenchmarkMatchSameKindMiss(b *testing.B) {
+	benchMatch(b, `f(1)`, template.ScaffoldExpression, fixture{name: "callOtherName", kind: template.ScaffoldExpression, code: `g(1)`})
+}
+
+func BenchmarkMatchSameKindMissDeepArg(b *testing.B) {
+	benchMatch(b, `f(a.b.c(1), 2)`, template.ScaffoldExpression, fixture{name: "callNear", kind: template.ScaffoldExpression, code: `f(a.b.c(1), 3)`})
+}
+
 func BenchmarkMatchDeep(b *testing.B) {
 	body := strings.Repeat("g(1)\n", 20)
 	code := "func F() {\n" + body + "}"
