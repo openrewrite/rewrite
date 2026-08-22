@@ -36,14 +36,22 @@ class CommentTest implements RewriteTest {
         );
     }
 
+    /// A comment is a line of its own. Docker reads a `#` that something else on its line comes before
+    /// as a character of the argument holding it, so what looks like a trailing comment on a `RUN` is
+    /// part of the command it runs.
     @Test
-    void commentsInline() {
+    void hashAfterAnArgumentIsNoComment() {
         rewriteRun(
           docker(
             """
-              FROM ubuntu:20.04  # Base image
-              RUN apt-get update  # Update packages
-              """
+              FROM ubuntu:20.04
+              RUN apt-get update  # this runs too
+              """,
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().getFirst();
+                assertThat(((Docker.ShellForm) run.getCommand()).getArgument().getText())
+                  .isEqualTo("apt-get update  # this runs too");
+            })
           )
         );
     }
@@ -98,18 +106,6 @@ class CommentTest implements RewriteTest {
               .satisfiesExactly(
                 run -> assertThat(run).isInstanceOf(Docker.Run.class),
                 env -> assertThat(env).isInstanceOf(Docker.Env.class)))
-          )
-        );
-    }
-
-    @Test
-    void trailingCommentAfterImage() {
-        rewriteRun(
-          docker(
-            """
-              FROM 'ubuntu:22.04' # Trailing comment
-              RUN apt-get update
-              """
           )
         );
     }

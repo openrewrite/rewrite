@@ -21,6 +21,8 @@ import org.openrewrite.docker.internal.Heredocs;}
     private boolean copyAddFlags = false;
     // Whether a parser directive is still recognized here, i.e. nothing but directives has been read yet
     private boolean atFileHead = true;
+    // Whether a comment is recognized here, i.e. at the start of a written line rather than a logical one
+    private boolean atLineHead = true;
 
     // Each flag above holds over a region of one logical line, so each is one question about the token
     // just matched: does that token still belong to the region, or is it the first one past its end?
@@ -36,6 +38,7 @@ import org.openrewrite.docker.internal.Heredocs;}
         afterHealthcheck = !lineEnded && (_type == HEALTHCHECK || afterHealthcheck && _type != CMD && _type != NONE);
         copyAddFlags = !lineEnded && (_type == COPY || _type == ADD || copyAddFlags && continuesCopyAddFlags());
         atFileHead = atFileHead && continuesFileHead();
+        atLineHead = beginsLineHead() || atLineHead && _type == WS;
         return super.emit();
     }
 
@@ -74,6 +77,13 @@ import org.openrewrite.docker.internal.Heredocs;}
             default:
                 return false;
         }
+    }
+
+    // A comment is a line, not the tail of one: Docker reads a '#' as a comment only where it is the
+    // first thing written on a written line. A continuation ends a written line without ending the
+    // logical one, which is why this is asked apart from atLineStart, where a continuation carries on.
+    private boolean beginsLineHead() {
+        return _type == NEWLINE && _mode != HEREDOC || _type == LINE_CONTINUATION || _type == PARSER_DIRECTIVE;
     }
 
     // Directives stand at the head of the file and nowhere else. Docker gives up on them at the first
@@ -126,7 +136,10 @@ options {
 PARSER_DIRECTIVE : '#' {atFileHead}? WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
 
 // Comments (after parser directives) - HIDDEN in main mode
-COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
+// As with PARSER_DIRECTIVE, the predicate sits behind the '#' the two rules share, so that only a
+// token starting with one is read without a cached edge. Where it fails the '#' is text: a '#' that
+// something else on its line comes before is a character of the argument holding it, not a comment.
+COMMENT : '#' {atLineHead}? ~[\r\n]* -> channel(HIDDEN);
 
 // Instructions (case-insensitive)
 // Instructions are only recognized at line start. Otherwise they become UNQUOTED_TEXT.
@@ -298,7 +311,7 @@ mode IMAGE_REF;
 
 IR_WS                : WS_CHAR+      -> type(WS), channel(HIDDEN);
 IR_LINE_CONTINUATION : LINE_CONT     -> type(LINE_CONTINUATION), channel(HIDDEN);
-IR_COMMENT           : '#' ~[\r\n]*  -> type(COMMENT), channel(HIDDEN);
+IR_COMMENT           : '#' {atLineHead}? ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
 IR_NEWLINE           : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 COLON : ':';
@@ -358,7 +371,7 @@ mode USER_SPEC;
 
 US_WS                : WS_CHAR+     -> type(WS), channel(HIDDEN);
 US_LINE_CONTINUATION : LINE_CONT    -> type(LINE_CONTINUATION), channel(HIDDEN);
-US_COMMENT           : '#' ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
+US_COMMENT           : '#' {atLineHead}? ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
 US_NEWLINE           : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 US_COLON : ':' -> type(COLON);
