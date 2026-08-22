@@ -42,20 +42,21 @@ const (
 )
 
 // compareTypes mirrors the Python matcher's _compare_types: an attribution
-// present on one side only is the mode's decision to make.
-func compareTypes(a, b java.JavaType, mode TypeMatchingMode) bool {
+// present on one side only is the mode's decision to make. The second result
+// is false where the mode decided, which is what Explain counts.
+func compareTypes(a, b java.JavaType, mode TypeMatchingMode) (bool, bool) {
 	if a == nil && b == nil {
-		return true
+		return true, true
 	}
 	if a == nil || b == nil {
-		return mode == TypeMatchingLenient
+		return mode == TypeMatchingLenient, false
 	}
 
 	// A literal's keyword names a class of Go types rather than one, so two
 	// of them agree when the classes overlap. matcher.IsSameGoType answers
 	// false for a keyword by design and cannot serve here.
 	if isPrimitive(a) && isPrimitive(b) {
-		return sharesGoTypeName(a, b)
+		return sharesGoTypeName(a, b), true
 	}
 	if ma, mb := matcher.AsMethod(a), matcher.AsMethod(b); ma != nil && mb != nil {
 		return compareMethodTypes(ma, mb, mode)
@@ -63,9 +64,9 @@ func compareTypes(a, b java.JavaType, mode TypeMatchingMode) bool {
 
 	fa, fb := matcher.GetFullyQualifiedName(a), matcher.GetFullyQualifiedName(b)
 	if fa == "" || fb == "" {
-		return mode == TypeMatchingLenient
+		return mode == TypeMatchingLenient, false
 	}
-	return fa == fb
+	return fa == fb, true
 }
 
 func isPrimitive(t java.JavaType) bool {
@@ -84,14 +85,14 @@ func sharesGoTypeName(a, b java.JavaType) bool {
 	return false
 }
 
-func compareMethodTypes(a, b *java.JavaTypeMethod, mode TypeMatchingMode) bool {
+func compareMethodTypes(a, b *java.JavaTypeMethod, mode TypeMatchingMode) (bool, bool) {
 	if a.Name != b.Name {
-		return false
+		return false, true
 	}
 	if a.DeclaringType == nil || b.DeclaringType == nil {
-		return mode == TypeMatchingLenient
+		return mode == TypeMatchingLenient, false
 	}
-	return a.DeclaringType.GetFullyQualifiedName() == b.DeclaringType.GetFullyQualifiedName()
+	return a.DeclaringType.GetFullyQualifiedName() == b.DeclaringType.GetFullyQualifiedName(), true
 }
 
 // matchByDeclaringType compares two resolved calls by the type declaring them

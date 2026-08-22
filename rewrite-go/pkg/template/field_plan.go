@@ -42,6 +42,7 @@ const (
 // resolves nothing per value it visits.
 type fieldStep struct {
 	index  int
+	name   string
 	rule   fieldRule
 	elem   *fieldStep
 	padded *paddedStep
@@ -87,7 +88,7 @@ func planFor(t reflect.Type) *typePlan {
 		if step.rule == ruleSkip {
 			continue
 		}
-		step.index = i
+		step.index, step.name = i, f.Name
 		plan.steps = append(plan.steps, step)
 	}
 	planCache.Store(t, plan)
@@ -168,7 +169,14 @@ func (c *patternComparator) matchFields(pattern, candidate java.J) bool {
 	}
 	pv, cv = pv.Elem(), cv.Elem()
 	for _, step := range planFor(pv.Type()).steps {
-		if !c.matchValue(step, pv.Field(step.index), cv.Field(step.index)) {
+		if c.tracking {
+			c.path = append(c.path, step.name)
+		}
+		ok := c.matchValue(step, pv.Field(step.index), cv.Field(step.index))
+		if c.tracking {
+			c.path = c.path[:len(c.path)-1]
+		}
+		if !ok {
 			return false
 		}
 	}

@@ -36,6 +36,13 @@ type patternComparator struct {
 	// skipFastPath routes every node through the reflective walk, so a test
 	// can hold the hand-written comparisons to what the walk says.
 	skipFastPath bool
+
+	// tracking records where a missing attribution decided a comparison, for
+	// Explain. The path is kept only while it is on.
+	tracking          bool
+	path              []string
+	inconclusive      int
+	firstInconclusive []string
 }
 
 // allowsDeclaredType holds a capture to the type it was declared with. The
@@ -52,6 +59,9 @@ func (c *patternComparator) allowsDeclaredType(name string, candidate java.J) bo
 	}
 	actual := matcher.TypeOfExpression(expr)
 	if actual == nil {
+		if c.tracking {
+			c.noteInconclusive()
+		}
 		return c.mode == TypeMatchingLenient
 	}
 	return matcher.IsAssignableTo(actual, capture.TypeName())
@@ -62,7 +72,11 @@ func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool
 	if c.mode == TypeMatchingOff {
 		return true
 	}
-	return compareTypes(pattern, candidate, c.mode)
+	result, conclusive := compareTypes(pattern, candidate, c.mode)
+	if !conclusive && c.tracking {
+		c.noteInconclusive()
+	}
+	return result
 }
 
 func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor, mode TypeMatchingMode) *patternComparator {

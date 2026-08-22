@@ -1,0 +1,68 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package template
+
+import (
+	"strings"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+)
+
+// MatchExplanation reports why a match came out as it did. A pattern reading
+// attribution answers false against a package go/types could not resolve, and
+// against source that genuinely differs; InconclusiveTypes tells them apart.
+//
+// A package known to be partly attributed should be refused outright rather
+// than counted, which waits on a marker saying so; see PARITY-AUDIT.md.
+type MatchExplanation struct {
+	Matched bool
+
+	// InconclusiveTypes counts the comparisons the mode decided because one
+	// side carried no attribution, rather than because the types differed.
+	InconclusiveTypes int
+
+	// FirstInconclusivePath names the field path of the first of them.
+	FirstInconclusivePath string
+}
+
+// Explain matches and reports what the match turned on.
+func (p *GoPattern) Explain(candidate java.J, cursor *visitor.Cursor) *MatchExplanation {
+	tree, err := p.getTree()
+	if err != nil || tree == nil {
+		return &MatchExplanation{}
+	}
+	cmp := newPatternComparator(p.captures, cursor, p.mode)
+	// The walk names the field it is at, which the hand-written comparisons
+	// do not, and answers the same by TestFastPathAgreesWithWalk.
+	cmp.tracking, cmp.skipFastPath = true, true
+	matched := cmp.match(tree, candidate) != nil
+	return &MatchExplanation{
+		Matched:               matched,
+		InconclusiveTypes:     cmp.inconclusive,
+		FirstInconclusivePath: strings.Join(cmp.firstInconclusive, "."),
+	}
+}
+
+// noteInconclusive records a type comparison the mode decided rather than the
+// types themselves.
+func (c *patternComparator) noteInconclusive() {
+	c.inconclusive++
+	if c.firstInconclusive == nil {
+		c.firstInconclusive = append([]string(nil), c.path...)
+	}
+}
