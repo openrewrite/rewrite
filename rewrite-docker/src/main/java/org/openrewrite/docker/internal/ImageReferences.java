@@ -26,10 +26,14 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Splits an image reference a recipe supplied as text, such as {@code "nginx:1.25"}, into its
- * component {@link Docker.Argument}s. A reference read from a Dockerfile is split by the grammar
- * instead, in the {@code IMAGE_REF} and {@code FLAG_IMAGE_REF} lexer modes, so this is only reached
- * for text that was never parsed.
+ * Translates between the two forms an image reference takes: the {@code {imageName, tag, digest}}
+ * parts a caller works in, and the flat contents of one {@link Docker.Argument}, where the {@code :}
+ * and {@code @} separating those parts are contents of their own.
+ * <p>
+ * That is the form the {@code IMAGE_REF} and {@code FLAG_IMAGE_REF} lexer modes leave a parsed
+ * reference in, so a reference a recipe supplies as text is modelled here the same way a parsed one
+ * is, and reading the parts back needs no knowledge of which colon separates a tag: a colon inside a
+ * quoted name, a variable reference or a registry port is never a content of its own.
  */
 public final class ImageReferences {
 
@@ -37,29 +41,31 @@ public final class ImageReferences {
     }
 
     /**
-     * Splits {@code reference} into {@code {imageName, tag, digest}}, with {@code tag} and
-     * {@code digest} null when the reference does not carry them. Environment variable references
-     * are split out first, so a colon inside {@code ${VAR:-default}} separates nothing.
+     * Splits a reference a recipe supplied as text, such as {@code "nginx:1.25"}, into
+     * {@code {imageName, tag, digest}}.
      */
     public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
+        return split(contents(reference), prefix);
+    }
+
+    /**
+     * Groups contents into {@code {imageName, tag, digest}}, with {@code tag} and {@code digest}
+     * null where the reference does not carry them, and empty where it ends in a dangling separator.
+     */
+    public static Docker.@Nullable Argument[] split(List<Docker.ArgumentContent> contents, Space prefix) {
         List<Docker.ArgumentContent> imageName = new ArrayList<>();
         List<Docker.ArgumentContent> tag = null;
         List<Docker.ArgumentContent> digest = null;
         List<Docker.ArgumentContent> part = imageName;
 
-        for (Docker.ArgumentContent content : ArgumentContents.of(reference, null)) {
-            if (!(content instanceof Docker.Literal)) {
+        for (Docker.ArgumentContent content : contents) {
+            if (digest == null && isSeparator(content, '@')) {
+                part = digest = new ArrayList<>();
+            } else if (tag == null && digest == null && isSeparator(content, ':')) {
+                part = tag = new ArrayList<>();
+            } else {
                 part.add(content);
-                continue;
             }
-            String text = ((Docker.Literal) content).getText();
-            int separator;
-            while ((separator = separatorIndex(text, tag != null, digest != null)) >= 0) {
-                addText(part, text.substring(0, separator));
-                part = text.charAt(separator) == '@' ? (digest = new ArrayList<>()) : (tag = new ArrayList<>());
-                text = text.substring(separator + 1);
-            }
-            addText(part, text);
         }
 
         return new Docker.@Nullable Argument[]{
@@ -68,21 +74,77 @@ public final class ImageReferences {
                 digest == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digest)};
     }
 
+    /**
+     * The contents of a reference given as text. Environment variable references are split out
+     * first, so a colon inside {@code ${VAR:-default}} separates nothing.
+     */
+    public static List<Docker.ArgumentContent> contents(String reference) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        boolean tagged = false;
+        boolean digested = false;
+
+        for (Docker.ArgumentContent content : ArgumentContents.of(reference, null)) {
+            if (!(content instanceof Docker.Literal)) {
+                contents.add(content);
+                continue;
+            }
+            String text = ((Docker.Literal) content).getText();
+            int separator;
+            while (!digested && (separator = separatorIndex(text, tagged)) >= 0) {
+                addText(contents, text.substring(0, separator));
+                digested = text.charAt(separator) == '@';
+                tagged = true;
+                contents.add(separator(text.charAt(separator)));
+                text = text.substring(separator + 1);
+            }
+            addText(contents, text);
+        }
+        return contents;
+    }
+
+    /**
+     * The contents of a reference held as its parts, the inverse of {@link #split(List, Space)}.
+     */
+    public static List<Docker.ArgumentContent> contents(Docker.@Nullable Argument[] parts) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>(parts[0].getContents());
+        if (parts[1] != null) {
+            contents.add(separator(':'));
+            contents.addAll(parts[1].getContents());
+        }
+        if (parts[2] != null) {
+            contents.add(separator('@'));
+            contents.addAll(parts[2].getContents());
+        }
+        return contents;
+    }
+
     /// The index of the first separator still to come, or `-1` when the text holds none. A colon
-    /// before the last `/` is a registry port rather than a tag separator, and one after a `@` or a
-    /// tag that was already found belongs to the part that holds it.
-    private static int separatorIndex(String text, boolean taggedAlready, boolean digestedAlready) {
-        int at = digestedAlready ? -1 : text.indexOf('@');
-        int colon = taggedAlready || digestedAlready ? -1 : text.indexOf(':', text.lastIndexOf('/') + 1);
+    /// before the last `/` is a registry port rather than a tag separator, and one after the tag
+    /// belongs to the tag.
+    private static int separatorIndex(String text, boolean tagged) {
+        int at = text.indexOf('@');
+        if (tagged) {
+            return at;
+        }
+        int colon = text.indexOf(':', text.lastIndexOf('/') + 1);
         if (at >= 0 && colon >= 0) {
             return Math.min(at, colon);
         }
         return at >= 0 ? at : colon;
     }
 
-    private static void addText(List<Docker.ArgumentContent> part, String text) {
+    private static Docker.Literal separator(char separator) {
+        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, String.valueOf(separator), null);
+    }
+
+    private static boolean isSeparator(Docker.ArgumentContent content, char separator) {
+        return content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted() &&
+                String.valueOf(separator).equals(((Docker.Literal) content).getText());
+    }
+
+    private static void addText(List<Docker.ArgumentContent> contents, String text) {
         if (!text.isEmpty()) {
-            part.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
+            contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
         }
     }
 }

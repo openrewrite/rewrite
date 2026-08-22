@@ -514,7 +514,7 @@ class CopyTest implements RewriteTest {
     }
 
     private static String text(Docker.Argument argument) {
-        return ((Docker.Literal) argument.getContents().getFirst()).getText();
+        return literal(argument.getContents().getFirst());
     }
 
     private static String literal(Docker.ArgumentContent content) {

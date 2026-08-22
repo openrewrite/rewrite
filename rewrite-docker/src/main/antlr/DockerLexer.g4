@@ -20,6 +20,14 @@ import java.util.Queue;}
     // Track if we're in the flag section of a COPY or ADD, where --from carries an image reference
     private boolean copyAddFlags = false;
 
+    // Every flag that is scoped to one logical line is cleared here, so that a mode of its own does
+    // not have to remember which of them the newline it matches instead of NEWLINE should reset
+    private void resetLine() {
+        atLineStart = true;
+        afterHealthcheck = false;
+        copyAddFlags = false;
+    }
+
     // Whether what follows the '--' that both flag rules begin with is the '--from=' of a COPY or ADD
     private boolean atFromFlag() {
         if (!copyAddFlags) {
@@ -112,8 +120,7 @@ FLAG : '--' {!atFromFlag()}? FLAG_BODY { if (!afterHealthcheck) atLineStart = fa
 // The --from of a COPY or ADD names an image, so its value is lexed as an image reference
 FROM_FLAG : '--' {atFromFlag()}? 'from=' { atLineStart = false; } -> pushMode(FLAG_IMAGE_REF);
 
-fragment FLAG_TOKEN : '--' FLAG_BODY;
-fragment FLAG_BODY  : [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
+fragment FLAG_BODY : [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
 fragment FLAG_VALUE_PART
     : '"' ( '\\' ~[\r\n] | ~["\\\r\n] )* '"'   // Double-quoted string (with escapes)
     | '\'' ~['\r\n]* '\''                        // Single-quoted string (literal)
@@ -198,7 +205,7 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 fragment WS_CHAR : [ \t];
 
 // Newlines - HIDDEN in main mode, reset state for next line
-NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; copyAddFlags = false; } -> channel(HIDDEN);
+NEWLINE : NEWLINE_CHAR+ { resetLine(); } -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 
@@ -213,7 +220,7 @@ mode IMAGE_REF;
 IR_WS                : WS_CHAR+      -> type(WS), channel(HIDDEN);
 IR_LINE_CONTINUATION : LINE_CONT     -> type(LINE_CONTINUATION), channel(HIDDEN);
 IR_COMMENT           : '#' ~[\r\n]*  -> type(COMMENT), channel(HIDDEN);
-IR_NEWLINE           : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> type(NEWLINE), channel(HIDDEN), popMode;
+IR_NEWLINE           : NEWLINE_CHAR+ { resetLine(); } -> type(NEWLINE), channel(HIDDEN), popMode;
 
 COLON : ':';
 AT    : '@';
@@ -221,7 +228,7 @@ AT    : '@';
 // AS ends the reference; the stage name that follows it is ordinary text
 AS : 'AS' -> popMode;
 
-IR_FLAG                 : FLAG_TOKEN      -> type(FLAG);
+IR_FLAG                 : '--' FLAG_BODY  -> type(FLAG);
 IR_DOUBLE_QUOTED_STRING : DQ_STRING       -> type(DOUBLE_QUOTED_STRING);
 IR_SINGLE_QUOTED_STRING : SQ_STRING       -> type(SINGLE_QUOTED_STRING);
 IR_ENV_VAR              : VAR_REF         -> type(ENV_VAR);
@@ -230,13 +237,14 @@ IR_DOLLAR               : '$'             -> type(DOLLAR);
 
 // Text of one part of the reference. A colon that a '/' follows belongs to a registry port rather
 // than to a tag ('host:5000/img:tag'), so it stays inside the token.
-IR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | IR_ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQUOTED_TEXT);
+IR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
+// Shared with FLAG_IMAGE_REF, which reads the same reference. ESCAPE_SEQUENCE rather than
+// ESCAPED_CHAR because it stops before a newline, which lexing longest-match-first would otherwise
+// take into the token and so hide the line continuation that ends the reference.
+fragment IR_TEXT       : ( IR_TEXT_CHAR | ESCAPE_SEQUENCE | IR_PORT_COLON )+;
 fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$];
 fragment IR_PORT_COLON : ':' ( IR_TEXT_CHAR | ':' )* '/';
-// Unlike ESCAPED_CHAR, this stops before a newline, which lexing longest-match-first would otherwise
-// take into the token and so hide the line continuation that ends the reference
-fragment IR_ESCAPED_CHAR : '\\' ~[\r\n];
 
 // ----------------------------------------------------------------------------------------------
 // FLAG_IMAGE_REF mode - the image reference carried by the --from flag of a COPY or ADD
@@ -250,7 +258,7 @@ mode FLAG_IMAGE_REF;
 // would carry on into the flag that follows it.
 FLAG_END : ( WS_CHAR+ | LINE_CONT ) -> popMode;
 
-FIR_NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; copyAddFlags = false; } -> type(NEWLINE), channel(HIDDEN), popMode;
+FIR_NEWLINE : NEWLINE_CHAR+ { resetLine(); } -> type(NEWLINE), channel(HIDDEN), popMode;
 
 FIR_COLON : ':' -> type(COLON);
 FIR_AT    : '@' -> type(AT);
@@ -261,7 +269,7 @@ FIR_ENV_VAR              : VAR_REF         -> type(ENV_VAR);
 FIR_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
 FIR_DOLLAR               : '$'             -> type(DOLLAR);
 
-FIR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | IR_ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQUOTED_TEXT);
+FIR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
 // ----------------------------------------------------------------------------------------------
 // USER_SPEC mode - the user:group of a USER instruction
@@ -274,7 +282,7 @@ mode USER_SPEC;
 US_WS                : WS_CHAR+     -> type(WS), channel(HIDDEN);
 US_LINE_CONTINUATION : LINE_CONT    -> type(LINE_CONTINUATION), channel(HIDDEN);
 US_COMMENT           : '#' ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
-US_NEWLINE           : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> type(NEWLINE), channel(HIDDEN), popMode;
+US_NEWLINE           : NEWLINE_CHAR+ { resetLine(); } -> type(NEWLINE), channel(HIDDEN), popMode;
 
 US_COLON : ':' -> type(COLON);
 
