@@ -20,11 +20,12 @@ import java.util.Queue;}
     // Track if we're in the flag section of a COPY or ADD, where --from carries an image reference
     private boolean copyAddFlags = false;
 
+    // Whether what follows the '--' that both flag rules begin with is the '--from=' of a COPY or ADD
     private boolean atFromFlag() {
         if (!copyAddFlags) {
             return false;
         }
-        String fromFlag = "--from=";
+        String fromFlag = "from=";
         for (int i = 0; i < fromFlag.length(); i++) {
             int c = _input.LA(i + 1);
             if (c == -1 || Character.toLowerCase(c) != fromFlag.charAt(i)) {
@@ -103,13 +104,16 @@ EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
 // This avoids the greedy flagValue+ parsing issue while keeping shell commands working
 // Flag values can contain quoted strings (which may include spaces)
 // The predicate excludes this rule where FROM_FLAG applies. Lexing is maximal munch, so without it
-// this longer token would always win and the image reference of a --from would stay unsplit.
-FLAG : {!atFromFlag()}? FLAG_TOKEN { if (!afterHealthcheck) atLineStart = false; };
+// this longer token would always win and the image reference of a --from would stay unsplit. It sits
+// after the '--' because a predicate reachable without consuming anything stops the lexer caching the
+// start state of the mode that holds it, which costs every token in that mode a closure computation.
+FLAG : '--' {!atFromFlag()}? FLAG_BODY { if (!afterHealthcheck) atLineStart = false; };
 
 // The --from of a COPY or ADD names an image, so its value is lexed as an image reference
-FROM_FLAG : {atFromFlag()}? '--from=' { atLineStart = false; } -> pushMode(FLAG_IMAGE_REF);
+FROM_FLAG : '--' {atFromFlag()}? 'from=' { atLineStart = false; } -> pushMode(FLAG_IMAGE_REF);
 
-fragment FLAG_TOKEN : '--' [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
+fragment FLAG_TOKEN : '--' FLAG_BODY;
+fragment FLAG_BODY  : [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
 fragment FLAG_VALUE_PART
     : '"' ( '\\' ~[\r\n] | ~["\\\r\n] )* '"'   // Double-quoted string (with escapes)
     | '\'' ~['\r\n]* '\''                        // Single-quoted string (literal)
