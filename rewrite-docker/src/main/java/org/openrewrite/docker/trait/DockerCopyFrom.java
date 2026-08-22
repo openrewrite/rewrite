@@ -29,10 +29,8 @@ import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.trait.VisitFunction2;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * A trait representing the image reference carried by the {@code --from} flag of a {@code COPY}
@@ -111,10 +109,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         if (value == null) {
             return false;
         }
-        if (isNonNegativeInteger(value)) {
-            return true;
-        }
-        return stageNames().contains(value);
+        return isNonNegativeInteger(value) || Stages.isDeclaredStage(cursor, value);
     }
 
     private static boolean isNonNegativeInteger(String value) {
@@ -127,20 +122,6 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
             }
         }
         return true;
-    }
-
-    private Set<String> stageNames() {
-        Docker.File file = cursor.firstEnclosing(Docker.File.class);
-        Set<String> names = new HashSet<>();
-        if (file != null) {
-            for (Docker.Stage stage : file.getStages()) {
-                Docker.From.As as = stage.getFrom().getAs();
-                if (as != null) {
-                    names.add(as.getName().getText());
-                }
-            }
-        }
-        return names;
     }
 
     /**

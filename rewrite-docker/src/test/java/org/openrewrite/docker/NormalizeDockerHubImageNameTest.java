@@ -283,6 +283,40 @@ class NormalizeDockerHubImageNameTest implements RewriteTest {
     }
 
     @Test
+    void normalizeMountFrom() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              RUN --mount=type=bind,from=docker.io/library/composer:2.8.3,source=/usr/bin/composer,target=/usr/bin/composer composer install
+              """,
+            """
+              FROM ubuntu:22.04
+              RUN --mount=type=bind,from=composer:2.8.3,source=/usr/bin/composer,target=/usr/bin/composer composer install
+              """
+          )
+        );
+    }
+
+    @Test
+    void mountFromAStageIsNotAnImageName() {
+        rewriteRun(
+          docker(
+            """
+              FROM docker.io/library/ubuntu:22.04 AS library
+              FROM alpine:3.19
+              RUN --mount=type=bind,from=library,source=/lib,target=/app/lib ls /app/lib
+              """,
+            """
+              FROM ubuntu:22.04 AS library
+              FROM alpine:3.19
+              RUN --mount=type=bind,from=library,source=/lib,target=/app/lib ls /app/lib
+              """
+          )
+        );
+    }
+
+    @Test
     void copyFromAStageIsNotAnImageName() {
         rewriteRun(
           docker(

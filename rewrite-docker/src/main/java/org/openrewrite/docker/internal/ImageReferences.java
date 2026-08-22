@@ -79,12 +79,23 @@ public final class ImageReferences {
      * first, so a colon inside {@code ${VAR:-default}} separates nothing.
      */
     public static List<Docker.ArgumentContent> contents(String reference) {
+        return separated(ArgumentContents.of(reference, null));
+    }
+
+    /**
+     * Re-reads contents that were parsed as ordinary text as an image reference, leaving the
+     * {@code :} and {@code @} separating its parts as contents of their own. This is what a
+     * reference the lexer did not read in an image reference mode needs before {@link
+     * #split(List, Space)} can group it, as in the {@code from=} option of a {@code --mount}.
+     * A quoted literal is left whole, since a quote makes the whole of it one name.
+     */
+    public static List<Docker.ArgumentContent> separated(List<Docker.ArgumentContent> source) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         boolean tagged = false;
         boolean digested = false;
 
-        for (Docker.ArgumentContent content : ArgumentContents.of(reference, null)) {
-            if (!(content instanceof Docker.Literal)) {
+        for (Docker.ArgumentContent content : source) {
+            if (!(content instanceof Docker.Literal) || ((Docker.Literal) content).isQuoted()) {
                 contents.add(content);
                 continue;
             }
@@ -100,6 +111,33 @@ public final class ImageReferences {
             addText(contents, text);
         }
         return contents;
+    }
+
+    /**
+     * Joins what {@link #separated(List)} split, merging adjacent unquoted literals back into one.
+     * A reference the lexer did not read in an image reference mode has to go back into the tree
+     * this way, since a reparse of the printed file would read it as one literal again.
+     */
+    public static List<Docker.ArgumentContent> joined(List<Docker.ArgumentContent> source) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        for (Docker.ArgumentContent content : source) {
+            Docker.Literal previous = lastUnquotedLiteral(contents);
+            if (previous != null && content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
+                contents.set(contents.size() - 1,
+                        previous.withText(previous.getText() + ((Docker.Literal) content).getText()));
+            } else {
+                contents.add(content);
+            }
+        }
+        return contents;
+    }
+
+    private static Docker.@Nullable Literal lastUnquotedLiteral(List<Docker.ArgumentContent> contents) {
+        if (contents.isEmpty()) {
+            return null;
+        }
+        Docker.ArgumentContent last = contents.get(contents.size() - 1);
+        return last instanceof Docker.Literal && !((Docker.Literal) last).isQuoted() ? (Docker.Literal) last : null;
     }
 
     /**

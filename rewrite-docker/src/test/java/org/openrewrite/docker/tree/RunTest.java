@@ -178,10 +178,10 @@ class RunTest implements RewriteTest {
                 assertThat(run.getFlags().get(0).getName()).isEqualTo("network");
                 assertThat(((Docker.Literal) run.getFlags().get(0).getValue().getContents().getFirst()).getText()).isEqualTo("none");
                 assertThat(run.getFlags().get(1).getName()).isEqualTo("mount");
-                // Flag value is parsed as multiple elements: type, =, cache,target, =, /cache
                 Docker.Argument mountValue = run.getFlags().get(1).getValue();
-                assertThat(mountValue.getContents()).hasSize(5);
-                assertThat(((Docker.Literal) mountValue.getContents().get(0)).getText()).isEqualTo("type");
+                assertThat(mountValue.getContents())
+                  .extracting(content -> ((Docker.Literal) content).getText())
+                  .containsExactly("type", "=", "cache", ",", "target", "=", "/cache");
             })
           )
         );
