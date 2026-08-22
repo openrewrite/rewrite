@@ -609,13 +609,14 @@ public class Assertions {
         }
 
         /// A single quoted string has no escape processing at all, so any quote of its own style ends
-        /// it; a double quoted one can hold an escaped quote.
+        /// it; a double quoted one can hold an escaped quote. A literal does not know which of `\\` and
+        /// `` ` `` its file's `# escape=` directive named, so either one counts here.
         private static boolean hasUnescapedQuote(String text, Docker.Literal.QuoteStyle style) {
             boolean escapable = style == Docker.Literal.QuoteStyle.DOUBLE;
             char quote = quoteOf(style);
             for (int i = 0; i < text.length(); i++) {
                 char c = text.charAt(i);
-                if (escapable && c == '\\') {
+                if (escapable && (c == '\\' || c == '`')) {
                     i++;
                 } else if (c == quote) {
                     return true;

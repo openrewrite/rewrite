@@ -16,8 +16,13 @@
 package org.openrewrite.docker;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
+import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 /**
@@ -102,6 +107,32 @@ class DockerParserTest implements RewriteTest {
         );
     }
 
+    /// Each file continues its lines on its own escape character, whichever order the two are read in.
+    @Test
+    void anEscapeDirectiveReachesOnlyItsOwnFile() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM alpine
+              RUN echo one `
+                  echo two
+              """,
+            spec -> spec.path("windows/Dockerfile").afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo one `\n    echo two"))
+          ),
+          docker(
+            """
+              FROM alpine
+              RUN echo one \\
+                  echo two
+              """,
+            spec -> spec.path("linux/Dockerfile").afterRecipe(doc ->
+              assertThat(shellCommands(doc)).containsExactly("echo one \\\n    echo two"))
+          )
+        );
+    }
+
     @Test
     void multipleJsonArrayWhitespaceStyles() {
         // Test different whitespace styles in JSON arrays are preserved
@@ -114,5 +145,11 @@ class DockerParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static List<String> shellCommands(Docker.File doc) {
+        return doc.getStages().getFirst().getInstructions().stream()
+          .map(instruction -> ((Docker.ShellForm) ((Docker.Run) instruction).getCommand()).getArgument().getText())
+          .collect(toList());
     }
 }

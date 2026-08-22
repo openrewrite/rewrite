@@ -204,6 +204,48 @@ class UserTest implements RewriteTest {
         );
     }
 
+    /// With no `# escape=` directive a backtick is the last character of the specification rather than
+    /// a continuation.
+    @Test
+    void aBacktickEndsNoSpecificationWithoutADirective() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine
+              USER root`
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var instructions = doc.getStages().getFirst().getInstructions();
+                assertThat(instructions).hasSize(2);
+                assertThat(ArgumentContents.text(((Docker.User) instructions.getFirst()).getUser())).isEqualTo("root`");
+                assertThat(instructions.getLast()).isInstanceOf(Docker.Run.class);
+            })
+          )
+        );
+    }
+
+    /// Under a backtick directive it is the backslash that ends nothing.
+    @Test
+    void aBackslashEndsNoSpecificationUnderABacktickDirective() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM alpine
+              USER root\\
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var instructions = doc.getStages().getFirst().getInstructions();
+                assertThat(instructions).hasSize(2);
+                assertThat(ArgumentContents.text(((Docker.User) instructions.getFirst()).getUser())).isEqualTo("root\\");
+                assertThat(instructions.getLast()).isInstanceOf(Docker.Run.class);
+            })
+          )
+        );
+    }
+
     /// A continuation that splits a name rather than ending it stays in the name, as in
     /// `continuationBeforeTheSeparator`.
     @Test
