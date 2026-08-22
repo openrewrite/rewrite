@@ -15,6 +15,8 @@
  */
 package org.openrewrite.docker.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -29,6 +31,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+
+import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.Tree.randomId;
 
 public interface Docker extends Tree {
 
@@ -348,6 +354,31 @@ public interface Docker extends Tree {
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArg(this, p);
+        }
+
+        /**
+         * Reads an LST serialized before an {@code ARG} could hold more than one name, where the
+         * instruction carried a {@code name} and a {@code value} of its own rather than a list of
+         * pairs. Such a payload is otherwise read without complaint - unknown properties are ignored
+         * and a missing one is null - and only fails much later, where something walks the pairs.
+         * <p>
+         * The name keeps the prefix it was serialized with, which is where the whitespace before it
+         * stood in that model, so the instruction still prints as it was written.
+         */
+        @JsonCreator
+        static Arg fromJson(@JsonProperty("id") UUID id,
+                            @JsonProperty("prefix") Space prefix,
+                            @JsonProperty("markers") Markers markers,
+                            @JsonProperty("keyword") String keyword,
+                            @JsonProperty("pairs") @Nullable List<ArgPair> pairs,
+                            @JsonProperty("name") @Nullable Literal name,
+                            @JsonProperty("value") @Nullable Argument value) {
+            if (pairs != null) {
+                return new Arg(id, prefix, markers, keyword, pairs);
+            }
+            requireNonNull(name, "A Docker.Arg needs either pairs or the name of a single build argument");
+            return new Arg(id, prefix, markers, keyword,
+                    singletonList(new ArgPair(randomId(), Space.EMPTY, Markers.EMPTY, name, value)));
         }
 
         /**
