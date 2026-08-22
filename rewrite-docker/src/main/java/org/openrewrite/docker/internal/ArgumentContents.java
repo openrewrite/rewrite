@@ -50,6 +50,64 @@ public class ArgumentContents {
         return splitVariables(text, Space.EMPTY);
     }
 
+    /// Splits the value of a command's flag into its quoted literals, environment variable references
+    /// and the separators of an option list: the `=` between a key and its value and the `,` between
+    /// one option and the next, as in `--mount=type=bind,from=alpine`. Everything that is not a quote
+    /// or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
+    /// the same thing here as it does in an argument's value.
+    public static List<Docker.ArgumentContent> flagValue(String text) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int i = 0;
+
+        while (i < text.length()) {
+            char c = text.charAt(i);
+
+            if (c == '"' || c == '\'') {
+                int close = findClosingQuote(text, i);
+                if (close < 0) {
+                    current.append(c);
+                    i++;
+                    continue;
+                }
+                flushFlagText(current, contents);
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
+                        c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
+                i = close + 1;
+            } else if (c == '=' || c == ',') {
+                flushFlagText(current, contents);
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, String.valueOf(c), null));
+                i++;
+            } else {
+                current.append(c);
+                i++;
+            }
+        }
+        flushFlagText(current, contents);
+
+        return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
+    }
+
+    private static void flushFlagText(StringBuilder current, List<Docker.ArgumentContent> contents) {
+        if (current.length() > 0) {
+            contents.addAll(splitVariables(current.toString(), Space.EMPTY));
+            current.setLength(0);
+        }
+    }
+
+    private static int findClosingQuote(String text, int openIndex) {
+        char quote = text.charAt(openIndex);
+        for (int i = openIndex + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote == '"' && c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /// Splits environment variable references out of a value's text. Token boundaries are no guide here:
     /// the lexer emits `--name=value` as a single token, so a reference can sit inside one. What counts
     /// as a reference mirrors the lexer's `ENV_VAR` and `SPECIAL_VAR` rules, so `$$` and `$1` stay text.

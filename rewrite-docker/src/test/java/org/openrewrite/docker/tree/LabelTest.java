@@ -280,6 +280,41 @@ class LabelTest implements RewriteTest {
         );
     }
 
+    @Test
+    void flagValueBindsToItsKey() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL build.args=--no-cache
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getKey())).isEqualTo("build.args");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("--no-cache");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueSeparatedFromItsKeyIsTheLegacyForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author =John
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=John");
+            })
+          )
+        );
+    }
+
     private static Docker.Label.LabelPair onlyPair(Docker.File doc) {
         var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
         return assertThat(label.getPairs()).singleElement().actual();

@@ -176,7 +176,14 @@ SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); };
 MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); };
 
 // Heredoc start - captures <<EOF or <<-EOF including the identifier and switches to HEREDOC_PREAMBLE mode
-HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* { pushHeredocMarker(); } -> pushMode(HEREDOC_PREAMBLE);
+HEREDOC_START : '<<' '-'? HEREDOC_NAME { pushHeredocMarker(); } -> pushMode(HEREDOC_PREAMBLE);
+
+// The delimiter as written. Docker takes it through the same quote removal a shell word gets, so any
+// part of it may be quoted - quoting is what says the body is not to be expanded, and says nothing
+// about the name, which is why the quotes come off again where the terminator is compared.
+fragment HEREDOC_NAME
+    : ( [A-Z_][A-Z0-9_]* | '\'' ~['\r\n]* '\'' | '"' ~["\r\n]* '"' )+
+    ;
 
 // Line continuation - HIDDEN in main mode
 LINE_CONTINUATION : LINE_CONT -> channel(HIDDEN);
@@ -408,7 +415,7 @@ HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);
 HP_WS : [ \t\r\u000C]+ -> channel(HIDDEN);
 
 // Additional heredoc marker in preamble (for multi-heredoc support)
-HP_HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* { pushHeredocMarker(); } -> type(HEREDOC_START);
+HP_HEREDOC_START : '<<' '-'? HEREDOC_NAME { pushHeredocMarker(); } -> type(HEREDOC_START);
 
 // Any text on the heredoc line after the marker (destination paths, interpreter names, shell commands, etc.)
 // Exclude < to allow HP_HEREDOC_START to match <<
