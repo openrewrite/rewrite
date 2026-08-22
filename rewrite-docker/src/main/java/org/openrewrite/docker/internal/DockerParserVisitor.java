@@ -1161,6 +1161,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // Track if we've seen the first HEREDOC_START (for destination extraction)
             boolean seenFirstHeredocStart = false;
             int heredocStartCount = 0;
+            List<String> openings = new ArrayList<>();
 
             // Collect all tokens in the preamble (HEREDOC_START and preambleElements)
             for (int i = 0; i < preambleCtx.getChildCount(); i++) {
@@ -1170,6 +1171,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     if (tn.getSymbol().getType() == DockerLexer.HEREDOC_START) {
                         heredocStartCount++;
                         seenFirstHeredocStart = true;
+                        openings.add(tn.getText());
                     }
                     // Add whitespace prefix if any
                     Space tokenPrefix = prefix(tn.getSymbol());
@@ -1205,8 +1207,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             // Parse each heredoc body
             List<Docker.HeredocBody> bodies = new ArrayList<>();
-            for (DockerParser.HeredocBodyContext bodyCtx : c.heredocBody()) {
-                bodies.add(visitHeredocBodyContext(bodyCtx));
+            for (int i = 0; i < c.heredocBody().size(); i++) {
+                bodies.add(visitHeredocBodyContext(c.heredocBody(i), i < openings.size() ? openings.get(i) : null));
             }
 
             return new Docker.HeredocForm(randomId(), prefix, Markers.EMPTY, preamble, destination, bodies);
@@ -1236,7 +1238,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
     }
 
-    private Docker.HeredocBody visitHeredocBodyContext(DockerParser.HeredocBodyContext ctx) {
+    private Docker.HeredocBody visitHeredocBodyContext(DockerParser.HeredocBodyContext ctx, @Nullable String opening) {
         Space prefix = prefix(ctx.getStart());
 
         // Collect content lines from heredocContent
@@ -1245,14 +1247,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             collectHeredocContent(ctx.heredocContent(), contentLines);
         }
 
-        // Get closing marker (UNQUOTED_TEXT) - this is also the opening marker name without <<
+        // The closing marker is the whole line that closed the body, which a "<<-" heredoc allows to be
+        // indented with tabs, so it is not always the text of the marker that opened it
         String closing = ctx.heredocEnd().UNQUOTED_TEXT().getText();
         skip(ctx.heredocEnd().UNQUOTED_TEXT().getSymbol());
 
-        // The opening marker is "<<" + closing (we reconstruct it for the model)
-        String opening = "<<" + closing;
-
-        return new Docker.HeredocBody(randomId(), prefix, Markers.EMPTY, opening, contentLines, closing);
+        return new Docker.HeredocBody(randomId(), prefix, Markers.EMPTY,
+                opening == null ? "<<" + closing : opening, contentLines, closing);
     }
 
     /**

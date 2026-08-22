@@ -6,7 +6,8 @@ lexer grammar DockerLexer;
 
 @lexer::header
 {import java.util.LinkedList;
-import java.util.Queue;}
+import java.util.Queue;
+import org.openrewrite.docker.internal.Heredocs;}
 
 @lexer::members
 {
@@ -72,6 +73,13 @@ import java.util.Queue;}
         }
     }
 
+    // Both rules that open a heredoc queue its marker exactly as written after the '<<', dash and all,
+    // because the dash is the only thing that tells the rule matching the terminator whether a line
+    // indented with tabs closes this body.
+    private void pushHeredocMarker() {
+        heredocIdentifiers.add(getText().substring(2));
+    }
+
     private boolean atLineContinuation() {
         for (int i = 1; ; i++) {
             int c = _input.LA(i);
@@ -134,13 +142,7 @@ SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); };
 MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); };
 
 // Heredoc start - captures <<EOF or <<-EOF including the identifier and switches to HEREDOC_PREAMBLE mode
-HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
-    // Extract and store the heredoc marker identifier in FIFO order
-    String text = getText();
-    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
-    String marker = text.substring(prefixLen);
-    heredocIdentifiers.add(marker);
-} -> pushMode(HEREDOC_PREAMBLE);
+HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* { pushHeredocMarker(); } -> pushMode(HEREDOC_PREAMBLE);
 
 // Line continuation - HIDDEN in main mode
 // Supports both backslash (Linux) and backtick (Windows with # escape=`)
@@ -367,13 +369,7 @@ HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);
 HP_WS : [ \t\r\u000C]+ -> channel(HIDDEN);
 
 // Additional heredoc marker in preamble (for multi-heredoc support)
-HP_HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
-    // Extract and store the heredoc marker identifier in FIFO order
-    String text = getText();
-    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
-    String marker = text.substring(prefixLen);
-    heredocIdentifiers.add(marker);
-} -> type(HEREDOC_START);
+HP_HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* { pushHeredocMarker(); } -> type(HEREDOC_START);
 
 // Any text on the heredoc line after the marker (destination paths, interpreter names, shell commands, etc.)
 // Exclude < to allow HP_HEREDOC_START to match <<
@@ -395,7 +391,7 @@ H_NEWLINE : '\n' -> type(NEWLINE);
 // For multi-heredoc, we only popMode when the queue is empty (all markers matched in FIFO order)
 HEREDOC_CONTENT : ~[\n]+
 {
-  if(!heredocIdentifiers.isEmpty() && getText().equals(heredocIdentifiers.peek())) {
+  if(!heredocIdentifiers.isEmpty() && Heredocs.closes(heredocIdentifiers.peek(), getText())) {
       setType(UNQUOTED_TEXT);
       heredocIdentifiers.poll();  // Remove from front of queue (FIFO)
       // Only pop mode when all heredoc markers have been matched
