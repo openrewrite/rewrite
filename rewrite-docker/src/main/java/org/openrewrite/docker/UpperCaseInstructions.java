@@ -40,17 +40,11 @@ public class UpperCaseInstructions extends Recipe {
     @Nullable
     String casing;
 
-    @Override
-    public String getDisplayName() {
-        return "Write Dockerfile instruction keywords in one casing";
-    }
+    String displayName = "Write Dockerfile instruction keywords in one casing";
 
-    @Override
-    public String getDescription() {
-        return "BuildKit's `ConsistentInstructionCasing` check reports a Dockerfile that writes its instruction " +
-                "keywords in more than one casing, since `FROM` and `from` name the same instruction. This writes " +
-                "every keyword, and the `AS` of a `FROM`, in the configured casing so that the file is consistent.";
-    }
+    String description = "BuildKit's `ConsistentInstructionCasing` check reports a Dockerfile that writes its instruction " +
+            "keywords in more than one casing, since `FROM` and `from` name the same instruction. This writes " +
+            "every keyword, and the `AS` of a `FROM`, in the configured casing so that the file is consistent.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

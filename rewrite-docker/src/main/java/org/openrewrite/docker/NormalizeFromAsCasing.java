@@ -28,17 +28,11 @@ import java.util.Locale;
 @EqualsAndHashCode(callSuper = false)
 public class NormalizeFromAsCasing extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Match the casing of `AS` to the casing of `FROM`";
-    }
+    String displayName = "Match the casing of `AS` to the casing of `FROM`";
 
-    @Override
-    public String getDescription() {
-        return "BuildKit's `FromAsCasing` check reports a `FROM ... as name` whose `AS` is not written in the same " +
-                "casing as the `FROM` that introduces it. A `FROM` whose own casing is mixed is left alone, as " +
-                "there is no casing for its `AS` to match.";
-    }
+    String description = "BuildKit's `FromAsCasing` check reports a `FROM ... as name` whose `AS` is not written in the same " +
+            "casing as the `FROM` that introduces it. A `FROM` whose own casing is mixed is left alone, as " +
+            "there is no casing for its `AS` to match.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

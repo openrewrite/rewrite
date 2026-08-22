@@ -29,19 +29,13 @@ import org.openrewrite.docker.tree.Space;
 @EqualsAndHashCode(callSuper = false)
 public class UseKeyValueEnvAndLabel extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Use the `key=value` form of `ENV` and `LABEL`";
-    }
+    String displayName = "Use the `key=value` form of `ENV` and `LABEL`";
 
-    @Override
-    public String getDescription() {
-        return "BuildKit's `LegacyKeyValueFormat` check reports an `ENV key value` or `LABEL key value`, whose " +
-                "value is the whole rest of the line, in favour of `ENV key=value`, whose value ends at the next " +
-                "space. A value that spans a space therefore has to be quoted to keep its meaning, and one whose " +
-                "quoting cannot be decided from the source, because it already carries quotes or escapes of its " +
-                "own, is left in the legacy form rather than silently given a different value.";
-    }
+    String description = "BuildKit's `LegacyKeyValueFormat` check reports an `ENV key value` or `LABEL key value`, whose " +
+            "value is the whole rest of the line, in favour of `ENV key=value`, whose value ends at the next " +
+            "space. A value that spans a space therefore has to be quoted to keep its meaning, and one whose " +
+            "quoting cannot be decided from the source, because it already carries quotes or escapes of its " +
+            "own, is left in the legacy form rather than silently given a different value.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

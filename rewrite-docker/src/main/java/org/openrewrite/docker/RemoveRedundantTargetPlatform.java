@@ -30,18 +30,12 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantTargetPlatform extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove a `--platform=$TARGETPLATFORM` from `FROM`";
-    }
+    String displayName = "Remove a `--platform=$TARGETPLATFORM` from `FROM`";
 
-    @Override
-    public String getDescription() {
-        return "BuildKit's `RedundantTargetPlatform` check reports a `FROM --platform=$TARGETPLATFORM`, which asks " +
-                "for the platform the build already targets. Any other platform, whether a constant such as " +
-                "`linux/amd64` or the `$BUILDPLATFORM` a cross-compiling stage builds on, says something the " +
-                "default does not and is left alone.";
-    }
+    String description = "BuildKit's `RedundantTargetPlatform` check reports a `FROM --platform=$TARGETPLATFORM`, which asks " +
+            "for the platform the build already targets. Any other platform, whether a constant such as " +
+            "`linux/amd64` or the `$BUILDPLATFORM` a cross-compiling stage builds on, says something the " +
+            "default does not and is left alone.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
