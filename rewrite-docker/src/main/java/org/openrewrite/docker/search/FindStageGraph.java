@@ -41,24 +41,29 @@ import static java.lang.String.join;
 @EqualsAndHashCode(callSuper = false)
 public class FindStageGraph extends ScanningRecipe<Set<String>> {
 
+    private static final String DISPLAY_NAME = "Find Docker build stage dependencies";
+
+    private static final String DESCRIPTION =
+            "Record which build stages of a multi-stage Dockerfile depend on which others, and mark the stages " +
+            "nothing builds. A stage is built when it is the last stage of the file, when a stage that is itself " +
+            "built names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag, or when something in " +
+            "the repository asks for it by name: a `docker build --target`, a `docker-bake.hcl`, a compose file, " +
+            "a CI workflow, or a comment in the Dockerfile showing how to build it. Where a reference cannot be " +
+            "resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
+            "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every " +
+            "stage in that file is reported as built. A stage nothing builds is dead weight that classic builds " +
+            "still build, so reading this across a fleet shows where that weight sits before anything is removed.";
+
     transient StageDependencies stageDependencies = new StageDependencies(this);
 
     @Override
     public String getDisplayName() {
-        return "Find Docker build stage dependencies";
+        return DISPLAY_NAME;
     }
 
     @Override
     public String getDescription() {
-        return "Record which build stages of a multi-stage Dockerfile depend on which others, and mark the stages " +
-               "nothing builds. A stage is built when it is the last stage of the file, when a stage that is itself " +
-               "built names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag, or when something in " +
-               "the repository asks for it by name: a `docker build --target`, a `docker-bake.hcl`, a compose file, " +
-               "a CI workflow, or a comment in the Dockerfile showing how to build it. Where a reference cannot be " +
-               "resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
-               "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every " +
-               "stage in that file is reported as built. A stage nothing builds is dead weight that classic builds " +
-               "still build, so reading this across a fleet shows where that weight sits before anything is removed.";
+        return DESCRIPTION;
     }
 
     @Override
