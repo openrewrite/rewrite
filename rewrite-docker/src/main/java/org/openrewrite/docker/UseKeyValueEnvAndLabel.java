@@ -70,7 +70,15 @@ public class UseKeyValueEnvAndLabel extends Recipe {
 
     /// The value as the `key=value` form has to write it, a single word that the shell reads as the value the
     /// legacy form gives, or null when no such word can be built from the source.
+    ///
+    /// The legacy form separates its key from its value with whitespace, so a value written hard against its key
+    /// is not one: it is a `key=value` whose value holds something the grammar reads as the rest of a line rather
+    /// than as a value, such as `ENV NODE_OPTIONS=--max-old-space-size=4096`. Writing an `=` before it would give
+    /// the pair a second one.
     private static Docker.@Nullable Argument singleWord(Docker.Argument value) {
+        if (value.getPrefix().getWhitespace().isEmpty()) {
+            return null;
+        }
         if (ArgumentContents.quoteStyle(value) != null) {
             return value;
         }
