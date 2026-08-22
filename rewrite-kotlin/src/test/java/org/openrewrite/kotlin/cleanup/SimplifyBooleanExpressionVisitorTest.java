@@ -108,4 +108,23 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void retainTypeTestThatSmartCasts() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(o: Any) {
+                  if (o is String && false) {
+                      println(o.length)
+                  }
+                  if (o !is String || true) {
+                      return
+                  }
+                  println(o.length)
+              }
+              """
+          )
+        );
+    }
 }
