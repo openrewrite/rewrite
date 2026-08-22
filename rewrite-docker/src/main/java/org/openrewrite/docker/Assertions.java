@@ -22,6 +22,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.docker.tree.Comment;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.StringUtils;
@@ -441,7 +442,7 @@ public class Assertions {
             for (int i = 1; i < contents.size(); i++) {
                 Space prefix = contents.get(i).getPrefix();
                 if (!prefix.getWhitespace().isEmpty() || !prefix.getComments().isEmpty()) {
-                    violations.add("expected the contents of the argument " + quoted(argument.getTextWithVariables()) +
+                    violations.add("expected the contents of the argument " + quoted(ArgumentContents.textWithVariables(argument)) +
                             " to be contiguous, but one is preceded by " + quoted(prefix.toString()));
                 }
             }

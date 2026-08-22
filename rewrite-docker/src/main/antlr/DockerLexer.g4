@@ -12,20 +12,64 @@ import java.util.Queue;}
 {
     // Use a queue (FIFO) for heredoc markers so they are matched in order of declaration
     private Queue<String> heredocIdentifiers = new LinkedList<String>();
-    private boolean heredocIdentifierCaptured = false;
-    // Track if we're at the start of a logical line (where instructions can appear)
+    // Whether an instruction keyword is recognized here, i.e. at the start of a logical line
     private boolean atLineStart = true;
-    // Track if we're after HEALTHCHECK to recognize CMD/NONE as keywords
+    // Whether the CMD or NONE that a HEALTHCHECK takes is still to come
     private boolean afterHealthcheck = false;
-    // Track if we're in the flag section of a COPY or ADD, where --from carries an image reference
+    // Whether the flags of a COPY or ADD are still being read, where --from carries an image reference
     private boolean copyAddFlags = false;
 
-    // Every flag that is scoped to one logical line is cleared here, so that a mode of its own does
-    // not have to remember which of them the newline it matches instead of NEWLINE should reset
-    private void resetLine() {
-        atLineStart = true;
-        afterHealthcheck = false;
-        copyAddFlags = false;
+    // Each flag above holds over a region of one logical line, so each is one question about the token
+    // just matched: does that token still belong to the region, or is it the first one past its end?
+    // Asking it here, once per flag, is what stops a rule added later from silently widening a region
+    // by forgetting to close it - a rule that is not named below ends every region it is not part of.
+    // emit() runs after the matched rule's action and commands, so _type is the type the token ends up
+    // with (an instruction off line start has become UNQUOTED_TEXT) and _mode is the mode after any
+    // push or pop, which is the mode the next token will be read in.
+    @Override
+    public Token emit() {
+        boolean lineEnded = endsLine();
+        atLineStart = lineEnded || atLineStart && continuesLineStart();
+        afterHealthcheck = !lineEnded && (_type == HEALTHCHECK || afterHealthcheck && _type != CMD && _type != NONE);
+        copyAddFlags = !lineEnded && (_type == COPY || _type == ADD || copyAddFlags && continuesCopyAddFlags());
+        return super.emit();
+    }
+
+    // A newline ends the logical line, except in the body of a heredoc, where it only separates content
+    // lines. A parser directive ends one too, because it matches its own trailing newline.
+    private boolean endsLine() {
+        return _type == PARSER_DIRECTIVE || _type == NEWLINE && _mode != HEREDOC;
+    }
+
+    // Nothing hidden stands between the start of a line and the instruction on it. ONBUILD and
+    // HEALTHCHECK each take a second instruction, and the flags of a HEALTHCHECK and their values stand
+    // between it and the CMD or NONE it takes, so neither ends the position an instruction is read in.
+    private boolean continuesLineStart() {
+        switch (_type) {
+            case WS: case LINE_CONTINUATION: case COMMENT:
+            case ONBUILD: case HEALTHCHECK:
+                return true;
+            case FLAG: case DASH_DASH: case EQUALS:
+            case DOUBLE_QUOTED_STRING: case SINGLE_QUOTED_STRING: case UNQUOTED_TEXT:
+                return afterHealthcheck;
+            default:
+                return false;
+        }
+    }
+
+    // The flag section of a COPY or ADD reaches to the first of its paths. FLAG_IMAGE_REF holds the
+    // value of a --from, which is part of the section rather than the end of it.
+    private boolean continuesCopyAddFlags() {
+        if (_mode == FLAG_IMAGE_REF) {
+            return true;
+        }
+        switch (_type) {
+            case FLAG: case FROM_FLAG: case FLAG_END:
+            case WS: case LINE_CONTINUATION: case COMMENT:
+                return true;
+            default:
+                return false;
+        }
     }
 
     // Whether the escape character just matched is the one LINE_CONT ends a logical line with, rather
@@ -61,7 +105,7 @@ options {
 
 // Parser directives (must be at the beginning of file)
 // After a parser directive, we're at line start (it consumes the newline)
-PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR { atLineStart = true; };
+PARSER_DIRECTIVE : '#' WS_CHAR* [A-Z_]+ WS_CHAR* '=' WS_CHAR* ~[\r\n]* NEWLINE_CHAR;
 
 // Comments (after parser directives) - HIDDEN in main mode
 COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
@@ -69,29 +113,27 @@ COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
 // Instructions (case-insensitive)
 // Instructions are only recognized at line start. Otherwise they become UNQUOTED_TEXT.
 // This eliminates ambiguity between instruction keywords and shell command text.
-FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(IMAGE_REF); atLineStart = false; };
-RUN        : 'RUN'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(IMAGE_REF); };
+RUN        : 'RUN'        { if (!atLineStart) setType(UNQUOTED_TEXT); };
 // CMD is a keyword at line start (CMD instruction) or after HEALTHCHECK
-CMD        : 'CMD'        { if (!atLineStart && !afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
+CMD        : 'CMD'        { if (!atLineStart && !afterHealthcheck) setType(UNQUOTED_TEXT); };
 // NONE is only a keyword after HEALTHCHECK
-NONE       : 'NONE'       { if (!afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
-LABEL      : 'LABEL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-EXPOSE     : 'EXPOSE'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-ENV        : 'ENV'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-ADD        : 'ADD'        { if (!atLineStart) setType(UNQUOTED_TEXT); else copyAddFlags = true; atLineStart = false; };
-COPY       : 'COPY'       { if (!atLineStart) setType(UNQUOTED_TEXT); else copyAddFlags = true; atLineStart = false; };
-ENTRYPOINT : 'ENTRYPOINT' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-VOLUME     : 'VOLUME'     { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-USER       : 'USER'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(USER_SPEC); atLineStart = false; };
-WORKDIR    : 'WORKDIR'    { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-ARG        : 'ARG'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-// ONBUILD is special: it keeps atLineStart true so the following instruction is recognized
-ONBUILD    : 'ONBUILD'    { if (!atLineStart) setType(UNQUOTED_TEXT); /* atLineStart stays true */ };
-STOPSIGNAL : 'STOPSIGNAL' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-// HEALTHCHECK is special: it keeps atLineStart true and sets afterHealthcheck so CMD/NONE are recognized after flags
-HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); else afterHealthcheck = true; /* atLineStart stays true */ };
-SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
-MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
+NONE       : 'NONE'       { if (!afterHealthcheck) setType(UNQUOTED_TEXT); };
+LABEL      : 'LABEL'      { if (!atLineStart) setType(UNQUOTED_TEXT); };
+EXPOSE     : 'EXPOSE'     { if (!atLineStart) setType(UNQUOTED_TEXT); };
+ENV        : 'ENV'        { if (!atLineStart) setType(UNQUOTED_TEXT); };
+ADD        : 'ADD'        { if (!atLineStart) setType(UNQUOTED_TEXT); };
+COPY       : 'COPY'       { if (!atLineStart) setType(UNQUOTED_TEXT); };
+ENTRYPOINT : 'ENTRYPOINT' { if (!atLineStart) setType(UNQUOTED_TEXT); };
+VOLUME     : 'VOLUME'     { if (!atLineStart) setType(UNQUOTED_TEXT); };
+USER       : 'USER'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(USER_SPEC); };
+WORKDIR    : 'WORKDIR'    { if (!atLineStart) setType(UNQUOTED_TEXT); };
+ARG        : 'ARG'        { if (!atLineStart) setType(UNQUOTED_TEXT); };
+ONBUILD    : 'ONBUILD'    { if (!atLineStart) setType(UNQUOTED_TEXT); };
+STOPSIGNAL : 'STOPSIGNAL' { if (!atLineStart) setType(UNQUOTED_TEXT); };
+HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); };
+SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); };
+MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); };
 
 // Heredoc start - captures <<EOF or <<-EOF including the identifier and switches to HEREDOC_PREAMBLE mode
 HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
@@ -100,8 +142,6 @@ HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
     int prefixLen = text.charAt(2) == '-' ? 3 : 2;
     String marker = text.substring(prefixLen);
     heredocIdentifiers.add(marker);
-    heredocIdentifierCaptured = true;
-    atLineStart = false;
 } -> pushMode(HEREDOC_PREAMBLE);
 
 // Line continuation - HIDDEN in main mode
@@ -111,12 +151,12 @@ LINE_CONTINUATION : LINE_CONT -> channel(HIDDEN);
 fragment LINE_CONT : ('\\' | '`') [ \t]* '\r'? '\n';
 
 // JSON array delimiters (for exec form) - no mode switching, handled in parser
-LBRACKET : '[' { atLineStart = false; };
-RBRACKET : ']' { atLineStart = false; };
-COMMA    : ',' { atLineStart = false; };
+LBRACKET : '[';
+RBRACKET : ']';
+COMMA    : ',';
 
 // Assignment (used in ENV, ARG, LABEL, etc.)
-EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
+EQUALS     : '=';
 
 // Flag with optional value: --name or --name=value
 // Captures the entire flag as a single token, stopping at whitespace
@@ -126,10 +166,10 @@ EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
 // this longer token would always win and the image reference of a --from would stay unsplit. It sits
 // after the '--' because a predicate reachable without consuming anything stops the lexer caching the
 // start state of the mode that holds it, which costs every token in that mode a closure computation.
-FLAG : '--' {!atFromFlag()}? FLAG_BODY { if (!afterHealthcheck) atLineStart = false; };
+FLAG : '--' {!atFromFlag()}? FLAG_BODY;
 
 // The --from of a COPY or ADD names an image, so its value is lexed as an image reference
-FROM_FLAG : '--' {atFromFlag()}? 'from=' { atLineStart = false; } -> pushMode(FLAG_IMAGE_REF);
+FROM_FLAG : '--' {atFromFlag()}? 'from=' -> pushMode(FLAG_IMAGE_REF);
 
 fragment FLAG_BODY : [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
 fragment FLAG_VALUE_PART
@@ -140,7 +180,7 @@ fragment FLAG_VALUE_PART
     ;
 
 // Standalone -- (double dash without flag name) - used in shell commands
-DASH_DASH  : '--' { if (!afterHealthcheck) atLineStart = false; };
+DASH_DASH  : '--';
 
 // Unquoted text fragment (to be used in UNQUOTED_TEXT)
 // This matches text that doesn't start with -- or <<
@@ -152,13 +192,13 @@ fragment ESCAPED_CHAR : '\\' .;
 // Double-quoted strings support escape sequences, line continuation, and bare newlines
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
 // Bare newlines are allowed (e.g., comment lines inside PowerShell strings don't need trailing backtick)
-DOUBLE_QUOTED_STRING : DQ_STRING { if (!afterHealthcheck) atLineStart = false; };
+DOUBLE_QUOTED_STRING : DQ_STRING;
 
 fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | [\r\n] | ~["\\\r\n`] )* '"';
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
 // Bare newlines are also allowed for multi-line strings
-SINGLE_QUOTED_STRING : SQ_STRING { if (!afterHealthcheck) atLineStart = false; };
+SINGLE_QUOTED_STRING : SQ_STRING;
 
 fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | [\r\n] | ~['\r\n] )* '\'';
 
@@ -182,28 +222,28 @@ fragment TEXT_ESCAPE
 fragment HEX_DIGIT : [0-9A-F];
 
 // Environment variable reference
-ENV_VAR : VAR_REF { atLineStart = false; };
+ENV_VAR : VAR_REF;
 
 fragment VAR_REF : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*;
 
 // Special shell variables ($!, $$, $?, $#, $@, $*, $0-$9)
-SPECIAL_VAR : SPECIAL_VAR_REF { atLineStart = false; };
+SPECIAL_VAR : SPECIAL_VAR_REF;
 
 fragment SPECIAL_VAR_REF : '$' [!$?#@*0-9];
 
 // Command substitution $(command) or $((arithmetic))
 // Handles nested parentheses by counting them
-COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* ')' { atLineStart = false; };
+COMMAND_SUBST : '$(' ( COMMAND_SUBST | ~[()] | '(' COMMAND_SUBST_INNER* ')' )* ')';
 fragment COMMAND_SUBST_INNER : COMMAND_SUBST | ~[()];
 
 // Backtick command substitution `command`
 // First char after backtick must NOT be whitespace/newline (which would be line continuation)
 // Content cannot span newlines (backtick command substitution doesn't support that)
-BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`' { atLineStart = false; };
+BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`';
 
 // Lone dollar sign that doesn't match ENV_VAR, SPECIAL_VAR, or COMMAND_SUBST
 // This handles cases like $'hello' (bash ANSI-C quoting) where $ precedes a quote
-DOLLAR : '$' { atLineStart = false; };
+DOLLAR : '$';
 
 // Unquoted text (arguments, file paths, etc.)
 // This should be after more specific tokens
@@ -217,7 +257,7 @@ UNQUOTED_TEXT
     | '<' ~[< \t\r\n\\"'$[\]=] ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Single < followed by non-<
     | '<'  // Just a < by itself
     | ESCAPED_CHAR ( UNQUOTED_CHAR | ESCAPED_CHAR )*  // Start with escaped char (e.g., \; in find -exec)
-    ) { if (!afterHealthcheck) atLineStart = false; copyAddFlags = false; }
+    )
     ;
 
 // Whitespace - HIDDEN in main mode
@@ -225,8 +265,8 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 
 fragment WS_CHAR : [ \t];
 
-// Newlines - HIDDEN in main mode, reset state for next line
-NEWLINE : NEWLINE_CHAR+ { resetLine(); } -> channel(HIDDEN);
+// Newlines - HIDDEN in main mode
+NEWLINE : NEWLINE_CHAR+ -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
 
@@ -241,7 +281,7 @@ mode IMAGE_REF;
 IR_WS                : WS_CHAR+      -> type(WS), channel(HIDDEN);
 IR_LINE_CONTINUATION : LINE_CONT     -> type(LINE_CONTINUATION), channel(HIDDEN);
 IR_COMMENT           : '#' ~[\r\n]*  -> type(COMMENT), channel(HIDDEN);
-IR_NEWLINE           : NEWLINE_CHAR+ { resetLine(); } -> type(NEWLINE), channel(HIDDEN), popMode;
+IR_NEWLINE           : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 COLON : ':';
 AT    : '@';
@@ -278,7 +318,7 @@ mode FLAG_IMAGE_REF;
 // would carry on into the flag that follows it.
 FLAG_END : ( WS_CHAR+ | LINE_CONT ) -> popMode;
 
-FIR_NEWLINE : NEWLINE_CHAR+ { resetLine(); } -> type(NEWLINE), channel(HIDDEN), popMode;
+FIR_NEWLINE : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 FIR_COLON : ':' -> type(COLON);
 FIR_AT    : '@' -> type(AT);
@@ -302,7 +342,7 @@ mode USER_SPEC;
 US_WS                : WS_CHAR+     -> type(WS), channel(HIDDEN);
 US_LINE_CONTINUATION : LINE_CONT    -> type(LINE_CONTINUATION), channel(HIDDEN);
 US_COMMENT           : '#' ~[\r\n]* -> type(COMMENT), channel(HIDDEN);
-US_NEWLINE           : NEWLINE_CHAR+ { resetLine(); } -> type(NEWLINE), channel(HIDDEN), popMode;
+US_NEWLINE           : NEWLINE_CHAR+ -> type(NEWLINE), channel(HIDDEN), popMode;
 
 US_COLON : ':' -> type(COLON);
 
@@ -369,7 +409,6 @@ HEREDOC_CONTENT : ~[\n]+
       // Only pop mode when all heredoc markers have been matched
       if(heredocIdentifiers.isEmpty()) {
           popMode();
-          atLineStart = true;  // After heredoc ends, next line is at line start
       }
   }
 };

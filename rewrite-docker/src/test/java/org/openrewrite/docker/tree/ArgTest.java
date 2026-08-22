@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -101,7 +102,7 @@ class ArgTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("1.0.0");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.getText()).isEqualTo("1.0.0");
+                assertThat(ArgumentContents.text(value)).isEqualTo("1.0.0");
             })
           )
         );
@@ -120,7 +121,7 @@ class ArgTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("1.0.0");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
-                assertThat(value.getText()).isEqualTo("1.0.0");
+                assertThat(ArgumentContents.text(value)).isEqualTo("1.0.0");
             })
           )
         );
@@ -137,8 +138,8 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(((Docker.Literal) value.getContents().getFirst()).getQuoteStyle()).isNull();
-                assertThat(value.getQuoteStyle()).isNull();
-                assertThat(value.getText()).isEqualTo("1.0.0");
+                assertThat(ArgumentContents.quoteStyle(value)).isNull();
+                assertThat(ArgumentContents.text(value)).isEqualTo("1.0.0");
             })
           )
         );
@@ -152,7 +153,7 @@ class ArgTest implements RewriteTest {
               FROM ubuntu:20.04
               ARG DESCRIPTION="some value"
               """,
-            spec -> spec.afterRecipe(doc -> assertThat(argValue(doc).getText()).isEqualTo("some value"))
+            spec -> spec.afterRecipe(doc -> assertThat(ArgumentContents.text(argValue(doc))).isEqualTo("some value"))
           )
         );
     }
@@ -167,8 +168,8 @@ class ArgTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
-                assertThat(value.getText()).isEmpty();
-                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.text(value)).isEmpty();
+                assertThat(ArgumentContents.quoteStyle(value)).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
             })
           )
         );
@@ -187,9 +188,9 @@ class ArgTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("BASE");
                 assertThat(var.isBraced()).isFalse();
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("$BASE");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("$BASE");
             })
           )
         );
@@ -210,8 +211,8 @@ class ArgTest implements RewriteTest {
                 assertThat(var.getName()).isEqualTo("BASE");
                 assertThat(var.isBraced()).isTrue();
                 assertThat(((Docker.Literal) value.getContents().getLast()).getText()).isEqualTo("-suffix");
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("${BASE}-suffix");
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("${BASE}-suffix");
             })
           )
         );
@@ -228,8 +229,8 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(value.getContents()).hasSize(1);
-                assertThat(value.getQuoteStyle()).isNull();
-                assertThat(value.getText()).isEqualTo("a\"b\"c");
+                assertThat(ArgumentContents.quoteStyle(value)).isNull();
+                assertThat(ArgumentContents.text(value)).isEqualTo("a\"b\"c");
             })
           )
         );
@@ -243,7 +244,7 @@ class ArgTest implements RewriteTest {
               FROM ubuntu:20.04
               ARG URL=http://example.com/x#fragment
               """,
-            spec -> spec.afterRecipe(doc -> assertThat(argValue(doc).getText()).isEqualTo("http://example.com/x#fragment"))
+            spec -> spec.afterRecipe(doc -> assertThat(ArgumentContents.text(argValue(doc))).isEqualTo("http://example.com/x#fragment"))
           )
         );
     }
@@ -259,8 +260,8 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(value.getContents()).hasSize(1);
-                assertThat(value.getQuoteStyle()).isNull();
-                assertThat(value.getText()).isEqualTo("--flag=\"a b\"");
+                assertThat(ArgumentContents.quoteStyle(value)).isNull();
+                assertThat(ArgumentContents.text(value)).isEqualTo("--flag=\"a b\"");
             })
           )
         );
@@ -277,7 +278,7 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(value.getContents()).hasSize(1);
-                assertThat(value.getText()).isEqualTo("\"a b\",more");
+                assertThat(ArgumentContents.text(value)).isEqualTo("\"a b\",more");
             })
           )
         );
@@ -297,9 +298,9 @@ class ArgTest implements RewriteTest {
                 assertThat(((Docker.Literal) value.getContents().get(0)).getText()).isEqualTo("\"pre ");
                 assertThat(((Docker.EnvironmentVariable) value.getContents().get(1)).getName()).isEqualTo("V");
                 assertThat(((Docker.Literal) value.getContents().get(2)).getText()).isEqualTo(" post\"");
-                assertThat(value.getQuoteStyle()).isNull();
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getTextWithVariables()).isEqualTo("\"pre $V post\"");
+                assertThat(ArgumentContents.quoteStyle(value)).isNull();
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("\"pre $V post\"");
             })
           )
         );
@@ -316,9 +317,9 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(value.getContents()).hasSize(1);
-                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
-                assertThat(value.hasEnvironmentVariables()).isFalse();
-                assertThat(value.getText()).isEqualTo("pre $V post");
+                assertThat(ArgumentContents.quoteStyle(value)).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
+                assertThat(ArgumentContents.containsVariable(value)).isFalse();
+                assertThat(ArgumentContents.text(value)).isEqualTo("pre $V post");
             })
           )
         );
@@ -335,8 +336,8 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(value.getContents()).hasSize(1);
-                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.hasEnvironmentVariables()).isFalse();
+                assertThat(ArgumentContents.quoteStyle(value)).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.containsVariable(value)).isFalse();
             })
           )
         );
@@ -353,8 +354,8 @@ class ArgTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = argValue(doc);
                 assertThat(value.getContents()).hasSize(1);
-                assertThat(value.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.getText()).isEqualTo("no vars here");
+                assertThat(ArgumentContents.quoteStyle(value)).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.text(value)).isEqualTo("no vars here");
             })
           )
         );
@@ -373,9 +374,9 @@ class ArgTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("base");
                 assertThat(var.isBraced()).isFalse();
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("$base");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("$base");
             })
           )
         );
@@ -395,9 +396,9 @@ class ArgTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("Java_Version");
                 assertThat(var.isBraced()).isFalse();
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("$Java_Version");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("$Java_Version");
             })
           )
         );

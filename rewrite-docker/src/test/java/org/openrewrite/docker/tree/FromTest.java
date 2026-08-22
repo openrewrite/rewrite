@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -442,9 +443,9 @@ class FromTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.From from = doc.getStages().getLast().getFrom();
-                assertThat(from.getImageName().getTextWithVariables()).isEqualTo("\"ubuntu:${TAG}\"");
+                assertThat(ArgumentContents.textWithVariables(from.getImageName())).isEqualTo("\"ubuntu:${TAG}\"");
                 assertThat(from.getTag()).isNull();
-                assertThat(from.getImageName().hasEnvironmentVariables()).isTrue();
+                assertThat(ArgumentContents.containsVariable(from.getImageName())).isTrue();
             })
           )
         );
@@ -464,9 +465,9 @@ class FromTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) tag.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("java_version");
                 assertThat(var.isBraced()).isTrue();
-                assertThat(tag.hasEnvironmentVariables()).isTrue();
-                assertThat(tag.getText()).isNull();
-                assertThat(tag.getTextWithVariables()).isEqualTo("${java_version}");
+                assertThat(ArgumentContents.containsVariable(tag)).isTrue();
+                assertThat(ArgumentContents.text(tag)).isNull();
+                assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("${java_version}");
             })
           )
         );
@@ -486,8 +487,8 @@ class FromTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) tag.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("java_version");
                 assertThat(var.isBraced()).isFalse();
-                assertThat(tag.getText()).isNull();
-                assertThat(tag.getTextWithVariables()).isEqualTo("$java_version");
+                assertThat(ArgumentContents.text(tag)).isNull();
+                assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("$java_version");
             })
           )
         );
@@ -505,8 +506,8 @@ class FromTest implements RewriteTest {
                 Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
                 assertThat(tag).isNotNull();
                 assertThat(((Docker.EnvironmentVariable) tag.getContents().getFirst()).getName()).isEqualTo("Java_Version");
-                assertThat(tag.getText()).isNull();
-                assertThat(tag.getTextWithVariables()).isEqualTo("${Java_Version}");
+                assertThat(ArgumentContents.text(tag)).isNull();
+                assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("${Java_Version}");
             })
           )
         );
@@ -524,8 +525,8 @@ class FromTest implements RewriteTest {
                 assertThat(flagValue).isNotNull();
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) flagValue.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("target_platform");
-                assertThat(flagValue.getText()).isNull();
-                assertThat(flagValue.getTextWithVariables()).isEqualTo("$target_platform");
+                assertThat(ArgumentContents.text(flagValue)).isNull();
+                assertThat(ArgumentContents.textWithVariables(flagValue)).isEqualTo("$target_platform");
             })
           )
         );
@@ -544,7 +545,7 @@ class FromTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) flagValue.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("TARGETPLATFORM:-linux/amd64");
                 assertThat(var.isBraced()).isTrue();
-                assertThat(flagValue.getTextWithVariables()).isEqualTo("${TARGETPLATFORM:-linux/amd64}");
+                assertThat(ArgumentContents.textWithVariables(flagValue)).isEqualTo("${TARGETPLATFORM:-linux/amd64}");
             })
           )
         );

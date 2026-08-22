@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,8 +68,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app");
-                assertThat(user.getGroup().getText()).isEqualTo("group:extra");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group:extra");
             })
           )
         );
@@ -106,7 +107,7 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
                 var group = (Docker.Literal) user.getGroup().getContents().getFirst();
                 assertThat(group.getText()).isEqualTo("group");
                 assertThat(group.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
@@ -125,7 +126,7 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
                 assertThat(user.getGroup().getContents()).isEmpty();
             })
           )
@@ -143,7 +144,7 @@ class UserTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(user.getUser().getContents()).isEmpty();
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );
@@ -199,8 +200,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
-                assertThat(user.getUser().getText()).isEqualTo("root");
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );
@@ -218,7 +219,7 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
-                assertThat(user.getUser().getText()).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
                 assertThat(user.getGroup()).isNull();
             })
           )
@@ -239,8 +240,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
-                assertThat(user.getUser().getText()).isEqualTo("root");
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );
@@ -260,8 +261,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
-                assertThat(user.getUser().getText()).isEqualTo("root");
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );
@@ -280,8 +281,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("root");
-                assertThat(user.getGroup().getText()).isEqualTo("gr\\\noup");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("gr\\\noup");
             })
           )
         );
@@ -298,8 +299,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("ro\\ ot");
-                assertThat(user.getGroup().getText()).isEqualTo("gr`oup");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("ro\\ ot");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("gr`oup");
             })
           )
         );
@@ -316,8 +317,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app\\\n  ");
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app\\\n  ");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );

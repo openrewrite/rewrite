@@ -73,7 +73,7 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
         }
         for (Docker.Flag flag : from.getFlags()) {
             if ("platform".equals(flag.getName()) && flag.getValue() != null) {
-                return flag.getValue().getTextWithVariables();
+                return ArgumentContents.textWithVariables(flag.getValue());
             }
         }
         return null;
@@ -95,7 +95,7 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
      * @return true if the image is "scratch"
      */
     public boolean isScratch() {
-        return "scratch".equals(getTree().getImageName().getText());
+        return "scratch".equals(ArgumentContents.text(getTree().getImageName()));
     }
 
     /**
@@ -104,7 +104,7 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
      * @return The quote style, or null if unquoted
      */
     public Docker.Literal.@Nullable QuoteStyle getQuoteStyle() {
-        return getTree().getImageName().getQuoteStyle();
+        return ArgumentContents.quoteStyle(getTree().getImageName());
     }
 
     /**

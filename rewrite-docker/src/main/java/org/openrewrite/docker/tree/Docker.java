@@ -979,58 +979,6 @@ public interface Docker extends Tree {
 
         List<ArgumentContent> contents;
 
-        /// @return The text of every content, or `null` if an environment variable reference makes it
-        /// impossible to resolve statically.
-        public @Nullable String getText() {
-            StringBuilder text = new StringBuilder();
-            for (ArgumentContent content : contents) {
-                if (content instanceof EnvironmentVariable) {
-                    return null;
-                }
-                if (content instanceof Literal) {
-                    text.append(((Literal) content).getText());
-                }
-            }
-            return text.toString();
-        }
-
-        /// @return As [#getText()], but rendering environment variable references in their original
-        /// `$VAR` or `${VAR}` form rather than giving up.
-        public String getTextWithVariables() {
-            StringBuilder text = new StringBuilder();
-            for (ArgumentContent content : contents) {
-                if (content instanceof Literal) {
-                    text.append(((Literal) content).getText());
-                } else if (content instanceof EnvironmentVariable) {
-                    EnvironmentVariable env = (EnvironmentVariable) content;
-                    text.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
-                }
-            }
-            return text.toString();
-        }
-
-        /// @return The quote style of the first quoted literal, or `null` if none is quoted.
-        public Literal.@Nullable QuoteStyle getQuoteStyle() {
-            for (ArgumentContent content : contents) {
-                if (content instanceof Literal) {
-                    Literal.QuoteStyle style = ((Literal) content).getQuoteStyle();
-                    if (style != null) {
-                        return style;
-                    }
-                }
-            }
-            return null;
-        }
-
-        public boolean hasEnvironmentVariables() {
-            for (ArgumentContent content : contents) {
-                if (content instanceof EnvironmentVariable) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArgument(this, p);

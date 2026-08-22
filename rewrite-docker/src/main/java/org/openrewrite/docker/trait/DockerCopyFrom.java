@@ -23,6 +23,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.ListUtils;
@@ -98,7 +99,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      */
     public Optional<String> getFromValue() {
         Docker.Argument arg = fromArgument();
-        return arg == null ? Optional.empty() : Optional.of(arg.getTextWithVariables());
+        return arg == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(arg));
     }
 
     /**
@@ -117,7 +118,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return false;
         }
-        String value = arg.getText();
+        String value = ArgumentContents.text(arg);
         if (value == null) {
             return false;
         }
