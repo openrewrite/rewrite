@@ -553,6 +553,25 @@ class CopyTest implements RewriteTest {
         );
     }
 
+    /// A quote the end of its line leaves open is a character of the reference around it, as it is of
+    /// any other argument, rather than the start of a string reaching into the lines below.
+    @Test
+    void anUnpairedQuoteInAFromFlagValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from='build /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(text(copy.getFlags().getFirst().getValue())).isEqualTo("'build");
+                assertThat(text(((Docker.CopyShellForm) copy.getForm()).getDestination())).isEqualTo("/app");
+            })
+          )
+        );
+    }
+
     private static String text(Docker.Argument argument) {
         return literal(argument.getContents().getFirst());
     }

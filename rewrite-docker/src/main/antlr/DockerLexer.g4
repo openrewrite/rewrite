@@ -334,6 +334,10 @@ IR_DOLLAR               : '$'             -> type(DOLLAR);
 // than to a tag ('host:5000/img:tag'), so it stays inside the token.
 IR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
+// As UNPAIRED_QUOTE in the default mode: a quote the end of its line leaves open is a character of the
+// reference around it rather than the start of a string.
+IR_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
+
 // Shared with FLAG_IMAGE_REF, which reads the same reference.
 fragment IR_TEXT       : ( IR_TEXT_CHAR | TEXT_ESCAPE | IR_PORT_COLON )+;
 fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$`];
@@ -364,6 +368,8 @@ FIR_DOLLAR               : '$'             -> type(DOLLAR);
 
 FIR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
+FIR_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
+
 // ----------------------------------------------------------------------------------------------
 // USER_SPEC mode - the user:group of a USER instruction
 // Entered from the USER keyword and left at the end of the line. As IMAGE_REF, minus the '@' and the
@@ -386,6 +392,8 @@ US_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
 US_DOLLAR               : '$'             -> type(DOLLAR);
 
 US_UNQUOTED_TEXT : ( US_TEXT_CHAR | TEXT_ESCAPE )+ -> type(UNQUOTED_TEXT);
+
+US_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 fragment US_TEXT_CHAR : ~[: \t\r\n\\"'$`];
 

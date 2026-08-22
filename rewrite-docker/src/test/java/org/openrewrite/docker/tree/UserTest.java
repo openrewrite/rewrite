@@ -186,6 +186,26 @@ class UserTest implements RewriteTest {
         );
     }
 
+    /// A quote the end of its line leaves open is a character of the name around it, as it is of any
+    /// other argument, rather than the start of a string reaching into the instructions below.
+    @Test
+    void unpairedQuoteInAUserSpecification() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER 'nobody
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("'nobody");
+                assertThat(doc.getStages().getFirst().getInstructions()).hasSize(2);
+            })
+          )
+        );
+    }
+
     /// A continuation that splits a name rather than ending it stays in the name, as in
     /// `continuationBeforeTheSeparator`.
     @Test

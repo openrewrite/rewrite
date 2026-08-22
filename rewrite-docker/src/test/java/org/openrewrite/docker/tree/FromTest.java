@@ -365,6 +365,26 @@ class FromTest implements RewriteTest {
         );
     }
 
+    /// A quote the end of its line leaves open is a character of the reference around it, as it is of
+    /// any other argument, rather than the start of a string reaching into the instructions below.
+    @Test
+    void unpairedQuoteInAnImageReference() {
+        rewriteRun(
+          docker(
+            """
+              FROM "ubuntu:22.04
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("\"ubuntu");
+                assertThat(ArgumentContents.text(from.getTag())).isEqualTo("22.04");
+                assertThat(doc.getStages().getFirst().getInstructions()).hasSize(1);
+            })
+          )
+        );
+    }
+
     /// A continuation joins the lines it spans, and Docker keeps the indent of the line that follows
     /// it, so only an unindented continuation leaves an image reference Docker still reads as one:
     /// `FROM ubuntu\<newline>  :22.04` reaches it as `FROM ubuntu  :22.04`, two arguments where FROM
