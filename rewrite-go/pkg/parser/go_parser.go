@@ -94,6 +94,17 @@ func (gp *GoParser) Parse(sourcePath string, source string) (*golang.Compilation
 	return cus[0], nil
 }
 
+// PackageParseError names the file whose syntax error stopped a package from
+// parsing, so callers reporting per-file can tell the offender from its siblings.
+type PackageParseError struct {
+	Path string
+	Err  error
+}
+
+func (e *PackageParseError) Error() string { return fmt.Sprintf("parse %s: %v", e.Path, e.Err) }
+
+func (e *PackageParseError) Unwrap() error { return e.Err }
+
 // ParsePackage parses every file in a single Go package together so
 // type-checking sees them as one unit. File A's reference to file B's
 // symbol resolves; the resulting CompilationUnits share a single
@@ -126,7 +137,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	for _, f := range files {
 		a, err := parser.ParseFile(fset, f.Path, f.Content, parser.ParseComments)
 		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f.Path, err)
+			return nil, &PackageParseError{Path: f.Path, Err: err}
 		}
 		asts = append(asts, a)
 	}
