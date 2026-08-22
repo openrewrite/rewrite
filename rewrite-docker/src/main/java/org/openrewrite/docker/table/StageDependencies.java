@@ -48,6 +48,11 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
                 description = "What the stage's `FROM` names: an image reference, or the earlier stage it extends.")
         String baseImage;
 
+        @Column(displayName = "Registry",
+                description = "The registry the base image is pulled from, `docker.io` when the image name does not " +
+                              "name one, and empty where the stage extends another stage rather than an image.")
+        String registry;
+
         @Column(displayName = "Referenced by",
                 description = "The stages that name this one, comma separated, by stage name where they have one and otherwise by `#index`.")
         String referencedBy;

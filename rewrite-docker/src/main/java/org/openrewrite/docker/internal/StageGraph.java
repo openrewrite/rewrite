@@ -39,11 +39,13 @@ public class StageGraph {
     private final List<@Nullable String> names;
     private final List<Set<Integer>> references;
     private final List<Set<Integer>> referencedBy;
+    private final Set<Integer> extendsStage;
     private final boolean ambiguous;
 
-    private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, boolean ambiguous) {
+    private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, Set<Integer> extendsStage, boolean ambiguous) {
         this.names = names;
         this.references = references;
+        this.extendsStage = extendsStage;
         this.ambiguous = ambiguous;
         this.referencedBy = new ArrayList<>(names.size());
         for (int i = 0; i < names.size(); i++) {
@@ -65,14 +67,18 @@ public class StageGraph {
         }
 
         List<Set<Integer>> references = new ArrayList<>(stages.size());
+        Set<Integer> extendsStage = new LinkedHashSet<>();
         boolean ambiguous = !isFullyParsed(file);
         for (int i = 0; i < stages.size(); i++) {
             ReferenceCollector collector = new ReferenceCollector(names, i);
             collector.visit(stages.get(i), 0);
             references.add(collector.targets);
+            if (collector.extendsStage) {
+                extendsStage.add(i);
+            }
             ambiguous |= collector.ambiguous;
         }
-        return new StageGraph(names, references, ambiguous);
+        return new StageGraph(names, references, extendsStage, ambiguous);
     }
 
     /// The tree is built from source offsets, so a token the error recovery dropped reappears as the whitespace
@@ -91,6 +97,11 @@ public class StageGraph {
 
     public @Nullable String getName(int stage) {
         return names.get(stage);
+    }
+
+    /// Whether the stage's `FROM` names another stage of the same file rather than an image to pull.
+    public boolean extendsStage(int stage) {
+        return extendsStage.contains(stage);
     }
 
     public List<String> getReferencedBy(int stage) {
@@ -146,6 +157,7 @@ public class StageGraph {
 
         final Set<Integer> targets = new LinkedHashSet<>();
         boolean ambiguous;
+        boolean extendsStage;
 
         ReferenceCollector(List<@Nullable String> names, int stage) {
             this.names = names;
@@ -157,7 +169,7 @@ public class StageGraph {
             if (from.getTag() == null && from.getDigest() == null) {
                 String plain = ArgumentContents.text(from.getImageName());
                 if (plain != null) {
-                    reference(plain, stage);
+                    extendsStage = reference(plain, stage);
                 } else if (!ArgumentContents.textWithVariables(from.getImageName()).contains("/")) {
                     ambiguous = true;
                 }
@@ -185,18 +197,19 @@ public class StageGraph {
         /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole file is read,
         /// so it reaches later stages too; hence `limit`. Searching backwards leaves a duplicated name at its last
         /// declaration, as it is for Docker.
-        private void reference(String value, int limit) {
+        private boolean reference(String value, int limit) {
             if (value.indexOf('$') >= 0 || isIndex(value)) {
                 ambiguous = true;
-                return;
+                return false;
             }
             String name = value.toLowerCase(Locale.ROOT);
             for (int i = limit - 1; i >= 0; i--) {
                 if (i != stage && name.equals(names.get(i))) {
                     targets.add(i);
-                    return;
+                    return true;
                 }
             }
+            return false;
         }
 
         private static boolean isIndex(String value) {
