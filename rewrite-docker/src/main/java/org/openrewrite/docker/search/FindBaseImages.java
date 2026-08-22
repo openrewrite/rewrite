@@ -62,15 +62,9 @@ public class FindBaseImages extends Recipe {
     @Nullable
     String platformPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Docker base images";
-    }
+    String displayName = "Find Docker base images";
 
-    @Override
-    public String getDescription() {
-        return "Find all base images (`FROM` instructions) in Dockerfiles.";
-    }
+    String description = "Find all base images (`FROM` instructions) in Dockerfiles.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
