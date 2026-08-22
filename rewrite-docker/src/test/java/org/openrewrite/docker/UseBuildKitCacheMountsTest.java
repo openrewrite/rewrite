@@ -73,12 +73,24 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
         rewriteRun(
           docker(
             """
-              FROM gradle:8-jdk21
+              FROM eclipse-temurin:21
               RUN gradle build
               """,
             """
-              FROM gradle:8-jdk21
+              FROM eclipse-temurin:21
               RUN --mount=type=cache,target=/root/.gradle gradle build
+              """
+          )
+        );
+    }
+
+    @Test
+    void gradleImageKeepsItsCacheOutsideRootsHome() {
+        rewriteRun(
+          docker(
+            """
+              FROM gradle:8-jdk21
+              RUN gradle build
               """
           )
         );
@@ -601,6 +613,180 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               # syntax=docker/dockerfile:1.0
               FROM maven:3.9-eclipse-temurin-21
               RUN mvn -B package
+              """
+          )
+        );
+    }
+
+    @Test
+    void pipToldNotToCache() {
+        rewriteRun(
+          docker(
+            """
+              FROM python:3.12
+              RUN pip install --no-cache-dir -r requirements.txt
+              """
+          )
+        );
+    }
+
+    @Test
+    void npmClearingTheCacheItJustFilled() {
+        rewriteRun(
+          docker(
+            """
+              FROM node:22
+              RUN npm ci && npm cache clean --force
+              """
+          )
+        );
+    }
+
+    @Test
+    void yarnClearingTheCacheItJustFilled() {
+        rewriteRun(
+          docker(
+            """
+              FROM node:22
+              RUN yarn install --frozen-lockfile && yarn cache clean
+              """
+          )
+        );
+    }
+
+    @Test
+    void goCleaningTheModuleCache() {
+        rewriteRun(
+          docker(
+            """
+              FROM golang:1.22
+              RUN go mod download && go clean -modcache
+              """
+          )
+        );
+    }
+
+    @Test
+    void commandRemovingOneOfTwoCacheDirectories() {
+        rewriteRun(
+          docker(
+            """
+              FROM golang:1.22
+              RUN go mod download && rm -rf /go/pkg/mod
+              """,
+            """
+              FROM golang:1.22
+              RUN --mount=type=cache,target=/root/.cache/go-build go mod download && rm -rf /go/pkg/mod
+              """
+          )
+        );
+    }
+
+    @Test
+    void environmentMovingTheCache() {
+        rewriteRun(
+          docker(
+            """
+              FROM golang:1.22
+              ENV GOPATH=/gopath
+              RUN go mod download
+              """,
+            """
+              FROM golang:1.22
+              ENV GOPATH=/gopath
+              RUN --mount=type=cache,target=/root/.cache/go-build go mod download
+              """
+          )
+        );
+    }
+
+    @Test
+    void environmentRestatingTheDefaultCacheLocation() {
+        rewriteRun(
+          docker(
+            """
+              FROM rust:1.79
+              ENV CARGO_HOME=/usr/local/cargo
+              RUN cargo build --release
+              """,
+            """
+              FROM rust:1.79
+              ENV CARGO_HOME=/usr/local/cargo
+              RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --release
+              """
+          )
+        );
+    }
+
+    @Test
+    void homeIsSomewhereElse() {
+        rewriteRun(
+          docker(
+            """
+              FROM python:3.12
+              ENV HOME=/home/app
+              RUN pip install -r requirements.txt
+              """
+          )
+        );
+    }
+
+    @Test
+    void mountWouldHideACopiedSettingsFile() {
+        rewriteRun(
+          docker(
+            """
+              FROM maven:3.9-eclipse-temurin-21
+              COPY settings.xml /root/.m2/settings.xml
+              RUN mvn -B package
+              """
+          )
+        );
+    }
+
+    @Test
+    void pipRunAsAPythonModule() {
+        rewriteRun(
+          docker(
+            """
+              FROM python:3.12
+              RUN python3 -m pip install -r requirements.txt
+              """,
+            """
+              FROM python:3.12
+              RUN --mount=type=cache,target=/root/.cache/pip python3 -m pip install -r requirements.txt
+              """
+          )
+        );
+    }
+
+    @Test
+    void goInstall() {
+        rewriteRun(
+          docker(
+            """
+              FROM golang:1.22
+              RUN go install github.com/example/tool@latest
+              """,
+            """
+              FROM golang:1.22
+              RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go install github.com/example/tool@latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void cargoInstall() {
+        rewriteRun(
+          docker(
+            """
+              FROM rust:1.79
+              RUN cargo install cargo-watch
+              """,
+            """
+              FROM rust:1.79
+              RUN --mount=type=cache,target=/usr/local/cargo/registry cargo install cargo-watch
               """
           )
         );
