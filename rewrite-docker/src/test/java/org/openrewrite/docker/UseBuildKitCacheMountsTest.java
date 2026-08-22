@@ -15,6 +15,7 @@
  */
 package org.openrewrite.docker;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -79,18 +80,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               FROM eclipse-temurin:21
               RUN --mount=type=cache,target=/root/.gradle,sharing=locked gradle build
-              """
-          )
-        );
-    }
-
-    @Test
-    void gradleImageKeepsItsCacheOutsideRootsHome() {
-        rewriteRun(
-          docker(
-            """
-              FROM gradle:8-jdk21
-              RUN gradle build
               """
           )
         );
@@ -193,18 +182,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     }
 
     @Test
-    void aptIsNotInTheDefaultSet() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN apt-get update && apt-get install -y curl
-              """
-          )
-        );
-    }
-
-    @Test
     void aptAsksForTheCacheItCachesInto() {
         rewriteRun(
           spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
@@ -216,19 +193,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               FROM ubuntu:22.04
               RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt/lists,sharing=locked rm -f /etc/apt/apt.conf.d/docker-clean && apt-get update && apt-get install -y curl
-              """
-          )
-        );
-    }
-
-    @Test
-    void aptCleanupDiscardsTheCache() {
-        rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
               """
           )
         );
@@ -263,43 +227,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               FROM alpine:3.20
               RUN --mount=type=cache,target=/var/cache/apk,sharing=locked apk add curl
-              """
-          )
-        );
-    }
-
-    @Test
-    void apkNoCacheKeepsNothingToCache() {
-        rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apk"), null)),
-          docker(
-            """
-              FROM alpine:3.20
-              RUN apk add --no-cache curl
-              """
-          )
-        );
-    }
-
-    @Test
-    void pipInstallingIntoTheImage() {
-        rewriteRun(
-          docker(
-            """
-              FROM python:3.12
-              RUN pip install --target=/app -r requirements.txt
-              """
-          )
-        );
-    }
-
-    @Test
-    void existingMountOfTheSameTarget() {
-        rewriteRun(
-          docker(
-            """
-              FROM maven:3.9-eclipse-temurin-21
-              RUN --mount=type=cache,target=/root/.m2 mvn -B package
               """
           )
         );
@@ -348,20 +275,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               FROM maven:3.9-eclipse-temurin-21
               RUN --mount=type=cache,target=/root/.m2,sharing=locked ["mvn", "-B", "package"]
-              """
-          )
-        );
-    }
-
-    @Test
-    void heredocFormIsLeftAlone() {
-        rewriteRun(
-          docker(
-            """
-              FROM maven:3.9-eclipse-temurin-21
-              RUN <<EOF
-              mvn -B package
-              EOF
               """
           )
         );
@@ -430,19 +343,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     }
 
     @Test
-    void nonRootUserHasAnotherHomeDirectory() {
-        rewriteRun(
-          docker(
-            """
-              FROM maven:3.9-eclipse-temurin-21
-              USER build
-              RUN mvn -B package
-              """
-          )
-        );
-    }
-
-    @Test
     void rootUserRestoredBeforeTheBuild() {
         rewriteRun(
           docker(
@@ -481,19 +381,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
 
               FROM maven:3.9-eclipse-temurin-21
               RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B package
-              """
-          )
-        );
-    }
-
-    @Test
-    void frontendOlderThanCacheMounts() {
-        rewriteRun(
-          docker(
-            """
-              # syntax=docker/dockerfile:1.0
-              FROM maven:3.9-eclipse-temurin-21
-              RUN mvn -B package
               """
           )
         );
@@ -554,119 +441,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     }
 
     @Test
-    void aPackageManagerNamedInPassingIsNotRun() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN echo "run mvn package to build"
-              """
-          )
-        );
-    }
-
-    @Test
-    void aptWithoutTheUpdateThatFillsTheCache() {
-        rewriteRun(
-          spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN apt-get update
-              RUN apt-get install -y curl
-              """
-          )
-        );
-    }
-
-    @Test
-    void separatorInsideAQuotedStringSeparatesNothing() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN echo "first && mvn package"
-              """
-          )
-        );
-    }
-
-    @Test
-    void frontendOlderThanCacheMountsPinnedByDigest() {
-        rewriteRun(
-          docker(
-            """
-              # syntax=docker/dockerfile:1.0@sha256:1234567890abcdef
-              FROM maven:3.9-eclipse-temurin-21
-              RUN mvn -B package
-              """
-          )
-        );
-    }
-
-    @Test
-    void escapeDirectiveBeforeTheSyntaxDirective() {
-        rewriteRun(
-          docker(
-            """
-              # escape=`
-              # syntax=docker/dockerfile:1.0
-              FROM maven:3.9-eclipse-temurin-21
-              RUN mvn -B package
-              """
-          )
-        );
-    }
-
-    @Test
-    void pipToldNotToCache() {
-        rewriteRun(
-          docker(
-            """
-              FROM python:3.12
-              RUN pip install --no-cache-dir -r requirements.txt
-              """
-          )
-        );
-    }
-
-    @Test
-    void npmClearingTheCacheItJustFilled() {
-        rewriteRun(
-          docker(
-            """
-              FROM node:22
-              RUN npm ci && npm cache clean --force
-              """
-          )
-        );
-    }
-
-    @Test
-    void yarnClearingTheCacheItJustFilled() {
-        rewriteRun(
-          docker(
-            """
-              FROM node:22
-              RUN yarn install --frozen-lockfile && yarn cache clean
-              """
-          )
-        );
-    }
-
-    @Test
-    void goCleaningTheModuleCache() {
-        rewriteRun(
-          docker(
-            """
-              FROM golang:1.22
-              RUN go mod download && go clean -modcache
-              """
-          )
-        );
-    }
-
-    @Test
     void commandRemovingOneOfTwoCacheDirectories() {
         rewriteRun(
           docker(
@@ -713,32 +487,6 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               FROM rust:1.79
               ENV CARGO_HOME=/usr/local/cargo
               RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --release
-              """
-          )
-        );
-    }
-
-    @Test
-    void homeIsSomewhereElse() {
-        rewriteRun(
-          docker(
-            """
-              FROM python:3.12
-              ENV HOME=/home/app
-              RUN pip install -r requirements.txt
-              """
-          )
-        );
-    }
-
-    @Test
-    void mountWouldHideACopiedSettingsFile() {
-        rewriteRun(
-          docker(
-            """
-              FROM maven:3.9-eclipse-temurin-21
-              COPY settings.xml /root/.m2/settings.xml
-              RUN mvn -B package
               """
           )
         );
@@ -800,5 +548,267 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
     @Test
     void unknownSharingModeIsRejected() {
         assertThat(new UseBuildKitCacheMounts(null, "exclusive").validate().isValid()).isFalse();
+    }
+
+    @Nested
+    class NoChange implements RewriteTest {
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            UseBuildKitCacheMountsTest.this.defaults(spec);
+        }
+
+        @Test
+        void gradleImageKeepsItsCacheOutsideRootsHome() {
+            rewriteRun(
+              docker(
+                """
+                  FROM gradle:8-jdk21
+                  RUN gradle build
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aptIsNotInTheDefaultSet() {
+            rewriteRun(
+              docker(
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update && apt-get install -y curl
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aptCleanupDiscardsTheCache() {
+            rewriteRun(
+              spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+              docker(
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+                  """
+              )
+            );
+        }
+
+        @Test
+        void apkNoCacheKeepsNothingToCache() {
+            rewriteRun(
+              spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apk"), null)),
+              docker(
+                """
+                  FROM alpine:3.20
+                  RUN apk add --no-cache curl
+                  """
+              )
+            );
+        }
+
+        @Test
+        void pipInstallingIntoTheImage() {
+            rewriteRun(
+              docker(
+                """
+                  FROM python:3.12
+                  RUN pip install --target=/app -r requirements.txt
+                  """
+              )
+            );
+        }
+
+        @Test
+        void existingMountOfTheSameTarget() {
+            rewriteRun(
+              docker(
+                """
+                  FROM maven:3.9-eclipse-temurin-21
+                  RUN --mount=type=cache,target=/root/.m2 mvn -B package
+                  """
+              )
+            );
+        }
+
+        @Test
+        void heredocFormIsLeftAlone() {
+            rewriteRun(
+              docker(
+                """
+                  FROM maven:3.9-eclipse-temurin-21
+                  RUN <<EOF
+                  mvn -B package
+                  EOF
+                  """
+              )
+            );
+        }
+
+        @Test
+        void nonRootUserHasAnotherHomeDirectory() {
+            rewriteRun(
+              docker(
+                """
+                  FROM maven:3.9-eclipse-temurin-21
+                  USER build
+                  RUN mvn -B package
+                  """
+              )
+            );
+        }
+
+        @Test
+        void frontendOlderThanCacheMounts() {
+            rewriteRun(
+              docker(
+                """
+                  # syntax=docker/dockerfile:1.0
+                  FROM maven:3.9-eclipse-temurin-21
+                  RUN mvn -B package
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aPackageManagerNamedInPassingIsNotRun() {
+            rewriteRun(
+              docker(
+                """
+                  FROM ubuntu:22.04
+                  RUN echo "run mvn package to build"
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aptWithoutTheUpdateThatFillsTheCache() {
+            rewriteRun(
+              spec -> spec.recipe(new UseBuildKitCacheMounts(singletonList("apt"), null)),
+              docker(
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  RUN apt-get install -y curl
+                  """
+              )
+            );
+        }
+
+        @Test
+        void separatorInsideAQuotedStringSeparatesNothing() {
+            rewriteRun(
+              docker(
+                """
+                  FROM ubuntu:22.04
+                  RUN echo "first && mvn package"
+                  """
+              )
+            );
+        }
+
+        @Test
+        void frontendOlderThanCacheMountsPinnedByDigest() {
+            rewriteRun(
+              docker(
+                """
+                  # syntax=docker/dockerfile:1.0@sha256:1234567890abcdef
+                  FROM maven:3.9-eclipse-temurin-21
+                  RUN mvn -B package
+                  """
+              )
+            );
+        }
+
+        @Test
+        void escapeDirectiveBeforeTheSyntaxDirective() {
+            rewriteRun(
+              docker(
+                """
+                  # escape=`
+                  # syntax=docker/dockerfile:1.0
+                  FROM maven:3.9-eclipse-temurin-21
+                  RUN mvn -B package
+                  """
+              )
+            );
+        }
+
+        @Test
+        void pipToldNotToCache() {
+            rewriteRun(
+              docker(
+                """
+                  FROM python:3.12
+                  RUN pip install --no-cache-dir -r requirements.txt
+                  """
+              )
+            );
+        }
+
+        @Test
+        void npmClearingTheCacheItJustFilled() {
+            rewriteRun(
+              docker(
+                """
+                  FROM node:22
+                  RUN npm ci && npm cache clean --force
+                  """
+              )
+            );
+        }
+
+        @Test
+        void yarnClearingTheCacheItJustFilled() {
+            rewriteRun(
+              docker(
+                """
+                  FROM node:22
+                  RUN yarn install --frozen-lockfile && yarn cache clean
+                  """
+              )
+            );
+        }
+
+        @Test
+        void goCleaningTheModuleCache() {
+            rewriteRun(
+              docker(
+                """
+                  FROM golang:1.22
+                  RUN go mod download && go clean -modcache
+                  """
+              )
+            );
+        }
+
+        @Test
+        void homeIsSomewhereElse() {
+            rewriteRun(
+              docker(
+                """
+                  FROM python:3.12
+                  ENV HOME=/home/app
+                  RUN pip install -r requirements.txt
+                  """
+              )
+            );
+        }
+
+        @Test
+        void mountWouldHideACopiedSettingsFile() {
+            rewriteRun(
+              docker(
+                """
+                  FROM maven:3.9-eclipse-temurin-21
+                  COPY settings.xml /root/.m2/settings.xml
+                  RUN mvn -B package
+                  """
+              )
+            );
+        }
     }
 }
