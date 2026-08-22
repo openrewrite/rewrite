@@ -418,6 +418,11 @@ public class Assertions {
                 violations.add("expected the preamble " + quoted(form.getPreamble()) + " to open one heredoc per" +
                         " body, but it opens " + markers.size() + " for " + form.getBodies().size() + " bodies");
             }
+            if (!form.getBodies().isEmpty() &&
+                    !form.getBodies().get(0).getPrefix().getWhitespace().contains("\n")) {
+                violations.add("expected the heredoc opened by the preamble " + quoted(form.getPreamble()) +
+                        " to begin on the line after it");
+            }
             for (int i = 0; i < form.getBodies().size(); i++) {
                 Docker.HeredocBody body = form.getBodies().get(i);
                 if (i < markers.size() && !Heredocs.closes(markers.get(i), body.getClosing())) {

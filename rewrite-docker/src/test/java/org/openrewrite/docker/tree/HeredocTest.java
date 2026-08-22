@@ -190,4 +190,172 @@ class HeredocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void heredocWithCRLF() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "RUN <<EOF\r\n" +
+            "echo hi\r\n" +
+            "EOF\r\n",
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().getLast();
+                var heredoc = (Docker.HeredocForm) run.getCommand();
+
+                // The carriage return ends the preamble line, so it belongs to neither the
+                // preamble nor the marker, but to the whitespace ahead of the body
+                assertThat(heredoc.getPreamble()).isEqualTo("<<EOF");
+                assertThat(heredoc.getBodies()).hasSize(1);
+                var body = heredoc.getBodies().getFirst();
+                assertThat(body.getPrefix().getWhitespace()).isEqualTo("\r\n");
+                assertThat(body.getContentLines()).containsExactly("echo hi\r\n");
+                assertThat(body.getClosing()).isEqualTo("EOF");
+            })
+          )
+        );
+    }
+
+    @Test
+    void heredocWithCRLFBeforeAnotherInstruction() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "RUN <<EOF\r\n" +
+            "echo hi\r\n" +
+            "EOF\r\n" +
+            "RUN echo done\r\n"
+          )
+        );
+    }
+
+    @Test
+    void heredocWithMultipleLinesCRLF() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "RUN <<EOF\r\n" +
+            "apt-get update\r\n" +
+            "apt-get install -y curl\r\n" +
+            "EOF\r\n" +
+            "RUN echo done\r\n"
+          )
+        );
+    }
+
+    @Test
+    void heredocWithDashCRLF() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "RUN <<-FILE_END\r\n" +
+            "echo \"Hello World\"\r\n" +
+            "echo \"Another line\"\r\n" +
+            "FILE_END\r\n" +
+            "RUN echo done\r\n"
+          )
+        );
+    }
+
+    @Test
+    void heredocWithEmptyBodyCRLF() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "RUN <<EOF\r\n" +
+            "EOF\r\n" +
+            "RUN echo done\r\n"
+          )
+        );
+    }
+
+    @Test
+    void heredocInCopyWithCRLF() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "COPY <<EOF /app/config.txt\r\n" +
+            "some content\r\n" +
+            "EOF\r\n" +
+            "RUN echo done\r\n",
+            spec -> spec.afterRecipe(file -> {
+                var copy = (Docker.Copy) file.getStages().getFirst().getInstructions().get(0);
+                assertThat(copy.getHeredoc()).isNotNull();
+                assertThat(copy.getHeredoc().getPreamble()).isEqualTo("<<EOF");
+                assertThat(((Docker.Literal) copy.getHeredoc().getDestination().getContents().getFirst()).getText())
+                  .isEqualTo("/app/config.txt");
+                assertThat(copy.getHeredoc().getBodies().getFirst().getContentLines())
+                  .containsExactly("some content\r\n");
+            })
+          )
+        );
+    }
+
+    @Test
+    void multipleHeredocsInRunCommandCRLF() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "RUN <<EOF1 cat >file1.sh &&\\\r\n" +
+            "    <<EOF2 cat >file2.sh &&\\\r\n" +
+            "    chmod +x file1.sh file2.sh\r\n" +
+            "#!/bin/bash\r\n" +
+            "echo \"script 1\"\r\n" +
+            "EOF1\r\n" +
+            "#!/bin/bash\r\n" +
+            "echo \"script 2\"\r\n" +
+            "EOF2\r\n" +
+            "RUN echo done\r\n",
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().get(0);
+                var heredoc = (Docker.HeredocForm) run.getCommand();
+
+                // The line continuations inside the preamble keep their carriage returns
+                assertThat(heredoc.getPreamble()).isEqualTo(
+                  "<<EOF1 cat >file1.sh &&\\\r\n" +
+                  "    <<EOF2 cat >file2.sh &&\\\r\n" +
+                  "    chmod +x file1.sh file2.sh");
+
+                assertThat(heredoc.getBodies()).hasSize(2);
+                var body1 = heredoc.getBodies().getFirst();
+                assertThat(body1.getClosing()).isEqualTo("EOF1");
+                assertThat(body1.getContentLines()).containsExactly("#!/bin/bash\r\n", "echo \"script 1\"\r\n");
+                var body2 = heredoc.getBodies().getLast();
+                assertThat(body2.getClosing()).isEqualTo("EOF2");
+                assertThat(body2.getContentLines()).containsExactly("\r\n", "#!/bin/bash\r\n", "echo \"script 2\"\r\n");
+            })
+          )
+        );
+    }
+
+    @Test
+    void heredocWithTrailingWhitespaceAfterMarker() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\n" +
+            "RUN <<EOF \n" +
+            "echo hi\n" +
+            "EOF\n" +
+            "RUN echo done\n"
+          )
+        );
+    }
+
+    @Test
+    void carriageReturnInsideAHeredocLineIsContent() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:20.04\n" +
+            "RUN <<EOF\n" +
+            "echo a\rb\n" +
+            "EOF\n" +
+            "RUN echo done\n",
+            spec -> spec.afterRecipe(file -> {
+                var run = (Docker.Run) file.getStages().getFirst().getInstructions().get(0);
+                var heredoc = (Docker.HeredocForm) run.getCommand();
+                assertThat(heredoc.getBodies().getFirst().getContentLines()).containsExactly("echo a\rb\n");
+            })
+          )
+        );
+    }
 }

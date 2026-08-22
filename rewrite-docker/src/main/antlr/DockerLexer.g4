@@ -385,11 +385,13 @@ HP_UNQUOTED_TEXT : ( ~[<\\` \t\r\n]+
 // ----------------------------------------------------------------------------------------------
 mode HEREDOC;
 
-H_NEWLINE : '\n' -> type(NEWLINE);
+H_NEWLINE : '\r'? '\n' -> type(NEWLINE);
 
 // Match heredoc content lines - emit as HEREDOC_CONTENT unless it's an ending identifier
 // For multi-heredoc, we only popMode when the queue is empty (all markers matched in FIFO order)
-HEREDOC_CONTENT : ~[\n]+
+// A '\r' only belongs to the content when it does not terminate the line, so that the closing
+// marker of a CRLF heredoc is "EOF" rather than "EOF\r".
+HEREDOC_CONTENT : ( ~[\r\n] | '\r' ~[\n] )+
 {
   if(!heredocIdentifiers.isEmpty() && Heredocs.closes(heredocIdentifiers.peek(), getText())) {
       setType(UNQUOTED_TEXT);

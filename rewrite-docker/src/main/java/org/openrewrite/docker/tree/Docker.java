@@ -843,6 +843,9 @@ public interface Docker extends Tree {
     /**
      * Represents a single heredoc body within a heredoc command.
      * Each body has its own opening marker, content lines, and closing marker.
+     * <p>
+     * A body begins on the line after the one that opens it, so its prefix holds that line ending,
+     * which is a carriage return and a line feed in a Dockerfile with CRLF line endings.
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

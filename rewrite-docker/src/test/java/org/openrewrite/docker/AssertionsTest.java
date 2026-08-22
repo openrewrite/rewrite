@@ -377,6 +377,24 @@ class AssertionsTest implements RewriteTest {
     }
 
     @Test
+    void catchesAHeredocBodyPulledOntoThePreambleLine() {
+        assertMalformed(
+          """
+            FROM alpine
+            RUN <<EOF
+            echo hi
+            EOF
+            """,
+          new DockerIsoVisitor<>() {
+              @Override
+              public Docker.HeredocForm visitHeredocForm(Docker.HeredocForm form, ExecutionContext ctx) {
+                  return form.withBodies(ListUtils.map(form.getBodies(), body -> body.withPrefix(Space.EMPTY)));
+              }
+          },
+          "expected the heredoc opened by the preamble \"<<EOF\" to begin on the line after it");
+    }
+
+    @Test
     void catchesAHeredocLineThatSwallowsTheNextOne() {
         assertMalformed(
           """
