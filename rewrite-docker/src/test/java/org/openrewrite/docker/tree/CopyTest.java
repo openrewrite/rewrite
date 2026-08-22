@@ -546,6 +546,8 @@ class CopyTest implements RewriteTest {
                 assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
                   .containsExactly("nginx", ":", "1.25");
                 var form = (Docker.CopyShellForm) copy.getForm();
+                assertThat(form.getPrefix().getComments()).singleElement()
+                  .satisfies(comment -> assertThat(comment.getText()).isEqualTo("# the built assets"));
                 assertThat(form.getSources()).map(CopyTest::text).containsExactly("/build");
                 assertThat(text(form.getDestination())).isEqualTo("/app");
             })
