@@ -212,8 +212,10 @@ heredoc
 // For single heredoc: just "<<EOF" or "<<EOF /dest" (for COPY/ADD)
 // For multi heredoc: "<<EOF1 cat >file1 && <<EOF2 cat >file2"
 // Elements are shell command text and, for COPY/ADD, the destination path.
+// Docker reads a heredoc from any word of the line, so a marker need not open it: `cat >>/f <<EOF`
+// redirects before it says what it is reading.
 heredocPreamble
-    : HEREDOC_START textElement* ( HEREDOC_START textElement* )*
+    : textElement* ( HEREDOC_START textElement* )+
     ;
 
 // A single heredoc body (content + closing marker)
