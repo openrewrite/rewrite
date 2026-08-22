@@ -46,7 +46,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               FROM maven:3.9-eclipse-temurin-21
               COPY . .
-              RUN --mount=type=cache,target=/root/.m2 mvn -B package
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B package
               """
           )
         );
@@ -62,7 +62,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               """,
             """
               FROM eclipse-temurin:21
-              RUN --mount=type=cache,target=/root/.m2 ./mvnw -B package
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked ./mvnw -B package
               """
           )
         );
@@ -78,7 +78,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               """,
             """
               FROM eclipse-temurin:21
-              RUN --mount=type=cache,target=/root/.gradle gradle build
+              RUN --mount=type=cache,target=/root/.gradle,sharing=locked gradle build
               """
           )
         );
@@ -106,7 +106,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               """,
             """
               FROM eclipse-temurin:21
-              RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon build
+              RUN --mount=type=cache,target=/root/.gradle,sharing=locked ./gradlew --no-daemon build
               """
           )
         );
@@ -331,7 +331,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               """,
             """
               FROM maven:3.9-eclipse-temurin-21
-              RUN --network=none --mount=type=cache,target=/root/.m2 mvn -B -o package
+              RUN --network=none --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -o package
               """
           )
         );
@@ -347,7 +347,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               """,
             """
               FROM maven:3.9-eclipse-temurin-21
-              RUN --mount=type=cache,target=/root/.m2 ["mvn", "-B", "package"]
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked ["mvn", "-B", "package"]
               """
           )
         );
@@ -418,7 +418,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               FROM maven:3.9-eclipse-temurin-21 AS build
               COPY . .
-              RUN --mount=type=cache,target=/root/.m2 mvn -B package
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B package
 
               FROM eclipse-temurin:21-jre
               COPY --from=build /target/app.jar /app.jar
@@ -458,7 +458,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               USER build
               RUN echo building
               USER root
-              RUN --mount=type=cache,target=/root/.m2 mvn -B package
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B package
               """
           )
         );
@@ -480,7 +480,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
               USER build
 
               FROM maven:3.9-eclipse-temurin-21
-              RUN --mount=type=cache,target=/root/.m2 mvn -B package
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B package
               """
           )
         );
@@ -511,7 +511,7 @@ class UseBuildKitCacheMountsTest implements RewriteTest {
             """
               # syntax=docker/dockerfile:1
               FROM maven:3.9-eclipse-temurin-21
-              RUN --mount=type=cache,target=/root/.m2 mvn -B package
+              RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B package
               """
           )
         );

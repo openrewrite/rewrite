@@ -54,12 +54,13 @@ name: org.openrewrite.docker.DockerBuildOptimization
 displayName: Optimize Docker builds
 description: >-
   Apply build optimization best practices to Dockerfiles. This includes combining RUN
-  instructions to reduce layers, adding cleanup commands to reduce image size, and caching
-  package manager downloads across builds with BuildKit cache mounts.
+  instructions to reduce layers and adding cleanup commands to reduce image size.
+  `org.openrewrite.docker.UseBuildKitCacheMounts` is deliberately not part of this recipe:
+  a cache mount changes how a build resolves its dependencies and hides whatever the base
+  image holds at the mounted directory, which is worth reading a diff for.
 tags:
   - docker
   - optimization
 recipeList:
   - org.openrewrite.docker.CombineRunInstructions
   - org.openrewrite.docker.AddAptGetCleanup
-  - org.openrewrite.docker.UseBuildKitCacheMounts

@@ -91,12 +91,20 @@ public class UseBuildKitCacheMounts extends Recipe {
             "form are both handled; a heredoc body is left alone, because the commands it holds are not modelled " +
             "as commands. A `RUN` that already mounts the same target, and a `RUN` that a preceding `USER` has " +
             "left running as somebody other than root, whose home directory this recipe cannot know, are both " +
-            "left alone. `apt` and `apk` are not in the default set. An `apt-get` cache mount is only added to a " +
+            "left alone. Maven, Gradle, `apt` and `apk` mount with `sharing=locked`, because a build sharing " +
+            "one of those caches with another build running at the same time, as the platforms of a " +
+            "multi-platform build do, can corrupt it. " +
+            "`apt` and `apk` are not in the default set. An `apt-get` cache mount is only added to a " +
             "`RUN` that runs `apt-get update` itself, since an empty cache hides the package lists an earlier " +
             "layer wrote; it only caches once the `docker-clean` configuration that discards the cache is " +
             "removed, which this recipe adds along with the mount; and it is incompatible with the " +
             "`rm -rf /var/lib/apt/lists/*` cleanup that `org.openrewrite.docker.AddAptGetCleanup` adds, which " +
-            "this recipe leaves in place.";
+            "this recipe leaves in place. " +
+            "What a base image holds is beyond what a Dockerfile says, so review what this recipe changes " +
+            "rather than applying it unattended: a base image that ships a populated cache directory, or that " +
+            "sets `HOME`, `GRADLE_USER_HOME` or `GOPATH` to somewhere this recipe does not expect, is invisible " +
+            "here, and a mount over such a directory hides what is in it. Nor does a Dockerfile say which " +
+            "builder reads it, and a builder that is not BuildKit does not accept `RUN --mount` at all.";
 
     private static final Set<String> SHARING_MODES = new HashSet<>(Arrays.asList("shared", "private", "locked"));
 
@@ -485,9 +493,9 @@ public class UseBuildKitCacheMounts extends Recipe {
 
     enum PackageManager {
         MAVEN("maven", new String[]{"mvn", "mvnw"}, new String[][]{},
-                new Target[]{new Target("/root/.m2", HOME)}, false, false),
+                new Target[]{new Target("/root/.m2", HOME)}, true, false),
         GRADLE("gradle", new String[]{"gradle", "gradlew"}, new String[][]{},
-                new Target[]{new Target("/root/.gradle", new String[][]{{"HOME", "/root"}, {"GRADLE_USER_HOME", "/root/.gradle"}})}, false, false),
+                new Target[]{new Target("/root/.gradle", new String[][]{{"HOME", "/root"}, {"GRADLE_USER_HOME", "/root/.gradle"}})}, true, false),
         NPM("npm", new String[]{"npm"}, new String[][]{{"ci"}, {"install"}},
                 new Target[]{new Target("/root/.npm", new String[][]{{"HOME", "/root"}, {"npm_config_cache", null}, {"NPM_CONFIG_CACHE", null}})}, false, false),
         YARN("yarn", new String[]{"yarn"}, new String[][]{{"install"}},
