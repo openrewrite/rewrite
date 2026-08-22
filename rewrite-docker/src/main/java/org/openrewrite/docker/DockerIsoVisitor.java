@@ -61,6 +61,11 @@ public class DockerIsoVisitor<P> extends DockerVisitor<P> {
     }
 
     @Override
+    public Docker.Arg.ArgPair visitArgPair(Docker.Arg.ArgPair pair, P p) {
+        return super.visitArgPair(pair, p);
+    }
+
+    @Override
     public Docker.Env visitEnv(Docker.Env env, P p) {
         return (Docker.Env) super.visitEnv(env, p);
     }

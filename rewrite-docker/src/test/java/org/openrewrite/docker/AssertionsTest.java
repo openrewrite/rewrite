@@ -187,7 +187,7 @@ class AssertionsTest implements RewriteTest {
           new DockerIsoVisitor<>() {
               @Override
               public Docker.Arg visitArg(Docker.Arg arg, ExecutionContext ctx) {
-                  return "DIGEST".equals(arg.getName().getText()) ? arg.withPrefix(Space.SINGLE_SPACE) : arg;
+                  return "DIGEST".equals(arg.getPairs().getFirst().getName().getText()) ? arg.withPrefix(Space.SINGLE_SPACE) : arg;
               }
           },
           "expected the Arg to start its own line");
@@ -606,7 +606,8 @@ class AssertionsTest implements RewriteTest {
           new DockerIsoVisitor<>() {
               @Override
               public Docker.Arg visitArg(Docker.Arg arg, ExecutionContext ctx) {
-                  return arg.withName(arg.getName().withText(arg.getName().getText() + " "));
+                  return arg.withPairs(ListUtils.map(arg.getPairs(), pair ->
+                    pair.withName(pair.getName().withText(pair.getName().getText() + " "))));
               }
           },
           "to hold only its value, but it starts or ends with whitespace");

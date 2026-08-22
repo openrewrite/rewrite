@@ -144,10 +144,13 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitArg(Docker.Arg arg, PrintOutputCapture<P> p) {
         beforeSyntax(arg, p);
         p.append(arg.getKeyword());
-        visit(arg.getName(), p);
-        if (arg.getValue() != null) {
-            p.append("=");
-            visit(arg.getValue(), p);
+        for (Docker.Arg.ArgPair pair : arg.getPairs()) {
+            visitSpace(pair.getPrefix(), p);
+            visit(pair.getName(), p);
+            if (pair.getValue() != null) {
+                p.append("=");
+                visit(pair.getValue(), p);
+            }
         }
         afterSyntax(arg, p);
         return arg;

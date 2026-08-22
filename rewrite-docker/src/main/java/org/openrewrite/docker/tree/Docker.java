@@ -343,14 +343,33 @@ public interface Docker extends Tree {
 
         String keyword;
 
-        Literal name;
-
-        @Nullable
-        Argument value;
+        List<ArgPair> pairs;
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArg(this, p);
+        }
+
+        /**
+         * A build argument: a name and, where the instruction writes one, the default it takes.
+         */
+        @Value
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @With
+        public static class ArgPair {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            Space prefix;
+            Markers markers;
+            Literal name;
+
+            /**
+             * The default, or null where the instruction writes no {@code =}. A name written with an
+             * {@code =} and nothing after it takes an empty default, which is a value with no content.
+             */
+            @Nullable
+            Argument value;
         }
     }
 

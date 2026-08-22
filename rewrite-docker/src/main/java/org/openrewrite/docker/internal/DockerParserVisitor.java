@@ -252,7 +252,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     /// value, whose quotes, if it has any, are part of its text.
     private @Nullable Token quotedValue(ParserRuleContext ctx) {
         ParseTree first = ctx.getChild(0);
-        return first instanceof DockerParser.QuotedContext ? ((DockerParser.QuotedContext) first).getStart() : null;
+        return ctx.getChildCount() == 1 && first instanceof DockerParser.QuotedContext ?
+                ((DockerParser.QuotedContext) first).getStart() : null;
     }
 
     private String sourceText(int startIndex, int stopIndex) {
@@ -380,21 +381,29 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         String argKeyword = ctx.ARG().getText();
         skip(ctx.ARG().getSymbol());
 
-        // ARG name is always a simple identifier
-        Space namePrefix = prefix(ctx.argName().getStart());
-        skip(ctx.argName().getStop());
-        Docker.Literal name = new Docker.Literal(
-                randomId(),
-                namePrefix,
-                Markers.EMPTY,
-                ctx.argName().getText(),
-                null
-        );
+        List<Docker.Arg.ArgPair> pairs = new ArrayList<>();
+        for (DockerParser.ArgPairContext pairCtx : ctx.argPair()) {
+            Space pairPrefix = prefix(pairCtx.getStart());
 
-        Docker.Argument value = null;
-        if (ctx.EQUALS() != null) {
-            skip(ctx.EQUALS().getSymbol());
-            value = parseArgument(ctx.argValue() == null ? null : ctx.argValue().text());
+            // ARG name is always a simple identifier
+            Space namePrefix = prefix(pairCtx.argName().getStart());
+            skip(pairCtx.argName().getStop());
+            Docker.Literal name = new Docker.Literal(
+                    randomId(),
+                    namePrefix,
+                    Markers.EMPTY,
+                    pairCtx.argName().getText(),
+                    null
+            );
+
+            // An '=' with nothing after it is an empty default, which is a value with no content
+            Docker.Argument value = null;
+            if (pairCtx.EQUALS() != null) {
+                skip(pairCtx.EQUALS().getSymbol());
+                value = parseArgument(pairCtx.argValue());
+            }
+
+            pairs.add(new Docker.Arg.ArgPair(randomId(), pairPrefix, Markers.EMPTY, name, value));
         }
 
         // Advance cursor to end of instruction
@@ -402,7 +411,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
-        return new Docker.Arg(randomId(), prefix, Markers.EMPTY, argKeyword, name, value);
+        return new Docker.Arg(randomId(), prefix, Markers.EMPTY, argKeyword, pairs);
     }
 
     @Override

@@ -105,11 +105,18 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         Docker.Arg a = arg;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withName((Docker.Literal) visit(a.getName(), p));
-        if (a.getValue() != null) {
-            a = a.withValue((Docker.Argument) visit(a.getValue(), p));
+        return a.withPairs(ListUtils.map(a.getPairs(), pair -> visitArgPair(pair, p)));
+    }
+
+    public Docker.Arg.ArgPair visitArgPair(Docker.Arg.ArgPair pair, P p) {
+        Docker.Arg.ArgPair ap = pair;
+        ap = ap.withPrefix(visitSpace(ap.getPrefix(), p));
+        ap = ap.withMarkers(visitMarkers(ap.getMarkers(), p));
+        ap = ap.withName((Docker.Literal) visit(ap.getName(), p));
+        if (ap.getValue() != null) {
+            ap = ap.withValue((Docker.Argument) visit(ap.getValue(), p));
         }
-        return a;
+        return ap;
     }
 
     public Docker visitEnv(Docker.Env env, P p) {
