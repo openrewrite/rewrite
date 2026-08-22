@@ -16,6 +16,7 @@
 package org.openrewrite.docker;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -480,6 +481,7 @@ public class UseBuildKitCacheMounts extends Recipe {
 
     private static final String[][] HOME = {{"HOME", "/root"}};
 
+    @RequiredArgsConstructor
     enum PackageManager {
         MAVEN(
                 "maven",
@@ -584,10 +586,9 @@ public class UseBuildKitCacheMounts extends Recipe {
                 true);
 
         final String id;
-        final Target[] targets;
-        final boolean explicitOnly;
         private final String[] executables;
         private final String[][] subcommands;
+        final Target[] targets;
 
         /// Arguments that tell this package manager not to cache at all, so that a mount over its cache
         /// directory would keep nothing.
@@ -602,27 +603,7 @@ public class UseBuildKitCacheMounts extends Recipe {
         private final @Nullable Pattern cacheFilledBy;
 
         private final boolean locked;
-
-        PackageManager(
-                String id,
-                String[] executables,
-                String[][] subcommands,
-                Target[] targets,
-                String[] cacheDisablingArguments,
-                @Nullable Pattern cacheDefeatedBy,
-                @Nullable Pattern cacheFilledBy,
-                boolean locked,
-                boolean explicitOnly) {
-            this.id = id;
-            this.executables = executables;
-            this.subcommands = subcommands;
-            this.targets = targets;
-            this.cacheDisablingArguments = cacheDisablingArguments;
-            this.cacheDefeatedBy = cacheDefeatedBy;
-            this.cacheFilledBy = cacheFilledBy;
-            this.locked = locked;
-            this.explicitOnly = explicitOnly;
-        }
+        final boolean explicitOnly;
 
         static @Nullable PackageManager of(String id) {
             for (PackageManager packageManager : values()) {
