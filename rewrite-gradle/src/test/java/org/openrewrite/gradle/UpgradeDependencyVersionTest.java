@@ -26,9 +26,9 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.MavenMetadataCacheEntry;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -141,13 +141,13 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             }
 
             @Override
-            public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+            public @Nullable MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav) {
                 assertNotFailureAccess(gav.getGroupId(), gav.getArtifactId());
                 return delegate.getMavenMetadata(repo, gav);
             }
 
             @Override
-            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
+            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata) {
                 assertNotFailureAccess(gav.getGroupId(), gav.getArtifactId());
                 delegate.putMavenMetadata(repo, gav, metadata);
             }

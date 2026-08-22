@@ -29,10 +29,24 @@ public interface MavenPomCache {
 
     void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved);
 
+    /**
+     * Look up a cached {@code maven-metadata.xml} entry. A {@code null} return is a cache miss. A
+     * non-null {@link MavenMetadataCacheEntry} carries the value (or a negative result, when its
+     * {@link MavenMetadataCacheEntry#getMetadata() metadata} is {@code null}) together with any HTTP
+     * validators; if the entry's freshness window has elapsed the cache marks it
+     * {@link MavenMetadataCacheEntry#isExpired() expired}, signalling the caller to revalidate it
+     * with a conditional GET rather than serving it directly.
+     */
     @Nullable
-    Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
+    MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav);
 
-    void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata);
+    /**
+     * Store a {@code maven-metadata.xml} entry, including any HTTP validators (ETag / Last-Modified)
+     * the origin returned, so that a later expiry can be revalidated cheaply via a conditional GET.
+     * The entry is supplied {@linkplain MavenMetadataCacheEntry#fresh fresh}; the cache owns when it
+     * subsequently considers the entry expired.
+     */
+    void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata);
 
     @Nullable
     Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException;
