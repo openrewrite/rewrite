@@ -39,17 +39,11 @@ public class ReplaceMaintainerWithLabel extends Recipe {
 
     private static final String AUTHORS = "org.opencontainers.image.authors";
 
-    @Override
-    public String getDisplayName() {
-        return "Replace `MAINTAINER` with an `org.opencontainers.image.authors` label";
-    }
+    String displayName = "Replace `MAINTAINER` with an `org.opencontainers.image.authors` label";
 
-    @Override
-    public String getDescription() {
-        return "BuildKit's `MaintainerDeprecated` check reports the `MAINTAINER` instruction, whose place has been " +
-                "taken by the `org.opencontainers.image.authors` label. A stage that already carries that label " +
-                "has its `MAINTAINER` dropped rather than gaining a second one.";
-    }
+    String description = "BuildKit's `MaintainerDeprecated` check reports the `MAINTAINER` instruction, whose place has been " +
+            "taken by the `org.opencontainers.image.authors` label. A stage that already carries that label " +
+            "has its `MAINTAINER` dropped rather than gaining a second one.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

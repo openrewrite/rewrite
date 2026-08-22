@@ -67,16 +67,10 @@ public class AddUserInstruction extends Recipe {
     @Nullable
     Boolean skipIfUserExists;
 
-    @Override
-    public String getDisplayName() {
-        return "Add `USER` instruction";
-    }
+    String displayName = "Add `USER` instruction";
 
-    @Override
-    public String getDescription() {
-        return "Adds a `USER` instruction to run the container as a non-root user (CIS Docker Benchmark 4.1). " +
-                "By default, adds to the final stage only and skips if a `USER` instruction already exists.";
-    }
+    String description = "Adds a `USER` instruction to run the container as a non-root user (CIS Docker Benchmark 4.1). " +
+            "By default, adds to the final stage only and skips if a `USER` instruction already exists.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

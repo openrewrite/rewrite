@@ -56,16 +56,10 @@ public class AddAptGetCleanup extends Recipe {
     @Nullable
     String cleanupCommand;
 
-    @Override
-    public String getDisplayName() {
-        return "Add apt-get cleanup";
-    }
+    String displayName = "Add apt-get cleanup";
 
-    @Override
-    public String getDescription() {
-        return "Adds cleanup commands to apt-get RUN instructions to reduce Docker image size. " +
-                "By default, adds 'rm -rf /var/lib/apt/lists/*' to remove cached package lists.";
-    }
+    String description = "Adds cleanup commands to apt-get RUN instructions to reduce Docker image size. " +
+            "By default, adds 'rm -rf /var/lib/apt/lists/*' to remove cached package lists.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

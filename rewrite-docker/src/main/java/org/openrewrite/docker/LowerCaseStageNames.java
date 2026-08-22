@@ -31,18 +31,12 @@ import java.util.*;
 @EqualsAndHashCode(callSuper = false)
 public class LowerCaseStageNames extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Name Dockerfile build stages in lowercase";
-    }
+    String displayName = "Name Dockerfile build stages in lowercase";
 
-    @Override
-    public String getDescription() {
-        return "BuildKit's `StageNameCasing` check reports a build stage whose name is not lowercase. Renaming a " +
-                "stage means renaming every reference to it, so the `FROM` instructions and `COPY --from` flags " +
-                "that name the stage are updated in the same pass. A stage whose lowercase name is already taken " +
-                "by another stage is left alone.";
-    }
+    String description = "BuildKit's `StageNameCasing` check reports a build stage whose name is not lowercase. Renaming a " +
+            "stage means renaming every reference to it, so the `FROM` instructions and `COPY --from` flags " +
+            "that name the stage are updated in the same pass. A stage whose lowercase name is already taken " +
+            "by another stage is left alone.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
