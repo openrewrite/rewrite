@@ -357,13 +357,11 @@ public interface Docker extends Tree {
         }
 
         /**
-         * Reads an LST serialized before an {@code ARG} could hold more than one name, where the
-         * instruction carried a {@code name} and a {@code value} of its own rather than a list of
-         * pairs. Such a payload is otherwise read without complaint - unknown properties are ignored
-         * and a missing one is null - and only fails much later, where something walks the pairs.
-         * <p>
-         * The name keeps the prefix it was serialized with, which is where the whitespace before it
-         * stood in that model, so the instruction still prints as it was written.
+         * Reads an LST serialized before an {@code ARG} could hold more than one name, which carried a
+         * {@code name} and a {@code value} of its own. Such a payload is otherwise read without
+         * complaint - an unknown property is ignored and a missing one is null - and only fails much
+         * later, where something walks the pairs. The name keeps the prefix it was serialized with,
+         * which is where the whitespace before it stood in that model.
          */
         @JsonCreator
         static Arg fromJson(@JsonProperty("id") UUID id,
@@ -381,9 +379,6 @@ public interface Docker extends Tree {
                     singletonList(new ArgPair(randomId(), Space.EMPTY, Markers.EMPTY, name, value)));
         }
 
-        /**
-         * A build argument: a name and, where the instruction writes one, the default it takes.
-         */
         @Value
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @With
@@ -396,8 +391,8 @@ public interface Docker extends Tree {
             Literal name;
 
             /**
-             * The default, or null where the instruction writes no {@code =}. A name written with an
-             * {@code =} and nothing after it takes an empty default, which is a value with no content.
+             * Null where the instruction writes no {@code =}. One written with an {@code =} and nothing
+             * after it takes an empty default, which is a value with no content.
              */
             @Nullable
             Argument value;

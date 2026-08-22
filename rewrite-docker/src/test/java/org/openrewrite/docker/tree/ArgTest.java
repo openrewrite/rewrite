@@ -135,8 +135,6 @@ class ArgTest implements RewriteTest {
         );
     }
 
-    /// A default ends at the next whitespace, where the value of an ENV or a LABEL takes the rest of
-    /// the line.
     @Test
     void whitespaceAfterADefaultBeginsAnotherName() {
         rewriteRun(
@@ -191,8 +189,7 @@ class ArgTest implements RewriteTest {
         );
     }
 
-    /// Docker joins the lines a continuation holds together before it reads what they say, so a
-    /// default written on the far side of the join belongs to the name all the same.
+    /// Docker joins the lines a continuation holds together before it reads what they say.
     @Test
     void aDefaultBoundAcrossAContinuation() {
         rewriteRun(
@@ -230,8 +227,6 @@ class ArgTest implements RewriteTest {
         );
     }
 
-    /// A name written with an `=` and nothing after it takes an empty default, which Docker tells apart
-    /// from a name declared without one.
     @Test
     void emptyDefault() {
         rewriteRun(

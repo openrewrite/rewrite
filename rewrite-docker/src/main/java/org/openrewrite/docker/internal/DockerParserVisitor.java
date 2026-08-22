@@ -385,7 +385,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         for (DockerParser.ArgPairContext pairCtx : ctx.argPair()) {
             Space pairPrefix = prefix(pairCtx.getStart());
 
-            // ARG name is always a simple identifier
             Space namePrefix = prefix(pairCtx.argName().getStart());
             skip(pairCtx.argName().getStop());
             Docker.Literal name = new Docker.Literal(
@@ -396,7 +395,6 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     null
             );
 
-            // An '=' with nothing after it is an empty default, which is a value with no content
             Docker.Argument value = null;
             if (pairCtx.EQUALS() != null) {
                 skip(pairCtx.EQUALS().getSymbol());
