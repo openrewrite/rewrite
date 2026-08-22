@@ -19,6 +19,7 @@ package parser
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/parser"
 	"go/token"
@@ -28,9 +29,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/mod/module"
 )
 
-// ProjectImporter resolves Go imports for a parsed file against four
+// ProjectImporter resolves Go imports for a parsed file against five
 // layers, in order:
 //
 //  1. Sibling sources within the same project (registered via AddSource).
@@ -40,27 +43,35 @@ import (
 //     accordingly: local replace (`./` / `../` prefix) walks the local
 //     path; module-path replace walks `vendor/<NewPath>/`.
 //     Yields real *types.Package objects with full method/field types.
-//  3. Modules declared in go.mod's `require` directives (registered via
+//  3. The module cache, for modules of the resolved build list (registered
+//     via AddModule). Yields real *types.Package objects from the module's
+//     extracted sources under $GOMODCACHE, which is where a `go build`
+//     without a vendor tree reads them from too.
+//  4. Modules declared in go.mod's `require` directives (registered via
 //     AddRequire). Yields a STUB *types.Package — right path and name,
 //     empty scope — so references like `import "github.com/x/y"` make
 //     the identifier `y` non-nil even when the module's source isn't
 //     present locally.
-//  4. The fallback (importer.Default by default), which resolves stdlib
+//  5. The fallback (importer.Default by default), which resolves stdlib
 //     packages from GOROOT.
 //
 // Mirrors the role of MavenProject/JavaSourceSet classpath resolution on
 // the Java side: when a recipe parses a Go file inside a project, imports
 // of `<modulePath>/<sub>` resolve against that sub-package's parsed
-// sources, vendored deps resolve against on-disk files, and requires
-// without vendor sources fall back to typed-but-empty stubs.
+// sources, and dependencies resolve against the on-disk sources a build
+// would compile. A module reachable through neither falls back to a
+// typed-but-empty stub.
 //
-// Vendor walking is lazy on each Import() call (matching the existing
-// 3-tier resolver's laziness). No eager startup walk.
+// Every on-disk layer is walked lazily, on the Import() call that needs
+// it.
 type ProjectImporter struct {
 	modulePath  string
 	projectRoot string // absolute or relative path to the dir containing go.mod
 	// sources keyed by full import path (e.g. "example.com/foo/sub").
 	sources map[string][]projectFile
+	// modules are the resolved build list, keyed by module path, so an import
+	// under one resolves against that module's extracted sources.
+	modules map[string]cacheModule
 	// requires lists module paths declared in go.mod `require` directives.
 	// An import path matches when it equals one of these OR is under one
 	// of them as a sub-path (require x/y also covers x/y/z imports).
@@ -95,6 +106,7 @@ func NewProjectImporter(modulePath string, fallback types.Importer) *ProjectImpo
 	return &ProjectImporter{
 		modulePath: modulePath,
 		sources:    make(map[string][]projectFile),
+		modules:    make(map[string]cacheModule),
 		replaces:   make(map[string]replaceTarget),
 		cache:      make(map[string]*types.Package),
 		fset:       token.NewFileSet(),
@@ -122,15 +134,33 @@ func (p *ProjectImporter) AddReplace(oldPath, newPath, newVersion string) {
 	p.replaces[oldPath] = replaceTarget{NewPath: newPath, NewVersion: newVersion}
 }
 
-// Imports of this path (or any sub-path under it) that aren't already
-// satisfied by AddSource'd sibling sources resolve to a stub
-// *types.Package — non-nil, with the right path and name, but with an
-// empty scope. Real method/field types still need the module's actual
-// sources (vendor dir or go-mod cache walk; not done yet).
+// Imports of this path (or any sub-path under it) that no earlier layer
+// satisfies resolve to a stub *types.Package — non-nil, with the right path
+// and name, but with an empty scope. Register the module with AddModule too
+// for real method/field types.
 func (p *ProjectImporter) AddRequire(modulePath string) {
 	if modulePath != "" {
 		p.requires = append(p.requires, modulePath)
 	}
+}
+
+// cacheModule is one module of the resolved build list: the import prefix it
+// provides, and the coordinate its sources live under.
+type cacheModule struct {
+	Path      string
+	CachePath string
+	Version   string
+}
+
+// AddModule registers a module of the resolved build list under modulePath,
+// the import prefix it provides. cachePath and version are the coordinate its
+// sources live under; leave cachePath empty to have any directive registered
+// with AddReplace decide it, which is what a caller reading go.mod wants.
+func (p *ProjectImporter) AddModule(modulePath, cachePath, version string) {
+	if modulePath == "" {
+		return
+	}
+	p.modules[modulePath] = cacheModule{Path: modulePath, CachePath: cachePath, Version: version}
 }
 
 // AddSource registers a .go file with the importer. relPath is the file's
@@ -172,6 +202,10 @@ func (p *ProjectImporter) Import(importPath string) (*types.Package, error) {
 			return pkg, nil
 		}
 	}
+	if pkg := p.walkModuleCache(importPath); pkg != nil {
+		p.cache[importPath] = pkg
+		return pkg, nil
+	}
 	// Stub-resolve any path declared in go.mod requires (or under one).
 	// Real symbols stay missing, but the package object itself is non-nil
 	// so identifiers referencing it have a Package type. The package must
@@ -208,6 +242,98 @@ func (p *ProjectImporter) walkVendor(importPath string) *types.Package {
 		return nil
 	}
 	return pkg
+}
+
+// walkModuleCache resolves importPath against the extracted sources of the
+// build-list module that provides it. Returns nil when no registered module
+// covers the path, the module is absent from the cache, or parsing failed.
+func (p *ProjectImporter) walkModuleCache(importPath string) *types.Package {
+	dir := p.resolveModuleCacheDir(importPath)
+	if dir == "" {
+		return nil
+	}
+	files, err := p.readBuildableGoFilesIn(dir)
+	if err != nil || len(files) == 0 {
+		return nil
+	}
+	pkg, err := p.parsePackage(importPath, files)
+	if err != nil {
+		log.Printf("module cache: skip %s (parse error: %v) — falling back to stub", importPath, err)
+		return nil
+	}
+	return pkg
+}
+
+// resolveModuleCacheDir maps an import path to the directory holding the
+// providing module's sources. A module path is a prefix of every import path it
+// provides, and the longest such prefix wins: `example.com/a` and
+// `example.com/a/b` can both be modules, and only the longer one provides
+// `example.com/a/b/c`.
+func (p *ProjectImporter) resolveModuleCacheDir(importPath string) string {
+	var best cacheModule
+	for path, m := range p.modules {
+		if importPath != path && !strings.HasPrefix(importPath, path+"/") {
+			continue
+		}
+		if len(path) > len(best.Path) {
+			best = m
+		}
+	}
+	if best.Path == "" {
+		return ""
+	}
+	cachePath, version := p.replacedCoordinate(best)
+	var root string
+	if isLocalReplace(cachePath) {
+		root = cachePath
+		if !filepath.IsAbs(root) {
+			root = filepath.Join(p.projectRoot, filepath.FromSlash(cachePath))
+		}
+	} else {
+		cache := GoModCache()
+		if cache == "" || version == "" {
+			return ""
+		}
+		esc, err := module.EscapePath(cachePath)
+		if err != nil {
+			return ""
+		}
+		vesc, err := module.EscapeVersion(version)
+		if err != nil {
+			return ""
+		}
+		root = filepath.Join(cache, esc+"@"+vesc)
+	}
+	return filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(importPath, best.Path)))
+}
+
+// replacedCoordinate is where a module's sources live, applying the replace
+// directive for a caller that left the coordinate to AddModule.
+func (p *ProjectImporter) replacedCoordinate(m cacheModule) (cachePath, version string) {
+	if m.CachePath != "" {
+		return m.CachePath, m.Version
+	}
+	if repl, ok := p.replaces[m.Path]; ok {
+		return repl.NewPath, repl.NewVersion
+	}
+	return m.Path, m.Version
+}
+
+// readBuildableGoFilesIn is readGoFilesIn restricted to the files this build
+// would compile. A module in the cache carries every platform's sources at
+// once, and `plat_linux.go` beside `plat_windows.go` redeclares everything.
+func (p *ProjectImporter) readBuildableGoFilesIn(dir string) ([]projectFile, error) {
+	files, err := readGoFilesIn(dir)
+	if err != nil {
+		return nil, err
+	}
+	out := files[:0]
+	for _, f := range files {
+		if MatchBuildContext(build.Default, filepath.Base(f.path), f.content) {
+			out = append(out, f)
+		}
+	}
+	return out, nil
 }
 
 // resolveVendorDir maps an import path to the on-disk directory the

@@ -172,7 +172,12 @@ Type attribution depth depends on how the parser is constructed:
 | `parser.NewGoParser()` (default) | ✓ | (single file only) | ✗ | ✗ |
 | `goparser.NewProjectImporter(modulePath, fallback)` + `AddSource(...)` | ✓ | ✓ (cross-file) | stub (typed) | ✗ |
 | `+ SetProjectRoot(rootDir)` | ✓ | ✓ | stub | ✓ if `<rootDir>/vendor/<path>/` exists |
+| `+ AddModule(path, cachePath, version)` | ✓ | ✓ | ✓ from `$GOMODCACHE` | ✓ (wins) |
 | `+ AddReplace(old, new, version)` | ✓ | ✓ | redirected to `new` (vendor or local) | ✓ |
+
+A module reachable through none of these still resolves to a typed
+stub — a package with the right path and an empty scope — so an import
+of it names something even though its symbols do not.
 
 For Java-side parsing through RPC, build the parser with
 `GolangParser.builder().module("...").goMod(content).build()`. The
@@ -357,6 +362,34 @@ your recipe imports `pkg/recipe/golang` (which most do), services are
 registered before any test or RPC dispatch runs. Looking up a missing
 service panics with a clear message.
 
+## The names types carry
+
+Every type is attributed under the name Go spells it with, so a pattern
+and a signature share one vocabulary:
+
+| Go | attributed as |
+|---|---|
+| `int`, `int32`, `uint8`, `float64`, `complex128`, `string`, `bool` | `JavaType.Class` with that name |
+| `byte`, `rune` | their own names, kept apart from `uint8` and `int32` |
+| an untyped constant | `untyped int`, `untyped string`, ... |
+| `any`, `interface{}` | `any` |
+| `map[K]V`, `chan T` | `map` / `chan` parameterized over K, V |
+| a builtin call (`append`, `len`, ...) | a method of `builtin` |
+| `unsafe.Pointer` | `unsafe.Pointer` |
+| an anonymous `struct{...}` / `interface{...}` | members, but no name |
+
+`byte` and `uint8` are one Go type spelled two ways, as are `rune` and
+`int32`; compare two types for identity with `matcher.IsSameGoType`
+rather than by name. `matcher.IsInt`, `IsNumeric`, `IsString` and
+`IsBool` classify without caring which spelling arrived.
+
+The one exception is a literal, which carries a `JavaType.Primitive`
+keyword instead: `J.Literal#type` is declared `JavaType.Primitive` on
+the Java side and `withType` drops anything else, and the LST
+deserializer reads the keyword to reconstruct the value. The `matcher`
+predicates above read both vocabularies, so a literal answers them the
+same way a variable of its type does.
+
 ## Asserting types in tests
 
 Two helpers exist on both sides for common type assertions:
@@ -366,8 +399,8 @@ Two helpers exist on both sides for common type assertions:
 ```go
 import . "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 
-ExpectType(t, cu, "p", "main.Point")          // class/struct types
-ExpectPrimitiveType(t, cu, "x", "int")         // primitives
+ExpectType(t, cu, "p", "main.Point")          // any type, by its Go name
+ExpectType(t, cu, "x", "int32")               // basic types included
 ExpectMethodType(t, cu, "Println", "fmt")      // method's declaring FQN
 ```
 
@@ -375,7 +408,7 @@ ExpectMethodType(t, cu, "Println", "fmt")      // method's declaring FQN
 
 ```java
 expectType(cu, "p", "main.Point");
-expectPrimitiveType(cu, "x", "int");
+expectType(cu, "x", "int32");
 expectMethodType(cu, "Println", "fmt");
 ```
 

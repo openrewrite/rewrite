@@ -140,7 +140,7 @@ func TestExportDataLeavesStdlibAttributionIntact(t *testing.T) {
 
 	require.Len(t, c.calls, 1)
 	assert.True(t, matcher.IsResolved(c.calls[0]))
-	assert.Equal(t, "boolean", matcher.GetFullyQualifiedName(c.calls[0].MethodType.ReturnType))
+	assert.Equal(t, "bool", matcher.GetFullyQualifiedName(c.calls[0].MethodType.ReturnType))
 }
 
 // countingFS records every blob it serves.

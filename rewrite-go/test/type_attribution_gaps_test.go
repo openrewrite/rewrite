@@ -37,6 +37,27 @@ func collectAttribution(t *testing.T, src string) *rwtest.TypedNodes {
 	return rwtest.CollectTypedNodes(cu)
 }
 
+func parseAttribution(t *testing.T, src string) *golang.CompilationUnit {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("attribution.go", src)
+	require.NoError(t, err)
+	return cu
+}
+
+// identType is the attributed type of the first identifier named `name`.
+func identType(t *testing.T, cu *golang.CompilationUnit, name string) java.JavaType {
+	t.Helper()
+	var found java.JavaType
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if id, ok := n.(*java.Identifier); ok && id.Name == name && found == nil {
+			found = id.Type
+		}
+		return found == nil
+	})
+	require.NotNilf(t, found, "no typed identifier named %q", name)
+	return found
+}
+
 // invocationNamed returns the single invocation of the given name, failing
 // when the source has none or more than one.
 func invocationNamed(t *testing.T, c *rwtest.TypedNodes, name string) *java.MethodInvocation {
@@ -249,9 +270,8 @@ func k(src []byte, n int64) {
 	for _, tc := range c.Conversions {
 		converted = append(converted, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(tc)))
 	}
-	// Go's `string` maps to the JavaTypePrimitive whose keyword is "String".
 	// A package-qualified conversion is the type it names, not its package.
-	assert.Equal(t, []string{"byte[]", "String", "main.MyInt", "time.Duration"}, converted)
+	assert.Equal(t, []string{"byte[]", "string", "main.MyInt", "time.Duration"}, converted)
 }
 
 func TestBuiltinIsMarked(t *testing.T) {
@@ -271,6 +291,181 @@ func k(dst, src []byte) {
 		}
 	}
 	assert.Equal(t, []string{"copy", "len", "append"}, marked)
+}
+
+// Go resolves a predeclared function to a *types.Builtin, whose own type is
+// invalid; the call-site signature lives on the callee expression instead.
+// `builtin` is the package Go's own documentation files them under.
+func TestBuiltinCallCarriesItsCallSiteSignature(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+func k(dst, src []byte, m map[string]int, ch chan int) {
+	_ = append(dst, src...)
+	_ = len(src)
+	delete(m, "k")
+	close(ch)
+}
+`)
+
+	for _, name := range []string{"append", "len", "delete", "close"} {
+		mi := invocationNamed(t, c, name)
+		require.NotNilf(t, mi.MethodType, "%s has no MethodType", name)
+		assert.Equalf(t, name, mi.MethodType.Name, "%s name", name)
+		assert.Equalf(t, "builtin", matcher.GetFullyQualifiedName(mi.MethodType.DeclaringType),
+			"%s declaring type", name)
+		assert.Truef(t, matcher.IsResolved(mi), "%s is not resolved", name)
+	}
+
+	assert.Equal(t, "byte[]", matcher.GetFullyQualifiedName(invocationNamed(t, c, "append").MethodType.ReturnType))
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(invocationNamed(t, c, "len").MethodType.ReturnType))
+	// A builtin returning nothing is void, as any other such call is.
+	assert.Equal(t, "void", matcher.GetFullyQualifiedName(invocationNamed(t, c, "close").MethodType.ReturnType))
+}
+
+// The identifier naming the callee carries the same method type a declared
+// function's would.
+func TestBuiltinCalleeIdentifierIsTyped(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+func k(src []byte) {
+	_ = len(src)
+}
+`)
+
+	mi := invocationNamed(t, c, "len")
+	assert.Equal(t, mi.MethodType, mi.Name.Type)
+}
+
+// unsafe's builtins fold to a constant, so go/types records `invalid type` for
+// the callee rather than the signature it recorded for every other builtin.
+// Attribution reports what the checker knows, so the call stays untyped.
+func TestUnsafeBuiltinCallIsUntyped(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+import "unsafe"
+
+func k(x int) uintptr {
+	return unsafe.Sizeof(x)
+}
+`)
+
+	assert.Nil(t, invocationNamed(t, c, "Sizeof").MethodType)
+}
+
+// In the comma-ok form go/types records the assertion as the tuple `(T, bool)`,
+// which is the idiomatic spelling; the assertion evaluates to T either way.
+func TestTypeAssertionCarriesTheTypeItAsserts(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+import "bytes"
+
+func k(a any) {
+	s := a.(string)
+	n, ok := a.(int)
+	b, ok2 := a.(*bytes.Buffer)
+	_, _, _, _, _ = s, n, ok, b, ok2
+}
+`)
+
+	var asserted []string
+	for _, ta := range c.TypeAssertions {
+		asserted = append(asserted, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(ta)))
+	}
+	assert.Equal(t, []string{"string", "int", "bytes.Buffer"}, asserted)
+}
+
+// `any` is an alias for the empty interface, which the checker resolves to a
+// *types.Interface naming nothing. It takes its Go name, as map and chan do,
+// rather than a class with no name to match on.
+func TestEmptyInterfaceIsNamedAny(t *testing.T) {
+	cu := parseAttribution(t, `package main
+
+func k(a any, e interface{}, m map[string]any) {
+	_, _, _ = a, e, m
+}
+`)
+
+	assert.Equal(t, "any", matcher.GetFullyQualifiedName(identType(t, cu, "a")))
+	assert.Equal(t, "any", matcher.GetFullyQualifiedName(identType(t, cu, "e")))
+	mapType, ok := identType(t, cu, "m").(*java.JavaTypeParameterized)
+	require.Truef(t, ok, "m is %T, want a parameterized map", identType(t, cu, "m"))
+	assert.Equal(t, "map", matcher.GetFullyQualifiedName(mapType))
+	assert.Equal(t, "any", matcher.GetFullyQualifiedName(mapType.TypeParameters[1]))
+}
+
+// An anonymous interface that declares methods has a method set but no name, so
+// its members are what a recipe can reach; there is no name to invent.
+func TestAnonymousInterfaceHasMembersButNoName(t *testing.T) {
+	cu := parseAttribution(t, `package main
+
+func k(r interface{ Read() int }) {
+	_ = r
+}
+`)
+
+	cls := matcher.AsClass(identType(t, cu, "r"))
+	require.NotNil(t, cls)
+	assert.Equal(t, "", cls.FullyQualifiedName)
+	require.Len(t, cls.Methods, 1)
+	assert.Equal(t, "Read", cls.Methods[0].Name)
+}
+
+// A composite type spelling — `map[K]V`, `chan T`, `[N]T` — is a node with no
+// type slot of its own, so its type comes from the parts it is spelled out of.
+// A recipe reading a conversion's type has to see the type either way.
+func TestCompositeTypeSpellingCarriesAType(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+func f(ch chan int, m map[string]int, a [3]int, s []int) {
+	_ = (chan int)(ch)
+	_ = (map[string]int)(m)
+	_ = ([3]int)(a)
+	_ = ([]int)(s)
+}
+`)
+
+	var converted []string
+	for _, tc := range c.Conversions {
+		converted = append(converted, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(tc)))
+	}
+	assert.Equal(t, []string{"chan", "map", "int[]", "int[]"}, converted)
+}
+
+// A directional channel is its own type, as the type mapper names it.
+func TestChannelDirectionIsPartOfTheType(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+func f(send chan<- int, recv <-chan int) {
+	_ = (chan<- int)(send)
+	_ = (<-chan int)(recv)
+}
+`)
+
+	var converted []string
+	for _, tc := range c.Conversions {
+		converted = append(converted, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(tc)))
+	}
+	assert.Equal(t, []string{"chan<-", "<-chan"}, converted)
+}
+
+// The element and key types are what make a composite spelling matchable.
+func TestCompositeTypeSpellingCarriesItsParts(t *testing.T) {
+	c := collectAttribution(t, `package main
+
+import "bytes"
+
+func f(m map[string]*bytes.Buffer) {
+	_ = (map[string]*bytes.Buffer)(m)
+}
+`)
+
+	require.Len(t, c.Conversions, 1)
+	mapType, ok := matcher.TypeOfExpression(c.Conversions[0]).(*java.JavaTypeParameterized)
+	require.Truef(t, ok, "conversion type is %T, want a parameterized map",
+		matcher.TypeOfExpression(c.Conversions[0]))
+	require.Len(t, mapType.TypeParameters, 2)
+	assert.Equal(t, "string", matcher.GetFullyQualifiedName(mapType.TypeParameters[0]))
+	assert.Equal(t, "bytes.Buffer", matcher.GetFullyQualifiedName(mapType.TypeParameters[1]))
 }
 
 func TestUserDefinedCopyIsNotABuiltin(t *testing.T) {
@@ -407,7 +602,7 @@ func f(xs []int, m map[string]bool, arr [3]byte, s string) {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(aa)))
 	}
 	// The comma-ok form evaluates to V.
-	assert.Equal(t, []string{"int", "boolean", "boolean", "byte", "byte"}, types)
+	assert.Equal(t, []string{"int", "bool", "bool", "byte", "byte"}, types)
 }
 
 func TestUnaryCarriesItsResultType(t *testing.T) {
@@ -425,7 +620,7 @@ func f(n int, b bool) {
 	for _, u := range c.Unaries {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(u)))
 	}
-	assert.Equal(t, []string{"int", "boolean", "int", "int"}, types)
+	assert.Equal(t, []string{"int", "bool", "int", "int"}, types)
 }
 
 func TestGoUnaryCarriesItsResultType(t *testing.T) {
@@ -445,7 +640,7 @@ func f(p *int, ch chan string) {
 		types = append(types, matcher.GetFullyQualifiedName(matcher.TypeOfExpression(u)))
 	}
 	// Go pointers are transparent for refactoring, so `&T{}` is typed T.
-	assert.Equal(t, []string{"crypto/tls.Config", "int", "String"}, types)
+	assert.Equal(t, []string{"crypto/tls.Config", "int", "string"}, types)
 }
 
 func TestParameterizedTypeCarriesItsType(t *testing.T) {

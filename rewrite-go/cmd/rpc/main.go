@@ -642,6 +642,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			if mrr, err := goparser.ParseGoMod("go.mod", req.GoModContent); err == nil && mrr != nil {
 				for _, r := range mrr.Requires {
 					pi.AddRequire(r.ModulePath)
+					pi.AddModule(r.ModulePath, "", r.Version)
 				}
 				for _, r := range mrr.Replaces {
 					pi.AddReplace(r.OldPath, r.NewPath, r.NewVersion)
@@ -2342,6 +2343,16 @@ func filterGitIgnored(projectPath string, paths []string) []string {
 	return kept
 }
 
+// versionOfResolved is the version a module's sources live under: the
+// replacement's when a replace applies. A local-path replacement names a
+// directory rather than a version, so it has none.
+func versionOfResolved(d golang.GoResolvedDependency) string {
+	if d.ReplacePath == "" {
+		return d.Version
+	}
+	return d.ReplaceVersion
+}
+
 func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	var req parseProjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -2407,8 +2418,12 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	// non-fatal — the affected files just lose module context and fall
 	// back to stdlib-only attribution.
 	type modCtx struct {
-		dir       string // absolute directory containing go.mod
-		mrr       *golang.GoResolutionResult
+		dir string // absolute directory containing go.mod
+		mrr *golang.GoResolutionResult
+		// buildList is what `go list -m` selected: one version per module path.
+		// mrr.ResolvedDependencies merges go.sum in and so names several
+		// versions of the same module, only one of which is on disk.
+		buildList []golang.GoResolvedDependency
 		goProject golang.GoProject // lightweight per-CU marker; one shared instance per module
 	}
 	mods := make(map[string]*modCtx, len(disc.goMods))
@@ -2439,15 +2454,18 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// package->module map. Best-effort: on any toolchain/network failure keep
 		// the go.sum-only result (never fail the parse).
 		moduleDir := filepath.Dir(modPath)
+		var buildList []golang.GoResolvedDependency
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
+			buildList = resolved
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
 			mrr.PackageModules = pkgs
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{
 			dir:       filepath.Dir(modPath),
 			mrr:       mrr,
+			buildList: buildList,
 			goProject: golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
 		}
 	}
@@ -2493,6 +2511,21 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		}
 		for _, r := range m.mrr.Replaces {
 			pi.AddReplace(r.OldPath, r.NewPath, r.NewVersion)
+		}
+		// The build list names the version MVS selected, which is the coordinate
+		// whose sources the module cache holds. Without toolchain resolution the
+		// go.mod requires name the minimum versions, which MVS selects for every
+		// module no other requirement raises.
+		if len(m.buildList) > 0 {
+			for _, d := range m.buildList {
+				if !d.Main {
+					pi.AddModule(d.ModulePath, d.ReplacePath, versionOfResolved(d))
+				}
+			}
+		} else {
+			for _, r := range m.mrr.Requires {
+				pi.AddModule(r.ModulePath, "", r.Version)
+			}
 		}
 		piByModule[m.dir] = pi
 	}
