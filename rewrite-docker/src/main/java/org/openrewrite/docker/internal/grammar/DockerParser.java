@@ -39,8 +39,7 @@ public class DockerParser extends Parser {
 		EQUALS=27, FLAG=28, FROM_FLAG=29, DASH_DASH=30, DOUBLE_QUOTED_STRING=31,
 		SINGLE_QUOTED_STRING=32, ENV_VAR=33, SPECIAL_VAR=34, COMMAND_SUBST=35,
 		BACKTICK_SUBST=36, DOLLAR=37, UNQUOTED_TEXT=38, WS=39, NEWLINE=40, COLON=41,
-		AT=42, AS=43, FLAG_END=44, HP_LINE_CONTINUATION=45, HP_WS=46, HEREDOC_CONTENT=47,
-		H_NEWLINE=48;
+		AT=42, AS=43, FLAG_END=44, HP_LINE_CONTINUATION=45, HP_WS=46, HEREDOC_CONTENT=47;
 	public static final int
 		RULE_dockerfile = 0, RULE_parserDirective = 1, RULE_globalArgs = 2, RULE_stage = 3,
 		RULE_stageInstruction = 4, RULE_instruction = 5, RULE_fromInstruction = 6,
@@ -87,8 +86,7 @@ public class DockerParser extends Parser {
 			"'ENV'", "'ADD'", "'COPY'", "'ENTRYPOINT'", "'VOLUME'", "'USER'", "'WORKDIR'",
 			"'ARG'", "'ONBUILD'", "'STOPSIGNAL'", "'HEALTHCHECK'", "'SHELL'", "'MAINTAINER'",
 			null, null, "'['", "']'", "','", "'='", null, null, "'--'", null, null,
-			null, null, null, null, null, null, null, null, null, null, "'AS'", null,
-			null, null, null, "'\\n'"
+			null, null, null, null, null, null, null, null, null, null, "'AS'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
@@ -101,7 +99,7 @@ public class DockerParser extends Parser {
 			"EQUALS", "FLAG", "FROM_FLAG", "DASH_DASH", "DOUBLE_QUOTED_STRING", "SINGLE_QUOTED_STRING",
 			"ENV_VAR", "SPECIAL_VAR", "COMMAND_SUBST", "BACKTICK_SUBST", "DOLLAR",
 			"UNQUOTED_TEXT", "WS", "NEWLINE", "COLON", "AT", "AS", "FLAG_END", "HP_LINE_CONTINUATION",
-			"HP_WS", "HEREDOC_CONTENT", "H_NEWLINE"
+			"HP_WS", "HEREDOC_CONTENT"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -4936,7 +4934,7 @@ public class DockerParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\u0004\u00010\u022f\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0004\u0001/\u022f\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
 		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
 		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002"+
 		"\b\u0007\b\u0002\t\u0007\t\u0002\n\u0007\n\u0002\u000b\u0007\u000b\u0002"+

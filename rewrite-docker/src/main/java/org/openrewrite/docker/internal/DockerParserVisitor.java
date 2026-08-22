@@ -1198,10 +1198,8 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             String preamble = preambleBuilder.toString();
 
-            // Skip the NEWLINE after the preamble
-            if (c.NEWLINE() != null) {
-                skip(c.NEWLINE().getSymbol());
-            }
+            // The NEWLINE that ends the preamble is deliberately not consumed here; it is the
+            // prefix of the first body, which is where a CRLF line ending survives the round trip.
 
             // Parse each heredoc body
             List<Docker.HeredocBody> bodies = new ArrayList<>();
