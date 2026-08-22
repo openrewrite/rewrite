@@ -57,17 +57,13 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
                 description = "The stages that name this one, comma separated, by stage name where they have one and otherwise by `#index`.")
         String referencedBy;
 
-        @Column(displayName = "Build target",
-                description = "Whether something in the repository asks for this stage by name, through a " +
-                              "`docker build --target`, a `docker-bake.hcl`, a compose file, a CI workflow, or a " +
-                              "comment in the Dockerfile showing how to build it.")
-        boolean buildTarget;
-
         @Column(displayName = "Reachable",
-                description = "Whether anything builds this stage, counting both what the file reaches and what the " +
-                              "repository names as a build target. A stage in a file holding a reference that cannot " +
-                              "be resolved, such as `COPY --from=$BUILDER` or `COPY --from=0`, is reported as " +
-                              "reachable because nothing about that file can be concluded.")
+                description = "Whether the image the file ends with is built from this stage, directly or through " +
+                              "another stage. A stage in a file holding a reference that cannot be resolved, such as " +
+                              "`COPY --from=$BUILDER` or `COPY --from=0`, is reported as reachable because nothing " +
+                              "about that file can be concluded. A stage meant to be built on its own with " +
+                              "`docker build --target` is reported as unreachable, since the Dockerfile does not say " +
+                              "that anything asks for it.")
         boolean reachable;
     }
 }

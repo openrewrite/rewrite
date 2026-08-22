@@ -22,7 +22,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.docker.Assertions.docker;
-import static org.openrewrite.test.SourceSpecs.text;
 
 class FindStageGraphTest implements RewriteTest {
 
@@ -33,15 +32,15 @@ class FindStageGraphTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void recordTheStageGraphAndMarkTheStagesNothingReaches() {
+    void recordTheStageGraphAndMarkTheStagesTheFileNeverReaches() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,build,0,maven:3.9,docker.io,,false,false
-              Dockerfile,tools,1,golang:1.22,docker.io,,false,false
-              Dockerfile,,2,eclipse-temurin:21-jre,docker.io,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,build,0,maven:3.9,docker.io,,false
+              Dockerfile,tools,1,golang:1.22,docker.io,,false
+              Dockerfile,,2,eclipse-temurin:21-jre,docker.io,,true
               """
           ),
           docker(
@@ -56,10 +55,10 @@ class FindStageGraphTest implements RewriteTest {
               RUN echo done
               """,
             """
-              ~~(unused)~~>FROM maven:3.9 AS build
+              ~~(unreached)~~>FROM maven:3.9 AS build
               RUN mvn package
 
-              ~~(unused)~~>FROM golang:1.22 AS tools
+              ~~(unreached)~~>FROM golang:1.22 AS tools
               RUN go build ./cmd/lint
 
               FROM eclipse-temurin:21-jre
@@ -75,10 +74,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,base,0,alpine,docker.io,"builder,#2",false,true
-              Dockerfile,builder,1,base,,"#2",false,true
-              Dockerfile,,2,base,,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,base,0,alpine,docker.io,"builder,#2",true
+              Dockerfile,builder,1,base,,"#2",true
+              Dockerfile,,2,base,,,true
               """
           ),
           docker(
@@ -102,9 +101,9 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,certs,0,alpine,docker.io,"#1",false,true
-              Dockerfile,,1,alpine,docker.io,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,certs,0,alpine,docker.io,"#1",true
+              Dockerfile,,1,alpine,docker.io,,true
               """
           ),
           docker(
@@ -125,10 +124,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,runtime,0,alpine,docker.io,"#2",false,true
-              Dockerfile,builder,1,golang,docker.io,runtime,false,true
-              Dockerfile,,2,runtime,,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,runtime,0,alpine,docker.io,"#2",true
+              Dockerfile,builder,1,golang,docker.io,runtime,true
+              Dockerfile,,2,runtime,,,true
               """
           ),
           docker(
@@ -152,10 +151,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,unused,0,alpine,docker.io,,false,true
-              Dockerfile,assets,1,node:22,docker.io,,false,true
-              Dockerfile,,2,nginx:alpine,docker.io,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,unused,0,alpine,docker.io,,true
+              Dockerfile,assets,1,node:22,docker.io,,true
+              Dockerfile,,2,nginx:alpine,docker.io,,true
               """
           ),
           docker(
@@ -174,42 +173,29 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
-    void recordAStageTheRepositoryBuildsOnItsOwn() {
+    void readOnlyTheDockerfile() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,lint,0,golangci/golangci-lint,docker.io,,true,true
-              Dockerfile,dead,1,alpine,docker.io,,false,false
-              Dockerfile,,2,alpine,docker.io,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,lint,0,golangci/golangci-lint,docker.io,,false
+              Dockerfile,,1,alpine,docker.io,,true
               """
-          ),
-          text(
-            """
-              target "lint" {
-                target = "lint"
-              }
-              """,
-            spec -> spec.path("docker-bake.hcl")
           ),
           docker(
             """
+              # Build with: docker build --target lint .
               FROM golangci/golangci-lint AS lint
               RUN golangci-lint run
-
-              FROM alpine AS dead
-              RUN echo nothing
 
               FROM alpine
               RUN echo done
               """,
             """
-              FROM golangci/golangci-lint AS lint
+              # Build with: docker build --target lint .
+              ~~(unreached)~~>FROM golangci/golangci-lint AS lint
               RUN golangci-lint run
-
-              ~~(unused)~~>FROM alpine AS dead
-              RUN echo nothing
 
               FROM alpine
               RUN echo done
@@ -224,9 +210,9 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,build,0,"mcr.microsoft.com/dotnet/sdk:8.0",mcr.microsoft.com,"#1",false,true
-              Dockerfile,,1,redhat/ubi9-minimal,docker.io,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,build,0,"mcr.microsoft.com/dotnet/sdk:8.0",mcr.microsoft.com,"#1",true
+              Dockerfile,,1,redhat/ubi9-minimal,docker.io,,true
               """
           ),
           docker(
@@ -247,8 +233,8 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
-              Dockerfile,,0,alpine:3.20@sha256:abc,docker.io,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,reachable
+              Dockerfile,,0,alpine:3.20@sha256:abc,docker.io,,true
               """
           ),
           docker(

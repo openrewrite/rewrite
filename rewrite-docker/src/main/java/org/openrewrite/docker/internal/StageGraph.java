@@ -25,6 +25,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 
 /**
  * Which build stages of a Dockerfile reach which other stages, and which of them the image being built
@@ -125,18 +127,13 @@ public class StageGraph {
         return all;
     }
 
-    public Set<Integer> reachableGiven(Collection<String> builtStageNames) {
-        Set<Integer> roots = new LinkedHashSet<>();
-        if (!names.isEmpty()) {
-            roots.add(names.size() - 1);
+    /// The stages the image the file ends with is built from, so the last stage and everything it names, directly
+    /// or through another stage it names.
+    public Set<Integer> reachable() {
+        if (ambiguous) {
+            return allIndices(names.size());
         }
-        for (int i = 0; i < names.size(); i++) {
-            String name = names.get(i);
-            if (name != null && builtStageNames.contains(name)) {
-                roots.add(i);
-            }
-        }
-        return ambiguous ? allIndices(names.size()) : reachableFrom(roots);
+        return names.isEmpty() ? emptySet() : reachableFrom(singletonList(names.size() - 1));
     }
 
     private Set<Integer> reachableFrom(Collection<Integer> roots) {
