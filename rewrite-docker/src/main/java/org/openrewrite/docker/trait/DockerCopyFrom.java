@@ -175,10 +175,28 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         if (arg == null) {
             return getTree();
         }
-        Docker.Argument newValue = arg.withContents(ImageReferences.contents(reference));
+        return withFromValue(arg.withContents(ImageReferences.contents(reference)));
+    }
+
+    /**
+     * Returns the instruction with the image name of its {@code --from} replaced by
+     * {@code imageName}, preserving any tag and digest. Unchanged for stage references.
+     */
+    @Override
+    public Docker.Copy withImageNameArgument(Docker.Argument imageName) {
+        Docker.@Nullable Argument[] parts = components();
+        Docker.Argument arg = fromArgument();
+        if (parts == null || arg == null) {
+            return getTree();
+        }
+        return withFromValue(arg.withContents(
+          ImageReferences.contents(new Docker.Argument[]{imageName, parts[1], parts[2]})));
+    }
+
+    private Docker.Copy withFromValue(Docker.Argument value) {
         Docker.Copy copy = getTree();
         return copy.withFlags(ListUtils.map(copy.getFlags(), f ->
-          "from".equals(f.getName()) ? f.withValue(newValue) : f));
+          "from".equals(f.getName()) ? f.withValue(value) : f));
     }
 
     /**

@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.trait.DockerImageReference;
 import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
 
@@ -51,23 +51,25 @@ public class NormalizeDockerHubImageName extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new DockerFrom.Matcher()
+        return new DockerImageReference.Matcher()
                 .excludeScratch()
                 .asVisitor(image -> {
-                    Docker.From from = image.getTree();
+                    Docker.Instruction instruction = image.getTree();
+                    Docker.Argument nameArgument = image.getImageNameArgument();
                     Optional<ImageName> parsed = image.getImage();
-                    if (!parsed.isPresent()) {
-                        return from;
+                    if (nameArgument == null || !parsed.isPresent()) {
+                        return instruction;
                     }
 
                     ImageName imageName = parsed.get();
                     int redundant = imageName.toString().length() - imageName.getFamiliar().length();
                     if (redundant <= 0) {
-                        return from;
+                        return instruction;
                     }
 
-                    List<Docker.ArgumentContent> contents = dropLeading(from.getImageName().getContents(), redundant);
-                    return contents == null ? from : from.withImageName(from.getImageName().withContents(contents));
+                    List<Docker.ArgumentContent> contents = dropLeading(nameArgument.getContents(), redundant);
+                    return contents == null ? instruction :
+                            image.withImageNameArgument(nameArgument.withContents(contents));
                 });
     }
 

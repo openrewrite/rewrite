@@ -400,6 +400,42 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     }
 
     @Test
+    void detectAnEolImageCopiedFrom() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(EolDockerImages.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
+              Dockerfile,runtime,debian,buster,2022-09-10,"trixie (13)"
+              """
+          ),
+          docker(
+            """
+              FROM busybox:1.36 AS runtime
+              COPY --from=debian:buster /usr/bin/tool /usr/bin/tool
+              """,
+            """
+              FROM busybox:1.36 AS runtime
+              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>COPY --from=debian:buster /usr/bin/tool /usr/bin/tool
+              """
+          )
+        );
+    }
+
+    @Test
+    void copyFromAStageIsNotAnImage() {
+        rewriteRun(
+          docker(
+            """
+              FROM busybox:1.36 AS buster
+              FROM busybox:1.36
+              COPY --from=buster /usr/bin/tool /usr/bin/tool
+              """
+          )
+        );
+    }
+
+    @Test
     void envVarTagNotFlagged() {
         // Cannot determine if EOL when tag contains environment variable
         rewriteRun(
