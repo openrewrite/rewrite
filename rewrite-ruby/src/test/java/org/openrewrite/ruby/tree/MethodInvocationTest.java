@@ -80,6 +80,57 @@ public class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void callSugar() {
+        rewriteRun(
+          ruby(
+            """
+              Sweep.()
+              MarkForToken.(t)
+              MarkForToken.(t, 1)
+              obj&.()
+              """
+          )
+        );
+    }
+
+    @Test
+    void callSugarWithBlock() {
+        rewriteRun(
+          ruby(
+            """
+              Sweep.() { |a| a }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitCall() {
+        rewriteRun(
+          ruby(
+            """
+              Sweep.call()
+              Sweep.call
+              MarkForToken.call(t)
+              """
+          )
+        );
+    }
+
+    @Test
+    void colon2Call() {
+        rewriteRun(
+          ruby(
+            """
+              Nokogiri::XML(response.body)
+              WEBrick::Log::new(log_path)
+              Integer::sqrt(9)
+              """
+          )
+        );
+    }
+
+    @Test
     void noParens() {
         rewriteRun(
           ruby(
