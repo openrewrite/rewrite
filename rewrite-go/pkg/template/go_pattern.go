@@ -32,6 +32,7 @@ type GoPattern struct {
 	code     string
 	captures map[string]*Capture
 	imports  []string
+	context  []string
 	kind     ScaffoldKind
 	mode     TypeMatchingMode
 	importerCache
@@ -74,7 +75,7 @@ func (p *GoPattern) Matches(candidate java.J, cursor *visitor.Cursor) bool {
 // getTree lazily parses the pattern and caches the result.
 func (p *GoPattern) getTree() (java.J, error) {
 	p.once.Do(func() {
-		p.cached, p.parseErr = parseScaffold(p.code, p.captures, p.imports, p.kind, p.shared())
+		p.cached, p.parseErr = parseScaffold(p.code, p.captures, p.imports, p.context, p.kind, p.shared())
 	})
 	return p.cached, p.parseErr
 }
@@ -83,6 +84,7 @@ type PatternBuilder struct {
 	code       string
 	captures   []*Capture
 	imports    []string
+	context    []string
 	kind       ScaffoldKind
 	mode       TypeMatchingMode
 	exportData []fs.FS
@@ -117,6 +119,15 @@ func (b *PatternBuilder) ExportData(sets ...fs.FS) *PatternBuilder {
 	return b
 }
 
+// Context adds declarations the pattern is parsed against, so it can be
+// attributed against types and functions no package exports. Imports and
+// ExportData cover everything importable. Mirrors PatternOptions.context in
+// the JavaScript matcher.
+func (b *PatternBuilder) Context(decls ...string) *PatternBuilder {
+	b.context = append(b.context, decls...)
+	return b
+}
+
 // TypeMatching says whether the match reads the attribution the pattern and
 // the candidate carry. Structural comparison is the default.
 func (b *PatternBuilder) TypeMatching(mode TypeMatchingMode) *PatternBuilder {
@@ -129,6 +140,7 @@ func (b *PatternBuilder) Build() *GoPattern {
 		code:          b.code,
 		captures:      captureMap(b.captures),
 		imports:       b.imports,
+		context:       b.context,
 		kind:          b.kind,
 		mode:          b.mode,
 		importerCache: importerCache{exportData: b.exportData},

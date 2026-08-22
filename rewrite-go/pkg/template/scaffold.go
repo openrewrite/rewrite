@@ -62,13 +62,22 @@ func buildPreamble(captures map[string]*Capture) string {
 }
 
 // buildScaffold wraps the template code in a compilable Go source so that
-// go/parser can parse it. Returns the full source and the number of
-// preamble statements to skip when extracting the target node.
-func buildScaffold(code string, captures map[string]*Capture, imports []string, kind ScaffoldKind) (string, int) {
+// go/parser can parse it. Returns the full source, the number of top-level
+// declarations before the target, and the number of body statements before
+// it — a statement scaffold puts context at the top level and the preamble
+// inside the function, so the two are counted apart.
+func buildScaffold(code string, captures map[string]*Capture, imports []string, context []string, kind ScaffoldKind) (string, int, int) {
 	preamble := buildPreamble(captures)
 	preambleCount := 0
 	if preamble != "" {
 		preambleCount = strings.Count(preamble, "\n") + 1
+	}
+
+	contextBlock := strings.Join(context, "\n")
+	contextCount := 0
+	if contextBlock != "" {
+		contextCount = countDeclarations(contextBlock)
+		contextBlock += "\n"
 	}
 
 	var importBlock string
@@ -82,35 +91,49 @@ func buildScaffold(code string, captures map[string]*Capture, imports []string, 
 
 	switch kind {
 	case ScaffoldExpression:
-		body := ""
+		body := contextBlock
 		if preamble != "" {
-			body = preamble + "\n"
+			body += preamble + "\n"
 		}
 		body += "var __v__ = " + code
-		return fmt.Sprintf("package __tmpl__\n%s\n%s\n", importBlock, body), preambleCount
+		return fmt.Sprintf("package __tmpl__\n%s\n%s\n", importBlock, body), contextCount + preambleCount, 0
 	case ScaffoldStatement:
 		body := ""
 		if preamble != "" {
 			body = preamble + "\n"
 		}
 		body += code
-		return fmt.Sprintf("package __tmpl__\n%s\nfunc __f__() {\n%s\n}\n", importBlock, body), preambleCount
+		return fmt.Sprintf("package __tmpl__\n%s\n%sfunc __f__() {\n%s\n}\n", importBlock, contextBlock, body), contextCount, preambleCount
 	case ScaffoldTopLevel:
-		body := ""
+		body := contextBlock
 		if preamble != "" {
-			body = preamble + "\n"
+			body += preamble + "\n"
 		}
 		body += code
-		return fmt.Sprintf("package __tmpl__\n%s\n%s\n", importBlock, body), preambleCount
+		return fmt.Sprintf("package __tmpl__\n%s\n%s\n", importBlock, body), contextCount + preambleCount, 0
 	default:
 		panic(fmt.Sprintf("unknown scaffold kind: %d", kind))
 	}
 }
 
+// countDeclarations counts the top-level declarations a context block holds,
+// which is what the target node sits behind. A declaration starts in the
+// first column; its body is indented.
+func countDeclarations(block string) int {
+	n := 0
+	for _, line := range strings.Split(block, "\n") {
+		if line == "" || line[0] == ' ' || line[0] == '\t' || line[0] == '}' || line[0] == ')' {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // parseScaffold parses the scaffold source and extracts the target node,
 // skipping the package declaration, imports, and preamble variables.
-func parseScaffold(code string, captures map[string]*Capture, imports []string, kind ScaffoldKind, imp types.Importer) (java.J, error) {
-	source, preambleCount := buildScaffold(code, captures, imports, kind)
+func parseScaffold(code string, captures map[string]*Capture, imports, context []string, kind ScaffoldKind, imp types.Importer) (java.J, error) {
+	source, topCount, bodyCount := buildScaffold(code, captures, imports, context, kind)
 
 	p := parser.NewGoParser()
 	if imp != nil {
@@ -121,17 +144,17 @@ func parseScaffold(code string, captures map[string]*Capture, imports []string, 
 		return nil, fmt.Errorf("template parse error: %w\nsource:\n%s", err, source)
 	}
 
-	return extractTarget(cu, kind, preambleCount)
+	return extractTarget(cu, kind, topCount, bodyCount)
 }
 
 // extractTarget navigates the parsed CompilationUnit to find the template node.
-func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preambleCount int) (java.J, error) {
+func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, topCount, bodyCount int) (java.J, error) {
 	stmts := cu.Statements
 
 	switch kind {
 	case ScaffoldExpression:
-		// Statements: [preamble vars...] [var __v__ = <expr>]
-		targetIdx := preambleCount
+		// Statements: [context...] [preamble vars...] [var __v__ = <expr>]
+		targetIdx := topCount
 		if targetIdx >= len(stmts) {
 			return nil, fmt.Errorf("expression scaffold: expected statement at index %d, got %d statements", targetIdx, len(stmts))
 		}
@@ -161,7 +184,7 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preambleCount 
 				continue
 			}
 			bodyStmts := md.Body.Statements
-			targetIdx := preambleCount
+			targetIdx := bodyCount
 			if targetIdx >= len(bodyStmts) {
 				return nil, fmt.Errorf("statement scaffold: expected body statement at index %d, got %d", targetIdx, len(bodyStmts))
 			}
@@ -170,8 +193,8 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preambleCount 
 		return nil, fmt.Errorf("statement scaffold: could not find __f__ function")
 
 	case ScaffoldTopLevel:
-		// Statements: [preamble vars...] [<target>]
-		targetIdx := preambleCount
+		// Statements: [context...] [preamble vars...] [<target>]
+		targetIdx := topCount
 		if targetIdx >= len(stmts) {
 			return nil, fmt.Errorf("top-level scaffold: expected statement at index %d, got %d statements", targetIdx, len(stmts))
 		}

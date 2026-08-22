@@ -32,6 +32,7 @@ type GoTemplate struct {
 	code     string
 	captures map[string]*Capture
 	imports  []string
+	context  []string
 	kind     ScaffoldKind
 	importerCache
 
@@ -54,7 +55,7 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
 	// and we need a fresh tree to substitute into).
 	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
+	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.context, t.kind, t.shared())
 	if err != nil {
 		return nil
 	}
@@ -112,7 +113,7 @@ func (v *idRefreshVisitor) Visit(t java.Tree, p any) java.Tree {
 // getTree lazily parses the template and caches the result.
 func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
-		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
+		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.context, t.kind, t.shared())
 	})
 	return t.cached, t.parseErr
 }
@@ -121,6 +122,7 @@ type TemplateBuilder struct {
 	code       string
 	captures   []*Capture
 	imports    []string
+	context    []string
 	kind       ScaffoldKind
 	exportData []fs.FS
 }
@@ -148,6 +150,13 @@ func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	return b
 }
 
+// Context adds declarations the template is parsed against. See
+// PatternBuilder.Context.
+func (b *TemplateBuilder) Context(decls ...string) *TemplateBuilder {
+	b.context = append(b.context, decls...)
+	return b
+}
+
 // ExportData attributes the template against compiler export data the recipe
 // module carries, reaching packages the running toolchain cannot load. Sets
 // accumulate, as Imports does, so a module can draw on several generated
@@ -162,6 +171,7 @@ func (b *TemplateBuilder) Build() *GoTemplate {
 		code:          b.code,
 		captures:      captureMap(b.captures),
 		imports:       b.imports,
+		context:       b.context,
 		kind:          b.kind,
 		importerCache: importerCache{exportData: b.exportData},
 	}

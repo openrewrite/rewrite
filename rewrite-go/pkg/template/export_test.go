@@ -17,6 +17,8 @@
 package template
 
 import (
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -31,4 +33,12 @@ func (p *GoPattern) MatchesViaWalk(candidate java.J, cursor *visitor.Cursor) boo
 	cmp := newPatternComparator(p.captures, cursor, p.mode)
 	cmp.skipFastPath = true
 	return cmp.match(tree, candidate) != nil
+}
+
+// Tree exposes the pattern's own parsed tree, so a test can assert how it was
+// attributed rather than only what it matches.
+func (p *GoPattern) Tree(t require.TestingT) java.J {
+	tree, err := p.getTree()
+	require.NoError(t, err)
+	return tree
 }

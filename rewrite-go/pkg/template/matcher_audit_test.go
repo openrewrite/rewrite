@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -321,4 +322,24 @@ func (c *callFinder) PreVisit(t java.Tree, p any) java.Tree {
 		c.call = mi
 	}
 	return t
+}
+
+// patternCall returns the sole call in a pattern's own tree, so a test can
+// assert what the pattern was attributed with.
+func patternCall(t *testing.T, pat *template.GoPattern) *java.MethodInvocation {
+	t.Helper()
+	tree := pat.Tree(t)
+	found := &callFinder{}
+	found.Self = found
+	found.Visit(tree, nil)
+	require.NotNil(t, found.call, "no call in the pattern")
+	return found.call
+}
+
+func patternParamFQNs(mi *java.MethodInvocation) []string {
+	var names []string
+	for _, p := range mi.MethodType.ParameterTypes {
+		names = append(names, matcher.GetFullyQualifiedName(p))
+	}
+	return names
 }

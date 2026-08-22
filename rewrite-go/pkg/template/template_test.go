@@ -34,7 +34,7 @@ import (
 )
 
 func TestScaffoldExpression(t *testing.T) {
-	source, _ := buildScaffold("1 + 2", nil, nil, ScaffoldExpression)
+	source, _, _ := buildScaffold("1 + 2", nil, nil, nil, ScaffoldExpression)
 	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
@@ -43,7 +43,7 @@ func TestScaffoldExpression(t *testing.T) {
 }
 
 func TestScaffoldStatement(t *testing.T) {
-	source, _ := buildScaffold("x = 1", nil, nil, ScaffoldStatement)
+	source, _, _ := buildScaffold("x = 1", nil, nil, nil, ScaffoldStatement)
 	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
@@ -53,7 +53,7 @@ func TestScaffoldStatement(t *testing.T) {
 
 func TestScaffoldWithCaptures(t *testing.T) {
 	caps := captureMap([]*Capture{Expr("x")})
-	source, count := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, ScaffoldExpression)
+	source, count, _ := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, nil, ScaffoldExpression)
 	assert.Equal(t, 1, count, "expected preamble count")
 
 	p := parser.NewGoParser()
@@ -62,7 +62,7 @@ func TestScaffoldWithCaptures(t *testing.T) {
 }
 
 func TestParseScaffoldExpression(t *testing.T) {
-	node, err := parseScaffold("1 + 2", nil, nil, ScaffoldExpression, nil)
+	node, err := parseScaffold("1 + 2", nil, nil, nil, ScaffoldExpression, nil)
 	require.NoError(t, err, "parseScaffold error")
 	require.NotNil(t, node, "expected non-nil node")
 	bin, ok := node.(*java.Binary)
