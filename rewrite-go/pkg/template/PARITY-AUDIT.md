@@ -1,4 +1,11 @@
-# GoTemplate ↔ JavaTemplate parity audit
+# rewrite-go template and matcher parity audit
+
+Two audits live here. The first maps `pkg/template/GoTemplate` against
+`org.openrewrite.java.JavaTemplate`. The second maps `pkg/template/GoPattern`
+— the AST matcher — against the JavaScript and Python matchers, which are the
+only other implementations of the same pattern surface.
+
+## GoTemplate ↔ JavaTemplate
 
 Item (10) of the rewrite-go parity plan asked for ergonomic parity between
 `pkg/template/GoTemplate` and `org.openrewrite.java.JavaTemplate`. This
@@ -6,7 +13,7 @@ document lists every public method on `JavaTemplate` (Java) and maps it to
 the equivalent surface on `GoTemplate` (Go), noting what was already
 present, what was added in this PR, and what is intentionally deferred.
 
-## Audit summary
+### Audit summary
 
 | Surface | JavaTemplate | GoTemplate | Status |
 |---|---|---|---|
@@ -22,7 +29,7 @@ present, what was added in this PR, and what is intentionally deferred.
 | Cursor-aware insertion | parameter to `.apply(cursor, ...)` | parameter to `.Apply(cursor, ...)` | ✓ shipped — the cursor names the node being replaced, from which `Apply` takes the leading whitespace, whether the result needs parenthesizing against the expression around it, and the level to indent to |
 | Variadic placeholders | n/a | `Capture.Variadic(min, max)` matched by `GoPattern`, expanded by `GoTemplate` | ✓ shipped — Go-side delta over Java. `JavaTemplate` has no variadic placeholder; `Substitutions.maybeExpandVarargsNewArray` flattens a captured varargs `J.NewArray` back into an argument list, which is a Java-language repair rather than a capture kind |
 
-## Already present before this PR (no delta required)
+### Already present before this PR (no delta required)
 
 The Go-side template engine is ~740 LOC and pre-dates the parity work.
 Surface that was already at parity:
@@ -43,7 +50,7 @@ Surface that was already at parity:
 - Scaffold-based parser (`pkg/template/scaffold.go`) compiles a template
   string into an AST that's cached per `GoTemplate` instance.
 
-## Deferred (intentional out-of-scope items)
+### Deferred (intentional out-of-scope items)
 
 These are explicitly out-of-scope per the eng review:
 
@@ -69,14 +76,14 @@ These are explicitly out-of-scope per the eng review:
    pattern surface; we'll add it only if a recipe actually needs splice
    semantics that Pattern→Template doesn't cover.
 
-## What recipe authors should know
+### What recipe authors should know
 
 For most refactors, the Go-side template surface is what you want:
 
 ```go
 import "github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 
-before := template.ExpressionPattern(`errors.Is(#{X}, #{Y})`).Build()
+before := template.Expression(`errors.Is(#{X}, #{Y})`).Build()
 after  := template.ExpressionTemplate(`xerrors.Is(#{X}, #{Y})`).Imports("xerrors").Build()
 visitor := template.Rewrite(before, after)
 ```
@@ -103,10 +110,10 @@ The Java →  Go porting cheat-sheet:
 | `JavaTemplate.builder("…").build()`    | `template.StatementTemplate("…").Build()`                |
 | `.imports("foo")`                      | `.Imports("foo")`                                        |
 | `.apply(getCursor(), JavaCoordinates.replace(target), arg1, arg2)` | match `target` with a `GoPattern`, then `template.Rewrite(before, after)` — the `RewriteVisitor` does the splice |
-| `#{any()}` as a wildcard placeholder    | `template.ExpressionPattern("#{X}").Build()` with an unconstrained `Capture` |
+| `#{any()}` as a wildcard placeholder    | `template.Expression("#{X}").Build()` with an unconstrained `Capture` |
 | `#{name:any(java.util.List)}`           | not yet — file an issue if you hit this                  |
 
-## Conclusion
+### Conclusion
 
 GoTemplate's surface is at functional parity with `JavaTemplate` for the
 common refactor patterns. The surface differences are mostly stylistic
@@ -114,3 +121,182 @@ common refactor patterns. The surface differences are mostly stylistic
 intentionally narrowed (no `staticImports`, no coordinate API). The
 deferred items are all opt-in features; the default Go template
 experience covers what recipes-go authors need today.
+
+## GoPattern ↔ JavaScript and Python matchers
+
+`GoPattern` matches an LST subtree against a parsed pattern and binds
+placeholder identifiers to what they matched. The equivalent surfaces are
+`rewrite-javascript/rewrite/src/javascript/templating/` (~6300 LOC, with
+`comparator.ts` at 1422) and
+`rewrite-python/rewrite/src/rewrite/python/template/` (~3000 LOC, with
+`comparator.py` at 537).
+
+### The structural comparison is built differently in Go
+
+Python's `PythonComparatorVisitor._compare_fields` iterates
+`dataclasses.fields()`. JavaScript's matcher iterates `Object.keys(j)`. Both
+skip identity and formatting fields by name and recurse into whatever remains,
+so neither can omit a node kind or a field: coverage is a property of the walk
+rather than of a table someone maintains.
+
+Go instead dispatched on a 65-case type switch in `matchProperties`. Three
+classes of defect followed from that, all of them measured against the parser
+rather than inferred from the source.
+
+**Kinds the switch never reached.** Taking the 78-case dispatch in
+`visitor.GoVisitor.Visit` as the model's enumeration, seven reachable kinds
+were absent: `golang.DeclarationBlock`, `golang.ExpressionStatement`,
+`golang.StatementExpression`, `java.ParameterizedType`, `java.TypeParameter`,
+`java.TypeParameters` and `java.Annotation`. A pattern naming one never
+matched — `const ( A = 1 )` and `Foo[string]` matched nothing at all. Six
+further kinds, `golang.GoMod`/`GoModBlock`/`GoModDirective`/`GoModValue` and
+`golang.GoSum`/`GoSumLine`, are unreachable by construction: a pattern is
+parsed from Go source by `parser.NewGoParser`, which produces neither.
+
+**Fields the cases forgot.** A case that compares some of a node's children
+and ignores the rest reports a match the source does not support:
+
+| pattern | candidate | matched |
+|---|---|---|
+| `func F(y bool) {…}` | `func F(x int) {…}` | yes |
+| `func F() string {…}` | `func F() int {…}` | yes |
+| `func (a *A) F() {…}` | `func (b *B) F() {…}` | yes |
+| `func G[T any]() {…}` | `func G[U comparable]() {…}` | yes |
+| ``F int `json:"a"` `` | ``F int `json:"b"` `` | yes |
+
+`java.MethodDeclaration` compared `Name` and `Body` only, leaving
+`Parameters`, `ReturnType`, `TypeParameters` and `LeadingAnnotations`
+unread; `golang.MethodDeclaration` compared `Declaration` and never
+`Receiver`; `java.MethodInvocation` ignored call-site `TypeParameters`.
+A false match is worse than a missing one, because the recipe rewrites on it.
+
+**Markers, which the peers can afford to ignore and Go cannot.** JavaScript
+and Python drop the marker collection wholesale, and their models let them:
+nothing that decides what the source says lives there. Go's does. `x = 1`
+matched `x := 1` and `var x = 1` matched `const x = 1`, because `:=` and
+`const` are `golang.ShortVarDecl` and `golang.ConstDecl` rather than tree
+structure. Rewriting the first of those drops a declaration.
+
+### Design
+
+Comparison is a reflective field walk over a per-`reflect.Type` plan, built
+once and cached. Each exported field resolves to one rule:
+
+| rule | applies to |
+|---|---|
+| skip | `uuid.UUID`, `java.Space`, and `golang.CompilationUnit`'s `SourcePath` / `CharsetBomMarked` / `EOF` |
+| type slot | any field whose type implements `java.JavaType` |
+| padded | `RightPadded[T]` / `LeftPadded[T]` / `Container[T]`, recursing on `Element`/`Elements` and ignoring `Before`/`After` |
+| node | anything implementing `java.J`, including the by-value `ForControl` and `ForEachControl` embeds |
+| slice | element-wise, with variadic run absorption for `[]RightPadded[T]` |
+| scalar | `==`, covering strings, bools, ints, `DeclKind`, `ChanDir`, the operator enums and `Literal.Value` |
+
+The padded rule keys on field name, so it holds for every instantiation of `T`
+without enumerating them, and `LeftPadded[Space]` degenerates to a skip.
+
+Explicit handling survives ahead of the walk where a node's meaning is not its
+fields: placeholder binding, `java.Literal` (compared by `Source`),
+`java.Empty` (always equal), variadic runs, and the FQN-based
+`java.MethodInvocation` comparison described below.
+
+**Which markers count.** `go_printer.go` reads twelve. Five change the
+keywords or operators emitted and are therefore compared: `ShortVarDecl`,
+`ConstDecl`, `VarKeyword` and `InterfaceMethod` by presence, and `StructTag`
+by the source of the `*java.Literal` it carries. The rest — `Semicolon`,
+`TrailingComma`, `GroupedSpec`, `GroupedImport`, `ImportBlock`,
+`StructTagQuote`, `ChanDirMarker` — move only whitespace and punctuation, as
+does every marker the printer never reads. A test derives this split from the
+printer, so a new marker cannot join the ignored set unexamined.
+
+### Type attribution
+
+Structural comparison is the default and the only mode the peers offer:
+`comparator.ts` compares no types at all, and Python layers
+`PythonSemanticComparator` on top of its structural visitor. Go follows
+Python, with `PatternBuilder.TypeMatching`:
+
+| mode | one side unattributed | both attributed |
+|---|---|---|
+| `TypeMatchingOff` (default) | type slots unread | type slots unread |
+| `TypeMatchingLenient` | matches | compared |
+| `TypeMatchingStrict` | fails | compared |
+
+Python's attribution comes from `ty` and is often partially absent, which
+makes its lenient default close to off in practice. Go's comes from `go/types` and is either complete for a package or
+absent for all of it, so the two modes diverge sharply and the default has to
+be the behaviour recipes already depend on.
+
+Comparison mirrors Python's `_compare_types`: two nils are equal, one nil
+defers to the mode, two primitives compare by the intersection of
+`matcher.GoTypeNames` — not `matcher.IsSameGoType`, which answers false for
+literal keywords by design — two method types compare by name and declaring
+type FQN, and anything else compares by `matcher.GetFullyQualifiedName`, with
+an empty FQN on either side deferring to the mode.
+
+When both sides of a `java.MethodInvocation` resolve, the declaring type FQN
+and method name are compared and `Select` is skipped, so a `fmt.Println`
+pattern still matches source that imported `fmt` under an alias. This is the
+Go reading of the case Python's comparator documents for `os.path.join`
+against a bare `join`.
+
+`Capture.WithType` already declares a type for a capture and feeds it to the
+scaffold preamble. Under either type-matching mode it is now also enforced
+against what the capture matched, which is what its name has always implied.
+
+**Degraded attribution.** A type-comparing match against a package whose
+attribution is incomplete returns false, which reads exactly like source that
+does not match. The comparator therefore counts the comparisons that were
+inconclusive for want of attribution, and `GoPattern.Explain` reports the
+count with the path of the node where it happened, so the two cases are
+distinguishable. The stronger behaviour — refusing rather than answering
+false when the package is known to be partially attributed — waits on the
+`PartialTypeAttribution` marker, which is not yet in the tree.
+
+### Attribution context for the pattern itself
+
+JavaScript's `PatternOptions.context` takes declarations that are prepended to
+the pattern before parsing, so the pattern gets attributed. Go arrives at the
+same place from two directions that already existed: `Imports` puts import
+declarations in the scaffold, and `ExportData` supplies the importer that
+resolves them, so `Expression("fmt.Println(\"x\")").Imports("fmt")` already
+yields a resolved `MethodType` whose declaring type is `fmt`. `Context` adds
+what those two cannot express — type aliases, local declarations, and any
+other top-level Go the pattern needs to read against.
+
+### Capture constraints, and why Go does not get them
+
+Both peers let a capture carry a predicate: Python's runs over the captured
+value after the match, JavaScript's also receives the cursor and the captures
+bound so far. Go does not, and should not yet.
+
+A Go recipe is compiled Go. An author wanting "capture only if it is a
+`time.Duration`" writes the check against the match result, with the type
+system behind it:
+
+```go
+if m := pat.Match(node, cursor); m != nil &&
+    matcher.IsOfClassType(matcher.TypeOfExpression(m.Get("d")), "time.Duration") {
+```
+
+A template literal is the only surface a JavaScript or Python pattern author
+has, which is why those implementations need the predicate inside the capture.
+The declarative Go surface — `template.WithAfter` and friends — is
+configuration and could not carry a closure regardless. Enforcing
+`Capture.WithType` covers the declarative subset that is actually expressible.
+
+### Where Go leads
+
+| capability | Go | JavaScript | Python |
+|---|---|---|---|
+| Variadic capture | a bounded run anywhere in a list, via `Capture.Variadic(min, max)` | marker-based, whole list | whole argument list only |
+| Match-free template instantiation | `MatchResult.Bind` / `BindList` | — | — |
+| Type-attribution comparison | opt-in, three modes | — | on by default, lenient only |
+
+### Enforcement
+
+`TestMatcherDistinctness` holds the audit. A corpus of fixtures spans every
+kind `visitor.GoVisitor.Visit` dispatches; each must match itself, and no
+fixture may match a different one. Distinctness is the property the rows above
+violated, and counting covered kinds would have caught none of them. The kinds
+that cannot be reached from Go source are asserted unreachable rather than
+passed over.
