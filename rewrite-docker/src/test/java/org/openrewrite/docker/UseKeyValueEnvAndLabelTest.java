@@ -143,6 +143,20 @@ class UseKeyValueEnvAndLabelTest implements RewriteTest {
     }
 
     @Test
+    void aValueWrittenHardAgainstItsKeyIsNotTheLegacyForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04
+              ENV NODE_OPTIONS=--max-old-space-size=4096
+              LABEL flags=--verbose
+              ENV LIST=[1,2]
+              """
+          )
+        );
+    }
+
+    @Test
     void multiStage() {
         rewriteRun(
           docker(

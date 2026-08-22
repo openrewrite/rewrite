@@ -136,6 +136,28 @@ class LowerCaseStageNamesTest implements RewriteTest {
     }
 
     @Test
+    void renameTheStageAMountReferences() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:22.04 AS Builder
+              RUN make build
+
+              FROM ubuntu:22.04
+              RUN --mount=type=bind,from=Builder,source=/app,target=/app cp -r /app /out
+              """,
+            """
+              FROM ubuntu:22.04 AS builder
+              RUN make build
+
+              FROM ubuntu:22.04
+              RUN --mount=type=bind,from=builder,source=/app,target=/app cp -r /app /out
+              """
+          )
+        );
+    }
+
+    @Test
     void numericStageReferenceIsUntouched() {
         rewriteRun(
           docker(
