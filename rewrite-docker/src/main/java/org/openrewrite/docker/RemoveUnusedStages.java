@@ -39,24 +39,19 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedStages extends ScanningRecipe<Set<String>> {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused Docker build stages";
-    }
+    final String displayName = "Remove unused Docker build stages";
 
-    @Override
-    public String getDescription() {
-        return "Remove build stages that nothing builds. A stage is built when it is the last stage of the file, " +
-               "when a stage that is itself built names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` " +
-               "flag, or when something in the repository asks for it by name: a `docker build --target`, a " +
-               "`docker-bake.hcl`, a compose file, a CI workflow, or a comment in the Dockerfile showing how to " +
-               "build it. The rest are dead weight that classic builds still build. Reachability is transitive, so " +
-               "a chain of stages that only the removed stages reached goes with them. A file is left alone entirely " +
-               "where a reference cannot be resolved without guessing, either because a build argument spells it " +
-               "(`COPY --from=$BUILDER`) or because it names a stage by a position that removing a stage would move " +
-               "(`COPY --from=0`), and where the parser left text it could not place. A build that names a target " +
-               "somewhere this recipe cannot read, such as a developer's shell history, is still invisible to it.";
-    }
+    final String description = "Remove build stages that nothing builds. A stage is built when it is the last stage " +
+            "of the file, when a stage that is itself built names it in a `FROM`, a `COPY --from`, or a " +
+            "`RUN --mount=...,from=` flag, or when something in the repository asks for it by name: a " +
+            "`docker build --target`, a `docker-bake.hcl`, a compose file, a CI workflow, or a comment in the " +
+            "Dockerfile showing how to build it. The rest are dead weight that classic builds still build. " +
+            "Reachability is transitive, so a chain of stages that only the removed stages reached goes with them. " +
+            "A file is left alone entirely where a reference cannot be resolved without guessing, either because a " +
+            "build argument spells it (`COPY --from=$BUILDER`) or because it names a stage by a position that " +
+            "removing a stage would move (`COPY --from=0`), and where the parser left text it could not place. A " +
+            "build that names a target somewhere this recipe cannot read, such as a developer's shell history, is " +
+            "still invisible to it.";
 
     @Override
     public Set<String> getInitialValue(ExecutionContext ctx) {
@@ -105,9 +100,8 @@ public class RemoveUnusedStages extends ScanningRecipe<Set<String>> {
         };
     }
 
-    /// The whitespace and comments above the first stage of a file are not the stage's own: they hold a parser
-    /// directive, and removing that stage would take the directive with it. Where a leading stage goes, its prefix
-    /// stays and stands in for the lead-in of whichever stage becomes the first.
+    /// The space above the first stage holds a parser directive, not the stage's own comments, so where a leading
+    /// stage goes its prefix stays and stands in for the lead-in of whichever stage becomes the first.
     private static Space inheritPrefix(Space removed, Space kept) {
         List<Comment> keptComments = kept.getComments();
         if (keptComments.isEmpty()) {

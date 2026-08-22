@@ -43,24 +43,18 @@ public class FindStageGraph extends ScanningRecipe<Set<String>> {
 
     transient StageDependencies stageDependencies = new StageDependencies(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find Docker build stage dependencies";
-    }
+    final String displayName = "Find Docker build stage dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Record which build stages of a multi-stage Dockerfile depend on which others, and mark the stages " +
-               "nothing builds. A stage is built when it is the last stage of the file, when a stage that is itself " +
-               "built names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag, or when something in " +
-               "the repository asks for it by name: a `docker build --target`, a `docker-bake.hcl`, a compose file, " +
-               "a CI workflow, or a comment in the Dockerfile showing how to build it. Where a reference cannot be " +
-               "resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
-               "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every " +
-               "stage in that file is reported as built. A stage nothing builds is dead weight that classic builds " +
-               "still build. This reaches the same verdict as `RemoveUnusedStages`, so reading it across a fleet " +
-               "shows what that recipe would delete before it deletes anything.";
-    }
+    final String description = "Record which build stages of a multi-stage Dockerfile depend on which others, and mark the stages " +
+            "nothing builds. A stage is built when it is the last stage of the file, when a stage that is itself " +
+            "built names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag, or when something in " +
+            "the repository asks for it by name: a `docker build --target`, a `docker-bake.hcl`, a compose file, " +
+            "a CI workflow, or a comment in the Dockerfile showing how to build it. Where a reference cannot be " +
+            "resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
+            "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every " +
+            "stage in that file is reported as built. A stage nothing builds is dead weight that classic builds " +
+            "still build. This reaches the same verdict as `RemoveUnusedStages`, so reading it across a fleet " +
+            "shows what that recipe would delete before it deletes anything.";
 
     @Override
     public Set<String> getInitialValue(ExecutionContext ctx) {

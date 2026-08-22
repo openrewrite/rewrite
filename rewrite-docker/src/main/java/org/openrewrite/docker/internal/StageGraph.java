@@ -27,16 +27,9 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 
 /**
- * Which build stages of a Dockerfile reach which other stages, and which of them the image being
- * built actually needs. A stage is needed when it is the last stage of the file, or when a stage
- * that is itself needed names it in a {@code FROM}, a {@code COPY --from}, or a
- * {@code RUN --mount=...,from=} flag.
- * <p>
- * A reference that only a build-time variable resolves ({@code COPY --from=$BUILDER}) or that names
- * a stage by position ({@code COPY --from=0}, whose meaning moves when a stage is removed) leaves
- * the graph ambiguous: nothing about the file can be concluded, and every stage is reported as
- * reached. So does a file the parser only partly understood, since a reference it dropped is a
- * reference the graph cannot see.
+ * Which build stages of a Dockerfile reach which other stages, and which of them the image being built
+ * actually needs. A reference nothing can resolve without guessing leaves the graph ambiguous, and every
+ * stage is then reported as reached rather than risk calling a used stage unused.
  */
 public class StageGraph {
 
@@ -82,9 +75,8 @@ public class StageGraph {
         return new StageGraph(names, references, ambiguous);
     }
 
-    /// Text the parser could not place does not go missing: the tree is built from source offsets, so a token the
-    /// error recovery dropped reappears as the whitespace before whatever came next. The file still prints as it was
-    /// read, and the instruction it held, which may be the `COPY --from` that makes a stage used, is simply absent.
+    /// The tree is built from source offsets, so a token the error recovery dropped reappears as the whitespace
+    /// before whatever came next, and the instruction it held is absent from the graph.
     private static boolean isFullyParsed(Docker.File file) {
         return new DockerIsoVisitor<AtomicBoolean>() {
             @Override
@@ -101,10 +93,6 @@ public class StageGraph {
         return names.get(stage);
     }
 
-    /**
-     * The stages naming the given stage, in the order they appear in the file, described the way the
-     * file names them: by stage name where they have one, otherwise by position.
-     */
     public List<String> getReferencedBy(int stage) {
         Set<Integer> referrers = referencedBy.get(stage);
         if (referrers.isEmpty()) {
@@ -126,10 +114,6 @@ public class StageGraph {
         return all;
     }
 
-    /**
-     * The stages needed once the named stages count as built in their own right, alongside the last stage
-     * of the file. Names are matched the way Dockerfile matches them, ignoring case.
-     */
     public Set<Integer> reachableGiven(Collection<String> builtStageNames) {
         Set<Integer> roots = new LinkedHashSet<>();
         if (!names.isEmpty()) {
@@ -173,7 +157,7 @@ public class StageGraph {
             if (from.getTag() == null && from.getDigest() == null) {
                 String plain = ArgumentContents.text(from.getImageName());
                 if (plain != null) {
-                    reference(plain);
+                    reference(plain, stage);
                 } else if (!ArgumentContents.textWithVariables(from.getImageName()).contains("/")) {
                     ambiguous = true;
                 }
@@ -186,11 +170,11 @@ public class StageGraph {
             Docker.Argument value = flag.getValue();
             if (value != null) {
                 if ("from".equals(flag.getName())) {
-                    reference(ArgumentContents.textWithVariables(value));
+                    reference(ArgumentContents.textWithVariables(value), names.size());
                 } else if ("mount".equals(flag.getName())) {
                     for (String field : ArgumentContents.textWithVariables(value).split(",")) {
                         if (field.regionMatches(true, 0, "from=", 0, "from=".length())) {
-                            reference(field.substring("from=".length()));
+                            reference(field.substring("from=".length()), names.size());
                         }
                     }
                 }
@@ -198,14 +182,17 @@ public class StageGraph {
             return super.visitFlag(flag, p);
         }
 
-        private void reference(String value) {
+        /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole file is read,
+        /// so it reaches later stages too; hence `limit`. Searching backwards leaves a duplicated name at its last
+        /// declaration, as it is for Docker.
+        private void reference(String value, int limit) {
             if (value.indexOf('$') >= 0 || isIndex(value)) {
                 ambiguous = true;
                 return;
             }
             String name = value.toLowerCase(Locale.ROOT);
-            for (int i = stage - 1; i >= 0; i--) {
-                if (name.equals(names.get(i))) {
+            for (int i = limit - 1; i >= 0; i--) {
+                if (i != stage && name.equals(names.get(i))) {
                     targets.add(i);
                     return;
                 }
