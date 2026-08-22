@@ -19,12 +19,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.*;
 
@@ -77,7 +76,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
         if (tree instanceof JavaSourceFile) {
-            return addStyleMarker((JavaSourceFile) tree, styles);
+            return StyleHelper.addStyleMarker((JavaSourceFile) tree, styles);
         }
 
         return (J) tree;
@@ -113,31 +112,10 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p);
 
             if (tree instanceof J.CompilationUnit) {
-                return addStyleMarker((JavaSourceFile) tree, styles);
+                return StyleHelper.addStyleMarker((JavaSourceFile) tree, styles);
             }
         }
         //noinspection DataFlowIssue
         return (J) tree;
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
-    private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
-        if (!styles.isEmpty()) {
-            Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
-            boolean styleAlreadyPresent = false;
-            for (NamedStyles namedStyle : t.getMarkers().findAll(NamedStyles.class)) {
-                styleAlreadyPresent = !newNamedStyles.add(namedStyle) || styleAlreadyPresent;
-            }
-            // As the order or NamedStyles matters, we cannot simply use addIfAbsent.
-            if (!styleAlreadyPresent) {
-                Markers markers = t.getMarkers().removeByType(NamedStyles.class);
-                for (NamedStyles namedStyle : newNamedStyles) {
-                    markers = markers.add(namedStyle);
-                }
-
-                return t.withMarkers(markers);
-            }
-        }
-        return t;
     }
 }
