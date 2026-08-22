@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.cleanup;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -48,6 +49,56 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
                 <groupId>test</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0-SNAPSHOT</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Disabled("isManagedDependencyTag() only matches /project/dependencyManagement, so versionless entries under <profiles> are never removed; see https://github.com/openrewrite/rewrite/pull/8445")
+    @Test
+    void profileDependencyManagementDependencyRequiresVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
+          pomXml(
+            """
+              <project>
+                <groupId>test</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <profiles>
+                  <profile>
+                    <id>example</id>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>test</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <profiles>
+                  <profile>
+                    <id>example</id>
+                  </profile>
+                </profiles>
               </project>
               """
           )
