@@ -543,26 +543,11 @@ class CopyTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
                 var form = (Docker.CopyShellForm) copy.getForm();
                 assertThat(form.getSources()).map(CopyTest::text).containsExactly("/build");
                 assertThat(text(form.getDestination())).isEqualTo("/app");
-            })
-          )
-        );
-    }
-
-    @Test
-    void anUnpairedQuoteInAFromFlagValue() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:20.04
-              COPY --from='build /build /app
-              """,
-            spec -> spec.afterRecipe(doc -> {
-                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(text(copy.getFlags().getFirst().getValue())).isEqualTo("'build");
-                assertThat(text(((Docker.CopyShellForm) copy.getForm()).getDestination())).isEqualTo("/app");
             })
           )
         );

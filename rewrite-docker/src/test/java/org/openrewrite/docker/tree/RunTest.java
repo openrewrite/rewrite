@@ -596,7 +596,9 @@ class RunTest implements RewriteTest {
         );
     }
 
-    /// Docker drops a comment line while joining the lines a continuation holds together.
+    /// Docker drops a comment line while joining the lines a continuation holds together. We keep it
+    /// where it was written, in the text of the command that spans it, rather than on the instruction
+    /// below - which is the one that would carry it were the continuation not there.
     @Test
     void commentLineInsideALineContinuation() {
         rewriteRun(
@@ -610,8 +612,16 @@ class RunTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
               .satisfiesExactly(
-                run -> assertThat(run).isInstanceOf(Docker.Run.class),
-                volume -> assertThat(volume).isInstanceOf(Docker.Volume.class)))
+                run -> assertThat(((Docker.ShellForm) ((Docker.Run) run).getCommand()).getArgument().getText())
+                  .isEqualTo("""
+                    apk del .checksum-deps \\
+                    # if we have leftovers from building, let's purge them
+                        && rm -rf /tmp/build\
+                    """),
+                volume -> {
+                    assertThat(volume.getPrefix().getComments()).isEmpty();
+                    assertThat(volume.getPrefix().getWhitespace()).isEqualTo("\n");
+                }))
           )
         );
     }

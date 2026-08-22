@@ -277,7 +277,8 @@ UNQUOTED_TEXT
     ;
 
 // Docker reads no strings in the arguments of an instruction, so a quote the end of its line leaves
-// open is an ordinary character. Mirrored into every mode that reads an argument of its own.
+// open is an ordinary character. Not so of the reference a FROM or a --from names, where an unpaired
+// quote is 'invalid reference format' and nothing to read on.
 UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 // Whitespace - HIDDEN in main mode
@@ -320,8 +321,6 @@ IR_DOLLAR               : '$'             -> type(DOLLAR);
 // than to a tag ('host:5000/img:tag'), so it stays inside the token.
 IR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
 
-IR_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
-
 // Shared with FLAG_IMAGE_REF, which reads the same reference.
 fragment IR_TEXT       : ( IR_TEXT_CHAR | TEXT_ESCAPE | IR_PORT_COLON )+;
 fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$`];
@@ -351,8 +350,6 @@ FIR_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
 FIR_DOLLAR               : '$'             -> type(DOLLAR);
 
 FIR_UNQUOTED_TEXT : IR_TEXT -> type(UNQUOTED_TEXT);
-
-FIR_UNPAIRED_QUOTE : ["'] -> type(UNQUOTED_TEXT);
 
 // ----------------------------------------------------------------------------------------------
 // USER_SPEC mode - the user:group of a USER instruction
