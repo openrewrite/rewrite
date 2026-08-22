@@ -28,6 +28,7 @@ import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.BuildTargets;
 import org.openrewrite.docker.internal.StageGraph;
 import org.openrewrite.docker.table.StageDependencies;
+import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.SearchResult;
@@ -92,6 +93,7 @@ public class FindStageGraph extends ScanningRecipe<Set<String>> {
                             name,
                             i,
                             baseImage(stage.getFrom()),
+                            graph.extendsStage(i) ? "" : registry(stage.getFrom()),
                             join(",", graph.getReferencedBy(i)),
                             name != null && built.contains(name),
                             reachable.contains(i)
@@ -101,6 +103,10 @@ public class FindStageGraph extends ScanningRecipe<Set<String>> {
                 }));
             }
         };
+    }
+
+    private static String registry(Docker.From from) {
+        return ImageName.parse(ArgumentContents.textWithVariables(from.getImageName())).getResolvedRegistry();
     }
 
     private static String baseImage(Docker.From from) {

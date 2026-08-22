@@ -38,10 +38,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,build,0,maven:3.9,,false,false
-              Dockerfile,tools,1,golang:1.22,,false,false
-              Dockerfile,,2,eclipse-temurin:21-jre,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,build,0,maven:3.9,docker.io,,false,false
+              Dockerfile,tools,1,golang:1.22,docker.io,,false,false
+              Dockerfile,,2,eclipse-temurin:21-jre,docker.io,,false,true
               """
           ),
           docker(
@@ -75,10 +75,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,base,0,alpine,"builder,#2",false,true
-              Dockerfile,builder,1,base,"#2",false,true
-              Dockerfile,,2,base,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,base,0,alpine,docker.io,"builder,#2",false,true
+              Dockerfile,builder,1,base,,"#2",false,true
+              Dockerfile,,2,base,,,false,true
               """
           ),
           docker(
@@ -102,9 +102,9 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,certs,0,alpine,"#1",false,true
-              Dockerfile,,1,alpine,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,certs,0,alpine,docker.io,"#1",false,true
+              Dockerfile,,1,alpine,docker.io,,false,true
               """
           ),
           docker(
@@ -125,10 +125,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,runtime,0,alpine,"#2",false,true
-              Dockerfile,builder,1,golang,runtime,false,true
-              Dockerfile,,2,runtime,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,runtime,0,alpine,docker.io,"#2",false,true
+              Dockerfile,builder,1,golang,docker.io,runtime,false,true
+              Dockerfile,,2,runtime,,,false,true
               """
           ),
           docker(
@@ -152,10 +152,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,unused,0,alpine,,false,true
-              Dockerfile,assets,1,node:22,,false,true
-              Dockerfile,,2,nginx:alpine,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,unused,0,alpine,docker.io,,false,true
+              Dockerfile,assets,1,node:22,docker.io,,false,true
+              Dockerfile,,2,nginx:alpine,docker.io,,false,true
               """
           ),
           docker(
@@ -179,10 +179,10 @@ class FindStageGraphTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,lint,0,golangci/golangci-lint,,true,true
-              Dockerfile,dead,1,alpine,,false,false
-              Dockerfile,,2,alpine,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,lint,0,golangci/golangci-lint,docker.io,,true,true
+              Dockerfile,dead,1,alpine,docker.io,,false,false
+              Dockerfile,,2,alpine,docker.io,,false,true
               """
           ),
           text(
@@ -219,13 +219,36 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
+    void recordTheRegistryAStageIsPulledFrom() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
+            //language=csv
+            """
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,build,0,"mcr.microsoft.com/dotnet/sdk:8.0",mcr.microsoft.com,"#1",false,true
+              Dockerfile,,1,redhat/ubi9-minimal,docker.io,,false,true
+              """
+          ),
+          docker(
+            """
+              FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+              RUN dotnet publish
+
+              FROM redhat/ubi9-minimal
+              COPY --from=build /app /app
+              """
+          )
+        );
+    }
+
+    @Test
     void recordTheDigestOfAPinnedBaseImage() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
             """
-              sourcePath,stageName,stageIndex,baseImage,referencedBy,buildTarget,reachable
-              Dockerfile,,0,alpine:3.20@sha256:abc,,false,true
+              sourcePath,stageName,stageIndex,baseImage,registry,referencedBy,buildTarget,reachable
+              Dockerfile,,0,alpine:3.20@sha256:abc,docker.io,,false,true
               """
           ),
           docker(
