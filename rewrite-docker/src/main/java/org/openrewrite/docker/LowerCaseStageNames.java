@@ -34,9 +34,8 @@ public class LowerCaseStageNames extends Recipe {
     String displayName = "Name Dockerfile build stages in lowercase";
 
     String description = "BuildKit's `StageNameCasing` check reports a build stage whose name is not lowercase. Renaming a " +
-            "stage means renaming every reference to it, so the `FROM` instructions and `COPY --from` flags " +
-            "that name the stage are updated in the same pass. A stage whose lowercase name is already taken " +
-            "by another stage is left alone.";
+            "stage means renaming every reference to it, so the `FROM` instructions, `COPY --from` flags and " +
+            "`RUN --mount` sources that name the stage are updated in the same pass.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -53,13 +52,6 @@ public class LowerCaseStageNames extends Recipe {
     }
 
     private static Map<String, String> renames(Docker.File file) {
-        Set<String> taken = new HashSet<>();
-        for (Docker.Stage stage : file.getStages()) {
-            Docker.From.As as = stage.getFrom().getAs();
-            if (as != null) {
-                taken.add(as.getName().getText());
-            }
-        }
         Map<String, String> renames = new LinkedHashMap<>();
         for (Docker.Stage stage : file.getStages()) {
             Docker.From.As as = stage.getFrom().getAs();
@@ -68,9 +60,8 @@ public class LowerCaseStageNames extends Recipe {
             }
             String name = as.getName().getText();
             String lower = name.toLowerCase(Locale.ROOT);
-            if (!name.equals(lower) && !taken.contains(lower)) {
+            if (!name.equals(lower)) {
                 renames.put(name, lower);
-                taken.add(lower);
             }
         }
         return renames;

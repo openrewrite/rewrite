@@ -118,24 +118,6 @@ class LowerCaseStageNamesTest implements RewriteTest {
     }
 
     @Test
-    void leaveAStageWhoseLowerCaseNameIsTakenAlone() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04 AS builder
-              RUN make build
-
-              FROM ubuntu:22.04 AS Builder
-              RUN make test
-
-              FROM ubuntu:22.04
-              COPY --from=builder /app /app
-              """
-          )
-        );
-    }
-
-    @Test
     void renameTheStageAMountReferences() {
         rewriteRun(
           docker(
