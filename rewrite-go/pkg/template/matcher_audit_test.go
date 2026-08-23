@@ -142,18 +142,18 @@ func auditFixtures() []fixture {
 	}
 }
 
-// matches runs the match under a recover: a comparison that panics has
+// matchesVia runs a match under a recover: a comparison that panics has
 // failed the same way one that answers wrongly has, and letting it abort the
 // process would hide every fixture after it.
-func matches(t *testing.T, pat *template.GoPattern, candidate java.J, label string) (result bool) {
+func matchesVia(t *testing.T, match func(java.J, *visitor.Cursor) bool, candidate java.J, label string) (result bool) {
 	t.Helper()
 	defer func() {
 		if r := recover(); r != nil {
-			t.Errorf("%s: match panicked: %v", label, r)
+			t.Errorf("%s: panicked: %v", label, r)
 			result = false
 		}
 	}()
-	return pat.Matches(candidate, nil)
+	return match(candidate, nil)
 }
 
 func patternFor(f fixture) *template.GoPattern {
@@ -213,7 +213,7 @@ func candidateFor(t testing.TB, f fixture) java.J {
 func TestMatcherMatchesItself(t *testing.T) {
 	for _, f := range auditFixtures() {
 		t.Run(f.name, func(t *testing.T) {
-			if !matches(t, patternFor(f), candidateFor(t, f), f.name) {
+			if !matchesVia(t, patternFor(f).Matches, candidateFor(t, f), f.name) {
 				t.Errorf("fixture %q does not match itself", f.name)
 			}
 		})
@@ -233,7 +233,7 @@ func TestMatcherDistinctness(t *testing.T) {
 				continue
 			}
 			label := fmt.Sprintf("%s vs %s", f.name, other.name)
-			if matches(t, pat, candidates[j], label) {
+			if matchesVia(t, pat.Matches, candidates[j], label) {
 				t.Errorf("pattern %q matches unrelated fixture %q", f.name, other.name)
 			}
 		}
@@ -292,7 +292,7 @@ func fastPathAgrees(t *testing.T, mode template.TypeMatchingMode) {
 			}
 			label := fmt.Sprintf("%s vs %s", f.name, other.name)
 			viaWalk := matchesVia(t, pat.MatchesViaWalk, candidates[j], label)
-			viaFast := matches(t, pat, candidates[j], label)
+			viaFast := matchesVia(t, pat.Matches, candidates[j], label)
 			if viaWalk != viaFast {
 				t.Errorf("%s: fast path says %v, walk says %v", label, viaFast, viaWalk)
 			}
@@ -300,39 +300,13 @@ func fastPathAgrees(t *testing.T, mode template.TypeMatchingMode) {
 	}
 }
 
-func matchesVia(t *testing.T, match func(java.J, *visitor.Cursor) bool, candidate java.J, label string) (result bool) {
-	t.Helper()
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("%s: walk panicked: %v", label, r)
-			result = false
-		}
-	}()
-	return match(candidate, nil)
-}
-
-type callFinder struct {
-	visitor.GoVisitor
-	call *java.MethodInvocation
-}
-
-func (c *callFinder) PreVisit(t java.Tree, p any) java.Tree {
-	if mi, ok := t.(*java.MethodInvocation); ok && c.call == nil {
-		c.call = mi
-	}
-	return t
-}
-
 // patternCall returns the sole call in a pattern's own tree, so a test can
 // assert what the pattern was attributed with.
 func patternCall(t *testing.T, pat *template.GoPattern) *java.MethodInvocation {
 	t.Helper()
-	tree := pat.Tree(t)
-	found := &callFinder{}
-	found.Self = found
-	found.Visit(tree, nil)
-	require.NotNil(t, found.call, "no call in the pattern")
-	return found.call
+	calls := callsIn(t, pat.Tree(t))
+	require.NotEmpty(t, calls, "no call in the pattern")
+	return calls[0]
 }
 
 func patternParamFQNs(mi *java.MethodInvocation) []string {
@@ -343,24 +317,28 @@ func patternParamFQNs(mi *java.MethodInvocation) []string {
 	return names
 }
 
+// allCalls returns every call expression in a source file, in source order.
 func allCalls(t *testing.T, src string) []*java.MethodInvocation {
 	t.Helper()
-	cu, err := parser.NewGoParser().Parse("a.go", src)
-	require.NoError(t, err)
-	f := &allCallFinder{}
-	f.Self = f
-	f.Visit(cu, nil)
-	return f.calls
+	return callsIn(t, parseSource(t, src))
 }
 
-type allCallFinder struct {
+func callsIn(t testing.TB, tree java.J) []*java.MethodInvocation {
+	t.Helper()
+	found := &callCollector{}
+	found.Self = found
+	found.Visit(tree, nil)
+	return found.calls
+}
+
+type callCollector struct {
 	visitor.GoVisitor
 	calls []*java.MethodInvocation
 }
 
-func (a *allCallFinder) PreVisit(t java.Tree, p any) java.Tree {
+func (c *callCollector) PreVisit(t java.Tree, p any) java.Tree {
 	if mi, ok := t.(*java.MethodInvocation); ok {
-		a.calls = append(a.calls, mi)
+		c.calls = append(c.calls, mi)
 	}
 	return t
 }
@@ -378,7 +356,7 @@ func firstStmt(t *testing.T, src string) java.J {
 	return nil
 }
 
-func parseCU(t *testing.T, src string) java.J {
+func parseSource(t testing.TB, src string) java.J {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("a.go", src)
 	require.NoError(t, err)

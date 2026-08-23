@@ -26,12 +26,17 @@ type MatchResult struct {
 	bindings map[string]any // single: java.J, variadic: []java.J
 }
 
+// The map is built by the first binding: most comparisons fail before there
+// is one, and a match that fails is never read.
 func NewMatchResult() *MatchResult {
-	return &MatchResult{bindings: make(map[string]any)}
+	return &MatchResult{}
 }
 
 // bind stores a single captured value.
 func (m *MatchResult) bind(name string, value java.J) {
+	if m.bindings == nil {
+		m.bindings = make(map[string]any)
+	}
 	m.bindings[name] = value
 }
 
@@ -45,6 +50,9 @@ func (m *MatchResult) Bind(c *Capture, value java.J) *MatchResult {
 
 // bindList stores a variadic captured list.
 func (m *MatchResult) bindList(name string, values []java.J) {
+	if m.bindings == nil {
+		m.bindings = make(map[string]any)
+	}
 	m.bindings[name] = values
 }
 

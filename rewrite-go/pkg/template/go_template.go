@@ -39,6 +39,26 @@ type GoTemplate struct {
 	once     sync.Once
 	cached   java.J
 	parseErr error
+
+	// required names the captures the parsed tree stands in for, which is a
+	// property of the template rather than of an application.
+	requiredOnce sync.Once
+	required     map[string]bool
+}
+
+// required names the captures a substitution has to bind. A capture the
+// template never names has no placeholder to leave behind, so a recipe may
+// declare one and share it across alternatives that do not all use it.
+func (t *GoTemplate) requiredCaptures(tree java.J) map[string]bool {
+	t.requiredOnce.Do(func() {
+		t.required = map[string]bool{}
+		for name := range placeholdersIn(tree) {
+			if _, declared := t.captures[name]; declared {
+				t.required[name] = true
+			}
+		}
+	})
+	return t.required
 }
 
 // Apply produces a new AST node by parsing the template and substituting
@@ -53,15 +73,9 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	}
 
 	// A placeholder left unsubstituted prints as the identifier standing in
-	// for it, which would reach the source file. A capture the template never
-	// names has no placeholder to leave, so it need not be bound: a recipe
-	// declares its captures once and shares them across its alternatives.
-	for name := range placeholdersIn(templateTree) {
-		capture, declared := t.captures[name]
-		if !declared {
-			continue
-		}
-		if values == nil || !values.satisfies(capture) {
+	// for it, which would reach the source file.
+	for name := range t.requiredCaptures(templateTree) {
+		if values == nil || !values.satisfies(t.captures[name]) {
 			return nil
 		}
 	}

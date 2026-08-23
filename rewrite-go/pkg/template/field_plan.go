@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -69,10 +70,13 @@ var (
 )
 
 // fileFields describe the file a compilation unit came from rather than the
-// tree in it, so a pattern parsed from a scaffold can still match source.
-var fileFields = map[string]bool{
-	"SourcePath": true, "CharsetBomMarked": true, "EOF": true,
-	"PackageDecl": true, "Imports": true,
+// tree in it — a scaffold names its own package and imports what the pattern
+// needs — so a pattern parsed from one can still match source.
+var fileFields = map[reflect.Type]map[string]bool{
+	reflect.TypeOf(golang.CompilationUnit{}): {
+		"SourcePath": true, "CharsetBomMarked": true, "EOF": true,
+		"PackageDecl": true, "Imports": true,
+	},
 }
 
 func planFor(t reflect.Type) *typePlan {
@@ -80,9 +84,10 @@ func planFor(t reflect.Type) *typePlan {
 		return cached.(*typePlan)
 	}
 	plan := &typePlan{}
+	skipped := fileFields[t]
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		if f.PkgPath != "" || fileFields[f.Name] {
+		if f.PkgPath != "" || skipped[f.Name] {
 			continue
 		}
 		step := stepFor(f.Type)

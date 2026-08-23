@@ -17,6 +17,7 @@
 package template_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -71,5 +72,47 @@ func BenchmarkApplyWithContext(b *testing.B) {
 	b.ResetTimer()
 	for b.Loop() {
 		tmpl.Apply(nil, nil)
+	}
+}
+
+// A template with many placeholders, applied the way a recipe applies one:
+// repeatedly, to every node it rewrote.
+func BenchmarkApplyWithCaptures(b *testing.B) {
+	caps := []*template.Capture{
+		template.Expr("a"), template.Expr("b"), template.Expr("c"), template.Expr("d"),
+	}
+	tmpl := template.ExpressionTemplate(
+		fmt.Sprintf("f(%s, g(%s, %s), h(%s))", caps[0], caps[1], caps[2], caps[3])).
+		Captures(caps...).Build()
+	values := template.NewMatchResult()
+	for _, c := range caps {
+		values.Bind(c, template.Expression("1").Build().Tree(b))
+	}
+	tmpl.Apply(nil, values)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		tmpl.Apply(nil, values)
+	}
+}
+
+// The same comparisons through the walk alone, which is what the numbers in
+// PARITY-AUDIT.md compare the hand-written cases against.
+func BenchmarkWalkSameKindMiss(b *testing.B) {
+	benchWalk(b, `f(1)`, fixture{kind: template.ScaffoldExpression, code: `g(1)`})
+}
+
+func BenchmarkWalkSameKindMissDeepArg(b *testing.B) {
+	benchWalk(b, `f(a.b.c(1), 2)`, fixture{kind: template.ScaffoldExpression, code: `f(a.b.c(1), 3)`})
+}
+
+func benchWalk(b *testing.B, pattern string, candidate fixture) {
+	pat := patternFor(fixture{kind: template.ScaffoldExpression, code: pattern})
+	node := candidateFor(b, candidate)
+	pat.MatchesViaWalk(node, nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		pat.MatchesViaWalk(node, nil)
 	}
 }

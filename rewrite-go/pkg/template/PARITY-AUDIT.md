@@ -207,8 +207,9 @@ without enumerating them, and `LeftPadded[Space]` degenerates to a skip.
 A recipe's visitor method calls `Match` once per node it has narrowed to, so
 the candidate usually shares the pattern's kind and the reject on concrete
 type never fires. `Identifier`, `MethodInvocation`, `FieldAccess`, `Binary`
-and `Block` therefore read their own fields, which costs 91ns against the
-walk's 207ns on that call, and 254ns against 1072ns once arguments nest.
+and `Block` therefore read their own fields, which costs 64ns against the
+walk's 200ns on that call, and 279ns against 1239ns once arguments nest —
+`BenchmarkMatchSameKindMiss` beside `BenchmarkWalkSameKindMiss` measures both.
 Everything else goes through the walk, so a new node kind needs no work.
 
 The variadic run is the one thing written twice, over a typed list here and a

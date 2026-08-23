@@ -23,22 +23,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// firstCall returns the sole call expression in a source file, so a test can
-// state the source it means rather than the tree it produces.
+// firstCall returns the leading call expression in a source file, so a test
+// can state the source it means rather than the tree it produces.
 func firstCall(t *testing.T, src string) *java.MethodInvocation {
 	t.Helper()
-	cu, err := parser.NewGoParser().Parse("a.go", src)
-	require.NoError(t, err)
-	found := &callFinder{}
-	found.Self = found
-	found.Visit(cu, nil)
-	require.NotNil(t, found.call, "no call in %q", src)
-	return found.call
+	calls := allCalls(t, src)
+	require.NotEmpty(t, calls, "no call in %q", src)
+	return calls[0]
 }
 
 const (
