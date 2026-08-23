@@ -117,8 +117,8 @@ public class LowerCaseStageNames extends Recipe {
         }
 
         /// A `RUN` mounts an earlier stage with `--mount=type=bind,from=<stage>`, so the name it uses has to be
-        /// renamed along with the rest. The value is a list of its own whose `=` separators the flag already
-        /// holds as literals, so the name is renamed where it sits rather than by rebuilding the value.
+        /// renamed along with the rest. The flag holds the `=` and `,` of an option list as contents of their
+        /// own, which leaves the name a content too, renamed where it sits rather than by rebuilding the value.
         @Override
         public Docker.Run visitRun(Docker.Run run, ExecutionContext ctx) {
             Docker.Run r = super.visitRun(run, ctx);
@@ -135,28 +135,17 @@ public class LowerCaseStageNames extends Recipe {
         private List<Docker.ArgumentContent> renameMountFrom(List<Docker.ArgumentContent> contents) {
             return ListUtils.map(contents, (i, content) -> {
                 if (i < 2 || !(content instanceof Docker.Literal) ||
-                        !isSeparator(contents.get(i - 1)) || !namesFrom(contents.get(i - 2))) {
+                        !reads(contents.get(i - 1), "=") || !reads(contents.get(i - 2), "from")) {
                     return content;
                 }
                 Docker.Literal literal = (Docker.Literal) content;
-                int comma = literal.getText().indexOf(',');
-                String name = comma < 0 ? literal.getText() : literal.getText().substring(0, comma);
-                String renamed = renames.get(name);
-                return renamed == null ? content :
-                        literal.withText(comma < 0 ? renamed : renamed + literal.getText().substring(comma));
+                String renamed = renames.get(literal.getText());
+                return renamed == null ? content : literal.withText(renamed);
             });
         }
 
-        private static boolean isSeparator(Docker.ArgumentContent content) {
-            return content instanceof Docker.Literal && "=".equals(((Docker.Literal) content).getText());
-        }
-
-        private static boolean namesFrom(Docker.ArgumentContent content) {
-            if (!(content instanceof Docker.Literal)) {
-                return false;
-            }
-            String text = ((Docker.Literal) content).getText();
-            return "from".equals(text) || text.endsWith(",from");
+        private static boolean reads(Docker.ArgumentContent content, String text) {
+            return content instanceof Docker.Literal && text.equals(((Docker.Literal) content).getText());
         }
 
         @Override
