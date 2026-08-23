@@ -109,6 +109,29 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
+    void aQuotedMountReferenceNamesTheStageItQuotes() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,stageIndex,baseImage,registry,referencedBy
+              Dockerfile,certs,0,alpine,docker.io,"#1"
+              Dockerfile,,1,alpine,docker.io,
+              """
+          ),
+          docker(
+            """
+              FROM alpine AS certs
+              RUN update-ca-certificates
+
+              FROM alpine
+              RUN --mount=type=bind,from="certs",target=/ssl cp -r /ssl /etc/ssl
+              """
+          )
+        );
+    }
+
+    @Test
     void aCopyReachesAStageDeclaredAfterIt() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
