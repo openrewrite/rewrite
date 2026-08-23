@@ -361,6 +361,15 @@ folded, and the method set last. A name the scaffold cannot resolve fails the pa
 than silently constraining nothing, and a declared type on anything but an
 expression capture panics, an expression being the only thing that carries one.
 
+The type filters what a match binds, and not what `MatchResult.Bind` does:
+`Instantiate` splices the node an author names, so `WithType("string")` bound
+to an `int` literal emits `errors.New(42)` and says nothing. This is
+`JavaTemplate`'s split too — `Substitutions.substituteTypedPattern` reads the
+declared type to generate the substitution stub and never compares the
+parameter against it — and it is what keeps a hand-built node with no
+attribution bindable, which a recipe supplying a runtime-computed literal
+needs.
+
 A run absorbed by a variadic capture is held to the type element by element,
 and a pattern that is a placeholder alone reaches the comparator to be held
 there too — its kind rejects nothing, so the type is all that is left.
@@ -428,7 +437,7 @@ configuration and could not carry a closure regardless. Enforcing
 | Variadic capture | a bounded run anywhere in a list, via `Capture.Variadic(min, max)` | marker-based, whole list | whole argument list only |
 | Match-free template instantiation | `MatchResult.Bind` / `BindList` | — | — |
 | Type-attribution comparison | opt-in, three modes | — | on by default, lenient only |
-| Type-constrained capture | `WithType`, assignable, interfaces satisfied structurally | parsed and never read | — |
+| Type-constrained capture | `WithType` filtering a match, assignable, interfaces satisfied structurally | parsed and never read | — |
 
 ### Enforcement
 

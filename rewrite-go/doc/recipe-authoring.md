@@ -437,7 +437,7 @@ takes two `error` arguments, so this is the guard that makes
 `err == io.EOF` → `errors.Is(err, io.EOF)` a rewrite a pattern can state
 safely.
 
-Three rules bound it:
+Four rules bound it:
 
 - **A declared type is read whatever `TypeMatching` says.** The mode
   governs the type slots a pattern did not ask about; this is one it did.
@@ -447,6 +447,9 @@ Three rules bound it:
   attribution"), so a typed capture against an unattributed tree no-ops
   by default — `GoPattern.Explain` counts what it refused for want of
   attribution, which tells that apart from source that differs.
+- **The type filters a match, not a bind.** `MatchResult.Bind` splices
+  the node you name, so `Instantiate` will emit `errors.New(42)` for a
+  capture declared `string`. Hand-built nodes are yours to get right.
 - **Only an expression carries a type.** `WithType` on a `Stmt`, `Ident`
   or `TypeExpr` capture panics, and a type name the pattern uses but
   cannot resolve fails the parse rather than constraining nothing. Name
