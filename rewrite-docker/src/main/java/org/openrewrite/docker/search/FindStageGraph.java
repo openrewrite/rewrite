@@ -182,12 +182,18 @@ public class FindStageGraph extends Recipe {
             }
 
             /// The value of one option of a flag holding a list of them, as a `RUN --mount` does. The `,` between two
-            /// options and the `=` binding a key to its value are contents of their own, so the value is the run of
-            /// contents up to the next `,`, and a `,` within quotes is a literal that does not end it.
+            /// options and the `=` binding a key to its value are contents of their own, so an option's value is the
+            /// run of contents up to the next `,`. Quoting an option whole keeps it in a single literal instead.
             private static @Nullable String option(List<Docker.ArgumentContent> contents, String key) {
                 for (int i = 0; i < contents.size(); i++) {
-                    if ((i == 0 || separator(contents.get(i - 1), ',')) && key(contents.get(i), key) &&
-                            i + 1 < contents.size() && separator(contents.get(i + 1), '=')) {
+                    if (i != 0 && !separator(contents.get(i - 1), ',')) {
+                        continue;
+                    }
+                    String quoted = quotedOption(contents.get(i), key);
+                    if (quoted != null) {
+                        return quoted;
+                    }
+                    if (key(contents.get(i), key) && i + 1 < contents.size() && separator(contents.get(i + 1), '=')) {
                         int end = i + 2;
                         while (end < contents.size() && !separator(contents.get(end), ',')) {
                             end++;
@@ -196,6 +202,15 @@ public class FindStageGraph extends Recipe {
                     }
                 }
                 return null;
+            }
+
+            private static @Nullable String quotedOption(Docker.ArgumentContent content, String key) {
+                if (!(content instanceof Docker.Literal) || ((Docker.Literal) content).getQuoteStyle() == null) {
+                    return null;
+                }
+                String text = ((Docker.Literal) content).getText();
+                return text.regionMatches(true, 0, key + '=', 0, key.length() + 1) ?
+                        text.substring(key.length() + 1) : null;
             }
 
             private static boolean separator(Docker.ArgumentContent content, char c) {
