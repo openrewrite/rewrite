@@ -211,6 +211,13 @@ and `Block` therefore read their own fields, which costs 91ns against the
 walk's 207ns on that call, and 254ns against 1072ns once arguments nest.
 Everything else goes through the walk, so a new node kind needs no work.
 
+The variadic run is the one thing written twice, over a typed list here and a
+reflected one in the walk. Handing the typed list to the reflected
+implementation costs the hand-written comparisons the speed they exist for —
+a deep match goes from 2.3us back to 8.3us — so
+`TestFastPathAgreesWithWalkOnVariadicRuns` compares the two on what they match
+and on the run each absorbs instead.
+
 `TestFastPathAgreesWithWalk` is what makes the hand-written comparisons safe:
 the walk reaches every field by construction, so it is the answer they are
 held to, under each matching mode, on what they bind as well as what they

@@ -263,6 +263,8 @@ func (c *patternComparator) matchRun(elem fieldStep, pv, cv reflect.Value) bool 
 	}
 
 	run := cv.Len() - (pv.Len() - 1)
+	// A bound on the slice arithmetic below. allowsCount rejects a
+	// negative run first, a capture's minimum never being negative.
 	if run < 0 {
 		return false
 	}

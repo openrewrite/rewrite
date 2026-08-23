@@ -17,8 +17,6 @@
 package template
 
 import (
-	"reflect"
-
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -108,10 +106,67 @@ func (c *patternComparator) matchContainer(pattern, candidate *java.Container[ja
 	return matchList(c, pattern.Elements, candidate.Elements)
 }
 
-// matchList hands a typed list to the one implementation of the variadic run,
-// so the hand-written comparisons and the walk cannot drift apart on it.
+// matchList is matchRun over a typed list. Routing it through the reflected
+// one costs the hand-written comparisons the speed they exist for, so the two
+// are held together by TestFastPathAgreesWithWalkOnVariadicRuns instead.
 func matchList[T java.J](c *patternComparator, pattern, candidate []java.RightPadded[T]) bool {
-	var zero T
-	elem := stepFor(reflect.TypeOf(java.RightPadded[T]{Element: zero}))
-	return c.matchRun(elem, reflect.ValueOf(pattern), reflect.ValueOf(candidate))
+	at, ok := variadicIndex(c, pattern)
+	if !ok {
+		return false
+	}
+	if at < 0 {
+		return len(pattern) == len(candidate) && matchElements(c, pattern, candidate)
+	}
+
+	run := len(candidate) - (len(pattern) - 1)
+	// A bound on the slice arithmetic below. allowsCount rejects a
+	// negative run first, a capture's minimum never being negative.
+	if run < 0 {
+		return false
+	}
+	name, _ := placeholderName(java.J(pattern[at].Element))
+	if !c.captures[name].allowsCount(run) {
+		return false
+	}
+	if !matchElements(c, pattern[:at], candidate[:at]) {
+		return false
+	}
+	if !matchElements(c, pattern[at+1:], candidate[at+run:]) {
+		return false
+	}
+	return c.bindRun(name, unwrap(candidate[at:at+run]))
+}
+
+func matchElements[T java.J](c *patternComparator, pattern, candidate []java.RightPadded[T]) bool {
+	for i := range pattern {
+		if !c.matchNode(pattern[i].Element, candidate[i].Element) {
+			return false
+		}
+	}
+	return true
+}
+
+// variadicIndex returns the position of the pattern's variadic capture, -1 when
+// it has none, and ok=false when it has more than one.
+func variadicIndex[T java.J](c *patternComparator, pattern []java.RightPadded[T]) (int, bool) {
+	at := -1
+	for i := range pattern {
+		name, ok := placeholderName(java.J(pattern[i].Element))
+		if !ok || !c.isVariadic(name) {
+			continue
+		}
+		if at >= 0 {
+			return 0, false
+		}
+		at = i
+	}
+	return at, true
+}
+
+func unwrap[T java.J](padded []java.RightPadded[T]) []java.J {
+	values := make([]java.J, len(padded))
+	for i, rp := range padded {
+		values[i] = rp.Element
+	}
+	return values
 }

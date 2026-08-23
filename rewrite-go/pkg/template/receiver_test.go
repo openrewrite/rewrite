@@ -124,3 +124,41 @@ func g(any) {}
 		TypeMatching(template.TypeMatchingStrict).Build()
 	require.False(t, pat.Matches(cand, nil), "a bytes.Reader named v is not a bytes.Buffer named v")
 }
+
+// The variadic run is written twice: once over a typed list for the
+// hand-written comparisons, once over a reflected one for the walk. Nothing
+// in the capture-free corpus reaches either, so the two are compared here.
+func TestFastPathAgreesWithWalkOnVariadicRuns(t *testing.T) {
+	src := `package a
+
+func f(a, b, c int) {
+	g()
+	g(a)
+	g(a, b)
+	g(a, b, c)
+}
+
+func g(...int) {}
+`
+	for _, mode := range allModes {
+		for _, bounds := range [][2]int{{0, -1}, {1, -1}, {1, 2}, {2, 2}} {
+			args := template.Expr("args").Variadic(bounds[0], bounds[1])
+			// The second shape puts a fixed argument ahead of the run, so a
+			// candidate shorter than the pattern leaves the run negative.
+			for _, code := range []string{"g(%s)", "g(a, %s)"} {
+				pat := template.Expression(fmt.Sprintf(code, args)).
+					Captures(args).Context("func g(...int) {}", "var a int").
+					TypeMatching(mode).Build()
+				for i, cand := range allCalls(t, src) {
+					fast, walk := pat.Match(cand, nil), pat.MatchViaWalk(cand, nil)
+					require.Equal(t, walk == nil, fast == nil,
+						"mode %v bounds %v %q call %d: fast and walk disagree", mode, bounds, code, i)
+					if walk != nil {
+						require.Equal(t, len(walk.GetList("args")), len(fast.GetList("args")),
+							"mode %v bounds %v %q call %d: absorbed different runs", mode, bounds, code, i)
+					}
+				}
+			}
+		}
+	}
+}
