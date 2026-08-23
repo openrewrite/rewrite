@@ -384,3 +384,10 @@ func parseCU(t *testing.T, src string) java.J {
 	require.NoError(t, err)
 	return cu
 }
+
+func exprOf(t *testing.T, code string) java.J {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("a.go", "package a\n\nvar __c__ = "+code+"\n")
+	require.NoError(t, err)
+	return cu.Statements[0].Element.(*java.VariableDeclarations).Variables[0].Element.Initializer.Element
+}

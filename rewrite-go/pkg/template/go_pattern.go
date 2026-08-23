@@ -60,7 +60,8 @@ func (p *GoPattern) Match(candidate java.J, cursor *visitor.Cursor) *MatchResult
 			return result
 		}
 	}
-	if reflect.TypeOf(patternTree) != reflect.TypeOf(candidate) {
+	if reflect.TypeOf(patternTree) != reflect.TypeOf(candidate) &&
+		reflect.TypeOf(patternTree) != reflect.TypeOf(unparenthesize(candidate)) {
 		return nil
 	}
 
@@ -76,6 +77,10 @@ func (p *GoPattern) Matches(candidate java.J, cursor *visitor.Cursor) bool {
 func (p *GoPattern) getTree() (java.J, error) {
 	p.once.Do(func() {
 		p.cached, p.parseErr = parseScaffold(p.code, p.captures, p.imports, p.context, p.kind, p.shared())
+		if p.cached != nil {
+			// A pattern is never printed, so it keeps only what it matches by.
+			p.cached = unparenthesize(p.cached)
+		}
 	})
 	return p.cached, p.parseErr
 }

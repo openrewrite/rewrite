@@ -100,27 +100,34 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 		return pattern == nil && candidate == nil
 	}
 
-	// Check if the pattern node is a placeholder identifier.
+	// Check if the pattern node is a placeholder identifier. A capture binds
+	// what it found, parentheses and all.
 	if name, isPlaceholder := placeholderName(pattern); isPlaceholder {
 		return c.bindCapture(name, candidate)
 	}
 
-	// Both nodes must be the same concrete type.
+	// Both nodes must be the same concrete type. Parentheses record how the
+	// source was written and the tree already says how it groups, so two
+	// kinds that disagree are compared again through them.
 	if reflect.TypeOf(pattern) != reflect.TypeOf(candidate) {
-		return false
+		inner, found := unparenthesize(pattern), unparenthesize(candidate)
+		if inner == pattern && found == candidate {
+			return false
+		}
+		return c.matchNode(inner, found)
 	}
 
 	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
 		return false
 	}
 
-	// A literal means the text it was written as and the type it was read as,
-	// and an Empty means only that it is there; neither reads as the rest of
-	// the fields it holds.
+	// A literal means what it evaluates to and the type it was read as, and an
+	// Empty means only that it is there; neither reads as the rest of the
+	// fields it holds.
 	switch p := pattern.(type) {
 	case *java.Literal:
 		q := candidate.(*java.Literal)
-		return p.Source == q.Source && c.matchTypeSlot(p.Type, q.Type)
+		return sameLiteralValue(p, q) && c.matchTypeSlot(p.Type, q.Type)
 	case *java.Empty:
 		return true
 	}
@@ -209,4 +216,44 @@ func structurallyEqual(a, b java.J) bool {
 	// Use a comparator with no captures — if it matches, they're equal.
 	cmp := newPatternComparator(nil, nil, TypeMatchingOff)
 	return cmp.matchNode(a, b)
+}
+
+// unparenthesize reads through the parentheses around a node.
+func unparenthesize(j java.J) java.J {
+	for {
+		switch p := j.(type) {
+		case *java.Parentheses:
+			j = p.Tree.Element
+		case *java.ControlParentheses:
+			j = p.Tree.Element
+		case *java.ParenthesizedTypeTree:
+			if p.Type == nil {
+				return j
+			}
+			j = p.Type.Tree.Element
+		default:
+			return j
+		}
+		if j == nil {
+			return nil
+		}
+	}
+}
+
+// sameLiteralValue compares what two literals evaluate to, so `0x1` and `1`
+// are one literal written twice. A value of another kind is another literal,
+// an integer and a float being different constants. Source stands in where
+// the parser recorded no value, which is how two of them are told apart.
+func sameLiteralValue(a, b *java.Literal) bool {
+	if a.Value == nil || b.Value == nil {
+		return a.Value == nil && b.Value == nil && a.Source == b.Source
+	}
+	at := reflect.TypeOf(a.Value)
+	if at != reflect.TypeOf(b.Value) {
+		return false
+	}
+	if !at.Comparable() {
+		return a.Source == b.Source
+	}
+	return a.Value == b.Value
 }

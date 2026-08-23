@@ -257,6 +257,35 @@ ignored set unexamined. A `StructTag` reaches a Go-parsed tree only from the
 RPC peer, this parser reading a tag into `LeadingAnnotations` instead; the
 `json:"a"` against `json:"b"` row above is that field, not the marker.
 
+### Reading an expression rather than its text
+
+Two spellings of one expression match. Parentheses are read through, and a
+literal compares by what it evaluates to:
+
+| pattern | candidate | matches |
+|---|---|---|
+| `true` | `(true)` | yes — the tree says how an expression groups, parentheses only how it was written |
+| `(a + b) * c` | `a + b*c` | no — the grouping differs, and reading through parentheses leaves it differing |
+| `1` | `0x1` | yes — one literal written twice |
+| `"x"` | `` `x` `` | yes |
+| `1` | `1.0` | no — an integer and a float are different constants |
+
+A capture binds what it found, parentheses included, so a replacement keeps
+the source's own spelling. Parentheses are read through only where two kinds
+disagree, which keeps the cost off the path where they agree; a pattern is
+never printed, so its own root is unwrapped once when it is parsed.
+
+`true`, `false` and `nil` are predeclared identifiers in Go rather than
+literals, so they are `java.Identifier` and the value comparison never sees
+them — `(true)` against `true` is the parentheses half alone.
+
+**What this deliberately stops short of.** `2 + 4` against `6`, `!true`
+against `false`, and `1` against `1.0` — which Go's untyped constants do make
+equal — all want the tree normalised before it is compared. Adding them as
+further pairs in the comparator is the wrong depth: each is a constant-folding
+rule, and the set of them is a pass, not a special case. The comparator is the
+place to read a normalised tree, not the place to normalise one.
+
 ### Type attribution
 
 Structural comparison is the default and the only mode the peers offer:
