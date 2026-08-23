@@ -155,8 +155,7 @@ func TestCaptureTypeIsUnenforcedWhenTypeMatchingIsOff(t *testing.T) {
 	require.NotNil(t, capturePattern(template.TypeMatchingOff).Match(intCall(t), nil))
 }
 
-// A statement carries no type slot, so its capture's declared type is an
-// attribution that is missing, which the mode decides.
+// A statement carries no type slot, so the attribution is a missing one.
 func TestStatementCaptureWithTypeFollowsTheMode(t *testing.T) {
 	cand := firstStmt(t, `package a
 

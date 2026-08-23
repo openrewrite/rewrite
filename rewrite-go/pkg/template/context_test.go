@@ -62,9 +62,8 @@ func TestContextLeavesAStatementPatternOnTheRightNode(t *testing.T) {
 	require.Equal(t, "Ready", call.MethodType.Name)
 }
 
-// Context is arbitrary Go, so the target is found by name rather than by
-// counting what precedes it: a comment line declares nothing, an unindented
-// body line is not a declaration, and two declarations can share a line.
+// A comment declares nothing, an unindented body line is not a declaration,
+// and two declarations can share a line.
 func TestContextTakesAnyShapeOfDeclaration(t *testing.T) {
 	for _, decls := range []string{
 		"// a helper\ntype Wrapped struct{ V int }\n\nfunc Wrap(v Wrapped) Wrapped { return v }",
@@ -78,7 +77,6 @@ func TestContextTakesAnyShapeOfDeclaration(t *testing.T) {
 	}
 }
 
-// The same for a top-level pattern, whose target is whatever comes last.
 func TestContextLeavesATopLevelPatternOnTheRightNode(t *testing.T) {
 	pat := template.TopLevel("func Use() { Wrap(Wrapped{}) }").Context(wrapDecls).Build()
 	call := patternCall(t, pat)
@@ -86,8 +84,7 @@ func TestContextLeavesATopLevelPatternOnTheRightNode(t *testing.T) {
 	require.Equal(t, "Wrap", call.MethodType.Name)
 }
 
-// A template names captures the match is expected to bind. Left unbound, the
-// placeholder identifier would print as source, so there is no result.
+// An unsubstituted placeholder would print as source.
 func TestApplyRefusesAnUnboundCapture(t *testing.T) {
 	missing := template.Expr("missing")
 	tmpl := template.ExpressionTemplate(fmt.Sprintf("f(%s)", missing)).Captures(missing).Build()
@@ -99,8 +96,7 @@ func TestApplyRefusesAnUnboundCapture(t *testing.T) {
 	require.NotNil(t, tmpl.Apply(nil, bound))
 }
 
-// Applying twice yields two trees sharing no node, so a later edit to one
-// leaves the other and the cached template alone.
+// An edit to one application must leave the other and the cache alone.
 func TestApplyYieldsIndependentTrees(t *testing.T) {
 	tmpl := template.TopLevelTemplate("func F[T any](a *T, m map[string]int, c chan int) error {\n" +
 		"\ttype S struct{ X int `json:\"x\"` }\n" +
@@ -131,8 +127,7 @@ func TestApplyIgnoresACaptureItDoesNotUse(t *testing.T) {
 	require.Nil(t, tmpl.Apply(nil, template.NewMatchResult()))
 }
 
-// The scaffold always declares something, so a target is absent only when
-// the template code itself declares nothing.
+// The scaffold always declares something of its own.
 func TestTopLevelPatternNeedsADeclaration(t *testing.T) {
 	_, err := template.TopLevel("").Captures(template.Expr("x")).Build().TreeOrError()
 	require.Error(t, err)

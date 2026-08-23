@@ -60,8 +60,7 @@ func TestScaffoldWithCaptures(t *testing.T) {
 	require.NoErrorf(t, err, "scaffold with captures should parse: %v\nsource:\n%s", err, source)
 }
 
-// A statement scaffold declares its captures inside the wrapper function, so
-// the count says how far into the body the target sits.
+// The count says how far into __f__'s body the target sits.
 func TestStatementScaffoldCountsItsPreamble(t *testing.T) {
 	caps := captureMap([]*Capture{Expr("x")})
 	_, count := buildScaffold(fmt.Sprintf("_ = %s", Expr("x")), caps, nil, nil, ScaffoldStatement)

@@ -22,7 +22,6 @@ func f(one, two bytes.Buffer, h H) {
 }
 `
 
-// A capture in the receiver binds what the receiver was, under every mode.
 func TestReceiverCaptureBinds(t *testing.T) {
 	for _, mode := range allModes {
 		b := template.Expr("b").WithType("bytes.Buffer")
@@ -34,8 +33,7 @@ func TestReceiverCaptureBinds(t *testing.T) {
 	}
 }
 
-// Two receivers of one type are two receivers. Only a package qualifier is
-// interchangeable with another spelling of itself.
+// Only a package qualifier is interchangeable with another spelling of itself.
 func TestOneReceiverIsNotAnother(t *testing.T) {
 	for _, mode := range allModes {
 		pat := template.Expression(`one.WriteString("x")`).
@@ -53,9 +51,7 @@ var allModes = []template.TypeMatchingMode{
 	template.TypeMatchingOff, template.TypeMatchingLenient, template.TypeMatchingStrict,
 }
 
-// The distinctness corpus is capture-free, so it compares the fast path and
-// the walk on structure alone. These carry captures in each position the
-// hand-written comparisons read, and compare what was bound as well.
+// The distinctness corpus is capture-free, so it compares structure alone.
 func TestFastPathAgreesWithWalkOnCaptures(t *testing.T) {
 	for _, mode := range allModes {
 		for _, tc := range []struct {
@@ -105,8 +101,7 @@ func f(x []string) { _ = slices.Clip[[]string](x) }
 	}
 }
 
-// Two variables can share a name and differ in type, which is the one thing
-// an identifier's own name does not already tell apart.
+// Two variables of one name are told apart by the type they hold.
 func TestSameNameDifferentTypeIsNotTheSameVariable(t *testing.T) {
 	cand := firstCall(t, `package a
 
@@ -125,9 +120,7 @@ func g(any) {}
 	require.False(t, pat.Matches(cand, nil), "a bytes.Reader named v is not a bytes.Buffer named v")
 }
 
-// The variadic run is written twice: once over a typed list for the
-// hand-written comparisons, once over a reflected one for the walk. Nothing
-// in the capture-free corpus reaches either, so the two are compared here.
+// Nothing in the capture-free corpus reaches either variadic implementation.
 func TestFastPathAgreesWithWalkOnVariadicRuns(t *testing.T) {
 	src := `package a
 

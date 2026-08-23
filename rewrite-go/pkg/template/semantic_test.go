@@ -45,8 +45,7 @@ func TestParenthesesDoNotChangeWhatAnExpressionIs(t *testing.T) {
 	}
 }
 
-// The tree says how an expression groups, so reading through parentheses
-// leaves two different groupings different.
+// The tree says how an expression groups, so two groupings stay different.
 func TestParenthesesStillRecordPrecedence(t *testing.T) {
 	require.False(t, matchesExpr(t, "(a + b) * c", "a + b*c"))
 	require.False(t, matchesExpr(t, "a + b*c", "(a + b) * c"))
@@ -73,8 +72,7 @@ func TestALiteralOfAnotherKindIsAnotherLiteral(t *testing.T) {
 	require.False(t, matchesExpr(t, `"x"`, `"y"`))
 }
 
-// A capture takes what it found, so the replacement keeps the parentheses the
-// source was written with.
+// The replacement keeps the parentheses the source has.
 func TestACaptureBindsWhatTheSourceWrote(t *testing.T) {
 	x := template.Expr("x")
 	pat := template.Expression(fmt.Sprintf("f(%s)", x)).Captures(x).Build()
@@ -84,8 +82,6 @@ func TestACaptureBindsWhatTheSourceWrote(t *testing.T) {
 	require.True(t, parenthesized, "got %T", match.Get("x"))
 }
 
-// A capture written twice holds the two to the same expression, which reads
-// through parentheses and literal spelling like any other comparison.
 func TestARepeatedCaptureComparesSemantically(t *testing.T) {
 	x := template.Expr("x")
 	pat := template.Expression(fmt.Sprintf("%s + %s", x, x)).Captures(x).Build()

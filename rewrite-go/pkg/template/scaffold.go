@@ -64,10 +64,6 @@ func buildPreamble(captures map[string]*Capture) string {
 // buildScaffold wraps the template code in a compilable Go source so that
 // go/parser can parse it, and reports how many statements precede the target
 // inside the wrapper function.
-//
-// At the top level the target comes first, Go resolving a name declared after
-// its use. A function body resolves no such name, so a statement scaffold
-// declares its captures ahead of the code and counts them.
 func buildScaffold(code string, captures map[string]*Capture, imports []string, context []string, kind ScaffoldKind) (string, int) {
 	preamble := buildPreamble(captures)
 	preambleCount := 0
@@ -104,14 +100,14 @@ func buildScaffold(code string, captures map[string]*Capture, imports []string, 
 		}
 		return fmt.Sprintf("package __tmpl__\n%s\n%sfunc __f__() {\n%s\n}\n", importBlock, contextBlock, body), preambleCount
 	case ScaffoldTopLevel:
+		// The target leads, Go resolving a name declared after its use.
 		return fmt.Sprintf("package __tmpl__\n%s\n%s\n%s\n", importBlock, code, trailing), 0
 	default:
 		panic(fmt.Sprintf("unknown scaffold kind: %d", kind))
 	}
 }
 
-// parseScaffold parses the scaffold source and extracts the target node,
-// skipping the package declaration, imports, and preamble variables.
+// parseScaffold parses the scaffold source and extracts the target node.
 func parseScaffold(code string, captures map[string]*Capture, imports, context []string, kind ScaffoldKind, imp types.Importer) (java.J, error) {
 	source, precedingCount := buildScaffold(code, captures, imports, context, kind)
 
@@ -149,9 +145,8 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preceding int)
 		return nil, fmt.Errorf("expression scaffold: could not find __v__ declaration")
 
 	case ScaffoldStatement:
-		// Statements: [func __f__() { preamble...; <target> }]
-		// The func is the first (and only) top-level statement after preamble decls.
-		// Find the function declaration.
+		// The target sits in __f__'s body, behind the captures the preamble
+		// declares there.
 		for _, stmt := range stmts {
 			md, ok := stmt.Element.(*java.MethodDeclaration)
 			if !ok {

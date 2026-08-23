@@ -240,8 +240,7 @@ func TestMatcherDistinctness(t *testing.T) {
 	}
 }
 
-// The go.mod and go.sum nodes a pattern can never meet, a pattern being
-// parsed from Go source and that yielding neither.
+// A pattern is parsed from Go source, which has no go.mod or go.sum in it.
 func TestMatcherUnreachableKinds(t *testing.T) {
 	found := map[string]bool{}
 	for _, f := range auditFixtures() {
@@ -257,9 +256,6 @@ func TestMatcherUnreachableKinds(t *testing.T) {
 	require.Empty(t, found, "go.mod and go.sum nodes are not reachable from Go source")
 }
 
-// TestFastPathAgreesWithWalk is what makes the hand-written comparisons in
-// fast_path.go safe: the walk reaches every field by construction, so it is
-// the answer they are held to.
 func TestFastPathAgreesWithWalk(t *testing.T) {
 	for _, mode := range []template.TypeMatchingMode{
 		template.TypeMatchingOff, template.TypeMatchingLenient, template.TypeMatchingStrict,
@@ -352,10 +348,7 @@ func exprOf(t *testing.T, code string) java.J {
 	return cu.Statements[0].Element.(*java.VariableDeclarations).Variables[0].Element.Initializer.Element
 }
 
-// A hand-written comparison in fast_path.go reads a fixed set of fields, and
-// the differential test only catches a field a fixture distinguishes. This
-// names the fields each kind holds, so one added to the model fails here
-// rather than going quietly uncompared.
+// TestFastPathAgreesWithWalk only catches a field some fixture distinguishes.
 func TestFastPathKindsHaveTheFieldsItReads(t *testing.T) {
 	for _, want := range []struct {
 		node   java.J
