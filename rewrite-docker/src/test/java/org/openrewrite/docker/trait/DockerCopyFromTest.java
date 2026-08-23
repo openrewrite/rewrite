@@ -145,6 +145,31 @@ class DockerCopyFromTest implements RewriteTest {
     }
 
     @Test
+    void stageNameIsMatchedWithoutRegardToCase() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.isStageReference()).isTrue();
+                assertThat(image.getImageName()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine AS Builder
+              FROM alpine
+              COPY --from=builder /out /app
+              """,
+            """
+              FROM alpine AS Builder
+              FROM alpine
+              ~~>COPY --from=builder /out /app
+              """
+          )
+        );
+    }
+
+    @Test
     void identifiesStageReferenceByNumericIndex() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
