@@ -134,8 +134,6 @@ workdirInstruction
     : WORKDIR path
     ;
 
-// As `envPairs`, a list of names each with an optional default. A name written apart from its `=`
-// declares a name of its own, which leaves an empty one for Docker to fail the build on.
 argInstruction
     : ARG argPair+
     ;
@@ -366,10 +364,7 @@ argName
     : UNQUOTED_TEXT
     ;
 
-// A default ends at the next whitespace, where the value of an `ENV` or a `LABEL` takes the rest of the
-// line: `ARG a=hello world` gives `a` the default `hello` and declares `world` besides. `quoted` leads
-// rather than standing as an alternative of its own, as it does in `text`, because a quote style belongs
-// only to a default that is nothing but a quoted string, which is not known before the run has been read.
+// A default ends at the next whitespace, where an `ENV` or `LABEL` value takes the rest of the line.
 argValue
     : ( quoted | textElement ) ( {bound()}? textElement )*
     ;
