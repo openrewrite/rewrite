@@ -417,6 +417,57 @@ name, and assert on its attributed type. Throw `AssertionError` with a
 descriptive message on mismatch — drop them straight into an
 `afterRecipe(cu -> ...)` lambda.
 
+## Typed captures
+
+`Capture.WithType` declares the Go type a capture stands for. The
+scaffold declares the placeholder with it, so the pattern type-checks,
+and the match binds only a subtree whose attributed type is assignable
+to it:
+
+```go
+e := template.Expr("e").WithType("error")
+pat := template.Expression(fmt.Sprintf("%s == nil", e)).Captures(e).Build()
+```
+
+That matches `err == nil` and refuses `s == nil` where `s` is a
+`*string`. Assignability follows Go's rule as far as the attributed model
+records it, so an interface is satisfied by a type carrying its methods:
+a concrete `*MyErr` answers to `error` the way `io.EOF` does. `errors.Is`
+takes two `error` arguments, so this is the guard that makes
+`err == io.EOF` → `errors.Is(err, io.EOF)` a rewrite a pattern can state
+safely.
+
+Three rules bound it:
+
+- **A declared type is read whatever `TypeMatching` says.** The mode
+  governs the type slots a pattern did not ask about; this is one it did.
+- **A candidate the parser could not attribute is the mode's decision.**
+  `TypeMatchingLenient` binds it; the other two refuse. A template parsed
+  alone attributes only the stdlib (see "Module context for type
+  attribution"), so a typed capture against an unattributed tree no-ops
+  by default — `GoPattern.Explain` counts what it refused for want of
+  attribution, which tells that apart from source that differs.
+- **Only an expression carries a type.** `WithType` on a `Stmt`, `Ident`
+  or `TypeExpr` capture panics, and a type name the pattern uses but
+  cannot resolve fails the parse rather than constraining nothing. Name
+  it through `Imports`, `Context` or `ExportData`.
+
+Four limits come from what the model carries, all of them worth knowing
+before a recipe leans on a typed capture as a safety guard:
+
+- **A method promoted from an embedded field is not in the embedding
+  type's method set** (`named.NumMethods` is what a type declares). So
+  `struct{ Inner }` does not answer to an interface `Inner` satisfies,
+  and the capture under-matches.
+- **`*T` and `T` are one attributed type.** A capture declared `error`
+  binds a `MyErr{}` whose `Error()` has a pointer receiver, which Go
+  would reject — the one direction in which the guard over-matches.
+- **A variadic `...T` parameter is recorded as `[]T`** with no flag to
+  tell the two apart, so an interface method that is variadic is
+  satisfied by one taking a slice.
+- **A type that export data names but does not describe carries no
+  method set**, so it satisfies an interface only by being it.
+
 ## Variadic captures
 
 A capture marked `Variadic(min, max)` stands for a run of list elements

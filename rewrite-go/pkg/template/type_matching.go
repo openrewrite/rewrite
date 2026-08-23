@@ -27,8 +27,9 @@ import (
 type TypeMatchingMode int
 
 const (
-	// TypeMatchingOff leaves type slots unread, which is what a pattern
-	// written without attribution in mind expects.
+	// TypeMatchingOff leaves unread every type slot but the one a capture
+	// declared, which is what a pattern written without attribution in mind
+	// expects.
 	TypeMatchingOff TypeMatchingMode = iota
 
 	// TypeMatchingLenient compares two attributions and accepts one that is
@@ -56,7 +57,7 @@ func compareTypes(a, b java.JavaType, mode TypeMatchingMode) (bool, bool) {
 	// of them agree when the classes overlap. matcher.IsSameGoType answers
 	// false for a keyword by design and cannot serve here.
 	if isPrimitive(a) && isPrimitive(b) {
-		return sharesGoTypeName(a, b), true
+		return matcher.SharesGoTypeName(a, b), true
 	}
 	if ma, mb := matcher.AsMethod(a), matcher.AsMethod(b); ma != nil && mb != nil {
 		return compareMethodTypes(ma, mb, mode)
@@ -77,17 +78,6 @@ func compareTypes(a, b java.JavaType, mode TypeMatchingMode) (bool, bool) {
 func isPrimitive(t java.JavaType) bool {
 	_, ok := t.(*java.JavaTypePrimitive)
 	return ok
-}
-
-func sharesGoTypeName(a, b java.JavaType) bool {
-	for _, name := range matcher.GoTypeNames(a) {
-		for _, other := range matcher.GoTypeNames(b) {
-			if name != "" && name == other {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // A variable is the name it was declared with and the type it holds. Its

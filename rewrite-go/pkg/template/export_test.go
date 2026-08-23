@@ -31,7 +31,7 @@ func (p *GoPattern) MatchesViaWalk(candidate java.J, cursor *visitor.Cursor) boo
 	if err != nil || tree == nil {
 		return false
 	}
-	cmp := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
+	cmp := p.comparator(cursor)
 	cmp.skipFastPath = true
 	return cmp.match(tree, candidate) != nil
 }
@@ -51,7 +51,7 @@ func (p *GoPattern) MatchViaWalk(candidate java.J, cursor *visitor.Cursor) *Matc
 	if err != nil || tree == nil {
 		return nil
 	}
-	cmp := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
+	cmp := p.comparator(cursor)
 	cmp.skipFastPath = true
 	return cmp.match(tree, candidate)
 }
