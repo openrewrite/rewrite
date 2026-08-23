@@ -32,7 +32,7 @@ class FindStageGraphTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void recordTheStageGraphAndMarkTheStagesTheFileNeverReaches() {
+    void recordTheStageGraph() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
@@ -49,16 +49,6 @@ class FindStageGraphTest implements RewriteTest {
               RUN mvn package
 
               FROM golang:1.22 AS tools
-              RUN go build ./cmd/lint
-
-              FROM eclipse-temurin:21-jre
-              RUN echo done
-              """,
-            """
-              ~~(unreached)~~>FROM maven:3.9 AS build
-              RUN mvn package
-
-              ~~(unreached)~~>FROM golang:1.22 AS tools
               RUN go build ./cmd/lint
 
               FROM eclipse-temurin:21-jre
@@ -146,7 +136,7 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
-    void reportEveryStageAsNeededWhenAReferenceNamesAPosition() {
+    void aReferenceNamingAPositionResolvesToNothing() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
@@ -173,7 +163,7 @@ class FindStageGraphTest implements RewriteTest {
     }
 
     @Test
-    void reportEveryStageAsReachedWhenABuildArgumentSpellsAReference() {
+    void aReferenceABuildArgumentSpellsResolvesToNothing() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
             //language=csv
@@ -192,38 +182,6 @@ class FindStageGraphTest implements RewriteTest {
 
               FROM alpine
               COPY --from=$BUILDER /app /app
-              """
-          )
-        );
-    }
-
-    @Test
-    void readOnlyTheDockerfile() {
-        rewriteRun(
-          spec -> spec.dataTableAsCsv(StageDependencies.class.getName(),
-            //language=csv
-            """
-              sourceFile,stageName,stageIndex,baseImage,registry,referencedBy
-              Dockerfile,lint,0,golangci/golangci-lint,docker.io,
-              Dockerfile,,1,alpine,docker.io,
-              """
-          ),
-          docker(
-            """
-              # Build with: docker build --target lint .
-              FROM golangci/golangci-lint AS lint
-              RUN golangci-lint run
-
-              FROM alpine
-              RUN echo done
-              """,
-            """
-              # Build with: docker build --target lint .
-              ~~(unreached)~~>FROM golangci/golangci-lint AS lint
-              RUN golangci-lint run
-
-              FROM alpine
-              RUN echo done
               """
           )
         );

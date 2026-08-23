@@ -26,16 +26,9 @@ import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.table.StageDependencies;
 import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.docker.tree.Space;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.marker.SearchResult;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
-
-import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -45,14 +38,12 @@ public class FindStageGraph extends Recipe {
 
     final String displayName = "Find Docker build stage dependencies";
 
-    final String description = "Record which build stages of a multi-stage Dockerfile depend on which others, and mark the stages " +
-            "the file never reaches. A stage is reached when it is the last stage of the file, or when a stage that is " +
-            "itself reached names it in a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag. Where a reference " +
-            "cannot be resolved without guessing, either because a build argument spells it (`COPY --from=$BUILDER`) or " +
-            "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), every stage in " +
-            "that file is reported as reached. Only the Dockerfile is read, so a stage that exists to be built on its " +
-            "own with `docker build --target` is reported as unreached: this says what the file builds, not what a " +
-            "repository asks for.";
+    final String description = "Record which build stages of a multi-stage Dockerfile depend on which others, one row " +
+            "per stage: what its `FROM` names, the registry that image is pulled from, and the stages that name it in " +
+            "a `FROM`, a `COPY --from`, or a `RUN --mount=...,from=` flag. Only the Dockerfile is read. A reference " +
+            "that cannot be resolved without guessing, because a build argument spells it (`COPY --from=$BUILDER`) or " +
+            "because it names a stage by a position that moves when stages are removed (`COPY --from=0`), is recorded " +
+            "as no reference at all.";
 
     private static final String SCRATCH = "scratch";
 
@@ -62,22 +53,20 @@ public class FindStageGraph extends Recipe {
             @Override
             public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
                 StageGraph graph = StageGraph.of(file);
-                Set<Integer> reachable = graph.reachable();
-
                 String sourceFile = file.getSourcePath().toString();
-                return file.withStages(ListUtils.map(file.getStages(), (i, stage) -> {
-                    boolean reached = reachable.contains(i);
+                List<Docker.Stage> stages = file.getStages();
+                for (int i = 0; i < stages.size(); i++) {
+                    Docker.From from = stages.get(i).getFrom();
                     stageDependencies.insertRow(ctx, new StageDependencies.Row(
                             sourceFile,
                             graph.getName(i),
                             i,
-                            baseImage(stage.getFrom()),
-                            graph.extendsStage(i) ? null : registry(stage.getFrom()),
+                            baseImage(from),
+                            graph.extendsStage(i) ? null : registry(from),
                             graph.getReferencedBy(i)
                     ));
-                    return reached ? stage :
-                            stage.withFrom(SearchResult.found(stage.getFrom(), "unreached"));
-                }));
+                }
+                return file;
             }
         };
     }
@@ -108,25 +97,18 @@ public class FindStageGraph extends Recipe {
     }
 
     /**
-     * Which build stages of a Dockerfile reach which other stages, and which of them the image being built
-     * actually needs. A reference nothing can resolve without guessing leaves the graph ambiguous, and every
-     * stage is then reported as reached rather than risk calling a used stage unused.
+     * Which build stages of a Dockerfile name which other stages.
      */
     private static class StageGraph {
-
-        /// A `\\` or `` ` `` that ends a line is whitespace to a Dockerfile, so it stands where only formatting belongs.
-        private static final Pattern LINE_CONTINUATION = Pattern.compile("[\\\\`][ \\t]*(?=\\r?\\n)");
 
         private final List<@Nullable String> names;
         private final List<Set<Integer>> references;
         private final boolean[] extendsStage;
-        private final boolean ambiguous;
 
-        private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, boolean[] extendsStage, boolean ambiguous) {
+        private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, boolean[] extendsStage) {
             this.names = names;
             this.references = references;
             this.extendsStage = extendsStage;
-            this.ambiguous = ambiguous;
         }
 
         static StageGraph of(Docker.File file) {
@@ -139,33 +121,13 @@ public class FindStageGraph extends Recipe {
 
             List<Set<Integer>> references = new ArrayList<>(stages.size());
             boolean[] extendsStage = new boolean[stages.size()];
-            boolean ambiguous = !isFullyParsed(file);
             for (int i = 0; i < stages.size(); i++) {
                 ReferenceCollector collector = new ReferenceCollector(names, i);
                 collector.visit(stages.get(i), 0);
                 references.add(collector.targets);
                 extendsStage[i] = collector.extendsStage;
-                ambiguous |= collector.ambiguous;
             }
-            return new StageGraph(names, references, extendsStage, ambiguous);
-        }
-
-        /// The tree is built from source offsets, so a token the error recovery dropped reappears as the whitespace
-        /// before whatever came next, and the instruction it held is absent from the graph.
-        private static boolean isFullyParsed(Docker.File file) {
-            return new DockerIsoVisitor<AtomicBoolean>() {
-                @Override
-                public Space visitSpace(Space space, AtomicBoolean parsed) {
-                    String whitespace = space.getWhitespace();
-                    if (whitespace.indexOf('\\') >= 0 || whitespace.indexOf('`') >= 0) {
-                        whitespace = LINE_CONTINUATION.matcher(whitespace).replaceAll("");
-                    }
-                    if (!whitespace.trim().isEmpty()) {
-                        parsed.set(false);
-                    }
-                    return super.visitSpace(space, parsed);
-                }
-            }.reduce(file, new AtomicBoolean(true)).get();
+            return new StageGraph(names, references, extendsStage);
         }
 
         @Nullable String getName(int stage) {
@@ -188,38 +150,11 @@ public class FindStageGraph extends Recipe {
             return referrers.toString();
         }
 
-        /// The stages the image the file ends with is built from, so the last stage and everything it names, directly
-        /// or through another stage it names.
-        Set<Integer> reachable() {
-            if (ambiguous) {
-                Set<Integer> all = new LinkedHashSet<>();
-                for (int i = 0; i < names.size(); i++) {
-                    all.add(i);
-                }
-                return all;
-            }
-            return names.isEmpty() ? emptySet() : reachableFrom(names.size() - 1);
-        }
-
-        private Set<Integer> reachableFrom(int root) {
-            Set<Integer> reached = new LinkedHashSet<>();
-            Deque<Integer> worklist = new ArrayDeque<>();
-            worklist.add(root);
-            while (!worklist.isEmpty()) {
-                Integer stage = worklist.remove();
-                if (reached.add(stage)) {
-                    worklist.addAll(references.get(stage));
-                }
-            }
-            return reached;
-        }
-
         private static class ReferenceCollector extends DockerIsoVisitor<Integer> {
             private final List<@Nullable String> names;
             private final int stage;
 
             final Set<Integer> targets = new LinkedHashSet<>();
-            boolean ambiguous;
             boolean extendsStage;
 
             ReferenceCollector(List<@Nullable String> names, int stage) {
@@ -233,8 +168,6 @@ public class FindStageGraph extends Recipe {
                     String plain = ArgumentContents.text(from.getImageName());
                     if (plain != null) {
                         extendsStage = reference(plain, stage);
-                    } else if (!ArgumentContents.textWithVariables(from.getImageName()).contains("/")) {
-                        ambiguous = true;
                     }
                 }
                 return super.visitFrom(from, p);
@@ -261,10 +194,10 @@ public class FindStageGraph extends Recipe {
 
             /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole file is read,
             /// so it reaches later stages too; hence `limit`. Searching backwards leaves a duplicated name at its last
-            /// declaration, as it is for Docker.
+            /// declaration, as it is for Docker. A name a build argument spells, or a position rather than a name,
+            /// resolves to nothing rather than to a guess.
             private boolean reference(String value, int limit) {
                 if (value.indexOf('$') >= 0 || StringUtils.isNumeric(value)) {
-                    ambiguous = true;
                     return false;
                 }
                 for (int i = limit - 1; i >= 0; i--) {
