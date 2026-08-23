@@ -73,8 +73,7 @@ public class FindStageGraph extends Recipe {
                             i,
                             baseImage(stage.getFrom()),
                             graph.extendsStage(i) ? null : registry(stage.getFrom()),
-                            graph.getReferencedBy(i),
-                            reached
+                            graph.getReferencedBy(i)
                     ));
                     return reached ? stage :
                             stage.withFrom(SearchResult.found(stage.getFrom(), "unreached"));

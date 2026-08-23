@@ -59,14 +59,5 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
         @Column(displayName = "Referenced by",
                 description = "The stages that name this one, comma separated, by stage name where they have one and otherwise by `#index`.")
         String referencedBy;
-
-        @Column(displayName = "Reachable",
-                description = "Whether the image the file ends with is built from this stage, directly or through " +
-                              "another stage. A stage in a file holding a reference that cannot be resolved, such as " +
-                              "`COPY --from=$BUILDER` or `COPY --from=0`, is reported as reachable because nothing " +
-                              "about that file can be concluded. A stage meant to be built on its own with " +
-                              "`docker build --target` is reported as unreachable, since the Dockerfile does not say " +
-                              "that anything asks for it.")
-        boolean reachable;
     }
 }
