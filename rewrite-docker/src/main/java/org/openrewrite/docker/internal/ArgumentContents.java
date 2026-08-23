@@ -194,8 +194,12 @@ public class ArgumentContents {
     /// @return As [#text], but rendering environment variable references in their original
     /// `$VAR` or `${VAR}` form rather than giving up.
     public static String textWithVariables(Docker.Argument argument) {
+        return textWithVariables(argument.getContents());
+    }
+
+    public static String textWithVariables(List<Docker.ArgumentContent> contents) {
         StringBuilder text = new StringBuilder();
-        for (Docker.ArgumentContent content : argument.getContents()) {
+        for (Docker.ArgumentContent content : contents) {
             if (content instanceof Docker.Literal) {
                 text.append(((Docker.Literal) content).getText());
             } else if (content instanceof Docker.EnvironmentVariable) {

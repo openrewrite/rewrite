@@ -173,13 +173,39 @@ public class FindStageGraph extends Recipe {
                 if ("from".equals(flag.getName())) {
                     reference(ArgumentContents.textWithVariables(value), limit);
                 } else if ("mount".equals(flag.getName())) {
-                    for (String field : ArgumentContents.textWithVariables(value).split(",")) {
-                        if (field.regionMatches(true, 0, "from=", 0, "from=".length())) {
-                            reference(field.substring("from=".length()), limit);
-                        }
+                    String from = option(value.getContents(), "from");
+                    if (from != null) {
+                        reference(from, limit);
                     }
                 }
                 return super.visitFlag(flag, p);
+            }
+
+            /// The value of one option of a flag holding a list of them, as a `RUN --mount` does. The `,` between two
+            /// options and the `=` binding a key to its value are contents of their own, so the value is the run of
+            /// contents up to the next `,`, and a `,` within quotes is a literal that does not end it.
+            private static @Nullable String option(List<Docker.ArgumentContent> contents, String key) {
+                for (int i = 0; i < contents.size(); i++) {
+                    if ((i == 0 || separator(contents.get(i - 1), ',')) && key(contents.get(i), key) &&
+                            i + 1 < contents.size() && separator(contents.get(i + 1), '=')) {
+                        int end = i + 2;
+                        while (end < contents.size() && !separator(contents.get(end), ',')) {
+                            end++;
+                        }
+                        return ArgumentContents.textWithVariables(contents.subList(i + 2, end));
+                    }
+                }
+                return null;
+            }
+
+            private static boolean separator(Docker.ArgumentContent content, char c) {
+                return content instanceof Docker.Literal &&
+                        ((Docker.Literal) content).getQuoteStyle() == null &&
+                        String.valueOf(c).equals(((Docker.Literal) content).getText());
+            }
+
+            private static boolean key(Docker.ArgumentContent content, String key) {
+                return content instanceof Docker.Literal && key.equalsIgnoreCase(((Docker.Literal) content).getText());
             }
 
             /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole file is read,
