@@ -62,19 +62,17 @@ func buildPreamble(captures map[string]*Capture) string {
 }
 
 // buildScaffold wraps the template code in a compilable Go source so that
-// go/parser can parse it. Returns the full source and the number of preamble
-// statements inside the wrapper function, which only a statement scaffold
-// has; the other kinds find their target by name or position.
+// go/parser can parse it, and reports how many statements precede the target
+// inside the wrapper function.
+//
+// At the top level the target comes first, Go resolving a name declared after
+// its use. A function body resolves no such name, so a statement scaffold
+// declares its captures ahead of the code and counts them.
 func buildScaffold(code string, captures map[string]*Capture, imports []string, context []string, kind ScaffoldKind) (string, int) {
 	preamble := buildPreamble(captures)
 	preambleCount := 0
 	if preamble != "" {
 		preambleCount = strings.Count(preamble, "\n") + 1
-	}
-
-	contextBlock := strings.Join(context, "\n")
-	if contextBlock != "" {
-		contextBlock += "\n"
 	}
 
 	var importBlock string
@@ -86,28 +84,27 @@ func buildScaffold(code string, captures map[string]*Capture, imports []string, 
 		importBlock = "import (\n" + strings.Join(importLines, "\n") + "\n)\n"
 	}
 
+	// A declaration between the target and what follows it marks where the
+	// template code ends, so code declaring nothing is told apart from code
+	// whose declaration is the context's first.
+	trailing := strings.Join(append([]string{scaffoldEnd}, append(append([]string{}, context...), preamble)...), "\n")
+
 	switch kind {
 	case ScaffoldExpression:
-		body := contextBlock
-		if preamble != "" {
-			body += preamble + "\n"
-		}
-		body += "var __v__ = " + code
-		return fmt.Sprintf("package __tmpl__\n%s\n%s\n", importBlock, body), 0
+		return fmt.Sprintf("package __tmpl__\n%s\nvar __v__ = %s\n%s\n", importBlock, code, trailing), 0
 	case ScaffoldStatement:
 		body := ""
 		if preamble != "" {
 			body = preamble + "\n"
 		}
 		body += code
+		contextBlock := strings.Join(context, "\n")
+		if contextBlock != "" {
+			contextBlock += "\n"
+		}
 		return fmt.Sprintf("package __tmpl__\n%s\n%sfunc __f__() {\n%s\n}\n", importBlock, contextBlock, body), preambleCount
 	case ScaffoldTopLevel:
-		body := contextBlock
-		if preamble != "" {
-			body += preamble + "\n"
-		}
-		body += code
-		return fmt.Sprintf("package __tmpl__\n%s\n%s\n", importBlock, body), 0
+		return fmt.Sprintf("package __tmpl__\n%s\n%s\n%s\n", importBlock, code, trailing), 0
 	default:
 		panic(fmt.Sprintf("unknown scaffold kind: %d", kind))
 	}
@@ -116,7 +113,7 @@ func buildScaffold(code string, captures map[string]*Capture, imports []string, 
 // parseScaffold parses the scaffold source and extracts the target node,
 // skipping the package declaration, imports, and preamble variables.
 func parseScaffold(code string, captures map[string]*Capture, imports, context []string, kind ScaffoldKind, imp types.Importer) (java.J, error) {
-	source, bodyCount := buildScaffold(code, captures, imports, context, kind)
+	source, precedingCount := buildScaffold(code, captures, imports, context, kind)
 
 	p := parser.NewGoParser()
 	if imp != nil {
@@ -127,11 +124,11 @@ func parseScaffold(code string, captures map[string]*Capture, imports, context [
 		return nil, fmt.Errorf("template parse error: %w\nsource:\n%s", err, source)
 	}
 
-	return extractTarget(cu, kind, bodyCount)
+	return extractTarget(cu, kind, precedingCount)
 }
 
 // extractTarget navigates the parsed CompilationUnit to find the template node.
-func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, bodyCount int) (java.J, error) {
+func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preceding int) (java.J, error) {
 	stmts := cu.Statements
 
 	switch kind {
@@ -164,7 +161,7 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, bodyCount int)
 				continue
 			}
 			bodyStmts := md.Body.Statements
-			targetIdx := bodyCount
+			targetIdx := preceding
 			if targetIdx >= len(bodyStmts) {
 				return nil, fmt.Errorf("statement scaffold: expected body statement at index %d, got %d", targetIdx, len(bodyStmts))
 			}
@@ -173,14 +170,20 @@ func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, bodyCount int)
 		return nil, fmt.Errorf("statement scaffold: could not find __f__ function")
 
 	case ScaffoldTopLevel:
-		// The target is appended after any context and preamble, so it is
-		// whatever the scaffold declares last.
-		if len(stmts) == 0 {
-			return nil, fmt.Errorf("top-level scaffold: no statements")
+		if len(stmts) == 0 || declaresScaffoldEnd(stmts[0].Element) {
+			return nil, fmt.Errorf("top-level scaffold: no declaration in the template code")
 		}
-		return stmts[len(stmts)-1].Element, nil
+		return stmts[0].Element, nil
 
 	default:
 		return nil, fmt.Errorf("unknown scaffold kind: %d", kind)
 	}
+}
+
+// scaffoldEnd is the declaration the scaffold writes after the template code.
+const scaffoldEnd = "type __end__ = int"
+
+func declaresScaffoldEnd(stmt java.J) bool {
+	decl, ok := stmt.(*golang.TypeDecl)
+	return ok && decl.Name != nil && decl.Name.Name == "__end__"
 }

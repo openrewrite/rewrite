@@ -24,6 +24,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 const wrapDecls = `type Wrapped struct{ V int }
@@ -101,11 +102,17 @@ func TestApplyRefusesAnUnboundCapture(t *testing.T) {
 // Applying twice yields two trees sharing no node, so a later edit to one
 // leaves the other and the cached template alone.
 func TestApplyYieldsIndependentTrees(t *testing.T) {
-	tmpl := template.ExpressionTemplate("f(1)").Build()
+	tmpl := template.TopLevelTemplate("func F[T any](a *T, m map[string]int, c chan int) error {\n" +
+		"\ttype S struct{ X int `json:\"x\"` }\n" +
+		"\tconst (\n\t\tA = 1\n\t)\n" +
+		"\tgo func() { _ = a }()\n" +
+		"\tselect {\n\tcase <-c:\n\t}\n" +
+		"\treturn nil\n}").Build()
 	first, second := tmpl.Apply(nil, nil), tmpl.Apply(nil, nil)
 	require.NotNil(t, first)
 	require.NotNil(t, second)
 
+	require.Greater(t, len(template.NodeIDs(first)), 40, "the template should exercise many node kinds")
 	ids := map[string]bool{}
 	for _, id := range template.NodeIDs(first) {
 		ids[id] = true
@@ -113,4 +120,28 @@ func TestApplyYieldsIndependentTrees(t *testing.T) {
 	for _, id := range template.NodeIDs(second) {
 		require.False(t, ids[id], "the two applications share node %s", id)
 	}
+}
+
+func TestApplyIgnoresACaptureItDoesNotUse(t *testing.T) {
+	used, unused := template.Expr("used"), template.Expr("unused")
+	tmpl := template.ExpressionTemplate(fmt.Sprintf("f(%s)", used)).Captures(used, unused).Build()
+
+	bound := template.NewMatchResult().Bind(used, template.Expression("42").Build().Tree(t))
+	require.NotNil(t, tmpl.Apply(nil, bound))
+	require.Nil(t, tmpl.Apply(nil, template.NewMatchResult()))
+}
+
+// The scaffold always declares something, so a target is absent only when
+// the template code itself declares nothing.
+func TestTopLevelPatternNeedsADeclaration(t *testing.T) {
+	_, err := template.TopLevel("").Captures(template.Expr("x")).Build().TreeOrError()
+	require.Error(t, err)
+}
+
+func TestTopLevelPatternTakesTheFirstDeclaration(t *testing.T) {
+	tree, err := template.TopLevel("func F() {}\n\nfunc G() {}").Build().TreeOrError()
+	require.NoError(t, err)
+	md, ok := tree.(*java.MethodDeclaration)
+	require.True(t, ok, "got %T", tree)
+	require.Equal(t, "F", md.Name.Name)
 }

@@ -61,6 +61,11 @@ func compareTypes(a, b java.JavaType, mode TypeMatchingMode) (bool, bool) {
 	if ma, mb := matcher.AsMethod(a), matcher.AsMethod(b); ma != nil && mb != nil {
 		return compareMethodTypes(ma, mb, mode)
 	}
+	if va, ok := a.(*java.JavaTypeVariable); ok {
+		if vb, ok := b.(*java.JavaTypeVariable); ok {
+			return compareVariableTypes(va, vb, mode)
+		}
+	}
 
 	fa, fb := matcher.GetFullyQualifiedName(a), matcher.GetFullyQualifiedName(b)
 	if fa == "" || fb == "" {
@@ -83,6 +88,16 @@ func sharesGoTypeName(a, b java.JavaType) bool {
 		}
 	}
 	return false
+}
+
+// A variable is the name it was declared with and the type it holds. Its
+// owner is not compared: a pattern declares its variables in a package of its
+// own, and would otherwise answer to no source at all.
+func compareVariableTypes(a, b *java.JavaTypeVariable, mode TypeMatchingMode) (bool, bool) {
+	if a.Name != b.Name {
+		return false, true
+	}
+	return compareTypes(a.Type, b.Type, mode)
 }
 
 func compareMethodTypes(a, b *java.JavaTypeMethod, mode TypeMatchingMode) (bool, bool) {
@@ -108,6 +123,9 @@ func (c *patternComparator) matchByDeclaringType(pattern, candidate *java.Method
 	}
 	if matcher.DeclaringTypeFQN(pattern) != matcher.DeclaringTypeFQN(candidate) ||
 		pattern.MethodType.Name != candidate.MethodType.Name {
+		return false, true
+	}
+	if !c.matchContainer(pattern.TypeParameters, candidate.TypeParameters) {
 		return false, true
 	}
 	return matchList(c, pattern.Arguments.Elements, candidate.Arguments.Elements), true

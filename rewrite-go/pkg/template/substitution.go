@@ -45,6 +45,9 @@ func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) jav
 	if val == nil {
 		return v.GoVisitor.VisitIdentifier(ident, p)
 	}
+	// A bound subtree came from the source and stays there, so what is
+	// spliced is a copy of it.
+	val = withFreshIDs(val)
 
 	// Preserve the placeholder's prefix whitespace on the substituted node.
 	// Use setLeadingPrefix to handle compound nodes where the prefix
@@ -145,7 +148,7 @@ func expandList[T java.J](v *substitutionVisitor, elements []java.RightPadded[T]
 		for i, value := range values {
 			// Returning the list untouched leaves the placeholder
 			// standing, which substitute reads as the failure it is.
-			element, ok := setPrefix(value, sep(i, prefix)).(T)
+			element, ok := setPrefix(withFreshIDs(value), sep(i, prefix)).(T)
 			if !ok {
 				return elements, false
 			}

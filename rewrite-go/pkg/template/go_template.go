@@ -53,16 +53,22 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	}
 
 	// A placeholder left unsubstituted prints as the identifier standing in
-	// for it, which would reach the source file.
-	for _, capture := range t.captures {
+	// for it, which would reach the source file. A capture the template never
+	// names has no placeholder to leave, so it need not be bound: a recipe
+	// declares its captures once and shares them across its alternatives.
+	for name := range placeholdersIn(templateTree) {
+		capture, declared := t.captures[name]
+		if !declared {
+			continue
+		}
 		if values == nil || !values.satisfies(capture) {
 			return nil
 		}
 	}
 
-	// Every node gets a new ID, which copies the whole tree: the result shares
-	// nothing with the cached one, and applying to a second site parses and
-	// type-checks neither the template nor the declarations behind it again.
+	// Giving every node a new ID copies the whole tree, so the result shares
+	// no node with the cached one and two applications share none with each
+	// other. The cache is what the scaffold parse produced, once.
 	fresh := withFreshIDs(templateTree)
 
 	if values != nil {
@@ -87,7 +93,7 @@ func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
 	}
 	// The prefix is the gap the scaffold leaves before the template code,
 	// not whitespace the template itself declares.
-	return setLeadingPrefix(withFreshIDs(instantiated), java.EmptySpace)
+	return setLeadingPrefix(instantiated, java.EmptySpace)
 }
 
 // withFreshIDs returns a copy of j in which every node has a new ID, keeping
@@ -229,4 +235,26 @@ func setLeadingPrefix(j java.J, prefix java.Space) java.J {
 // leading prefix lives directly on the node.
 func getLeadingPrefix(j java.J) java.Space {
 	return j.GetPrefix()
+}
+
+// placeholdersIn names the captures a template tree actually stands in for.
+func placeholdersIn(tree java.J) map[string]bool {
+	v := &placeholderCollector{names: map[string]bool{}}
+	v.Self = v
+	v.Visit(tree, nil)
+	return v.names
+}
+
+type placeholderCollector struct {
+	visitor.GoVisitor
+	names map[string]bool
+}
+
+func (p *placeholderCollector) PreVisit(t java.Tree, _ any) java.Tree {
+	if ident, ok := t.(*java.Identifier); ok {
+		if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
+			p.names[name] = true
+		}
+	}
+	return t
 }

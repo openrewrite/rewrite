@@ -217,10 +217,11 @@ held to, under each matching mode, on what they bind as well as what they
 answer.
 
 Mutating their clauses one at a time, twelve of seventeen fail a test. Of the
-five that do not, two are slots Go source never fills and only the RPC peer
-sends — an identifier's annotations, a call's type parameters — one is the
-method type that the declaring-type comparison settles first, and two are
-type slots on `FieldAccess` and `Binary` that no fixture attributes.
+five that do not: an identifier's annotations are a slot Go source never fills
+and only the RPC peer sends; a call's method type is settled first by the
+declaring-type comparison; an identifier's variable slot is redundant with the
+name and type beside it; and the type slots on `FieldAccess` and `Binary` want
+a fixture the corpus does not attribute.
 
 Generating the comparison per node type from the model would give the same
 speed without the hand-written half. It is the principled successor to both
@@ -228,8 +229,8 @@ the walk and the fast path, and wants its own change: there is no model
 generator in the tree today.
 
 Explicit handling survives ahead of the walk where a node's meaning is not its
-fields: placeholder binding, `java.Literal` (compared by `Source`),
-`java.Empty` (always equal), variadic runs, and the FQN-based
+fields: placeholder binding, `java.Literal` (its source text and its type),
+`java.Empty` (present or not), variadic runs, and the FQN-based
 `java.MethodInvocation` comparison described below.
 
 **Which markers count.** Six decide what the source says and are compared:
@@ -243,8 +244,8 @@ what reaches the output is the wrong test to apply. The rest carry layout —
 or describe the project rather than the file: `GoProject`,
 `GoResolutionResult`.
 
-`TestEveryMarkerIsClassified` reads the marker types back out of the tree
-package and fails on one neither list names, so a marker cannot join the
+`TestEveryMarkerIsClassified` reads the marker types back out of both tree
+packages and fails on one neither list names, so a marker cannot join the
 ignored set unexamined. A `StructTag` reaches a Go-parsed tree only from the
 RPC peer, this parser reading a tag into `LeadingAnnotations` instead; the
 `json:"a"` against `json:"b"` row above is that field, not the marker.
@@ -271,13 +272,21 @@ Comparison mirrors Python's `_compare_types`: two nils are equal, one nil
 defers to the mode, two primitives compare by the intersection of
 `matcher.GoTypeNames` — not `matcher.IsSameGoType`, which answers false for
 literal keywords by design — two method types compare by name and declaring
-type FQN, and anything else compares by `matcher.GetFullyQualifiedName`, with
-an empty FQN on either side deferring to the mode.
+type FQN, two variables by name and the type they hold, and anything else by
+`matcher.GetFullyQualifiedName`, with an empty FQN on either side deferring to
+the mode.
+
+A variable's owner is left out of that comparison on purpose. A pattern
+declares its variables in a package of its own, so comparing owners would
+have a pattern naming a variable answer to no source at all — and, since a
+`JavaTypeVariable` carries no fully qualified name, would report every such
+comparison as an attribution that is missing.
 
 When both sides of a `java.MethodInvocation` resolve **and both receivers name
-a package**, the declaring type FQN and method name are compared and the
-receiver is skipped, so a `fmt.Println` pattern still matches source that
-imported `fmt` under an alias. This is the Go reading of the case Python's
+a package**, the declaring type FQN, the method name and the call's explicit
+type arguments are compared and the receiver is skipped, so a `fmt.Println`
+pattern still matches source that imported `fmt` under an alias while
+`slices.Clip[[]int]` still differs from `slices.Clip[[]string]`. This is the Go reading of the case Python's
 comparator documents for `os.path.join` against a bare `join`.
 
 The receiver has to name a package for this to be sound. Skipping it wherever
@@ -286,10 +295,6 @@ as the same call, and would leave a capture written in receiver position
 unbound while still reporting a match — the placeholder then prints into the
 source. Attribution tells the two apart: a value's identifier carries the
 variable it reads, and a package name carries none, being no value.
-
-Under `TypeMatchingStrict` a pattern naming a variable matches nothing, since
-the variable the pattern declares belongs to the pattern's own package.
-Lenient is the mode for patterns that name values.
 
 `Capture.WithType` declares a type for a capture and feeds it to the scaffold
 preamble. Under either type-matching mode it also holds what the capture

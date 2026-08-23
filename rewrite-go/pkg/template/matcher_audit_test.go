@@ -364,3 +364,23 @@ func (a *allCallFinder) PreVisit(t java.Tree, p any) java.Tree {
 	}
 	return t
 }
+
+func firstStmt(t *testing.T, src string) java.J {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("a.go", src)
+	require.NoError(t, err)
+	for _, s := range cu.Statements {
+		if md, ok := s.Element.(*java.MethodDeclaration); ok && md.Body != nil {
+			return md.Body.Statements[0].Element
+		}
+	}
+	t.Fatal("no body")
+	return nil
+}
+
+func parseCU(t *testing.T, src string) java.J {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("a.go", src)
+	require.NoError(t, err)
+	return cu
+}

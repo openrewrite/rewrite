@@ -53,11 +53,10 @@ func (c *patternComparator) allowsDeclaredType(name string, candidate java.J) bo
 	if !ok || c.mode == TypeMatchingOff || capture.TypeName() == "" {
 		return true
 	}
-	expr, ok := candidate.(java.Expression)
-	if !ok {
-		return false
+	var actual java.JavaType
+	if expr, ok := candidate.(java.Expression); ok {
+		actual = matcher.TypeOfExpression(expr)
 	}
-	actual := matcher.TypeOfExpression(expr)
 	if actual == nil {
 		if c.tracking {
 			c.noteInconclusive()
@@ -111,16 +110,19 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 		return false
 	}
 
-	// A literal means the text it was written as, and an Empty means only
-	// that it is there; neither reads as the fields it holds.
-	switch p := pattern.(type) {
-	case *java.Literal:
-		return p.Source == candidate.(*java.Literal).Source
-	case *java.Empty:
-		return true
-	}
 	if !matchMarkers(pattern.GetMarkers(), candidate.GetMarkers()) {
 		return false
+	}
+
+	// A literal means the text it was written as and the type it was read as,
+	// and an Empty means only that it is there; neither reads as the rest of
+	// the fields it holds.
+	switch p := pattern.(type) {
+	case *java.Literal:
+		q := candidate.(*java.Literal)
+		return p.Source == q.Source && c.matchTypeSlot(p.Type, q.Type)
+	case *java.Empty:
+		return true
 	}
 	if p, ok := pattern.(*java.MethodInvocation); ok {
 		if result, handled := c.matchByDeclaringType(p, candidate.(*java.MethodInvocation)); handled {

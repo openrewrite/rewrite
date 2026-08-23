@@ -82,3 +82,6 @@ func (c *idCollector) PreVisit(t java.Tree, p any) java.Tree {
 	}
 	return t
 }
+
+// TreeOrError exposes the pattern's parse outcome for tests about scaffolding.
+func (p *GoPattern) TreeOrError() (java.J, error) { return p.getTree() }

@@ -72,6 +72,7 @@ var (
 // tree in it, so a pattern parsed from a scaffold can still match source.
 var fileFields = map[string]bool{
 	"SourcePath": true, "CharsetBomMarked": true, "EOF": true,
+	"PackageDecl": true, "Imports": true,
 }
 
 func planFor(t reflect.Type) *typePlan {
@@ -322,7 +323,13 @@ func elemJ(elem fieldStep, v reflect.Value) java.J {
 }
 
 func asJavaType(v reflect.Value) java.JavaType {
-	if v.IsZero() {
+	if v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return nil
 	}
 	t, _ := v.Interface().(java.JavaType)

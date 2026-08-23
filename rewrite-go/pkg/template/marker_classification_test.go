@@ -34,6 +34,11 @@ var ignoredMarkers = map[string]bool{
 	"GroupedImport": true, "ImportBlock": true, "StructTagQuote": true,
 	"ChanDirMarker": true, "ImplicitForClauses": true, "TypeSwitchGuard": true,
 	"GoProject": true, "GoResolutionResult": true,
+	// Recipe bookkeeping the java tree carries: what a run found or changed,
+	// never what the source says.
+	"GenericMarker": true, "RecipesThatMadeChanges": true, "SearchResult": true,
+	"SearchResultMarker": true, "Markup": true, "RecipeThatMadeChanges": true,
+	"ParseExceptionResult": true,
 }
 
 // declaredMarkers reads back every marker the golang tree package declares, so
@@ -41,11 +46,26 @@ var ignoredMarkers = map[string]bool{
 // with it. A marker is a struct with an ID method returning a uuid.UUID.
 func declaredMarkers(t *testing.T) []string {
 	t.Helper()
-	pkgs, err := goparser.ParseDir(gotoken.NewFileSet(), "../tree/golang", nil, 0)
-	require.NoError(t, err)
-
 	structs := map[string]bool{}
 	withID := map[string]bool{}
+	for _, dir := range []string{"../tree/golang", "../tree/java"} {
+		collectMarkers(t, dir, structs, withID)
+	}
+
+	var names []string
+	for name := range structs {
+		if withID[name] {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func collectMarkers(t *testing.T, dir string, structs, withID map[string]bool) {
+	t.Helper()
+	pkgs, err := goparser.ParseDir(gotoken.NewFileSet(), dir, nil, 0)
+	require.NoError(t, err)
 	for _, pkg := range pkgs {
 		for _, file := range pkg.Files {
 			for _, decl := range file.Decls {
@@ -71,15 +91,6 @@ func declaredMarkers(t *testing.T) []string {
 			}
 		}
 	}
-
-	var names []string
-	for name := range structs {
-		if withID[name] {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
-	return names
 }
 
 func TestEveryMarkerIsClassified(t *testing.T) {

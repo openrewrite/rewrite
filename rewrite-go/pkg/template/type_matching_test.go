@@ -159,3 +159,37 @@ func TestCaptureTypeRefusesAnArgumentOfAnotherType(t *testing.T) {
 func TestCaptureTypeIsUnenforcedWhenTypeMatchingIsOff(t *testing.T) {
 	require.NotNil(t, capturePattern(template.TypeMatchingOff).Match(intCall(t), nil))
 }
+
+// A statement carries no type slot, so its capture's declared type is an
+// attribution that is missing, which the mode decides.
+func TestStatementCaptureWithTypeFollowsTheMode(t *testing.T) {
+	cand := firstStmt(t, `package a
+
+func f(c bool) {
+	if c {
+		return
+	}
+}
+`)
+	for _, mode := range allModes {
+		body := template.Stmt("body").WithType("int")
+		pat := template.StatementPattern(fmt.Sprintf("if c {\n%s\n}", body)).
+			Captures(body).Context("var c bool").TypeMatching(mode).Build()
+		require.Equal(t, mode != template.TypeMatchingStrict, pat.Matches(cand, nil), "mode %v", mode)
+	}
+}
+
+func TestAnAttributedMatchIsConclusive(t *testing.T) {
+	pat := template.Expression(`one.WriteString("x")`).
+		Imports("bytes").Context("var one bytes.Buffer").
+		TypeMatching(template.TypeMatchingStrict).Build()
+
+	why := pat.Explain(firstCall(t, `package a
+
+import "bytes"
+
+func f(one bytes.Buffer) { one.WriteString("x") }
+`), nil)
+	require.True(t, why.Matched)
+	require.Zero(t, why.InconclusiveTypes)
+}

@@ -45,10 +45,7 @@ func TestOneReceiverIsNotAnother(t *testing.T) {
 		for _, c := range allCalls(t, bufSrc) {
 			got = append(got, pat.Matches(c, nil))
 		}
-		// Strict also refuses `one`: the pattern declares its own, in its own
-		// package, and a variable is the one it was declared as.
-		want := []bool{mode != template.TypeMatchingStrict, false, false}
-		require.Equal(t, want, got, "mode %v: [one, two, h.B]", mode)
+		require.Equal(t, []bool{true, false, false}, got, "mode %v: [one, two, h.B]", mode)
 	}
 }
 
@@ -87,4 +84,43 @@ func TestFastPathAgreesWithWalkOnCaptures(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestPackageCallComparesItsTypeArguments(t *testing.T) {
+	cand := firstCall(t, `package a
+
+import "slices"
+
+func f(x []string) { _ = slices.Clip[[]string](x) }
+`)
+	for _, mode := range allModes {
+		a := template.Expr("a")
+		other := template.Expression(fmt.Sprintf("slices.Clip[[]int](%s)", a)).
+			Captures(a).Imports("slices").TypeMatching(mode).Build()
+		require.False(t, other.Matches(cand, nil), "mode %v: differing type arguments", mode)
+
+		same := template.Expression(fmt.Sprintf("slices.Clip[[]string](%s)", a)).
+			Captures(a).Imports("slices").TypeMatching(mode).Build()
+		require.True(t, same.Matches(cand, nil), "mode %v: matching type arguments", mode)
+	}
+}
+
+// Two variables can share a name and differ in type, which is the one thing
+// an identifier's own name does not already tell apart.
+func TestSameNameDifferentTypeIsNotTheSameVariable(t *testing.T) {
+	cand := firstCall(t, `package a
+
+import "bytes"
+
+func f() {
+	var v bytes.Reader
+	g(v)
+}
+
+func g(any) {}
+`)
+	pat := template.Expression("g(v)").
+		Imports("bytes").Context("var v bytes.Buffer", "func g(any) {}").
+		TypeMatching(template.TypeMatchingStrict).Build()
+	require.False(t, pat.Matches(cand, nil), "a bytes.Reader named v is not a bytes.Buffer named v")
 }
