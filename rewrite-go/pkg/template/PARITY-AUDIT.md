@@ -194,7 +194,7 @@ once and cached. Each exported field resolves to one rule:
 
 | rule | applies to |
 |---|---|
-| skip | `uuid.UUID`, `java.Space`, and `golang.CompilationUnit`'s `SourcePath` / `CharsetBomMarked` / `EOF` |
+| skip | `uuid.UUID`, `java.Space`, `java.Markers` (compared separately, below), and `golang.CompilationUnit`'s `SourcePath` / `CharsetBomMarked` / `EOF` / `PackageDecl` / `Imports` |
 | type slot | any field whose type implements `java.JavaType` |
 | padded | `RightPadded[T]` / `LeftPadded[T]` / `Container[T]`, recursing on `Element`/`Elements` and ignoring `Before`/`After` |
 | node | anything implementing `java.J`, including the by-value `ForControl` and `ForEachControl` embeds |
@@ -207,9 +207,11 @@ without enumerating them, and `LeftPadded[Space]` degenerates to a skip.
 A recipe's visitor method calls `Match` once per node it has narrowed to, so
 the candidate usually shares the pattern's kind and the reject on concrete
 type never fires. `Identifier`, `MethodInvocation`, `FieldAccess`, `Binary`
-and `Block` therefore read their own fields, which costs 64ns against the
-walk's 200ns on that call, and 279ns against 1239ns once arguments nest —
+and `Block` therefore read their own fields, which costs 50ns against the
+walk's 180ns on that call, and 248ns against 1172ns once arguments nest —
 `BenchmarkMatchSameKindMiss` beside `BenchmarkWalkSameKindMiss` measures both.
+`TestFastPathKindsHaveTheFieldsItReads` names the fields each of the five
+holds, so one added to the model fails a test rather than going uncompared.
 Everything else goes through the walk, so a new node kind needs no work.
 
 The variadic run is the one thing written twice, over a typed list here and a
@@ -280,12 +282,23 @@ never printed, so its own root is unwrapped once when it is parsed.
 literals, so they are `java.Identifier` and the value comparison never sees
 them — `(true)` against `true` is the parentheses half alone.
 
-**What this deliberately stops short of.** `2 + 4` against `6`, `!true`
-against `false`, and `1` against `1.0` — which Go's untyped constants do make
-equal — all want the tree normalised before it is compared. Adding them as
-further pairs in the comparator is the wrong depth: each is a constant-folding
-rule, and the set of them is a pass, not a special case. The comparator is the
-place to read a normalised tree, not the place to normalise one.
+**The line this draws.** Compare values the parser already computed; never
+compute new ones. `sameLiteralValue` reads the `Value` the parser filled, so
+`0x1` against `1` evaluates nothing. Reading through parentheses is a
+projection with no arithmetic, and it is a rule no normalising pass could
+apply anyway, since a capture has to bind the parentheses it found.
+
+`2 + 4` against `6`, `!true` against `false`, and `1` against `1.0` — which
+Go's untyped constants do make equal — sit on the far side of that line,
+needing the program evaluated. Each is a constant-folding rule and the set of
+them is a pass, not a special case.
+
+When that step comes it may not be a folding pass at all: `go/types` has
+already folded every constant expression, and `types.Info.Types[expr].Value`
+holds the result. Recording it on the model and reading it here covers all
+three cases uniformly, for a value slot plus RPC registration and a few lines
+in the comparator — against re-implementing Go's untyped-constant arithmetic
+in an LST visitor that would own its own correctness surface.
 
 ### Type attribution
 

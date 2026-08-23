@@ -101,6 +101,17 @@ func (c *Capture) allowsCount(n int) bool {
 	return n >= c.minCount && (c.maxCount < 0 || n <= c.maxCount)
 }
 
+// anyVariadic reports whether a run has to be looked for at all, which is a
+// property of the pattern rather than of the list being compared.
+func anyVariadic(captures map[string]*Capture) bool {
+	for _, c := range captures {
+		if c.IsVariadic() {
+			return true
+		}
+	}
+	return false
+}
+
 func captureMap(captures []*Capture) map[string]*Capture {
 	m := make(map[string]*Capture, len(captures))
 	for _, c := range captures {

@@ -31,7 +31,7 @@ func (c *patternComparator) fastMatch(pattern, candidate java.J) (bool, bool) {
 		q := candidate.(*java.Identifier)
 		return p.Name == q.Name &&
 			c.matchTypeSlot(p.Type, q.Type) &&
-			c.matchTypeSlot(fieldTypeOf(p), fieldTypeOf(q)) &&
+			c.matchTypeSlot(typeOrNil(p.FieldType), typeOrNil(q.FieldType)) &&
 			c.matchTrees(p.Annotations, q.Annotations), true
 
 	case *java.MethodInvocation:
@@ -40,7 +40,7 @@ func (c *patternComparator) fastMatch(pattern, candidate java.J) (bool, bool) {
 			c.matchContainer(p.TypeParameters, q.TypeParameters) &&
 			c.matchNode(p.Name, q.Name) &&
 			matchList(c, p.Arguments.Elements, q.Arguments.Elements) &&
-			c.matchTypeSlot(methodTypeOf(p), methodTypeOf(q)), true
+			c.matchTypeSlot(typeOrNil(p.MethodType), typeOrNil(q.MethodType)), true
 
 	case *java.FieldAccess:
 		q := candidate.(*java.FieldAccess)
@@ -64,18 +64,15 @@ func (c *patternComparator) fastMatch(pattern, candidate java.J) (bool, bool) {
 
 // A typed nil in a JavaType slot is an absent type, so it reaches the
 // comparison as an untyped one and two of them are equal.
-func fieldTypeOf(i *java.Identifier) java.JavaType {
-	if i.FieldType == nil {
+func typeOrNil[T interface {
+	comparable
+	java.JavaType
+}](t T) java.JavaType {
+	var absent T
+	if t == absent {
 		return nil
 	}
-	return i.FieldType
-}
-
-func methodTypeOf(mi *java.MethodInvocation) java.JavaType {
-	if mi.MethodType == nil {
-		return nil
-	}
-	return mi.MethodType
+	return t
 }
 
 func (c *patternComparator) matchTrees(pattern, candidate []java.Tree) bool {
@@ -149,6 +146,9 @@ func matchElements[T java.J](c *patternComparator, pattern, candidate []java.Rig
 // variadicIndex returns the position of the pattern's variadic capture, -1 when
 // it has none, and ok=false when it has more than one.
 func variadicIndex[T java.J](c *patternComparator, pattern []java.RightPadded[T]) (int, bool) {
+	if !c.variadic {
+		return -1, true
+	}
 	at := -1
 	for i := range pattern {
 		name, ok := placeholderName(java.J(pattern[i].Element))
@@ -164,9 +164,10 @@ func variadicIndex[T java.J](c *patternComparator, pattern []java.RightPadded[T]
 }
 
 func unwrap[T java.J](padded []java.RightPadded[T]) []java.J {
-	values := make([]java.J, len(padded))
-	for i, rp := range padded {
-		values[i] = rp.Element
+	elements := java.UnwrapRightPadded(padded)
+	values := make([]java.J, len(elements))
+	for i, e := range elements {
+		values[i] = e
 	}
 	return values
 }

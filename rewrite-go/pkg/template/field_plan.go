@@ -56,11 +56,8 @@ type paddedStep struct {
 	inner fieldStep
 }
 
-type typePlan struct{ steps []fieldStep }
-
 var (
-	planCache    sync.Map // reflect.Type -> *typePlan
-	paddedCache  sync.Map // reflect.Type -> *paddedStep
+	planCache    sync.Map // reflect.Type -> []fieldStep
 	uuidType     = reflect.TypeOf(uuid.UUID{})
 	spaceType    = reflect.TypeOf(java.Space{})
 	markersType  = reflect.TypeOf(java.Markers{})
@@ -69,9 +66,9 @@ var (
 	javaTypeType = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 )
 
-// fileFields describe the file a compilation unit came from rather than the
-// tree in it — a scaffold names its own package and imports what the pattern
-// needs — so a pattern parsed from one can still match source.
+// fileFields belong to the file a compilation unit was read from rather than
+// to the code in it: where it lives and how it is encoded, and the package
+// clause and imports that a scaffold writes for itself.
 var fileFields = map[reflect.Type]map[string]bool{
 	reflect.TypeOf(golang.CompilationUnit{}): {
 		"SourcePath": true, "CharsetBomMarked": true, "EOF": true,
@@ -79,11 +76,11 @@ var fileFields = map[reflect.Type]map[string]bool{
 	},
 }
 
-func planFor(t reflect.Type) *typePlan {
+func planFor(t reflect.Type) []fieldStep {
 	if cached, ok := planCache.Load(t); ok {
-		return cached.(*typePlan)
+		return cached.([]fieldStep)
 	}
-	plan := &typePlan{}
+	var plan []fieldStep
 	skipped := fileFields[t]
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -95,7 +92,7 @@ func planFor(t reflect.Type) *typePlan {
 			continue
 		}
 		step.index, step.name = i, f.Name
-		plan.steps = append(plan.steps, step)
+		plan = append(plan, step)
 	}
 	planCache.Store(t, plan)
 	return plan
@@ -119,16 +116,11 @@ func paddedFor(t reflect.Type) *paddedStep {
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	if cached, ok := paddedCache.Load(t); ok {
-		return cached.(*paddedStep)
-	}
 	field, ok := t.FieldByName("Elements")
 	if !ok {
 		field, _ = t.FieldByName("Element")
 	}
-	step := &paddedStep{index: field.Index[0], inner: stepFor(field.Type)}
-	paddedCache.Store(t, step)
-	return step
+	return &paddedStep{index: field.Index[0], inner: stepFor(field.Type)}
 }
 
 func ruleFor(t reflect.Type) fieldRule {
@@ -174,7 +166,7 @@ func (c *patternComparator) matchFields(pattern, candidate java.J) bool {
 		return pv.IsNil() && cv.IsNil()
 	}
 	pv, cv = pv.Elem(), cv.Elem()
-	for _, step := range planFor(pv.Type()).steps {
+	for _, step := range planFor(pv.Type()) {
 		if c.tracking {
 			c.path = append(c.path, step.name)
 		}
@@ -300,6 +292,9 @@ func (c *patternComparator) matchSpan(elem fieldStep, pv, cv reflect.Value, from
 }
 
 func (c *patternComparator) reflectVariadicIndex(elem fieldStep, pv reflect.Value) (int, bool) {
+	if !c.variadic {
+		return -1, true
+	}
 	at := -1
 	for i := range pv.Len() {
 		name, ok := placeholderName(elemJ(elem, pv.Index(i)))

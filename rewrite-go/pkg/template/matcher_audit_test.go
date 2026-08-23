@@ -240,31 +240,21 @@ func TestMatcherDistinctness(t *testing.T) {
 	}
 }
 
-// unreachableCollector finds the go.mod and go.sum nodes a pattern can never
-// meet, since a pattern is parsed from Go source and that yields neither.
-type unreachableCollector struct {
-	visitor.GoVisitor
-	found map[string]bool
-}
-
-func (u *unreachableCollector) PreVisit(t java.Tree, p any) java.Tree {
-	switch t.(type) {
-	case *golang.GoMod, *golang.GoModBlock, *golang.GoModDirective,
-		*golang.GoModValue, *golang.GoSum, *golang.GoSumLine:
-		u.found[fmt.Sprintf("%T", t)] = true
-	}
-	return t
-}
-
+// The go.mod and go.sum nodes a pattern can never meet, a pattern being
+// parsed from Go source and that yielding neither.
 func TestMatcherUnreachableKinds(t *testing.T) {
-	u := &unreachableCollector{found: map[string]bool{}}
-	u.Self = u
+	found := map[string]bool{}
 	for _, f := range auditFixtures() {
-		cu, err := parser.NewGoParser().Parse("audit.go", fixtureSource(f))
-		require.NoError(t, err, "fixture %q", f.name)
-		u.Visit(cu, nil)
+		visitor.Walk(parseSource(t, fixtureSource(f)), func(n java.Tree) bool {
+			switch n.(type) {
+			case *golang.GoMod, *golang.GoModBlock, *golang.GoModDirective,
+				*golang.GoModValue, *golang.GoSum, *golang.GoSumLine:
+				found[fmt.Sprintf("%T", n)] = true
+			}
+			return true
+		})
 	}
-	require.Empty(t, u.found, "go.mod and go.sum nodes are not reachable from Go source")
+	require.Empty(t, found, "go.mod and go.sum nodes are not reachable from Go source")
 }
 
 // TestFastPathAgreesWithWalk is what makes the hand-written comparisons in
@@ -325,22 +315,14 @@ func allCalls(t *testing.T, src string) []*java.MethodInvocation {
 
 func callsIn(t testing.TB, tree java.J) []*java.MethodInvocation {
 	t.Helper()
-	found := &callCollector{}
-	found.Self = found
-	found.Visit(tree, nil)
-	return found.calls
-}
-
-type callCollector struct {
-	visitor.GoVisitor
-	calls []*java.MethodInvocation
-}
-
-func (c *callCollector) PreVisit(t java.Tree, p any) java.Tree {
-	if mi, ok := t.(*java.MethodInvocation); ok {
-		c.calls = append(c.calls, mi)
-	}
-	return t
+	var calls []*java.MethodInvocation
+	visitor.Walk(tree, func(n java.Tree) bool {
+		if mi, ok := n.(*java.MethodInvocation); ok {
+			calls = append(calls, mi)
+		}
+		return true
+	})
+	return calls
 }
 
 func firstStmt(t *testing.T, src string) java.J {
@@ -368,4 +350,24 @@ func exprOf(t *testing.T, code string) java.J {
 	cu, err := parser.NewGoParser().Parse("a.go", "package a\n\nvar __c__ = "+code+"\n")
 	require.NoError(t, err)
 	return cu.Statements[0].Element.(*java.VariableDeclarations).Variables[0].Element.Initializer.Element
+}
+
+// A hand-written comparison in fast_path.go reads a fixed set of fields, and
+// the differential test only catches a field a fixture distinguishes. This
+// names the fields each kind holds, so one added to the model fails here
+// rather than going quietly uncompared.
+func TestFastPathKindsHaveTheFieldsItReads(t *testing.T) {
+	for _, want := range []struct {
+		node   java.J
+		fields []string
+	}{
+		{&java.Identifier{}, []string{"Annotations", "Name", "Type", "FieldType"}},
+		{&java.MethodInvocation{}, []string{"Select", "TypeParameters", "Name", "Arguments", "MethodType"}},
+		{&java.FieldAccess{}, []string{"Target", "Name", "Type"}},
+		{&java.Binary{}, []string{"Left", "Operator", "Right", "Type"}},
+		{&java.Block{}, []string{"Statements"}},
+	} {
+		require.Equal(t, want.fields, template.ComparedFields(want.node),
+			"%T gained or lost a field; fast_path.go must read it too", want.node)
+	}
 }

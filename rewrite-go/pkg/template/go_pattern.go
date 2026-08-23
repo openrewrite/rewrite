@@ -35,6 +35,7 @@ type GoPattern struct {
 	context  []string
 	kind     ScaffoldKind
 	mode     TypeMatchingMode
+	variadic bool
 	importerCache
 
 	once     sync.Once
@@ -60,12 +61,15 @@ func (p *GoPattern) Match(candidate java.J, cursor *visitor.Cursor) *MatchResult
 			return result
 		}
 	}
+	// The same rule matchNode applies to every node, narrowed by the pattern
+	// root already being unwrapped, and worth its own place: rejecting here
+	// costs no comparator.
 	if reflect.TypeOf(patternTree) != reflect.TypeOf(candidate) &&
 		reflect.TypeOf(patternTree) != reflect.TypeOf(unparenthesize(candidate)) {
 		return nil
 	}
 
-	cmp := newPatternComparator(p.captures, cursor, p.mode)
+	cmp := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
 	return cmp.match(patternTree, candidate)
 }
 
@@ -148,6 +152,7 @@ func (b *PatternBuilder) Build() *GoPattern {
 		context:       b.context,
 		kind:          b.kind,
 		mode:          b.mode,
+		variadic:      anyVariadic(captureMap(b.captures)),
 		importerCache: importerCache{exportData: b.exportData},
 	}
 }

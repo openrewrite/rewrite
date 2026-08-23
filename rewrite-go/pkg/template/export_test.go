@@ -17,6 +17,8 @@
 package template
 
 import (
+	"reflect"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -29,7 +31,7 @@ func (p *GoPattern) MatchesViaWalk(candidate java.J, cursor *visitor.Cursor) boo
 	if err != nil || tree == nil {
 		return false
 	}
-	cmp := newPatternComparator(p.captures, cursor, p.mode)
+	cmp := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
 	cmp.skipFastPath = true
 	return cmp.match(tree, candidate) != nil
 }
@@ -49,7 +51,7 @@ func (p *GoPattern) MatchViaWalk(candidate java.J, cursor *visitor.Cursor) *Matc
 	if err != nil || tree == nil {
 		return nil
 	}
-	cmp := newPatternComparator(p.captures, cursor, p.mode)
+	cmp := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
 	cmp.skipFastPath = true
 	return cmp.match(tree, candidate)
 }
@@ -65,23 +67,24 @@ func (m *MatchResult) Bindings() map[string]bool {
 
 // NodeIDs lists every node's ID, so a test can show two trees share none.
 func NodeIDs(j java.J) []string {
-	v := &idCollector{}
-	v.Self = v
-	v.Visit(j, nil)
-	return v.ids
-}
-
-type idCollector struct {
-	visitor.GoVisitor
-	ids []string
-}
-
-func (c *idCollector) PreVisit(t java.Tree, p any) java.Tree {
-	if j, ok := t.(java.J); ok {
-		c.ids = append(c.ids, j.GetID().String())
-	}
-	return t
+	var ids []string
+	visitor.Walk(j, func(t java.Tree) bool {
+		if node, ok := t.(java.J); ok {
+			ids = append(ids, node.GetID().String())
+		}
+		return true
+	})
+	return ids
 }
 
 // TreeOrError exposes the pattern's parse outcome for tests about scaffolding.
 func (p *GoPattern) TreeOrError() (java.J, error) { return p.getTree() }
+
+// ComparedFields names the fields the walk reads on a node, in order.
+func ComparedFields(node java.J) []string {
+	var names []string
+	for _, step := range planFor(reflect.TypeOf(node).Elem()) {
+		names = append(names, step.name)
+	}
+	return names
+}

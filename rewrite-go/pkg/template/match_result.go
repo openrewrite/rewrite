@@ -86,6 +86,9 @@ func Elems[T java.J](groups ...[]T) []java.J {
 // at all. It is the binding's shape, not the capture's declaration, that
 // decides how substitution treats a placeholder.
 func (m *MatchResult) listBinding(name string) ([]java.J, bool) {
+	if m == nil {
+		return nil, false
+	}
 	list, ok := m.bindings[name].([]java.J)
 	return list, ok
 }
@@ -100,11 +103,17 @@ func (m *MatchResult) satisfies(c *Capture) bool {
 }
 
 func (m *MatchResult) Has(name string) bool {
+	if m == nil {
+		return false
+	}
 	_, ok := m.bindings[name]
 	return ok
 }
 
 func (m *MatchResult) Get(name string) java.J {
+	if m == nil {
+		return nil
+	}
 	v, ok := m.bindings[name]
 	if !ok {
 		return nil

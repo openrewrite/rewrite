@@ -32,6 +32,7 @@ type patternComparator struct {
 	result   *MatchResult
 	cursor   *visitor.Cursor
 	mode     TypeMatchingMode
+	variadic bool
 
 	// skipFastPath routes every node through the reflective walk.
 	skipFastPath bool
@@ -39,7 +40,6 @@ type patternComparator struct {
 	// tracking records where a missing attribution decided a comparison, for
 	// Explain. The path is kept only while it is on.
 	tracking          bool
-	noted             bool
 	path              []string
 	inconclusive      int
 	firstInconclusive []string
@@ -77,20 +77,29 @@ func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool
 	return result
 }
 
-func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor, mode TypeMatchingMode) *patternComparator {
+func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor, mode TypeMatchingMode, variadic bool) *patternComparator {
 	return &patternComparator{
 		captures: captures,
-		result:   NewMatchResult(),
 		cursor:   cursor,
 		mode:     mode,
+		variadic: variadic,
 	}
+}
+
+// bindings is the result the comparator fills, built at the first binding:
+// most comparisons fail before there is one.
+func (c *patternComparator) bindings() *MatchResult {
+	if c.result == nil {
+		c.result = NewMatchResult()
+	}
+	return c.result
 }
 
 // match compares the pattern against the candidate. Returns the MatchResult
 // on success, or nil on failure.
 func (c *patternComparator) match(pattern, candidate java.J) *MatchResult {
 	if c.matchNode(pattern, candidate) {
-		return c.result
+		return c.bindings()
 	}
 	return nil
 }
@@ -121,17 +130,16 @@ func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 		return false
 	}
 
-	// A literal means what it evaluates to and the type it was read as, and an
-	// Empty means only that it is there; neither reads as the rest of the
-	// fields it holds.
+	// A literal means what it evaluates to and the type it was read as, an
+	// Empty means only that it is there, and a resolved package call means the
+	// symbol it names; none reads as the fields it holds.
 	switch p := pattern.(type) {
 	case *java.Literal:
 		q := candidate.(*java.Literal)
 		return sameLiteralValue(p, q) && c.matchTypeSlot(p.Type, q.Type)
 	case *java.Empty:
 		return true
-	}
-	if p, ok := pattern.(*java.MethodInvocation); ok {
+	case *java.MethodInvocation:
 		if result, handled := c.matchByDeclaringType(p, candidate.(*java.MethodInvocation)); handled {
 			return result
 		}
@@ -155,7 +163,7 @@ func (c *patternComparator) bindCapture(name string, candidate java.J) bool {
 		prev := c.result.Get(name)
 		return structurallyEqual(prev, candidate)
 	}
-	c.result.bind(name, candidate)
+	c.bindings().bind(name, candidate)
 	return true
 }
 
@@ -190,7 +198,7 @@ func (c *patternComparator) bindRun(name string, values []java.J) bool {
 	}
 	prev, bound := c.result.listBinding(name)
 	if !bound {
-		c.result.bindList(name, values)
+		c.bindings().bindList(name, values)
 		return true
 	}
 	if len(prev) != len(values) {
@@ -207,15 +215,9 @@ func (c *patternComparator) bindRun(name string, values []java.J) bool {
 // structurallyEqual checks if two nodes are structurally equivalent
 // (ignoring whitespace). Used for repeated captures.
 func structurallyEqual(a, b java.J) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	// Use a comparator with no captures — if it matches, they're equal.
-	cmp := newPatternComparator(nil, nil, TypeMatchingOff)
-	return cmp.matchNode(a, b)
+	// A comparator with no captures meets no placeholder, so a match is
+	// equality.
+	return newPatternComparator(nil, nil, TypeMatchingOff, false).matchNode(a, b)
 }
 
 // unparenthesize reads through the parentheses around a node.

@@ -251,24 +251,16 @@ func getLeadingPrefix(j java.J) java.Space {
 	return j.GetPrefix()
 }
 
-// placeholdersIn names the captures a template tree actually stands in for.
+// placeholdersIn names the captures a template tree stands in for.
 func placeholdersIn(tree java.J) map[string]bool {
-	v := &placeholderCollector{names: map[string]bool{}}
-	v.Self = v
-	v.Visit(tree, nil)
-	return v.names
-}
-
-type placeholderCollector struct {
-	visitor.GoVisitor
-	names map[string]bool
-}
-
-func (p *placeholderCollector) PreVisit(t java.Tree, _ any) java.Tree {
-	if ident, ok := t.(*java.Identifier); ok {
-		if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
-			p.names[name] = true
+	names := map[string]bool{}
+	visitor.Walk(tree, func(t java.Tree) bool {
+		if ident, ok := t.(*java.Identifier); ok {
+			if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
+				names[name] = true
+			}
 		}
-	}
-	return t
+		return true
+	})
+	return names
 }
